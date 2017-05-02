@@ -40,6 +40,8 @@ func fetchManifest() (Manifest, error) {
 func main() {
 	flag.Parse()
 
+	fmt.Println(DetectOsquery())
+
 	// Analyze the command inputs to determine what the requested actions are
 	// TODO
 
