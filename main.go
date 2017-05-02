@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 )
 
 var (
@@ -39,6 +40,13 @@ func fetchManifest() (Manifest, error) {
 
 func main() {
 	flag.Parse()
+
+	platform, err := DetectPlatform()
+	if err != nil {
+		fmt.Println("Error detecting platform: " + err.Error())
+		os.Exit(1)
+	}
+	fmt.Println("Detected platform: " + platform)
 
 	// Analyze the command inputs to determine what the requested actions are
 	// TODO
