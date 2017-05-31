@@ -1,3 +1,3 @@
-osql - the osquery launcher
+The Kolide Agent
 ===========================
 
