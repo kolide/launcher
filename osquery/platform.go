@@ -15,8 +15,8 @@ const (
 	Linux   OsqueryPlatform = "linux"
 )
 
-// DetectPlatform returns the runtime platform, or an error if it cannot
-// sufficiently detect.
+// DetectPlatform returns the runtime platform, or an error if the runtime
+// platform cannot be sufficiently detected.
 func DetectPlatform() (OsqueryPlatform, error) {
 	switch runtime.GOOS {
 	case "windows":
