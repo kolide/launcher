@@ -1,8 +1,9 @@
 package osquery
 
 import (
-	"errors"
 	"runtime"
+
+	"github.com/pkg/errors"
 )
 
 // OsqueryPlatform is the specific type assigned to osquery platform strings

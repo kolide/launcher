@@ -1,4 +1,6 @@
 agent
+vendor
+build
 
 ## Below from https://github.com/github/gitignore/blob/master/Go.gitignore ##
 
