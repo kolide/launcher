@@ -21,7 +21,7 @@ func LaunchOsqueryInstance(path string) (*OsqueryInstance, error) {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "supplied osquery instance path: %s", path)
 		} else {
-			return nil, errors.Wrapf(err, "could not stat supplied osquery instance patch")
+			return nil, errors.Wrapf(err, "could not stat supplied osquery instance path")
 		}
 	}
 
