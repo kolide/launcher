@@ -29,20 +29,24 @@ func LaunchOsqueryInstance(path string) (*OsqueryInstance, error) {
 
 	// TODO Launch a goroutine to continuously check if osquery has died
 
-	oi := &OsqueryInstance{}
+	o := &OsqueryInstance{}
 	// TODO populate OsqueryInstance with relevant data
 
-	if ok, err := oi.Healthy(); !ok {
-		return nil, errors.Wrap(err, "osquery instance instantly became unhealthy after launch")
+	if ok, err := o.Healthy(); err != nil {
+		return nil, errors.Wrap(err, "an error occured trying to determine osquery's health")
+	} else if !ok {
+		return nil, errors.Wrap(err, "osquery is not healthy")
 	}
 
-	return oi, nil
+	return o, nil
 }
 
 // Kill will terminate all managed osquery processes and release all resources.
 func (o *OsqueryInstance) Kill() error {
-	if ok, err := o.Healthy(); !ok {
-		return errors.Wrap(err, "could not kill osquery because it was not healthy")
+	if ok, err := o.Healthy(); err != nil {
+		return errors.Wrap(err, "an error occured trying to determine osquery's health")
+	} else if !ok {
+		return errors.Wrap(err, "osquery is not healthy")
 	}
 
 	watcher, err := os.FindProcess(o.pid)
@@ -67,8 +71,10 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 // most senior process ID is). If the osquery instance is not healthy, an error
 // will be returned.
 func (o *OsqueryInstance) Pid() (int, error) {
-	if ok, err := o.Healthy(); !ok {
-		return 0, errors.Wrap(err, "could not get the pid because osquery was not healthy")
+	if ok, err := o.Healthy(); err != nil {
+		return 0, errors.Wrap(err, "an error occured trying to determine osquery's health")
+	} else if !ok {
+		return 0, errors.Wrap(err, "osquery is not healthy")
 	}
 
 	return o.pid, nil
