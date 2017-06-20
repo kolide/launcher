@@ -7,7 +7,7 @@ build: agent extproxy
 	mkdir -p build
 
 extproxy: .pre-build
-	go build -o build/extproxy ./cmd/extproxy/
+	go build -o build/extproxy.ext ./cmd/extproxy/
 
 agent: .pre-build
 	go build -o build/agent ./cmd/agent/

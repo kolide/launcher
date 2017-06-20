@@ -1,8 +1,12 @@
 package osquery
 
 import (
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/kolide/osquery-go"
@@ -12,14 +16,14 @@ import (
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	pid                 int
-	extensionSocketPath string
+	cmd *exec.Cmd
 }
 
 // LaunchOsqueryInstance will launch an osqueryd binary. The path parameter
-// should be a valid path to an osqueryd binary. If any errors occur during
-// process initialization, an error will be returned.
-func LaunchOsqueryInstance(path string) (*OsqueryInstance, error) {
+// should be a valid path to an osqueryd binary. The root parameter should be a
+// valid directory where the osquery database and pidfile can be stored. If any
+// errors occur during process initialization, an error will be returned.
+func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 	// Ensure that the supplied path exists
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -29,10 +33,41 @@ func LaunchOsqueryInstance(path string) (*OsqueryInstance, error) {
 		}
 	}
 
-	// TODO Launch the osqueryd process
+	// Launch the osqueryd process
+	pidfilePath := filepath.Join(root, "osquery.pid")
+	databasePath := filepath.Join(root, "osquery.db")
+	extensionSocketPath := filepath.Join(root, "osquery.sock")
 
-	// TODO Get the socket path from the extension proxy
-	extensionSocketPath := "/not/quite/sure/yet"
+	// TODO write the autoloader
+	extensionAutoloadPath := filepath.Join(root, "osquery.autoload")
+	extensionPath := "/Users/marpaia/go/src/github.com/kolide/agent/build/extproxy.ext"
+	if err := ioutil.WriteFile(extensionAutoloadPath, []byte(extensionPath), 0644); err != nil {
+		return nil, errors.Wrap(err, "could not write osquery extension autoload file")
+	}
+
+	flagfileContent := fmt.Sprintf(`
+--pidfile=%s
+--database_path=%s
+--extensions_socket=%s
+--extensions_autoload=%s
+--config_refresh=10
+--config_plugin=example_config
+--logger_plugin=example_logger
+`, pidfilePath, databasePath, extensionSocketPath, extensionAutoloadPath)
+	flagfilePath := filepath.Join(root, "osquery.flags")
+
+	if err := ioutil.WriteFile(flagfilePath, []byte(flagfileContent), 0644); err != nil {
+		return nil, errors.Wrap(err, "could not write osquery flagfile")
+	}
+
+	cmd := exec.Command(path, fmt.Sprintf("--flagfile=%s", flagfilePath))
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return nil, errors.Wrap(err, "could not start the osqueryd command")
+	}
+
+	time.Sleep(3 * time.Second)
 
 	// Create the extension server
 	extensionServer, err := osquery.NewExtensionManagerServer("kolide_agent", extensionSocketPath, 1*time.Second)
@@ -55,7 +90,7 @@ func LaunchOsqueryInstance(path string) (*OsqueryInstance, error) {
 
 	// Create the reference instance for the running osquery instance
 	o := &OsqueryInstance{
-		extensionSocketPath: extensionSocketPath,
+		cmd: cmd,
 	}
 
 	// Ensure that the recently created instance is healthy
@@ -76,12 +111,11 @@ func (o *OsqueryInstance) Kill() error {
 		return errors.Wrap(err, "osquery is not healthy")
 	}
 
-	watcher, err := os.FindProcess(o.pid)
-	if err != nil {
+	if err := o.cmd.Process.Kill(); err != nil {
 		return errors.Wrap(err, "could not find the watcher process")
 	}
 
-	return watcher.Kill()
+	return nil
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -90,19 +124,5 @@ func (o *OsqueryInstance) Kill() error {
 func (o *OsqueryInstance) Healthy() (bool, error) {
 	// TODO Query the osquery_info table and update the OsqueryInstance data
 	// structure if any information has changed
-
-	return false, errors.New("not implemented")
-}
-
-// Pid returns the process ID of the osqueryd watcher process (or whatever the
-// most senior process ID is). If the osquery instance is not healthy, an error
-// will be returned.
-func (o *OsqueryInstance) Pid() (int, error) {
-	if ok, err := o.Healthy(); err != nil {
-		return 0, errors.Wrap(err, "an error occured trying to determine osquery's health")
-	} else if !ok {
-		return 0, errors.Wrap(err, "osquery is not healthy")
-	}
-
-	return o.pid, nil
+	return true, nil
 }

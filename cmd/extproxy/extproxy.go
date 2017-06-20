@@ -3,16 +3,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"time"
 )
 
 func main() {
-	socketPath := flag.String("socket", "", "path to osqueryd extension socket")
+	flag.String("socket", "", "")
 	flag.Int("timeout", 0, "")
 	flag.Int("interval", 0, "")
+	flag.Bool("verbose", false, "")
 	flag.Parse()
 
-	fmt.Printf("{\"socketPath\": \"%s\"}\n", *socketPath)
+	fmt.Printf("%+v", os.Args)
 
 	for {
 		time.Sleep(time.Hour)
