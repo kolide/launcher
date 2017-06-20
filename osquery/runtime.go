@@ -21,12 +21,6 @@ type OsqueryInstance struct {
 	cmd *exec.Cmd
 }
 
-var (
-	// TODO update this with a more realistic path when we understand the
-	// directory structure of the package.
-	extensionPath = "/Users/marpaia/go/src/github.com/kolide/agent/build/extproxy.ext"
-)
-
 // LaunchOsqueryInstance will launch an osqueryd binary. The path parameter
 // should be a valid path to an osqueryd binary. The root parameter should be a
 // valid directory where the osquery database and pidfile can be stored. If any
@@ -45,6 +39,9 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 	pidfilePath := filepath.Join(root, "osquery.pid")
 	databasePath := filepath.Join(root, "osquery.db")
 	extensionSocketPath := filepath.Join(root, "osquery.sock")
+
+	// Determine the path to the extension
+	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "extproxy.ext")
 
 	// Write the autoload file
 	extensionAutoloadPath := filepath.Join(root, "osquery.autoload")
