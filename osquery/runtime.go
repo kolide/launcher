@@ -18,7 +18,10 @@ import (
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	cmd *exec.Cmd
+	cmd        *exec.Cmd
+	errs       chan error
+	binaryPath string
+	workingDir string
 }
 
 // LaunchOsqueryInstance will launch an osqueryd binary. The path parameter
@@ -63,12 +66,33 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 		return nil, errors.Wrap(err, "could not write osquery flagfile")
 	}
 
+	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(path, fmt.Sprintf("--flagfile=%s", flagfilePath))
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
+
+	errs := make(chan error)
+
+	o := &OsqueryInstance{
+		cmd:        cmd,
+		errs:       errs,
+		binaryPath: path,
+		workingDir: root,
+	}
+
+	if err := o.cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start the osqueryd command")
 	}
+
+	// Launch a long running goroutine to which will keep tabs on the health of
+	// the osqueryd process
+	go func() {
+		if err := o.cmd.Wait(); err != nil {
+			o.errs <- errors.Wrap(err, "osqueryd processes died due to an error")
+		} else {
+			o.errs <- errors.New("osqueryd processes exited successfully")
+		}
+	}()
 
 	// Briefly sleep so that osqueryd has time to initialize before starting the
 	// extension manager server
@@ -87,15 +111,11 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 	// Launch the server asynchronously
 	go func() {
 		if err := extensionServer.Start(); err != nil {
-			log.Println(errors.Wrap(err, "starting/running the extension server"))
-			// TODO Relaunch extension server / try to recover
+			o.errs <- errors.Wrap(err, "the extension server died due to an error")
+		} else {
+			o.errs <- errors.New("the extension server exited prematurely")
 		}
 	}()
-
-	// Create the reference instance for the running osquery instance
-	o := &OsqueryInstance{
-		cmd: cmd,
-	}
 
 	// Ensure that the recently created instance is healthy
 	if ok, err := o.Healthy(); err != nil {
@@ -104,7 +124,24 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 		return nil, errors.Wrap(err, "osquery is not healthy")
 	}
 
+	go func() {
+		var executionError error
+		select {
+		case o.errs <- executionError:
+			if recoveryError := o.Recover(executionError); recoveryError != nil {
+				log.Fatalln("Could not recover the osqueryd process: %s", recoveryError)
+			} else {
+				log.Println("Received an execution error, but successfully recovered from it: %s", executionError)
+			}
+		}
+	}()
+
 	return o, nil
+}
+
+func (o *OsqueryInstance) Recover(executionError error) error {
+	// TODO recover the instance
+	return nil
 }
 
 // Kill will terminate all managed osquery processes and release all resources.
@@ -126,7 +163,6 @@ func (o *OsqueryInstance) Kill() error {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy.
 func (o *OsqueryInstance) Healthy() (bool, error) {
-	// TODO Query the osquery_info table and update the OsqueryInstance data
-	// structure if any information has changed
+	// TODO determine whether or not the instance is healthy
 	return true, nil
 }
