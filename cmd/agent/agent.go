@@ -23,9 +23,11 @@ func main() {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		fmt.Printf("Sleeping for %d more seconds...\n", 10-i)
+		if i%5 == 0 {
+			fmt.Printf("Sleeping for %d more seconds...\n", 30-i)
+		}
 	}
 
 	if err := osq.Kill(); err != nil {

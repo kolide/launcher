@@ -2,7 +2,6 @@
 
 
 [[projects]]
-  branch = "master"
   name = "git.apache.org/thrift.git"
   packages = ["lib/go/thrift"]
   revision = "b8ee72de5bf9318d50846852082325d0f932682b"
@@ -11,13 +10,13 @@
   branch = "master"
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery"]
-  revision = "dfaecbc82a9eb76f7b0ecf44249a476a3b6cb37a"
+  revision = "aa3a62b729047baa4a62e445f20378bc8adf0e4d"
 
 [[projects]]
   branch = "master"
   name = "github.com/pkg/errors"
   packages = ["."]
-  revision = "ff09b135c25aae272398c51a07235b90a75aa4f0"
+  revision = "c605e284fe17294bda444b34710735b29d1a9d90"
 
 [solve-meta]
   analyzer-name = "dep"

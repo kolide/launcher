@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 )
 
@@ -18,6 +20,12 @@ import (
 type OsqueryInstance struct {
 	cmd *exec.Cmd
 }
+
+var (
+	// TODO update this with a more realistic path when we understand the
+	// directory structure of the package.
+	extensionPath = "/Users/marpaia/go/src/github.com/kolide/agent/build/extproxy.ext"
+)
 
 // LaunchOsqueryInstance will launch an osqueryd binary. The path parameter
 // should be a valid path to an osqueryd binary. The root parameter should be a
@@ -38,9 +46,8 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 	databasePath := filepath.Join(root, "osquery.db")
 	extensionSocketPath := filepath.Join(root, "osquery.sock")
 
-	// TODO write the autoloader
+	// Write the autoload file
 	extensionAutoloadPath := filepath.Join(root, "osquery.autoload")
-	extensionPath := "/Users/marpaia/go/src/github.com/kolide/agent/build/extproxy.ext"
 	if err := ioutil.WriteFile(extensionAutoloadPath, []byte(extensionPath), 0644); err != nil {
 		return nil, errors.Wrap(err, "could not write osquery extension autoload file")
 	}
@@ -51,11 +58,10 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 --extensions_socket=%s
 --extensions_autoload=%s
 --config_refresh=10
---config_plugin=example_config
---logger_plugin=example_logger
+--config_plugin=kolide_grpc
+--logger_plugin=kolide_grpc
 `, pidfilePath, databasePath, extensionSocketPath, extensionAutoloadPath)
 	flagfilePath := filepath.Join(root, "osquery.flags")
-
 	if err := ioutil.WriteFile(flagfilePath, []byte(flagfileContent), 0644); err != nil {
 		return nil, errors.Wrap(err, "could not write osquery flagfile")
 	}
@@ -67,18 +73,19 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 		return nil, errors.Wrap(err, "could not start the osqueryd command")
 	}
 
-	time.Sleep(3 * time.Second)
+	// Briefly sleep so that osqueryd has time to initialize before starting the
+	// extension manager server
+	time.Sleep(2 * time.Second)
 
 	// Create the extension server
-	extensionServer, err := osquery.NewExtensionManagerServer("kolide_agent", extensionSocketPath, 1*time.Second)
+	extensionServer, err := osquery.NewExtensionManagerServer("kolide", extensionSocketPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", extensionSocketPath)
 	}
 
 	// Register all custom osquery plugins
-	extensionServer.RegisterPlugin(osquery.NewLoggerPlugin(&ExampleLogger{}))
-	extensionServer.RegisterPlugin(osquery.NewConfigPlugin(&ExampleConfig{}))
-	extensionServer.RegisterPlugin(osquery.NewTablePlugin(&ExampleTable{}))
+	extensionServer.RegisterPlugin(config.NewPlugin("kolide_grpc", GenerateConfigs))
+	extensionServer.RegisterPlugin(logger.NewPlugin("kolide_grpc", LogString))
 
 	// Launch the server asynchronously
 	go func() {
