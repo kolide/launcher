@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	binPath          = "/usr/local/kolide/bin/osqueryd"
-	workingDirectory = "/var/kolide"
+	binPath = "/usr/local/kolide/bin/osqueryd"
 )
 
 func main() {
@@ -18,6 +17,11 @@ func main() {
 		log.Fatalf("error detecting platform: %s\n", err)
 	} else if platform != "darwin" {
 		log.Fatalln("This tool only works on macOS right now")
+	}
+
+	workingDirectory := os.Getenv("KOLIDE_LAUNCHER_WORKDIR")
+	if workingDirectory == "" {
+		workingDirectory = os.TempDir()
 	}
 
 	if _, err := osquery.LaunchOsqueryInstance(binPath, workingDirectory); err != nil {

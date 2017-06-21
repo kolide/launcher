@@ -4,6 +4,11 @@
     <dict>
         <key>Label</key>
         <string>com.kolide.launcher</string>
+        <key>EnvironmentVariables</key>
+        <dict>
+            <key>KOLIDE_LAUNCHER_WORKDIR</key>
+            <string>/var/kolide</string>
+        </dict>
         <key>RunAtLoad</key>
         <true/>
         <key>KeepAlive</key>
