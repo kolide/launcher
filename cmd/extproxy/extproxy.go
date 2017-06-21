@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
+	"os/signal"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 
 	fmt.Printf("%+v", os.Args)
 
-	for {
-		time.Sleep(time.Hour)
-	}
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+	<-sig
 }
