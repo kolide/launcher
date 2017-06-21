@@ -146,9 +146,20 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	return o, nil
 }
 
+// Recover attempts to launch a new osquery instance if the running instance has
+// failed for some reason. executionError is the error that occurred to the
+// instance of osqueryd that has caused it to stop running.
 func (o *OsqueryInstance) Recover(executionError error) error {
-	// TODO recover the instance
-	log.Printf("Recovery error: %s", executionError)
+	if !o.cmd.ProcessState.Exited() {
+		if err := o.cmd.Process.Kill(); err != nil {
+			return errors.Wrap(err, "could not kill the osquery process during recovery")
+		}
+	}
+
+	o, err := LaunchOsqueryInstance(o.binaryPath, o.rootDir)
+	if err != nil {
+		return errors.Wrap(err, "could not launch new osquery instance")
+	}
 	return nil
 }
 
