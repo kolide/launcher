@@ -38,15 +38,8 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 		}
 	}
 
-	// Launch the osqueryd process
-	pidfilePath := filepath.Join(rootDir, "osquery.pid")
-	databasePath := filepath.Join(rootDir, "osquery.db")
-	extensionSocketPath := filepath.Join(rootDir, "osquery.sock")
-
 	// Determine the path to the extension
-	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "extproxy.ext")
-
-	// Ensure that the extension path exists
+	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "osquery-extension.ext")
 	if _, err := os.Stat(extensionPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
@@ -62,6 +55,10 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	}
 
 	// Create the reference instance for the running osquery instance
+	pidfilePath := filepath.Join(rootDir, "osquery.pid")
+	databasePath := filepath.Join(rootDir, "osquery.db")
+	extensionSocketPath := filepath.Join(rootDir, "osquery.sock")
+
 	cmd := exec.Command(
 		binaryPath,
 		fmt.Sprintf("--pidfile=%s", pidfilePath),
@@ -127,6 +124,8 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 		return nil, errors.Wrap(err, "osquery is not healthy")
 	}
 
+	// Launch a long-running recovery goroutine which can handle various errors
+	// that can occur
 	go func() {
 		select {
 		case executionError := <-o.errs:

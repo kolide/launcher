@@ -1,13 +1,13 @@
 all: build
 
 .PHONY: build
-build: agent extproxy
+build: agent extension
 
 .pre-build:
 	mkdir -p build
 
-extproxy: .pre-build
-	go build -o build/extproxy.ext ./cmd/extproxy/
+extension: .pre-build
+	go build -o build/osquery-extension.ext ./cmd/osquery-extension/
 
 agent: .pre-build
 	go build -o build/agent ./cmd/agent/
