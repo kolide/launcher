@@ -84,7 +84,7 @@ func createMacPackage(pemKey []byte, id int, p packageParams) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := ioutil.WriteFile(secretPath, []byte(token), fileMode); err != nil {
+	if err := ioutil.WriteFile(secretPath, []byte(token), 0400); err != nil {
 		log.Fatal(err)
 	}
 
