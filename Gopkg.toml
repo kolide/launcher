@@ -1,3 +1,7 @@
 [[constraint]]
   branch = "master"
+  name = "github.com/kolide/osquery-go"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/pkg/errors"

@@ -2,14 +2,25 @@
 
 
 [[projects]]
+  name = "git.apache.org/thrift.git"
+  packages = ["lib/go/thrift"]
+  revision = "b8ee72de5bf9318d50846852082325d0f932682b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/kolide/osquery-go"
+  packages = [".","gen/osquery","plugin/config","plugin/logger"]
+  revision = "b2f68eb86431f2fa9b2f5bc77599fa436935b45b"
+
+[[projects]]
   branch = "master"
   name = "github.com/pkg/errors"
   packages = ["."]
-  revision = "ff09b135c25aae272398c51a07235b90a75aa4f0"
+  revision = "c605e284fe17294bda444b34710735b29d1a9d90"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a5785f91e34c6888b78d77a1937bcd00ba051ca6e3927b0b9a119bcbf5a1a325"
+  inputs-digest = "3869c50c7b33129c42b869eeb9e84279e585b91c6a83421bf9f673711153f0c1"
   solver-name = "gps-cdcl"
   solver-version = 1
