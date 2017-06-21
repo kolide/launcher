@@ -19,11 +19,11 @@ func GenerateConfigs(ctx context.Context) (map[string]string, error) {
       "query": "select * from time;",
       "interval": 2
     },
-		"osquery_info": {
-			"query": "select * from osquery_info;",
-			"interval": 2,
-			"snapshot": true
-		}
+    "osquery_info": {
+      "query": "select * from osquery_info;",
+      "interval": 2,
+      "snapshot": true
+    }
   }
 }
 `,
