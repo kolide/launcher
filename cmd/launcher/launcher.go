@@ -8,6 +8,11 @@ import (
 	"github.com/kolide/launcher/osquery"
 )
 
+const (
+	binPath          = "/usr/local/kolide/bin/osqueryd"
+	workingDirectory = "/var/kolide"
+)
+
 func main() {
 	if platform, err := osquery.DetectPlatform(); err != nil {
 		log.Fatalf("error detecting platform: %s\n", err)
@@ -15,7 +20,7 @@ func main() {
 		log.Fatalln("This tool only works on macOS right now")
 	}
 
-	if _, err := osquery.LaunchOsqueryInstance("/usr/local/kolide/bin/osqueryd", os.TempDir()); err != nil {
+	if _, err := osquery.LaunchOsqueryInstance(binPath, workingDirectory); err != nil {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
 
