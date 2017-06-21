@@ -18,10 +18,12 @@ import (
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	cmd        *exec.Cmd
-	errs       chan error
-	binaryPath string
-	rootDir    string
+	cmd                    *exec.Cmd
+	errs                   chan error
+	binaryPath             string
+	rootDir                string
+	extensionSocketPath    string
+	extensionManagerServer *osquery.ExtensionManagerServer
 }
 
 // LaunchOsqueryInstance will launch an osqueryd binary. The binaryPath parameter
@@ -74,10 +76,11 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	cmd.Stderr = os.Stderr
 
 	o := &OsqueryInstance{
-		cmd:        cmd,
-		errs:       make(chan error),
-		binaryPath: binaryPath,
-		rootDir:    rootDir,
+		cmd:                 cmd,
+		errs:                make(chan error),
+		binaryPath:          binaryPath,
+		rootDir:             rootDir,
+		extensionSocketPath: extensionSocketPath,
 	}
 
 	if err := o.cmd.Start(); err != nil {
@@ -103,6 +106,7 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", extensionSocketPath)
 	}
+	o.extensionManagerServer = extensionServer
 
 	// Register all custom osquery plugins
 	extensionServer.RegisterPlugin(
@@ -167,6 +171,9 @@ func (o *OsqueryInstance) Kill() error {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy.
 func (o *OsqueryInstance) Healthy() (bool, error) {
-	// TODO determine whether or not the instance is healthy
-	return true, nil
+	status, err := o.extensionManagerServer.Ping()
+	if err != nil {
+		return false, errors.Wrap(err, "could not ping osquery through extension interface")
+	}
+	return status.Code == 0, nil
 }
