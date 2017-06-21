@@ -1,3 +1,3 @@
-The Kolide Agent
-===========================
+The Osquery Launcher
+====================
 

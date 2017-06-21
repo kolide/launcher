@@ -142,6 +142,7 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 
 func (o *OsqueryInstance) Recover(executionError error) error {
 	// TODO recover the instance
+	log.Printf("Recovery error: %s", executionError)
 	return nil
 }
 

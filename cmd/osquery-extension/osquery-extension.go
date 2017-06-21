@@ -17,6 +17,6 @@ func main() {
 	fmt.Printf("%+v", os.Args)
 
 	sig := make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt, os.Kill)
+	signal.Notify(sig, os.Interrupt)
 	<-sig
 }

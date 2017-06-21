@@ -1,7 +1,7 @@
 all: build
 
 .PHONY: build
-build: agent extension
+build: launcher extension
 
 .pre-build:
 	mkdir -p build
@@ -9,8 +9,8 @@ build: agent extension
 extension: .pre-build
 	go build -o build/osquery-extension.ext ./cmd/osquery-extension/
 
-agent: .pre-build
-	go build -o build/agent ./cmd/agent/
+launcher: .pre-build
+	go build -o build/launcher ./cmd/launcher/
 
 deps:
 	go get -u github.com/golang/dep/cmd/dep
