@@ -21,63 +21,66 @@ type OsqueryInstance struct {
 	cmd        *exec.Cmd
 	errs       chan error
 	binaryPath string
-	workingDir string
+	rootDir    string
 }
 
-// LaunchOsqueryInstance will launch an osqueryd binary. The path parameter
-// should be a valid path to an osqueryd binary. The root parameter should be a
+// LaunchOsqueryInstance will launch an osqueryd binary. The binaryPath parameter
+// should be a valid path to an osqueryd binary. The rootDir parameter should be a
 // valid directory where the osquery database and pidfile can be stored. If any
 // errors occur during process initialization, an error will be returned.
-func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
+func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance, error) {
 	// Ensure that the supplied path exists
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(binaryPath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, errors.Wrapf(err, "supplied osquery instance path: %s", path)
+			return nil, errors.Wrapf(err, "osquery instance path does not exist: %s", binaryPath)
 		} else {
 			return nil, errors.Wrapf(err, "could not stat supplied osquery instance path")
 		}
 	}
 
 	// Launch the osqueryd process
-	pidfilePath := filepath.Join(root, "osquery.pid")
-	databasePath := filepath.Join(root, "osquery.db")
-	extensionSocketPath := filepath.Join(root, "osquery.sock")
+	pidfilePath := filepath.Join(rootDir, "osquery.pid")
+	databasePath := filepath.Join(rootDir, "osquery.db")
+	extensionSocketPath := filepath.Join(rootDir, "osquery.sock")
 
 	// Determine the path to the extension
 	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "extproxy.ext")
 
+	// Ensure that the extension path exists
+	if _, err := os.Stat(extensionPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
+		} else {
+			return nil, errors.Wrapf(err, "could not stat extension path")
+		}
+	}
+
 	// Write the autoload file
-	extensionAutoloadPath := filepath.Join(root, "osquery.autoload")
+	extensionAutoloadPath := filepath.Join(rootDir, "osquery.autoload")
 	if err := ioutil.WriteFile(extensionAutoloadPath, []byte(extensionPath), 0644); err != nil {
 		return nil, errors.Wrap(err, "could not write osquery extension autoload file")
 	}
 
-	flagfileContent := fmt.Sprintf(`
---pidfile=%s
---database_path=%s
---extensions_socket=%s
---extensions_autoload=%s
---config_refresh=10
---config_plugin=kolide_grpc
---logger_plugin=kolide_grpc
-`, pidfilePath, databasePath, extensionSocketPath, extensionAutoloadPath)
-	flagfilePath := filepath.Join(root, "osquery.flags")
-	if err := ioutil.WriteFile(flagfilePath, []byte(flagfileContent), 0644); err != nil {
-		return nil, errors.Wrap(err, "could not write osquery flagfile")
-	}
-
 	// Create the reference instance for the running osquery instance
-	cmd := exec.Command(path, fmt.Sprintf("--flagfile=%s", flagfilePath))
+	cmd := exec.Command(
+		binaryPath,
+		fmt.Sprintf("--pidfile=%s", pidfilePath),
+		fmt.Sprintf("--database_path=%s", databasePath),
+		fmt.Sprintf("--extensions_socket=%s", extensionSocketPath),
+		fmt.Sprintf("--extensions_autoload=%s", extensionAutoloadPath),
+		"--pack_delimiter=:",
+		"--config_refresh=10",
+		"--config_plugin=kolide_grpc",
+		"--logger_plugin=kolide_grpc",
+	)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 
-	errs := make(chan error)
-
 	o := &OsqueryInstance{
 		cmd:        cmd,
-		errs:       errs,
-		binaryPath: path,
-		workingDir: root,
+		errs:       make(chan error),
+		binaryPath: binaryPath,
+		rootDir:    rootDir,
 	}
 
 	if err := o.cmd.Start(); err != nil {
@@ -125,9 +128,8 @@ func LaunchOsqueryInstance(path string, root string) (*OsqueryInstance, error) {
 	}
 
 	go func() {
-		var executionError error
 		select {
-		case o.errs <- executionError:
+		case executionError := <-o.errs:
 			if recoveryError := o.Recover(executionError); recoveryError != nil {
 				log.Fatalln("Could not recover the osqueryd process: %s", recoveryError)
 			} else {

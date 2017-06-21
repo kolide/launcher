@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -23,12 +22,8 @@ func main() {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
 
-	for i := 0; i < 30; i++ {
-		time.Sleep(time.Second)
-		if i%5 == 0 {
-			fmt.Printf("Sleeping for %d more seconds...\n", 30-i)
-		}
-	}
+	time.Sleep(10 * time.Second)
+	log.Println("Quitting!")
 
 	if err := osq.Kill(); err != nil {
 		log.Fatalf("Unable to kill osqueryd: %s", err)
