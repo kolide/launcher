@@ -15,9 +15,9 @@
             <string>/usr/local/kolide/bin/launcher</string>
         </array>
         <key>StandardErrorPath</key>
-        <string>/var/log/kolide/osquery-stderr.log</string>
+        <string>/var/log/kolide/launcher-stderr.log</string>
         <key>StandardOutPath</key>
-        <string>/var/log/kolide/osquery-stdout.log</string>
+        <string>/var/log/kolide/launcher-stdout.log</string>
     </dict>
 </plist>
 
