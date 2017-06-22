@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if platform, err := osquery.DetectPlatform(); err != nil {
-		log.Fatalln("error detecting platform:", err)
+		log.Fatalf("error detecting platform: %s\n", err)
 	} else if platform != "darwin" {
 		log.Fatalln("This tool only works on macOS right now")
 	}

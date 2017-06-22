@@ -130,9 +130,9 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 		select {
 		case executionError := <-o.errs:
 			if recoveryError := o.Recover(executionError); recoveryError != nil {
-				log.Fatalln("Could not recover the osqueryd process: %s", recoveryError)
+				log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
 			} else {
-				log.Println("Received an execution error, but successfully recovered from it: %s", executionError)
+				log.Printf("Received an execution error, but successfully recovered from it: %s\n", executionError)
 			}
 		}
 	}()
