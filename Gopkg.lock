@@ -10,7 +10,7 @@
   branch = "master"
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","plugin/config","plugin/logger"]
-  revision = "b2f68eb86431f2fa9b2f5bc77599fa436935b45b"
+  revision = "2ceb9a30db9b7b939c66f38da75d18e865b85e2d"
 
 [[projects]]
   branch = "master"
