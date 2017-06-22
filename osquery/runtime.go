@@ -105,8 +105,10 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	}
 
 	// Register all custom osquery plugins
-	extensionServer.RegisterPlugin(config.NewPlugin("kolide_grpc", GenerateConfigs))
-	extensionServer.RegisterPlugin(logger.NewPlugin("kolide_grpc", LogString))
+	extensionServer.RegisterPlugin(
+		config.NewPlugin("kolide_grpc", GenerateConfigs),
+		logger.NewPlugin("kolide_grpc", LogString),
+	)
 
 	// Launch the server asynchronously
 	go func() {
