@@ -18,6 +18,14 @@ import (
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
+	*osqueryInstanceFields
+}
+
+// osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
+// in the event that the underlying process instance changes, the fields can be
+// updated wholesale without updating the actual OsqueryInstance pointer which
+// may be held by the original caller.
+type osqueryInstanceFields struct {
 	cmd                    *exec.Cmd
 	errs                   chan error
 	binaryPath             string
@@ -76,11 +84,13 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	cmd.Stderr = os.Stderr
 
 	o := &OsqueryInstance{
-		cmd:                 cmd,
-		errs:                make(chan error),
-		binaryPath:          binaryPath,
-		rootDir:             rootDir,
-		extensionSocketPath: extensionSocketPath,
+		&osqueryInstanceFields{
+			cmd:                 cmd,
+			errs:                make(chan error),
+			binaryPath:          binaryPath,
+			rootDir:             rootDir,
+			extensionSocketPath: extensionSocketPath,
+		},
 	}
 
 	if err := o.cmd.Start(); err != nil {
@@ -156,10 +166,13 @@ func (o *OsqueryInstance) Recover(executionError error) error {
 		}
 	}
 
-	o, err := LaunchOsqueryInstance(o.binaryPath, o.rootDir)
+	newInstance, err := LaunchOsqueryInstance(o.binaryPath, o.rootDir)
 	if err != nil {
 		return errors.Wrap(err, "could not launch new osquery instance")
 	}
+
+	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
+
 	return nil
 }
 
