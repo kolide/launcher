@@ -4,4 +4,12 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/kolide/updater"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/pkg/errors"
+
+[[override]]
+  revision = "b8ee72de5bf9318d50846852082325d0f932682b"
+  name = "git.apache.org/thrift.git"
