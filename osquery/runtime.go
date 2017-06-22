@@ -18,10 +18,20 @@ import (
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	cmd        *exec.Cmd
-	errs       chan error
-	binaryPath string
-	rootDir    string
+	*osqueryInstanceFields
+}
+
+// osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
+// in the event that the underlying process instance changes, the fields can be
+// updated wholesale without updating the actual OsqueryInstance pointer which
+// may be held by the original caller.
+type osqueryInstanceFields struct {
+	cmd                    *exec.Cmd
+	errs                   chan error
+	binaryPath             string
+	rootDir                string
+	extensionSocketPath    string
+	extensionManagerServer *osquery.ExtensionManagerServer
 }
 
 // LaunchOsqueryInstance will launch an osqueryd binary. The binaryPath parameter
@@ -74,10 +84,13 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	cmd.Stderr = os.Stderr
 
 	o := &OsqueryInstance{
-		cmd:        cmd,
-		errs:       make(chan error),
-		binaryPath: binaryPath,
-		rootDir:    rootDir,
+		&osqueryInstanceFields{
+			cmd:                 cmd,
+			errs:                make(chan error),
+			binaryPath:          binaryPath,
+			rootDir:             rootDir,
+			extensionSocketPath: extensionSocketPath,
+		},
 	}
 
 	if err := o.cmd.Start(); err != nil {
@@ -103,6 +116,7 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", extensionSocketPath)
 	}
+	o.extensionManagerServer = extensionServer
 
 	// Register all custom osquery plugins
 	extensionServer.RegisterPlugin(
@@ -142,9 +156,23 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	return o, nil
 }
 
+// Recover attempts to launch a new osquery instance if the running instance has
+// failed for some reason. executionError is the error that occurred to the
+// instance of osqueryd that has caused it to stop running.
 func (o *OsqueryInstance) Recover(executionError error) error {
-	// TODO recover the instance
-	log.Printf("Recovery error: %s", executionError)
+	if !o.cmd.ProcessState.Exited() {
+		if err := o.cmd.Process.Kill(); err != nil {
+			return errors.Wrap(err, "could not kill the osquery process during recovery")
+		}
+	}
+
+	newInstance, err := LaunchOsqueryInstance(o.binaryPath, o.rootDir)
+	if err != nil {
+		return errors.Wrap(err, "could not launch new osquery instance")
+	}
+
+	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
+
 	return nil
 }
 
@@ -167,6 +195,9 @@ func (o *OsqueryInstance) Kill() error {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy.
 func (o *OsqueryInstance) Healthy() (bool, error) {
-	// TODO determine whether or not the instance is healthy
-	return true, nil
+	status, err := o.extensionManagerServer.Ping()
+	if err != nil {
+		return false, errors.Wrap(err, "could not ping osquery through extension interface")
+	}
+	return status.Code == 0, nil
 }

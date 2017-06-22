@@ -14,7 +14,7 @@ launcher: .pre-build
 
 deps:
 	go get -u github.com/golang/dep/cmd/dep
-	dep ensure
+	dep ensure -v
 
 test:
 	go test -race -cover -v "$(go list ./... | grep -v /vendor/)"
