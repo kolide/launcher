@@ -102,6 +102,9 @@ func createOsquerydCommand(paths *osqueryFilePaths) (*exec.Cmd, error) {
 		"--config_refresh=10",
 		"--config_plugin=kolide_grpc",
 		"--logger_plugin=kolide_grpc",
+		"--disable_distributed=false",
+		"--host_identifier=uuid",
+		"--force=true",
 	)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
