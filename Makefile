@@ -17,5 +17,4 @@ deps:
 	dep ensure
 
 test:
-	go test ./cmd/...
-	go test ./osquery
+	go test -race -cover -v "$(go list ./... | grep -v /vendor/)"
