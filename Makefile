@@ -27,5 +27,5 @@ build-mac-pkg: launcher extension mac-pkg-builder
 	cp /usr/local/bin/osqueryd ./bin
 	cp ./build/launcher ./bin
 	cp ./build/osquery-extension.ext ./bin
-	./build/mac-pkg-builder -key ${CLOUDREPO}/config/example_rsa.pem -package
+	./build/mac-pkg-builder -key ${ENROLL_JWT_KEY} -package
 	rm -rf bin

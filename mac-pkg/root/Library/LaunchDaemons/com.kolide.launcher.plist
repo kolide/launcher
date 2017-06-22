@@ -6,7 +6,7 @@
         <string>com.kolide.launcher</string>
         <key>EnvironmentVariables</key>
         <dict>
-            <key>KOLIDE_LAUNCHER_WORKDIR</key>
+            <key>KOLIDE_LAUNCHER_WORKING_DIRECTORY</key>
             <string>/var/kolide</string>
         </dict>
         <key>RunAtLoad</key>

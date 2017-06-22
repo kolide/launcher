@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -8,23 +9,28 @@ import (
 	"github.com/kolide/launcher/osquery"
 )
 
-const (
-	binPath = "/usr/local/kolide/bin/osqueryd"
-)
-
 func main() {
+	var (
+		flBinPath = flag.String(
+			"osqueryd",
+			"/usr/local/kolide/bin/osqueryd",
+			"path to osqueryd binary",
+		)
+	)
+	flag.Parse()
+
 	if platform, err := osquery.DetectPlatform(); err != nil {
 		log.Fatalf("error detecting platform: %s\n", err)
 	} else if platform != "darwin" {
 		log.Fatalln("This tool only works on macOS right now")
 	}
 
-	workingDirectory := os.Getenv("KOLIDE_LAUNCHER_WORKDIR")
+	workingDirectory := os.Getenv("KOLIDE_LAUNCHER_WORKING_DIR")
 	if workingDirectory == "" {
 		workingDirectory = os.TempDir()
 	}
 
-	if _, err := osquery.LaunchOsqueryInstance(binPath, workingDirectory); err != nil {
+	if _, err := osquery.LaunchOsqueryInstance(*flBinPath, workingDirectory); err != nil {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
 

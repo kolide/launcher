@@ -16,41 +16,6 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
-func main() {
-	var (
-		flKey       = flag.String("key", "", "path to rsa private key")
-		flTennantID = flag.Int("id", 100001, "tennant id. must be greater than 1")
-		flPrint     = flag.Bool("print", false, "print info for stdout -- requires passing a tennant id")
-		flPackage   = flag.Bool("package", false, "generate macOS package")
-		bindirPath  = flag.String("bindir", "./bin", "path to binaries")
-	)
-	flag.Parse()
-
-	printMode := (*flTennantID > 0) && *flPrint
-	packageMode := !printMode && *flPackage
-	badInput := (*flTennantID == 0 && *flPrint) || *flKey == "" || (!printMode && !packageMode)
-	if badInput {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	keyData, err := ioutil.ReadFile(*flKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	p := packageParams{bindir: *bindirPath}
-	if printMode {
-		printTennant(keyData, *flTennantID, p)
-		return
-	}
-
-	if packageMode {
-		createMacPackage(keyData, *flTennantID, p)
-	}
-
-}
-
 const (
 	packageRoot = "mac-pkg/root"
 	scriptsRoot = "mac-pkg/scripts"
@@ -101,7 +66,13 @@ func createMacPackage(pemKey []byte, id int, p packageParams) {
 }
 
 /*
-	pkgbuild --root root --scripts scripts --identifier ${PKGID} --version ${PKGVERSION} out/${PKGNAME}-${PKGVERSION}.pkg
+runs the following pkgbuild command:
+	pkgbuild \
+	--root root \
+	--scripts scripts \
+	--identifier ${PKGID} \
+	--version ${PKGVERSION} \
+	out/${PKGNAME}-${PKGVERSION}.pkg
 */
 func pkgbuild(pkgroot, version, pkgname string) error {
 	identifier := "com.kolide.osquery"
@@ -117,8 +88,10 @@ func pkgbuild(pkgroot, version, pkgname string) error {
 	return cmd.Run()
 }
 
-const dirMode = 0755
-const fileMode = 0644
+const (
+	dirMode  = 0755
+	fileMode = 0644
+)
 
 func copyDir(src, dest string) error {
 	dir, err := os.Open(src)
@@ -266,4 +239,39 @@ func (m *munemo) tos(num int) {
 	}
 
 	m.w.Write([]byte(m.syls[mod]))
+}
+
+func main() {
+	var (
+		flKey       = flag.String("key", "", "path to rsa private key")
+		flTennantID = flag.Int("id", 100001, "tennant id. must be greater than 1")
+		flPrint     = flag.Bool("print", false, "print info for stdout -- requires passing a tennant id")
+		flPackage   = flag.Bool("package", false, "generate macOS package")
+		bindirPath  = flag.String("bindir", "./bin", "path to binaries")
+	)
+	flag.Parse()
+
+	printMode := (*flTennantID > 0) && *flPrint
+	packageMode := !printMode && *flPackage
+	badInput := (*flTennantID == 0 && *flPrint) || *flKey == "" || (!printMode && !packageMode)
+	if badInput {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	keyData, err := ioutil.ReadFile(*flKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	p := packageParams{bindir: *bindirPath}
+	if printMode {
+		printTennant(keyData, *flTennantID, p)
+		return
+	}
+
+	if packageMode {
+		createMacPackage(keyData, *flTennantID, p)
+	}
+
 }
