@@ -1,0 +1,30 @@
+version: 2
+jobs:
+  build:
+    docker:
+        - image: golang:1.8
+    working_directory: /go/src/github.com/kolide/launcher
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - vendor-cache-{{ .Branch }}-{{ checksum "Gopkg.lock" }}
+            - vendor-cache-{{ .Branch }}
+            - vendor-cache
+      - run: make deps
+      - save_cache:
+          key: vendor-cache-{{ .Branch }}-{{ checksum "Gopkg.lock" }}
+          paths:
+            - vendor
+      - save_cache:
+          key: vendor-cache-{{ .Branch }}
+          paths:
+            - vendor
+      - save_cache:
+          key: vendor-cache
+          paths:
+            - vendor
+
+      - run: go test -race -cover -v $(go list ./... | grep -v /vendor/)
+      - run: make extension
+      - run: make launcher
