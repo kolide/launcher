@@ -18,6 +18,15 @@ import (
 // of osqueryd.
 type OsqueryInstance struct {
 	*osqueryInstanceFields
+	*osqueryInstanceOptions
+}
+
+type osqueryInstanceOptions struct {
+	binaryPath    string
+	rootDirectory string
+	configPlugin  string
+	loggerPlugin  string
+	plugins       []osquery.OsqueryPlugin
 }
 
 // osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
@@ -29,21 +38,16 @@ type osqueryInstanceFields struct {
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
 	paths                  *osqueryFilePaths
-	plugins                []osquery.OsqueryPlugin
-	configPlugin           string
-	loggerPlugin           string
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
 // launch an osqueryd instance.
 type osqueryFilePaths struct {
-	RootDir               string
-	BinaryPath            string
-	PidfilePath           string
-	DatabasePath          string
-	ExtensionPath         string
-	ExtensionAutoloadPath string
-	ExtensionSocketPath   string
+	pidfilePath           string
+	databasePath          string
+	extensionPath         string
+	extensionAutoloadPath string
+	extensionSocketPath   string
 }
 
 // calculateOsqueryPaths accepts a the path to a working osqueryd binary and a
@@ -51,16 +55,7 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(binaryPath, rootDir string) (*osqueryFilePaths, error) {
-	// Ensure that the supplied path exists
-	if _, err := os.Stat(binaryPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, errors.Wrapf(err, "osquery instance path does not exist: %s", binaryPath)
-		} else {
-			return nil, errors.Wrapf(err, "could not stat supplied osquery instance path")
-		}
-	}
-
+func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
 	// Determine the path to the extension
 	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "osquery-extension.ext")
 	if _, err := os.Stat(extensionPath); err != nil {
@@ -78,27 +73,25 @@ func calculateOsqueryPaths(binaryPath, rootDir string) (*osqueryFilePaths, error
 	}
 
 	return &osqueryFilePaths{
-		RootDir:               rootDir,
-		BinaryPath:            binaryPath,
-		PidfilePath:           filepath.Join(rootDir, "osquery.pid"),
-		DatabasePath:          filepath.Join(rootDir, "osquery.db"),
-		ExtensionPath:         extensionPath,
-		ExtensionAutoloadPath: extensionAutoloadPath,
-		ExtensionSocketPath:   filepath.Join(rootDir, "osquery.sock"),
+		pidfilePath:           filepath.Join(rootDir, "osquery.pid"),
+		databasePath:          filepath.Join(rootDir, "osquery.db"),
+		extensionPath:         extensionPath,
+		extensionAutoloadPath: extensionAutoloadPath,
+		extensionSocketPath:   filepath.Join(rootDir, "osquery.sock"),
 	}, nil
 }
 
 // createOsquerydCommand accepts a structure of relevant file paths relating to
 // an osquery instance and returns an *exec.Cmd which will launch a properly
 // configured osqueryd process.
-func createOsquerydCommand(paths *osqueryFilePaths, configPlugin, loggerPlugin string) (*exec.Cmd, error) {
+func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin string) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
-		paths.BinaryPath,
-		fmt.Sprintf("--pidfile=%s", paths.PidfilePath),
-		fmt.Sprintf("--database_path=%s", paths.DatabasePath),
-		fmt.Sprintf("--extensions_socket=%s", paths.ExtensionSocketPath),
-		fmt.Sprintf("--extensions_autoload=%s", paths.ExtensionAutoloadPath),
+		osquerydBinary,
+		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
+		fmt.Sprintf("--database_path=%s", paths.databasePath),
+		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
+		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		fmt.Sprintf("--config_plugin=%s", configPlugin),
 		fmt.Sprintf("--logger_plugin=%s", loggerPlugin),
 		"--pack_delimiter=:",
@@ -112,11 +105,39 @@ func createOsquerydCommand(paths *osqueryFilePaths, configPlugin, loggerPlugin s
 	return cmd, nil
 }
 
+// OsqueryInstanceOption is a functional option pattern for defining how an
+// osqueryd instance should be configured. For more information on this pattern,
+// see the following blog post:
+// https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
 type OsqueryInstanceOption func(*OsqueryInstance)
 
-func WithPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
+func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.plugins = append(i.plugins, plugin)
+	}
+}
+
+func WithOsquerydBinary(path string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.binaryPath = path
+	}
+}
+
+func WithRootDirectory(path string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.rootDirectory = path
+	}
+}
+
+func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.configPlugin = plugin
+	}
+}
+
+func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.loggerPlugin = plugin
 	}
 }
 
@@ -124,29 +145,54 @@ func WithPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
 // should be a valid path to an osqueryd binary. The rootDir parameter should be a
 // valid directory where the osquery database and pidfile can be stored. If any
 // errors occur during process initialization, an error will be returned.
-func LaunchOsqueryInstance(binaryPath, rootDir, configPlugin, loggerPlugin string, opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
-	paths, err := calculateOsqueryPaths(binaryPath, rootDir)
+func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
+	o := &OsqueryInstance{
+		&osqueryInstanceFields{
+			errs: make(chan error),
+		},
+		&osqueryInstanceOptions{},
+	}
+
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
+	// try to find it in the path.
+	if o.binaryPath == "" {
+		path, err := exec.LookPath("osqueryd")
+		if err != nil {
+			return nil, errors.Wrap(err, "osqueryd not supplied and not found")
+		}
+		o.binaryPath = path
+	}
+
+	// If the caller did not define the directory which all of the osquery file
+	// artifacts should be stored in, use a temporary directory.
+	if o.rootDirectory == "" {
+		o.rootDirectory = os.TempDir()
+	}
+
+	// Based on the root directory, calculate the file names of all of the
+	// required osquery artifact files.
+	paths, err := calculateOsqueryPaths(o.rootDirectory)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	cmd, err := createOsquerydCommand(paths, configPlugin, loggerPlugin)
+	if o.configPlugin == "" {
+		// TODO
+	}
+
+	if o.loggerPlugin == "" {
+		// TODO
+	}
+
+	cmd, err := createOsquerydCommand(o.binaryPath, paths, o.configPlugin, o.loggerPlugin)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create osqueryd command")
 	}
-
-	o := &OsqueryInstance{
-		&osqueryInstanceFields{
-			cmd:          cmd,
-			errs:         make(chan error),
-			paths:        paths,
-			configPlugin: configPlugin,
-			loggerPlugin: loggerPlugin,
-		},
-	}
-	for _, opt := range opts {
-		opt(o)
-	}
+	o.cmd = cmd
 
 	if err := o.cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start the osqueryd command")
@@ -160,40 +206,44 @@ func LaunchOsqueryInstance(binaryPath, rootDir, configPlugin, loggerPlugin strin
 		}
 	}()
 
-	// Briefly sleep so that osqueryd has time to initialize before starting the
-	// extension manager server
-	time.Sleep(2 * time.Second)
+	// If the caller has indicated that the osquery instance should launch one or
+	// more plugins, we need to launch an extension server
+	if len(o.plugins) > 0 {
+		// Briefly sleep so that osqueryd has time to initialize before starting the
+		// extension manager server
+		time.Sleep(2 * time.Second)
 
-	// Create the extension server
-	extensionServer, err := osquery.NewExtensionManagerServer("kolide", paths.ExtensionSocketPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.ExtensionSocketPath)
-	}
-	o.extensionManagerServer = extensionServer
-
-	// Register all custom osquery plugins
-	extensionServer.RegisterPlugin(o.plugins...)
-
-	// register all platform specific table plugins
-	for _, t := range table.PlatformTables() {
-		extensionServer.RegisterPlugin(t)
-	}
-
-	// Launch the server asynchronously
-	go func() {
-		if err := extensionServer.Start(); err != nil {
-			o.errs <- errors.Wrap(err, "the extension server died")
+		// Create the extension server
+		extensionServer, err := osquery.NewExtensionManagerServer("kolide", paths.extensionSocketPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 		}
-	}()
+		o.extensionManagerServer = extensionServer
 
-	// Launch a long-running recovery goroutine which can handle various errors
-	// that can occur
-	go func() {
-		<-o.errs
-		if recoveryError := o.Recover(); recoveryError != nil {
-			log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+		// Register all custom osquery plugins
+		extensionServer.RegisterPlugin(o.plugins...)
+
+		// register all platform specific table plugins
+		for _, t := range table.PlatformTables() {
+			extensionServer.RegisterPlugin(t)
 		}
-	}()
+
+		// Launch the server asynchronously
+		go func() {
+			if err := extensionServer.Start(); err != nil {
+				o.errs <- errors.Wrap(err, "the extension server died")
+			}
+		}()
+
+		// Launch a long-running recovery goroutine which can handle various errors
+		// that can occur
+		go func() {
+			<-o.errs
+			if recoveryError := o.Recover(); recoveryError != nil {
+				log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+			}
+		}()
+	}
 
 	return o, nil
 }
@@ -210,12 +260,24 @@ func (o *OsqueryInstance) Recover() error {
 		}
 	}
 
-	newInstance, err := LaunchOsqueryInstance(o.paths.BinaryPath, o.paths.RootDir, o.configPlugin, o.loggerPlugin)
+	opts := []OsqueryInstanceOption{
+		WithOsquerydBinary(o.binaryPath),
+		WithRootDirectory(o.rootDirectory),
+		WithConfigPluginFlag(o.configPlugin),
+		WithLoggerPluginFlag(o.loggerPlugin),
+	}
+	for _, plugin := range o.plugins {
+		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
+	}
+	newInstance, err := LaunchOsqueryInstance(
+		opts...,
+	)
 	if err != nil {
 		return errors.Wrap(err, "could not launch new osquery instance")
 	}
 
 	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
+	o.osqueryInstanceOptions = newInstance.osqueryInstanceOptions
 
 	return nil
 }

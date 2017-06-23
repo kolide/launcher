@@ -15,18 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func findOsquerydBinaryPath(t *testing.T) string {
-	path, err := exec.LookPath("osqueryd")
-	require.NoError(t, err)
-	_, err = os.Stat(path)
-	require.NoError(t, err)
-	return path
-}
-
 func TestCalculateOsqueryPaths(t *testing.T) {
 	tempDir := filepath.Dir(os.TempDir())
-
-	osquerydPath := findOsquerydBinaryPath(t)
 
 	// the launcher expects an osquery extension to be right next to the launcher
 	// binary on the filesystem so we doctor os.Args here and create a mock file
@@ -35,38 +25,36 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
 	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
 
-	paths, err := calculateOsqueryPaths(osquerydPath, tempDir)
+	paths, err := calculateOsqueryPaths(tempDir)
 	require.NoError(t, err)
-
-	// ensure that the path of the binary is actually what we told the function
-	// that it should be
-	require.Equal(t, osquerydPath, paths.BinaryPath)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
 	// dictated
-	require.Equal(t, tempDir, filepath.Dir(paths.PidfilePath))
-	require.Equal(t, tempDir, filepath.Dir(paths.DatabasePath))
-	require.Equal(t, tempDir, filepath.Dir(paths.ExtensionPath))
-	require.Equal(t, tempDir, filepath.Dir(paths.ExtensionSocketPath))
-	require.Equal(t, tempDir, filepath.Dir(paths.ExtensionAutoloadPath))
+	require.Equal(t, tempDir, filepath.Dir(paths.pidfilePath))
+	require.Equal(t, tempDir, filepath.Dir(paths.databasePath))
+	require.Equal(t, tempDir, filepath.Dir(paths.extensionPath))
+	require.Equal(t, tempDir, filepath.Dir(paths.extensionSocketPath))
+	require.Equal(t, tempDir, filepath.Dir(paths.extensionAutoloadPath))
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
 	paths := &osqueryFilePaths{
-		PidfilePath:           "/foo/bar/osquery.pid",
-		DatabasePath:          "/foo/bar/osquery.db",
-		ExtensionSocketPath:   "/foo/bar/osquery.sock",
-		ExtensionAutoloadPath: "/foo/bar/osquery.autoload",
+		pidfilePath:           "/foo/bar/osquery.pid",
+		databasePath:          "/foo/bar/osquery.db",
+		extensionSocketPath:   "/foo/bar/osquery.sock",
+		extensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	cmd, err := createOsquerydCommand(paths, "config_plugin", "logger_plugin")
+	osquerydPath, err := exec.LookPath("osqueryd")
+	require.NoError(t, err)
+
+	cmd, err := createOsquerydCommand(osquerydPath, paths, "config_plugin", "logger_plugin")
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
 func TestOsqueryRuntime(t *testing.T) {
-	osquerydPath := findOsquerydBinaryPath(t)
 	tempDir := filepath.Dir(os.TempDir())
 
 	// the launcher expects an osquery extension to be right next to the launcher
@@ -87,12 +75,11 @@ func TestOsqueryRuntime(t *testing.T) {
 	}
 
 	instance, err := LaunchOsqueryInstance(
-		osquerydPath,
-		tempDir,
-		"foo",
-		"bar",
-		WithPlugin(config.NewPlugin("foo", generateConfigs)),
-		WithPlugin(logger.NewPlugin("bar", logString)),
+		WithRootDirectory(tempDir),
+		WithOsqueryExtensionPlugin(config.NewPlugin("foo", generateConfigs)),
+		WithConfigPluginFlag("foo"),
+		WithOsqueryExtensionPlugin(logger.NewPlugin("bar", logString)),
+		WithLoggerPluginFlag("bar"),
 	)
 	require.NoError(t, err)
 

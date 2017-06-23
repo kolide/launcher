@@ -49,12 +49,12 @@ func main() {
 	}
 
 	if _, err := osquery.LaunchOsqueryInstance(
-		*flBinPath,
-		workingDirectory,
-		"kolide_grpc",
-		"kolide_grpc",
-		osquery.WithPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
-		osquery.WithPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
+		osquery.WithOsquerydBinary(*flBinPath),
+		osquery.WithRootDirectory(workingDirectory),
+		osquery.WithConfigPluginFlag("kolide_grpc"),
+		osquery.WithLoggerPluginFlag("kolide_grpc"),
+		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
+		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
 	); err != nil {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
