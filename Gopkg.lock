@@ -7,10 +7,28 @@
   revision = "b8ee72de5bf9318d50846852082325d0f932682b"
 
 [[projects]]
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  revision = "d2709f9f1f31ebcda9651b03077758c1f3a0018c"
+  version = "v3.0.0"
+
+[[projects]]
+  name = "github.com/docker/go"
+  packages = ["canonical/json"]
+  revision = "62e5ec7cf43f795986ec658df7cb317255772993"
+  version = "v1.5.1-1"
+
+[[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","plugin/config","plugin/logger"]
-  revision = "2ceb9a30db9b7b939c66f38da75d18e865b85e2d"
+  revision = "ede32b5b35534f341f53c5413afabced7f655d69"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/kolide/updater"
+  packages = [".","tuf"]
+  revision = "521dd696d181fc109aede0e401d60f888dd81b60"
 
 [[projects]]
   branch = "master"
@@ -21,6 +39,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3869c50c7b33129c42b869eeb9e84279e585b91c6a83421bf9f673711153f0c1"
+  inputs-digest = "0ddf07513ef440a8a32464bfcfb2e27d0175701bcbcf51e844bff0d9572b5797"
   solver-name = "gps-cdcl"
   solver-version = 1

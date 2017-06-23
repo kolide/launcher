@@ -17,7 +17,7 @@ deps:
 	dep ensure -v
 
 test:
-	go test -race -cover -v "$(go list ./... | grep -v /vendor/)"
+	go test -race -cover -v $(shell go list ./... | grep -v /vendor/)
 
 mac-pkg-builder:
 	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
