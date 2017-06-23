@@ -43,9 +43,9 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 
 func TestCreateOsqueryCommand(t *testing.T) {
 	paths := &osqueryFilePaths{
-		PidfilePath: "/foo/bar/osquery.pid",
-		DatabasePath: "/foo/bar/osquery.db",
-		ExtensionSocketPath: "/foo/bar/osquery.sock",
+		PidfilePath:           "/foo/bar/osquery.pid",
+		DatabasePath:          "/foo/bar/osquery.db",
+		ExtensionSocketPath:   "/foo/bar/osquery.sock",
 		ExtensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
@@ -53,4 +53,10 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
+}
+
+func TestLaunchOsqueryInstance(t *testing.T) {
+	if _, err := os.Stat("/usr/bin/osqueryd"); os.IsNotExist(err) {
+		t.Fatal("osqueryd not found")
+	}
 }
