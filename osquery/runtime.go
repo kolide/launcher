@@ -11,8 +11,6 @@ import (
 
 	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/config"
-	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 )
 
@@ -31,6 +29,7 @@ type osqueryInstanceFields struct {
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
 	paths                  *osqueryFilePaths
+	plugins                []osquery.OsqueryPlugin
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -111,11 +110,19 @@ func createOsquerydCommand(paths *osqueryFilePaths) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+type OsqueryInstanceOption func(*OsqueryInstance)
+
+func WithPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.plugins = append(i.plugins, plugin)
+	}
+}
+
 // LaunchOsqueryInstance will launch an osqueryd binary. The binaryPath parameter
 // should be a valid path to an osqueryd binary. The rootDir parameter should be a
 // valid directory where the osquery database and pidfile can be stored. If any
 // errors occur during process initialization, an error will be returned.
-func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance, error) {
+func LaunchOsqueryInstance(binaryPath string, rootDir string, opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
 	paths, err := calculateOsqueryPaths(binaryPath, rootDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not calculate osquery file paths")
@@ -132,6 +139,9 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 			errs:  make(chan error),
 			paths: paths,
 		},
+	}
+	for _, opt := range opts {
+		opt(o)
 	}
 
 	if err := o.cmd.Start(); err != nil {
@@ -160,10 +170,7 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	o.extensionManagerServer = extensionServer
 
 	// Register all custom osquery plugins
-	extensionServer.RegisterPlugin(
-		config.NewPlugin("kolide_grpc", GenerateConfigs),
-		logger.NewPlugin("kolide_grpc", LogString),
-	)
+	extensionServer.RegisterPlugin(o.plugins...)
 
 	// register all platform specific table plugins
 	for _, t := range table.PlatformTables() {

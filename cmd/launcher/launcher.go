@@ -7,6 +7,8 @@ import (
 	"os/signal"
 
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/kolide/updater"
 )
 
@@ -46,7 +48,12 @@ func main() {
 		defer launcherUpdater.Stop()
 	}
 
-	if _, err := osquery.LaunchOsqueryInstance(*flBinPath, workingDirectory); err != nil {
+	if _, err := osquery.LaunchOsqueryInstance(
+		*flBinPath,
+		workingDirectory,
+		osquery.WithPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
+		osquery.WithPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
+	); err != nil {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}
 

@@ -60,3 +60,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
+
+func TestOsqueryRuntime(t *testing.T) {
+
+}
