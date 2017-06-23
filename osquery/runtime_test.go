@@ -4,19 +4,25 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func findOsquerydBinaryPath(t *testing.T) string {
+	path, err := exec.LookPath("osqueryd")
+	require.NoError(t, err)
+	_, err = os.Stat(path)
+	require.NoError(t, err)
+	return path
+}
+
 func TestCalculateOsqueryPaths(t *testing.T) {
 	tempDir := filepath.Dir(os.TempDir())
 
-	// the launcher will verify that the supplied osquery path is an actual file,
-	// so we create a mock file on the filesystem to satisfy this requirement
-	fakeOsquerydPath := filepath.Join(tempDir, "osqueryd")
-	require.NoError(t, ioutil.WriteFile(fakeOsquerydPath, []byte(""), 0755))
+	osquerydPath := findOsquerydBinaryPath(t)
 
 	// the launcher expects an osquery extension to be right next to the launcher
 	// binary on the filesystem so we doctor os.Args here and create a mock file
@@ -25,12 +31,12 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
 	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte(""), 0755))
 
-	paths, err := calculateOsqueryPaths(fakeOsquerydPath, tempDir)
+	paths, err := calculateOsqueryPaths(osquerydPath, tempDir)
 	require.NoError(t, err)
 
 	// ensure that the path of the binary is actually what we told the function
 	// that it should be
-	require.Equal(t, fakeOsquerydPath, paths.BinaryPath)
+	require.Equal(t, osquerydPath, paths.BinaryPath)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
 	// dictated
@@ -53,10 +59,4 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
-}
-
-func TestLaunchOsqueryInstance(t *testing.T) {
-	if _, err := os.Stat("/usr/bin/osqueryd"); os.IsNotExist(err) {
-		t.Fatal("osqueryd not found")
-	}
 }
