@@ -1,13 +1,17 @@
 package osquery
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +33,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	// on the filesystem to satisfy this requirement
 	os.Args = []string{fmt.Sprintf("%s/launcher", tempDir)}
 	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
-	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte(""), 0755))
+	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
 
 	paths, err := calculateOsqueryPaths(osquerydPath, tempDir)
 	require.NoError(t, err)
@@ -55,12 +59,49 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		ExtensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	cmd, err := createOsquerydCommand(paths)
+	cmd, err := createOsquerydCommand(paths, "config_plugin", "logger_plugin")
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
 func TestOsqueryRuntime(t *testing.T) {
+	osquerydPath := findOsquerydBinaryPath(t)
+	tempDir := filepath.Dir(os.TempDir())
 
+	// the launcher expects an osquery extension to be right next to the launcher
+	// binary on the filesystem so we doctor os.Args here and create a mock file
+	// on the filesystem to satisfy this requirement
+	os.Args = []string{fmt.Sprintf("%s/launcher", tempDir)}
+	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
+	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
+
+	generateConfigs := func(ctx context.Context) (map[string]string, error) {
+		t.Log("osquery config requested")
+		return map[string]string{}, nil
+	}
+
+	logString := func(ctx context.Context, typ logger.LogType, logText string) error {
+		t.Logf("%s: %s\n", typ, logText)
+		return nil
+	}
+
+	instance, err := LaunchOsqueryInstance(
+		osquerydPath,
+		tempDir,
+		"foo",
+		"bar",
+		WithPlugin(config.NewPlugin("foo", generateConfigs)),
+		WithPlugin(logger.NewPlugin("bar", logString)),
+	)
+	require.NoError(t, err)
+
+	// Give osquery some time to boot, start the plugins, and execute for a bit
+	time.Sleep(10 * time.Second)
+
+	healthy, err := instance.Healthy()
+	require.NoError(t, err)
+	require.True(t, healthy)
+
+	require.NoError(t, instance.Kill())
 }

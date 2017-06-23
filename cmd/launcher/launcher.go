@@ -51,6 +51,8 @@ func main() {
 	if _, err := osquery.LaunchOsqueryInstance(
 		*flBinPath,
 		workingDirectory,
+		"kolide_grpc",
+		"kolide_grpc",
 		osquery.WithPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
 		osquery.WithPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
 	); err != nil {
