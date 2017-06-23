@@ -105,7 +105,7 @@ func createOsquerydCommand(paths *osqueryFilePaths) (*exec.Cmd, error) {
 		"--host_identifier=uuid",
 		"--force=true",
 	)
-	cmd.Stdout = os.Stderr
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	return cmd, nil
