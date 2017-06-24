@@ -1,6 +1,7 @@
 package osquery
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 )
 
@@ -18,15 +21,6 @@ import (
 // of osqueryd.
 type OsqueryInstance struct {
 	*osqueryInstanceFields
-	*osqueryInstanceOptions
-}
-
-type osqueryInstanceOptions struct {
-	binaryPath    string
-	rootDirectory string
-	configPlugin  string
-	loggerPlugin  string
-	plugins       []osquery.OsqueryPlugin
 }
 
 // osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
@@ -34,6 +28,16 @@ type osqueryInstanceOptions struct {
 // updated wholesale without updating the actual OsqueryInstance pointer which
 // may be held by the original caller.
 type osqueryInstanceFields struct {
+	// the following are options which may or may not be set by the functional
+	// options included by the caller of LaunchOsqueryInstance
+	binaryPath       string
+	rootDirectory    string
+	configPluginFlag string
+	loggerPluginFlag string
+	extensionPlugins []osquery.OsqueryPlugin
+
+	// the following are instance artifacts that are created and held as a result
+	// of launching an osqueryd process
 	cmd                    *exec.Cmd
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
@@ -111,33 +115,54 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 // https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
 type OsqueryInstanceOption func(*OsqueryInstance)
 
+// WithOsqueryExtensionPlugin is a functional option which allows the user to
+// declare a number of osquery plugins (ie: config plugin, logger plugin, tables,
+// etc) which can be loaded when calling LaunchOsqueryInstance. You can load as
+// many plugins as you'd like.
 func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.plugins = append(i.plugins, plugin)
+		i.extensionPlugins = append(i.extensionPlugins, plugin)
 	}
 }
 
+// WithOsquerydBinary is a functional option which allows the user to define the
+// path of the osqueryd binary which will be launched. This should only be called
+// once as only one binary will be executed.
 func WithOsquerydBinary(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.binaryPath = path
 	}
 }
 
+// WithRootDirectory is a functional option which allows the user to define the
+// path where filesystem artifacts will be stored. This may include pidfiles,
+// RocksDB database files, etc. If this is not defined, a temporary directory
+// will be used.
 func WithRootDirectory(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.rootDirectory = path
 	}
 }
 
+// WithConfigPluginFlag is a functional option which allows the user to define
+// which config plugin osqueryd should use to retrieve the config. If this is not
+// defined, it is assumed that no configuration is needed and a no-op config
+// will be used. This should only be configured once and cannot be changed once
+// osqueryd is running.
 func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.configPlugin = plugin
+		i.configPluginFlag = plugin
 	}
 }
 
+// WithLoggerPluginFlag is a functional option which allows the user to define
+// which logger plugin osqueryd should use to log status and result logs. If this
+// is not defined, logs will be logged via the application's default logger. The
+// logger plugin which osquery uses can be changed at any point during the
+// osqueryd execution lifecycle by defining the option via the config.
 func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.loggerPlugin = plugin
+		i.loggerPluginFlag = plugin
 	}
 }
 
@@ -146,11 +171,12 @@ func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 // valid directory where the osquery database and pidfile can be stored. If any
 // errors occur during process initialization, an error will be returned.
 func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
+	// Create an OsqueryInstance and apply the functional options supplied by the
+	// caller.
 	o := &OsqueryInstance{
 		&osqueryInstanceFields{
 			errs: make(chan error),
 		},
-		&osqueryInstanceOptions{},
 	}
 
 	for _, opt := range opts {
@@ -180,77 +206,100 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		return nil, errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	if o.configPlugin == "" {
-		// TODO
+	// If a config plugin has not been set by the caller, then it is likely that
+	// the instance will just be used for executing queries, so we will use a
+	// minimal config plugin that basically is a no-op
+	if o.configPluginFlag == "" {
+		generateConfigs := func(ctx context.Context) (map[string]string, error) {
+			return map[string]string{}, nil
+		}
+		o.extensionPlugins = append(o.extensionPlugins, config.NewPlugin("internal_noop", generateConfigs))
+		o.configPluginFlag = "internal_noop"
 	}
 
-	if o.loggerPlugin == "" {
-		// TODO
+	// If a logger plugin has not been set by the caller, we set a logger plugin
+	// that outputs logs to the default application logger
+	if o.loggerPluginFlag == "" {
+		logString := func(ctx context.Context, typ logger.LogType, logText string) error {
+			log.Printf("%s: %s\n", typ, logText)
+			return nil
+		}
+		o.extensionPlugins = append(o.extensionPlugins, logger.NewPlugin("internal_noop", logString))
+		o.loggerPluginFlag = "internal_noop"
 	}
 
-	cmd, err := createOsquerydCommand(o.binaryPath, paths, o.configPlugin, o.loggerPlugin)
+	// Now that we have accepted options from the caller and/or determined what
+	// they should be due to them not being set, we are ready to create and start
+	// the *exec.Cmd instance that will run osqueryd.
+	cmd, err := createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create osqueryd command")
 	}
 	o.cmd = cmd
-
 	if err := o.cmd.Start(); err != nil {
 		return nil, errors.Wrap(err, "could not start the osqueryd command")
 	}
 
 	// Launch a long running goroutine to which will keep tabs on the health of
-	// the osqueryd process
+	// the osqueryd process.
 	go func() {
 		if err := o.cmd.Wait(); err != nil {
 			o.errs <- errors.Wrap(err, "osqueryd processes died")
 		}
 	}()
 
-	// If the caller has indicated that the osquery instance should launch one or
-	// more plugins, we need to launch an extension server
-	if len(o.plugins) > 0 {
-		// Briefly sleep so that osqueryd has time to initialize before starting the
-		// extension manager server
-		time.Sleep(2 * time.Second)
+	// Briefly sleep so that osqueryd has time to initialize before starting the
+	// extension manager server
+	time.Sleep(2 * time.Second)
 
-		// Create the extension server
-		extensionServer, err := osquery.NewExtensionManagerServer("kolide", paths.extensionSocketPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
-		}
-		o.extensionManagerServer = extensionServer
-
-		// Register all custom osquery plugins
-		extensionServer.RegisterPlugin(o.plugins...)
-
-		// register all platform specific table plugins
-		for _, t := range table.PlatformTables() {
-			extensionServer.RegisterPlugin(t)
-		}
-
-		// Launch the server asynchronously
-		go func() {
-			if err := extensionServer.Start(); err != nil {
-				o.errs <- errors.Wrap(err, "the extension server died")
-			}
-		}()
-
-		// Launch a long-running recovery goroutine which can handle various errors
-		// that can occur
-		go func() {
-			<-o.errs
-			if recoveryError := o.Recover(); recoveryError != nil {
-				log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
-			}
-		}()
+	// Create the extension server and register all custom osquery plugins
+	extensionServer, err := osquery.NewExtensionManagerServer("kolide", paths.extensionSocketPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 	}
+	o.extensionManagerServer = extensionServer
+	extensionServer.RegisterPlugin(o.extensionPlugins...)
+
+	// register all platform specific table plugins
+	for _, t := range table.PlatformTables() {
+		extensionServer.RegisterPlugin(t)
+	}
+
+	// Launch the extension manager server asynchronously.
+	go func() {
+		if err := extensionServer.Start(); err != nil {
+			o.errs <- errors.Wrap(err, "the extension server died")
+		}
+	}()
+
+	// Launch a long-running recovery goroutine which can handle various errors
+	// that can occur
+	go func() {
+		// Block until an error is generated by the osqueryd process itself or the
+		// extension manager server. We don't select, because if one element of the
+		// runtime produces an error, it's likely that all of the other components
+		// will produce errors as well since everything is so interconnected. For
+		// this reason, when any error occurs, we attempt a total recovery.
+		<-o.errs
+		if recoveryError := o.Recover(); recoveryError != nil {
+			// If we were not able to recover the osqueryd process for some reason,
+			// kill the process and hope that the operating system scheduling
+			// mechanism (launchd, etc) can relaunch the tool cleanly.
+			log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+		}
+	}()
 
 	return o, nil
 }
 
 // Recover attempts to launch a new osquery instance if the running instance has
-// failed for some reason.
+// failed for some reason. Note that this function does not call o.Kill() to
+// release resources becausevKill() expects the osquery instance to be healthy,
+// whereas Recover() expects a hostile environment and is slightly more
+// defensive in it's actions.
 func (o *OsqueryInstance) Recover() error {
+
+	// First, we try to kill the osqueryd process if it isn't already dead.
 	if !o.cmd.ProcessState.Exited() {
 		if err := o.extensionManagerServer.Shutdown(); err != nil {
 			return errors.Wrap(err, "could not shutdown the osquery extension")
@@ -260,29 +309,42 @@ func (o *OsqueryInstance) Recover() error {
 		}
 	}
 
+	// Next, we try to kill the osquery extension manager server if it isn't
+	// already dead.
+	if _, err := o.extensionManagerServer.Ping(); err != nil {
+		if err := o.extensionManagerServer.Shutdown(); err != nil {
+			return errors.Wrap(err, "could not kill the extension manager server")
+		}
+	}
+
+	// In order to be sure we are launching a new osquery instance with the same
+	// configuration, we define a set of OsqueryInstanceOptions based on the
+	// configuration of the previous OsqueryInstance.
 	opts := []OsqueryInstanceOption{
 		WithOsquerydBinary(o.binaryPath),
 		WithRootDirectory(o.rootDirectory),
-		WithConfigPluginFlag(o.configPlugin),
-		WithLoggerPluginFlag(o.loggerPlugin),
+		WithConfigPluginFlag(o.configPluginFlag),
+		WithLoggerPluginFlag(o.loggerPluginFlag),
 	}
-	for _, plugin := range o.plugins {
+	for _, plugin := range o.extensionPlugins {
 		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
 	}
-	newInstance, err := LaunchOsqueryInstance(
-		opts...,
-	)
+	newInstance, err := LaunchOsqueryInstance(opts...)
 	if err != nil {
 		return errors.Wrap(err, "could not launch new osquery instance")
 	}
 
+	// Finally, now that we have a new running osquery instance, we replace the
+	// fields of our old instance with a pointer to the fields of the new instance
+	// so that existing references still work properly.
 	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
-	o.osqueryInstanceOptions = newInstance.osqueryInstanceOptions
 
 	return nil
 }
 
-// Kill will terminate all managed osquery processes and release all resources.
+// Kill will terminate all osquery processes managed by the OsqueryInstance
+// instance and release all resources that have been acquired throughout the
+// process lifecycle.
 func (o *OsqueryInstance) Kill() error {
 	if ok, err := o.Healthy(); err != nil {
 		return errors.Wrap(err, "an error occured trying to determine osquery's health")
@@ -291,7 +353,11 @@ func (o *OsqueryInstance) Kill() error {
 	}
 
 	if err := o.cmd.Process.Kill(); err != nil {
-		return errors.Wrap(err, "could not find the watcher process")
+		return errors.Wrap(err, "could not kill the osqueryd process")
+	}
+
+	if err := o.extensionManagerServer.Shutdown(); err != nil {
+		return errors.Wrap(err, "could not kill the extension manager server")
 	}
 
 	return nil

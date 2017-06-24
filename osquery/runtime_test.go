@@ -1,7 +1,6 @@
 package osquery
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/osquery-go/plugin/config"
-	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,7 +51,10 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
-func TestOsqueryRuntime(t *testing.T) {
+// prepareExtensionEnvironment is a helper which prepares the filesystem and
+// execution environment so that an osquery instance can be launched in tests.
+// The path to the necessary root directory is returned.
+func prepareExtensionEnvironment(t *testing.T) string {
 	tempDir := filepath.Dir(os.TempDir())
 
 	// the launcher expects an osquery extension to be right next to the launcher
@@ -64,23 +64,12 @@ func TestOsqueryRuntime(t *testing.T) {
 	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
 	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
 
-	generateConfigs := func(ctx context.Context) (map[string]string, error) {
-		t.Log("osquery config requested")
-		return map[string]string{}, nil
-	}
+	return tempDir
+}
 
-	logString := func(ctx context.Context, typ logger.LogType, logText string) error {
-		t.Logf("%s: %s\n", typ, logText)
-		return nil
-	}
-
-	instance, err := LaunchOsqueryInstance(
-		WithRootDirectory(tempDir),
-		WithOsqueryExtensionPlugin(config.NewPlugin("foo", generateConfigs)),
-		WithConfigPluginFlag("foo"),
-		WithOsqueryExtensionPlugin(logger.NewPlugin("bar", logString)),
-		WithLoggerPluginFlag("bar"),
-	)
+func TestOsqueryRuntime(t *testing.T) {
+	rootDirectory := prepareExtensionEnvironment(t)
+	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	// Give osquery some time to boot, start the plugins, and execute for a bit
