@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -123,6 +124,11 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 		config.NewPlugin("kolide_grpc", GenerateConfigs),
 		logger.NewPlugin("kolide_grpc", LogString),
 	)
+
+	// register all platform specific table plugins
+	for _, t := range table.PlatformTables() {
+		extensionServer.RegisterPlugin(t)
+	}
 
 	// Launch the server asynchronously
 	go func() {
