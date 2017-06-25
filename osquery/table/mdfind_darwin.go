@@ -1,6 +1,6 @@
-// +build !cgo darwin
+// +build darwin !cgo
 
-package mdfind
+package table
 
 import (
 	"bufio"

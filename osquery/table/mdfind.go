@@ -1,14 +1,6 @@
 // +build darwin
 
-/*
-package mdfind implements an osquery table for the macOS spotlight search.
-
-Example Query:
-	SELECT uid, f.path FROM file
-	AS f JOIN mdfind ON mdfind.path = f.path
-	AND mdfind.query = "kMDItemKint = 'Agile Keychain'";
-*/
-package mdfind
+package table
 
 import (
 	"context"
@@ -18,18 +10,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-func NewTable(name string) *table.Plugin {
-	return table.NewPlugin(name, Columns(), Generate)
-}
-
-func Columns() []table.ColumnDefinition {
-	return []table.ColumnDefinition{
+/*
+Spotlight returns a macOS spotlight table
+Example Query:
+	SELECT uid, f.path FROM file
+	AS f JOIN spotlight ON spotlight.path = f.path
+	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
+*/
+func Spotlight() *table.Plugin {
+	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
 	}
+	return table.NewPlugin("spotlight", columns, generateSpotlight)
 }
 
-func Generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	where := queryContext.Constraints["query"].Constraints[0].Expression
 	var query []string
 	if strings.Contains(where, "-") {
