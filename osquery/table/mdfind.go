@@ -26,7 +26,11 @@ func Spotlight() *table.Plugin {
 }
 
 func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	where := queryContext.Constraints["query"].Constraints[0].Expression
+	q, ok := queryContext.Constraints["query"]
+	if !ok || len(q.Constraints) == 0 {
+		return nil, errors.New("The spotlight table requires that you specify a constraint WHERE query =")
+	}
+	where := q.Constraints[0].Expression
 	var query []string
 	if strings.Contains(where, "-") {
 		query = strings.Split(where, " ")
