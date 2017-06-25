@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/kolide/launcher/osquery/table/mdfind"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -122,6 +123,7 @@ func LaunchOsqueryInstance(binaryPath string, rootDir string) (*OsqueryInstance,
 	extensionServer.RegisterPlugin(
 		config.NewPlugin("kolide_grpc", GenerateConfigs),
 		logger.NewPlugin("kolide_grpc", LogString),
+		mdfind.NewTable("spotlight"),
 	)
 
 	// Launch the server asynchronously
