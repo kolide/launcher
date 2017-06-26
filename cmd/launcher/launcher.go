@@ -75,10 +75,12 @@ func parseOptions() (*options, error) {
 	// osqueryd path, but if it cannot be found, we will fail back to using an
 	// osqueryd found in the path
 	if opts.osquerydPath == "" {
-		if _, err := os.Stat(defaultOsquerydPath); err != nil {
+		if _, err := os.Stat(defaultOsquerydPath); err == nil {
 			opts.osquerydPath = defaultOsquerydPath
-		} else if path, err := exec.LookPath("osqueryd"); err != nil {
+		} else if path, err := exec.LookPath("osqueryd"); err == nil {
 			opts.osquerydPath = path
+		} else {
+			log.Fatal("Could not find osqueryd binary")
 		}
 	}
 
