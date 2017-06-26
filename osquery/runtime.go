@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/launcher/osquery/table"
@@ -43,6 +44,8 @@ type osqueryInstanceFields struct {
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
 	paths                  *osqueryFilePaths
+	once                   sync.Once
+	hasBeganTeardown       bool
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -281,12 +284,14 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		// will produce errors as well since everything is so interconnected. For
 		// this reason, when any error occurs, we attempt a total recovery.
 		<-o.errs
-		if recoveryError := o.Recover(); recoveryError != nil {
-			// If we were not able to recover the osqueryd process for some reason,
-			// kill the process and hope that the operating system scheduling
-			// mechanism (launchd, etc) can relaunch the tool cleanly.
-			log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
-		}
+		o.once.Do(func() {
+			if recoveryError := o.Recover(); recoveryError != nil {
+				// If we were not able to recover the osqueryd process for some reason,
+				// kill the process and hope that the operating system scheduling
+				// mechanism (launchd, etc) can relaunch the tool cleanly.
+				log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+			}
+		})
 	}()
 
 	return o, nil
@@ -298,6 +303,11 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 // whereas Recover() expects a hostile environment and is slightly more
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover() error {
+	if o.hasBeganTeardown {
+		return nil
+	}
+
+	o.hasBeganTeardown = true
 
 	// First, we try to kill the osqueryd process if it isn't already dead.
 	if !o.cmd.ProcessState.Exited() {
@@ -346,6 +356,12 @@ func (o *OsqueryInstance) Recover() error {
 // instance and release all resources that have been acquired throughout the
 // process lifecycle.
 func (o *OsqueryInstance) Kill() error {
+	if o.hasBeganTeardown {
+		return nil
+	}
+
+	o.hasBeganTeardown = true
+
 	if ok, err := o.Healthy(); err != nil {
 		return errors.Wrap(err, "an error occured trying to determine osquery's health")
 	} else if !ok {
