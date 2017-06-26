@@ -300,9 +300,6 @@ func (o *OsqueryInstance) Recover() error {
 
 	// First, we try to kill the osqueryd process if it isn't already dead.
 	if !o.cmd.ProcessState.Exited() {
-		if err := o.extensionManagerServer.Shutdown(); err != nil {
-			return errors.Wrap(err, "could not shutdown the osquery extension")
-		}
 		if err := o.cmd.Process.Kill(); err != nil {
 			return errors.Wrap(err, "could not kill the osquery process during recovery")
 		}
