@@ -13,25 +13,17 @@ import (
 )
 
 func TestCalculateOsqueryPaths(t *testing.T) {
-	tempDir := filepath.Dir(os.TempDir())
-
-	// the launcher expects an osquery extension to be right next to the launcher
-	// binary on the filesystem so we doctor os.Args here and create a mock file
-	// on the filesystem to satisfy this requirement
-	os.Args = []string{fmt.Sprintf("%s/launcher", tempDir)}
-	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
-	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
-
-	paths, err := calculateOsqueryPaths(tempDir)
+	rootDirectory := prepareExtensionEnvironment(t)
+	paths, err := calculateOsqueryPaths(rootDirectory)
 	require.NoError(t, err)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
 	// dictated
-	require.Equal(t, tempDir, filepath.Dir(paths.pidfilePath))
-	require.Equal(t, tempDir, filepath.Dir(paths.databasePath))
-	require.Equal(t, tempDir, filepath.Dir(paths.extensionPath))
-	require.Equal(t, tempDir, filepath.Dir(paths.extensionSocketPath))
-	require.Equal(t, tempDir, filepath.Dir(paths.extensionAutoloadPath))
+	require.Equal(t, rootDirectory, filepath.Dir(paths.pidfilePath))
+	require.Equal(t, rootDirectory, filepath.Dir(paths.databasePath))
+	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionPath))
+	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionSocketPath))
+	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionAutoloadPath))
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {

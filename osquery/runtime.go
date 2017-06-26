@@ -54,8 +54,8 @@ type osqueryFilePaths struct {
 	extensionSocketPath   string
 }
 
-// calculateOsqueryPaths accepts a the path to a working osqueryd binary and a
-// root directory where all of the osquery filesystem artifacts should be stored.
+// calculateOsqueryPaths accepts a ath to a working osqueryd binary and a root
+// directory where all of the osquery filesystem artifacts should be stored.
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
@@ -127,7 +127,9 @@ func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOpt
 
 // WithOsquerydBinary is a functional option which allows the user to define the
 // path of the osqueryd binary which will be launched. This should only be called
-// once as only one binary will be executed.
+// once as only one binary will be executed. Defining the path to the osqueryd
+// binary is optional. If it is not explicitly defined by the caller, an osqueryd
+// binary will be looked for in the current $PATH.
 func WithOsquerydBinary(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.binaryPath = path
@@ -166,10 +168,7 @@ func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	}
 }
 
-// LaunchOsqueryInstance will launch an osqueryd binary. The binaryPath parameter
-// should be a valid path to an osqueryd binary. The rootDir parameter should be a
-// valid directory where the osquery database and pidfile can be stored. If any
-// errors occur during process initialization, an error will be returned.
+// LaunchOsqueryInstance will launch an osqueryd binary.
 func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
@@ -208,7 +207,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 
 	// If a config plugin has not been set by the caller, then it is likely that
 	// the instance will just be used for executing queries, so we will use a
-	// minimal config plugin that basically is a no-op
+	// minimal config plugin that basically is a no-op.
 	if o.configPluginFlag == "" {
 		generateConfigs := func(ctx context.Context) (map[string]string, error) {
 			return map[string]string{}, nil
@@ -218,7 +217,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	}
 
 	// If a logger plugin has not been set by the caller, we set a logger plugin
-	// that outputs logs to the default application logger
+	// that outputs logs to the default application logger.
 	if o.loggerPluginFlag == "" {
 		logString := func(ctx context.Context, typ logger.LogType, logText string) error {
 			log.Printf("%s: %s\n", typ, logText)
@@ -294,7 +293,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 
 // Recover attempts to launch a new osquery instance if the running instance has
 // failed for some reason. Note that this function does not call o.Kill() to
-// release resources becausevKill() expects the osquery instance to be healthy,
+// release resources because Kill() expects the osquery instance to be healthy,
 // whereas Recover() expects a hostile environment and is slightly more
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover() error {
