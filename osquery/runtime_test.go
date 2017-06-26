@@ -95,6 +95,8 @@ func TestOsqueryRuntime(t *testing.T) {
 	healthy, err := instance.Healthy()
 	require.NoError(t, err)
 	require.True(t, healthy)
+	time.Sleep(2 * time.Second)
 
 	require.NoError(t, instance.Kill())
+	time.Sleep(1 * time.Second)
 }
