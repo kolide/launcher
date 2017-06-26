@@ -1,18 +1,33 @@
 package osquery
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateOsqueryPaths(t *testing.T) {
-	rootDirectory := prepareExtensionEnvironment(t)
+	rootDirectory := filepath.Dir(os.TempDir())
+
+	// the launcher expects an osquery extension to be right next to the launcher
+	// binary on the filesystem so we doctor os.Args here and create a mock file
+	// on the filesystem to satisfy this requirement
+	previousArgs := os.Args
+	os.Args = []string{fmt.Sprintf("%s/launcher", rootDirectory)}
+	defer func() {
+		os.Args = previousArgs
+	}()
+
+	fakeExtensionPath := filepath.Join(rootDirectory, "osquery-extension.ext")
+	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
+
 	paths, err := calculateOsqueryPaths(rootDirectory)
 	require.NoError(t, err)
 
@@ -42,24 +57,38 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
-// prepareExtensionEnvironment is a helper which prepares the filesystem and
-// execution environment so that an osquery instance can be launched in tests.
-// The path to the necessary root directory is returned.
-func prepareExtensionEnvironment(t *testing.T) string {
-	tempDir := filepath.Dir(os.TempDir())
+func TestOsqueryRuntime(t *testing.T) {
+	rootDirectory := filepath.Dir(os.TempDir())
 
 	// the launcher expects an osquery extension to be right next to the launcher
 	// binary on the filesystem so we doctor os.Args here and create a mock file
 	// on the filesystem to satisfy this requirement
-	os.Args = []string{fmt.Sprintf("%s/launcher", tempDir)}
-	fakeExtensionPath := filepath.Join(tempDir, "osquery-extension.ext")
-	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
+	previousArgs := os.Args
+	os.Args = []string{fmt.Sprintf("%s/launcher", rootDirectory)}
+	defer func() {
+		os.Args = previousArgs
+	}()
 
-	return tempDir
-}
+	// Drop the actual version of our extension on disk so that we can get as
+	// realistic of a test environment as possible
+	goBinary, err := exec.LookPath("go")
+	require.NoError(t, err)
+	goPath := os.Getenv("GOPATH")
+	require.NotEmpty(t, goPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(
+		ctx,
+		goBinary,
+		"build",
+		"-o",
+		filepath.Join(rootDirectory, "osquery-extension.ext"),
+		filepath.Join(goPath, "src/github.com/kolide/launcher/cmd/osquery-extension/osquery-extension.go"),
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	require.NoError(t, cmd.Run())
 
-func TestOsqueryRuntime(t *testing.T) {
-	rootDirectory := prepareExtensionEnvironment(t)
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 

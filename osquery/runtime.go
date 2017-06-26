@@ -234,17 +234,16 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	cmd, err := createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag)
+	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create osqueryd command")
 	}
-	o.cmd = cmd
+
 	if err := o.cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "could not start the osqueryd command")
+		return nil, errors.Wrap(err, "couldn't start osqueryd command")
 	}
 
-	// Launch a long running goroutine to which will keep tabs on the health of
-	// the osqueryd process.
+	// Launch a long running goroutine to monitor the osqueryd process.
 	go func() {
 		if err := o.cmd.Wait(); err != nil {
 			o.errs <- errors.Wrap(err, "osqueryd processes died")
@@ -256,21 +255,23 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	time.Sleep(2 * time.Second)
 
 	// Create the extension server and register all custom osquery plugins
-	extensionServer, err := osquery.NewExtensionManagerServer("kolide", paths.extensionSocketPath)
+	o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
+		"kolide",
+		paths.extensionSocketPath,
+		osquery.ServerTimeout(2*time.Second),
+	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 	}
-	o.extensionManagerServer = extensionServer
-	extensionServer.RegisterPlugin(o.extensionPlugins...)
-
+	o.extensionManagerServer.RegisterPlugin(o.extensionPlugins...)
 	// register all platform specific table plugins
 	for _, t := range table.PlatformTables() {
-		extensionServer.RegisterPlugin(t)
+		o.extensionManagerServer.RegisterPlugin(t)
 	}
 
 	// Launch the extension manager server asynchronously.
 	go func() {
-		if err := extensionServer.Start(); err != nil {
+		if err := o.extensionManagerServer.Start(); err != nil {
 			o.errs <- errors.Wrap(err, "the extension server died")
 		}
 	}()
