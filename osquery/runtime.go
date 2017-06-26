@@ -304,6 +304,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover() error {
 	if o.hasBeganTeardown {
+		log.Println("Will not recover osqueryd instance because teardown has already begun somewhere else")
 		return nil
 	}
 
@@ -357,6 +358,7 @@ func (o *OsqueryInstance) Recover() error {
 // process lifecycle.
 func (o *OsqueryInstance) Kill() error {
 	if o.hasBeganTeardown {
+		log.Println("Will not kill osqueryd instance because teardown has already begun somewhere else")
 		return nil
 	}
 
