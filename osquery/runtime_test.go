@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -63,9 +62,6 @@ func TestOsqueryRuntime(t *testing.T) {
 	rootDirectory := prepareExtensionEnvironment(t)
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
-
-	// Give osquery some time to boot, start the plugins, and execute for a bit
-	time.Sleep(10 * time.Second)
 
 	healthy, err := instance.Healthy()
 	require.NoError(t, err)
