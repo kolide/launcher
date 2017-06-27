@@ -12,15 +12,15 @@ extension: .pre-build
 launcher: .pre-build
 	go build -i -o build/launcher ./cmd/launcher/
 
+mac-pkg-builder: .pre-build
+	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
+
 deps:
 	go get -u github.com/golang/dep/cmd/dep
 	dep ensure -v
 
 test:
 	go test -race -cover -v $(shell go list ./... | grep -v /vendor/)
-
-mac-pkg-builder:
-	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
 
 build-mac-pkg: launcher extension mac-pkg-builder
 	mkdir -p bin/
