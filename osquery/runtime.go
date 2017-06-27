@@ -172,7 +172,19 @@ func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	}
 }
 
-// LaunchOsqueryInstance will launch an osqueryd binary.
+// LaunchOsqueryInstance will launch an instance of osqueryd via a very
+// configurable API as defined by the various OsqueryInstanceOption functional
+// options. For example, a more customized caller might do something like the
+// following:
+//
+//   instance, err := LaunchOsqueryInstance(
+//     WithOsquerydBinary("/usr/local/bin/osqueryd"),
+//     WithRootDirectory("/var/foobar"),
+//     WithOsqueryExtensionPlugin(config.NewPlugin("custom", custom.GenerateConfigs)),
+//     WithConfigPluginFlag("custom"),
+//     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
+//     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
+//   )
 func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
