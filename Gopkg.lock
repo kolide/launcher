@@ -27,8 +27,8 @@
 [[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
-  packages = [".","gen/osquery","plugin/config","plugin/logger"]
-  revision = "ede32b5b35534f341f53c5413afabced7f655d69"
+  packages = [".","gen/osquery","plugin/config","plugin/logger","plugin/table"]
+  revision = "71d3fc1b79c146722e5719bd3a9f11d22eaa3207"
 
 [[projects]]
   branch = "master"
@@ -57,6 +57,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0bfd578e3910839340689f07400d2db003a71096a42316e9691cfc35990b1406"
+  inputs-digest = "cf18a8da6c8ea03e9077fe5817867e2d388cfda6d78ad25110ca514bc21a6d1a"
   solver-name = "gps-cdcl"
   solver-version = 1
