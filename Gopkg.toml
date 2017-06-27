@@ -11,5 +11,6 @@
   name = "github.com/pkg/errors"
 
 [[override]]
-  revision = "b8ee72de5bf9318d50846852082325d0f932682b"
   name = "git.apache.org/thrift.git"
+  source = "git@github.com:kolide/thrift.git"
+  branch = "master"
