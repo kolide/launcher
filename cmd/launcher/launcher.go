@@ -137,6 +137,8 @@ func main() {
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
 		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
+		osquery.WithStdout(os.Stdout),
+		osquery.WithStderr(os.Stderr),
 	); err != nil {
 		log.Fatalf("Error launching osquery instance: %s", err)
 	}

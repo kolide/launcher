@@ -3,6 +3,7 @@ package osquery
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -37,6 +38,8 @@ type osqueryInstanceFields struct {
 	configPluginFlag string
 	loggerPluginFlag string
 	extensionPlugins []osquery.OsqueryPlugin
+	stdout           io.Writer
+	stderr           io.Writer
 
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
@@ -92,7 +95,7 @@ func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
 // createOsquerydCommand accepts a structure of relevant file paths relating to
 // an osquery instance and returns an *exec.Cmd which will launch a properly
 // configured osqueryd process.
-func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin string) (*exec.Cmd, error) {
+func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin string, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
 		osquerydBinary,
@@ -107,8 +110,8 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--host_identifier=uuid",
 		"--force=true",
 	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	return cmd, nil
 }
@@ -172,6 +175,24 @@ func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	}
 }
 
+// WithStdout is a functional option which allows the user to define where the
+// stdout of the osquery process should be directed. By default, the output will
+// be discarded. This should only be configured once.
+func WithStdout(w io.Writer) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.stdout = w
+	}
+}
+
+// WithStderr is a functional option which allows the user to define where the
+// stderr of the osquery process should be directed. By default, the output will
+// be discarded. This should only be configured once.
+func WithStderr(w io.Writer) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.stderr = w
+	}
+}
+
 // LaunchOsqueryInstance will launch an instance of osqueryd via a very
 // configurable API as defined by the various OsqueryInstanceOption functional
 // options. For example, a more customized caller might do something like the
@@ -190,7 +211,9 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// caller.
 	o := &OsqueryInstance{
 		&osqueryInstanceFields{
-			errs: make(chan error),
+			stdout: ioutil.Discard,
+			stderr: ioutil.Discard,
+			errs:   make(chan error),
 		},
 	}
 
@@ -246,7 +269,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag)
+	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag, o.stdout, o.stderr)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create osqueryd command")
 	}
