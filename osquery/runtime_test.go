@@ -92,11 +92,12 @@ func TestOsqueryRuntime(t *testing.T) {
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
+	// Sleep to avoid race condition: https://issues.apache.org/jira/browse/THRIFT-4237
+	time.Sleep(1 * time.Second)
+
 	healthy, err := instance.Healthy()
 	require.NoError(t, err)
 	require.True(t, healthy)
-	time.Sleep(2 * time.Second)
 
 	require.NoError(t, instance.Kill())
-	time.Sleep(1 * time.Second)
 }

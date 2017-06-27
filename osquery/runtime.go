@@ -316,11 +316,11 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 // whereas Recover() expects a hostile environment and is slightly more
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover() error {
+	// If the user explicitly calls o.Kill(), as the components are shutdown, they
+	// may exit with errors. In this case, we shouldn't recover the instance.
 	if o.hasBeganTeardown {
-		log.Println("Will not recover osqueryd instance because teardown has already begun somewhere else")
 		return nil
 	}
-
 	o.hasBeganTeardown = true
 
 	// First, we try to kill the osqueryd process if it isn't already dead.
@@ -371,10 +371,8 @@ func (o *OsqueryInstance) Recover() error {
 // process lifecycle.
 func (o *OsqueryInstance) Kill() error {
 	if o.hasBeganTeardown {
-		log.Println("Will not kill osqueryd instance because teardown has already begun somewhere else")
-		return nil
+		return errors.New("Will not kill osqueryd instance because teardown has already begun somewhere else")
 	}
-
 	o.hasBeganTeardown = true
 
 	if ok, err := o.Healthy(); err != nil {
