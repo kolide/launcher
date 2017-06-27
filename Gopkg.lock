@@ -2,9 +2,11 @@
 
 
 [[projects]]
+  branch = "master"
   name = "git.apache.org/thrift.git"
   packages = ["lib/go/thrift"]
-  revision = "b8ee72de5bf9318d50846852082325d0f932682b"
+  revision = "7d1581917d37694e54a253c841f276002773188e"
+  source = "git@github.com:kolide/thrift.git"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -28,13 +30,13 @@
   branch = "master"
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","plugin/config","plugin/logger","plugin/table"]
-  revision = "71d3fc1b79c146722e5719bd3a9f11d22eaa3207"
+  revision = "5ff815310afd1fffe38a9a92c35e257d960fe71b"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/updater"
   packages = [".","tuf"]
-  revision = "521dd696d181fc109aede0e401d60f888dd81b60"
+  revision = "04e45b3f8fe303492c6cfe261ca6369c97f773f0"
 
 [[projects]]
   branch = "master"
@@ -57,6 +59,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "cf18a8da6c8ea03e9077fe5817867e2d388cfda6d78ad25110ca514bc21a6d1a"
+  inputs-digest = "41b8cbea9bd39adc6c7996eaf2f890459dfd364de1d509ea27529eba8b1d349f"
   solver-name = "gps-cdcl"
   solver-version = 1
