@@ -23,9 +23,8 @@ func TestBestPractices(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, healthy)
 
-	results, err := instance.Query("select * from kolide_best_practices;")
+	results, err := instance.Query("select * from kolide_best_practices")
 	require.NoError(t, err)
-
 	require.Len(t, results, 1)
 
 	passwordRequiredFromScreensaver, ok := results[0]["password_required_from_screensaver"]

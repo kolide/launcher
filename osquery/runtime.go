@@ -46,6 +46,7 @@ type osqueryInstanceFields struct {
 	cmd                    *exec.Cmd
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
+	extensionManagerClient *osquery.ExtensionManagerClient
 	paths                  *osqueryFilePaths
 	once                   sync.Once
 	hasBeganTeardown       bool
@@ -321,11 +322,12 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 	}
-	o.extensionManagerServer.RegisterPlugin(o.extensionPlugins...)
-	// register all platform specific table plugins
+
+	plugins := o.extensionPlugins
 	for _, t := range PlatformTables() {
-		o.extensionManagerServer.RegisterPlugin(t)
+		plugins = append(plugins, t)
 	}
+	o.extensionManagerServer.RegisterPlugin(plugins...)
 
 	// Launch the extension manager server asynchronously.
 	go func() {
@@ -333,6 +335,11 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			o.errs <- errors.Wrap(err, "the extension server died")
 		}
 	}()
+
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create an extension client")
+	}
 
 	// Launch a long-running recovery goroutine which can handle various errors
 	// that can occur
@@ -452,7 +459,13 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
-	return []map[string]string{
-		map[string]string{},
-	}, nil
+	resp, err := o.extensionManagerClient.Query(query)
+	if err != nil {
+		return []map[string]string{}, errors.Wrap(err, "could not query the extension manager client")
+	}
+	if resp.Status.Code != int32(0) {
+		return []map[string]string{}, errors.New(resp.Status.Message)
+	}
+
+	return resp.Response, nil
 }
