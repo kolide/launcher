@@ -2,6 +2,7 @@ package osquery
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -48,6 +49,7 @@ type osqueryInstanceFields struct {
 	paths                  *osqueryFilePaths
 	once                   sync.Once
 	hasBeganTeardown       bool
+	rmRootDirectory        func()
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -113,6 +115,22 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 	cmd.Stderr = stderr
 
 	return cmd, nil
+}
+
+func osqueryTempDir() (string, error, func()) {
+	randomBytes := make([]byte, 10)
+	if _, err := rand.Read(randomBytes); err != nil {
+		panic(err)
+	}
+	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("%X", randomBytes))
+	err := os.Mkdir(tempPath, 0700)
+	if err != nil {
+		return "", err, func() {}
+	}
+
+	return tempPath, nil, func() {
+		os.Remove(tempPath)
+	}
 }
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -210,9 +228,10 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// caller.
 	o := &OsqueryInstance{
 		&osqueryInstanceFields{
-			stdout: ioutil.Discard,
-			stderr: ioutil.Discard,
-			errs:   make(chan error),
+			stdout:          ioutil.Discard,
+			stderr:          ioutil.Discard,
+			rmRootDirectory: func() {},
+			errs:            make(chan error),
 		},
 	}
 
@@ -233,7 +252,12 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// If the caller did not define the directory which all of the osquery file
 	// artifacts should be stored in, use a temporary directory.
 	if o.rootDirectory == "" {
-		o.rootDirectory = os.TempDir()
+		rootDirectory, err, rmRootDirectory := osqueryTempDir()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't create temp directory for osquery instance")
+		}
+		o.rootDirectory = rootDirectory
+		o.rmRootDirectory = rmRootDirectory
 	}
 
 	// Based on the root directory, calculate the file names of all of the
@@ -411,6 +435,8 @@ func (o *OsqueryInstance) Kill() error {
 		return errors.Wrap(err, "could not kill the extension manager server")
 	}
 
+	o.rmRootDirectory()
+
 	return nil
 }
 
@@ -423,4 +449,10 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 		return false, errors.Wrap(err, "could not ping osquery through extension interface")
 	}
 	return status.Code == 0, nil
+}
+
+func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
+	return []map[string]string{
+		map[string]string{},
+	}, nil
 }
