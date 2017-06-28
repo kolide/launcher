@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -300,7 +299,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	}
 	o.extensionManagerServer.RegisterPlugin(o.extensionPlugins...)
 	// register all platform specific table plugins
-	for _, t := range table.PlatformTables() {
+	for _, t := range PlatformTables() {
 		o.extensionManagerServer.RegisterPlugin(t)
 	}
 

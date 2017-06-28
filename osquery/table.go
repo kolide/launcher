@@ -1,5 +1,4 @@
-// package table provides custom osquery table implementations.
-package table
+package osquery
 
 import "github.com/kolide/osquery-go/plugin/table"
 
