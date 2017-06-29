@@ -79,7 +79,10 @@ func buildOsqueryExtensionInTempDir(rootDirectory string) error {
 
 	goPath := os.Getenv("GOPATH")
 	if goPath == "" {
-		return errors.New("GOPATH is not set")
+		goPath = filepath.Join(os.Getenv("HOME"), "go")
+		if stat, err := os.Stat(goPath); err != nil || !stat.IsDir() {
+			return errors.New("GOPATH is not set and default doesn't exist")
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
