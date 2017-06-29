@@ -344,6 +344,9 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		return nil, errors.Wrap(err, "could not create an extension client")
 	}
 
+	// Briefly sleep so that osqueryd has time to register all extensions
+	time.Sleep(2 * time.Second)
+
 	// Launch a long-running recovery goroutine which can handle various errors
 	// that can occur
 	go func() {

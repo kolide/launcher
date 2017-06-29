@@ -2,7 +2,6 @@ package osquery
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +22,6 @@ func TestBestPractices(t *testing.T) {
 	healthy, err := instance.Healthy()
 	require.NoError(t, err)
 	require.True(t, healthy)
-
-	// bug: osquery needs time to register plugins
-	time.Sleep(2 * time.Second)
 
 	results, err := instance.Query("select * from kolide_best_practices")
 	require.NoError(t, err)
