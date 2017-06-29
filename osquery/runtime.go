@@ -47,8 +47,9 @@ type osqueryInstanceFields struct {
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
+	clientLock             *sync.Mutex
 	paths                  *osqueryFilePaths
-	once                   sync.Once
+	once                   *sync.Once
 	hasBeganTeardown       bool
 	rmRootDirectory        func()
 }
@@ -233,6 +234,8 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			stderr:          ioutil.Discard,
 			rmRootDirectory: func() {},
 			errs:            make(chan error),
+			once:            new(sync.Once),
+			clientLock:      new(sync.Mutex),
 		},
 	}
 
@@ -459,6 +462,8 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
+	o.clientLock.Lock()
+	defer o.clientLock.Unlock()
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not query the extension manager client")
