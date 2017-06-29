@@ -1,6 +1,6 @@
 // +build darwin !cgo
 
-package table
+package osquery
 
 import (
 	"bufio"

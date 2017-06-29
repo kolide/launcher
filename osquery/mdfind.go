@@ -1,6 +1,6 @@
 // +build darwin
 
-package table
+package osquery
 
 import (
 	"context"

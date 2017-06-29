@@ -2,6 +2,7 @@ package osquery
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -46,9 +46,12 @@ type osqueryInstanceFields struct {
 	cmd                    *exec.Cmd
 	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
+	extensionManagerClient *osquery.ExtensionManagerClient
+	clientLock             *sync.Mutex
 	paths                  *osqueryFilePaths
-	once                   sync.Once
+	once                   *sync.Once
 	hasBeganTeardown       bool
+	rmRootDirectory        func()
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -114,6 +117,22 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 	cmd.Stderr = stderr
 
 	return cmd, nil
+}
+
+func osqueryTempDir() (string, func(), error) {
+	randomBytes := make([]byte, 10)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", func() {}, errors.Wrap(err, "could not read random bytes")
+	}
+	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("%X", randomBytes))
+	err := os.Mkdir(tempPath, 0700)
+	if err != nil {
+		return "", func() {}, errors.Wrap(err, "could not make temp path")
+	}
+
+	return tempPath, func() {
+		os.Remove(tempPath)
+	}, nil
 }
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -211,9 +230,12 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// caller.
 	o := &OsqueryInstance{
 		&osqueryInstanceFields{
-			stdout: ioutil.Discard,
-			stderr: ioutil.Discard,
-			errs:   make(chan error),
+			stdout:          ioutil.Discard,
+			stderr:          ioutil.Discard,
+			rmRootDirectory: func() {},
+			errs:            make(chan error),
+			once:            new(sync.Once),
+			clientLock:      new(sync.Mutex),
 		},
 	}
 
@@ -234,7 +256,12 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// If the caller did not define the directory which all of the osquery file
 	// artifacts should be stored in, use a temporary directory.
 	if o.rootDirectory == "" {
-		o.rootDirectory = os.TempDir()
+		rootDirectory, rmRootDirectory, err := osqueryTempDir()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't create temp directory for osquery instance")
+		}
+		o.rootDirectory = rootDirectory
+		o.rmRootDirectory = rmRootDirectory
 	}
 
 	// Based on the root directory, calculate the file names of all of the
@@ -298,11 +325,12 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 	}
-	o.extensionManagerServer.RegisterPlugin(o.extensionPlugins...)
-	// register all platform specific table plugins
-	for _, t := range table.PlatformTables() {
-		o.extensionManagerServer.RegisterPlugin(t)
+
+	plugins := o.extensionPlugins
+	for _, t := range PlatformTables() {
+		plugins = append(plugins, t)
 	}
+	o.extensionManagerServer.RegisterPlugin(plugins...)
 
 	// Launch the extension manager server asynchronously.
 	go func() {
@@ -310,6 +338,14 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			o.errs <- errors.Wrap(err, "the extension server died")
 		}
 	}()
+
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create an extension client")
+	}
+
+	// Briefly sleep so that osqueryd has time to register all extensions
+	time.Sleep(2 * time.Second)
 
 	// Launch a long-running recovery goroutine which can handle various errors
 	// that can occur
@@ -412,6 +448,8 @@ func (o *OsqueryInstance) Kill() error {
 		return errors.Wrap(err, "could not kill the extension manager server")
 	}
 
+	o.rmRootDirectory()
+
 	return nil
 }
 
@@ -424,4 +462,18 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 		return false, errors.Wrap(err, "could not ping osquery through extension interface")
 	}
 	return status.Code == 0, nil
+}
+
+func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
+	o.clientLock.Lock()
+	defer o.clientLock.Unlock()
+	resp, err := o.extensionManagerClient.Query(query)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not query the extension manager client")
+	}
+	if resp.Status.Code != int32(0) {
+		return nil, errors.New(resp.Status.Message)
+	}
+
+	return resp.Response, nil
 }

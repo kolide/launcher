@@ -2,6 +2,7 @@ package osquery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -57,24 +58,30 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
-func TestOsqueryRuntime(t *testing.T) {
-	rootDirectory := filepath.Dir(os.TempDir())
-
+func falsifyOsArgs(rootDirectory string) func() {
 	// the launcher expects an osquery extension to be right next to the launcher
 	// binary on the filesystem so we doctor os.Args here and create a mock file
 	// on the filesystem to satisfy this requirement
 	previousArgs := os.Args
 	os.Args = []string{fmt.Sprintf("%s/launcher", rootDirectory)}
-	defer func() {
+	return func() {
 		os.Args = previousArgs
-	}()
+	}
+}
 
+func buildOsqueryExtensionInTempDir(rootDirectory string) error {
 	// Drop the actual version of our extension on disk so that we can get as
 	// realistic of a test environment as possible
 	goBinary, err := exec.LookPath("go")
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
+
 	goPath := os.Getenv("GOPATH")
-	require.NotEmpty(t, goPath)
+	if goPath == "" {
+		return errors.New("GOPATH is not set")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(
@@ -87,8 +94,19 @@ func TestOsqueryRuntime(t *testing.T) {
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	require.NoError(t, cmd.Run())
+	return cmd.Run()
+}
 
+func TestOsqueryRuntime(t *testing.T) {
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
+	cancelFunc := falsifyOsArgs(rootDirectory)
+	defer cancelFunc()
+
+	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
