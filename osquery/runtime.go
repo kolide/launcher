@@ -118,20 +118,20 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 	return cmd, nil
 }
 
-func osqueryTempDir() (string, error, func()) {
+func osqueryTempDir() (string, func(), error) {
 	randomBytes := make([]byte, 10)
 	if _, err := rand.Read(randomBytes); err != nil {
-		panic(err)
+		return "", func() {}, errors.Wrap(err, "could not read random bytes")
 	}
 	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("%X", randomBytes))
 	err := os.Mkdir(tempPath, 0700)
 	if err != nil {
-		return "", err, func() {}
+		return "", func() {}, errors.Wrap(err, "could not make temp path")
 	}
 
-	return tempPath, nil, func() {
+	return tempPath, func() {
 		os.Remove(tempPath)
-	}
+	}, nil
 }
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -253,7 +253,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// If the caller did not define the directory which all of the osquery file
 	// artifacts should be stored in, use a temporary directory.
 	if o.rootDirectory == "" {
-		rootDirectory, err, rmRootDirectory := osqueryTempDir()
+		rootDirectory, rmRootDirectory, err := osqueryTempDir()
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create temp directory for osquery instance")
 		}

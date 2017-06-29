@@ -98,7 +98,7 @@ func buildOsqueryExtensionInTempDir(rootDirectory string) error {
 }
 
 func TestOsqueryRuntime(t *testing.T) {
-	rootDirectory, err, rmRootDirectory := osqueryTempDir()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
