@@ -461,10 +461,10 @@ func (o *OsqueryInstance) Healthy() (bool, error) {
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
-		return []map[string]string{}, errors.Wrap(err, "could not query the extension manager client")
+		return nil, errors.Wrap(err, "could not query the extension manager client")
 	}
 	if resp.Status.Code != int32(0) {
-		return []map[string]string{}, errors.New(resp.Status.Message)
+		return nil, errors.New(resp.Status.Message)
 	}
 
 	return resp.Response, nil
