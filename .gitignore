@@ -19,3 +19,7 @@ bin
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+
+# TUF metadata
+autoupdate/assets/
+autoupdate/bindata.go

@@ -1,5 +1,5 @@
-hash: 2e4c0d45bee6bc38d880919591317507cca57d098dafb3db5a89ff20dec916ed
-updated: 2017-08-01T15:52:36.524460391-04:00
+hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
+updated: 2017-08-03T17:46:50.671578064-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -9,6 +9,10 @@ imports:
   version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+- name: github.com/docker/go
+  version: d30aec9fd63c35133f8f79c3412ad91a3b08be06
+  subpackages:
+  - canonical/json
 - name: github.com/go-kit/kit
   version: 19463ea8b215413a29c3513aa3a76181f4bac58d
   subpackages:
@@ -48,6 +52,11 @@ imports:
   - plugin/distributed
   - plugin/logger
   - plugin/table
+- name: github.com/kolide/updater
+  version: 8ff71420c45f358475e14c5c8ddf340a1985c71f
+  repo: git@github.com:kolide/updater.git
+  subpackages:
+  - tuf
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/mixer/clock
@@ -101,7 +110,7 @@ imports:
   - transport
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
@@ -109,7 +118,7 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 05e8a0eda380579888eb53c394909df027f06991
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
   - require

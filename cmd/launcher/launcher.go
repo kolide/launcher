@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -15,11 +19,13 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/autoupdate"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
+	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -34,14 +40,17 @@ var (
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
-	osquerydPath     string
-	rootDirectory    string
-	notaryServerURL  string
-	kolideServerURL  string
-	enrollSecret     string
-	enrollSecretPath string
-	printVersion     bool
-	debug            bool
+	osquerydPath       string
+	rootDirectory      string
+	notaryServerURL    string
+	mirrorServerURL    string
+	kolideServerURL    string
+	enrollSecret       string
+	enrollSecretPath   string
+	autoupdateInterval time.Duration
+	insecureTLS        bool
+	printVersion       bool
+	debug              bool
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -58,6 +67,11 @@ func parseOptions() (*options, error) {
 			"version",
 			false,
 			"print launcher version and exit",
+		)
+		flInsecureTLS = flag.Bool(
+			"insecure",
+			false,
+			"do not verify TLS certs for os update",
 		)
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
@@ -89,18 +103,31 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
 			"Path to a file containing the enroll secret to authenticate with the Kolide server",
 		)
+		flMirrorURL = flag.String(
+			"mirror_url",
+			env.String("KOLIDE_LAUNCHER_MIRROR_SERVER_URL", ""),
+			"The URL of the mirror server for autoupdates",
+		)
+		flAutoupdateInterval = flag.Duration(
+			"autoupdate_interval",
+			duration("KOLIDE_LAUNCHER_AUTOUPDATE_INTERVAL", 1*time.Hour),
+			"The interval when launcher checks for new updates. Only enabled if notary_url is set.",
+		)
 	)
 	flag.Parse()
 
 	opts := &options{
-		osquerydPath:     *flOsquerydPath,
-		rootDirectory:    *flRootDirectory,
-		notaryServerURL:  *flNotaryServerURL,
-		printVersion:     *flVersion,
-		kolideServerURL:  *flKolideServerURL,
-		enrollSecret:     *flEnrollSecret,
-		enrollSecretPath: *flEnrollSecretPath,
-		debug:            *flDebug,
+		osquerydPath:       *flOsquerydPath,
+		rootDirectory:      *flRootDirectory,
+		notaryServerURL:    *flNotaryServerURL,
+		mirrorServerURL:    *flMirrorURL,
+		printVersion:       *flVersion,
+		kolideServerURL:    *flKolideServerURL,
+		enrollSecret:       *flEnrollSecret,
+		enrollSecretPath:   *flEnrollSecretPath,
+		debug:              *flDebug,
+		insecureTLS:        *flInsecureTLS,
+		autoupdateInterval: *flAutoupdateInterval,
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -123,16 +150,81 @@ func parseOptions() (*options, error) {
 	return opts, nil
 }
 
-// updateOsquery is the callback which handles new versions of the osqueryd
-// binary
-func updateOsquery(stagingDir string, err error) {
-	return
+func insecureHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 }
 
-// updateLauncher is the callback which handled new versions of the launcher
-// binary
-func updateLauncher(stagingDir string, err error) {
-	return
+func enableAutoUpdate(
+	notaryURL, mirrorURL, binaryPath, rootdir string,
+	autoupdateInterval time.Duration,
+	restart func() error,
+	client *http.Client,
+	logger log.Logger,
+) (stop func(), err error) {
+	defaultOpts := []autoupdate.UpdaterOption{
+		autoupdate.WithHTTPClient(client),
+		autoupdate.WithNotaryURL(notaryURL),
+		autoupdate.WithLogger(logger),
+	}
+	if mirrorURL != "" {
+		defaultOpts = append(defaultOpts, autoupdate.WithMirrorURL(mirrorURL))
+	}
+
+	var osquerydUpdaterOpts []autoupdate.UpdaterOption
+	osquerydUpdaterOpts = append(osquerydUpdaterOpts, defaultOpts...)
+	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdate.WithFinalizer(restart))
+	osquerydUpdater, err := autoupdate.NewUpdater(
+		autoupdate.Destination(binaryPath),
+		rootdir,
+		osquerydUpdaterOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	stopO, err := osquerydUpdater.Run(tuf.WithFrequency(autoupdateInterval))
+	if err != nil {
+		return nil, err
+	}
+
+	launcherPath, err := os.Executable()
+	if err != nil {
+		return nil, errors.Wrap(err, "get launcher path")
+	}
+
+	// call this method to restart the launcher when autoupdate completes.
+	launcherFinalizer := func() error {
+		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+			return errors.Wrap(err, "restarting launcher")
+		}
+		return nil
+	}
+
+	var launcherUpdaterOpts []autoupdate.UpdaterOption
+	launcherUpdaterOpts = append(launcherUpdaterOpts, defaultOpts...)
+	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdate.WithFinalizer(launcherFinalizer))
+	launcherUpdater, err := autoupdate.NewUpdater(
+		autoupdate.Destination(launcherPath),
+		rootdir,
+		launcherUpdaterOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	stopL, err := launcherUpdater.Run(tuf.WithFrequency(autoupdateInterval))
+	if err != nil {
+		return nil, err
+	}
+
+	return func() {
+		stopO()
+		stopL()
+	}, nil
 }
 
 func logFatal(logger log.Logger, args ...interface{}) {
@@ -167,8 +259,13 @@ func main() {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
+	httpClient := http.DefaultClient
+	if opts.insecureTLS {
+		httpClient = insecureHTTPClient()
+	}
+
 	versionInfo := version.Version()
-	logFatal(logger, "msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
+	level.Info(logger).Log("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
 
 	db, err := bolt.Open(filepath.Join(opts.rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
@@ -208,7 +305,7 @@ func main() {
 		logFatal(logger, errors.Wrap(err, "invalid enroll secret"))
 	}
 
-	if _, err := osquery.LaunchOsqueryInstance(
+	instance, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(opts.rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
@@ -219,11 +316,42 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
-	); err != nil {
+	)
+	if err != nil {
 		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
+	}
+
+	if opts.notaryServerURL != "" {
+		stop, err := enableAutoUpdate(
+			opts.notaryServerURL,
+			opts.mirrorServerURL,
+			opts.osquerydPath,
+			opts.rootDirectory,
+			opts.autoupdateInterval,
+			instance.Restart,
+			httpClient,
+			logger,
+		)
+		if err != nil {
+			logFatal(logger, errors.Wrap(err, "starting autoupdater"))
+		}
+		defer stop()
 	}
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
+}
+
+// TODO: move to kolide/kit and figure out error handling there.
+func duration(key string, def time.Duration) time.Duration {
+	if env, ok := os.LookupEnv(key); ok {
+		t, err := time.ParseDuration(env)
+		if err != nil {
+			fmt.Println("env: parse duration flag: ", err)
+			os.Exit(1)
+		}
+		return t
+	}
+	return def
 }
