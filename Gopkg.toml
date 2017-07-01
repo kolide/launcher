@@ -8,6 +8,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/kolide/kit"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/pkg/errors"
 
 [[override]]
