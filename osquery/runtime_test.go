@@ -145,3 +145,26 @@ func TestRestart(t *testing.T) {
 
 	require.NoError(t, instance.Kill())
 }
+
+func TestRecover(t *testing.T) {
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
+	cancelFunc := falsifyOsArgs(rootDirectory)
+	defer cancelFunc()
+
+	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
+	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
+	require.NoError(t, err)
+
+	require.NoError(t, instance.Recover(errors.New("fabricated in a test")))
+	require.NoError(t, instance.Recover(errors.New("fabricated in a test")))
+
+	healthy, err := instance.Healthy()
+	require.NoError(t, err)
+	require.True(t, healthy)
+
+	require.NoError(t, instance.Kill())
+}
