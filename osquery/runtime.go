@@ -52,6 +52,7 @@ type osqueryInstanceFields struct {
 	once                   *sync.Once
 	hasBeganTeardown       bool
 	rmRootDirectory        func()
+	usingTempDir           bool
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -262,6 +263,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		}
 		o.rootDirectory = rootDirectory
 		o.rmRootDirectory = rmRootDirectory
+		o.usingTempDir = true
 	}
 
 	// Based on the root directory, calculate the file names of all of the
@@ -400,29 +402,7 @@ func (o *OsqueryInstance) Recover() error {
 		}
 	}
 
-	// In order to be sure we are launching a new osquery instance with the same
-	// configuration, we define a set of OsqueryInstanceOptions based on the
-	// configuration of the previous OsqueryInstance.
-	opts := []OsqueryInstanceOption{
-		WithOsquerydBinary(o.binaryPath),
-		WithRootDirectory(o.rootDirectory),
-		WithConfigPluginFlag(o.configPluginFlag),
-		WithLoggerPluginFlag(o.loggerPluginFlag),
-	}
-	for _, plugin := range o.extensionPlugins {
-		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
-	}
-	newInstance, err := LaunchOsqueryInstance(opts...)
-	if err != nil {
-		return errors.Wrap(err, "could not launch new osquery instance")
-	}
-
-	// Finally, now that we have a new running osquery instance, we replace the
-	// fields of our old instance with a pointer to the fields of the new instance
-	// so that existing references still work properly.
-	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
-
-	return nil
+	return o.relaunchAndReplace()
 }
 
 // Kill will terminate all osquery processes managed by the OsqueryInstance
@@ -453,6 +433,20 @@ func (o *OsqueryInstance) Kill() error {
 	return nil
 }
 
+// Restart allows you to cleanly shutdown the current osquery instance and launch
+// a new osquery instance with the same configurations.
+func (o *OsqueryInstance) Restart() error {
+	if err := o.Kill(); err != nil {
+		return errors.Wrap(err, "could not kill the osqueryd instance")
+	}
+
+	if err := o.relaunchAndReplace(); err != nil {
+		return errors.Wrap(err, "could not relaunch osquery instance")
+	}
+
+	return nil
+}
+
 // Healthy will check to determine whether or not the osquery process that is
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy.
@@ -476,4 +470,35 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
+}
+
+// relaunchAndReplace is an internal helper for launching a new osquery
+// instance with the same options as the existing instance and replacing the
+// internal o.osqueryInstanceFields with the new instance.
+func (o *OsqueryInstance) relaunchAndReplace() error {
+	// In order to be sure we are launching a new osquery instance with the same
+	// configuration, we define a set of OsqueryInstanceOptions based on the
+	// configuration of the previous OsqueryInstance.
+	opts := []OsqueryInstanceOption{
+		WithOsquerydBinary(o.binaryPath),
+		WithConfigPluginFlag(o.configPluginFlag),
+		WithLoggerPluginFlag(o.loggerPluginFlag),
+	}
+	if !o.usingTempDir {
+		opts = append(opts, WithRootDirectory(o.rootDirectory))
+	}
+	for _, plugin := range o.extensionPlugins {
+		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
+	}
+	newInstance, err := LaunchOsqueryInstance(opts...)
+	if err != nil {
+		return errors.Wrap(err, "could not launch new osquery instance")
+	}
+
+	// Now that we have a new running osquery instance, we replace the fields of
+	// our old instance with a pointer to the fields of the new instance so that
+	// existing references still work properly.
+	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
+
+	return nil
 }
