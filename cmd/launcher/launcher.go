@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -27,6 +28,7 @@ type options struct {
 	osquerydPath    string
 	rootDirectory   string
 	notaryServerUrl string
+	printVersion    bool
 }
 
 // flagOrEnv accepts an option configured via a flag and an option configured
@@ -44,6 +46,11 @@ func flagOrEnv(flag, env string) string {
 // typed struct of options for further application use
 func parseOptions() (*options, error) {
 	var (
+		flVersion = flag.Bool(
+			"version",
+			false,
+			"print launcher version and exit",
+		)
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
 			"",
@@ -69,6 +76,7 @@ func parseOptions() (*options, error) {
 		osquerydPath:    flagOrEnv(*flOsquerydPath, envOsquerydPath),
 		rootDirectory:   flagOrEnv(*flRootDirectory, envRootDirectory),
 		notaryServerUrl: flagOrEnv(*flNotaryServerUrl, envNotaryServerUrl),
+		printVersion:    *flVersion,
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -115,6 +123,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unacceptable options: %s\n", err)
 	}
+
+	if opts.printVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
+	versionInfo := version.Version()
+	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
 	if opts.notaryServerUrl != "" {
 		osqueryUpdater, err := updater.Start(updater.Settings{}, updateOsquery)
