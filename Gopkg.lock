@@ -21,12 +21,6 @@
   version = "v3.0.0"
 
 [[projects]]
-  name = "github.com/docker/go"
-  packages = ["canonical/json"]
-  revision = "62e5ec7cf43f795986ec658df7cb317255772993"
-  version = "v1.5.1-1"
-
-[[projects]]
   branch = "master"
   name = "github.com/kolide/kit"
   packages = ["version"]
@@ -37,12 +31,6 @@
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","plugin/config","plugin/logger","plugin/table"]
   revision = "5ff815310afd1fffe38a9a92c35e257d960fe71b"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/kolide/updater"
-  packages = [".","tuf"]
-  revision = "04e45b3f8fe303492c6cfe261ca6369c97f773f0"
 
 [[projects]]
   branch = "master"
@@ -65,6 +53,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "88f93a59a7832382d0f6c59515da6c9dde7d736f5baaaa7199f664b8fd4bac16"
+  inputs-digest = "3f71393f37f4ae32ae4286b1069b3cad243ad1362df06caed1b5a4ac5e1c0f6a"
   solver-name = "gps-cdcl"
   solver-version = 1

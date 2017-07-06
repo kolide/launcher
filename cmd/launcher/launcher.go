@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/logger"
-	"github.com/kolide/updater"
 )
 
 var (
@@ -131,20 +130,6 @@ func main() {
 
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
-
-	if opts.notaryServerUrl != "" {
-		osqueryUpdater, err := updater.Start(updater.Settings{}, updateOsquery)
-		if err != nil {
-			log.Fatalf("Error launching osqueryd updater service %s\n", err)
-		}
-		defer osqueryUpdater.Stop()
-
-		launcherUpdater, err := updater.Start(updater.Settings{}, updateLauncher)
-		if err != nil {
-			log.Fatalf("Error launching osqueryd updater service %s\n", err)
-		}
-		defer launcherUpdater.Stop()
-	}
 
 	if _, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
