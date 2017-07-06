@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -30,16 +31,6 @@ type options struct {
 	printVersion    bool
 }
 
-// flagOrEnv accepts an option configured via a flag and an option configured
-// via an environment variable and returns the correct value as determined by
-// order of precedence
-func flagOrEnv(flag, env string) string {
-	if flag != "" {
-		return flag
-	}
-	return env
-}
-
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
@@ -52,29 +43,26 @@ func parseOptions() (*options, error) {
 		)
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
-			"",
+			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
 			"path to osqueryd binary",
 		)
-		envOsquerydPath = os.Getenv("KOLIDE_LAUNCHER_OSQUERYD_PATH")
 		flRootDirectory = flag.String(
 			"root_directory",
-			"",
+			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", os.TempDir()),
 			"path to the working directory where file artifacts can be stored",
 		)
-		envRootDirectory  = os.Getenv("KOLIDE_LAUNCHER_ROOT_DIRECTORY")
 		flNotaryServerUrl = flag.String(
 			"notary_url",
-			"",
+			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", ""),
 			"The URL of the notary update server",
 		)
-		envNotaryServerUrl = os.Getenv("KOLIDE_LAUNCHER_NOTARY_SERVER_URL")
 	)
 	flag.Parse()
 
 	opts := &options{
-		osquerydPath:    flagOrEnv(*flOsquerydPath, envOsquerydPath),
-		rootDirectory:   flagOrEnv(*flRootDirectory, envRootDirectory),
-		notaryServerUrl: flagOrEnv(*flNotaryServerUrl, envNotaryServerUrl),
+		osquerydPath:    *flOsquerydPath,
+		rootDirectory:   *flRootDirectory,
+		notaryServerUrl: *flNotaryServerUrl,
 		printVersion:    *flVersion,
 	}
 
@@ -89,11 +77,6 @@ func parseOptions() (*options, error) {
 		} else {
 			log.Fatal("Could not find osqueryd binary")
 		}
-	}
-
-	// if a root directory was not set, we will fail back to using a temporary path
-	if opts.rootDirectory == "" {
-		opts.rootDirectory = os.TempDir()
 	}
 
 	return opts, nil
