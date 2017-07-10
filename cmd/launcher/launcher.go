@@ -114,13 +114,18 @@ func main() {
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
+	ext, err := osquery.NewExtension("localhost:8082", "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IjRkOmM1OmRlOmE1OjczOmUxOmE4OjI4OmU2OmEyOjMwOmI4OmI1OjBmOjg4OjQ0In0.eyJ0ZW5hbnQiOiJkYWJhYmkifQ.RdiMJpNVhOmHLm7nrRedeje60XY5_DJz4MDNR7fyL51kc887lh609BaKMZut6hJ6JqL6w5dcNqOVE74477itriEjwyuF44k842dJWcCitvAlT4-Dh4KS5nqhKNA3BMNjPKvclmz7s4d7GajD-yB4nlMXPLmcupQxbijWnibsaQdlSm016mILym8SgcJY_foOmsbgzD8avcEH0WqyhUk_wFBVRZxhuItYmwB7G6letBRX7kzUmwKQNP5uV2pxsqOW3on82WRGQv_g9bca1DePCo_3tDplK8exH60-Qdj9DecGYpRFhimKAh9wI_vuyCgQr8CiOgkZnfy5vntIEusyNg", "bar_host")
+	if err != nil {
+		log.Fatalf("Error strating grpc extension: %s\n", err)
+	}
+
 	if _, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(opts.rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
-		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
-		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
+		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
+		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", ext.LogString)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
 	); err != nil {

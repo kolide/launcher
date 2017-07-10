@@ -21,6 +21,36 @@
   version = "v3.0.0"
 
 [[projects]]
+  name = "github.com/go-kit/kit"
+  packages = ["endpoint","log","transport/grpc"]
+  revision = "a9ca6725cbbea455e61c6bc8a1ed28e81eb3493b"
+  version = "v0.5.0"
+
+[[projects]]
+  name = "github.com/go-logfmt/logfmt"
+  packages = ["."]
+  revision = "390ab7935ee28ec6b286364bba9b4dd6410cb3d5"
+  version = "v0.3.0"
+
+[[projects]]
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  revision = "7a2f19628aabfe68f0766b59e74d6315f8347d22"
+  version = "v1.5.3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/protobuf"
+  packages = ["proto","ptypes/any"]
+  revision = "6a1fa9404c0aebf36c879bc50152edcc953910d2"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/kolide/agent-api"
+  packages = ["."]
+  revision = "f278f0edfa00d86c0afbc0e3396f589fc36e67cd"
+
+[[projects]]
   branch = "master"
   name = "github.com/kolide/kit"
   packages = ["env","version"]
@@ -31,6 +61,12 @@
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","plugin/config","plugin/logger","plugin/table"]
   revision = "5ff815310afd1fffe38a9a92c35e257d960fe71b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/kr/logfmt"
+  packages = ["."]
+  revision = "b84e30acd515aadc4b783ad4ff83aff3299bdfe0"
 
 [[projects]]
   branch = "master"
@@ -50,9 +86,33 @@
   revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
   version = "v1.1.4"
 
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  revision = "054b33e6527139ad5b1ec2f6232c3b175bd9a30c"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/text"
+  packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  revision = "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa"
+
+[[projects]]
+  branch = "master"
+  name = "google.golang.org/genproto"
+  packages = ["googleapis/rpc/status"]
+  revision = "aa2eb687b4d3e17154372564ad8d6bf11c3cf21f"
+
+[[projects]]
+  name = "google.golang.org/grpc"
+  packages = [".","codes","credentials","grpclb/grpc_lb_v1","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
+  revision = "b15215fb911b24a5d61d57feec4233d610530464"
+  version = "v1.4.2"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d9f70e2c8698bfae2996d848eab83be300d934016a03d41c43161e2fc3a33871"
+  inputs-digest = "8fd21e867227fea5d22a765c64a5192b4d9dadcef295edcb766c500b35c400db"
   solver-name = "gps-cdcl"
   solver-version = 1

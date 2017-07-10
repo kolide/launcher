@@ -2,10 +2,6 @@
   branch = "master"
   name = "github.com/kolide/osquery-go"
 
-[[override]]
-  revision = "b8ee72de5bf9318d50846852082325d0f932682b"
-  name = "git.apache.org/thrift.git"
-
 [[constraint]]
   branch = "master"
   name = "github.com/kolide/updater"

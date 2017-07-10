@@ -72,7 +72,7 @@ type agentAPIResponse struct {
 
 func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, logType LogType, logs []Log) (string, string, bool, error) {
 	request := logCollection{NodeKey: nodeKey, AgentVersion: version, LogType: logType, Logs: logs}
-	response, err := e.RequestConfigEndpoint(ctx, request)
+	response, err := e.PublishLogsEndpoint(ctx, request)
 	if err != nil {
 		return "", "", false, err
 	}
