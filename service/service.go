@@ -10,10 +10,8 @@ type Query struct {
 type Result struct {
 	ID     string
 	Status int
-	Rows   []Row
+	Rows   []map[string]string
 }
-
-type Row map[string]string
 
 type LogType int
 

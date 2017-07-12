@@ -16,6 +16,7 @@ import (
 
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 )
@@ -33,13 +34,14 @@ type OsqueryInstance struct {
 type osqueryInstanceFields struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
-	binaryPath       string
-	rootDirectory    string
-	configPluginFlag string
-	loggerPluginFlag string
-	extensionPlugins []osquery.OsqueryPlugin
-	stdout           io.Writer
-	stderr           io.Writer
+	binaryPath            string
+	rootDirectory         string
+	configPluginFlag      string
+	loggerPluginFlag      string
+	distributedPluginFlag string
+	extensionPlugins      []osquery.OsqueryPlugin
+	stdout                io.Writer
+	stderr                io.Writer
 
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
@@ -99,7 +101,7 @@ func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
 // createOsquerydCommand accepts a structure of relevant file paths relating to
 // an osquery instance and returns an *exec.Cmd which will launch a properly
 // configured osqueryd process.
-func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin string, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
+func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin, distributedPlugin string, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
 		osquerydBinary,
@@ -109,6 +111,8 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		fmt.Sprintf("--config_plugin=%s", configPlugin),
 		fmt.Sprintf("--logger_plugin=%s", loggerPlugin),
+		fmt.Sprintf("--distributed_plugin=%s", distributedPlugin),
+		"--disable_distributed=false",
 		"--pack_delimiter=:",
 		"--config_refresh=10",
 		"--host_identifier=uuid",
@@ -192,6 +196,17 @@ func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
 func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.loggerPluginFlag = plugin
+	}
+}
+
+// WithDistributedPluginFlag is a functional option which allows the user to define
+// which distributed plugin osqueryd should use to log status and result logs. If this
+// is not defined, logs will be logged via the application's default distributed. The
+// distributed plugin which osquery uses can be changed at any point during the
+// osqueryd execution lifecycle by defining the option via the config.
+func WithDistributedPluginFlag(plugin string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.distributedPluginFlag = plugin
 	}
 }
 
@@ -295,10 +310,23 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		o.loggerPluginFlag = "internal_noop"
 	}
 
+	// If a distributed plugin has not been set by the caller, we set a distributed plugin
+	// that outputs logs to the default application distributed.
+	if o.distributedPluginFlag == "" {
+		getQueries := func(ctx context.Context) (*distributed.GetQueriesResult, error) {
+			return &distributed.GetQueriesResult{}, nil
+		}
+		writeResults := func(ctx context.Context, results []distributed.Result) error {
+			return nil
+		}
+		o.extensionPlugins = append(o.extensionPlugins, distributed.NewPlugin("internal_noop", getQueries, writeResults))
+		o.distributedPluginFlag = "internal_noop"
+	}
+
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag, o.stdout, o.stderr)
+	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag, o.distributedPluginFlag, o.stdout, o.stderr)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create osqueryd command")
 	}
@@ -483,6 +511,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 		WithOsquerydBinary(o.binaryPath),
 		WithConfigPluginFlag(o.configPluginFlag),
 		WithLoggerPluginFlag(o.loggerPluginFlag),
+		WithDistributedPluginFlag(o.distributedPluginFlag),
 	}
 	if !o.usingTempDir {
 		opts = append(opts, WithRootDirectory(o.rootDirectory))

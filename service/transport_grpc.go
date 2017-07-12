@@ -155,7 +155,7 @@ func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 	results := make([]Result, len(req.Results))
 	for _, result := range req.Results {
 		// Iterate results
-		rows := make([]Row, len(result.Rows))
+		rows := make([]map[string]string, len(result.Rows))
 		for _, row := range result.Rows {
 			// Extract rows into map[string]string
 			rowMap := make(map[string]string, len(row.Columns))

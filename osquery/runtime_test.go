@@ -52,7 +52,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	osquerydPath, err := exec.LookPath("osqueryd")
 	require.NoError(t, err)
 
-	cmd, err := createOsquerydCommand(osquerydPath, paths, "config_plugin", "logger_plugin", os.Stdout, os.Stderr)
+	cmd, err := createOsquerydCommand(osquerydPath, paths, "config_plugin", "logger_plugin", "distributed_plugin", os.Stdout, os.Stderr)
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)

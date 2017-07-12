@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
@@ -124,8 +125,10 @@ func main() {
 		osquery.WithRootDirectory(opts.rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
+		osquery.WithDistributedPluginFlag("kolide_grpc"),
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
 		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", ext.LogString)),
+		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
 	); err != nil {

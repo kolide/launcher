@@ -35,8 +35,8 @@
 [[projects]]
   name = "github.com/go-stack/stack"
   packages = ["."]
-  revision = "7a2f19628aabfe68f0766b59e74d6315f8347d22"
-  version = "v1.5.3"
+  revision = "54be5f394ed2c3e19dac9134a40a95ba5a017f7b"
+  version = "v1.5.4"
 
 [[projects]]
   branch = "master"
@@ -54,13 +54,13 @@
   branch = "master"
   name = "github.com/kolide/kit"
   packages = ["env","version"]
-  revision = "76f6e824d778576cdf8c89f13cd21d8db2436db3"
+  revision = "c26f6b9b1f8658c8486a2bf3eaa969308ec2f85e"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
-  packages = [".","gen/osquery","plugin/config","plugin/logger","plugin/table"]
-  revision = "5ff815310afd1fffe38a9a92c35e257d960fe71b"
+  packages = [".","gen/osquery","plugin/config","plugin/distributed","plugin/logger","plugin/table"]
+  revision = "3bee1bb9072f095ae9c558a7a3c79c0bc297a727"
 
 [[projects]]
   branch = "master"
@@ -90,7 +90,7 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "054b33e6527139ad5b1ec2f6232c3b175bd9a30c"
+  revision = "f01ecb60fe3835d80d9a0b7b2bf24b228c89260e"
 
 [[projects]]
   branch = "master"
@@ -102,7 +102,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "aa2eb687b4d3e17154372564ad8d6bf11c3cf21f"
+  revision = "40b7550fd0ba4b8f7e9d70ed40fcd4f3375db1de"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -113,6 +113,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8fd21e867227fea5d22a765c64a5192b4d9dadcef295edcb766c500b35c400db"
+  inputs-digest = "af7e9b964a713b8095bd77d8b5a178904efc7ae0eef875598ff0902fc01603a8"
   solver-name = "gps-cdcl"
   solver-version = 1
