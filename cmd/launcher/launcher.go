@@ -33,8 +33,8 @@ var (
 type options struct {
 	osquerydPath    string
 	rootDirectory   string
-	notaryServerUrl string
-	kolideServerUrl string
+	notaryServerURL string
+	kolideServerURL string
 	enrollSecret    string
 	printVersion    bool
 }
@@ -59,12 +59,12 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", os.TempDir()),
 			"path to the working directory where file artifacts can be stored",
 		)
-		flNotaryServerUrl = flag.String(
+		flNotaryServerURL = flag.String(
 			"notary_url",
 			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", ""),
 			"The URL of the notary update server",
 		)
-		flKolideServerUrl = flag.String(
+		flKolideServerURL = flag.String(
 			"kolide_url",
 			env.String("KOLIDE_LAUNCHER_KOLIDE_URL", ""),
 			"URL of the Kolide server to communicate with",
@@ -80,9 +80,9 @@ func parseOptions() (*options, error) {
 	opts := &options{
 		osquerydPath:    *flOsquerydPath,
 		rootDirectory:   *flRootDirectory,
-		notaryServerUrl: *flNotaryServerUrl,
+		notaryServerURL: *flNotaryServerURL,
 		printVersion:    *flVersion,
-		kolideServerUrl: *flKolideServerUrl,
+		kolideServerURL: *flKolideServerURL,
 		enrollSecret:    *flEnrollSecret,
 	}
 
@@ -135,7 +135,7 @@ func main() {
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
 	// TODO fix insecure
-	conn, err := grpc.Dial(opts.kolideServerUrl, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
+	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
 	if err != nil {
 		log.Fatalf("Error dialing grpc server: %s\n", err)
 	}

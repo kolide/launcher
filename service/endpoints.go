@@ -8,6 +8,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
+// Endpoints is the implementation of the KolideService interface.
 type Endpoints struct {
 	RequestEnrollmentEndpoint endpoint.Endpoint
 	RequestConfigEndpoint     endpoint.Endpoint
@@ -27,6 +28,7 @@ type enrollmentResponse struct {
 	Err         error
 }
 
+// RequestEnrollment implements KolideService.RequestEnrollment
 func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier}
 	response, err := e.RequestEnrollmentEndpoint(ctx, request)
@@ -48,6 +50,7 @@ type configResponse struct {
 	Err            error
 }
 
+// RequestConfig implements KolideService.RequestConfig.
 func (e Endpoints) RequestConfig(ctx context.Context, nodeKey, version string) (string, bool, error) {
 	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
 	response, err := e.RequestConfigEndpoint(ctx, request)
@@ -72,6 +75,7 @@ type agentAPIResponse struct {
 	Err         error
 }
 
+// PublishLogs implements KolideService.PublishLogs
 func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	request := logCollection{NodeKey: nodeKey, AgentVersion: version, LogType: logType, Logs: logs}
 	response, err := e.PublishLogsEndpoint(ctx, request)
@@ -88,6 +92,7 @@ type queryCollection struct {
 	Err         error
 }
 
+// RequestQueries implements KolideService.RequestQueries
 func (e Endpoints) RequestQueries(ctx context.Context, nodeKey, version string) (*distributed.GetQueriesResult, bool, error) {
 	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
 	response, err := e.RequestQueriesEndpoint(ctx, request)
@@ -103,6 +108,7 @@ type resultCollection struct {
 	Results []distributed.Result
 }
 
+// PublishResults implements KolideService.PublishResults
 func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	request := resultCollection{NodeKey: nodeKey, Results: results}
 	response, err := e.PublishResultsEndpoint(ctx, request)

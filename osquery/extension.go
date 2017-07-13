@@ -27,6 +27,9 @@ func NewExtension(client service.KolideService) (*Extension, error) {
 // TODO this should come from something sensible
 const version = "foobar"
 
+// Enroll will attempt to enroll the host using the provided enroll secret for
+// identification. In the future it should look for existing enrollment
+// configuration locally.
 func (e *Extension) Enroll(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
 	key, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), enrollSecret, hostIdentifier)
 	if err != nil {
@@ -40,6 +43,8 @@ func (e *Extension) Enroll(ctx context.Context, enrollSecret, hostIdentifier str
 	return key, invalid, err
 }
 
+// GenerateConfigs will request the osquery configuration from the server. In
+// the future it should look for existing configuration locally.
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
 	// TODO get version
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey, version)
@@ -54,6 +59,8 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 	return map[string]string{"config": config}, nil
 }
 
+// LogString will publish a status/result log from osquery to the server. In
+// the future it should buffer logs and send them at intervals.
 func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText string) error {
 	// TODO get version
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, version, typ, []string{logText})
@@ -68,6 +75,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	return nil
 }
 
+// GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey, version)
 	if err != nil {
@@ -81,6 +89,8 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 	return queries, nil
 }
 
+// WriteResults will publish results of the executed distributed queries back
+// to the server.
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if err != nil {
