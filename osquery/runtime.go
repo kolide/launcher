@@ -357,9 +357,9 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		// runtime produces an error, it's likely that all of the other components
 		// will produce errors as well since everything is so interconnected. For
 		// this reason, when any error occurs, we attempt a total recovery.
-		<-o.errs
+		runtimeError := <-o.errs
 		o.once.Do(func() {
-			if recoveryError := o.Recover(); recoveryError != nil {
+			if recoveryError := o.Recover(runtimeError); recoveryError != nil {
 				// If we were not able to recover the osqueryd process for some reason,
 				// kill the process and hope that the operating system scheduling
 				// mechanism (launchd, etc) can relaunch the tool cleanly.
@@ -376,7 +376,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 // release resources because Kill() expects the osquery instance to be healthy,
 // whereas Recover() expects a hostile environment and is slightly more
 // defensive in it's actions.
-func (o *OsqueryInstance) Recover() error {
+func (o *OsqueryInstance) Recover(runtimeError error) error {
 	// If the user explicitly calls o.Kill(), as the components are shutdown, they
 	// may exit with errors. In this case, we shouldn't recover the instance.
 	if o.hasBeganTeardown {
@@ -385,18 +385,18 @@ func (o *OsqueryInstance) Recover() error {
 	o.hasBeganTeardown = true
 
 	// First, we try to kill the osqueryd process if it isn't already dead.
-	if !o.cmd.ProcessState.Exited() {
+	if o.cmd.Process != nil {
 		if err := o.cmd.Process.Kill(); err != nil {
 			if !strings.Contains(err.Error(), "process already finished") {
 				return errors.Wrap(err, "could not kill the osquery process during recovery")
-
 			}
 		}
 	}
 
 	// Next, we try to kill the osquery extension manager server if it isn't
 	// already dead.
-	if _, err := o.extensionManagerServer.Ping(); err != nil {
+	status, err := o.extensionManagerServer.Ping()
+	if err == nil && status.Code == int32(0) {
 		if err := o.extensionManagerServer.Shutdown(); err != nil {
 			return errors.Wrap(err, "could not kill the extension manager server")
 		}
