@@ -1,17 +1,23 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
+	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
@@ -27,7 +33,9 @@ var (
 type options struct {
 	osquerydPath    string
 	rootDirectory   string
-	notaryServerUrl string
+	notaryServerURL string
+	kolideServerURL string
+	enrollSecret    string
 	printVersion    bool
 }
 
@@ -51,10 +59,20 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", os.TempDir()),
 			"path to the working directory where file artifacts can be stored",
 		)
-		flNotaryServerUrl = flag.String(
+		flNotaryServerURL = flag.String(
 			"notary_url",
 			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", ""),
 			"The URL of the notary update server",
+		)
+		flKolideServerURL = flag.String(
+			"kolide_url",
+			env.String("KOLIDE_LAUNCHER_KOLIDE_URL", ""),
+			"URL of the Kolide server to communicate with",
+		)
+		flEnrollSecret = flag.String(
+			"enroll_secret",
+			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
+			"Enroll secret to authenticate with the Kolide server",
 		)
 	)
 	flag.Parse()
@@ -62,8 +80,10 @@ func parseOptions() (*options, error) {
 	opts := &options{
 		osquerydPath:    *flOsquerydPath,
 		rootDirectory:   *flRootDirectory,
-		notaryServerUrl: *flNotaryServerUrl,
+		notaryServerURL: *flNotaryServerURL,
 		printVersion:    *flVersion,
+		kolideServerURL: *flKolideServerURL,
+		enrollSecret:    *flEnrollSecret,
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -114,13 +134,36 @@ func main() {
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
+	// TODO fix insecure
+	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
+	if err != nil {
+		log.Fatalf("Error dialing grpc server: %s\n", err)
+	}
+
+	client := service.New(conn)
+
+	ext, err := osquery.NewExtension(client)
+	if err != nil {
+		log.Fatalf("Error starting grpc extension: %s\n", err)
+	}
+
+	_, invalid, err := ext.Enroll(context.Background(), opts.enrollSecret, "foo_host")
+	if err != nil {
+		log.Fatalf("Error in enrollment: %s\n", err)
+	}
+	if invalid {
+		log.Fatalf("Invalid enrollment secret\n")
+	}
+
 	if _, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(opts.rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
-		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", osquery.GenerateConfigs)),
-		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", osquery.LogString)),
+		osquery.WithDistributedPluginFlag("kolide_grpc"),
+		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
+		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", ext.LogString)),
+		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
 	); err != nil {
