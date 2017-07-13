@@ -8,7 +8,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
-func DecodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.EnrollmentRequest)
 	return enrollmentRequest{
 		EnrollSecret:   req.EnrollSecret,
@@ -16,7 +16,7 @@ func DecodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interf
 	}, nil
 }
 
-func EncodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentRequest)
 	return &kolide_agent.EnrollmentRequest{
 		EnrollSecret:   req.EnrollSecret,
@@ -24,7 +24,7 @@ func EncodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interf
 	}, nil
 }
 
-func DecodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.EnrollmentResponse)
 	return enrollmentResponse{
 		NodeKey:     req.NodeKey,
@@ -32,7 +32,7 @@ func DecodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (inter
 	}, nil
 }
 
-func EncodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentResponse)
 	return &kolide_agent.EnrollmentResponse{
 		NodeKey:     req.NodeKey,
@@ -40,7 +40,7 @@ func EncodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (inter
 	}, nil
 }
 
-func DecodeGRPCAgentAPIRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCAgentAPIRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.AgentApiRequest)
 	return agentAPIRequest{
 		NodeKey:      req.NodeKey,
@@ -48,7 +48,7 @@ func DecodeGRPCAgentAPIRequest(_ context.Context, grpcReq interface{}) (interfac
 	}, nil
 }
 
-func EncodeGRPCAgentAPIRequest(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCAgentAPIRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(agentAPIRequest)
 	return &kolide_agent.AgentApiRequest{
 		NodeKey:      req.NodeKey,
@@ -56,7 +56,7 @@ func EncodeGRPCAgentAPIRequest(_ context.Context, request interface{}) (interfac
 	}, nil
 }
 
-func DecodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.ConfigResponse)
 	return configResponse{
 		ConfigJSONBlob: req.ConfigJsonBlob,
@@ -64,7 +64,7 @@ func DecodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface
 	}, nil
 }
 
-func EncodeGRPCConfigResponse(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(configResponse)
 	return &kolide_agent.ConfigResponse{
 		ConfigJsonBlob: req.ConfigJSONBlob,
@@ -72,7 +72,7 @@ func EncodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 	}, nil
 }
 
-func DecodeGRPCAgentAPIResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCAgentAPIResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.AgentApiResponse)
 	return agentAPIResponse{
 		Message:     req.Message,
@@ -81,7 +81,7 @@ func DecodeGRPCAgentAPIResponse(_ context.Context, grpcReq interface{}) (interfa
 	}, nil
 }
 
-func EncodeGRPCAgentAPIResponse(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCAgentAPIResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(agentAPIResponse)
 	return &kolide_agent.AgentApiResponse{
 		Message:     req.Message,
@@ -90,7 +90,7 @@ func EncodeGRPCAgentAPIResponse(_ context.Context, request interface{}) (interfa
 	}, nil
 }
 
-func DecodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.LogCollection)
 	logs := make([]string, 0, len(req.Logs))
 	for _, log := range req.Logs {
@@ -103,7 +103,7 @@ func DecodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 	}, nil
 }
 
-func EncodeGRPCLogCollection(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(logCollection)
 	logs := make([]*kolide_agent.LogCollection_Log, 0, len(req.Logs))
 	for _, log := range req.Logs {
@@ -117,7 +117,7 @@ func EncodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 
 }
 
-func DecodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.QueryCollection)
 	queries := distributed.GetQueriesResult{
 		Queries:   map[string]string{},
@@ -132,7 +132,7 @@ func DecodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interfac
 	}, nil
 }
 
-func EncodeGRPCQueryCollection(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(queryCollection)
 	queries := make([]*kolide_agent.QueryCollection_Query, 0, len(req.Queries.Queries))
 	for id, query := range req.Queries.Queries {
@@ -149,7 +149,7 @@ func EncodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 	}, nil
 }
 
-func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
+func decodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.ResultCollection)
 
 	results := make([]distributed.Result, 0, len(req.Results))
@@ -179,7 +179,7 @@ func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 	}, nil
 }
 
-func EncodeGRPCResultCollection(_ context.Context, request interface{}) (interface{}, error) {
+func encodeGRPCResultCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(resultCollection)
 
 	results := make([]*kolide_agent.ResultCollection_Result, 0, len(req.Results))

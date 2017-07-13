@@ -12,8 +12,8 @@ func New(conn *grpc.ClientConn) KolideService {
 		conn,
 		"kolide.agent.Api",
 		"RequestEnrollment",
-		EncodeGRPCEnrollmentRequest,
-		DecodeGRPCEnrollmentResponse,
+		encodeGRPCEnrollmentRequest,
+		decodeGRPCEnrollmentResponse,
 		kolide_agent.EnrollmentResponse{},
 	).Endpoint()
 
@@ -21,8 +21,8 @@ func New(conn *grpc.ClientConn) KolideService {
 		conn,
 		"kolide.agent.Api",
 		"RequestConfig",
-		EncodeGRPCAgentAPIRequest,
-		DecodeGRPCConfigResponse,
+		encodeGRPCAgentAPIRequest,
+		decodeGRPCConfigResponse,
 		kolide_agent.ConfigResponse{},
 	).Endpoint()
 
@@ -30,8 +30,8 @@ func New(conn *grpc.ClientConn) KolideService {
 		conn,
 		"kolide.agent.Api",
 		"PublishLogs",
-		EncodeGRPCLogCollection,
-		DecodeGRPCAgentAPIResponse,
+		encodeGRPCLogCollection,
+		decodeGRPCAgentAPIResponse,
 		kolide_agent.AgentApiResponse{},
 	).Endpoint()
 
@@ -39,8 +39,8 @@ func New(conn *grpc.ClientConn) KolideService {
 		conn,
 		"kolide.agent.Api",
 		"RequestQueries",
-		EncodeGRPCAgentAPIRequest,
-		DecodeGRPCQueryCollection,
+		encodeGRPCAgentAPIRequest,
+		decodeGRPCQueryCollection,
 		kolide_agent.QueryCollection{},
 	).Endpoint()
 
@@ -48,8 +48,8 @@ func New(conn *grpc.ClientConn) KolideService {
 		conn,
 		"kolide.agent.Api",
 		"PublishResults",
-		EncodeGRPCResultCollection,
-		DecodeGRPCAgentAPIResponse,
+		encodeGRPCResultCollection,
+		decodeGRPCAgentAPIResponse,
 		kolide_agent.AgentApiResponse{},
 	).Endpoint()
 

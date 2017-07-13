@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kolide/launcher/service"
 	"github.com/kolide/launcher/service/mock"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -111,7 +110,7 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 
 func TestExtensionLogStringTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType service.LogType, logs []service.Log) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
 		},
 	}
@@ -125,7 +124,7 @@ func TestExtensionLogStringTransportError(t *testing.T) {
 func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 	var gotNodeKey string
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType service.LogType, logs []service.Log) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
@@ -141,10 +140,10 @@ func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 
 func TestExtensionLogString(t *testing.T) {
 	var gotNodeKey, gotVersion string
-	var gotLogType service.LogType
-	var gotLogs []service.Log
+	var gotLogType logger.LogType
+	var gotLogs []string
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType service.LogType, logs []service.Log) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			gotNodeKey = nodeKey
 			gotVersion = version
 			gotLogType = logType
@@ -160,13 +159,13 @@ func TestExtensionLogString(t *testing.T) {
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
-	assert.Equal(t, service.LogType(logger.LogTypeStatus), gotLogType)
-	assert.Equal(t, []service.Log{service.Log{"foobar"}}, gotLogs)
+	assert.Equal(t, logger.LogTypeStatus, gotLogType)
+	assert.Equal(t, []string{"foobar"}, gotLogs)
 }
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) ([]service.Query, bool, error) {
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
 			return nil, false, errors.New("transport")
 		},
 	}
@@ -181,7 +180,7 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	var gotNodeKey string
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) ([]service.Query, bool, error) {
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
 			gotNodeKey = nodeKey
 			return nil, true, nil
 		},
@@ -199,10 +198,12 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 func TestExtensionGetQueries(t *testing.T) {
 	expectedQueries := map[string]string{"time": "select * from time", "version": "select version from osquery_info"}
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) ([]service.Query, bool, error) {
-			return []service.Query{
-				service.Query{"time", "select * from time"},
-				service.Query{"version", "select version from osquery_info"},
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+			return &distributed.GetQueriesResult{
+				Queries: map[string]string{
+					"time":    "select * from time",
+					"version": "select version from osquery_info",
+				},
 			}, false, nil
 		},
 	}
@@ -216,7 +217,7 @@ func TestExtensionGetQueries(t *testing.T) {
 
 func TestExtensionWriteResultsTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []service.Result) (string, string, bool, error) {
+		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
 		},
 	}
@@ -230,7 +231,7 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	var gotNodeKey string
 	m := &mock.KolideService{
-		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []service.Result) (string, string, bool, error) {
+		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
@@ -245,26 +246,25 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteResults(t *testing.T) {
-	var gotResults []service.Result
+	var gotResults []distributed.Result
 	m := &mock.KolideService{
-		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []service.Result) (string, string, bool, error) {
+		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			gotResults = results
 			return "", "", true, nil
 		},
 	}
 	e := &Extension{serviceClient: m}
 
-	expectedResult := distributed.Result{
-		QueryName: "foobar",
-		Status:    0,
-		Rows:      []map[string]string{{"foo": "bar"}},
+	expectedResults := []distributed.Result{
+		{
+			QueryName: "foobar",
+			Status:    0,
+			Rows:      []map[string]string{{"foo": "bar"}},
+		},
 	}
 
-	err := e.WriteResults(context.Background(), []distributed.Result{expectedResult})
+	err := e.WriteResults(context.Background(), expectedResults)
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.NotNil(t, err)
-	if assert.Len(t, gotResults, 1) {
-		res := gotResults[0]
-		assert.Equal(t, expectedResult, distributed.Result{res.ID, res.Status, res.Rows})
-	}
+	assert.Equal(t, expectedResults, gotResults)
 }

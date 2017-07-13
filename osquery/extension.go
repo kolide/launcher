@@ -2,7 +2,6 @@ package osquery
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -10,13 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Extension is the implementation of the osquery extension methods. It handles
+// both the communication with the osquery daemon and the Kolide server.
 type Extension struct {
-	ServerAddress string
-	EnrollSecret  string
 	NodeKey       string
 	serviceClient service.KolideService
 }
 
+// NewExtension creates a new Extension from the provided service.KolideService
+// implementation.
 func NewExtension(client service.KolideService) (*Extension, error) {
 	return &Extension{
 		serviceClient: client,
@@ -77,12 +78,10 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 		return nil, errors.New("enrollment invalid")
 	}
 
-	fmt.Println("queries: ", queries)
 	return queries, nil
 }
 
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
-	fmt.Println("results: ", results)
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if err != nil {
 		return errors.Wrap(err, "transport error writing results")

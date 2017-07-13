@@ -6,6 +6,8 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/service"
+	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/kolide/osquery-go/plugin/logger"
 )
 
 var _ service.KolideService = (*KolideService)(nil)
@@ -14,11 +16,11 @@ type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostId
 
 type RequestConfigFunc func(ctx context.Context, nodeKey string, version string) (string, bool, error)
 
-type RequestQueriesFunc func(ctx context.Context, nodeKey string, version string) ([]service.Query, bool, error)
+type PublishLogsFunc func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error)
 
-type PublishLogsFunc func(ctx context.Context, nodeKey string, version string, logType service.LogType, logs []service.Log) (string, string, bool, error)
+type RequestQueriesFunc func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error)
 
-type PublishResultsFunc func(ctx context.Context, nodeKey string, results []service.Result) (string, string, bool, error)
+type PublishResultsFunc func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 
 type KolideService struct {
 	RequestEnrollmentFunc        RequestEnrollmentFunc
@@ -27,11 +29,11 @@ type KolideService struct {
 	RequestConfigFunc        RequestConfigFunc
 	RequestConfigFuncInvoked bool
 
-	RequestQueriesFunc        RequestQueriesFunc
-	RequestQueriesFuncInvoked bool
-
 	PublishLogsFunc        PublishLogsFunc
 	PublishLogsFuncInvoked bool
+
+	RequestQueriesFunc        RequestQueriesFunc
+	RequestQueriesFuncInvoked bool
 
 	PublishResultsFunc        PublishResultsFunc
 	PublishResultsFuncInvoked bool
@@ -47,17 +49,17 @@ func (s *KolideService) RequestConfig(ctx context.Context, nodeKey string, versi
 	return s.RequestConfigFunc(ctx, nodeKey, version)
 }
 
-func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string, version string) ([]service.Query, bool, error) {
-	s.RequestQueriesFuncInvoked = true
-	return s.RequestQueriesFunc(ctx, nodeKey, version)
-}
-
-func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, version string, logType service.LogType, logs []service.Log) (string, string, bool, error) {
+func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	s.PublishLogsFuncInvoked = true
 	return s.PublishLogsFunc(ctx, nodeKey, version, logType, logs)
 }
 
-func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []service.Result) (string, string, bool, error) {
+func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+	s.RequestQueriesFuncInvoked = true
+	return s.RequestQueriesFunc(ctx, nodeKey, version)
+}
+
+func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	s.PublishResultsFuncInvoked = true
 	return s.PublishResultsFunc(ctx, nodeKey, results)
 }
