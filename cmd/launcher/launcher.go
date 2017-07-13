@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -129,9 +134,25 @@ func main() {
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
-	ext, err := osquery.NewExtension(opts.kolideServerUrl, opts.enrollSecret, "bar_host")
+	// TODO fix insecure
+	conn, err := grpc.Dial(opts.kolideServerUrl, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
+	if err != nil {
+		log.Fatalf("Error dialing grpc server: %s\n", err)
+	}
+
+	client := service.New(conn)
+
+	ext, err := osquery.NewExtension(client)
 	if err != nil {
 		log.Fatalf("Error starting grpc extension: %s\n", err)
+	}
+
+	_, invalid, err := ext.Enroll(context.Background(), opts.enrollSecret, "foo_host")
+	if err != nil {
+		log.Fatalf("Error in enrollment: %s\n", err)
+	}
+	if invalid {
+		log.Fatalf("Invalid enrollment secret\n")
 	}
 
 	if _, err := osquery.LaunchOsqueryInstance(

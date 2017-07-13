@@ -13,6 +13,59 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExtensionEnrollTransportError(t *testing.T) {
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+			return "", false, errors.New("transport")
+		},
+	}
+	e := &Extension{serviceClient: m}
+
+	key, invalid, err := e.Enroll(context.Background(), "foo", "bar")
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.True(t, invalid)
+	assert.NotNil(t, err)
+}
+
+func TestExtensionEnrollSecretInvalid(t *testing.T) {
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+			return "", true, nil
+		},
+	}
+	e := &Extension{serviceClient: m}
+
+	key, invalid, err := e.Enroll(context.Background(), "foo", "bar")
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.True(t, invalid)
+	assert.NotNil(t, err)
+}
+
+func TestExtensionEnroll(t *testing.T) {
+	var gotEnrollSecret, gotHostIdentifier string
+	expectedNodeKey := "node_key"
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+			gotEnrollSecret = enrollSecret
+			gotHostIdentifier = hostIdentifier
+			return expectedNodeKey, false, nil
+		},
+	}
+	e := &Extension{serviceClient: m}
+
+	expectedEnrollSecret := "foo_secret"
+	expectedHostIdentifier := "bar_host"
+	key, invalid, err := e.Enroll(context.Background(), expectedEnrollSecret, expectedHostIdentifier)
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	require.Nil(t, err)
+	assert.False(t, invalid)
+	assert.Equal(t, expectedNodeKey, key)
+	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
+}
+
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string, version string) (string, bool, error) {

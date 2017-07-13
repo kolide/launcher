@@ -2,9 +2,6 @@ package osquery
 
 import (
 	"context"
-	"time"
-
-	"google.golang.org/grpc"
 
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -17,38 +14,29 @@ type Extension struct {
 	EnrollSecret  string
 	NodeKey       string
 	serviceClient service.KolideService
-	clientConn    *grpc.ClientConn
 }
 
-func NewExtension(serverAddress, enrollSecret, hostIdentifier string) (*Extension, error) {
-	// TODO fix insecure
-	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
-	if err != nil {
-		return nil, errors.Wrap(err, "dialing grpc server")
-	}
-
-	client := service.New(conn)
-
-	key, invalid, err := client.RequestEnrollment(context.Background(), enrollSecret, hostIdentifier)
-	if err != nil {
-		conn.Close()
-		return nil, errors.Wrap(err, "transport error in enrollment")
-	}
-	if invalid {
-		conn.Close()
-		return nil, errors.New("enrollment invalid")
-	}
-
+func NewExtension(client service.KolideService) (*Extension, error) {
 	return &Extension{
-		ServerAddress: serverAddress,
-		EnrollSecret:  enrollSecret,
-		NodeKey:       key,
 		serviceClient: client,
-		clientConn:    conn,
 	}, nil
 }
 
+// TODO this should come from something sensible
 const version = "foobar"
+
+func (e *Extension) Enroll(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+	key, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), enrollSecret, hostIdentifier)
+	if err != nil {
+		return "", true, errors.Wrap(err, "transport error in enrollment")
+	}
+	if invalid {
+		return "", true, errors.New("enrollment invalid")
+	}
+
+	e.NodeKey = key
+	return key, invalid, err
+}
 
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
 	// TODO get version
