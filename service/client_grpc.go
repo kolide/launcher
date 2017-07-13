@@ -49,7 +49,7 @@ func New(conn *grpc.ClientConn) KolideService {
 		"kolide.agent.Api",
 		"PublishResults",
 		EncodeGRPCResultCollection,
-		DecodeGRPCAgentAPIRequest,
+		DecodeGRPCAgentAPIResponse,
 		kolide_agent.AgentApiResponse{},
 	).Endpoint()
 

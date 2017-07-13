@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/kolide/agent-api"
+	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/kolide/osquery-go/plugin/logger"
 )
 
 func DecodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -90,22 +92,22 @@ func EncodeGRPCAgentAPIResponse(_ context.Context, request interface{}) (interfa
 
 func DecodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.LogCollection)
-	logs := make([]Log, len(req.Logs))
+	logs := make([]string, 0, len(req.Logs))
 	for _, log := range req.Logs {
-		logs = append(logs, Log{log.Data})
+		logs = append(logs, log.Data)
 	}
 	return logCollection{
 		NodeKey: req.NodeKey,
-		LogType: LogType(req.LogType),
+		LogType: logger.LogType(req.LogType),
 		Logs:    logs,
 	}, nil
 }
 
 func EncodeGRPCLogCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(logCollection)
-	logs := make([]*kolide_agent.LogCollection_Log, len(req.Logs))
+	logs := make([]*kolide_agent.LogCollection_Log, 0, len(req.Logs))
 	for _, log := range req.Logs {
-		logs = append(logs, &kolide_agent.LogCollection_Log{log.Data})
+		logs = append(logs, &kolide_agent.LogCollection_Log{log})
 	}
 	return &kolide_agent.LogCollection{
 		NodeKey: req.NodeKey,
@@ -117,14 +119,12 @@ func EncodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 
 func DecodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.QueryCollection)
-	queries := make([]Query, len(req.Queries))
+	queries := distributed.GetQueriesResult{
+		Queries:   map[string]string{},
+		Discovery: map[string]string{},
+	}
 	for _, query := range req.Queries {
-		queries = append(queries,
-			Query{
-				ID:    query.Id,
-				Query: query.Query,
-			},
-		)
+		queries.Queries[query.Id] = query.Query
 	}
 	return queryCollection{
 		Queries:     queries,
@@ -134,12 +134,12 @@ func DecodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interfac
 
 func EncodeGRPCQueryCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(queryCollection)
-	queries := make([]*kolide_agent.QueryCollection_Query, len(req.Queries))
-	for _, query := range req.Queries {
+	queries := make([]*kolide_agent.QueryCollection_Query, 0, len(req.Queries.Queries))
+	for id, query := range req.Queries.Queries {
 		queries = append(queries,
 			&kolide_agent.QueryCollection_Query{
-				Id:    query.ID,
-				Query: query.Query,
+				Id:    id,
+				Query: query,
 			},
 		)
 	}
@@ -152,10 +152,10 @@ func EncodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.ResultCollection)
 
-	results := make([]Result, len(req.Results))
+	results := make([]distributed.Result, 0, len(req.Results))
 	for _, result := range req.Results {
 		// Iterate results
-		rows := make([]map[string]string, len(result.Rows))
+		rows := make([]map[string]string, 0, len(result.Rows))
 		for _, row := range result.Rows {
 			// Extract rows into map[string]string
 			rowMap := make(map[string]string, len(row.Columns))
@@ -165,10 +165,10 @@ func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 			rows = append(rows, rowMap)
 		}
 		results = append(results,
-			Result{
-				ID:     result.Id,
-				Status: int(result.Status),
-				Rows:   rows,
+			distributed.Result{
+				QueryName: result.Id,
+				Status:    int(result.Status),
+				Rows:      rows,
 			},
 		)
 	}
@@ -182,13 +182,13 @@ func DecodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 func EncodeGRPCResultCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(resultCollection)
 
-	results := make([]*kolide_agent.ResultCollection_Result, len(req.Results))
+	results := make([]*kolide_agent.ResultCollection_Result, 0, len(req.Results))
 	for _, result := range req.Results {
 		// Iterate results
-		rows := make([]*kolide_agent.ResultCollection_Result_ResultRow, len(result.Rows))
+		rows := make([]*kolide_agent.ResultCollection_Result_ResultRow, 0, len(result.Rows))
 		for _, row := range result.Rows {
 			// Extract rows into columns
-			rowCols := make([]*kolide_agent.ResultCollection_Result_ResultRow_Column, len(row))
+			rowCols := make([]*kolide_agent.ResultCollection_Result_ResultRow_Column, 0, len(row))
 			for col, val := range row {
 				rowCols = append(rowCols, &kolide_agent.ResultCollection_Result_ResultRow_Column{
 					Name:  col,
@@ -199,7 +199,7 @@ func EncodeGRPCResultCollection(_ context.Context, request interface{}) (interfa
 		}
 		results = append(results,
 			&kolide_agent.ResultCollection_Result{
-				Id:     result.ID,
+				Id:     result.QueryName,
 				Status: int32(result.Status),
 				Rows:   rows,
 			},

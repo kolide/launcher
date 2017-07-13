@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/kolide/osquery-go/plugin/logger"
 )
 
 type Endpoints struct {
@@ -59,8 +61,8 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey, version string) (
 type logCollection struct {
 	NodeKey      string
 	AgentVersion string
-	LogType      LogType
-	Logs         []Log
+	LogType      logger.LogType
+	Logs         []string
 }
 
 type agentAPIResponse struct {
@@ -70,7 +72,7 @@ type agentAPIResponse struct {
 	Err         error
 }
 
-func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, logType LogType, logs []Log) (string, string, bool, error) {
+func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	request := logCollection{NodeKey: nodeKey, AgentVersion: version, LogType: logType, Logs: logs}
 	response, err := e.PublishLogsEndpoint(ctx, request)
 	if err != nil {
@@ -81,27 +83,27 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, log
 }
 
 type queryCollection struct {
-	Queries     []Query
+	Queries     distributed.GetQueriesResult
 	NodeInvalid bool
 	Err         error
 }
 
-func (e Endpoints) RequestQueries(ctx context.Context, nodeKey, version string) ([]Query, bool, error) {
+func (e Endpoints) RequestQueries(ctx context.Context, nodeKey, version string) (*distributed.GetQueriesResult, bool, error) {
 	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
 	response, err := e.RequestQueriesEndpoint(ctx, request)
 	if err != nil {
 		return nil, false, err
 	}
 	resp := response.(queryCollection)
-	return resp.Queries, resp.NodeInvalid, resp.Err
+	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 
 type resultCollection struct {
 	NodeKey string
-	Results []Result
+	Results []distributed.Result
 }
 
-func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []Result) (string, string, bool, error) {
+func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	request := resultCollection{NodeKey: nodeKey, Results: results}
 	response, err := e.PublishResultsEndpoint(ctx, request)
 	if err != nil {

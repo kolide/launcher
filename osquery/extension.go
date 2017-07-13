@@ -2,6 +2,7 @@ package osquery
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -54,7 +55,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 
 func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText string) error {
 	// TODO get version
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, version, service.LogType(typ), []service.Log{service.Log{logText}})
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, version, typ, []string{logText})
 	if err != nil {
 		return errors.Wrap(err, "transport error sending logs")
 	}
@@ -76,21 +77,13 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 		return nil, errors.New("enrollment invalid")
 	}
 
-	res := &distributed.GetQueriesResult{Queries: map[string]string{}}
-	for _, query := range queries {
-		res.Queries[query.ID] = query.Query
-	}
-
-	return res, nil
+	fmt.Println("queries: ", queries)
+	return queries, nil
 }
 
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
-	res := make([]service.Result, 0, len(results))
-	for _, result := range results {
-		res = append(res, service.Result{result.QueryName, result.Status, result.Rows})
-	}
-
-	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, res)
+	fmt.Println("results: ", results)
+	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if err != nil {
 		return errors.Wrap(err, "transport error writing results")
 	}
