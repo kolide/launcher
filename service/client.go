@@ -8,8 +8,9 @@ import (
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
-// Endpoints is the implementation of the KolideService interface.
-type Endpoints struct {
+// KolideClient is the implementation of the KolideService interface, intended
+// to be used as an API client.
+type KolideClient struct {
 	RequestEnrollmentEndpoint endpoint.Endpoint
 	RequestConfigEndpoint     endpoint.Endpoint
 	PublishLogsEndpoint       endpoint.Endpoint
@@ -29,7 +30,7 @@ type enrollmentResponse struct {
 }
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+func (e KolideClient) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier}
 	response, err := e.RequestEnrollmentEndpoint(ctx, request)
 	if err != nil {
@@ -51,7 +52,7 @@ type configResponse struct {
 }
 
 // RequestConfig implements KolideService.RequestConfig.
-func (e Endpoints) RequestConfig(ctx context.Context, nodeKey, version string) (string, bool, error) {
+func (e KolideClient) RequestConfig(ctx context.Context, nodeKey, version string) (string, bool, error) {
 	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
 	response, err := e.RequestConfigEndpoint(ctx, request)
 	if err != nil {
@@ -76,7 +77,7 @@ type agentAPIResponse struct {
 }
 
 // PublishLogs implements KolideService.PublishLogs
-func (e Endpoints) PublishLogs(ctx context.Context, nodeKey, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
+func (e KolideClient) PublishLogs(ctx context.Context, nodeKey, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	request := logCollection{NodeKey: nodeKey, AgentVersion: version, LogType: logType, Logs: logs}
 	response, err := e.PublishLogsEndpoint(ctx, request)
 	if err != nil {
@@ -93,7 +94,7 @@ type queryCollection struct {
 }
 
 // RequestQueries implements KolideService.RequestQueries
-func (e Endpoints) RequestQueries(ctx context.Context, nodeKey, version string) (*distributed.GetQueriesResult, bool, error) {
+func (e KolideClient) RequestQueries(ctx context.Context, nodeKey, version string) (*distributed.GetQueriesResult, bool, error) {
 	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
 	response, err := e.RequestQueriesEndpoint(ctx, request)
 	if err != nil {
@@ -109,7 +110,7 @@ type resultCollection struct {
 }
 
 // PublishResults implements KolideService.PublishResults
-func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+func (e KolideClient) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	request := resultCollection{NodeKey: nodeKey, Results: results}
 	response, err := e.PublishResultsEndpoint(ctx, request)
 	if err != nil {

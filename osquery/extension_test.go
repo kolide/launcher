@@ -196,14 +196,14 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionGetQueries(t *testing.T) {
-	expectedQueries := map[string]string{"time": "select * from time", "version": "select version from osquery_info"}
+	expectedQueries := map[string]string{
+		"time":    "select * from time",
+		"version": "select version from osquery_info",
+	}
 	m := &mock.KolideService{
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
 			return &distributed.GetQueriesResult{
-				Queries: map[string]string{
-					"time":    "select * from time",
-					"version": "select version from osquery_info",
-				},
+				Queries: expectedQueries,
 			}, false, nil
 		},
 	}

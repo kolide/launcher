@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-// New creates a new KolideService client using the provided gRPC client
-// connection.
-func New(conn *grpc.ClientConn) KolideService {
+// New creates a new KolideClient (implementation of the KolideService
+// interface) using the provided gRPC client connection.
+func New(conn *grpc.ClientConn) KolideClient {
 	requestEnrollmentEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
@@ -55,7 +55,7 @@ func New(conn *grpc.ClientConn) KolideService {
 		kolide_agent.AgentApiResponse{},
 	).Endpoint()
 
-	return Endpoints{
+	return KolideClient{
 		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,
