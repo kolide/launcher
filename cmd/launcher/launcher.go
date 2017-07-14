@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/boltdb/bolt"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
@@ -134,15 +135,22 @@ func main() {
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
+	db, err := bolt.Open("launcher.db", 0600, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
 	// TODO fix insecure
 	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
 	if err != nil {
 		log.Fatalf("Error dialing grpc server: %s\n", err)
 	}
+	defer conn.Close()
 
 	client := service.New(conn)
 
-	ext, err := osquery.NewExtension(client)
+	ext, err := osquery.NewExtension(client, db)
 	if err != nil {
 		log.Fatalf("Error starting grpc extension: %s\n", err)
 	}

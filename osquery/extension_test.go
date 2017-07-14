@@ -3,8 +3,11 @@ package osquery
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"os"
 	"testing"
 
+	"github.com/boltdb/bolt"
 	"github.com/kolide/launcher/service/mock"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -12,13 +15,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func makeTempDB() (db *bolt.DB, cleanup func()) {
+	file, err := ioutil.TempFile("", "kolide_launcher_test")
+	if err != nil {
+		panic("creating temp file: " + err.Error())
+	}
+
+	db, err = bolt.Open(file.Name(), 0600, nil)
+	if err != nil {
+		panic("opening bolt DB: " + err.Error())
+	}
+
+	return db, func() {
+		db.Close()
+		os.Remove(file.Name())
+	}
+}
+
 func TestExtensionEnrollTransportError(t *testing.T) {
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
 			return "", false, errors.New("transport")
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background(), "foo", "bar")
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
@@ -33,7 +56,10 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 			return "", true, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background(), "foo", "bar")
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
@@ -52,13 +78,50 @@ func TestExtensionEnroll(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	expectedEnrollSecret := "foo_secret"
 	expectedHostIdentifier := "bar_host"
 	key, invalid, err := e.Enroll(context.Background(), expectedEnrollSecret, expectedHostIdentifier)
-	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	require.Nil(t, err)
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.False(t, invalid)
+	assert.Equal(t, expectedNodeKey, key)
+	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
+
+	// Should not re-enroll with stored secret
+	m.RequestEnrollmentFuncInvoked = false
+	key, invalid, err = e.Enroll(context.Background(), expectedEnrollSecret, expectedHostIdentifier)
+	require.Nil(t, err)
+	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
+	assert.False(t, invalid)
+	assert.Equal(t, expectedNodeKey, key)
+	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
+
+	e, err = NewExtension(m, db)
+	require.Nil(t, err)
+	// Still should not re-enroll (because node key stored in DB)
+	key, invalid, err = e.Enroll(context.Background(), expectedEnrollSecret, expectedHostIdentifier)
+	require.Nil(t, err)
+	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
+	assert.False(t, invalid)
+	assert.Equal(t, expectedNodeKey, key)
+	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
+
+	// Re-enroll for new node key
+	expectedNodeKey = "new_node_key"
+	e.RequireReenroll(context.Background())
+	assert.Empty(t, e.NodeKey)
+	key, invalid, err = e.Enroll(context.Background(), expectedEnrollSecret, expectedHostIdentifier)
+	require.Nil(t, err)
+	// Now enroll func should be called again
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
@@ -71,7 +134,10 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
 	assert.True(t, m.RequestConfigFuncInvoked)
@@ -85,7 +151,10 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			return "", true, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
 	assert.True(t, m.RequestConfigFuncInvoked)
@@ -100,7 +169,10 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 			return configVal, false, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
 	assert.True(t, m.RequestConfigFuncInvoked)
@@ -114,9 +186,12 @@ func TestExtensionLogStringTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
-	err := e.LogString(context.Background(), logger.LogTypeSnapshot, "foobar")
+	err = e.LogString(context.Background(), logger.LogTypeSnapshot, "foobar")
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.NotNil(t, err)
 }
@@ -130,9 +205,13 @@ func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	e := &Extension{serviceClient: m, NodeKey: expectedNodeKey}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
+	e.NodeKey = expectedNodeKey
 
-	err := e.LogString(context.Background(), logger.LogTypeString, "foobar")
+	err = e.LogString(context.Background(), logger.LogTypeString, "foobar")
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.NotNil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
@@ -153,9 +232,13 @@ func TestExtensionLogString(t *testing.T) {
 	}
 
 	expectedNodeKey := "node_key"
-	e := &Extension{serviceClient: m, NodeKey: expectedNodeKey}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
+	e.NodeKey = expectedNodeKey
 
-	err := e.LogString(context.Background(), logger.LogTypeStatus, "foobar")
+	err = e.LogString(context.Background(), logger.LogTypeStatus, "foobar")
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
@@ -169,7 +252,10 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 			return nil, false, errors.New("transport")
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
 	assert.True(t, m.RequestQueriesFuncInvoked)
@@ -186,7 +272,11 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	e := &Extension{serviceClient: m, NodeKey: expectedNodeKey}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
+	e.NodeKey = expectedNodeKey
 
 	queries, err := e.GetQueries(context.Background())
 	assert.True(t, m.RequestQueriesFuncInvoked)
@@ -207,7 +297,10 @@ func TestExtensionGetQueries(t *testing.T) {
 			}, false, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
 	assert.True(t, m.RequestQueriesFuncInvoked)
@@ -221,9 +314,12 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
-	err := e.WriteResults(context.Background(), []distributed.Result{})
+	err = e.WriteResults(context.Background(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.NotNil(t, err)
 }
@@ -237,9 +333,13 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	e := &Extension{serviceClient: m, NodeKey: expectedNodeKey}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
+	e.NodeKey = expectedNodeKey
 
-	err := e.WriteResults(context.Background(), []distributed.Result{})
+	err = e.WriteResults(context.Background(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.NotNil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
@@ -253,7 +353,10 @@ func TestExtensionWriteResults(t *testing.T) {
 			return "", "", true, nil
 		},
 	}
-	e := &Extension{serviceClient: m}
+	db, cleanup := makeTempDB()
+	defer cleanup()
+	e, err := NewExtension(m, db)
+	require.Nil(t, err)
 
 	expectedResults := []distributed.Result{
 		{
@@ -263,7 +366,7 @@ func TestExtensionWriteResults(t *testing.T) {
 		},
 	}
 
-	err := e.WriteResults(context.Background(), expectedResults)
+	err = e.WriteResults(context.Background(), expectedResults)
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.NotNil(t, err)
 	assert.Equal(t, expectedResults, gotResults)

@@ -9,6 +9,12 @@
   source = "git@github.com:kolide/thrift.git"
 
 [[projects]]
+  name = "github.com/boltdb/bolt"
+  packages = ["."]
+  revision = "583e8937c61f1af6513608ccc75c97b6abdf4ff9"
+  version = "v1.3.0"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -94,6 +100,12 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "abf9c25f54453410d0c6668e519582a9e1115027"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
   revision = "cfdf022e86b4ecfb646e1efbd7db175dd623a8fa"
@@ -113,6 +125,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "af7e9b964a713b8095bd77d8b5a178904efc7ae0eef875598ff0902fc01603a8"
+  inputs-digest = "83b652e395c35a137fa567f31310bde3683262c012e2aa5d958fb222719e2fb7"
   solver-name = "gps-cdcl"
   solver-version = 1
