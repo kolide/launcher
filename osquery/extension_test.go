@@ -15,15 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeTempDB() (db *bolt.DB, cleanup func()) {
+func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
 	file, err := ioutil.TempFile("", "kolide_launcher_test")
 	if err != nil {
-		panic("creating temp file: " + err.Error())
+		t.Fatalf("creating temp file: %s", err.Error())
 	}
 
 	db, err = bolt.Open(file.Name(), 0600, nil)
 	if err != nil {
-		panic("opening bolt DB: " + err.Error())
+		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
 
 	return db, func() {
@@ -38,7 +38,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -56,7 +56,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 			return "", true, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -78,7 +78,7 @@ func TestExtensionEnroll(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -134,7 +134,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -151,7 +151,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			return "", true, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -169,7 +169,7 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 			return configVal, false, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -186,7 +186,7 @@ func TestExtensionLogStringTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -205,7 +205,7 @@ func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -232,7 +232,7 @@ func TestExtensionLogString(t *testing.T) {
 	}
 
 	expectedNodeKey := "node_key"
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -252,7 +252,7 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 			return nil, false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -272,7 +272,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -297,7 +297,7 @@ func TestExtensionGetQueries(t *testing.T) {
 			}, false, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -314,7 +314,7 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -333,7 +333,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	expectedNodeKey := "node_key"
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
@@ -353,7 +353,7 @@ func TestExtensionWriteResults(t *testing.T) {
 			return "", "", true, nil
 		},
 	}
-	db, cleanup := makeTempDB()
+	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db)
 	require.Nil(t, err)
