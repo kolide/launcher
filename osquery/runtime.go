@@ -2,7 +2,6 @@ package osquery
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -125,12 +124,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 }
 
 func osqueryTempDir() (string, func(), error) {
-	randomBytes := make([]byte, 10)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", func() {}, errors.Wrap(err, "could not read random bytes")
-	}
-	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("%X", randomBytes))
-	err := os.Mkdir(tempPath, 0700)
+	tempPath, err := ioutil.TempDir("", "")
 	if err != nil {
 		return "", func() {}, errors.Wrap(err, "could not make temp path")
 	}
