@@ -135,7 +135,7 @@ func main() {
 	versionInfo := version.Version()
 	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
 
-	db, err := bolt.Open("launcher.db", 0600, nil)
+	db, err := bolt.Open(filepath.Join(opts.rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
