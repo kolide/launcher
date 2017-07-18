@@ -25,9 +25,20 @@ type Extension struct {
 // opens the DB. It should be treated as a constant.
 var bucketNames = []string{configBucket}
 
+// ExtensionOpts is options to be passed in NewExtension
+type ExtensionOpts struct {
+	// EnrollSecret is the (mandatory) enroll secret used for
+	// enrolling with the server.
+	EnrollSecret string
+}
+
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation.
-func NewExtension(client service.KolideService, db *bolt.DB, enrollSecret string) (*Extension, error) {
+func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
+	if opts.EnrollSecret == "" {
+		return nil, errors.New("empty enroll secret")
+	}
+
 	// Create Bolt buckets as necessary
 	err := db.Update(func(tx *bolt.Tx) error {
 		for _, name := range bucketNames {
@@ -45,7 +56,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, enrollSecret string
 	return &Extension{
 		serviceClient: client,
 		db:            db,
-		EnrollSecret:  enrollSecret,
+		EnrollSecret:  opts.EnrollSecret,
 	}, nil
 }
 
