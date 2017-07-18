@@ -15,6 +15,7 @@ import (
 // both the communication with the osquery daemon and the Kolide server.
 type Extension struct {
 	NodeKey       string
+	EnrollSecret  string
 	db            *bolt.DB
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
@@ -26,7 +27,7 @@ var bucketNames = []string{configBucket}
 
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation.
-func NewExtension(client service.KolideService, db *bolt.DB) (*Extension, error) {
+func NewExtension(client service.KolideService, db *bolt.DB, enrollSecret string) (*Extension, error) {
 	// Create Bolt buckets as necessary
 	err := db.Update(func(tx *bolt.Tx) error {
 		for _, name := range bucketNames {
@@ -44,6 +45,7 @@ func NewExtension(client service.KolideService, db *bolt.DB) (*Extension, error)
 	return &Extension{
 		serviceClient: client,
 		db:            db,
+		EnrollSecret:  enrollSecret,
 	}, nil
 }
 
@@ -59,7 +61,7 @@ const nodeKeyKey = "nodeKey"
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
-func (e *Extension) Enroll(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+func (e *Extension) Enroll(ctx context.Context, hostIdentifier string) (string, bool, error) {
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
 	e.enrollMutex.Lock()
@@ -85,7 +87,7 @@ func (e *Extension) Enroll(ctx context.Context, enrollSecret, hostIdentifier str
 	}
 
 	// If no cached node key, enroll for new node key
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), enrollSecret, hostIdentifier)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.EnrollSecret, hostIdentifier)
 	if err != nil {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
@@ -122,6 +124,11 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 // GenerateConfigs will request the osquery configuration from the server. In
 // the future it should look for existing configuration locally.
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
+	return e.generateConfigsWithReenroll(ctx, true)
+}
+
+// Helper to allow for a single attempt at re-enrollment
+func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (map[string]string, error) {
 	// TODO get version
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey, version)
 	if err != nil {
@@ -129,15 +136,35 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 	}
 
 	if invalid {
-		return nil, errors.New("enrollment invalid")
+		if !reenroll {
+			return nil, errors.New("enrollment invalid, reenroll disabled")
+		}
+
+		e.RequireReenroll(ctx)
+		_, invalid, err := e.Enroll(ctx, "foobar")
+		if err != nil {
+			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
+		}
+		if invalid {
+			return nil, errors.New("enrollment invalid, reenrollment invalid")
+		}
+
+		// Don't attempt reenroll after first attempt
+		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
 	return map[string]string{"config": config}, nil
+
 }
 
 // LogString will publish a status/result log from osquery to the server. In
 // the future it should buffer logs and send them at intervals.
 func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText string) error {
+	return e.logStringWithReenroll(ctx, typ, logText, true)
+}
+
+// Helper to allow for a single attempt at re-enrollment
+func (e *Extension) logStringWithReenroll(ctx context.Context, typ logger.LogType, logText string, reenroll bool) error {
 	// TODO get version
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, version, typ, []string{logText})
 	if err != nil {
@@ -145,7 +172,21 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	if invalid {
-		return errors.New("enrollment invalid")
+		if !reenroll {
+			return errors.New("enrollment invalid, reenroll disabled")
+		}
+
+		e.RequireReenroll(ctx)
+		_, invalid, err := e.Enroll(ctx, "foobar")
+		if err != nil {
+			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
+		}
+		if invalid {
+			return errors.New("enrollment invalid, reenrollment invalid")
+		}
+
+		// Don't attempt reenroll after first attempt
+		return e.logStringWithReenroll(ctx, typ, logText, false)
 	}
 
 	return nil
@@ -153,13 +194,32 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
+	return e.getQueriesWithReenroll(ctx, true)
+}
+
+// Helper to allow for a single attempt at re-enrollment
+func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey, version)
 	if err != nil {
 		return nil, errors.Wrap(err, "transport error getting queries")
 	}
 
 	if invalid {
-		return nil, errors.New("enrollment invalid")
+		if !reenroll {
+			return nil, errors.New("enrollment invalid, reenroll disabled")
+		}
+
+		e.RequireReenroll(ctx)
+		_, invalid, err := e.Enroll(ctx, "foobar")
+		if err != nil {
+			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
+		}
+		if invalid {
+			return nil, errors.New("enrollment invalid, reenrollment invalid")
+		}
+
+		// Don't attempt reenroll after first attempt
+		return e.getQueriesWithReenroll(ctx, false)
 	}
 
 	return queries, nil
@@ -168,13 +228,32 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 // WriteResults will publish results of the executed distributed queries back
 // to the server.
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
+	return e.writeResultsWithReenroll(ctx, results, true)
+}
+
+// Helper to allow for a single attempt at re-enrollment
+func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if err != nil {
 		return errors.Wrap(err, "transport error writing results")
 	}
 
 	if invalid {
-		return errors.New("enrollment invalid")
+		if !reenroll {
+			return errors.New("enrollment invalid, reenroll disabled")
+		}
+
+		e.RequireReenroll(ctx)
+		_, invalid, err := e.Enroll(ctx, "foobar")
+		if err != nil {
+			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
+		}
+		if invalid {
+			return errors.New("enrollment invalid, reenrollment invalid")
+		}
+
+		// Don't attempt reenroll after first attempt
+		return e.writeResultsWithReenroll(ctx, results, false)
 	}
 
 	return nil
