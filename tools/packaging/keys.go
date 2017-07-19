@@ -13,12 +13,12 @@ func Secret(tenantName string, pemKey []byte) (string, error) {
 	fingerPrint = strings.Replace(fingerPrint, " ", ":", 15)
 
 	var claims = struct {
-		Tennant string `json:"tennant"`
-		KID     string `json:"kid"`
+		tenant string `json:"tenant"`
+		KID    string `json:"kid"`
 		jwt.StandardClaims
 	}{
-		Tennant: tenantName,
-		KID:     fingerPrint,
+		tenant: tenantName,
+		KID:    fingerPrint,
 	}
 
 	key, err := jwt.ParseRSAPrivateKeyFromPEM(pemKey)

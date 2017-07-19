@@ -61,17 +61,17 @@ func createMacPackage(pemKey []byte, id int, osqueryPath string) {
 
 func main() {
 	var (
-		flKey       = flag.String("key", "", "path to rsa private key")
-		flTennantID = flag.Int("id", 100001, "tennant id. must be greater than 1")
-		flPrint     = flag.Bool("print", false, "print info for stdout -- requires passing a tennant id")
-		flPackage   = flag.Bool("package", false, "generate macOS package")
-		bindirPath  = flag.String("bindir", "./bin", "path to binaries")
+		flKey      = flag.String("key", "", "path to rsa private key")
+		fltenantID = flag.Int("id", 100001, "tenant id. must be greater than 1")
+		flPrint    = flag.Bool("print", false, "print info for stdout -- requires passing a tenant id")
+		flPackage  = flag.Bool("package", false, "generate macOS package")
+		bindirPath = flag.String("bindir", "./bin", "path to binaries")
 	)
 	flag.Parse()
 
-	printMode := (*flTennantID > 0) && *flPrint
+	printMode := (*fltenantID > 0) && *flPrint
 	packageMode := !printMode && *flPackage
-	badInput := (*flTennantID == 0 && *flPrint) || *flKey == "" || (!printMode && !packageMode)
+	badInput := (*fltenantID == 0 && *flPrint) || *flKey == "" || (!printMode && !packageMode)
 	if badInput {
 		flag.Usage()
 		os.Exit(1)
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	if printMode {
-		name := packaging.Munemo(*flTennantID)
+		name := packaging.Munemo(*fltenantID)
 		token, err := packaging.Secret(name, keyData)
 		if err != nil {
 			log.Fatal(err)
@@ -95,6 +95,6 @@ func main() {
 	}
 
 	if packageMode {
-		createMacPackage(keyData, *flTennantID, *bindirPath)
+		createMacPackage(keyData, *fltenantID, *bindirPath)
 	}
 }
