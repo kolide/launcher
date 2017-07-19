@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/md5"
 	"flag"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/kolide/launcher/tools/packaging"
 )
 
 const (
@@ -171,10 +171,7 @@ func (t *tennant) Name() string {
 	if t.name != "" {
 		return t.name
 	}
-	m := newMunemo()
-	m.tos(t.id)
-	t.name = m.String()
-	return t.name
+	return packaging.Munemo(t.id)
 }
 
 func (t *tennant) Secret(pemKey []byte) (token string, err error) {
@@ -200,45 +197,6 @@ func (t *tennant) Secret(pemKey []byte) (token string, err error) {
 		return "", err
 	}
 	return signed, nil
-}
-
-// munemo is based off of the ruby library https://github.com/jmettraux/munemo
-// it provides a deterministic way to create a tennant name from UID
-type munemo struct {
-	count int
-	neg   string
-	syls  []string
-	w     *bytes.Buffer // string buffer
-}
-
-func newMunemo() *munemo {
-	m := &munemo{
-		syls: []string{"ba", "bi", "bu", "be", "bo", "cha", "chi", "chu", "che", "cho", "da", "di", "du", "de", "do", "fa", "fi", "fu", "fe", "fo", "ga", "gi", "gu", "ge", "go", "ha", "hi", "hu", "he", "ho", "ja", "ji", "ju", "je", "jo", "ka", "ki", "ku", "ke", "ko", "la", "li", "lu", "le", "lo", "ma", "mi", "mu", "me", "mo", "na", "ni", "nu", "ne", "no", "pa", "pi", "pu", "pe", "po", "ra", "ri", "ru", "re", "ro", "sa", "si", "su", "se", "so", "sha", "shi", "shu", "she", "sho", "ta", "ti", "tu", "te", "to", "tsa", "tsi", "tsu", "tse", "tso", "wa", "wi", "wu", "we", "wo", "ya", "yi", "yu", "ye", "yo", "za", "zi", "zu", "ze", "zo"},
-		neg:  "xa",
-		w:    new(bytes.Buffer),
-	}
-	m.count = len(m.syls)
-	return m
-}
-
-func (m *munemo) String() string {
-	return m.w.String()
-}
-
-func (m *munemo) tos(num int) {
-	if num < 0 {
-		m.w.Write([]byte(m.neg))
-		return
-	}
-
-	mod := num % m.count
-	rst := num / m.count
-
-	if rst > 0 {
-		m.tos(rst)
-	}
-
-	m.w.Write([]byte(m.syls[mod]))
 }
 
 func main() {
