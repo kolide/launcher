@@ -47,8 +47,8 @@ mac-pkg-builder: .pre-build
 	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
 
 deps:
-	go get -u github.com/golang/dep/cmd/dep
-	dep ensure -v
+	go get -u github.com/Masterminds/glide
+	glide install
 
 test:
 	go test -cover -v $(shell go list ./... | grep -v /vendor/)
