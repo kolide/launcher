@@ -121,6 +121,7 @@ func TestOsqueryRuntime(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	t.Skip("causing noise in CI (see #42)")
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -147,6 +148,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRecover(t *testing.T) {
+	t.Skip("causing nose in CI (see #42)")
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()

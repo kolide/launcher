@@ -150,7 +150,7 @@ func main() {
 
 	client := service.New(conn)
 
-	ext, err := osquery.NewExtension(client, db, opts.enrollSecret)
+	ext, err := osquery.NewExtension(client, db, osquery.ExtensionOpts{EnrollSecret: opts.enrollSecret})
 	if err != nil {
 		log.Fatalf("Error starting grpc extension: %s\n", err)
 	}
