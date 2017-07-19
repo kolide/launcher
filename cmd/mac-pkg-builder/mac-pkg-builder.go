@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -57,35 +56,12 @@ func createMacPackage(pemKey []byte, id int, p packageParams) {
 		log.Fatal(err)
 	}
 
-	if err := pkgbuild(pkgroot, "1.0.0", fmt.Sprintf("%s-launcher.pkg", t.Name())); err != nil {
+	if err := packaging.Pkgbuild(pkgroot, scriptsRoot, "1.0.0", fmt.Sprintf("%s-launcher.pkg", t.Name())); err != nil {
 		log.Fatal(err)
 	}
 
 	os.RemoveAll(pkgroot)
 
-}
-
-/*
-runs the following pkgbuild command:
-	pkgbuild \
-	--root root \
-	--scripts scripts \
-	--identifier ${PKGID} \
-	--version ${PKGVERSION} \
-	out/${PKGNAME}-${PKGVERSION}.pkg
-*/
-func pkgbuild(pkgroot, version, pkgname string) error {
-	identifier := "com.kolide.osquery"
-	cmd := exec.Command("pkgbuild",
-		"--root", pkgroot,
-		"--scripts", scriptsRoot,
-		"--identifier", identifier,
-		"--version", version,
-		fmt.Sprintf("build/%s", pkgname),
-	)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
 }
 
 const (
