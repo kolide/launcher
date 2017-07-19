@@ -142,7 +142,38 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	configs, err := e.GenerateConfigs(context.Background())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.Nil(t, configs)
+	// An error with the cache empty should be returned
 	assert.NotNil(t, err)
+}
+
+func TestExtensionGenerateConfigsCaching(t *testing.T) {
+	configVal := `{"foo": "bar"}`
+	m := &mock.KolideService{
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
+			return configVal, false, nil
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.Nil(t, err)
+
+	configs, err := e.GenerateConfigs(context.Background())
+	assert.True(t, m.RequestConfigFuncInvoked)
+	assert.Equal(t, map[string]string{"config": configVal}, configs)
+	assert.Nil(t, err)
+
+	// Now have requesting the config fail, and expect to get the same
+	// config anyway (through the cache).
+	m.RequestConfigFuncInvoked = false
+	m.RequestConfigFunc = func(ctx context.Context, nodeKey string) (string, bool, error) {
+		return "", false, errors.New("foobar")
+	}
+	configs, err = e.GenerateConfigs(context.Background())
+	assert.True(t, m.RequestConfigFuncInvoked)
+	assert.Equal(t, map[string]string{"config": configVal}, configs)
+	// No error because config came from the cache.
+	assert.Nil(t, err)
 }
 
 func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {

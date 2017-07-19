@@ -66,6 +66,9 @@ const configBucket = "config"
 // DB key for node key
 const nodeKeyKey = "nodeKey"
 
+// DB key for last retrieved config
+const configKey = "config"
+
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
@@ -129,38 +132,65 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	})
 }
 
-// GenerateConfigs will request the osquery configuration from the server. In
-// the future it should look for existing configuration locally.
+// GenerateConfigs will request the osquery configuration from the server. If
+// retrieving the configuration from the server fails, the locally stored
+// configuration will be returned. If that fails, this method will return an
+// error.
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
-	return e.generateConfigsWithReenroll(ctx, true)
+	config, err := e.generateConfigsWithReenroll(ctx, true)
+	if err != nil {
+		// Try to use cached config
+		var confBytes []byte
+		e.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(configBucket))
+			confBytes = b.Get([]byte(configKey))
+			return nil
+		})
+
+		if len(confBytes) == 0 {
+			return nil, errors.Wrap(err, "loading config failed, no cached config")
+		}
+		config = string(confBytes)
+	} else {
+		// Store good config
+		e.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(configBucket))
+			return b.Put([]byte(configKey), []byte(config))
+		})
+		// TODO log or record metrics when caching config fails? We
+		// would probably like to return the config and not an error in
+		// this case.
+	}
+
+	return map[string]string{"config": config}, nil
 }
 
 // Helper to allow for a single attempt at re-enrollment
-func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (map[string]string, error) {
+func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "transport error retrieving config")
+		return "", errors.Wrap(err, "transport error retrieving config")
 	}
 
 	if invalid {
 		if !reenroll {
-			return nil, errors.New("enrollment invalid, reenroll disabled")
+			return "", errors.New("enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
 		_, invalid, err := e.Enroll(ctx, "foobar")
 		if err != nil {
-			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
+			return "", errors.Wrap(err, "enrollment invalid, reenrollment errored")
 		}
 		if invalid {
-			return nil, errors.New("enrollment invalid, reenrollment invalid")
+			return "", errors.New("enrollment invalid, reenrollment invalid")
 		}
 
 		// Don't attempt reenroll after first attempt
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	return map[string]string{"config": config}, nil
+	return config, nil
 
 }
 
