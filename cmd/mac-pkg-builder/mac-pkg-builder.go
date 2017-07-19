@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	packageRoot = "mac-pkg/root"
-	scriptsRoot = "mac-pkg/scripts"
+	packageRoot = "tools/packaging/macos/root"
+	scriptsRoot = "tools/packaging/macos/scripts"
 )
 
 func createMacPackage(pemKey []byte, id int, p packageParams) {
