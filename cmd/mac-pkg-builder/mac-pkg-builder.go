@@ -1,17 +1,13 @@
 package main
 
 import (
-	"crypto/md5"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/kolide/launcher/tools/packaging"
 )
 
@@ -20,31 +16,31 @@ const (
 	scriptsRoot = "tools/packaging/macos/scripts"
 )
 
-func createMacPackage(pemKey []byte, id int, p packageParams) {
+func createMacPackage(pemKey []byte, id int, osqueryPath string) {
 	// make temp directory for package
 	pkgroot := filepath.Join(os.TempDir(), "pkgroot")
 	os.RemoveAll(pkgroot)
 
-	if err := copyDir(packageRoot, pkgroot); err != nil {
+	if err := packaging.CopyDir(packageRoot, pkgroot); err != nil {
 		log.Fatal(err)
 	}
 	etcPath := filepath.Join(pkgroot, "etc", "kolide")
-	if err := os.MkdirAll(etcPath, dirMode); err != nil {
+	if err := os.MkdirAll(etcPath, packaging.DirMode); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(pkgroot, "var", "kolide"), dirMode); err != nil {
+	if err := os.MkdirAll(filepath.Join(pkgroot, "var", "kolide"), packaging.DirMode); err != nil {
 		log.Fatal(err)
 	}
 
 	binPath := filepath.Join(pkgroot, "usr", "local", "kolide", "bin")
-	if err := os.MkdirAll(binPath, dirMode); err != nil {
+	if err := os.MkdirAll(binPath, packaging.DirMode); err != nil {
 		log.Fatal(err)
 	}
 
-	t := tennant{id: id}
 	secretPath := filepath.Join(etcPath, "token")
-	token, err := t.Secret(pemKey)
+	tenantName := packaging.Munemo(id)
+	token, err := packaging.Secret(tenantName, pemKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,127 +48,15 @@ func createMacPackage(pemKey []byte, id int, p packageParams) {
 		log.Fatal(err)
 	}
 
-	if err := copyDir(p.bindir, binPath); err != nil {
+	if err := packaging.CopyDir(osqueryPath, binPath); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := packaging.Pkgbuild(pkgroot, scriptsRoot, "1.0.0", fmt.Sprintf("%s-launcher.pkg", t.Name())); err != nil {
+	if err := packaging.Pkgbuild(pkgroot, scriptsRoot, "1.0.0", fmt.Sprintf("%s-launcher.pkg", tenantName)); err != nil {
 		log.Fatal(err)
 	}
 
 	os.RemoveAll(pkgroot)
-
-}
-
-const (
-	dirMode  = 0755
-	fileMode = 0644
-)
-
-func copyDir(src, dest string) error {
-	dir, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dest, dirMode); err != nil {
-		return err
-	}
-
-	files, err := dir.Readdir(-1)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		srcptr := filepath.Join(src, file.Name())
-		dstptr := filepath.Join(dest, file.Name())
-		if file.IsDir() {
-			if err := copyDir(srcptr, dstptr); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(srcptr, dstptr); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func copyFile(src, dest string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destfile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer destfile.Close()
-
-	_, err = io.Copy(destfile, source)
-	if err != nil {
-		return err
-	}
-	sourceinfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dest, sourceinfo.Mode())
-}
-
-func printTennant(pemKey []byte, id int, p packageParams) {
-	t := tennant{id: id}
-	token, err := t.Secret(pemKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Name: %s\n", t.Name())
-	fmt.Printf("JWT: %s\n", token)
-}
-
-type tennant struct {
-	id     int
-	name   string
-	secret string
-}
-
-type packageParams struct {
-	bindir string //path to agent, osquery and other binaries that need to be in the pkg
-}
-
-func (t *tennant) Name() string {
-	if t.name != "" {
-		return t.name
-	}
-	return packaging.Munemo(t.id)
-}
-
-func (t *tennant) Secret(pemKey []byte) (token string, err error) {
-	fingerPrint := fmt.Sprintf("% x", md5.Sum([]byte(pemKey)))
-	fingerPrint = strings.Replace(fingerPrint, " ", ":", 15)
-
-	var claims = struct {
-		Tennant string `json:"tennant"`
-		KID     string `json:"kid"`
-		jwt.StandardClaims
-	}{
-		Tennant: t.Name(),
-		KID:     fingerPrint,
-	}
-
-	key, err := jwt.ParseRSAPrivateKeyFromPEM(pemKey)
-	if err != nil {
-		return "", fmt.Errorf("parsing pem key: %s", err)
-	}
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, &claims)
-	signed, err := jwtToken.SignedString(key)
-	if err != nil {
-		return "", err
-	}
-	return signed, nil
 }
 
 func main() {
@@ -198,14 +82,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	p := packageParams{bindir: *bindirPath}
 	if printMode {
-		printTennant(keyData, *flTennantID, p)
+		name := packaging.Munemo(*flTennantID)
+		token, err := packaging.Secret(name, keyData)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Name: %s\n", name)
+		fmt.Printf("JWT: %s\n", token)
+
 		return
 	}
 
 	if packageMode {
-		createMacPackage(keyData, *flTennantID, p)
+		createMacPackage(keyData, *flTennantID, *bindirPath)
 	}
-
 }
