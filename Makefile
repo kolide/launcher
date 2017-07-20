@@ -46,6 +46,9 @@ launcher: .pre-build
 mac-pkg-builder: .pre-build
 	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
 
+package-builder: .pre-build
+	go build -i -o build/package-builder ./cmd/package-builder/
+
 deps:
 	go get -u github.com/Masterminds/glide
 	glide install
@@ -60,3 +63,4 @@ build-mac-pkg: launcher extension mac-pkg-builder
 	cp ./build/osquery-extension.ext ./bin
 	./build/mac-pkg-builder -key ${ENROLL_JWT_KEY} -package
 	rm -rf bin
+
