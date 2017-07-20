@@ -17,7 +17,6 @@ import (
 // this program
 type options struct {
 	osqueryVersion                 string
-	launcherVersion                string
 	enrollmentSecretSigningKeyPath string
 }
 
@@ -31,11 +30,6 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
-		flLauncherVersion = flag.String(
-			"launcher_version",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_LAUNCHER_VERSION", ""),
-			"the launcher version to include in the resultant packages",
-		)
 		flEnrollmentSecretSigningKeyPath = flag.String(
 			"enrollment_secret_signing_key",
 			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_ENROLLMENT_SECRET_SIGNING_KEY", ""),
@@ -46,16 +40,11 @@ func parseOptions() (*options, error) {
 
 	opts := &options{
 		osqueryVersion:                 *flOsqueryVersion,
-		launcherVersion:                *flLauncherVersion,
 		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
 	}
 
 	if opts.osqueryVersion == "" {
 		opts.osqueryVersion = "stable"
-	}
-
-	if opts.launcherVersion == "" {
-		opts.launcherVersion = "stable"
 	}
 
 	if opts.enrollmentSecretSigningKeyPath == "" {
@@ -78,7 +67,6 @@ func main() {
 
 	level.Debug(logger).Log(
 		"osquery_version", opts.osqueryVersion,
-		"launcher_version", opts.launcherVersion,
 		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
 		"message", "finished parsing arguments",
 	)
@@ -95,7 +83,7 @@ func main() {
 	for id := firstID; id <= firstID+numberOfIDsToGenerate; id++ {
 		tenant := packaging.Munemo(id)
 
-		macPackagePath, err := packaging.MakeMacOSPkg(opts.launcherVersion, opts.osqueryVersion, tenant, pemKey)
+		macPackagePath, err := packaging.MakeMacOSPkg(opts.osqueryVersion, tenant, pemKey)
 		if err != nil {
 			level.Error(logger).Log("error", fmt.Sprintf("Could not generate macOS package for tenant (%s): %s", tenant, err))
 			os.Exit(1)
