@@ -3,19 +3,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/launcher/tools/packaging"
+	"github.com/pkg/errors"
 )
 
 // options is the set of configurable options that may be set when launching
 // this program
 type options struct {
-	osqueryVersion  string
-	launcherVersion string
+	osqueryVersion                 string
+	launcherVersion                string
+	enrollmentSecretSigningKeyPath string
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -33,12 +36,18 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_LAUNCHER_VERSION", ""),
 			"the launcher version to include in the resultant packages",
 		)
+		flEnrollmentSecretSigningKeyPath = flag.String(
+			"enrollment_secret_signing_key",
+			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_ENROLLMENT_SECRET_SIGNING_KEY", ""),
+			"the path to the PEM key which is used to sign the enrollment secret JWT token",
+		)
 	)
 	flag.Parse()
 
 	opts := &options{
-		osqueryVersion:  *flOsqueryVersion,
-		launcherVersion: *flLauncherVersion,
+		osqueryVersion:                 *flOsqueryVersion,
+		launcherVersion:                *flLauncherVersion,
+		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
 	}
 
 	if opts.osqueryVersion == "" {
@@ -47,6 +56,10 @@ func parseOptions() (*options, error) {
 
 	if opts.launcherVersion == "" {
 		opts.launcherVersion = "stable"
+	}
+
+	if opts.enrollmentSecretSigningKeyPath == "" {
+		return nil, errors.New("an enrollment secret signing key path was not specified")
 	}
 
 	return opts, nil
@@ -66,14 +79,41 @@ func main() {
 	level.Debug(logger).Log(
 		"osquery_version", opts.osqueryVersion,
 		"launcher_version", opts.launcherVersion,
+		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
 		"message", "finished parsing arguments",
 	)
+
+	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
+	if err != nil {
+		level.Error(logger).Log("error", fmt.Sprintf("Could not read the supplied key file: %s", err))
+		os.Exit(1)
+	}
 
 	firstID := 100001
 	numberOfIDsToGenerate := 1000
 
 	for id := firstID; id <= firstID+numberOfIDsToGenerate; id++ {
 		tenant := packaging.Munemo(id)
-		fmt.Println(tenant)
+
+		macPackagePath, err := packaging.MakeMacOSPkg(opts.launcherVersion, opts.osqueryVersion, tenant, pemKey)
+		if err != nil {
+			level.Error(logger).Log("error", fmt.Sprintf("Could not generate macOS package for tenant (%s): %s", tenant, err))
+			os.Exit(1)
+		}
+
+		level.Debug(logger).Log(
+			"msg", "Generated macOS package",
+			"path", macPackagePath,
+		)
+
+		if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant); err != nil {
+			level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
+		}
+
+		logger.Log(
+			"msg", "Successfully uploaded macOS package to GSC",
+			"path", macPackagePath,
+			"tenant", tenant,
+		)
 	}
 }
