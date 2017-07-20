@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/osquery-go"
@@ -24,6 +25,7 @@ import (
 // of osqueryd.
 type OsqueryInstance struct {
 	*osqueryInstanceFields
+	instanceLock sync.Mutex
 }
 
 // osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
@@ -50,8 +52,7 @@ type osqueryInstanceFields struct {
 	extensionManagerClient *osquery.ExtensionManagerClient
 	clientLock             *sync.Mutex
 	paths                  *osqueryFilePaths
-	once                   *sync.Once
-	hasBeganTeardown       bool
+	hasBegunTeardown       int32
 	rmRootDirectory        func()
 	usingTempDir           bool
 }
@@ -66,7 +67,7 @@ type osqueryFilePaths struct {
 	extensionSocketPath   string
 }
 
-// calculateOsqueryPaths accepts a ath to a working osqueryd binary and a root
+// calculateOsqueryPaths accepts a path to a working osqueryd binary and a root
 // directory where all of the osquery filesystem artifacts should be stored.
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
@@ -239,12 +240,11 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
 	o := &OsqueryInstance{
-		&osqueryInstanceFields{
+		osqueryInstanceFields: &osqueryInstanceFields{
 			stdout:          ioutil.Discard,
 			stderr:          ioutil.Discard,
 			rmRootDirectory: func() {},
 			errs:            make(chan error),
-			once:            new(sync.Once),
 			clientLock:      new(sync.Mutex),
 		},
 	}
@@ -297,7 +297,6 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// that outputs logs to the default application logger.
 	if o.loggerPluginFlag == "" {
 		logString := func(ctx context.Context, typ logger.LogType, logText string) error {
-			log.Printf("%s: %s\n", typ, logText)
 			return nil
 		}
 		o.extensionPlugins = append(o.extensionPlugins, logger.NewPlugin("internal_noop", logString))
@@ -330,9 +329,15 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	}
 
 	// Launch a long running goroutine to monitor the osqueryd process.
+	cmd := o.cmd
+	errChannel := o.errs
 	go func() {
-		if err := o.cmd.Wait(); err != nil {
-			o.errs <- errors.Wrap(err, "osqueryd processes died")
+		if err := cmd.Wait(); err != nil {
+			errChannel <- errors.Wrap(err, "osqueryd processes died")
+		} else {
+			// Close the channel so that the goroutine blocked
+			// waiting for errors will be able to exit
+			close(errChannel)
 		}
 	}()
 
@@ -359,7 +364,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// Launch the extension manager server asynchronously.
 	go func() {
 		if err := o.extensionManagerServer.Start(); err != nil {
-			o.errs <- errors.Wrap(err, "the extension server died")
+			errChannel <- errors.Wrap(err, "the extension server died")
 		}
 	}()
 
@@ -379,15 +384,16 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		// runtime produces an error, it's likely that all of the other components
 		// will produce errors as well since everything is so interconnected. For
 		// this reason, when any error occurs, we attempt a total recovery.
-		runtimeError := <-o.errs
-		o.once.Do(func() {
-			if recoveryError := o.Recover(runtimeError); recoveryError != nil {
-				// If we were not able to recover the osqueryd process for some reason,
-				// kill the process and hope that the operating system scheduling
-				// mechanism (launchd, etc) can relaunch the tool cleanly.
-				log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
-			}
-		})
+		runtimeError, done := <-errChannel
+		if done {
+			return
+		}
+		if recoveryError := o.Recover(runtimeError); recoveryError != nil {
+			// If we were not able to recover the osqueryd process for some reason,
+			// kill the process and hope that the operating system scheduling
+			// mechanism (launchd, etc) can relaunch the tool cleanly.
+			log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+		}
 	}()
 
 	return o, nil
@@ -401,10 +407,9 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 func (o *OsqueryInstance) Recover(runtimeError error) error {
 	// If the user explicitly calls o.Kill(), as the components are shutdown, they
 	// may exit with errors. In this case, we shouldn't recover the instance.
-	if o.hasBeganTeardown {
+	if begun := atomic.SwapInt32(&o.hasBegunTeardown, 1); begun != 0 {
 		return nil
 	}
-	o.hasBeganTeardown = true
 
 	// First, we try to kill the osqueryd process if it isn't already dead.
 	if o.cmd.Process != nil {
@@ -431,10 +436,9 @@ func (o *OsqueryInstance) Recover(runtimeError error) error {
 // instance and release all resources that have been acquired throughout the
 // process lifecycle.
 func (o *OsqueryInstance) Kill() error {
-	if o.hasBeganTeardown {
+	if begun := atomic.SwapInt32(&o.hasBegunTeardown, 1); begun != 0 {
 		return errors.New("Will not kill osqueryd instance because teardown has already begun somewhere else")
 	}
-	o.hasBeganTeardown = true
 
 	if ok, err := o.Healthy(); err != nil {
 		return errors.Wrap(err, "an error occured trying to determine osquery's health")
@@ -521,7 +525,9 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 	// Now that we have a new running osquery instance, we replace the fields of
 	// our old instance with a pointer to the fields of the new instance so that
 	// existing references still work properly.
+	o.instanceLock.Lock()
 	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
+	o.instanceLock.Unlock()
 
 	return nil
 }
