@@ -42,7 +42,7 @@ launcher: .pre-build
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/launcher/
 
-package-builder: .pre-build
+package-builder: .pre-build launcher extension
 	go build -i -o build/package-builder ./cmd/package-builder/
 
 deps:
