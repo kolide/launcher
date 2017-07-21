@@ -1,5 +1,5 @@
-hash: 0a444a9c5ef1302e9ec8afda8c59ea9b7346a1f7cc6906c1c29f3d5bc16b73b6
-updated: 2017-07-19T14:45:06.354364112-07:00
+hash: 043273c06c9264d8eed188def8f1d2ddea47951f2e3d59792d46b615a590025b
+updated: 2017-07-20T18:15:16.251647836-07:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -10,7 +10,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
 - name: github.com/go-kit/kit
-  version: 1beb0cbdd6b131b37491875a5fbd306576be370f
+  version: e10f5bf035be9af21fd5b2fb4469d5716c6ab07d
   subpackages:
   - endpoint
   - log
@@ -34,7 +34,8 @@ imports:
   - env
   - version
 - name: github.com/kolide/osquery-go
-  version: 8b23634ab364100018376115fa78f14808fde3f7
+  version: 707117629cf31599ee62e6ecec4685d3e4d5e587
+  repo: git@github.com:zwass/osquery-go.git
   subpackages:
   - gen/osquery
   - plugin/config
@@ -46,7 +47,7 @@ imports:
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net
-  version: 02ac38e2528ff4adea90f184d71a3faa04b4b1b0
+  version: 7b7efd8000731a766f6cbfa2c04010627521c66e
   subpackages:
   - context
   - http2
@@ -57,8 +58,6 @@ imports:
   - trace
 - name: golang.org/x/sys
   version: 7a4fde3fda8ef580a89dbae8138c26041be14299
-  subpackages:
-  - unix
 - name: golang.org/x/text
   version: 836efe42bb4aa16aaa17b9c155d8813d336ed720
   subpackages:
@@ -71,7 +70,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 939edc09d6577e6c1221b4a65feb1e3d88ba6439
+  version: 2bb318258959db281674bc6fd67b5167b7ff0d65
   subpackages:
   - codes
   - credentials
