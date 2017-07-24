@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -223,6 +225,13 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 	}
 }
 
+// How long to wait before erroring because we cannot open the osquery
+// extension socket.
+const socketOpenTimeout = 10 * time.Second
+
+// How often to try to open the osquery extension socket
+const socketOpenInterval = 500 * time.Millisecond
+
 // LaunchOsqueryInstance will launch an instance of osqueryd via a very
 // configurable API as defined by the various OsqueryInstanceOption functional
 // options. For example, a more customized caller might do something like the
@@ -341,18 +350,32 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		}
 	}()
 
-	// Briefly sleep so that osqueryd has time to initialize before starting the
-	// extension manager server
-	time.Sleep(2 * time.Second)
+	// Because we "invert" the control of the osquery process and the
+	// extension (we are running the extension from the process that starts
+	// osquery, rather than the other way around), we don't know exactly
+	// when osquery will have the extension socket open. Because of this,
+	// we want to try opening the socket until we are successful (with a
+	// timeout if something goes wrong).
+	deadlineCtx, cancel := context.WithTimeout(context.Background(), socketOpenTimeout)
+	defer cancel()
+	limiter := rate.NewLimiter(rate.Every(socketOpenInterval), 1)
+	for {
+		// Create the extension server and register all custom osquery
+		// plugins
+		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
+			"kolide",
+			paths.extensionSocketPath,
+			osquery.ServerTimeout(2*time.Second),
+		)
+		if err == nil {
+			break
+		}
 
-	// Create the extension server and register all custom osquery plugins
-	o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
-		"kolide",
-		paths.extensionSocketPath,
-		osquery.ServerTimeout(2*time.Second),
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
+		limiterErr := limiter.Wait(deadlineCtx)
+		if limiterErr != nil {
+			// This means that our deadline expired
+			return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
+		}
 	}
 
 	plugins := o.extensionPlugins

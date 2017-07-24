@@ -1,5 +1,5 @@
-hash: 0a444a9c5ef1302e9ec8afda8c59ea9b7346a1f7cc6906c1c29f3d5bc16b73b6
-updated: 2017-07-24T14:52:29.884404148-04:00
+hash: ff02bd055f210412398240a85921e1ff96ef303522137eb13fd4f8e8c4d80e47
+updated: 2017-07-24T17:38:06.019957865-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -66,6 +66,10 @@ imports:
   - transform
   - unicode/bidi
   - unicode/norm
+- name: golang.org/x/time
+  version: 8be79e1e0910c292df4e79c241bb7e8f7e725959
+  subpackages:
+  - wait
 - name: google.golang.org/genproto
   version: b0a3dcfcd1a9bd48e63634bd8802960804cf8315
   subpackages:
