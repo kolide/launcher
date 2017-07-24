@@ -51,7 +51,7 @@ deps:
 	glide install
 
 test:
-	go test -cover -v $(shell go list ./... | grep -v /vendor/)
+	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
 
 build-mac-pkg: launcher extension mac-pkg-builder
 	mkdir -p bin/

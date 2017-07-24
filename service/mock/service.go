@@ -14,11 +14,11 @@ var _ service.KolideService = (*KolideService)(nil)
 
 type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostIdentifer string) (string, bool, error)
 
-type RequestConfigFunc func(ctx context.Context, nodeKey string, version string) (string, bool, error)
+type RequestConfigFunc func(ctx context.Context, nodeKey string) (string, bool, error)
 
-type PublishLogsFunc func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error)
+type PublishLogsFunc func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error)
 
-type RequestQueriesFunc func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error)
+type RequestQueriesFunc func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error)
 
 type PublishResultsFunc func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 
@@ -44,19 +44,19 @@ func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret stri
 	return s.RequestEnrollmentFunc(ctx, enrollSecret, hostIdentifer)
 }
 
-func (s *KolideService) RequestConfig(ctx context.Context, nodeKey string, version string) (string, bool, error) {
+func (s *KolideService) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
 	s.RequestConfigFuncInvoked = true
-	return s.RequestConfigFunc(ctx, nodeKey, version)
+	return s.RequestConfigFunc(ctx, nodeKey)
 }
 
-func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
+func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	s.PublishLogsFuncInvoked = true
-	return s.PublishLogsFunc(ctx, nodeKey, version, logType, logs)
+	return s.PublishLogsFunc(ctx, nodeKey, logType, logs)
 }
 
-func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 	s.RequestQueriesFuncInvoked = true
-	return s.RequestQueriesFunc(ctx, nodeKey, version)
+	return s.RequestQueriesFunc(ctx, nodeKey)
 }
 
 func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {

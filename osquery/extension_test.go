@@ -130,7 +130,7 @@ func TestExtensionEnroll(t *testing.T) {
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestConfigFunc: func(ctx context.Context, nodeKey string, version string) (string, bool, error) {
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return "", false, errors.New("transport")
 		},
 	}
@@ -149,7 +149,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
-		RequestConfigFunc: func(ctx context.Context, nodeKey string, version string) (string, bool, error) {
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			gotNodeKey = nodeKey
 			return "", true, nil
 		},
@@ -174,7 +174,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 func TestExtensionGenerateConfigs(t *testing.T) {
 	configVal := `{"foo": "bar"}`
 	m := &mock.KolideService{
-		RequestConfigFunc: func(ctx context.Context, nodeKey string, version string) (string, bool, error) {
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
 		},
 	}
@@ -191,7 +191,7 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 
 func TestExtensionLogStringTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
 		},
 	}
@@ -209,7 +209,7 @@ func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
@@ -231,13 +231,12 @@ func TestExtensionLogStringEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionLogString(t *testing.T) {
-	var gotNodeKey, gotVersion string
+	var gotNodeKey string
 	var gotLogType logger.LogType
 	var gotLogs []string
 	m := &mock.KolideService{
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			gotNodeKey = nodeKey
-			gotVersion = version
 			gotLogType = logType
 			gotLogs = logs
 			return "", "", false, nil
@@ -261,7 +260,7 @@ func TestExtensionLogString(t *testing.T) {
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 			return nil, false, errors.New("transport")
 		},
 	}
@@ -280,7 +279,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 			gotNodeKey = nodeKey
 			return nil, true, nil
 		},
@@ -308,7 +307,7 @@ func TestExtensionGetQueries(t *testing.T) {
 		"version": "select version from osquery_info",
 	}
 	m := &mock.KolideService{
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string, version string) (*distributed.GetQueriesResult, bool, error) {
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 			return &distributed.GetQueriesResult{
 				Queries: expectedQueries,
 			}, false, nil
