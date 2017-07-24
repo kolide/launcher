@@ -41,8 +41,7 @@ func (e KolideClient) RequestEnrollment(ctx context.Context, enrollSecret, hostI
 }
 
 type agentAPIRequest struct {
-	NodeKey      string
-	AgentVersion string
+	NodeKey string
 }
 
 type configResponse struct {
@@ -52,8 +51,8 @@ type configResponse struct {
 }
 
 // RequestConfig implements KolideService.RequestConfig.
-func (e KolideClient) RequestConfig(ctx context.Context, nodeKey, version string) (string, bool, error) {
-	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
+func (e KolideClient) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
+	request := agentAPIRequest{NodeKey: nodeKey}
 	response, err := e.RequestConfigEndpoint(ctx, request)
 	if err != nil {
 		return "", false, err
@@ -63,10 +62,9 @@ func (e KolideClient) RequestConfig(ctx context.Context, nodeKey, version string
 }
 
 type logCollection struct {
-	NodeKey      string
-	AgentVersion string
-	LogType      logger.LogType
-	Logs         []string
+	NodeKey string
+	LogType logger.LogType
+	Logs    []string
 }
 
 type agentAPIResponse struct {
@@ -77,8 +75,8 @@ type agentAPIResponse struct {
 }
 
 // PublishLogs implements KolideService.PublishLogs
-func (e KolideClient) PublishLogs(ctx context.Context, nodeKey, version string, logType logger.LogType, logs []string) (string, string, bool, error) {
-	request := logCollection{NodeKey: nodeKey, AgentVersion: version, LogType: logType, Logs: logs}
+func (e KolideClient) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}
 	response, err := e.PublishLogsEndpoint(ctx, request)
 	if err != nil {
 		return "", "", false, err
@@ -94,8 +92,8 @@ type queryCollection struct {
 }
 
 // RequestQueries implements KolideService.RequestQueries
-func (e KolideClient) RequestQueries(ctx context.Context, nodeKey, version string) (*distributed.GetQueriesResult, bool, error) {
-	request := agentAPIRequest{NodeKey: nodeKey, AgentVersion: version}
+func (e KolideClient) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	request := agentAPIRequest{NodeKey: nodeKey}
 	response, err := e.RequestQueriesEndpoint(ctx, request)
 	if err != nil {
 		return nil, false, err

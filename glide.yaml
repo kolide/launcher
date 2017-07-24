@@ -14,8 +14,6 @@ import:
   - env
   - version
 - package: github.com/kolide/osquery-go
-  repo: git@github.com:zwass/osquery-go.git
-  version: 707117629cf31599ee62e6ecec4685d3e4d5e587
   subpackages:
   - plugin/config
   - plugin/distributed

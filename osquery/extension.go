@@ -60,9 +60,6 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}, nil
 }
 
-// TODO this should come from something sensible
-const version = "foobar"
-
 // Bucket name to use for launcher configuration.
 const configBucket = "config"
 
@@ -140,8 +137,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (map[string]string, error) {
-	// TODO get version
-	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey, version)
+	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "transport error retrieving config")
 	}
@@ -176,8 +172,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) logStringWithReenroll(ctx context.Context, typ logger.LogType, logText string, reenroll bool) error {
-	// TODO get version
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, version, typ, []string{logText})
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, []string{logText})
 	if err != nil {
 		return errors.Wrap(err, "transport error sending logs")
 	}
@@ -210,7 +205,7 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
-	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey, version)
+	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "transport error getting queries")
 	}

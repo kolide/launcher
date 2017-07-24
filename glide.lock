@@ -1,5 +1,5 @@
-hash: 043273c06c9264d8eed188def8f1d2ddea47951f2e3d59792d46b615a590025b
-updated: 2017-07-20T18:15:16.251647836-07:00
+hash: 0a444a9c5ef1302e9ec8afda8c59ea9b7346a1f7cc6906c1c29f3d5bc16b73b6
+updated: 2017-07-24T14:52:29.884404148-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -18,14 +18,14 @@ imports:
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-stack/stack
-  version: 54be5f394ed2c3e19dac9134a40a95ba5a017f7b
+  version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
   version: 0a4f71a498b7c4812f64969510bcb4eca251e33a
   subpackages:
   - proto
   - ptypes/any
 - name: github.com/kolide/agent-api
-  version: f278f0edfa00d86c0afbc0e3396f589fc36e67cd
+  version: 9de61790e3e57187ae0485ce38c7598d61bbe446
   repo: git@github.com:kolide/agent-api.git
 - name: github.com/kolide/kit
   version: c26f6b9b1f8658c8486a2bf3eaa969308ec2f85e
@@ -34,8 +34,7 @@ imports:
   - env
   - version
 - name: github.com/kolide/osquery-go
-  version: 707117629cf31599ee62e6ecec4685d3e4d5e587
-  repo: git@github.com:zwass/osquery-go.git
+  version: 178e77662e89793d8e1406ab7a7bb92439ddcc41
   subpackages:
   - gen/osquery
   - plugin/config
@@ -47,7 +46,7 @@ imports:
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net
-  version: 7b7efd8000731a766f6cbfa2c04010627521c66e
+  version: ab5485076ff3407ad2d02db054635913f017b0ed
   subpackages:
   - context
   - http2
@@ -57,7 +56,9 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 7a4fde3fda8ef580a89dbae8138c26041be14299
+  version: c4489faa6e5ab84c0ef40d6ee878f7a030281f0f
+  subpackages:
+  - unix
 - name: golang.org/x/text
   version: 836efe42bb4aa16aaa17b9c155d8813d336ed720
   subpackages:
@@ -70,7 +71,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 2bb318258959db281674bc6fd67b5167b7ff0d65
+  version: 6495e8dfeb47dc61ff4c392ba6369fa3f15cdc1b
   subpackages:
   - codes
   - credentials
@@ -87,7 +88,7 @@ imports:
   - transport
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
@@ -95,7 +96,7 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 05e8a0eda380579888eb53c394909df027f06991
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
   - require
