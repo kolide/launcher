@@ -399,6 +399,14 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	return o, nil
 }
 
+// Helper to check whether teardown should commence. This will atomically set
+// the teardown flag, and return true if teardown should commence, or false if
+// teardown has already begun.
+func (o *OsqueryInstance) beginTeardown() bool {
+	begun := atomic.SwapInt32(&o.hasBegunTeardown, 1)
+	return begun == 0
+}
+
 // Recover attempts to launch a new osquery instance if the running instance has
 // failed for some reason. Note that this function does not call o.Kill() to
 // release resources because Kill() expects the osquery instance to be healthy,
@@ -406,8 +414,9 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover(runtimeError error) error {
 	// If the user explicitly calls o.Kill(), as the components are shutdown, they
-	// may exit with errors. In this case, we shouldn't recover the instance.
-	if begun := atomic.SwapInt32(&o.hasBegunTeardown, 1); begun != 0 {
+	// may exit with errors. In this case, we shouldn't recover the
+	// instance.
+	if !o.beginTeardown() {
 		return nil
 	}
 
@@ -436,7 +445,7 @@ func (o *OsqueryInstance) Recover(runtimeError error) error {
 // instance and release all resources that have been acquired throughout the
 // process lifecycle.
 func (o *OsqueryInstance) Kill() error {
-	if begun := atomic.SwapInt32(&o.hasBegunTeardown, 1); begun != 0 {
+	if !o.beginTeardown() {
 		return errors.New("Will not kill osqueryd instance because teardown has already begun somewhere else")
 	}
 
