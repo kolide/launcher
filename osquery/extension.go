@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/google/uuid"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -60,6 +61,43 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}, nil
 }
 
+const uuidKey = "uuid"
+
+// getHostIdentifier returns the UUID identifier associated with this host. If
+// there is an existing identifier, that should be returned. If not, the
+// identifier should be randomly generated and persisted.
+func (e *Extension) getHostIdentifier() (string, error) {
+	var identifier string
+	err := e.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		uuidBytes := b.Get([]byte(uuidKey))
+		gotID, err := uuid.ParseBytes(uuidBytes)
+
+		// Use existing UUID
+		if err == nil {
+			identifier = gotID.String()
+			return nil
+		}
+
+		// Generate new (random) UUID
+		gotID, err = uuid.NewRandom()
+		if err != nil {
+			return errors.Wrap(err, "generating new UUID")
+		}
+		identifier = gotID.String()
+
+		// Save new UUID
+		err = b.Put([]byte(uuidKey), []byte(identifier))
+		return errors.Wrap(err, "saving new UUID")
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return identifier, nil
+}
+
 // Bucket name to use for launcher configuration.
 const configBucket = "config"
 
@@ -69,7 +107,7 @@ const nodeKeyKey = "nodeKey"
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
-func (e *Extension) Enroll(ctx context.Context, hostIdentifier string) (string, bool, error) {
+func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
 	e.enrollMutex.Lock()
@@ -94,8 +132,13 @@ func (e *Extension) Enroll(ctx context.Context, hostIdentifier string) (string, 
 		return e.NodeKey, false, nil
 	}
 
+	identifier, err := e.getHostIdentifier()
+	if err != nil {
+		return "", true, errors.Wrap(err, "generating UUID")
+	}
+
 	// If no cached node key, enroll for new node key
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.EnrollSecret, hostIdentifier)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.EnrollSecret, identifier)
 	if err != nil {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
@@ -148,7 +191,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		}
 
 		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx, "foobar")
+		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
 		}
@@ -183,7 +226,7 @@ func (e *Extension) logStringWithReenroll(ctx context.Context, typ logger.LogTyp
 		}
 
 		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx, "foobar")
+		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
 			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
 		}
@@ -216,7 +259,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 		}
 
 		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx, "foobar")
+		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
 		}
@@ -250,7 +293,7 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 		}
 
 		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx, "foobar")
+		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
 			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
 		}
