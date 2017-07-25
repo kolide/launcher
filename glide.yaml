@@ -23,7 +23,7 @@ import:
 - package: google.golang.org/grpc
 - package: golang.org/x/time
   subpackages:
-  - wait
+  - rate
 testImport:
 - package: github.com/stretchr/testify
   subpackages:

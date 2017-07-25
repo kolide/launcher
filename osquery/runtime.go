@@ -371,9 +371,10 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			break
 		}
 
-		limiterErr := limiter.Wait(deadlineCtx)
-		if limiterErr != nil {
-			// This means that our deadline expired
+		if limiter.Wait(deadlineCtx) != nil {
+			// This means that our timeout expired. Return the
+			// error from creating the server, not the error from
+			// the timeout expiration.
 			return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 		}
 	}
