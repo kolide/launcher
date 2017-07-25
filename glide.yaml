@@ -21,6 +21,9 @@ import:
   - plugin/table
 - package: github.com/pkg/errors
 - package: google.golang.org/grpc
+- package: golang.org/x/time
+  subpackages:
+  - rate
 testImport:
 - package: github.com/stretchr/testify
   subpackages:

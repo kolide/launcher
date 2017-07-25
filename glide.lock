@@ -1,5 +1,5 @@
-hash: 0a444a9c5ef1302e9ec8afda8c59ea9b7346a1f7cc6906c1c29f3d5bc16b73b6
-updated: 2017-07-24T14:52:29.884404148-04:00
+hash: 94baccfde35067234c80f101c669ca7cf12ea8b62255c85fa5cc416510f88ef1
+updated: 2017-07-25T13:22:14.380369231-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -23,7 +23,10 @@ imports:
   version: 0a4f71a498b7c4812f64969510bcb4eca251e33a
   subpackages:
   - proto
+  - ptypes
   - ptypes/any
+  - ptypes/duration
+  - ptypes/timestamp
 - name: github.com/kolide/agent-api
   version: 9de61790e3e57187ae0485ce38c7598d61bbe446
   repo: git@github.com:kolide/agent-api.git
@@ -56,7 +59,7 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: c4489faa6e5ab84c0ef40d6ee878f7a030281f0f
+  version: 14ac33bf8474b62c65cae263af2e4d3b543cc699
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -66,12 +69,16 @@ imports:
   - transform
   - unicode/bidi
   - unicode/norm
+- name: golang.org/x/time
+  version: 8be79e1e0910c292df4e79c241bb7e8f7e725959
+  subpackages:
+  - rate
 - name: google.golang.org/genproto
   version: b0a3dcfcd1a9bd48e63634bd8802960804cf8315
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 6495e8dfeb47dc61ff4c392ba6369fa3f15cdc1b
+  version: a56843968d388dfa9f3ba1b7ac2f509665d6af73
   subpackages:
   - codes
   - credentials
