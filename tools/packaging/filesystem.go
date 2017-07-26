@@ -1,10 +1,22 @@
 package packaging
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/kolide/kit/env"
 )
+
+func Gopath() string {
+	home := env.String("HOME", "~/")
+	return env.String("GOPATH", fmt.Sprintf("%s/go", home))
+}
+
+func LauncherSource() string {
+	return fmt.Sprintf("%s/src/github.com/kolide/launcher", Gopath())
+}
 
 const (
 	DirMode  = 0755

@@ -10,15 +10,9 @@ import (
 	"os/exec"
 	"text/template"
 
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
-
-func Gopath() string {
-	home := env.String("HOME", "~/")
-	return env.String("GOPATH", fmt.Sprintf("%s/go", home))
-}
 
 type launchDaemonTemplateOptions struct {
 	KolideURL string

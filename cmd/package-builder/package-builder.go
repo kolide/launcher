@@ -74,8 +74,23 @@ func main() {
 	}
 
 	if opts.enrollmentSecretSigningKeyPath == "" {
-		level.Error(logger).Log("error", "an enrollment secret signing key path was not specified")
-		os.Exit(1)
+		level.Warn(logger).Log("warning", "an enrollment secret signing key path was not specified, trying the test key")
+		opts.enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
+	}
+
+	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
+		if os.IsNotExist(err) {
+			level.Error(logger).Log(
+				"error", "Key file doesn't exist",
+				"path", opts.enrollmentSecretSigningKeyPath,
+			)
+		} else {
+			level.Error(logger).Log(
+				"error", "Could not stat key file",
+				"path", opts.enrollmentSecretSigningKeyPath,
+				"message", err.Error(),
+			)
+		}
 	}
 
 	level.Debug(logger).Log(
