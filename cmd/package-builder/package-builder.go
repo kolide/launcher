@@ -58,7 +58,7 @@ func parseOptions() (*options, error) {
 }
 
 func main() {
-	logger := log.NewLogfmtLogger(os.Stderr)
+	logger := log.NewJSONLogger(os.Stderr)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	logger = log.With(logger, "caller", log.DefaultCaller)
 
@@ -105,31 +105,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	firstID := 100001
-	numberOfIDsToGenerate := 1000
+	prToStartFrom := 350
+	prToGenerateUntil := 500
 
-	for id := firstID; id <= firstID+numberOfIDsToGenerate; id++ {
-		tenant := packaging.Munemo(id)
+	for i := prToStartFrom; i < prToGenerateUntil; i++ {
+		hostname := fmt.Sprintf("%d.cloud.kolide.net", i)
 
-		macPackagePath, err := packaging.MakeMacOSPkg(opts.osqueryVersion, tenant, pemKey)
-		if err != nil {
-			level.Error(logger).Log("error", fmt.Sprintf("Could not generate macOS package for tenant (%s): %s", tenant, err))
-			os.Exit(1)
+		firstID := 100001
+		numberOfIDsToGenerate := 2
+		for id := firstID; id <= firstID+numberOfIDsToGenerate; id++ {
+			tenant := packaging.Munemo(id)
+
+			macPackagePath, err := packaging.MakeMacOSPkg(opts.osqueryVersion, tenant, hostname, pemKey)
+			if err != nil {
+				level.Error(logger).Log("error", fmt.Sprintf("Could not generate macOS package for tenant (%s): %s", tenant, err))
+				os.Exit(1)
+			}
+
+			level.Debug(logger).Log(
+				"msg", "Generated macOS package",
+				"path", macPackagePath,
+			)
+
+			/*
+				if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant); err != nil {
+					level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
+				}
+
+				logger.Log(
+					"msg", "Successfully uploaded macOS package to GSC",
+					"path", macPackagePath,
+					"tenant", tenant,
+				)
+			*/
 		}
-
-		level.Debug(logger).Log(
-			"msg", "Generated macOS package",
-			"path", macPackagePath,
-		)
-
-		if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant); err != nil {
-			level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
-		}
-
-		logger.Log(
-			"msg", "Successfully uploaded macOS package to GSC",
-			"path", macPackagePath,
-			"tenant", tenant,
-		)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"text/template"
 
 	"github.com/kolide/kit/version"
@@ -73,8 +74,6 @@ func Pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) 
 		"--version", version,
 		outputPath,
 	)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
 	return cmd.Run()
 }
 
@@ -82,7 +81,7 @@ func Pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) 
 // verison identifier, a munemo tenant identifier, and a key used to sign the
 // enrollment secret JWT token. The output path of the package is returned and
 // an error if the operation was not successful.
-func MakeMacOSPkg(osqueryVersion, tenantIdentifier string, pemKey []byte) (string, error) {
+func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -106,7 +105,12 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier string, pemKey []byte) (strin
 		"/usr/local/kolide/bin",
 		"/Library/LaunchDaemons",
 	}
-	_ = pathsToCreate
+	for _, pathToCreate := range pathsToCreate {
+		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
+		if err != nil {
+			return "", errors.Wrap(err, fmt.Sprintf("could not make directory %s/%s", packageRoot, pathToCreate))
+		}
+	}
 
 	// Next we create each file that gets laid down as a result of the package
 	// installation:
@@ -116,7 +120,8 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier string, pemKey []byte) (strin
 	if err != nil {
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
-	err = CopyFile(osquerydPath, fmt.Sprintf("%s/usr/local/bin/osqueryd", packageRoot))
+
+	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
@@ -134,8 +139,8 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier string, pemKey []byte) (strin
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("", "MakeMacOSPkg.outputPath")
-	outputPath := fmt.Sprintf("%s/launcher-darwin-%s.pkg", outputPathDir, currentVersion)
+	outputPathDir, err := ioutil.TempDir("", fmt.Sprintf("%s-%s-", hostname, tenantIdentifier))
+	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
