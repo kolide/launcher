@@ -118,7 +118,14 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier string, pemKey []byte) (strin
 	// installation:
 
 	// The initial osqueryd binary
-	// TODO
+	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
+	if err != nil {
+		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
+	}
+	err = CopyFile(osquerydPath, fmt.Sprintf("%s/usr/local/bin/osqueryd", packageRoot))
+	if err != nil {
+		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
+	}
 
 	// The initial launcher (and extension) binary
 	// TODO
