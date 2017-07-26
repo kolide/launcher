@@ -43,7 +43,16 @@ launcher: .pre-build
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/launcher/
 
 package-builder: .pre-build launcher extension
-	go build -i -o build/package-builder ./cmd/package-builder/
+	go build -i -o build/package-builder -ldflags "\
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=package-builder \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/package-builder/
+
+
 
 deps:
 	go get -u github.com/Masterminds/glide

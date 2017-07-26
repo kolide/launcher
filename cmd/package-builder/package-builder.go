@@ -9,13 +9,14 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/tools/packaging"
-	"github.com/pkg/errors"
 )
 
 // options is the set of configurable options that may be set when launching
 // this program
 type options struct {
+	printVersion                   bool
 	osqueryVersion                 string
 	enrollmentSecretSigningKeyPath string
 }
@@ -25,6 +26,11 @@ type options struct {
 // typed struct of options for further application use
 func parseOptions() (*options, error) {
 	var (
+		flVersion = flag.Bool(
+			"version",
+			false,
+			"print package-builder version and exit",
+		)
 		flOsqueryVersion = flag.String(
 			"osquery_version",
 			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
@@ -41,14 +47,11 @@ func parseOptions() (*options, error) {
 	opts := &options{
 		osqueryVersion:                 *flOsqueryVersion,
 		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
+		printVersion:                   *flVersion,
 	}
 
 	if opts.osqueryVersion == "" {
 		opts.osqueryVersion = "stable"
-	}
-
-	if opts.enrollmentSecretSigningKeyPath == "" {
-		return nil, errors.New("an enrollment secret signing key path was not specified")
 	}
 
 	return opts, nil
@@ -62,6 +65,16 @@ func main() {
 	opts, err := parseOptions()
 	if err != nil {
 		level.Error(logger).Log("error", fmt.Sprintf("Could not parse options: %s", err))
+		os.Exit(1)
+	}
+
+	if opts.printVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
+	if opts.enrollmentSecretSigningKeyPath == "" {
+		level.Error(logger).Log("error", "an enrollment secret signing key path was not specified")
 		os.Exit(1)
 	}
 
