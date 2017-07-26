@@ -1,5 +1,5 @@
-hash: 94baccfde35067234c80f101c669ca7cf12ea8b62255c85fa5cc416510f88ef1
-updated: 2017-07-25T13:22:14.380369231-04:00
+hash: 7f7182bce2a90776c8107d5e98e17d17b3bb3ce1e47e8fef7c57b469d8a1fd03
+updated: 2017-07-25T15:27:15.081985034-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -27,6 +27,8 @@ imports:
   - ptypes/any
   - ptypes/duration
   - ptypes/timestamp
+- name: github.com/google/uuid
+  version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/kolide/agent-api
   version: 9de61790e3e57187ae0485ce38c7598d61bbe446
   repo: git@github.com:kolide/agent-api.git
@@ -78,7 +80,7 @@ imports:
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: a56843968d388dfa9f3ba1b7ac2f509665d6af73
+  version: ca9e0c3458ef816b9f0ff97f29c6b1fed48d8f49
   subpackages:
   - codes
   - credentials

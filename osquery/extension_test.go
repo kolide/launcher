@@ -32,6 +32,56 @@ func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
 	}
 }
 
+func TestGetHostIdentifier(t *testing.T) {
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	e, err := NewExtension(&mock.KolideService{}, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.Nil(t, err)
+
+	ident, err := e.getHostIdentifier()
+	require.Nil(t, err)
+	assert.True(t, len(ident) > 10)
+	oldIdent := ident
+
+	ident, err = e.getHostIdentifier()
+	require.Nil(t, err)
+	assert.Equal(t, oldIdent, ident)
+
+	db, cleanup = makeTempDB(t)
+	defer cleanup()
+	e, err = NewExtension(&mock.KolideService{}, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.Nil(t, err)
+
+	ident, err = e.getHostIdentifier()
+	require.Nil(t, err)
+	// Should get different UUID with fresh DB
+	assert.NotEqual(t, oldIdent, ident)
+}
+
+func TestGetHostIdentifierCorruptedData(t *testing.T) {
+	// Put bad data in the DB and ensure we can still generate a fresh UUID
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	e, err := NewExtension(&mock.KolideService{}, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.Nil(t, err)
+
+	// Put garbage UUID in DB
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		return b.Put([]byte(uuidKey), []byte("garbage_uuid"))
+	})
+	require.Nil(t, err)
+
+	ident, err := e.getHostIdentifier()
+	require.Nil(t, err)
+	assert.True(t, len(ident) > 10)
+	oldIdent := ident
+
+	ident, err = e.getHostIdentifier()
+	require.Nil(t, err)
+	assert.Equal(t, oldIdent, ident)
+}
+
 func TestExtensionEnrollTransportError(t *testing.T) {
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
@@ -43,7 +93,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 
-	key, invalid, err := e.Enroll(context.Background(), "bar")
+	key, invalid, err := e.Enroll(context.Background())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.Equal(t, "", key)
 	assert.True(t, invalid)
@@ -61,7 +111,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 
-	key, invalid, err := e.Enroll(context.Background(), "bar")
+	key, invalid, err := e.Enroll(context.Background())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.Equal(t, "", key)
 	assert.True(t, invalid)
@@ -69,12 +119,11 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 }
 
 func TestExtensionEnroll(t *testing.T) {
-	var gotEnrollSecret, gotHostIdentifier string
+	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
 			gotEnrollSecret = enrollSecret
-			gotHostIdentifier = hostIdentifier
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -84,48 +133,43 @@ func TestExtensionEnroll(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
 	require.Nil(t, err)
 
-	expectedHostIdentifier := "bar_host"
-	key, invalid, err := e.Enroll(context.Background(), expectedHostIdentifier)
+	key, invalid, err := e.Enroll(context.Background())
 	require.Nil(t, err)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
-	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
-	key, invalid, err = e.Enroll(context.Background(), expectedHostIdentifier)
+	key, invalid, err = e.Enroll(context.Background())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
-	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
 
 	e, err = NewExtension(m, db, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
-	key, invalid, err = e.Enroll(context.Background(), expectedHostIdentifier)
+	key, invalid, err = e.Enroll(context.Background())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
-	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
 
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
 	e.RequireReenroll(context.Background())
 	assert.Empty(t, e.NodeKey)
-	key, invalid, err = e.Enroll(context.Background(), expectedHostIdentifier)
+	key, invalid, err = e.Enroll(context.Background())
 	require.Nil(t, err)
 	// Now enroll func should be called again
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
-	assert.Equal(t, expectedHostIdentifier, gotHostIdentifier)
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {

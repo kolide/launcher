@@ -155,7 +155,7 @@ func main() {
 		log.Fatalf("Error starting grpc extension: %s\n", err)
 	}
 
-	_, invalid, err := ext.Enroll(context.Background(), "foo_host")
+	_, invalid, err := ext.Enroll(context.Background())
 	if err != nil {
 		log.Fatalf("Error in enrollment: %s\n", err)
 	}
