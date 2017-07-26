@@ -1,7 +1,6 @@
 package packaging
 
 import (
-	"html/template"
 	"os"
 	"testing"
 
@@ -9,10 +8,5 @@ import (
 )
 
 func TestRenderLaunchDaemonTemplate(t *testing.T) {
-	compiledTemplate, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
-	require.NoError(t, err)
-	options := &launchDaemonTemplateOptions{
-		KolideURL: "kolide.com",
-	}
-	require.NoError(t, compiledTemplate.ExecuteTemplate(os.Stdout, "LaunchDaemon", options))
+	require.NoError(t, renderLaunchDaemon(os.Stdout, &launchDaemonTemplateOptions{KolideURL: "kolide.com"}))
 }

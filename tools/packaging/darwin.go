@@ -3,14 +3,21 @@
 package packaging
 
 import (
+	"io"
 	"os"
 	"os/exec"
+	"text/template"
 
 	"github.com/pkg/errors"
 )
 
-var launchDaemonTemplate = `
-<?xml version="1.0" encoding="UTF-8"?>
+type launchDaemonTemplateOptions struct {
+	KolideURL string
+}
+
+func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error {
+	launchDaemonTemplate :=
+		`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
     <dict>
@@ -40,11 +47,12 @@ var launchDaemonTemplate = `
         <key>StandardOutPath</key>
         <string>/var/log/kolide/launcher-stdout.log</string>
     </dict>
-</plist>
-`
-
-type launchDaemonTemplateOptions struct {
-	KolideURL string
+</plist>`
+	t, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse LaunchDaemon template")
+	}
+	return t.ExecuteTemplate(w, "LaunchDaemon", options)
 }
 
 // Pkgbuild runs the following pkgbuild command:
