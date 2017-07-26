@@ -99,6 +99,7 @@ func main() {
 		"message", "finished parsing arguments",
 	)
 
+	// Generate packages for PRs
 	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
 	if err != nil {
 		level.Error(logger).Log("error", fmt.Sprintf("Could not read the supplied key file: %s", err))
@@ -140,4 +141,5 @@ func main() {
 			*/
 		}
 	}
+
 }

@@ -90,7 +90,6 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 		return "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
 	defer os.RemoveAll(packageRoot)
-	_ = packageRoot
 
 	// a macOS package is basically the ability to lay an additive addition of
 	// files to the file system, as well as specify exeuctable scripts at certain
@@ -127,13 +126,43 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	}
 
 	// The initial launcher (and extension) binary
-	// TODO
+	err = CopyFile(
+		filepath.Join(LauncherSource(), "build/launcher"),
+		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
+	}
+
+	err = CopyFile(
+		filepath.Join(LauncherSource(), "build/osquery-extension.ext"),
+		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
+	}
 
 	// The LaunchDaemon which will connect the launcher to the cloud
-	// TODO
+	launchDaemonFile, err := os.Create(filepath.Join(packageRoot, "/Library/LaunchDaemons/com.kolide.launcher.plist"))
+	if err != nil {
+		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
+	}
+	err = renderLaunchDaemon(launchDaemonFile, &launchDaemonTemplateOptions{
+		KolideURL: fmt.Sprintf("https://%s", hostname),
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
+	}
 
 	// The secret which the user will use to authenticate to the cloud
-	// TODO
+	secretString, err := Secret(tenantIdentifier, pemKey)
+	if err != nil {
+		return "", errors.Wrap(err, "could not generate secret for tenant")
+	}
+	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secretString), FileMode)
+	if err != nil {
+		return "", errors.Wrap(err, "could not write secret string to file for packaging")
+	}
 
 	// Finally, now that the final directory structure of the package is
 	// represented, we can create the package
