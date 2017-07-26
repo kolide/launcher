@@ -17,6 +17,7 @@ import (
 // this program
 type options struct {
 	printVersion                   bool
+	debugLogging                   bool
 	osqueryVersion                 string
 	enrollmentSecretSigningKeyPath string
 }
@@ -30,6 +31,11 @@ func parseOptions() (*options, error) {
 			"version",
 			false,
 			"print package-builder version and exit",
+		)
+		flDebug = flag.Bool(
+			"debug",
+			false,
+			"enable debug logging",
 		)
 		flOsqueryVersion = flag.String(
 			"osquery_version",
@@ -48,10 +54,15 @@ func parseOptions() (*options, error) {
 		osqueryVersion:                 *flOsqueryVersion,
 		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
 		printVersion:                   *flVersion,
+		debugLogging:                   *flDebug,
 	}
 
 	if opts.osqueryVersion == "" {
 		opts.osqueryVersion = "stable"
+	}
+
+	if opts.enrollmentSecretSigningKeyPath == "" {
+		opts.enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
 	}
 
 	return opts, nil
@@ -73,11 +84,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	if opts.enrollmentSecretSigningKeyPath == "" {
-		level.Warn(logger).Log("warning", "an enrollment secret signing key path was not specified, trying the test key")
-		opts.enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
-	}
-
 	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
 		if os.IsNotExist(err) {
 			level.Error(logger).Log(
@@ -93,11 +99,13 @@ func main() {
 		}
 	}
 
-	level.Debug(logger).Log(
-		"osquery_version", opts.osqueryVersion,
-		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
-		"message", "finished parsing arguments",
-	)
+	if opts.debugLogging {
+		level.Debug(logger).Log(
+			"osquery_version", opts.osqueryVersion,
+			"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
+			"message", "finished parsing arguments",
+		)
+	}
 
 	// Generate packages for PRs
 	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
@@ -123,23 +131,28 @@ func main() {
 				os.Exit(1)
 			}
 
-			level.Debug(logger).Log(
-				"msg", "Generated macOS package",
-				"path", macPackagePath,
-			)
+			if opts.debugLogging {
+				level.Debug(logger).Log(
+					"msg", "Generated macOS package",
+					"path", macPackagePath,
+					"tenant", tenant,
+					"hostname", hostname,
+				)
+			}
 
 			if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant, hostname); err != nil {
 				level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
 				os.Exit(1)
 			}
 
-			logger.Log(
-				"msg", "Successfully uploaded macOS package to GSC",
-				"path", macPackagePath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
+			if opts.debugLogging {
+				level.Debug(logger).Log(
+					"msg", "Successfully uploaded macOS package to GSC",
+					"path", macPackagePath,
+					"tenant", tenant,
+					"hostname", hostname,
+				)
+			}
 		}
 	}
-
 }
