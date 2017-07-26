@@ -128,17 +128,17 @@ func main() {
 				"path", macPackagePath,
 			)
 
-			/*
-				if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant); err != nil {
-					level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
-				}
+			if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant, hostname); err != nil {
+				level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
+				os.Exit(1)
+			}
 
-				logger.Log(
-					"msg", "Successfully uploaded macOS package to GSC",
-					"path", macPackagePath,
-					"tenant", tenant,
-				)
-			*/
+			logger.Log(
+				"msg", "Successfully uploaded macOS package to GSC",
+				"path", macPackagePath,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
 		}
 	}
 
