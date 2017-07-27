@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -115,14 +116,23 @@ func main() {
 	}
 
 	prToStartFrom := 350
-	prToGenerateUntil := 500
+	prToGenerateUntil := 400
+
+	uploadRoot, err := ioutil.TempDir("", "upload_")
+	if err != nil {
+		level.Error(logger).Log("error", fmt.Sprintf("Could not create upload root temporary directory: %s", err))
+	}
 
 	for i := prToStartFrom; i < prToGenerateUntil; i++ {
 		hostname := fmt.Sprintf("%d.cloud.kolide.net", i)
 
+		if err := os.MkdirAll(filepath.Join(uploadRoot, hostname), packaging.DirMode); err != nil {
+			level.Error(logger).Log("error", fmt.Sprintf("Could not create hostname root: %s", err))
+		}
+
 		firstID := 100001
-		numberOfIDsToGenerate := 2
-		for id := firstID; id <= firstID+numberOfIDsToGenerate; id++ {
+		numberOfIDsToGenerate := 3
+		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.Munemo(id)
 
 			macPackagePath, err := packaging.MakeMacOSPkg(opts.osqueryVersion, tenant, hostname, pemKey)
@@ -131,28 +141,49 @@ func main() {
 				os.Exit(1)
 			}
 
-			if opts.debugLogging {
-				level.Debug(logger).Log(
-					"msg", "Generated macOS package",
-					"path", macPackagePath,
-					"tenant", tenant,
-					"hostname", hostname,
-				)
+			darwinRoot := filepath.Join(uploadRoot, hostname, tenant, "darwin")
+			if err := os.MkdirAll(darwinRoot, packaging.DirMode); err != nil {
+				level.Error(logger).Log("error", fmt.Sprintf("Could not create darwin root: %s", err))
 			}
 
-			if err := packaging.UploadMacOSPkgToGCS(macPackagePath, tenant, hostname); err != nil {
-				level.Error(logger).Log("error", fmt.Sprintf("Could not upload macOS package to GCS: %s", err))
+			destinationPath := filepath.Join(uploadRoot, hostname, tenant, "darwin", "launcher.pkg")
+			err = packaging.CopyFile(macPackagePath, destinationPath)
+			if err != nil {
+				level.Error(logger).Log("error", "Could not copy file from %s to %s: %s", macPackagePath, destinationPath, err)
 				os.Exit(1)
 			}
 
 			if opts.debugLogging {
 				level.Debug(logger).Log(
-					"msg", "Successfully uploaded macOS package to GSC",
-					"path", macPackagePath,
+					"msg", "Copied macOS package for tenant and hostname",
+					"source", macPackagePath,
+					"destination", destinationPath,
 					"tenant", tenant,
 					"hostname", hostname,
 				)
 			}
+
+			if err := os.RemoveAll(filepath.Dir(macPackagePath)); err != nil {
+				level.Error(logger).Log("error", fmt.Sprintf("Could not remove the macOS package: %s", err))
+				os.Exit(1)
+			}
 		}
 	}
+
+	level.Info(logger).Log(
+		"msg", "package generation complete",
+		"path", uploadRoot,
+	)
+
+	if err := packaging.GsutilRsync(uploadRoot, "gs://packaging/"); err != nil {
+		level.Error(logger).Log("error", fmt.Sprintf("Could not upload files to GCS: %s", err))
+		os.Exit(1)
+	}
+
+	if err := os.RemoveAll(uploadRoot); err != nil {
+		level.Error(logger).Log("error", fmt.Sprintf("Could not remove the upload root: %s", err))
+		os.Exit(1)
+	}
+
+	level.Info(logger).Log("msg", "upload complete")
 }
