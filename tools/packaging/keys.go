@@ -8,7 +8,9 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
-func Secret(tenantName string, pemKey []byte) (string, error) {
+// enrollSecret will generate an enrollment secret for a tenant given a valid
+// signing key
+func enrollSecret(tenantName string, pemKey []byte) (string, error) {
 	fingerPrint := fmt.Sprintf("% x", md5.Sum([]byte(pemKey)))
 	fingerPrint = strings.Replace(fingerPrint, " ", ":", 15)
 

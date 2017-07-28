@@ -39,11 +39,11 @@ func newMunemo() *munemo {
 	}
 }
 
-func (m *munemo) String() string {
+func (m *munemo) string() string {
 	return m.buffer.String()
 }
 
-func (m *munemo) Calculate(number int) {
+func (m *munemo) calculate(number int) {
 	if number < 0 {
 		m.buffer.Write([]byte(m.negativeSymbol))
 		return
@@ -53,7 +53,7 @@ func (m *munemo) Calculate(number int) {
 	result := number / len(m.symbols)
 
 	if result > 0 {
-		m.Calculate(result)
+		m.calculate(result)
 	}
 
 	m.buffer.Write([]byte(m.symbols[modulo]))
@@ -63,6 +63,6 @@ func (m *munemo) Calculate(number int) {
 // It provides a deterministic way to generate a string from a number.
 func Munemo(id int) string {
 	m := newMunemo()
-	m.Calculate(id)
-	return m.String()
+	m.calculate(id)
+	return m.string()
 }

@@ -8,20 +8,29 @@ import (
 	"github.com/kolide/kit/env"
 )
 
+// Gopath will return the current GOPATH as set by environment variables and
+// will fall back to ~/go if a GOPATH is not set.
 func Gopath() string {
 	home := env.String("HOME", "~/")
 	return env.String("GOPATH", filepath.Join(home, "go"))
 }
 
+// LauncherSource returns the path of the launcher codebase, based on the
+// current GOPATH
 func LauncherSource() string {
 	return filepath.Join(Gopath(), "/src/github.com/kolide/launcher")
 }
 
 const (
-	DirMode  = 0755
+	// DirMode is the default permission used when creating directories
+	DirMode = 0755
+	// DirMode is the default permission used when creating files
 	FileMode = 0644
 )
 
+// CopyDir is a utility to assist with copying a directory from src to dest.
+// Note that directory permissions are not maintained, but the permissions of
+// the files in those directories are.
 func CopyDir(src, dest string) error {
 	dir, err := os.Open(src)
 	if err != nil {
@@ -51,6 +60,8 @@ func CopyDir(src, dest string) error {
 	return nil
 }
 
+// CopyFile is a utility to assist with copying a file from src to dest.
+// Note that file permissions are maintained.
 func CopyFile(src, dest string) error {
 	source, err := os.Open(src)
 	if err != nil {

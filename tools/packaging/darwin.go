@@ -13,10 +13,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
+// parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
 	KolideURL string
 }
 
+// renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
 func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error {
 	launchDaemonTemplate :=
 		`<?xml version="1.0" encoding="UTF-8"?>
@@ -153,7 +156,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	}
 
 	// The secret which the user will use to authenticate to the cloud
-	secretString, err := Secret(tenantIdentifier, pemKey)
+	secretString, err := enrollSecret(tenantIdentifier, pemKey)
 	if err != nil {
 		return "", errors.Wrap(err, "could not generate secret for tenant")
 	}
