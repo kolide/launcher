@@ -1,7 +1,6 @@
 package packaging
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,11 +10,11 @@ import (
 
 func Gopath() string {
 	home := env.String("HOME", "~/")
-	return env.String("GOPATH", fmt.Sprintf("%s/go", home))
+	return env.String("GOPATH", filepath.Join(home, "go"))
 }
 
 func LauncherSource() string {
-	return fmt.Sprintf("%s/src/github.com/kolide/launcher", Gopath())
+	return filepath.Join(Gopath(), "/src/github.com/kolide/launcher")
 }
 
 const (

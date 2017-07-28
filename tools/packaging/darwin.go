@@ -76,7 +76,7 @@ func Pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) 
 }
 
 // MakeMacOSPkg will create a launcher macOS package given a specific osquery
-// verison identifier, a munemo tenant identifier, and a key used to sign the
+// version identifier, a munemo tenant identifier, and a key used to sign the
 // enrollment secret JWT token. The output path of the package is returned and
 // an error if the operation was not successful.
 func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, error) {

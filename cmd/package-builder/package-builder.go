@@ -87,9 +87,8 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 		return "", errors.Wrap(err, "could not create darwin root")
 	}
 
-	destinationPath := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "darwin", "launcher.pkg")
-	err = packaging.CopyFile(macPackagePath, destinationPath)
-	if err != nil {
+	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
+	if err = packaging.CopyFile(macPackagePath, destinationPath); err != nil {
 		return "", errors.Wrap(err, "could not copy file to upload root")
 	}
 	return destinationPath, nil
@@ -146,17 +145,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	prToStartFrom := 350
-	prToGenerateUntil := 400
-
-	firstID := 100001
-	numberOfIDsToGenerate := 3
+	prToStartFrom, prToGenerateUntil := 350, 400
+	firstID, numberOfIDsToGenerate := 100001, 3
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
 		level.Info(logger).Log("err", fmt.Sprintf("Could not create upload root temporary directory: %s", err))
 	}
 	defer os.RemoveAll(uploadRoot)
+
 	makeHostnameDirInRoot := func(hostname string) {
 		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
 			level.Info(logger).Log(
