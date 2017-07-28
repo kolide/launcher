@@ -25,6 +25,17 @@ type options struct {
 	enrollmentSecretSigningKeyPath string
 }
 
+func (opts *options) check() error {
+	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
+		if os.IsNotExist(err) {
+			return errors.Wrap(err, "key file doesn't exist")
+		} else {
+			return errors.Wrap(err, "could not stat key file")
+		}
+	}
+	return nil
+}
+
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
@@ -101,7 +112,24 @@ func main() {
 
 	opts, err := parseOptions()
 	if err != nil {
-		level.Info(logger).Log("err", fmt.Sprintf("could not parse options: %s", err))
+		logger.Log(
+			"msg", "could not parse options",
+			"err", err,
+		)
+		os.Exit(1)
+	}
+
+	if opts.debugLogging {
+		logger = level.NewFilter(logger, level.AllowDebug())
+	} else {
+		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	if err := opts.check(); err != nil {
+		logger.Log(
+			"msg", "invalid options",
+			"err", err,
+		)
 		os.Exit(1)
 	}
 
@@ -110,35 +138,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
-		if os.IsNotExist(err) {
-			level.Info(logger).Log(
-				"msg", "key file doesn't exist",
-				"err", err,
-				"path", opts.enrollmentSecretSigningKeyPath,
-			)
-		} else {
-			level.Info(logger).Log(
-				"msg", "could not stat key file",
-				"err", err,
-				"path", opts.enrollmentSecretSigningKeyPath,
-			)
-		}
-		os.Exit(1)
-	}
-
-	if opts.debugLogging {
-		level.Debug(logger).Log(
-			"osquery_version", opts.osqueryVersion,
-			"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
-			"msg", "finished parsing arguments",
-		)
-	}
+	level.Debug(logger).Log(
+		"osquery_version", opts.osqueryVersion,
+		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
+		"msg", "finished parsing arguments",
+	)
 
 	// Generate packages for PRs
 	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
 	if err != nil {
-		level.Info(logger).Log(
+		logger.Log(
 			"msg", "could not read the supplied key file",
 			"err", err,
 		)
@@ -150,13 +159,17 @@ func main() {
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
-		level.Info(logger).Log("err", fmt.Sprintf("Could not create upload root temporary directory: %s", err))
+		logger.Log(
+			"msg", "could not create upload root temporary directory",
+			"err", err,
+		)
+		os.Exit(1)
 	}
 	defer os.RemoveAll(uploadRoot)
 
 	makeHostnameDirInRoot := func(hostname string) {
 		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
-			level.Info(logger).Log(
+			logger.Log(
 				"msg", "could not create hostname root",
 				"err", err,
 			)
@@ -175,21 +188,19 @@ func main() {
 			tenant := packaging.Munemo(id)
 			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
-				level.Info(logger).Log(
+				logger.Log(
 					"msg", "could not generate macOS package for tenant",
 					"tenant", tenant,
 					"err", err,
 				)
 				os.Exit(1)
 			}
-			if opts.debugLogging {
-				level.Debug(logger).Log(
-					"msg", "copied macOS package for tenant and hostname",
-					"destination", destinationPath,
-					"tenant", tenant,
-					"hostname", hostname,
-				)
-			}
+			level.Debug(logger).Log(
+				"msg", "copied macOS package for tenant and hostname",
+				"destination", destinationPath,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
 		}
 	}
 
@@ -202,31 +213,29 @@ func main() {
 			tenant := packaging.Munemo(id)
 			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
-				level.Info(logger).Log(
+				logger.Log(
 					"msg", "could not generate macOS package for tenant",
 					"tenant", tenant,
 					"err", err,
 				)
 				os.Exit(1)
 			}
-			if opts.debugLogging {
-				level.Debug(logger).Log(
-					"msg", "copied macOS package for tenant and hostname",
-					"path", destinationPath,
-					"tenant", tenant,
-					"hostname", hostname,
-				)
-			}
+			level.Debug(logger).Log(
+				"msg", "copied macOS package for tenant and hostname",
+				"path", destinationPath,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
 		}
 	}
 
-	level.Info(logger).Log(
+	logger.Log(
 		"msg", "package generation complete",
 		"path", uploadRoot,
 	)
 
 	if err := packaging.GsutilRsync(uploadRoot, "gs://packaging/"); err != nil {
-		level.Info(logger).Log(
+		logger.Log(
 			"msg", "could not upload files to GCS",
 			"err", err,
 		)
@@ -234,12 +243,12 @@ func main() {
 	}
 
 	if err := os.RemoveAll(uploadRoot); err != nil {
-		level.Info(logger).Log(
+		logger.Log(
 			"msg", "could not remove the upload root",
 			"err", err,
 		)
 		os.Exit(1)
 	}
 
-	level.Info(logger).Log("msg", "upload complete")
+	logger.Log("msg", "upload complete")
 }
