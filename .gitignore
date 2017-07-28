@@ -1,5 +1,6 @@
 vendor
 build
+bin
 .DS_Store
 
 ## Below from https://github.com/github/gitignore/blob/master/Go.gitignore ##

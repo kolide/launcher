@@ -24,7 +24,6 @@ else
 	NOW	= $(shell powershell Get-Date -format s)
 endif
 
-
 build: launcher extension
 
 .pre-build:
@@ -43,8 +42,17 @@ launcher: .pre-build
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/launcher/
 
-mac-pkg-builder: .pre-build
-	go build -i -o build/mac-pkg-builder ./cmd/mac-pkg-builder/
+package-builder: .pre-build launcher extension
+	go build -i -o build/package-builder -ldflags "\
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=package-builder \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/package-builder/
+
+
 
 deps:
 	go get -u github.com/Masterminds/glide
@@ -52,11 +60,3 @@ deps:
 
 test:
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
-
-build-mac-pkg: launcher extension mac-pkg-builder
-	mkdir -p bin/
-	cp /usr/local/bin/osqueryd ./bin
-	cp ./build/launcher ./bin
-	cp ./build/osquery-extension.ext ./bin
-	./build/mac-pkg-builder -key ${ENROLL_JWT_KEY} -package
-	rm -rf bin

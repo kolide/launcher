@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"time"
-
-	"google.golang.org/grpc"
 
 	"github.com/boltdb/bolt"
 	"github.com/kolide/kit/env"
@@ -20,6 +19,8 @@ import (
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -32,12 +33,13 @@ var (
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
-	osquerydPath    string
-	rootDirectory   string
-	notaryServerURL string
-	kolideServerURL string
-	enrollSecret    string
-	printVersion    bool
+	osquerydPath     string
+	rootDirectory    string
+	notaryServerURL  string
+	kolideServerURL  string
+	enrollSecret     string
+	enrollSecretPath string
+	printVersion     bool
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -75,16 +77,22 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
 			"Enroll secret to authenticate with the Kolide server",
 		)
+		flEnrollSecretPath = flag.String(
+			"enroll_secret_path",
+			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
+			"Path to a file containing the enroll secret to authenticate with the Kolide server",
+		)
 	)
 	flag.Parse()
 
 	opts := &options{
-		osquerydPath:    *flOsquerydPath,
-		rootDirectory:   *flRootDirectory,
-		notaryServerURL: *flNotaryServerURL,
-		printVersion:    *flVersion,
-		kolideServerURL: *flKolideServerURL,
-		enrollSecret:    *flEnrollSecret,
+		osquerydPath:     *flOsquerydPath,
+		rootDirectory:    *flRootDirectory,
+		notaryServerURL:  *flNotaryServerURL,
+		printVersion:     *flVersion,
+		kolideServerURL:  *flKolideServerURL,
+		enrollSecret:     *flEnrollSecret,
+		enrollSecretPath: *flEnrollSecretPath,
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -96,8 +104,12 @@ func parseOptions() (*options, error) {
 		} else if path, err := exec.LookPath("osqueryd"); err == nil {
 			opts.osquerydPath = path
 		} else {
-			log.Fatal("Could not find osqueryd binary")
+			return nil, errors.New("Could not find osqueryd binary")
 		}
+	}
+
+	if opts.enrollSecret != "" && opts.enrollSecretPath != "" {
+		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
 	}
 
 	return opts, nil
@@ -150,7 +162,17 @@ func main() {
 
 	client := service.New(conn)
 
-	ext, err := osquery.NewExtension(client, db, osquery.ExtensionOpts{EnrollSecret: opts.enrollSecret})
+	var enrollSecret string
+	if opts.enrollSecret != "" {
+		enrollSecret = opts.enrollSecret
+	} else if opts.enrollSecretPath != "" {
+		content, err := ioutil.ReadFile(opts.enrollSecretPath)
+		if err != nil {
+			log.Fatalf("Could not read enroll_secret_path (%s): %s", opts.enrollSecretPath, err)
+		}
+		enrollSecret = string(content)
+	}
+	ext, err := osquery.NewExtension(client, db, osquery.ExtensionOpts{EnrollSecret: enrollSecret})
 	if err != nil {
 		log.Fatalf("Error starting grpc extension: %s\n", err)
 	}
