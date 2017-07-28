@@ -21,6 +21,7 @@ import (
 type options struct {
 	printVersion                   bool
 	debugLogging                   bool
+	devCommand                     bool
 	osqueryVersion                 string
 	enrollmentSecretSigningKeyPath string
 }
@@ -51,6 +52,11 @@ func parseOptions() (*options, error) {
 			false,
 			"enable debug logging",
 		)
+		flDevCommand = flag.Bool(
+			"dev",
+			false,
+			"create and upload the development packages",
+		)
 		flOsqueryVersion = flag.String(
 			"osquery_version",
 			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
@@ -69,6 +75,7 @@ func parseOptions() (*options, error) {
 		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
 		printVersion:                   *flVersion,
 		debugLogging:                   *flDebug,
+		devCommand:                     *flDevCommand,
 	}
 
 	if opts.osqueryVersion == "" {
@@ -105,6 +112,93 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 	return destinationPath, nil
 }
 
+func devCommand(opts *options, logger log.Logger) error {
+	// Generate packages for PRs
+	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
+	if err != nil {
+		return errors.Wrap(err, "could not read the supplied key file")
+	}
+
+	prToStartFrom, prToGenerateUntil := 350, 400
+	firstID, numberOfIDsToGenerate := 100001, 3
+
+	uploadRoot, err := ioutil.TempDir("", "upload_")
+	if err != nil {
+		return errors.Wrap(err, "could not create upload root temporary directory")
+	}
+	defer os.RemoveAll(uploadRoot)
+
+	makeHostnameDirInRoot := func(hostname string) error {
+		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
+			return errors.Wrap(err, "could not create hostname root")
+		}
+		return nil
+	}
+
+	// Generate packages for localhost and master
+	hostnames := []string{
+		"master.cloud.kolide.net",
+		"localhost:5000",
+	}
+	for _, hostname := range hostnames {
+		if err := makeHostnameDirInRoot(hostname); err != nil {
+			return err
+		}
+		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
+			tenant := packaging.Munemo(id)
+			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
+			if err != nil {
+				return errors.Wrap(err, "could not generate macOS package for tenant")
+			}
+			level.Debug(logger).Log(
+				"msg", "copied macOS package for tenant and hostname",
+				"destination", destinationPath,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
+		}
+	}
+
+	// Generate packages for PRs
+	for i := prToStartFrom; i <= prToGenerateUntil; i++ {
+		hostname := fmt.Sprintf("%d.cloud.kolide.net", i)
+		if err := makeHostnameDirInRoot(hostname); err != nil {
+			return err
+		}
+
+		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
+			tenant := packaging.Munemo(id)
+			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
+			if err != nil {
+				return errors.Wrap(err, "could not generate macOS package for tenant")
+			}
+			level.Debug(logger).Log(
+				"msg", "copied macOS package for tenant and hostname",
+				"path", destinationPath,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
+		}
+	}
+
+	logger.Log(
+		"msg", "package generation complete",
+		"path", uploadRoot,
+	)
+
+	if err := packaging.GsutilRsync(uploadRoot, "gs://packaging/"); err != nil {
+		return errors.Wrap(err, "could not upload files to GCS")
+	}
+
+	if err := os.RemoveAll(uploadRoot); err != nil {
+		return errors.Wrap(err, "could not remove the upload root")
+	}
+
+	logger.Log("msg", "upload complete")
+
+	return nil
+}
+
 func main() {
 	logger := log.NewJSONLogger(os.Stderr)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
@@ -125,6 +219,17 @@ func main() {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
+	level.Debug(logger).Log(
+		"osquery_version", opts.osqueryVersion,
+		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
+		"msg", "finished parsing arguments",
+	)
+
+	if opts.printVersion {
+		version.PrintFull()
+		return
+	}
+
 	if err := opts.check(); err != nil {
 		logger.Log(
 			"msg", "invalid options",
@@ -133,122 +238,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if opts.printVersion {
-		version.PrintFull()
-		os.Exit(0)
+	if opts.devCommand {
+		devCommand(opts, logger)
+	} else {
+		fmt.Printf("Usage: %s --help\n", os.Args[0])
 	}
-
-	level.Debug(logger).Log(
-		"osquery_version", opts.osqueryVersion,
-		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
-		"msg", "finished parsing arguments",
-	)
-
-	// Generate packages for PRs
-	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
-	if err != nil {
-		logger.Log(
-			"msg", "could not read the supplied key file",
-			"err", err,
-		)
-		os.Exit(1)
-	}
-
-	prToStartFrom, prToGenerateUntil := 350, 400
-	firstID, numberOfIDsToGenerate := 100001, 3
-
-	uploadRoot, err := ioutil.TempDir("", "upload_")
-	if err != nil {
-		logger.Log(
-			"msg", "could not create upload root temporary directory",
-			"err", err,
-		)
-		os.Exit(1)
-	}
-	defer os.RemoveAll(uploadRoot)
-
-	makeHostnameDirInRoot := func(hostname string) {
-		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
-			logger.Log(
-				"msg", "could not create hostname root",
-				"err", err,
-			)
-			os.Exit(1)
-		}
-	}
-
-	// Generate packages for localhost and master
-	hostnames := []string{
-		"master.cloud.kolide.net",
-		"localhost:5000",
-	}
-	for _, hostname := range hostnames {
-		makeHostnameDirInRoot(hostname)
-		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
-				logger.Log(
-					"msg", "could not generate macOS package for tenant",
-					"tenant", tenant,
-					"err", err,
-				)
-				os.Exit(1)
-			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"destination", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
-		}
-	}
-
-	// Generate packages for PRs
-	for i := prToStartFrom; i <= prToGenerateUntil; i++ {
-		hostname := fmt.Sprintf("%d.cloud.kolide.net", i)
-		makeHostnameDirInRoot(hostname)
-
-		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
-				logger.Log(
-					"msg", "could not generate macOS package for tenant",
-					"tenant", tenant,
-					"err", err,
-				)
-				os.Exit(1)
-			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"path", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
-		}
-	}
-
-	logger.Log(
-		"msg", "package generation complete",
-		"path", uploadRoot,
-	)
-
-	if err := packaging.GsutilRsync(uploadRoot, "gs://packaging/"); err != nil {
-		logger.Log(
-			"msg", "could not upload files to GCS",
-			"err", err,
-		)
-		os.Exit(1)
-	}
-
-	if err := os.RemoveAll(uploadRoot); err != nil {
-		logger.Log(
-			"msg", "could not remove the upload root",
-			"err", err,
-		)
-		os.Exit(1)
-	}
-
-	logger.Log("msg", "upload complete")
 }
