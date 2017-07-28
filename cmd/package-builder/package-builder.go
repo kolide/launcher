@@ -26,17 +26,6 @@ type options struct {
 	enrollmentSecretSigningKeyPath string
 }
 
-func (opts *options) check() error {
-	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
-		if os.IsNotExist(err) {
-			return errors.Wrap(err, "key file doesn't exist")
-		} else {
-			return errors.Wrap(err, "could not stat key file")
-		}
-	}
-	return nil
-}
-
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
@@ -113,12 +102,19 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 }
 
 func devCommand(opts *options, logger log.Logger) error {
-	// Generate packages for PRs
+	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
+		if os.IsNotExist(err) {
+			return errors.Wrap(err, "key file doesn't exist")
+		} else {
+			return errors.Wrap(err, "could not stat key file")
+		}
+	}
 	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
 	if err != nil {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
 
+	// Generate packages for PRs
 	prToStartFrom, prToGenerateUntil := 350, 400
 	firstID, numberOfIDsToGenerate := 100001, 3
 
@@ -227,18 +223,7 @@ func main() {
 
 	if opts.printVersion {
 		version.PrintFull()
-		return
-	}
-
-	if err := opts.check(); err != nil {
-		logger.Log(
-			"msg", "invalid options",
-			"err", err,
-		)
-		os.Exit(1)
-	}
-
-	if opts.devCommand {
+	} else if opts.devCommand {
 		devCommand(opts, logger)
 	} else {
 		fmt.Printf("Usage: %s --help\n", os.Args[0])
