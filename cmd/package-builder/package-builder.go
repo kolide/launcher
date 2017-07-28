@@ -3,229 +3,60 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/tools/packaging"
-	"github.com/pkg/errors"
 )
 
-// options is the set of configurable options that may be set when launching
-// this program
-type options struct {
-	printVersion                   bool
-	debugLogging                   bool
-	devCommand                     bool
-	osqueryVersion                 string
-	enrollmentSecretSigningKeyPath string
+func usageFor(fs *flag.FlagSet, short string) func() {
+	return func() {
+		fmt.Fprintf(os.Stderr, "USAGE\n")
+		fmt.Fprintf(os.Stderr, "  %s\n", short)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "FLAGS\n")
+		w := tabwriter.NewWriter(os.Stderr, 0, 2, 2, ' ', 0)
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(w, "\t-%s %s\t%s\n", f.Name, f.DefValue, f.Usage)
+		})
+		w.Flush()
+		fmt.Fprintf(os.Stderr, "\n")
+	}
 }
 
-// parseOptions parses the options that may be configured via command-line flags
-// and/or environment variables, determines order of precedence and returns a
-// typed struct of options for further application use
-func parseOptions() (*options, error) {
-	var (
-		flVersion = flag.Bool(
-			"version",
-			false,
-			"print package-builder version and exit",
-		)
-		flDebug = flag.Bool(
-			"debug",
-			false,
-			"enable debug logging",
-		)
-		flDevCommand = flag.Bool(
-			"dev",
-			false,
-			"create and upload the development packages",
-		)
-		flOsqueryVersion = flag.String(
-			"osquery_version",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
-			"the osquery version to include in the resultant packages",
-		)
-		flEnrollmentSecretSigningKeyPath = flag.String(
-			"enrollment_secret_signing_key",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_ENROLLMENT_SECRET_SIGNING_KEY", ""),
-			"the path to the PEM key which is used to sign the enrollment secret JWT token",
-		)
-	)
-	flag.Parse()
-
-	opts := &options{
-		osqueryVersion:                 *flOsqueryVersion,
-		enrollmentSecretSigningKeyPath: *flEnrollmentSecretSigningKeyPath,
-		printVersion:                   *flVersion,
-		debugLogging:                   *flDebug,
-		devCommand:                     *flDevCommand,
-	}
-
-	if opts.osqueryVersion == "" {
-		opts.osqueryVersion = "stable"
-	}
-
-	if opts.enrollmentSecretSigningKeyPath == "" {
-		opts.enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
-	}
-
-	return opts, nil
-}
-
-func safePathHostname(hostname string) string {
-	return strings.Replace(hostname, ":", "-", -1)
-}
-
-func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
-	macPackagePath, err := packaging.MakeMacOSPkg(osqueryVersion, tenant, hostname, pemKey)
-	defer os.RemoveAll(filepath.Dir(macPackagePath))
-	if err != nil {
-		return "", errors.Wrap(err, "could not make macOS package")
-	}
-
-	darwinRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "darwin")
-	if err := os.MkdirAll(darwinRoot, packaging.DirMode); err != nil {
-		return "", errors.Wrap(err, "could not create darwin root")
-	}
-
-	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
-	if err = packaging.CopyFile(macPackagePath, destinationPath); err != nil {
-		return "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return destinationPath, nil
-}
-
-func devCommand(opts *options, logger log.Logger) error {
-	if _, err := os.Stat(opts.enrollmentSecretSigningKeyPath); err != nil {
-		if os.IsNotExist(err) {
-			return errors.Wrap(err, "key file doesn't exist")
-		} else {
-			return errors.Wrap(err, "could not stat key file")
-		}
-	}
-	pemKey, err := ioutil.ReadFile(opts.enrollmentSecretSigningKeyPath)
-	if err != nil {
-		return errors.Wrap(err, "could not read the supplied key file")
-	}
-
-	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 350, 400
-	firstID, numberOfIDsToGenerate := 100001, 3
-
-	uploadRoot, err := ioutil.TempDir("", "upload_")
-	if err != nil {
-		return errors.Wrap(err, "could not create upload root temporary directory")
-	}
-	defer os.RemoveAll(uploadRoot)
-
-	makeHostnameDirInRoot := func(hostname string) error {
-		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
-			return errors.Wrap(err, "could not create hostname root")
-		}
-		return nil
-	}
-
-	// Generate packages for localhost and master
-	hostnames := []string{
-		"master.cloud.kolide.net",
-		"localhost:5000",
-	}
-	for _, hostname := range hostnames {
-		if err := makeHostnameDirInRoot(hostname); err != nil {
-			return err
-		}
-		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
-				return errors.Wrap(err, "could not generate macOS package for tenant")
-			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"destination", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
-		}
-	}
-
-	// Generate packages for PRs
-	for i := prToStartFrom; i <= prToGenerateUntil; i++ {
-		hostname := fmt.Sprintf("%d.cloud.kolide.net", i)
-		if err := makeHostnameDirInRoot(hostname); err != nil {
-			return err
-		}
-
-		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, opts.osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
-				return errors.Wrap(err, "could not generate macOS package for tenant")
-			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"path", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
-		}
-	}
-
-	logger.Log(
-		"msg", "package generation complete",
-		"path", uploadRoot,
-	)
-
-	if err := packaging.GsutilRsync(uploadRoot, "gs://packaging/"); err != nil {
-		return errors.Wrap(err, "could not upload files to GCS")
-	}
-
-	if err := os.RemoveAll(uploadRoot); err != nil {
-		return errors.Wrap(err, "could not remove the upload root")
-	}
-
-	logger.Log("msg", "upload complete")
-
-	return nil
+func usage() {
+	fmt.Fprintf(os.Stderr, "USAGE\n")
+	fmt.Fprintf(os.Stderr, "  %s <mode> --help\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "MODES\n")
+	fmt.Fprintf(os.Stderr, "  dev          Generate development launcher packages and upload them to GCS\n")
+	fmt.Fprintf(os.Stderr, "  version      Print full version information\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "VERSION\n")
+	fmt.Fprintf(os.Stderr, "  %s\n", version.Version().Version)
+	fmt.Fprintf(os.Stderr, "\n")
 }
 
 func main() {
-	logger := log.NewJSONLogger(os.Stderr)
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	logger = log.With(logger, "caller", log.DefaultCaller)
-
-	opts, err := parseOptions()
-	if err != nil {
-		logger.Log(
-			"msg", "could not parse options",
-			"err", err,
-		)
+	if len(os.Args) < 2 {
+		usage()
 		os.Exit(1)
 	}
 
-	if opts.debugLogging {
-		logger = level.NewFilter(logger, level.AllowDebug())
-	} else {
-		logger = level.NewFilter(logger, level.AllowInfo())
+	var run func([]string) error
+	switch strings.ToLower(os.Args[1]) {
+	case "dev":
+		run = runDev
+	case "version":
+		run = runVersion
+	default:
+		usage()
+		os.Exit(1)
 	}
 
-	level.Debug(logger).Log(
-		"osquery_version", opts.osqueryVersion,
-		"enrollment_secret_signing_key", opts.enrollmentSecretSigningKeyPath,
-		"msg", "finished parsing arguments",
-	)
-
-	if opts.printVersion {
-		version.PrintFull()
-	} else if opts.devCommand {
-		devCommand(opts, logger)
-	} else {
-		fmt.Printf("Usage: %s --help\n", os.Args[0])
+	if err := run(os.Args[2:]); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
 }
