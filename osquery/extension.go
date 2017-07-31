@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -26,6 +28,7 @@ type Extension struct {
 	enrollMutex   sync.Mutex
 	done          chan struct{}
 	wg            sync.WaitGroup
+	logger        log.Logger
 }
 
 const (
@@ -63,6 +66,9 @@ type ExtensionOpts struct {
 	// default it will be a normal realtime clock, but a mock clock can be
 	// passed with clock.NewMockClock() for testing purposes.
 	Clock clock.Clock
+	// Logger is the logger that the extension should use. This is for
+	// logging about the launcher, and not for logging osquery results.
+	Logger log.Logger
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
@@ -83,6 +89,13 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 
 	if opts.Clock == nil {
 		opts.Clock = clock.DefaultClock{}
+	}
+
+	if opts.Logger == nil {
+		// Nop logger
+		opts.Logger = log.LoggerFunc(func(...interface{}) error {
+			return nil
+		})
 	}
 
 	// Create Bolt buckets as necessary
@@ -318,7 +331,7 @@ func (e *Extension) writeLogsLoop() {
 	for {
 		err := e.writeBufferedLogs()
 		if err != nil {
-			fmt.Println("Error writing logs: ", err)
+			level.Debug(e.Opts.Logger).Log("err", errors.Wrap(err, "writing logs"))
 		}
 
 		// select to either exit or write another batch of logs
