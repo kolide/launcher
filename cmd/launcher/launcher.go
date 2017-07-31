@@ -136,7 +136,7 @@ func updateLauncher(stagingDir string, err error) {
 }
 
 func logFatal(logger log.Logger, args ...interface{}) {
-	logger.Log(args...)
+	level.Info(logger).Log(args...)
 	os.Exit(1)
 }
 
