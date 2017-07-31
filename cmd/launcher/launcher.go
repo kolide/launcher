@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,13 +11,15 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
+	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -40,6 +41,7 @@ type options struct {
 	enrollSecret     string
 	enrollSecretPath string
 	printVersion     bool
+	debug            bool
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -47,6 +49,11 @@ type options struct {
 // typed struct of options for further application use
 func parseOptions() (*options, error) {
 	var (
+		flDebug = flag.Bool(
+			"debug",
+			false,
+			"enable debug logging",
+		)
 		flVersion = flag.Bool(
 			"version",
 			false,
@@ -93,6 +100,7 @@ func parseOptions() (*options, error) {
 		kolideServerURL:  *flKolideServerURL,
 		enrollSecret:     *flEnrollSecret,
 		enrollSecretPath: *flEnrollSecretPath,
+		debug:            *flDebug,
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -127,16 +135,25 @@ func updateLauncher(stagingDir string, err error) {
 	return
 }
 
+func logFatal(logger log.Logger, args ...interface{}) {
+	level.Info(logger).Log(args...)
+	os.Exit(1)
+}
+
 func main() {
+	logger := log.NewJSONLogger(os.Stderr)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+	logger = log.With(logger, "caller", log.DefaultCaller)
+
 	if platform, err := osquery.DetectPlatform(); err != nil {
-		log.Fatalf("error detecting platform: %s\n", err)
+		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	} else if platform != "darwin" {
-		log.Fatalln("This tool only works on macOS right now")
+		logFatal(logger, "err", "this tool only works on macOS right now")
 	}
 
 	opts, err := parseOptions()
 	if err != nil {
-		log.Fatalf("Unacceptable options: %s\n", err)
+		logFatal(logger, "err", errors.Wrap(err, "invalid options"))
 	}
 
 	if opts.printVersion {
@@ -144,19 +161,25 @@ func main() {
 		os.Exit(0)
 	}
 
+	if opts.debug {
+		logger = level.NewFilter(logger, level.AllowDebug())
+	} else {
+		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
 	versionInfo := version.Version()
-	log.Printf("Started kolide launcher, version %s, build %s\n", versionInfo.Version, versionInfo.Revision)
+	logFatal(logger, "msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
 
 	db, err := bolt.Open(filepath.Join(opts.rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		log.Fatal(err)
+		logFatal(logger, "err", errors.Wrap(err, "open local store"))
 	}
 	defer db.Close()
 
 	// TODO fix insecure
 	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
 	if err != nil {
-		log.Fatalf("Error dialing grpc server: %s\n", err)
+		logFatal(logger, "err", errors.Wrap(err, "dialing grpc server"))
 	}
 	defer conn.Close()
 
@@ -168,21 +191,21 @@ func main() {
 	} else if opts.enrollSecretPath != "" {
 		content, err := ioutil.ReadFile(opts.enrollSecretPath)
 		if err != nil {
-			log.Fatalf("Could not read enroll_secret_path (%s): %s", opts.enrollSecretPath, err)
+			logFatal(logger, "err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", opts.enrollSecretPath)
 		}
 		enrollSecret = string(content)
 	}
 	ext, err := osquery.NewExtension(client, db, osquery.ExtensionOpts{EnrollSecret: enrollSecret})
 	if err != nil {
-		log.Fatalf("Error starting grpc extension: %s\n", err)
+		logFatal(logger, "err", errors.Wrap(err, "starting grpc extension"))
 	}
 
 	_, invalid, err := ext.Enroll(context.Background())
 	if err != nil {
-		log.Fatalf("Error in enrollment: %s\n", err)
+		logFatal(logger, "err", errors.Wrap(err, "enrolling host"))
 	}
 	if invalid {
-		log.Fatalf("Invalid enrollment secret\n")
+		logFatal(logger, errors.Wrap(err, "invalid enroll secret"))
 	}
 
 	if _, err := osquery.LaunchOsqueryInstance(
@@ -192,12 +215,12 @@ func main() {
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
 		osquery.WithDistributedPluginFlag("kolide_grpc"),
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
-		osquery.WithOsqueryExtensionPlugin(logger.NewPlugin("kolide_grpc", ext.LogString)),
+		osquery.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
 	); err != nil {
-		log.Fatalf("Error launching osquery instance: %s", err)
+		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
 	}
 
 	sig := make(chan os.Signal)
