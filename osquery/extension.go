@@ -25,6 +25,7 @@ type Extension struct {
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
+	wg            sync.WaitGroup
 }
 
 const (
@@ -47,10 +48,6 @@ const (
 	defaultMaxLogsPerBatch = 500
 )
 
-// bucketNames contains the names of buckets that should be created when the
-// extension opens the DB. It should be treated as a constant.
-var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket}
-
 // ExtensionOpts is options to be passed in NewExtension
 type ExtensionOpts struct {
 	// EnrollSecret is the (mandatory) enroll secret used for
@@ -64,14 +61,18 @@ type ExtensionOpts struct {
 	LoggingInterval time.Duration
 	// Clock is the clock that should be used for time based operations. By
 	// default it will be a normal realtime clock, but a mock clock can be
-	// passed with clock.NewMock() for testing purposes.
+	// passed with clock.NewMockClock() for testing purposes.
 	Clock clock.Clock
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
-// implementation. When the extension is created, the log flushing thread
-// starts up. It should be shut down by calling the Shutdown() method.
+// implementation. The background routines should be started by calling
+// Start().
 func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
+	// bucketNames contains the names of buckets that should be created when the
+	// extension opens the DB. It should be treated as a constant.
+	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket}
+
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -106,10 +107,19 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}, nil
 }
 
+// Start begins the goroutines responsible for background processing (currently
+// just the log buffer flushing routine). It should be shut down by calling the
+// Shutdown() method.
+func (e *Extension) Start() {
+	e.wg.Add(1)
+	go e.writeLogsLoop()
+}
+
 // Shutdown should be called to cleanup the resources and goroutines associated
 // with this extension.
 func (e *Extension) Shutdown() {
 	close(e.done)
+	e.wg.Wait()
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
@@ -302,6 +312,7 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 }
 
 func (e *Extension) writeLogsLoop() {
+	defer e.wg.Done()
 	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {

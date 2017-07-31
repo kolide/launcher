@@ -560,7 +560,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	}
 
 	// Should write first 10 logs
-	go e.writeLogsLoop()
+	e.Start()
 	// PublishLogsFunc runs twice of each run of the loop
 	<-done
 	<-done
