@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/facebookgo/clock"
 	"github.com/kolide/launcher/service/mock"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/mixer/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -537,7 +537,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	}
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
-	mockClock := clock.NewMock()
+	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(m, db, ExtensionOpts{
 		EnrollSecret:    "enroll_secret",
@@ -576,7 +576,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	gotResultLogs = nil
 
 	// Should write last 10 logs
-	mockClock.Add(expectedLoggingInterval + 1*time.Second)
+	mockClock.AddTime(expectedLoggingInterval + 1)
 	// PublishLogsFunc runs twice of each run of the loop
 	<-done
 	<-done
@@ -592,7 +592,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	gotResultLogs = nil
 
 	// No more logs to write
-	mockClock.Add(expectedLoggingInterval + 1*time.Second)
+	mockClock.AddTime(expectedLoggingInterval + 1)
 	// Block to ensure publish function could be called if the logic is
 	// incorrect
 	time.Sleep(1 * time.Millisecond)

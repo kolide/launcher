@@ -1,5 +1,5 @@
-hash: e74ccb98d4ceca50129e0864ffb3b77e91a3560a9d572443705da8f4e52b5b36
-updated: 2017-07-31T17:47:47.735775562-04:00
+hash: d63afbed0638708e72f2a6b3702c2697f0bfdce7553aa40715100dec4c15ada4
+updated: 2017-07-31T17:48:11.134368352-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -9,8 +9,6 @@ imports:
   version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
-- name: github.com/facebookgo/clock
-  version: 600d898af40aa09a7a93ecb9265d87b0504b6f03
 - name: github.com/go-kit/kit
   version: 19463ea8b215413a29c3513aa3a76181f4bac58d
   subpackages:
@@ -51,6 +49,8 @@ imports:
   - plugin/table
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/mixer/clock
+  version: f004c38fe9815ffab9ebb7aa6c39691759f91b8c
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net

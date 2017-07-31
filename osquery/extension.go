@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/facebookgo/clock"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/mixer/clock"
 	"github.com/pkg/errors"
 )
 
@@ -81,7 +81,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}
 
 	if opts.Clock == nil {
-		opts.Clock = clock.New()
+		opts.Clock = clock.DefaultClock{}
 	}
 
 	// Create Bolt buckets as necessary
@@ -302,7 +302,7 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 }
 
 func (e *Extension) writeLogsLoop() {
-	ticker := e.Opts.Clock.Ticker(e.Opts.LoggingInterval)
+	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {
 		err := e.writeBufferedLogs()
@@ -314,7 +314,7 @@ func (e *Extension) writeLogsLoop() {
 		select {
 		case <-e.done:
 			return
-		case <-ticker.C:
+		case <-ticker.Chan():
 			// Resume loop
 		}
 	}
@@ -348,6 +348,9 @@ func (e *Extension) writeBufferedLogs() error {
 
 			err := e.writeLogsWithReenroll(context.Background(), typ, logs, true)
 			if err != nil {
+				// Returning an error will cancel the
+				// transaction and the logs will not be
+				// deleted.
 				return errors.Wrap(err, "writing logs")
 			}
 

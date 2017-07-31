@@ -27,7 +27,7 @@ import:
   - rate
 - package: github.com/google/uuid
   version: ^0.2.0
-- package: github.com/facebookgo/clock
+- package: github.com/mixer/clock
 testImport:
 - package: github.com/stretchr/testify
   subpackages:
