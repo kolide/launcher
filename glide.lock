@@ -1,5 +1,5 @@
-hash: 7f7182bce2a90776c8107d5e98e17d17b3bb3ce1e47e8fef7c57b469d8a1fd03
-updated: 2017-07-25T15:27:15.081985034-04:00
+hash: 9960dfffd7ab395c7c1e681ea15507ae2b80a5660b8206cc9b081de1ef3bfe74
+updated: 2017-07-31T16:32:51.211751804-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -10,17 +10,18 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
 - name: github.com/go-kit/kit
-  version: e10f5bf035be9af21fd5b2fb4469d5716c6ab07d
+  version: 19463ea8b215413a29c3513aa3a76181f4bac58d
   subpackages:
   - endpoint
   - log
+  - log/level
   - transport/grpc
 - name: github.com/go-logfmt/logfmt
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
-  version: 0a4f71a498b7c4812f64969510bcb4eca251e33a
+  version: 748d386b5c1ea99658fd69fe9f03991ce86a90c1
   subpackages:
   - proto
   - ptypes
@@ -51,7 +52,7 @@ imports:
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net
-  version: ab5485076ff3407ad2d02db054635913f017b0ed
+  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
   - context
   - http2
@@ -61,11 +62,11 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 14ac33bf8474b62c65cae263af2e4d3b543cc699
+  version: 0f826bdd13b500be0f1d4004938ad978fcc6031e
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 836efe42bb4aa16aaa17b9c155d8813d336ed720
+  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
   subpackages:
   - secure/bidirule
   - transform
@@ -76,11 +77,11 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/genproto
-  version: b0a3dcfcd1a9bd48e63634bd8802960804cf8315
+  version: 09f6ed296fc66555a25fe4ce95173148778dfa85
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: ca9e0c3458ef816b9f0ff97f29c6b1fed48d8f49
+  version: 4c7bb729169fc725cc8ee5a6455893eb36a4ec2f
   subpackages:
   - codes
   - credentials

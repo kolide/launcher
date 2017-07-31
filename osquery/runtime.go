@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -28,6 +29,7 @@ import (
 type OsqueryInstance struct {
 	*osqueryInstanceFields
 	instanceLock sync.Mutex
+	logger       log.Logger
 }
 
 // osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
@@ -416,7 +418,8 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			// If we were not able to recover the osqueryd process for some reason,
 			// kill the process and hope that the operating system scheduling
 			// mechanism (launchd, etc) can relaunch the tool cleanly.
-			log.Fatalf("Could not recover the osqueryd process: %s\n", recoveryError)
+			level.Info(o.logger).Log("err", errors.Wrap(recoveryError, "could not recover the osqueryd process"))
+			os.Exit(1)
 		}
 	}()
 
