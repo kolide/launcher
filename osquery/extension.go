@@ -317,6 +317,12 @@ func byteKeyFromUint64(k uint64) []byte {
 	return b
 }
 
+// uint64FromByteKey turns a byte slice (retrieved as the key from Bolt) into a
+// uint64
+func uint64FromByteKey(k []byte) uint64 {
+	return binary.BigEndian.Uint64(k)
+}
+
 // bucketNameFromLogType returns the Bolt bucket name that stores logs of the
 // provided type.
 func bucketNameFromLogType(typ logger.LogType) (string, error) {
