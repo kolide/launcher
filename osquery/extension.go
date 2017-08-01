@@ -49,6 +49,9 @@ const (
 	// Default maximum number of logs per batch (used if not specified in
 	// options)
 	defaultMaxLogsPerBatch = 500
+	// Default logging interval (used if not specified in
+	// options)
+	defaultLoggingInterval = 1 * time.Minute
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -85,6 +88,10 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 
 	if opts.MaxLogsPerBatch == 0 {
 		opts.MaxLogsPerBatch = defaultMaxLogsPerBatch
+	}
+
+	if opts.LoggingInterval == 0 {
+		opts.LoggingInterval = defaultLoggingInterval
 	}
 
 	if opts.Clock == nil {

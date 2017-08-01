@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/service/mock"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -561,9 +562,11 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 
 	// Should write first 10 logs
 	e.Start()
-	// PublishLogsFunc runs twice of each run of the loop
-	<-done
-	<-done
+	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+		// PublishLogsFunc runs twice for each run of the loop
+		<-done
+		<-done
+	})
 	assert.True(t, funcInvokedStatus)
 	assert.True(t, funcInvokedResult)
 	assert.Nil(t, err)
@@ -577,9 +580,11 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 
 	// Should write last 10 logs
 	mockClock.AddTime(expectedLoggingInterval + 1)
-	// PublishLogsFunc runs twice of each run of the loop
-	<-done
-	<-done
+	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+		// PublishLogsFunc runs twice of each run of the loop
+		<-done
+		<-done
+	})
 	assert.True(t, funcInvokedStatus)
 	assert.True(t, funcInvokedResult)
 	assert.Nil(t, err)
