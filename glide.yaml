@@ -14,6 +14,7 @@ import:
   subpackages:
   - env
   - version
+  - testutil
 - package: github.com/kolide/osquery-go
   subpackages:
   - plugin/config
@@ -27,6 +28,7 @@ import:
   - rate
 - package: github.com/google/uuid
   version: ^0.2.0
+- package: github.com/mixer/clock
 testImport:
 - package: github.com/stretchr/testify
   subpackages:
