@@ -1,5 +1,5 @@
 hash: 2e4c0d45bee6bc38d880919591317507cca57d098dafb3db5a89ff20dec916ed
-updated: 2017-08-01T11:59:17.246267993-04:00
+updated: 2017-08-01T15:52:36.524460391-04:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -51,7 +51,7 @@ imports:
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/mixer/clock
-  version: f004c38fe9815ffab9ebb7aa6c39691759f91b8c
+  version: ac3776ffbf764bc40bda24e84184146865d0a46d
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net
@@ -65,7 +65,7 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: b892924b68aa53038e8a55b255ee0d8391e8eec5
+  version: 396c9fc8fb0ce27fc7a1ff136dc5af797bba258a
   subpackages:
   - unix
 - name: golang.org/x/text

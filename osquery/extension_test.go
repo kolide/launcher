@@ -607,7 +607,9 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
-	e.Shutdown()
+	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+		e.Shutdown()
+	})
 }
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
