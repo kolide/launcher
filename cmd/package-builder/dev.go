@@ -22,7 +22,7 @@ func safePathHostname(hostname string) string {
 func createPackages(logger log.Logger, uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) error {
 	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 	if err != nil {
-		return errors.Wrap(err, "could not generate macOS package for tenant")
+		return errors.Wrap(err, "could not generate macOS package")
 	}
 	level.Debug(logger).Log(
 		"msg", "created macOS package",
@@ -31,7 +31,50 @@ func createPackages(logger log.Logger, uploadRoot, osqueryVersion, hostname, ten
 		"hostname", hostname,
 	)
 
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+	if err != nil {
+		return errors.Wrap(err, "could not generate linux packages")
+	}
+	level.Debug(logger).Log(
+		"msg", "created linux packages",
+		"deb", debDestinationPath,
+		"rpm", rpmDestinationPath,
+		"tenant", tenant,
+		"hostname", hostname,
+	)
+
 	return nil
+}
+
+func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, string, error) {
+	debPath, rpmPath, err := packaging.MakeLinuxPackages(osqueryVersion, tenant, hostname, pemKey)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not make macOS package")
+	}
+	defer os.RemoveAll(filepath.Dir(debPath))
+	defer os.RemoveAll(filepath.Dir(rpmPath))
+
+	debRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "deb")
+	if err := os.MkdirAll(debRoot, packaging.DirMode); err != nil {
+		return "", "", errors.Wrap(err, "could not create deb root")
+	}
+
+	rpmRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "rpm")
+	if err := os.MkdirAll(debRoot, packaging.DirMode); err != nil {
+		return "", "", errors.Wrap(err, "could not create rpm root")
+	}
+
+	debDestinationPath := filepath.Join(debRoot, "launcher.deb")
+	if err = packaging.CopyFile(debPath, debDestinationPath); err != nil {
+		return "", "", errors.Wrap(err, "could not copy file to upload root")
+	}
+
+	rpmDestinationPath := filepath.Join(rpmRoot, "launcher.rpm")
+	if err = packaging.CopyFile(rpmPath, rpmDestinationPath); err != nil {
+		return "", "", errors.Wrap(err, "could not copy file to upload root")
+	}
+	return debDestinationPath, rpmDestinationPath, nil
+
 }
 
 func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
