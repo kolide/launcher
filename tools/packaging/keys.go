@@ -15,11 +15,11 @@ func enrollSecret(tenantName string, pemKey []byte) (string, error) {
 	fingerPrint = strings.Replace(fingerPrint, " ", ":", 15)
 
 	var claims = struct {
-		tenant string `json:"tenant"`
+		Tenant string `json:"tenant"`
 		KID    string `json:"kid"`
 		jwt.StandardClaims
 	}{
-		tenant: tenantName,
+		Tenant: tenantName,
 		KID:    fingerPrint,
 	}
 
