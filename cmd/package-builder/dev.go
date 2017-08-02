@@ -19,6 +19,21 @@ func safePathHostname(hostname string) string {
 	return strings.Replace(hostname, ":", "-", -1)
 }
 
+func createPackages(logger log.Logger, uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) error {
+	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+	if err != nil {
+		return errors.Wrap(err, "could not generate macOS package for tenant")
+	}
+	level.Debug(logger).Log(
+		"msg", "created macOS package",
+		"path", macPkgDestinationPath,
+		"tenant", tenant,
+		"hostname", hostname,
+	)
+
+	return nil
+}
+
 func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
 	macPackagePath, err := packaging.MakeMacOSPkg(osqueryVersion, tenant, hostname, pemKey)
 	defer os.RemoveAll(filepath.Dir(macPackagePath))
@@ -123,16 +138,9 @@ func runDev(args []string) error {
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
+			if err := createPackages(logger, uploadRoot, osqueryVersion, hostname, tenant, pemKey); err != nil {
 				return errors.Wrap(err, "could not generate macOS package for tenant")
 			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"destination", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
 		}
 	}
 
@@ -145,16 +153,9 @@ func runDev(args []string) error {
 
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
-			if err != nil {
+			if err := createPackages(logger, uploadRoot, osqueryVersion, hostname, tenant, pemKey); err != nil {
 				return errors.Wrap(err, "could not generate macOS package for tenant")
 			}
-			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"path", destinationPath,
-				"tenant", tenant,
-				"hostname", hostname,
-			)
 		}
 	}
 
