@@ -60,14 +60,14 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 	return t.ExecuteTemplate(w, "LaunchDaemon", options)
 }
 
-// Pkgbuild runs the following pkgbuild command:
+// pkgbuild runs the following pkgbuild command:
 //   pkgbuild \
 //     --root ${packageRoot} \
 //     --scripts ${scriptsRoot} \
 //     --identifier ${identifier} \
 //     --version ${packageVersion} \
 //     ${outputPath}
-func Pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) error {
+func pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) error {
 	cmd := exec.Command("pkgbuild",
 		"--root", packageRoot,
 		"--scripts", scriptsRoot,
@@ -175,7 +175,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
-	err = Pkgbuild(
+	err = pkgbuild(
 		packageRoot,
 		fmt.Sprintf("%s/src/github.com/kolide/launcher/tools/packaging/macos/scripts", Gopath()),
 		"com.kolide.launcher",
