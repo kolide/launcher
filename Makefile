@@ -8,16 +8,29 @@ REVISION = $(shell git rev-parse HEAD)
 REVSHORT = $(shell git rev-parse --short HEAD)
 USER = $(shell whoami)
 
+KIT_VERSION = "\
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=launcher \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}"
+
 ifneq ($(OS), Windows_NT)
+	CURRENT_PLATFORM = linux
+
 	# If on macOS, set the shell to bash explicitly
 	ifeq ($(shell uname), Darwin)
 		SHELL := /bin/bash
+		CURRENT_PLATFORM = darwin
 	endif
 
 	# To populate version metadata, we use unix tools to get certain data
 	GOVERSION = $(shell go version | awk '{print $$3}')
 	NOW	= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 else
+	CURRENT_PLATFORM = windows
 	# To populate version metadata, we use windows tools to get the certain data
 	GOVERSION_CMD = "(go version).Split()[2]"
 	GOVERSION = $(shell powershell $(GOVERSION_CMD))
@@ -27,32 +40,21 @@ endif
 build: launcher extension
 
 .pre-build:
-	mkdir -p build
+	mkdir -p build/darwin
+	mkdir -p build/linux
 
 extension: .pre-build
-	go build -i -o build/osquery-extension.ext ./cmd/osquery-extension/
+	GOOS=darwin CGO_ENABLED=0 go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
+	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
+	ln -f build/$(CURRENT_PLATFORM)/osquery-extension.ext build/osquery-extension.ext
 
 launcher: .pre-build
-	go build -i -o build/launcher -ldflags "\
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=launcher \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/launcher/
+	GOOS=darwin CGO_ENABLED=0 go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	ln -f build/$(CURRENT_PLATFORM)/launcher build/launcher
 
 package-builder: .pre-build launcher extension
-	go build -i -o build/package-builder -ldflags "\
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=package-builder \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}" ./cmd/package-builder/
-
-
+	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 deps:
 	go get -u github.com/Masterminds/glide

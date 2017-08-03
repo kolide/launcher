@@ -128,7 +128,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 
 	// The initial launcher (and extension) binary
 	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/launcher"),
+		filepath.Join(LauncherSource(), "build/darwin/launcher"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
 	)
 	if err != nil {
@@ -136,7 +136,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	}
 
 	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/osquery-extension.ext"),
+		filepath.Join(LauncherSource(), "build/darwin/osquery-extension.ext"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
 	)
 	if err != nil {
