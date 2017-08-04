@@ -426,9 +426,9 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 
 	// No buffered logs should result in success and no remote action being
 	// taken.
-	err = e.writeBufferedLogs()
-	assert.False(t, m.PublishLogsFuncInvoked)
+	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
+	assert.False(t, m.PublishLogsFuncInvoked)
 }
 
 func TestExtensionWriteBufferedLogs(t *testing.T) {
@@ -457,27 +457,33 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeString, "result foo")
 	e.LogString(context.Background(), logger.LogTypeString, "result bar")
 
-	err = e.writeBufferedLogs()
-	assert.True(t, m.PublishLogsFuncInvoked)
+	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
+	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Equal(t, []string{"status foo", "status bar"}, gotStatusLogs)
+
+	err = e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.Nil(t, err)
+	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Equal(t, []string{"result foo", "result bar"}, gotResultLogs)
 
 	// No more logs should be written after logs flushed
 	m.PublishLogsFuncInvoked = false
 	gotStatusLogs = nil
 	gotResultLogs = nil
-	err = e.writeBufferedLogs()
-	assert.False(t, m.PublishLogsFuncInvoked)
+	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
+	err = e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.Nil(t, err)
+	assert.False(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
 
-	err = e.writeBufferedLogs()
-	assert.True(t, m.PublishLogsFuncInvoked)
+	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
+	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Equal(t, []string{"status foo"}, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 }
@@ -518,9 +524,9 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	}
 
 	// Should write first 10 logs
-	err = e.writeBufferedLogs()
+	e.writeBufferedLogsForType(logger.LogTypeStatus)
+	e.writeBufferedLogsForType(logger.LogTypeString)
 	assert.True(t, m.PublishLogsFuncInvoked)
-	assert.Nil(t, err)
 	assert.Equal(t, expectedStatusLogs[:10], gotStatusLogs)
 	assert.Equal(t, expectedResultLogs[:10], gotResultLogs)
 
@@ -528,9 +534,9 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	m.PublishLogsFuncInvoked = false
 	gotStatusLogs = nil
 	gotResultLogs = nil
-	err = e.writeBufferedLogs()
+	e.writeBufferedLogsForType(logger.LogTypeStatus)
+	e.writeBufferedLogsForType(logger.LogTypeString)
 	assert.True(t, m.PublishLogsFuncInvoked)
-	assert.Nil(t, err)
 	assert.Equal(t, expectedStatusLogs[10:], gotStatusLogs)
 	assert.Equal(t, expectedResultLogs[10:], gotResultLogs)
 
@@ -538,9 +544,9 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	m.PublishLogsFuncInvoked = false
 	gotStatusLogs = nil
 	gotResultLogs = nil
-	err = e.writeBufferedLogs()
+	e.writeBufferedLogsForType(logger.LogTypeStatus)
+	e.writeBufferedLogsForType(logger.LogTypeString)
 	assert.False(t, m.PublishLogsFuncInvoked)
-	assert.Nil(t, err)
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 }
@@ -640,6 +646,52 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	testutil.FatalAfterFunc(t, 1*time.Second, func() {
 		e.Shutdown()
 	})
+}
+
+func TestExtensionPurgeBufferedLogs(t *testing.T) {
+	var gotStatusLogs, gotResultLogs []string
+	m := &mock.KolideService{
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			switch logType {
+			case logger.LogTypeStatus:
+				gotStatusLogs = logs
+			case logger.LogTypeString:
+				gotResultLogs = logs
+			default:
+				t.Error("Unkown log type")
+			}
+			// Mock as if sending logs errored
+			return "", "", false, errors.New("server rejected logs")
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	max := 10
+	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret", MaxBufferedLogs: max})
+	require.Nil(t, err)
+
+	var expectedStatusLogs, expectedResultLogs []string
+	for i := 0; i < 100; i++ {
+		gotStatusLogs = nil
+		gotResultLogs = nil
+		statusLog := fmt.Sprintf("status %d", i)
+		expectedStatusLogs = append(expectedStatusLogs, statusLog)
+		e.LogString(context.Background(), logger.LogTypeStatus, statusLog)
+
+		resultLog := fmt.Sprintf("result %d", i)
+		expectedResultLogs = append(expectedResultLogs, resultLog)
+		e.LogString(context.Background(), logger.LogTypeString, resultLog)
+
+		e.writeAndPurgeLogs()
+
+		if i < max {
+			assert.Equal(t, expectedStatusLogs, gotStatusLogs)
+			assert.Equal(t, expectedResultLogs, gotResultLogs)
+		} else {
+			assert.Equal(t, expectedStatusLogs[i-max:], gotStatusLogs)
+			assert.Equal(t, expectedResultLogs[i-max:], gotResultLogs)
+		}
+	}
 }
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {

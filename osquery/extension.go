@@ -52,6 +52,9 @@ const (
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 1 * time.Minute
+	// Default maximum number of logs to buffer before purging oldest logs
+	// (applies per log type).
+	defaultMaxBufferedLogs = 500000
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -72,6 +75,9 @@ type ExtensionOpts struct {
 	// Logger is the logger that the extension should use. This is for
 	// logging about the launcher, and not for logging osquery results.
 	Logger log.Logger
+	// MaxBufferedLogs is the maximum number of logs to buffer before
+	// purging oldest logs (applies per log type).
+	MaxBufferedLogs int
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
@@ -105,6 +111,10 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		})
 	}
 
+	if opts.MaxBufferedLogs == 0 {
+		opts.MaxBufferedLogs = defaultMaxBufferedLogs
+	}
+
 	// Create Bolt buckets as necessary
 	err := db.Update(func(tx *bolt.Tx) error {
 		for _, name := range bucketNames {
@@ -132,7 +142,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 // Shutdown() method.
 func (e *Extension) Start() {
 	e.wg.Add(1)
-	go e.writeLogsLoop()
+	go e.writeLogsLoopRunner()
 }
 
 // Shutdown should be called to cleanup the resources and goroutines associated
@@ -337,15 +347,39 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 	}
 }
 
-func (e *Extension) writeLogsLoop() {
+// writeAndPurgeLogs flushes the log buffers, writing up to
+// Opts.MaxLogsPerBatch in one run. If the logs write successfully, they will
+// be deleted from the buffer. After writing (whether success or failure), logs
+// over the maximum count will be purged to avoid unbounded growth of the
+// buffers.
+func (e *Extension) writeAndPurgeLogs() {
+	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
+		// Write logs
+		err := e.writeBufferedLogsForType(typ)
+		if err != nil {
+			level.Info(e.Opts.Logger).Log(
+				"err",
+				errors.Wrapf(err, "sending %v logs", typ),
+			)
+		}
+
+		// Purge overflow
+		err = e.purgeBufferedLogsForType(typ)
+		if err != nil {
+			level.Info(e.Opts.Logger).Log(
+				"err",
+				errors.Wrapf(err, "purging %v logs", typ),
+			)
+		}
+	}
+}
+
+func (e *Extension) writeLogsLoopRunner() {
 	defer e.wg.Done()
 	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {
-		err := e.writeBufferedLogs()
-		if err != nil {
-			level.Debug(e.Opts.Logger).Log("err", errors.Wrap(err, "writing logs"))
-		}
+		e.writeAndPurgeLogs()
 
 		// select to either exit or write another batch of logs
 		select {
@@ -360,42 +394,40 @@ func (e *Extension) writeLogsLoop() {
 // writeBufferedLogs flushes the log buffers, writing up to
 // Opts.MaxLogsPerBatch in one run. If the logs write successfully, they will
 // be deleted from the buffer.
-func (e *Extension) writeBufferedLogs() error {
-	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
-		bucketName, err := bucketNameFromLogType(typ)
-		if err != nil {
-			return err
+func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return err
+	}
+	err = e.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+
+		logs := []string{}
+		c := b.Cursor()
+		k, v := c.First()
+		for total := 0; k != nil && total < e.Opts.MaxLogsPerBatch; total++ {
+			logs = append(logs, string(v))
+			c.Delete() // Note: This advances the cursor
+			k, v = c.First()
 		}
-		err = e.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
 
-			logs := []string{}
-			c := b.Cursor()
-			k, v := c.First()
-			for total := 0; k != nil && total < e.Opts.MaxLogsPerBatch; total++ {
-				logs = append(logs, string(v))
-				c.Delete() // Note: This advances the cursor
-				k, v = c.First()
-			}
-
-			if len(logs) == 0 {
-				// Nothing to send
-				return nil
-			}
-
-			err := e.writeLogsWithReenroll(context.Background(), typ, logs, true)
-			if err != nil {
-				// Returning an error will cancel the
-				// transaction and the logs will not be
-				// deleted.
-				return errors.Wrap(err, "writing logs")
-			}
-
+		if len(logs) == 0 {
+			// Nothing to send
 			return nil
-		})
-		if err != nil {
-			return errors.Wrap(err, "writing buffered logs")
 		}
+
+		err := e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+		if err != nil {
+			// Returning an error will cancel the
+			// transaction and the logs will not be
+			// deleted.
+			return errors.Wrap(err, "writing logs")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "writing buffered logs")
 	}
 	return nil
 }
@@ -428,12 +460,56 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	return nil
 }
 
+// purgeBufferedLogs flushes the log buffers, ensuring that at most
+// Opts.MaxBufferedLogs logs remain for each log type.
+func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return err
+	}
+	err = e.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+
+		logCount := b.Stats().KeyN
+		deleteCount := logCount - e.Opts.MaxBufferedLogs
+
+		if deleteCount <= 0 {
+			// Limit not exceeded
+			return nil
+		}
+
+		level.Info(e.Opts.Logger).Log(
+			"msg",
+			fmt.Sprintf("Buffered logs limit (%d) exceeded. Purging %d logs.",
+				e.Opts.MaxBufferedLogs,
+				deleteCount,
+			),
+		)
+
+		c := b.Cursor()
+		k, _ := c.First()
+		for total := 0; k != nil && total < deleteCount; total++ {
+			c.Delete() // Note: This advances the cursor
+			k, _ = c.First()
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "deleting overflowed logs")
+	}
+	return nil
+}
+
 // LogString will publish a status/result log from osquery to the server. In
 // the future it should buffer logs and send them at intervals.
 func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText string) error {
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
-		fmt.Println("ignoring unknown log type: ", err)
+		level.Info(e.Opts.Logger).Log(
+			"msg",
+			fmt.Sprintf("Ignoring unknown log type: %v", typ),
+		)
 	}
 
 	// Buffer the log for sending later in a batch
