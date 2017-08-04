@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/kolide/kit/version"
@@ -169,7 +170,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", hostname, tenantIdentifier))
+	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", strings.Replace(hostname, ":", "-", -1), tenantIdentifier))
 	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
@@ -263,7 +264,7 @@ func MakeLinuxPackages(osqueryVersion, tenantIdentifier, hostname string, pemKey
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", hostname, tenantIdentifier))
+	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", strings.Replace(hostname, ":", "-", -1), tenantIdentifier))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not create final output directory for package")
 	}
