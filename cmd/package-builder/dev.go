@@ -138,7 +138,7 @@ func runDev(args []string) error {
 
 	enrollmentSecretSigningKeyPath := *flEnrollmentSecretSigningKeyPath
 	if enrollmentSecretSigningKeyPath == "" {
-		enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
+		enrollmentSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
 	}
 
 	if _, err := os.Stat(enrollmentSecretSigningKeyPath); err != nil {
