@@ -150,8 +150,8 @@ func runDev(args []string) error {
 	}
 
 	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 350, 400
-	firstID, numberOfIDsToGenerate := 100001, 3
+	prToStartFrom, prToGenerateUntil := 350, 500
+	firstID, numberOfIDsToGenerate := 100001, 1
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
