@@ -56,7 +56,18 @@ package-builder: .pre-build launcher extension
 
 deps:
 	go get -u github.com/Masterminds/glide
+	go get -u github.com/jteeuwen/go-bindata/...
 	glide install
 
-test:
+INSECURE ?= false
+generate:
+	go run ./autoupdate/generate_tuf.go \
+		-binary=osqueryd -notary=${NOTARY_URL} -insecure=${INSECURE}
+	go run ./autoupdate/generate_tuf.go \
+		-binary=launcher -notary=${NOTARY_URL} -insecure=${INSECURE}
+	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/... 
+
+
+test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
+
