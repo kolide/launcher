@@ -63,12 +63,12 @@ func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pe
 	}
 
 	debDestinationPath := filepath.Join(debRoot, "launcher.deb")
-	if err = CopyFile(debPath, debDestinationPath); err != nil {
+	if err = copyFile(debPath, debDestinationPath); err != nil {
 		return "", "", errors.Wrap(err, "could not copy file to upload root")
 	}
 
 	rpmDestinationPath := filepath.Join(rpmRoot, "launcher.rpm")
-	if err = CopyFile(rpmPath, rpmDestinationPath); err != nil {
+	if err = copyFile(rpmPath, rpmDestinationPath); err != nil {
 		return "", "", errors.Wrap(err, "could not copy file to upload root")
 	}
 	return debDestinationPath, rpmDestinationPath, nil
@@ -88,7 +88,7 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 	}
 
 	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
-	if err = CopyFile(macPackagePath, destinationPath); err != nil {
+	if err = copyFile(macPackagePath, destinationPath); err != nil {
 		return "", errors.Wrap(err, "could not copy file to upload root")
 	}
 	return destinationPath, nil
@@ -202,13 +202,13 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
+	err = copyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
 	// The initial launcher (and extension) binary
-	err = CopyFile(
+	err = copyFile(
 		filepath.Join(LauncherSource(), "build/darwin/launcher"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
 	)
@@ -216,7 +216,7 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
 	}
 
-	err = CopyFile(
+	err = copyFile(
 		filepath.Join(LauncherSource(), "build/darwin/osquery-extension.ext"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
 	)
@@ -258,7 +258,7 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 
 	err = pkgbuild(
 		packageRoot,
-		fmt.Sprintf("%s/src/github.com/kolide/launcher/tools/packaging/macos/scripts", Gopath()),
+		fmt.Sprintf("%s/src/github.com/kolide/launcher/tools/packaging/macos/scripts", gopath()),
 		"com.kolide.launcher",
 		currentVersion,
 		outputPath,
@@ -308,13 +308,13 @@ func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname str
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
+	err = copyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
 	// The initial launcher (and extension) binary
-	err = CopyFile(
+	err = copyFile(
 		filepath.Join(LauncherSource(), "build/linux/launcher"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
 	)
@@ -322,7 +322,7 @@ func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname str
 		return "", "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
 	}
 
-	err = CopyFile(
+	err = copyFile(
 		filepath.Join(LauncherSource(), "build/linux/osquery-extension.ext"),
 		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
 	)

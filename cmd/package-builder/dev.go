@@ -99,7 +99,7 @@ func runDev(args []string) error {
 			return err
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
+			tenant := packaging.TenantName(id)
 			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
@@ -123,7 +123,7 @@ func runDev(args []string) error {
 		}
 
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
+			tenant := packaging.TenantName(id)
 			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
