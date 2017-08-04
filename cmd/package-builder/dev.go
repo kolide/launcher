@@ -15,83 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func safePathHostname(hostname string) string {
-	return strings.Replace(hostname, ":", "-", -1)
-}
-
-func createPackages(logger log.Logger, uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) error {
-	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
-	if err != nil {
-		return errors.Wrap(err, "could not generate macOS package")
-	}
-
-	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
-	if err != nil {
-		return errors.Wrap(err, "could not generate linux packages")
-	}
-
-	level.Debug(logger).Log(
-		"msg", "created packages",
-		"deb", debDestinationPath,
-		"rpm", rpmDestinationPath,
-		"mac", macPkgDestinationPath,
-		"tenant", tenant,
-		"hostname", hostname,
-	)
-
-	return nil
-}
-
-func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, string, error) {
-	debPath, rpmPath, err := packaging.MakeLinuxPackages(osqueryVersion, tenant, hostname, pemKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not make linux packages")
-	}
-	defer os.RemoveAll(filepath.Dir(debPath))
-	defer os.RemoveAll(filepath.Dir(rpmPath))
-
-	debRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "ubuntu")
-	if err := os.MkdirAll(debRoot, packaging.DirMode); err != nil {
-		return "", "", errors.Wrap(err, "could not create deb root")
-	}
-
-	rpmRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "centos")
-	if err := os.MkdirAll(rpmRoot, packaging.DirMode); err != nil {
-		return "", "", errors.Wrap(err, "could not create rpm root")
-	}
-
-	debDestinationPath := filepath.Join(debRoot, "launcher.deb")
-	if err = packaging.CopyFile(debPath, debDestinationPath); err != nil {
-		return "", "", errors.Wrap(err, "could not copy file to upload root")
-	}
-
-	rpmDestinationPath := filepath.Join(rpmRoot, "launcher.rpm")
-	if err = packaging.CopyFile(rpmPath, rpmDestinationPath); err != nil {
-		return "", "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return debDestinationPath, rpmDestinationPath, nil
-
-}
-
-func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
-	macPackagePath, err := packaging.MakeMacOSPkg(osqueryVersion, tenant, hostname, pemKey)
-	defer os.RemoveAll(filepath.Dir(macPackagePath))
-	if err != nil {
-		return "", errors.Wrap(err, "could not make macOS package")
-	}
-
-	darwinRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "darwin")
-	if err := os.MkdirAll(darwinRoot, packaging.DirMode); err != nil {
-		return "", errors.Wrap(err, "could not create darwin root")
-	}
-
-	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
-	if err = packaging.CopyFile(macPackagePath, destinationPath); err != nil {
-		return "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return destinationPath, nil
-}
-
 func runDev(args []string) error {
 	flagset := flag.NewFlagSet("query", flag.ExitOnError)
 	var (
@@ -160,7 +83,7 @@ func runDev(args []string) error {
 	defer os.RemoveAll(uploadRoot)
 
 	makeHostnameDirInRoot := func(hostname string) error {
-		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
+		if err := os.MkdirAll(filepath.Join(uploadRoot, strings.Replace(hostname, ":", "-", -1)), packaging.DirMode); err != nil {
 			return errors.Wrap(err, "could not create hostname root")
 		}
 		return nil
@@ -177,9 +100,18 @@ func runDev(args []string) error {
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.Munemo(id)
-			if err := createPackages(logger, uploadRoot, osqueryVersion, hostname, tenant, pemKey); err != nil {
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
 			}
+			level.Debug(logger).Log(
+				"msg", "created packages",
+				"deb", paths.Deb,
+				"rpm", paths.RPM,
+				"mac", paths.MacOS,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
 		}
 	}
 
@@ -192,9 +124,18 @@ func runDev(args []string) error {
 
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.Munemo(id)
-			if err := createPackages(logger, uploadRoot, osqueryVersion, hostname, tenant, pemKey); err != nil {
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
 			}
+			level.Debug(logger).Log(
+				"msg", "created packages",
+				"deb", paths.Deb,
+				"rpm", paths.RPM,
+				"mac", paths.MacOS,
+				"tenant", tenant,
+				"hostname", hostname,
+			)
 		}
 	}
 

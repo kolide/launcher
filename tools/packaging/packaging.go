@@ -14,6 +14,86 @@ import (
 	"github.com/pkg/errors"
 )
 
+// PackagePaths is a simple wrapper for passing around the paths of packages for
+// various platforms
+type PackagePaths struct {
+	MacOS string
+	Deb   string
+	RPM   string
+}
+
+func CreatePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate macOS package")
+	}
+
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate linux packages")
+	}
+
+	return &PackagePaths{
+		MacOS: macPkgDestinationPath,
+		Deb:   debDestinationPath,
+		RPM:   rpmDestinationPath,
+	}, nil
+}
+
+func sanitizeHostname(hostname string) string {
+	return strings.Replace(hostname, ":", "-", -1)
+}
+
+func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, string, error) {
+	debPath, rpmPath, err := createLinuxPackagesInTempDir(osqueryVersion, tenant, hostname, pemKey)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not make linux packages")
+	}
+	defer os.RemoveAll(filepath.Dir(debPath))
+	defer os.RemoveAll(filepath.Dir(rpmPath))
+
+	debRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "ubuntu")
+	if err := os.MkdirAll(debRoot, DirMode); err != nil {
+		return "", "", errors.Wrap(err, "could not create deb root")
+	}
+
+	rpmRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "centos")
+	if err := os.MkdirAll(rpmRoot, DirMode); err != nil {
+		return "", "", errors.Wrap(err, "could not create rpm root")
+	}
+
+	debDestinationPath := filepath.Join(debRoot, "launcher.deb")
+	if err = CopyFile(debPath, debDestinationPath); err != nil {
+		return "", "", errors.Wrap(err, "could not copy file to upload root")
+	}
+
+	rpmDestinationPath := filepath.Join(rpmRoot, "launcher.rpm")
+	if err = CopyFile(rpmPath, rpmDestinationPath); err != nil {
+		return "", "", errors.Wrap(err, "could not copy file to upload root")
+	}
+	return debDestinationPath, rpmDestinationPath, nil
+
+}
+
+func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
+	macPackagePath, err := createMacPackageInTempDir(osqueryVersion, tenant, hostname, pemKey)
+	defer os.RemoveAll(filepath.Dir(macPackagePath))
+	if err != nil {
+		return "", errors.Wrap(err, "could not make macOS package")
+	}
+
+	darwinRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "darwin")
+	if err := os.MkdirAll(darwinRoot, DirMode); err != nil {
+		return "", errors.Wrap(err, "could not create darwin root")
+	}
+
+	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
+	if err = CopyFile(macPackagePath, destinationPath); err != nil {
+		return "", errors.Wrap(err, "could not copy file to upload root")
+	}
+	return destinationPath, nil
+}
+
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
@@ -79,15 +159,15 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) 
 	return cmd.Run()
 }
 
-// MakeMacOSPkg will create a launcher macOS package given a specific osquery
+// createMacPackageInTempDir will create a launcher macOS package given a specific osquery
 // version identifier, a munemo tenant identifier, and a key used to sign the
 // enrollment secret JWT token. The output path of the package is returned and
 // an error if the operation was not successful.
-func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, error) {
+func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "MakeMacOSPkg.packageRoot")
+	packageRoot, err := ioutil.TempDir("/tmp", "createMacPackageInTempDir.packageRoot")
 	if err != nil {
 		return "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
@@ -170,7 +250,7 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", strings.Replace(hostname, ":", "-", -1), tenantIdentifier))
+	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", sanitizeHostname(hostname), tenantIdentifier))
 	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
@@ -190,15 +270,15 @@ func MakeMacOSPkg(osqueryVersion, tenantIdentifier, hostname string, pemKey []by
 	return outputPath, nil
 }
 
-// MakeLinuxPackages will create a deb and rpm package given a specific osquery
+// createLinuxPackagesInTempDir will create a deb and rpm package given a specific osquery
 // version identifier, a munemo tenant identifier, and a key used to sign the
 // enrollment secret JWT token. The output path of the package is returned and
 // an error if the operation was not successful.
-func MakeLinuxPackages(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, string, error) {
+func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "MakeLinuxPackages.packageRoot")
+	packageRoot, err := ioutil.TempDir("/tmp", "createLinuxPackagesInTempDir.packageRoot")
 	if err != nil {
 		return "", "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
@@ -264,7 +344,7 @@ func MakeLinuxPackages(osqueryVersion, tenantIdentifier, hostname string, pemKey
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", strings.Replace(hostname, ":", "-", -1), tenantIdentifier))
+	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", sanitizeHostname(hostname), tenantIdentifier))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not create final output directory for package")
 	}
