@@ -334,15 +334,15 @@ func runMirror(args []string) error {
 		}
 	}
 
-	if err := m.determineOsqueryVersion(); err != nil {
-		return err
-	}
-
 	if *flExtract && *flPlatform == "darwin" {
 		// TODO move to an extract helper with a platform switch statement
 		if err := m.extractDarwin(); err != nil {
 			return err
 		}
+	}
+
+	if err := m.determineOsqueryVersion(); err != nil {
+		return err
 	}
 
 	if *flTar {
