@@ -129,6 +129,17 @@ func (m *mirror) extractLinux() error {
 
 }
 
+func (m *mirror) extract() error {
+	switch m.platform {
+	case "darwin":
+		return m.extractDarwin()
+	case "linux":
+		return m.extractLinux()
+	default:
+		return fmt.Errorf("unsupported platform %s", m.platform)
+	}
+}
+
 func (m *mirror) extractDarwin() error {
 	pkgPath := filepath.Join(m.path, m.platform, "osquery.pkg")
 	xr, err := xar.OpenReader(pkgPath)
@@ -377,8 +388,7 @@ func runMirror(args []string) error {
 	}
 
 	if *flExtract && *flPlatform == "darwin" {
-		// TODO move to an extract helper with a platform switch statement
-		if err := m.extractDarwin(); err != nil {
+		if err := m.extract(); err != nil {
 			return err
 		}
 	}
@@ -406,5 +416,4 @@ func runMirror(args []string) error {
 	}
 
 	return nil
-
 }
