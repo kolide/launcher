@@ -49,8 +49,10 @@ func (m *mirror) downloadOsqueryPackage() error {
 		url = "https://osquery-packages.s3.amazonaws.com/xenial/osquery.deb"
 		destination = filepath.Join(destination, "osquery.deb")
 	case "windows":
-		// TODO(@groob)
+		// TODO
+		// https://github.com/kolide/launcher/issues/71
 		// The windows URL is https://chocolatey.org/api/v2/package/osquery/<version>,
+		// and https://osquery-packages.s3.amazonaws.com/windows/osquery.nupkg
 	default:
 		return fmt.Errorf("unknown platform for download url %s", m.platform)
 	}
