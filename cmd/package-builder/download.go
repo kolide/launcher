@@ -139,8 +139,6 @@ func (m *mirror) readCpioFile(input io.Reader, filename string) error {
 	cmd := exec.Command("cpio", "-ivdm", filename)
 	cmd.Dir = tempdir
 	cmd.Stdin = input
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
 	level.Debug(m.logger).Log(
 		"msg", "executing cpio command",
 		"cmd", strings.Join(cmd.Args, " "),
@@ -256,7 +254,7 @@ func (m *mirror) createTarball(source string) error {
 	return nil
 }
 
-func (m *mirror) copyTarball(source string) error {
+func (m *mirror) createTaggedTarball(source string) error {
 	saveDir := filepath.Join(m.path, mirrorBucketname, "kolide", m.platform)
 	filename := fmt.Sprintf("%s-%s.tar.gz", filepath.Base(source), m.osqueryVersion)
 	versionTarball := filepath.Join(saveDir, filename)
@@ -353,7 +351,7 @@ func runMirror(args []string) error {
 			return err
 		}
 		if m.updateChannel != "" {
-			if err := m.copyTarball(source); err != nil {
+			if err := m.createTaggedTarball(source); err != nil {
 				return err
 			}
 		}
