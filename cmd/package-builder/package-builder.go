@@ -32,6 +32,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "MODES\n")
 	fmt.Fprintf(os.Stderr, "  dev          Generate development launcher packages and upload them to GCS\n")
 	fmt.Fprintf(os.Stderr, "  version      Print full version information\n")
+	fmt.Fprintf(os.Stderr, "  mirror       Manage the local mirror for binaries.\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "VERSION\n")
 	fmt.Fprintf(os.Stderr, "  %s\n", version.Version().Version)
@@ -50,6 +51,8 @@ func main() {
 		run = runDev
 	case "version":
 		run = runVersion
+	case "mirror":
+		run = runMirror
 	default:
 		usage()
 		os.Exit(1)
