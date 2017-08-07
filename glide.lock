@@ -1,5 +1,5 @@
-hash: 2ab71f198758719a3460ddfa614387cc6409db3a7a2344de199c9c6bf0d02b3a
-updated: 2017-08-07T18:53:54.38499883+03:00
+hash: cbbee1d2c2cad1651428517f1051d68a891cd7d1fc3ea67fb050879af685d989
+updated: 2017-08-07T22:33:34.627152539+03:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -61,10 +61,23 @@ imports:
   - tuf
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/lxq/lzma
+  version: 777990e8297312151ce72197ae52c4db505bb40f
 - name: github.com/mixer/clock
   version: ac3776ffbf764bc40bda24e84184146865d0a46d
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: golang.org/x/crypto
+  version: bc89c496413265e715159bdc8478ee9a92fdc265
+  subpackages:
+  - cast5
+  - openpgp
+  - openpgp/armor
+  - openpgp/clearsign
+  - openpgp/elgamal
+  - openpgp/errors
+  - openpgp/packet
+  - openpgp/s2k
 - name: golang.org/x/net
   version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
@@ -110,6 +123,19 @@ imports:
   - status
   - tap
   - transport
+- name: pault.ag/go/debian
+  version: 247d411992777dbb91b2ff8cf344824d08ed4b7d
+  subpackages:
+  - control
+  - deb
+  - dependency
+  - internal
+  - transput
+  - version
+- name: pault.ag/go/topsort
+  version: f98d2ad46e1adcbf8fa59a95a3b5509a7da9c6b5
+- name: xi2.org/x/xz
+  version: 19aeb13c4e7cb6bd3188dfede73840f33455425a
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

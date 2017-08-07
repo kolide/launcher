@@ -35,6 +35,10 @@ import:
   version: ^0.2.0
 - package: github.com/mixer/clock
 - package: github.com/groob/goxar
+- package: pault.ag/go/debian
+  version: ~0.5.0
+  subpackages:
+  - deb
 testImport:
 - package: github.com/stretchr/testify
   subpackages:
