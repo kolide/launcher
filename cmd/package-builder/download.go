@@ -201,7 +201,7 @@ func (m *mirror) createTarball(source string) error {
 	filename := fmt.Sprintf("%s-%s.tar.gz", filepath.Base(source), m.osqueryVersion)
 	savePath := filepath.Join(saveDir, filename)
 	level.Debug(m.logger).Log(
-		"msg", "creating tarbal",
+		"msg", "creating tarball",
 		"output", savePath,
 	)
 
