@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"strings"
 
+	"pault.ag/go/debian/deb"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	xar "github.com/groob/goxar"
@@ -44,8 +46,8 @@ func (m *mirror) downloadOsqueryPackage() error {
 		destination = filepath.Join(destination, "osquery.pkg")
 	case "linux":
 		// using rpm because it's a simple tar archive.
-		url = "https://osquery-packages.s3.amazonaws.com/centos7/osquery.rpm"
-		destination = filepath.Join(destination, "osquery.rpm")
+		url = "https://osquery-packages.s3.amazonaws.com/xenial/osquery.deb"
+		destination = filepath.Join(destination, "osquery.deb")
 	case "windows":
 		// TODO(@groob)
 		// The windows URL is https://chocolatey.org/api/v2/package/osquery/<version>,
@@ -85,6 +87,46 @@ func (m *mirror) downloadOsqueryPackage() error {
 	)
 
 	return nil
+}
+
+func (m *mirror) extractLinux() error {
+	savePath := filepath.Join(m.path, m.platform, "bin", "osqueryd")
+	if err := os.MkdirAll(filepath.Dir(savePath), packaging.DirMode); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(savePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	pkgPath := filepath.Join(m.path, m.platform, "osquery.deb")
+	debFile, closer, err := deb.LoadFile(pkgPath)
+	if err != nil {
+		return err
+	}
+	defer closer()
+
+	tr := debFile.Data
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if header.Name == "./usr/bin/osqueryd" {
+			if _, err := io.CopyN(out, tr, header.Size); err != nil {
+				return err
+			}
+			break
+		}
+	}
+
+	return nil
+
 }
 
 func (m *mirror) extractDarwin() error {
@@ -337,6 +379,12 @@ func runMirror(args []string) error {
 	if *flExtract && *flPlatform == "darwin" {
 		// TODO move to an extract helper with a platform switch statement
 		if err := m.extractDarwin(); err != nil {
+			return err
+		}
+	}
+	if *flExtract && *flPlatform == "linux" {
+		// TODO move to an extract helper with a platform switch statement
+		if err := m.extractLinux(); err != nil {
 			return err
 		}
 	}
