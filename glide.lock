@@ -1,5 +1,5 @@
-hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
-updated: 2017-08-03T17:46:50.671578064-04:00
+hash: 2ab71f198758719a3460ddfa614387cc6409db3a7a2344de199c9c6bf0d02b3a
+updated: 2017-08-07T18:53:54.38499883+03:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -34,6 +34,8 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
+- name: github.com/groob/goxar
+  version: 908d7dee5b14b7157e77d16fef6fa7e33fbcb3d7
 - name: github.com/kolide/agent-api
   version: 9de61790e3e57187ae0485ce38c7598d61bbe446
   repo: git@github.com:kolide/agent-api.git
