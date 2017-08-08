@@ -27,7 +27,6 @@ type Extension struct {
 	enrollMutex   sync.Mutex
 	done          chan struct{}
 	wg            sync.WaitGroup
-	logger        log.Logger
 }
 
 const (
@@ -507,6 +506,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 			"msg", "Ignoring unknown log type: %v",
 			"log_type", typ,
 		)
+		return errors.Wrap(err, "unknown log type")
 	}
 
 	// Buffer the log for sending later in a batch
