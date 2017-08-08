@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -28,6 +29,7 @@ import (
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -49,6 +51,7 @@ type options struct {
 	enrollSecretPath   string
 	autoupdateInterval time.Duration
 	insecureTLS        bool
+	insecureGRPC       bool
 	printVersion       bool
 	debug              bool
 }
@@ -71,7 +74,12 @@ func parseOptions() (*options, error) {
 		flInsecureTLS = flag.Bool(
 			"insecure",
 			false,
-			"do not verify TLS certs for os update",
+			"do not verify TLS certs for outgoing connections",
+		)
+		flInsecureGRPC = flag.Bool(
+			"insecure_grpc",
+			false,
+			"dial GRPC without a TLS config",
 		)
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
@@ -127,6 +135,7 @@ func parseOptions() (*options, error) {
 		enrollSecretPath:   *flEnrollSecretPath,
 		debug:              *flDebug,
 		insecureTLS:        *flInsecureTLS,
+		insecureGRPC:       *flInsecureGRPC,
 		autoupdateInterval: *flAutoupdateInterval,
 	}
 
@@ -232,6 +241,42 @@ func logFatal(logger log.Logger, args ...interface{}) {
 	os.Exit(1)
 }
 
+// dialGRPC creates a grpc client connection.
+func dialGRPC(
+	serverURL string,
+	insecureTLS bool,
+	insecureGRPC bool,
+	logger log.Logger,
+) (*grpc.ClientConn, error) {
+	level.Info(logger).Log(
+		"msg", "dialing grpc server",
+		"server", serverURL,
+		"tls_secure", insecureTLS == false,
+		"grpc_secure", insecureGRPC == false,
+	)
+	grpcOpts := []grpc.DialOption{
+		grpc.WithTimeout(time.Second),
+	}
+	if insecureGRPC {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	} else {
+		host, _, err := net.SplitHostPort(serverURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			ServerName:         host,
+			InsecureSkipVerify: insecureTLS,
+		})
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
+	}
+	conn, err := grpc.Dial(
+		serverURL,
+		grpcOpts...,
+	)
+	return conn, err
+}
+
 func main() {
 	logger := log.NewJSONLogger(os.Stderr)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
@@ -273,8 +318,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// TODO fix insecure
-	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
+	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "dialing grpc server"))
 	}
