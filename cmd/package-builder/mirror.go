@@ -91,46 +91,6 @@ func (m *mirror) downloadOsqueryPackage() error {
 	return nil
 }
 
-func (m *mirror) extractLinux() error {
-	savePath := filepath.Join(m.path, m.platform, "bin", "osqueryd")
-	if err := os.MkdirAll(filepath.Dir(savePath), packaging.DirMode); err != nil {
-		return err
-	}
-	out, err := os.OpenFile(savePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	pkgPath := filepath.Join(m.path, m.platform, "osquery.deb")
-	debFile, closer, err := deb.LoadFile(pkgPath)
-	if err != nil {
-		return err
-	}
-	defer closer()
-
-	tr := debFile.Data
-
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if header.Name == "./usr/bin/osqueryd" {
-			if _, err := io.CopyN(out, tr, header.Size); err != nil {
-				return err
-			}
-			break
-		}
-	}
-
-	return nil
-
-}
-
 func (m *mirror) extract() error {
 	switch m.platform {
 	case "darwin":
@@ -140,6 +100,64 @@ func (m *mirror) extract() error {
 	default:
 		return fmt.Errorf("unsupported platform %s", m.platform)
 	}
+}
+
+func (m *mirror) extractLinux() error {
+	savePath := filepath.Join(m.path, m.platform, "bin", "osqueryd")
+	if err := os.MkdirAll(filepath.Dir(savePath), packaging.DirMode); err != nil {
+		return errors.Wrapf(err, "create directory %s", filepath.Dir(savePath))
+	}
+	out, err := os.OpenFile(savePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return errors.Wrapf(err, "create file %s", savePath)
+	}
+	defer out.Close()
+
+	pkgPath := filepath.Join(m.path, m.platform, "osquery.deb")
+
+	level.Debug(m.logger).Log(
+		"msg", "extracting osqueryd from deb archive",
+		"package_path", pkgPath,
+		"output_path", savePath,
+	)
+
+	debFile, closer, err := deb.LoadFile(pkgPath)
+	if err != nil {
+		return errors.Wrapf(err, "loading deb archive at %s", pkgPath)
+	}
+	defer closer()
+
+	tr := debFile.Data
+
+	found := false
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errors.Wrap(err, "reading next header from osquery tarball")
+		}
+		if header.Name == "./usr/bin/osqueryd" {
+			found = true
+			level.Debug(m.logger).Log(
+				"msg", "copying osqueryd from tar",
+				"output_path", savePath,
+				"file_size", header.Size,
+			)
+			if _, err := io.CopyN(out, tr, header.Size); err != nil {
+				return errors.Wrapf(err, "copy %d bytes from tarball", header.Size)
+			}
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("could not find osqueryd binary in deb package %s", pkgPath)
+	}
+
+	return nil
+
 }
 
 func (m *mirror) extractDarwin() error {
@@ -384,33 +402,32 @@ func runMirror(args []string) error {
 	}
 
 	if *flDownload {
+		level.Debug(logger).Log("msg", "starting download")
 		if err := m.downloadOsqueryPackage(); err != nil {
 			return err
 		}
 	}
 
-	if *flExtract && *flPlatform == "darwin" {
+	if *flExtract {
+		level.Debug(logger).Log("msg", "extracting osqueryd from package")
 		if err := m.extract(); err != nil {
 			return err
 		}
 	}
-	if *flExtract && *flPlatform == "linux" {
-		// TODO move to an extract helper with a platform switch statement
-		if err := m.extractLinux(); err != nil {
-			return err
-		}
-	}
 
+	level.Debug(logger).Log("msg", "running osqueryd to detrmine the current version")
 	if err := m.determineOsqueryVersion(); err != nil {
 		return err
 	}
 
 	if *flTar {
+		level.Debug(logger).Log("msg", "building tar archive", "binary", "osqueryd")
 		source := filepath.Join(m.path, m.platform, "bin", "osqueryd")
 		if err := m.createTarball(source); err != nil {
 			return err
 		}
 		if m.updateChannel != "" {
+			level.Debug(logger).Log("msg", "tag tar archive with release", "binary", "osqueryd", "channel", m.updateChannel)
 			if err := m.createTaggedTarball(source); err != nil {
 				return err
 			}
