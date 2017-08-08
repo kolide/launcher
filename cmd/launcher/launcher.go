@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -28,6 +29,7 @@ import (
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -71,7 +73,7 @@ func parseOptions() (*options, error) {
 		flInsecureTLS = flag.Bool(
 			"insecure",
 			false,
-			"do not verify TLS certs for os update",
+			"do not verify TLS certs for outgoing connections",
 		)
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
@@ -273,8 +275,28 @@ func main() {
 	}
 	defer db.Close()
 
-	// TODO fix insecure
-	conn, err := grpc.Dial(opts.kolideServerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second))
+	level.Info(logger).Log(
+		"msg", "dialing grpc server",
+		"server", opts.kolideServerURL,
+		"credentials", opts.insecureTLS == true,
+	)
+	grpcOpts := []grpc.DialOption{
+		grpc.WithTimeout(time.Second),
+	}
+	if opts.insecureTLS {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	} else {
+		host, _, err := net.SplitHostPort(opts.kolideServerURL)
+		if err != nil {
+			logFatal(logger, "err", errors.Wrap(err, "split grpc server host and port"))
+		}
+		creds := credentials.NewTLS(&tls.Config{ServerName: host})
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
+	}
+	conn, err := grpc.Dial(
+		opts.kolideServerURL,
+		grpcOpts...,
+	)
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "dialing grpc server"))
 	}
