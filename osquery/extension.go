@@ -3,7 +3,6 @@ package osquery
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"sync"
 	"time"
 
@@ -479,11 +478,9 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 		}
 
 		level.Info(e.Opts.Logger).Log(
-			"msg",
-			fmt.Sprintf("Buffered logs limit (%d) exceeded. Purging %d logs.",
-				e.Opts.MaxBufferedLogs,
-				deleteCount,
-			),
+			"msg", "Buffered logs limit exceeded. Purging excess.",
+			"limit", e.Opts.MaxBufferedLogs,
+			"purge_count", deleteCount,
 		)
 
 		c := b.Cursor()
@@ -507,8 +504,8 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
 		level.Info(e.Opts.Logger).Log(
-			"msg",
-			fmt.Sprintf("Ignoring unknown log type: %v", typ),
+			"msg", "Ignoring unknown log type: %v",
+			"log_type", typ,
 		)
 	}
 
