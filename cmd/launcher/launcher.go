@@ -353,6 +353,8 @@ func main() {
 	if invalid {
 		logFatal(logger, errors.Wrap(err, "invalid enroll secret"))
 	}
+	ext.Start()
+	defer ext.Shutdown()
 
 	instance, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
