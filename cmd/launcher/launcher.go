@@ -336,7 +336,12 @@ func main() {
 		}
 		enrollSecret = string(content)
 	}
-	ext, err := osquery.NewExtension(client, db, osquery.ExtensionOpts{EnrollSecret: enrollSecret})
+
+	extOpts := osquery.ExtensionOpts{
+		EnrollSecret: enrollSecret,
+		Logger:       logger,
+	}
+	ext, err := osquery.NewExtension(client, db, extOpts)
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "starting grpc extension"))
 	}
@@ -348,6 +353,8 @@ func main() {
 	if invalid {
 		logFatal(logger, errors.Wrap(err, "invalid enroll secret"))
 	}
+	ext.Start()
+	defer ext.Shutdown()
 
 	instance, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
