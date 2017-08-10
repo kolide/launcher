@@ -262,7 +262,7 @@ const mirrorBucketname = "binaries-for-launcher"
 
 // wraps a single file in a tarball
 func (m *mirror) createTarball(source string) error {
-	saveDir := filepath.Join(m.path, mirrorBucketname, "kolide", m.platform)
+	saveDir := filepath.Join(m.path, mirrorBucketname, "kolide", filepath.Base(source), m.platform)
 	if err := os.MkdirAll(saveDir, packaging.DirMode); err != nil {
 		return errors.Wrapf(err, "create tarball directory %s", saveDir)
 	}
@@ -328,7 +328,7 @@ func (m *mirror) createTarball(source string) error {
 }
 
 func (m *mirror) createTaggedTarball(source string) error {
-	saveDir := filepath.Join(m.path, mirrorBucketname, "kolide", m.platform)
+	saveDir := filepath.Join(m.path, mirrorBucketname, "kolide", filepath.Base(source), m.platform)
 	filename := fmt.Sprintf("%s-%s.tar.gz", filepath.Base(source), m.osqueryVersion)
 	versionTarball := filepath.Join(saveDir, filename)
 	taggedFilename := fmt.Sprintf("%s-%s.tar.gz", filepath.Base(source), m.updateChannel)
