@@ -47,7 +47,7 @@ extension: .pre-build
 	go build -i -o build/osquery-extension.ext ./cmd/osquery-extension/
 
 xp-extension: .pre-build
-	GOOS=darwin CGO_ENABLED=0 go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
+	GOOS=darwin go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
 	ln -f build/$(CURRENT_PLATFORM)/osquery-extension.ext build/osquery-extension.ext
 
@@ -55,7 +55,7 @@ launcher: .pre-build
 	go build -i -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 
 xp-launcher: .pre-build
-	GOOS=darwin CGO_ENABLED=0 go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	GOOS=darwin go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	ln -f build/$(CURRENT_PLATFORM)/launcher build/launcher
 
@@ -73,7 +73,7 @@ generate:
 		-binary=osqueryd -notary=${NOTARY_URL} -insecure=${INSECURE}
 	go run ./autoupdate/generate_tuf.go \
 		-binary=launcher -notary=${NOTARY_URL} -insecure=${INSECURE}
-	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/... 
+	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/...
 
 
 test: generate
