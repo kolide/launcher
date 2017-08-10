@@ -7,6 +7,11 @@ import (
 )
 
 func TestFetchOsqueryBinary(t *testing.T) {
-	_, err := FetchOsquerydBinary("stable", "darwin")
+	path1, err := FetchOsquerydBinary("stable", "linux")
 	require.NoError(t, err)
+
+	path2, err := FetchOsquerydBinary("stable", "linux")
+	require.NoError(t, err)
+
+	require.Equal(t, path1, path2)
 }
