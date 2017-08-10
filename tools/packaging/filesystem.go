@@ -8,17 +8,17 @@ import (
 	"github.com/kolide/kit/env"
 )
 
-// gopath will return the current gopath as set by environment variables and
-// will fall back to ~/go if a gopath is not set.
-func gopath() string {
+// Gopath will return the current GOPATH as set by environment variables and
+// will fall back to ~/go if a GOPATH is not set.
+func Gopath() string {
 	home := env.String("HOME", "~/")
 	return env.String("GOPATH", filepath.Join(home, "go"))
 }
 
-// launcherSource returns the path of the launcher codebase, based on the
-// current gopath
+// LauncherSource returns the path of the launcher codebase, based on the
+// current GOPATH
 func LauncherSource() string {
-	return filepath.Join(gopath(), "/src/github.com/kolide/launcher")
+	return filepath.Join(Gopath(), "/src/github.com/kolide/launcher")
 }
 
 const (
@@ -28,10 +28,10 @@ const (
 	FileMode = 0644
 )
 
-// copyDir is a utility to assist with copying a directory from src to dest.
+// CopyDir is a utility to assist with copying a directory from src to dest.
 // Note that directory permissions are not maintained, but the permissions of
 // the files in those directories are.
-func copyDir(src, dest string) error {
+func CopyDir(src, dest string) error {
 	dir, err := os.Open(src)
 	if err != nil {
 		return err
@@ -48,11 +48,11 @@ func copyDir(src, dest string) error {
 		srcptr := filepath.Join(src, file.Name())
 		dstptr := filepath.Join(dest, file.Name())
 		if file.IsDir() {
-			if err := copyDir(srcptr, dstptr); err != nil {
+			if err := CopyDir(srcptr, dstptr); err != nil {
 				return err
 			}
 		} else {
-			if err := copyFile(srcptr, dstptr); err != nil {
+			if err := CopyFile(srcptr, dstptr); err != nil {
 				return err
 			}
 		}
@@ -60,9 +60,9 @@ func copyDir(src, dest string) error {
 	return nil
 }
 
-// copyFile is a utility to assist with copying a file from src to dest.
+// CopyFile is a utility to assist with copying a file from src to dest.
 // Note that file permissions are maintained.
-func copyFile(src, dest string) error {
+func CopyFile(src, dest string) error {
 	source, err := os.Open(src)
 	if err != nil {
 		return err
