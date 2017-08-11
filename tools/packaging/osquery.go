@@ -29,7 +29,7 @@ func osqueryTarPath(osqueryVersion, osqueryPlatform string) string {
 }
 
 func osqueryBinaryPath(osqueryVersion, osqueryPlatform string) string {
-	return fmt.Sprintf("kolide/osqueryd/%s/%s/osqueryd", osqueryPlatform, osqueryVersion)
+	return filepath.Join("kolide", "osqueryd", osqueryPlatform, osqueryVersion, "osqueryd")
 }
 
 // FetchOsquerydBinary will synchronously download an osquery binary as per the

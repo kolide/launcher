@@ -258,7 +258,7 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 
 	err = pkgbuild(
 		packageRoot,
-		fmt.Sprintf("%s/src/github.com/kolide/launcher/tools/packaging/macos/scripts", Gopath()),
+		filepath.Join(Gopath(), "src/github.com/kolide/launcher/tools/packaging/macos/scripts"),
 		"com.kolide.launcher",
 		currentVersion,
 		outputPath,
@@ -366,7 +366,7 @@ func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname str
 		"-t", "deb",
 		"-n", "launcher",
 		"-v", currentVersion,
-		"-p", fmt.Sprintf("/out/%s", debOutputFilename),
+		"-p", filepath.Join("/out", debOutputFilename),
 		"/pkgroot=/",
 	)
 	if err := debCmd.Run(); err != nil {
@@ -383,7 +383,7 @@ func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname str
 		"-t", "rpm",
 		"-n", "launcher",
 		"-v", currentVersion,
-		"-p", fmt.Sprintf("/out/%s", rpmOutputFilename),
+		"-p", filepath.Join("/out", rpmOutputFilename),
 		"/pkgroot=/",
 	)
 	if err := rpmCmd.Run(); err != nil {
