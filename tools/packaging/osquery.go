@@ -25,7 +25,7 @@ func populateLocalCacheDir() error {
 }
 
 func osqueryTarPath(osqueryVersion, osqueryPlatform string) string {
-	return fmt.Sprintf("kolide/osqueryd/%s/osqueryd-%s.tar.gz", osqueryPlatform, osqueryVersion)
+	return filepath.Join("kolide", "osqueryd", osqueryPlatform, fmt.Sprintf("osqueryd-%s.tar.gz", osqueryVersion))
 }
 
 func osqueryBinaryPath(osqueryVersion, osqueryPlatform string) string {
