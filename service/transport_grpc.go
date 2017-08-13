@@ -110,9 +110,9 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 
 	var typ kolide_agent.LogCollection_LogType
 	switch req.LogType {
-	case logger.LogTypeSnapshot, logger.LogTypeStatus:
+	case logger.LogTypeStatus:
 		typ = kolide_agent.LogCollection_STATUS
-	case logger.LogTypeString:
+	case logger.LogTypeString, logger.LogTypeSnapshot:
 		typ = kolide_agent.LogCollection_RESULT
 	default:
 		typ = kolide_agent.LogCollection_AGENT
