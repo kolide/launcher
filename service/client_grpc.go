@@ -3,13 +3,14 @@ package service
 import (
 	"github.com/kolide/agent-api"
 
+	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"google.golang.org/grpc"
 )
 
 // New creates a new KolideClient (implementation of the KolideService
 // interface) using the provided gRPC client connection.
-func New(conn *grpc.ClientConn) KolideClient {
+func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 	requestEnrollmentEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
@@ -55,11 +56,13 @@ func New(conn *grpc.ClientConn) KolideClient {
 		kolide_agent.AgentApiResponse{},
 	).Endpoint()
 
-	return KolideClient{
+	client := KolideClient{
 		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
 	}
+
+	return loggingMiddleware(logger)(client)
 }
