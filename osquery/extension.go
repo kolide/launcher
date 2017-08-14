@@ -458,8 +458,8 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	return nil
 }
 
-// purgeBufferedLogs flushes the log buffers, ensuring that at most
-// Opts.MaxBufferedLogs logs remain for each log type.
+// purgeBufferedLogsForType flushes the log buffers for the provided type,
+// ensuring that at most Opts.MaxBufferedLogs logs remain.
 func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
@@ -497,13 +497,20 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	return nil
 }
 
-// LogString will publish a status/result log from osquery to the server. In
-// the future it should buffer logs and send them at intervals.
+// LogString will buffer logs from osquery into the local BoltDB store. No
+// immediate action is taken to push the logs to the server (that is handled by
+// the log publishing thread).
 func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText string) error {
+	if typ == logger.LogTypeInit {
+		// osquery seems to send an empty init log whenever it starts
+		// up. Ignore this log without generating an error.
+		return nil
+	}
+
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
 		level.Info(e.Opts.Logger).Log(
-			"msg", "Ignoring unknown log type: %v",
+			"msg", "Received unknown log type",
 			"log_type", typ,
 		)
 		return errors.Wrap(err, "unknown log type")
