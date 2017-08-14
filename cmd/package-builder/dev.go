@@ -15,29 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func safePathHostname(hostname string) string {
-	return strings.Replace(hostname, ":", "-", -1)
-}
-
-func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
-	macPackagePath, err := packaging.MakeMacOSPkg(osqueryVersion, tenant, hostname, pemKey)
-	defer os.RemoveAll(filepath.Dir(macPackagePath))
-	if err != nil {
-		return "", errors.Wrap(err, "could not make macOS package")
-	}
-
-	darwinRoot := filepath.Join(uploadRoot, safePathHostname(hostname), tenant, "darwin")
-	if err := os.MkdirAll(darwinRoot, packaging.DirMode); err != nil {
-		return "", errors.Wrap(err, "could not create darwin root")
-	}
-
-	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
-	if err = packaging.CopyFile(macPackagePath, destinationPath); err != nil {
-		return "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return destinationPath, nil
-}
-
 func runDev(args []string) error {
 	flagset := flag.NewFlagSet("query", flag.ExitOnError)
 	var (
@@ -80,7 +57,7 @@ func runDev(args []string) error {
 
 	enrollmentSecretSigningKeyPath := *flEnrollmentSecretSigningKeyPath
 	if enrollmentSecretSigningKeyPath == "" {
-		enrollmentSecretSigningKeyPath = fmt.Sprintf("%s/tools/packaging/example_rsa.pem", packaging.LauncherSource())
+		enrollmentSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
 	}
 
 	if _, err := os.Stat(enrollmentSecretSigningKeyPath); err != nil {
@@ -96,8 +73,8 @@ func runDev(args []string) error {
 	}
 
 	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 350, 400
-	firstID, numberOfIDsToGenerate := 100001, 3
+	prToStartFrom, prToGenerateUntil := 350, 500
+	firstID, numberOfIDsToGenerate := 100001, 1
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
@@ -106,7 +83,7 @@ func runDev(args []string) error {
 	defer os.RemoveAll(uploadRoot)
 
 	makeHostnameDirInRoot := func(hostname string) error {
-		if err := os.MkdirAll(filepath.Join(uploadRoot, safePathHostname(hostname)), packaging.DirMode); err != nil {
+		if err := os.MkdirAll(filepath.Join(uploadRoot, strings.Replace(hostname, ":", "-", -1)), packaging.DirMode); err != nil {
 			return errors.Wrap(err, "could not create hostname root")
 		}
 		return nil
@@ -122,14 +99,16 @@ func runDev(args []string) error {
 			return err
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			tenant := packaging.TenantName(id)
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
-				return errors.Wrap(err, "could not generate macOS package for tenant")
+				return errors.Wrap(err, "could not generate package for tenant")
 			}
 			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"destination", destinationPath,
+				"msg", "created packages",
+				"deb", paths.Deb,
+				"rpm", paths.RPM,
+				"mac", paths.MacOS,
 				"tenant", tenant,
 				"hostname", hostname,
 			)
@@ -144,14 +123,16 @@ func runDev(args []string) error {
 		}
 
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
-			tenant := packaging.Munemo(id)
-			destinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			tenant := packaging.TenantName(id)
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 			if err != nil {
-				return errors.Wrap(err, "could not generate macOS package for tenant")
+				return errors.Wrap(err, "could not generate package for tenant")
 			}
 			level.Debug(logger).Log(
-				"msg", "copied macOS package for tenant and hostname",
-				"path", destinationPath,
+				"msg", "created packages",
+				"deb", paths.Deb,
+				"rpm", paths.RPM,
+				"mac", paths.MacOS,
 				"tenant", tenant,
 				"hostname", hostname,
 			)

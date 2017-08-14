@@ -6,6 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewMunemo(t *testing.T) {
-	require.Equal(t, Munemo(100001), "dababi")
+func TestTenantName(t *testing.T) {
+	require.Equal(t, TenantName(100001), "dababi")
 }
