@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -25,7 +26,7 @@ func populateLocalCacheDir() error {
 }
 
 func osqueryTarPath(osqueryVersion, osqueryPlatform string) string {
-	return filepath.Join("kolide", "osqueryd", osqueryPlatform, fmt.Sprintf("osqueryd-%s.tar.gz", osqueryVersion))
+	return path.Join("kolide", "osqueryd", osqueryPlatform, fmt.Sprintf("osqueryd-%s.tar.gz", osqueryVersion))
 }
 
 func osqueryBinaryPath(osqueryVersion, osqueryPlatform string) string {
