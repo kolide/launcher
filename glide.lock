@@ -1,5 +1,5 @@
-hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
-updated: 2017-08-03T17:46:50.671578064-04:00
+hash: 5dddda7b3b4ac61a44a5559725f78c9cc213acd18761873e77454a999625edea
+updated: 2017-08-11T12:15:38.482531185-05:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -45,7 +45,7 @@ imports:
   - testutil
   - version
 - name: github.com/kolide/osquery-go
-  version: 7ceba810d60e0fca30437253bc33717a30698021
+  version: 5419715d060ff8c2e1b7f6ff5a8127ac2ce3fbdc
   subpackages:
   - gen/osquery
   - plugin/config
@@ -59,10 +59,16 @@ imports:
   - tuf
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/kr/pretty
+  version: cfb55aafdaf3ec08f0db22699ab822c50091b1c4
+- name: github.com/kr/text
+  version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/mixer/clock
   version: ac3776ffbf764bc40bda24e84184146865d0a46d
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: github.com/y0ssar1an/q
+  version: 74ed9d9525c7e0a8f3c031c8d399f25bd6e09c30
 - name: golang.org/x/net
   version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:

@@ -107,9 +107,20 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 	for _, log := range req.Logs {
 		logs = append(logs, &kolide_agent.LogCollection_Log{log})
 	}
+
+	var typ kolide_agent.LogCollection_LogType
+	switch req.LogType {
+	case logger.LogTypeStatus:
+		typ = kolide_agent.LogCollection_STATUS
+	case logger.LogTypeString, logger.LogTypeSnapshot:
+		typ = kolide_agent.LogCollection_RESULT
+	default:
+		typ = kolide_agent.LogCollection_AGENT
+	}
+
 	return &kolide_agent.LogCollection{
 		NodeKey: req.NodeKey,
-		LogType: kolide_agent.LogCollection_LogType(req.LogType),
+		LogType: typ,
 		Logs:    logs,
 	}, nil
 
