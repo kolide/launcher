@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/kolide/launcher/autoupdate"
 	"github.com/pkg/errors"
 )
 
@@ -77,21 +78,12 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 		return "", errors.Wrap(err, "couldn't copy HTTP response body to file")
 	}
 
-	writeHandle.Close()
-
-	// Untar the file
-	untarHandle, err := os.Open(localPackageDownloadPath)
-	if err != nil {
-		return "", errors.Wrap(err, "couldn't create read file handle for untar process")
-	}
-	defer untarHandle.Close()
-
 	if err := os.MkdirAll(filepath.Dir(localBinaryDownloadPath), DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
-	if err := Untar(filepath.Dir(localBinaryDownloadPath), untarHandle); err != nil {
-		return "", errors.Wrap(err, "could not untar the package")
+	if err := autoupdate.UntarDownload(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
+		return "", errors.Wrap(err, "couldn't untar package")
 	}
 
 	if _, err := os.Stat(localBinaryDownloadPath); err != nil {

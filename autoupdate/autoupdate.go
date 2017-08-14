@@ -224,7 +224,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
-		if err := untarDownload(stagingPath, stagingPath); err != nil {
+		if err := UntarDownload(stagingPath, stagingPath); err != nil {
 			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}
@@ -249,7 +249,8 @@ func (u *Updater) handler() tuf.NotificationHandler {
 	}
 }
 
-func untarDownload(destination string, source string) error {
+// UntarDownload will untar a source tar.gz archive to the supplied destination
+func UntarDownload(destination string, source string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return errors.Wrap(err, "autoupdate: open download source")
