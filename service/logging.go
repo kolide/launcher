@@ -19,7 +19,7 @@ func loggingMiddleware(logger log.Logger) func(KolideService) KolideService {
 
 type logmw struct {
 	logger log.Logger
-	KolideService
+	next   KolideService
 }
 
 func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (errcode string, reauth bool, err error) {
@@ -35,7 +35,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		)
 	}(time.Now())
 
-	errcode, reauth, err = mw.KolideService.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
+	errcode, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
 	return
 }
 
@@ -50,7 +50,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (errcode stri
 		)
 	}(time.Now())
 
-	errcode, reauth, err = mw.KolideService.RequestConfig(ctx, nodeKey)
+	errcode, reauth, err = mw.next.RequestConfig(ctx, nodeKey)
 	return
 }
 
@@ -68,7 +68,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 		)
 	}(time.Now())
 
-	message, errcode, reauth, err = mw.KolideService.PublishLogs(ctx, nodeKey, logType, logs)
+	message, errcode, reauth, err = mw.next.PublishLogs(ctx, nodeKey, logType, logs)
 	return
 }
 
@@ -84,7 +84,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		)
 	}(time.Now())
 
-	res, reauth, err = mw.KolideService.RequestQueries(ctx, nodeKey)
+	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)
 	return
 }
 
@@ -102,6 +102,6 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 		)
 	}(time.Now())
 
-	message, errcode, reauth, err = mw.KolideService.PublishResults(ctx, nodeKey, results)
+	message, errcode, reauth, err = mw.next.PublishResults(ctx, nodeKey, results)
 	return
 }
