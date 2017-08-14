@@ -78,6 +78,9 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 		return "", errors.Wrap(err, "couldn't copy HTTP response body to file")
 	}
 
+	// explicitly close the write handle before untaring the archive
+	writeHandle.Close()
+
 	if err := os.MkdirAll(filepath.Dir(localBinaryDownloadPath), DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
