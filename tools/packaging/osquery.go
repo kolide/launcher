@@ -76,6 +76,8 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 		return "", errors.Wrap(err, "couldn't copy HTTP response body to file")
 	}
 
+	writeHandle.Close()
+
 	// Untar the file
 	untarHandle, err := os.Open(localPackageDownloadPath)
 	if err != nil {
