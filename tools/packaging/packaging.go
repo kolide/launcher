@@ -22,6 +22,11 @@ type PackagePaths struct {
 	RPM   string
 }
 
+// CreatePackages will create a launcher macOS package given an upload root
+// where the packages should be stores, a specific osquery version identifier,
+// a munemo tenant identifier, and a key used to sign the enrollment secret JWT
+// token. The output paths of the packages are returned and an error if the
+// operation was not successful.
 func CreatePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (*PackagePaths, error) {
 	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
 	if err != nil {
