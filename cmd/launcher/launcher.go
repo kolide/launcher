@@ -324,7 +324,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := service.New(conn)
+	client := service.New(conn, logger)
 
 	var enrollSecret string
 	if opts.enrollSecret != "" {
