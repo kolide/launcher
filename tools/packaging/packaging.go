@@ -196,7 +196,7 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 	for _, pathToCreate := range pathsToCreate {
 		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
 		if err != nil {
-			return "", errors.Wrap(err, fmt.Sprintf("could not make directory %s/%s", packageRoot, pathToCreate))
+			return "", errors.Wrapf(err, "could not make directory %s/%s", packageRoot, pathToCreate)
 		}
 	}
 
