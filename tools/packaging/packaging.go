@@ -135,7 +135,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <key>ProgramArguments</key>
         <array>
             <string>/usr/local/kolide/bin/launcher</string>
-            {{if .InsecureGrpc}}<string>--insecure_grpc<string>{{end}}
+            {{if .InsecureGrpc}}<string>--insecure_grpc</string>{{end}}
         </array>
         <key>StandardErrorPath</key>
         <string>/var/log/kolide/launcher-stderr.log</string>

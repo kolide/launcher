@@ -1,7 +1,5 @@
 #!/bin/bash
 
-[[ $3 != "/" ]] && exit 0
-
 /bin/launchctl stop com.kolide.launcher
 
 sleep 5
