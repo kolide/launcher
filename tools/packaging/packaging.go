@@ -119,7 +119,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <string>com.kolide.launcher</string>
         <key>EnvironmentVariables</key>
         <dict>
-            <key>KOLIDE_LAUNCHER_WORKING_DIRECTORY</key>
+            <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
             <string>/var/kolide</string>
             <key>KOLIDE_LAUNCHER_KOLIDE_URL</key>
             <string>{{.KolideURL}}</string>
