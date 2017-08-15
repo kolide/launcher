@@ -104,7 +104,8 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	KolideURL string
+	KolideURL    string
+	InsecureGrpc bool
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -134,6 +135,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <key>ProgramArguments</key>
         <array>
             <string>/usr/local/kolide/bin/launcher</string>
+            {{if .InsecureGrpc}}<string>--insecure_grpc<string>{{end}}
         </array>
         <key>StandardErrorPath</key>
         <string>/var/log/kolide/launcher-stderr.log</string>
@@ -164,6 +166,19 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) 
 		outputPath,
 	)
 	return cmd.Run()
+}
+
+// grpcServerForHostname returns the gRPC server hostname given a web address
+// that was serving the website itself
+func grpcServerForHostname(hostname string) string {
+	switch hostname {
+	case "localhost:5000":
+		return "localhost:8082"
+	case "master.cloud.kolide.net":
+		return "master-grpc.cloud.kolide.net:443"
+	default:
+		return fmt.Sprintf("%s:443", hostname)
+	}
 }
 
 // createMacPackageInTempDir will create a launcher macOS package given a specific osquery
@@ -236,10 +251,13 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 	if err != nil {
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
-	err = renderLaunchDaemon(launchDaemonFile, &launchDaemonTemplateOptions{
-		KolideURL: fmt.Sprintf("https://%s", hostname),
-	})
-	if err != nil {
+	opts := &launchDaemonTemplateOptions{
+		KolideURL: grpcServerForHostname(hostname),
+	}
+	if hostname == "localhost:5000" {
+		opts.InsecureGrpc = true
+	}
+	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
 	}
 
