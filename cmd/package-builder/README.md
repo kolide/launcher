@@ -17,10 +17,10 @@ make package-builder
 To use the tool to generate development packages, run:
 
 ```
-./build/package-builder dev --help
+./build/package-builder dev --debug
 ```
 
-This command will build (macOS) packages for PR 350-399, master, and localhost for the first three tenants and upload them to the `gs://packaging/` bucket in the `kolide-ose-testing` gcloud project. You must be authenticated to gcloud with the `kolide-ose-testing` project set as active for this to work.
+This command will build (macOS) packages for PRs, master, and localhost for the first tenant and upload them to the `gs://packaging/` bucket in the `kolide-ose-testing` gcloud project. You must be authenticated to gcloud with the `kolide-ose-testing` project set as active for this to work.
 
 To authenticate to GCloud, use the following:
 
