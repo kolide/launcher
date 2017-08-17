@@ -1,4 +1,4 @@
-# `package-builder`
+# Building Packages
 
 ## Building the tool
 
@@ -12,15 +12,9 @@ make package-builder
 
 ## General Usage
 
-### Dev Command
+### Logging in
 
-To use the tool to generate development packages, run:
-
-```
-./build/package-builder dev --debug
-```
-
-This command will build (macOS) packages for PRs, master, and localhost for the first tenant and upload them to the `gs://packaging/` bucket in the `kolide-ose-testing` gcloud project. You must be authenticated to gcloud with the `kolide-ose-testing` project set as active for this to work.
+You must be authenticated to Kolide's GCloud organization for the various `package-builder` commands to work. To do this, you will need to install the GCloud tools. Documentation on using and installing these tools can be found [here](https://cloud.google.com/sdk/gcloud/).
 
 To authenticate to GCloud, use the following:
 
@@ -28,16 +22,44 @@ To authenticate to GCloud, use the following:
 gcloud auth application-default login
 ```
 
-To set the `kolide-ose-testing` project as active, use the following:
+You can also use the `make` shortcut if you prefer:
 
 ```
+make gcloud-login
+```
+
+### Dev Packages
+
+To use the tool to generate development packages, run:
+
+```
+make package-builder
 gcloud config set project kolide-ose-testing
+./build/package-builder dev --debug
 ```
 
-Documentation on using and installing these tools can be found [here](https://cloud.google.com/sdk/gcloud/).
-
-### Version info
+You can also use the `make` shortcut if you prefer:
 
 ```
-./build/package-builder version
+make dev-packages
 ```
+
+This command will build (macOS and Linux) packages for PRs, master, and localhost for the first tenant and upload them to the `gs://packaging/` bucket in the `kolide-ose-testing` GCloud project.
+
+### Production Packages
+
+To use the tool to generate production packages, run:
+
+```
+make package-builder
+gcloud config set project kolide-website
+./build/package-builder prod --enrollment_secret_signing_key=./key.pem --debug
+```
+
+You can also use the `make` shortcut if you prefer:
+
+```
+ENROLLMENT_SECRET_SIGNING_KEY=/path/to/key.pem make prod-packages
+```
+
+This command will build (macOS and Linux) packages for production and upload them to the `gs://packaging/` bucket in the `kolide-website` GCloud project.

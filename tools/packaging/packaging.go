@@ -176,6 +176,8 @@ func grpcServerForHostname(hostname string) string {
 		return "localhost:8082"
 	case "master.cloud.kolide.net":
 		return "master-grpc.cloud.kolide.net:443"
+	case "kolide.co", "kolide.com":
+		return "launcher.kolide.com:443"
 	default:
 		return fmt.Sprintf("%s:443", hostname)
 	}

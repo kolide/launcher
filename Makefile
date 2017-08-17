@@ -75,7 +75,21 @@ generate:
 		-binary=launcher -notary=${NOTARY_URL} -insecure=${INSECURE}
 	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/...
 
-
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
 
+gcloud-login:
+	gcloud auth application-default login
+
+dev-packages: package-builder
+	gcloud config set project kolide-ose-testing
+	./build/package-builder dev --debug
+
+.check-prod-packages:
+ifndef ENROLLMENT_SECRET_SIGNING_KEY
+	$(error ENROLLMENT_SECRET_SIGNING_KEY is undefined, but required)
+endif
+
+prod-packages: .check-prod-packages package-builder
+	gcloud config set project kolide-website
+	./build/package-builder prod --debug --enrollment_secret_signing_key=$(ENROLLMENT_SECRET_SIGNING_KEY)
