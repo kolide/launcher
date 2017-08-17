@@ -31,6 +31,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "MODES\n")
 	fmt.Fprintf(os.Stderr, "  dev          Generate development launcher packages and upload them to GCS\n")
+	fmt.Fprintf(os.Stderr, "  prod         Generate production launcher packages and upload them to GCS\n")
 	fmt.Fprintf(os.Stderr, "  version      Print full version information\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "VERSION\n")
@@ -48,6 +49,8 @@ func main() {
 	switch strings.ToLower(os.Args[1]) {
 	case "dev":
 		run = runDev
+	case "prod":
+		run = runProd
 	case "version":
 		run = runVersion
 	default:
