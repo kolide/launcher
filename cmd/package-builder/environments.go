@@ -214,7 +214,7 @@ func runProd(args []string) error {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
 
-	firstID, numberOfIDsToGenerate := 100001, 3
+	firstID, numberOfIDsToGenerate := 100001, 100
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
