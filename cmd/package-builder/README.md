@@ -59,7 +59,7 @@ gcloud config set project kolide-website
 You can also use the `make` shortcut if you prefer:
 
 ```
-make prod-packages
+ENROLLMENT_SECRET_SIGNING_KEY=/path/to/key.pem make prod-packages
 ```
 
 This command will build (macOS and Linux) packages for production and upload them to the `gs://packaging/` bucket in the `kolide-website` GCloud project.
