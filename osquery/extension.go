@@ -258,6 +258,22 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 // configuration will be returned. If that fails, this method will return an
 // error.
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
+	return map[string]string{
+		"config": `{
+  "packs":{
+    "kolide:test":{
+      "platform":"all",
+      "queries":{
+        "best_practices":{
+          "query":"SELECT * from kolide_best_practices;",
+          "interval":"5"
+        }
+      }
+    }
+  }
+}
+`,
+	}, nil
 	config, err := e.generateConfigsWithReenroll(ctx, true)
 	if err != nil {
 		// Try to use cached config
