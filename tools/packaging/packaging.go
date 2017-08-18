@@ -27,8 +27,8 @@ type PackagePaths struct {
 // a munemo tenant identifier, and a key used to sign the enrollment secret JWT
 // token. The output paths of the packages are returned and an error if the
 // operation was not successful.
-func CreatePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+func CreatePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
@@ -82,8 +82,8 @@ func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pe
 
 }
 
-func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, error) {
-	macPackagePath, err := createMacPackageInTempDir(osqueryVersion, tenant, hostname, pemKey)
+func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (string, error) {
+	macPackagePath, err := createMacPackageInTempDir(osqueryVersion, tenant, hostname, pemKey, macPackageSigningKey)
 	defer os.RemoveAll(filepath.Dir(macPackagePath))
 	if err != nil {
 		return "", errors.Wrap(err, "could not make macOS package")
@@ -157,14 +157,21 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 //     --identifier ${identifier} \
 //     --version ${packageVersion} \
 //     ${outputPath}
-func pkgbuild(packageRoot, scriptsRoot, identifier, version, outputPath string) error {
-	cmd := exec.Command("pkgbuild",
+func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKey, outputPath string) error {
+
+	args := []string{"pkgbuild",
 		"--root", packageRoot,
 		"--scripts", scriptsRoot,
 		"--identifier", identifier,
 		"--version", version,
-		outputPath,
-	)
+	}
+
+	if macPackageSigningKey != "" {
+		args = append(args, "--sign", macPackageSigningKey)
+	}
+
+	args = append(args, outputPath)
+	cmd := exec.Command(strings.Join(args, " "))
 	return cmd.Run()
 }
 
@@ -187,7 +194,7 @@ func grpcServerForHostname(hostname string) string {
 // version identifier, a munemo tenant identifier, and a key used to sign the
 // enrollment secret JWT token. The output path of the package is returned and
 // an error if the operation was not successful.
-func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, error) {
+func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte, macPackageSigningKey string) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -288,6 +295,7 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 		filepath.Join(Gopath(), "src/github.com/kolide/launcher/tools/packaging/macos/scripts"),
 		"com.kolide.launcher",
 		currentVersion,
+		macPackageSigningKey,
 		outputPath,
 	)
 	if err != nil {
