@@ -158,8 +158,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 //     --version ${packageVersion} \
 //     ${outputPath}
 func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKey, outputPath string) error {
-
-	args := []string{"pkgbuild",
+	args := []string{
 		"--root", packageRoot,
 		"--scripts", scriptsRoot,
 		"--identifier", identifier,
@@ -171,7 +170,7 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 	}
 
 	args = append(args, outputPath)
-	cmd := exec.Command(strings.Join(args, " "))
+	cmd := exec.Command("pkgbuild", args...)
 	return cmd.Run()
 }
 
