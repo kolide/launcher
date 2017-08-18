@@ -84,10 +84,10 @@ func createLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pe
 
 func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (string, error) {
 	macPackagePath, err := createMacPackageInTempDir(osqueryVersion, tenant, hostname, pemKey, macPackageSigningKey)
-	defer os.RemoveAll(filepath.Dir(macPackagePath))
 	if err != nil {
 		return "", errors.Wrap(err, "could not make macOS package")
 	}
+	defer os.RemoveAll(filepath.Dir(macPackagePath))
 
 	darwinRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "darwin")
 	if err := os.MkdirAll(darwinRoot, DirMode); err != nil {
@@ -317,7 +317,7 @@ func createLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname str
 	if err != nil {
 		return "", "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
-	//defer os.RemoveAll(packageRoot)
+	defer os.RemoveAll(packageRoot)
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
