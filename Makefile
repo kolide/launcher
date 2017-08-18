@@ -81,15 +81,20 @@ test: generate
 gcloud-login:
 	gcloud auth application-default login
 
-dev-packages: package-builder
-	gcloud config set project kolide-ose-testing
-	./build/package-builder dev --debug
-
-.check-prod-packages:
+.check-enrollment-secret-signing-key:
 ifndef ENROLLMENT_SECRET_SIGNING_KEY
 	$(error ENROLLMENT_SECRET_SIGNING_KEY is undefined, but required)
 endif
 
-prod-packages: .check-prod-packages package-builder
+.check-mac-package-signing-key:
+ifndef MAC_PACKAGE_SIGNING_KEY
+	$(error MAC_PACKAGE_SIGNING_KEY is undefined, but required)
+endif
+
+dev-packages: .check-mac-package-signing-key package-builder
+	gcloud config set project kolide-ose-testing
+	./build/package-builder dev --debug
+
+prod-packages: .check-mac-package-signing-key .check-enrollment-secret-signing-key package-builder
 	gcloud config set project kolide-website
-	./build/package-builder prod --debug --enrollment_secret_signing_key=$(ENROLLMENT_SECRET_SIGNING_KEY)
+	./build/package-builder prod --debug
