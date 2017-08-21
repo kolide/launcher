@@ -67,7 +67,7 @@ make package-builder
 gcloud config set project kolide-website
 ./build/package-builder prod --debug \
   --enrollment_secret_signing_key=./key.pem \
-	--mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
+  --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
 ```
 
 You can also use the `make` shortcut if you prefer:
