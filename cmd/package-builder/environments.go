@@ -232,7 +232,7 @@ func runProd(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	firstID, numberOfIDsToGenerate := 100001, 100
+	firstID, numberOfIDsToGenerate := 100001, 10
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
