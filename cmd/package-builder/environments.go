@@ -25,13 +25,18 @@ func runDev(args []string) error {
 		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
+			env.String("OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
 		flEnrollmentSecretSigningKeyPath = flagset.String(
 			"enrollment_secret_signing_key",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_ENROLLMENT_SECRET_SIGNING_KEY", ""),
+			env.String("ENROLLMENT_SECRET_SIGNING_KEY", ""),
 			"the path to the PEM key which is used to sign the enrollment secret JWT token",
+		)
+		flMacPackageSigningKey = flagset.String(
+			"mac_package_signing_key",
+			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
+			"the name of the key that should be used to sign mac packages",
 		)
 	)
 
@@ -72,8 +77,12 @@ func runDev(args []string) error {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
 
+	// TODO check that the signing key is installed if defined
+	macPackageSigningKey := *flMacPackageSigningKey
+	_ = macPackageSigningKey
+
 	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 445, 500
+	prToStartFrom, prToGenerateUntil := 465, 500
 	firstID, numberOfIDsToGenerate := 100001, 1
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
@@ -100,7 +109,7 @@ func runDev(args []string) error {
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.TenantName(id)
-			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
 			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
 			}
@@ -124,7 +133,7 @@ func runDev(args []string) error {
 
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.TenantName(id)
-			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
 			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
 			}
@@ -167,13 +176,18 @@ func runProd(args []string) error {
 		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_OSQUERY_VERSION", ""),
+			env.String("OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
 		flEnrollmentSecretSigningKeyPath = flagset.String(
 			"enrollment_secret_signing_key",
-			env.String("KOLIDE_LAUNCHER_PACKAGE_BUILDER_ENROLLMENT_SECRET_SIGNING_KEY", ""),
+			env.String("ENROLLMENT_SECRET_SIGNING_KEY", ""),
 			"the path to the PEM key which is used to sign the enrollment secret JWT token",
+		)
+		flMacPackageSigningKey = flagset.String(
+			"mac_package_signing_key",
+			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
+			"the name of the key that should be used to sign mac packages",
 		)
 	)
 
@@ -214,7 +228,11 @@ func runProd(args []string) error {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
 
-	firstID, numberOfIDsToGenerate := 100001, 100
+	// TODO check that the signing key is installed if defined
+	macPackageSigningKey := *flMacPackageSigningKey
+	_ = macPackageSigningKey
+
+	firstID, numberOfIDsToGenerate := 100001, 10
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
@@ -232,7 +250,7 @@ func runProd(args []string) error {
 		}
 		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
 			tenant := packaging.TenantName(id)
-			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+			paths, err := packaging.CreatePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
 			if err != nil {
 				return errors.Wrap(err, "could not generate package for tenant")
 			}
