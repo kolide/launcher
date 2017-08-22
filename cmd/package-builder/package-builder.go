@@ -50,6 +50,16 @@ func runMake(args []string) error {
 			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
 			"the name of the key that should be used to sign mac packages",
 		)
+		flInsecure = flagset.Bool(
+			"insecure",
+			env.Bool("INSECURE", false),
+			"whether or not the launcher packages should invoke the launcher's --insecure flag",
+		)
+		flInsecureGrpc = flagset.Bool(
+			"insecure_grpc",
+			env.Bool("INSECURE_GRPC", false),
+			"whether or not the launcher packages should invoke the launcher's --insecure_grpc flag",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -80,7 +90,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollmentSecret, macPackageSigningKey)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollmentSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}

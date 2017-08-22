@@ -22,8 +22,8 @@ type PackagePaths struct {
 	RPM   string
 }
 
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey)
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
@@ -219,7 +219,7 @@ func createKolideLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant stri
 
 }
 
-func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string) (string, error) {
+func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -290,12 +290,8 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	opts := &launchDaemonTemplateOptions{
 		KolideURL:     grpcServerForHostname(hostname),
 		RootDirectory: rootDirectory,
-	}
-	if hostname == "localhost:5000" {
-		opts.InsecureGrpc = true
-	}
-	if hostname == "localhost:8080" {
-		opts.Insecure = true
+		Insecure:      insecure,
+		InsecureGrpc:  insecureGrpc,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
