@@ -1,22 +1,5 @@
 #!/bin/bash
 
-for i in "$@"
-do
-case $i in
-    -h | --help)
-    usage
-    exit 0
-    ;;
-    --remove-db)
-    REMOVE_DATABASE=1
-    shift
-    ;;
-    *)
-    ;;
-esac
-done
-
-
 function usage() {
     echo "Clean launcher instances from your host"
     echo ""
@@ -72,5 +55,21 @@ function main() {
 
   echo "One launcher instance cleaned"
 }
+
+for i in "$@"
+do
+case $i in
+    -h | --help)
+    usage
+    exit 0
+    ;;
+    --remove-db)
+    REMOVE_DATABASE=1
+    shift
+    ;;
+    *)
+    ;;
+esac
+done
 
 main
