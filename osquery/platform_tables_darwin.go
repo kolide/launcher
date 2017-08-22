@@ -2,11 +2,14 @@
 
 package osquery
 
-import "github.com/kolide/osquery-go/plugin/table"
+import (
+	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/plugin/table"
+)
 
-func platformTables() []*table.Plugin {
+func platformTables(client *osquery.ExtensionManagerClient) []*table.Plugin {
 	return []*table.Plugin{
-		BestPractices(),
+		BestPractices(client),
 		Spotlight(),
 	}
 }

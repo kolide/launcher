@@ -381,8 +381,13 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		}
 	}
 
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create an extension client")
+	}
+
 	plugins := o.extensionPlugins
-	for _, t := range PlatformTables() {
+	for _, t := range PlatformTables(o.extensionManagerClient) {
 		plugins = append(plugins, t)
 	}
 	o.extensionManagerServer.RegisterPlugin(plugins...)
@@ -393,11 +398,6 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 			errChannel <- errors.Wrap(err, "the extension server died")
 		}
 	}()
-
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not create an extension client")
-	}
 
 	// Briefly sleep so that osqueryd has time to register all extensions
 	time.Sleep(2 * time.Second)

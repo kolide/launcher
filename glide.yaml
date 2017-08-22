@@ -21,7 +21,6 @@ import:
   - version
   - testutil
 - package: github.com/kolide/osquery-go
-  version: 5419715d060ff8c2e1b7f6ff5a8127ac2ce3fbdc
   subpackages:
   - plugin/config
   - plugin/distributed
