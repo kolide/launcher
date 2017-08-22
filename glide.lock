@@ -1,5 +1,5 @@
 hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
-updated: 2017-08-21T17:32:13.018986208-07:00
+updated: 2017-08-22T13:22:52.521141821-07:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -45,9 +45,10 @@ imports:
   - testutil
   - version
 - name: github.com/kolide/osquery-go
-  version: cef4aa6e047f55cb3188f398be767fb71c46da88
+  version: 3a5470e0f31babefb194e30b00ac0da35e14d064
   subpackages:
   - gen/osquery
+  - gen/osquery/mock
   - plugin/config
   - plugin/distributed
   - plugin/logger

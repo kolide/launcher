@@ -8,12 +8,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// simpleColumns is a map of the best practices columns that are "simple" to
-// generate. The keys are the columns names, and the values are the associated
-// queries. Any practice that can be defined by a query returning a single row
-// with an integer "1" for compliant, or "0" for non-compliant can be added to
-// this map and automatically included in the best practices table. This should
-// be treated as const.
+// bestPracticesSimpleColumns is a map of the best practices columns that are
+// "simple" to generate. The keys are the column names, and the values are the
+// associated queries. Any practice that can be defined by a query returning a
+// single row with an integer "1" for compliant, or "0" for non-compliant can
+// be added to this map and automatically included in the best practices table.
+// This should be treated as const.
 var bestPracticesSimpleColumns = map[string]string{
 	"sip_enabled":        "SELECT enabled AS compliant FROM sip_config WHERE config_flag='sip'",
 	"gatekeeper_enabled": "SELECT assessments_enabled AS compliant FROM gatekeeper",
