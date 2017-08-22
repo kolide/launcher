@@ -1,35 +1,54 @@
 package osquery
 
 import (
+	"context"
+	"math/rand"
 	"testing"
+	"time"
 
+	osquery_client "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/gen/osquery"
+	"github.com/kolide/osquery-go/gen/osquery/mock"
+	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBestPractices(t *testing.T) {
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	mock := &mock.ExtensionManager{}
+	client := &osquery_client.ExtensionManagerClient{Client: mock}
 
-	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
-	cancelFunc := falsifyOsArgs(rootDirectory)
-	defer cancelFunc()
+	rand.Seed(time.Now().Unix())
 
-	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
-	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
-	require.NoError(t, err)
+	// Generate random fake query values
+	expectedRow := map[string]string{}
+	queryValues := map[string]string{}
+	for col, query := range bestPracticesSimpleColumns {
+		val := "0"
+		if rand.Int()%2 == 0 {
+			val = "1"
+		}
+		expectedRow[col] = val
+		queryValues[query] = val
+	}
 
-	healthy, err := instance.Healthy()
-	require.NoError(t, err)
-	require.True(t, healthy)
+	mock.QueryFunc = func(sql string) (*osquery.ExtensionResponse, error) {
+		val, ok := queryValues[sql]
+		if !ok {
+			return &osquery.ExtensionResponse{
+				Status: &osquery.ExtensionStatus{Code: 1, Message: "unknown query"},
+			}, nil
+		}
+		return &osquery.ExtensionResponse{
+			Status:   &osquery.ExtensionStatus{Code: 0, Message: "OK"},
+			Response: []map[string]string{{"compliant": val}},
+		}, nil
+	}
 
-	results, err := instance.Query("select * from kolide_best_practices")
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	passwordRequiredFromScreensaver, ok := results[0]["password_required_from_screensaver"]
-	require.True(t, ok)
-	require.Equal(t, "true", passwordRequiredFromScreensaver)
-
-	require.NoError(t, instance.Kill())
+	generateFunc := generateBestPractices(client)
+	rows, err := generateFunc(context.Background(), table.QueryContext{})
+	require.Nil(t, err)
+	if assert.Equal(t, 1, len(rows)) {
+		assert.Equal(t, expectedRow, rows[0])
+	}
 }
