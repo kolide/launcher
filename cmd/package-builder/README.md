@@ -6,13 +6,36 @@ From the root of the repository, run the following:
 
 ```
 make deps
+make generate
 make package-builder
 ./build/package-builder --help
 ```
 
 ## General Usage
 
-### Logging in
+### Creating a set of packages
+
+```
+make package-builder
+./build/package-builder make --hostname=grpc.launcher.acme.biz:443 --secret=foobar123
+```
+
+If you'd like to customize the keys that are used to sign the enrollment secret and macOS package, consider the following usage:
+
+```
+make package-builder
+./build/package-builder make \
+  --hostname=localhost:8082 \
+	--secret=foobar123
+	--osquery_version=stable \
+	--mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
+```
+
+The macOS package will install a LaunchDaemon that will connect the launcher to the server specified by the `--hostname` flag, using an enrollment secret specified by the `--enrollment_secret` flag. The Linux packages will currently lay down the launcher and osquery binaries as well as the enrollment secret specified by the `--enrollment_secret` flag.
+
+## Kolide Usage
+
+### Authentication
 
 You must be authenticated to Kolide's GCloud organization for the various `package-builder` commands to work. To do this, you will need to install the GCloud tools. Documentation on using and installing these tools can be found [here](https://cloud.google.com/sdk/gcloud/).
 
@@ -28,9 +51,9 @@ You can also use the `make` shortcut if you prefer:
 make gcloud-login
 ```
 
-### Dev Packages
+### Development Packages
 
-To use the tool to generate development packages, run:
+To use the tool to generate internal development packages, run:
 
 ```
 make package-builder
@@ -47,16 +70,10 @@ If you'd like the resultant macOS packages to be signed, specify the name of the
 You can also use the `make` shortcut if you prefer:
 
 ```
-make dev-packages
-```
-
-or
-
-```
 MAC_PACKAGE_SIGNING_KEY="Developer ID Installer: Acme Inc (ABCDEF123456)" make dev-packages
 ```
 
-This command will build (macOS and Linux) packages for PRs, master, and localhost for the first tenant and upload them to the `gs://packaging/` bucket in the `kolide-ose-testing` GCloud project.
+This command will build (macOS and Linux) packages for PRs, master, and localhost for the first tenant and upload them to the appropriate bucket in the `kolide-ose-testing` GCloud project.
 
 ### Production Packages
 
@@ -78,4 +95,4 @@ ENROLLMENT_SECRET_SIGNING_KEY=/path/to/key.pem \
   make prod-packages
 ```
 
-This command will build (macOS and Linux) packages for production and upload them to the `gs://packaging/` bucket in the `kolide-website` GCloud project.
+This command will build (macOS and Linux) packages for production and upload them to the appropriate bucket in the `kolide-website` GCloud project.
