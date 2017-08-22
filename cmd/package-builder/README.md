@@ -6,7 +6,6 @@ From the root of the repository, run the following:
 
 ```
 make deps
-make generate
 make package-builder
 ./build/package-builder --help
 ```
