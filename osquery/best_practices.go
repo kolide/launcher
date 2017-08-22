@@ -4,64 +4,58 @@ import (
 	"context"
 	"fmt"
 
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
-const (
-	sipEnabled                 = "sip_enabled"
-	gatekeeperEnabled          = "gatekeeper_enabled"
-	filevaultEnabled           = "filevault_enabled"
-	firewallEnabled            = "firewall_enabled"
-	screensaverPasswordEnabled = "screensaver_password_enabled"
-)
+// simpleColumns is a map of the best practices columns that are "simple" to
+// generate. The keys are the columns names, and the values are the associated
+// queries. Any practice that can be defined by a query returning a single row
+// with an integer "1" for compliant, or "0" for non-compliant can be added to
+// this map and automatically included in the best practices table.
+func simpleColumns() map[string]string {
+	return map[string]string{
+		"sip_enabled":        "SELECT enabled AS compliant FROM sip_config WHERE config_flag='sip'",
+		"gatekeeper_enabled": "SELECT assessments_enabled AS compliant FROM gatekeeper",
+		"filevault_enabled":  "SELECT de.encrypted AS compliant FROM mounts m join disk_encryption de ON m.device_alias = de.name WHERE m.path = '/'",
+		"firewall_enabled":   "SELECT global_state AS compliant FROM alf",
+		// TODO account for possibility of multiple logged in
+		// users for screensaver password
+		"screensaver_password_enabled": "SELECT value AS compliant FROM preferences WHERE domain='com.apple.screensaver' AND key='askForPassword' AND username in (SELECT user FROM logged_in_users) LIMIT 1",
+		// Sharing prefs
+		"screen_sharing_disabled":      "SELECT screen_sharing = 0 AS compliant FROM sharing_preferences",
+		"file_sharing_disabled":        "SELECT file_sharing = 0 AS compliant FROM sharing_preferences",
+		"printer_sharing_disabled":     "SELECT printer_sharing = 0 AS compliant FROM sharing_preferences",
+		"remote_login_disabled":        "SELECT remote_login = 0 AS compliant FROM sharing_preferences",
+		"remote_management_disabled":   "SELECT remote_management = 0 AS compliant FROM sharing_preferences",
+		"remote_apple_events_disabled": "SELECT remote_apple_events = 0 AS compliant FROM sharing_preferences",
+		"internet_sharing_disabled":    "SELECT internet_sharing = 0 AS compliant FROM sharing_preferences",
+		"bluetooth_sharing_disabled":   "SELECT bluetooth_sharing = 0 AS compliant FROM sharing_preferences",
+		"disc_sharing_disabled":        "SELECT disc_sharing = 0 AS compliant FROM sharing_preferences",
+	}
+}
 
 func BestPractices(client *osquery.ExtensionManagerClient) *table.Plugin {
-	columns := []table.ColumnDefinition{
-		table.IntegerColumn(sipEnabled),
-		table.IntegerColumn(gatekeeperEnabled),
-		table.IntegerColumn(filevaultEnabled),
-		table.IntegerColumn(firewallEnabled),
-		table.IntegerColumn(screensaverPasswordEnabled),
+	columns := []table.ColumnDefinition{}
+	for col, _ := range simpleColumns() {
+		columns = append(columns, table.IntegerColumn(col))
 	}
+
 	return table.NewPlugin("kolide_best_practices", columns, generateBestPractices(client))
 }
 
 func generateBestPractices(client *osquery.ExtensionManagerClient) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		res := map[string]string{}
-
-		row, err := client.QueryRow("SELECT enabled AS enabled FROM sip_config WHERE config_flag='sip'")
-		if err != nil {
-			return nil, errors.Wrap(err, "query sip_config")
+		// Add all of the "simple" columns
+		for col, query := range simpleColumns() {
+			row, err := client.QueryRow(query)
+			if err != nil {
+				return nil, errors.Wrapf(err, "query %s", col)
+			}
+			res[col] = row["compliant"]
 		}
-		res[sipEnabled] = row["enabled"]
-
-		row, err = client.QueryRow("SELECT assessments_enabled AS enabled FROM gatekeeper")
-		if err != nil {
-			return nil, errors.Wrap(err, "query gatekeeper")
-		}
-		res[gatekeeperEnabled] = row["enabled"]
-
-		row, err = client.QueryRow("SELECT de.encrypted AS enabled FROM mounts m join disk_encryption de ON m.device_alias = de.name WHERE m.path = '/'")
-		if err != nil {
-			return nil, errors.Wrap(err, "query filevault")
-		}
-		res[filevaultEnabled] = row["enabled"]
-
-		row, err = client.QueryRow("SELECT global_state AS enabled FROM alf")
-		if err != nil {
-			return nil, errors.Wrap(err, "query firewall")
-		}
-		res[firewallEnabled] = row["enabled"]
-
-		// TODO account for possibility of multiple logged in users
-		row, err = client.QueryRow("SELECT value AS enabled FROM preferences WHERE domain='com.apple.screensaver' AND key='askForPassword' AND username in (SELECT user FROM logged_in_users) LIMIT 1")
-		if err != nil {
-			return nil, errors.Wrap(err, "query screensaver password")
-		}
-		res[screensaverPasswordEnabled] = row["enabled"]
 
 		fmt.Println(res) // TODO remove before merge
 		return []map[string]string{res}, nil
