@@ -62,10 +62,12 @@ xp-launcher: .pre-build
 package-builder: .pre-build xp-launcher xp-extension
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
-deps:
+.deps:
 	go get -u github.com/Masterminds/glide
 	go get -u github.com/jteeuwen/go-bindata/...
 	glide install
+
+deps: .deps generate
 
 INSECURE ?= false
 generate:
@@ -77,24 +79,3 @@ generate:
 
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
-
-gcloud-login:
-	gcloud auth application-default login
-
-.check-enrollment-secret-signing-key:
-ifndef ENROLLMENT_SECRET_SIGNING_KEY
-	$(error ENROLLMENT_SECRET_SIGNING_KEY is undefined, but required)
-endif
-
-.check-mac-package-signing-key:
-ifndef MAC_PACKAGE_SIGNING_KEY
-	$(error MAC_PACKAGE_SIGNING_KEY is undefined, but required)
-endif
-
-dev-packages: .check-mac-package-signing-key package-builder
-	gcloud config set project kolide-ose-testing
-	./build/package-builder dev --debug
-
-prod-packages: .check-mac-package-signing-key .check-enrollment-secret-signing-key package-builder
-	gcloud config set project kolide-website
-	./build/package-builder prod --debug
