@@ -22,40 +22,15 @@ type PackagePaths struct {
 	RPM   string
 }
 
+// CreatePackages will create a launcher macOS package. The output paths of the
+// packages are returned and an error if the operation was not successful.
 func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (*PackagePaths, error) {
 	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	/*
-		debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not generate linux packages")
-		}
-	*/
-
-	return &PackagePaths{
-		MacOS: macPkgDestinationPath,
-		/*
-			Deb:   debDestinationPath,
-			RPM:   rpmDestinationPath,
-		*/
-	}, nil
-}
-
-// CreateKolidePackages will create a launcher macOS package given an upload root
-// where the packages should be stores, a specific osquery version identifier,
-// a munemo tenant identifier, and a key used to sign the enrollment secret JWT
-// token. The output paths of the packages are returned and an error if the
-// operation was not successful.
-func CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createKolideMacPackage(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not generate macOS package")
-	}
-
-	debDestinationPath, rpmDestinationPath, err := createKolideLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey)
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -67,13 +42,7 @@ func CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant string, p
 	}, nil
 }
 
-// sanitizeHostname will replace any ":" characters in a given hostname with "-"
-// This is useful because ":" is not a valid character for file paths.
-func sanitizeHostname(hostname string) string {
-	return strings.Replace(hostname, ":", "-", -1)
-}
-
-func createLinuxPackages(osqueryVersion, hostname, secret string) (string, string, error) {
+func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc bool) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -139,7 +108,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string) (string, strin
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("", "packages_")
+	outputPathDir, err := ioutil.TempDir("/tmp", "packages_")
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not create final output directory for package")
 	}
@@ -186,37 +155,6 @@ func createLinuxPackages(osqueryVersion, hostname, secret string) (string, strin
 	}
 
 	return debOutputPath, rpmOutputPath, nil
-}
-
-func createKolideLinuxPackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte) (string, string, error) {
-	debPath, rpmPath, err := createKolideLinuxPackagesInTempDir(osqueryVersion, tenant, hostname, pemKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not make linux packages")
-	}
-	defer os.RemoveAll(filepath.Dir(debPath))
-	defer os.RemoveAll(filepath.Dir(rpmPath))
-
-	debRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "ubuntu")
-	if err := os.MkdirAll(debRoot, DirMode); err != nil {
-		return "", "", errors.Wrap(err, "could not create deb root")
-	}
-
-	rpmRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "centos")
-	if err := os.MkdirAll(rpmRoot, DirMode); err != nil {
-		return "", "", errors.Wrap(err, "could not create rpm root")
-	}
-
-	debDestinationPath := filepath.Join(debRoot, "launcher.deb")
-	if err = CopyFile(debPath, debDestinationPath); err != nil {
-		return "", "", errors.Wrap(err, "could not copy file to upload root")
-	}
-
-	rpmDestinationPath := filepath.Join(rpmRoot, "launcher.rpm")
-	if err = CopyFile(rpmPath, rpmDestinationPath); err != nil {
-		return "", "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return debDestinationPath, rpmDestinationPath, nil
-
 }
 
 func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (string, error) {
@@ -307,7 +245,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// represented, we can create the package
 	currentVersion := version.Version().Version
 
-	outputPathDir, err := ioutil.TempDir("", "packaging_")
+	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
 	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
@@ -326,25 +264,6 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	return outputPath, nil
-}
-
-func createKolideMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (string, error) {
-	macPackagePath, err := createKolideMacPackageInTempDir(osqueryVersion, tenant, hostname, pemKey, macPackageSigningKey)
-	if err != nil {
-		return "", errors.Wrap(err, "could not make macOS package")
-	}
-	defer os.RemoveAll(filepath.Dir(macPackagePath))
-
-	darwinRoot := filepath.Join(uploadRoot, sanitizeHostname(hostname), tenant, "darwin")
-	if err := os.MkdirAll(darwinRoot, DirMode); err != nil {
-		return "", errors.Wrap(err, "could not create darwin root")
-	}
-
-	destinationPath := filepath.Join(darwinRoot, "launcher.pkg")
-	if err = CopyFile(macPackagePath, destinationPath); err != nil {
-		return "", errors.Wrap(err, "could not copy file to upload root")
-	}
-	return destinationPath, nil
 }
 
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
@@ -442,243 +361,8 @@ func grpcServerForHostname(hostname string) string {
 	}
 }
 
-// createKolideMacPackageInTempDir will create a launcher macOS package given a specific osquery
-// version identifier, a munemo tenant identifier, and a key used to sign the
-// enrollment secret JWT token. The output path of the package is returned and
-// an error if the operation was not successful.
-func createKolideMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte, macPackageSigningKey string) (string, error) {
-	// first, we have to create a local temp directory on disk that we will use as
-	// a packaging root, but will delete once the generated package is created and
-	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "createKolideMacPackageInTempDir.packageRoot")
-	if err != nil {
-		return "", errors.Wrap(err, "unable to create temporary packaging root directory")
-	}
-	defer os.RemoveAll(packageRoot)
-
-	// a macOS package is basically the ability to lay an additive addition of
-	// files to the file system, as well as specify exeuctable scripts at certain
-	// points in the installation process (before install, after, etc.).
-
-	// Here, we must create the directory structure of our package.
-	// First, we create all of the directories that we will need:
-	rootDirectory := filepath.Join("/var/kolide", sanitizeHostname(hostname))
-	pathsToCreate := []string{
-		"/etc/kolide",
-		"/var/kolide",
-		rootDirectory,
-		"/var/log/kolide",
-		"/usr/local/kolide/bin",
-		"/Library/LaunchDaemons",
-	}
-	for _, pathToCreate := range pathsToCreate {
-		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
-		if err != nil {
-			return "", errors.Wrapf(err, "could not make directory %s/%s", packageRoot, pathToCreate)
-		}
-	}
-
-	// Next we create each file that gets laid down as a result of the package
-	// installation:
-
-	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
-	if err != nil {
-		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
-	}
-
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
-	if err != nil {
-		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
-	}
-
-	// The initial launcher (and extension) binary
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/darwin/launcher"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
-	)
-	if err != nil {
-		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
-	}
-
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/darwin/osquery-extension.ext"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
-	)
-	if err != nil {
-		return "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
-	}
-
-	// The LaunchDaemon which will connect the launcher to the cloud
-	launchDaemonFile, err := os.Create(filepath.Join(packageRoot, "/Library/LaunchDaemons/com.kolide.launcher.plist"))
-	if err != nil {
-		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
-	}
-	opts := &launchDaemonTemplateOptions{
-		KolideURL:     grpcServerForHostname(hostname),
-		RootDirectory: rootDirectory,
-	}
-	if hostname == "localhost:5000" {
-		opts.InsecureGrpc = true
-	}
-	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
-		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
-	}
-
-	// The secret which the user will use to authenticate to the cloud
-	secretString, err := enrollSecret(tenantIdentifier, pemKey)
-	if err != nil {
-		return "", errors.Wrap(err, "could not generate secret for tenant")
-	}
-	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secretString), FileMode)
-	if err != nil {
-		return "", errors.Wrap(err, "could not write secret string to file for packaging")
-	}
-
-	// Finally, now that the final directory structure of the package is
-	// represented, we can create the package
-	currentVersion := version.Version().Version
-
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", sanitizeHostname(hostname), tenantIdentifier))
-	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
-	if err != nil {
-		return "", errors.Wrap(err, "could not create final output directory for package")
-	}
-
-	err = pkgbuild(
-		packageRoot,
-		filepath.Join(Gopath(), "src/github.com/kolide/launcher/tools/packaging/macos/scripts"),
-		"com.kolide.launcher",
-		currentVersion,
-		macPackageSigningKey,
-		outputPath,
-	)
-	if err != nil {
-		return "", errors.Wrap(err, "could not create macOS package")
-	}
-
-	return outputPath, nil
-}
-
-// createKolideLinuxPackagesInTempDir will create a deb and rpm package given a specific osquery
-// version identifier, a munemo tenant identifier, and a key used to sign the
-// enrollment secret JWT token. The output path of the package is returned and
-// an error if the operation was not successful.
-func createKolideLinuxPackagesInTempDir(osqueryVersion, tenantIdentifier, hostname string, pemKey []byte) (string, string, error) {
-	// first, we have to create a local temp directory on disk that we will use as
-	// a packaging root, but will delete once the generated package is created and
-	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "createKolideLinuxPackagesInTempDir.packageRoot")
-	if err != nil {
-		return "", "", errors.Wrap(err, "unable to create temporary packaging root directory")
-	}
-	defer os.RemoveAll(packageRoot)
-
-	// Here, we must create the directory structure of our package.
-	// First, we create all of the directories that we will need:
-	pathsToCreate := []string{
-		"/etc/kolide",
-		"/var/kolide",
-		"/var/log/kolide",
-		"/usr/local/kolide/bin",
-	}
-	for _, pathToCreate := range pathsToCreate {
-		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
-		if err != nil {
-			return "", "", errors.Wrap(err, fmt.Sprintf("could not make directory %s/%s", packageRoot, pathToCreate))
-		}
-	}
-
-	// Next we create each file that gets laid down as a result of the package
-	// installation:
-
-	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "linux")
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
-	}
-
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
-	}
-
-	// The initial launcher (and extension) binary
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/linux/launcher"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
-	)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
-	}
-
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/linux/osquery-extension.ext"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
-	)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
-	}
-
-	// The secret which the user will use to authenticate to the cloud
-	secretString, err := enrollSecret(tenantIdentifier, pemKey)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not generate secret for tenant")
-	}
-	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secretString), FileMode)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
-	}
-
-	// Finally, now that the final directory structure of the package is
-	// represented, we can create the package
-	currentVersion := version.Version().Version
-
-	outputPathDir, err := ioutil.TempDir("/tmp", fmt.Sprintf("%s-%s-", sanitizeHostname(hostname), tenantIdentifier))
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not create final output directory for package")
-	}
-
-	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", currentVersion)
-	debOutputPath := filepath.Join(outputPathDir, debOutputFilename)
-
-	rpmOutputFilename := fmt.Sprintf("launcher-linux-%s.rpm", currentVersion)
-	rpmOutputPath := filepath.Join(outputPathDir, rpmOutputFilename)
-
-	// Create the packages
-	debCmd := exec.Command(
-		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"kolide/fpm",
-		"fpm",
-		"-s", "dir",
-		"-t", "deb",
-		"-n", "launcher",
-		"-v", currentVersion,
-		"-p", filepath.Join("/out", debOutputFilename),
-		"/pkgroot=/",
-	)
-	if err := debCmd.Run(); err != nil {
-		return "", "", errors.Wrap(err, "could not create deb package")
-	}
-
-	rpmCmd := exec.Command(
-		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"kolide/fpm",
-		"fpm",
-		"-s", "dir",
-		"-t", "rpm",
-		"-n", "launcher",
-		"-v", currentVersion,
-		"-p", filepath.Join("/out", rpmOutputFilename),
-		"/pkgroot=/",
-	)
-	if err := rpmCmd.Run(); err != nil {
-		return "", "", errors.Wrap(err, "could not create rpm package")
-	}
-
-	return debOutputPath, rpmOutputPath, nil
+// sanitizeHostname will replace any ":" characters in a given hostname with "-"
+// This is useful because ":" is not a valid character for file paths.
+func sanitizeHostname(hostname string) string {
+	return strings.Replace(hostname, ":", "-", -1)
 }
