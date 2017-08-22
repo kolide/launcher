@@ -104,8 +104,9 @@ func createMacPackage(uploadRoot, osqueryVersion, hostname, tenant string, pemKe
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	KolideURL    string
-	InsecureGrpc bool
+	KolideURL     string
+	RootDirectory string
+	InsecureGrpc  bool
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -120,7 +121,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <key>EnvironmentVariables</key>
         <dict>
             <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
-            <string>/var/kolide</string>
+            <string>{{.RootDirectory}}</string>
             <key>KOLIDE_LAUNCHER_KOLIDE_URL</key>
             <string>{{.KolideURL}}</string>
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
@@ -209,9 +210,11 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
+	rootDirectory := filepath.Join("/var/kolide", sanitizeHostname(hostname))
 	pathsToCreate := []string{
 		"/etc/kolide",
 		"/var/kolide",
+		rootDirectory,
 		"/var/log/kolide",
 		"/usr/local/kolide/bin",
 		"/Library/LaunchDaemons",
@@ -260,7 +263,8 @@ func createMacPackageInTempDir(osqueryVersion, tenantIdentifier, hostname string
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
 	opts := &launchDaemonTemplateOptions{
-		KolideURL: grpcServerForHostname(hostname),
+		KolideURL:     grpcServerForHostname(hostname),
+		RootDirectory: rootDirectory,
 	}
 	if hostname == "localhost:5000" {
 		opts.InsecureGrpc = true
