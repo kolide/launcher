@@ -242,6 +242,10 @@ func runDev(args []string) error {
 		"path", uploadRoot,
 	)
 
+	if err := packaging.SetGCPProject("kolide-ose-testing"); err != nil {
+		return errors.Wrap(err, "could not set GCP project")
+	}
+
 	if err := packaging.GsutilRsync(uploadRoot, "gs://kolide-ose-testing_packaging/"); err != nil {
 		return errors.Wrap(err, "could not upload files to GCS")
 	}
@@ -352,6 +356,10 @@ func runProd(args []string) error {
 				"hostname", hostname,
 			)
 		}
+	}
+
+	if err := packaging.SetGCPProject("kolide-website"); err != nil {
+		return errors.Wrap(err, "could not set GCP project")
 	}
 
 	if err := packaging.GsutilRsync(uploadRoot, "gs://kolide-website_packaging/"); err != nil {

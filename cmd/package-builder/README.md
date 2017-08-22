@@ -59,8 +59,6 @@ gcloud auth application-default login
 To use the tool to generate Kolide internal development packages, run:
 
 ```
-make package-builder
-gcloud config set project kolide-ose-testing
 ./build/package-builder dev --debug \
   --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
 ```
@@ -70,8 +68,6 @@ gcloud config set project kolide-ose-testing
 To use the tool to generate Kolide production packages, run:
 
 ```
-make package-builder
-gcloud config set project kolide-website
 ./build/package-builder prod --debug \
   --enrollment_secret_signing_key=/path/to/key.pem \
   --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
