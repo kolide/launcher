@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 countLaunchersQuery="select count(name) as launchers from launchd where name = 'com.kolide.launcher.plist';"
-launchersInstalled=`osqueryi "${countLaunchersQuery}" --line | awk {'print $3'}`
+launchersInstalled=`osqueryi "${countLaunchersQuery}" --line | awk '{print $3}'`
 
 if [[ $launchersInstalled -ne 1 ]]; then
   echo "Found $launchersInstalled running launcher instance, but was expecting 1"
