@@ -1,5 +1,5 @@
-hash: 5dddda7b3b4ac61a44a5559725f78c9cc213acd18761873e77454a999625edea
-updated: 2017-08-11T12:15:38.482531185-05:00
+hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
+updated: 2017-08-21T17:32:13.018986208-07:00
 imports:
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -14,7 +14,7 @@ imports:
   subpackages:
   - canonical/json
 - name: github.com/go-kit/kit
-  version: 19463ea8b215413a29c3513aa3a76181f4bac58d
+  version: f01651a61ac759c6b508539bddda24f63ea34bbb
   subpackages:
   - endpoint
   - log
@@ -25,7 +25,7 @@ imports:
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
-  version: 748d386b5c1ea99658fd69fe9f03991ce86a90c1
+  version: ab9f9a6dab164b7d1246e0e688b0ab7b94d8553e
   subpackages:
   - proto
   - ptypes
@@ -35,7 +35,7 @@ imports:
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/kolide/agent-api
-  version: 9de61790e3e57187ae0485ce38c7598d61bbe446
+  version: 7fa34da2e8903787c7a5a3a14fb91892680add1b
   repo: git@github.com:kolide/agent-api.git
 - name: github.com/kolide/kit
   version: 65836196b611159ee343be3cc9c856b2e5818276
@@ -45,7 +45,7 @@ imports:
   - testutil
   - version
 - name: github.com/kolide/osquery-go
-  version: 5419715d060ff8c2e1b7f6ff5a8127ac2ce3fbdc
+  version: cef4aa6e047f55cb3188f398be767fb71c46da88
   subpackages:
   - gen/osquery
   - plugin/config
@@ -59,18 +59,12 @@ imports:
   - tuf
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
-- name: github.com/kr/pretty
-  version: cfb55aafdaf3ec08f0db22699ab822c50091b1c4
-- name: github.com/kr/text
-  version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/mixer/clock
-  version: ac3776ffbf764bc40bda24e84184146865d0a46d
+  version: 3bbc1709cc6e4624b68eb52152cb9add5433c05a
 - name: github.com/pkg/errors
-  version: 645ef00459ed84a119197bfb8d8205042c6df63d
-- name: github.com/y0ssar1an/q
-  version: 74ed9d9525c7e0a8f3c031c8d399f25bd6e09c30
+  version: c605e284fe17294bda444b34710735b29d1a9d90
 - name: golang.org/x/net
-  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
+  version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
   - http2
@@ -80,11 +74,11 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 396c9fc8fb0ce27fc7a1ff136dc5af797bba258a
+  version: 07c182904dbd53199946ba614a412c61d3c548f5
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
+  version: e56139fd9c5bc7244c76116c68e500765bb6db6b
   subpackages:
   - secure/bidirule
   - transform
@@ -95,15 +89,16 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/genproto
-  version: 09f6ed296fc66555a25fe4ce95173148778dfa85
+  version: ee236bd376b077c7a89f260c026c4735b195e459
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: fa1cb32dc4f81e23ab862dd5e7ac4f2920a33088
+  version: 2308131c44e408bb7a4da392ed6849a0afe85b2f
   subpackages:
   - codes
+  - connectivity
   - credentials
-  - grpclb/grpc_lb_v1
+  - grpclb/messages_only/grpc_lb_v1
   - grpclog
   - internal
   - keepalive
@@ -116,7 +111,7 @@ imports:
   - transport
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
@@ -124,7 +119,7 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
+  version: 890a5c3458b43e6104ff5da8dfa139d013d77544
   subpackages:
   - assert
   - require
