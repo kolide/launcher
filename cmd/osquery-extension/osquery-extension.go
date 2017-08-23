@@ -14,7 +14,7 @@ func main() {
 	flag.Bool("verbose", false, "")
 	flag.Parse()
 
-	fmt.Printf("%+v", os.Args)
+	fmt.Fprintf(os.Stderr, "%+v", os.Args)
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
