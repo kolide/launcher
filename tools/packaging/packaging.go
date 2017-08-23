@@ -226,10 +226,10 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
 	opts := &launchDaemonTemplateOptions{
-		KolideURL:     grpcServerForHostname(hostname),
-		RootDirectory: rootDirectory,
-		Insecure:      insecure,
-		InsecureGrpc:  insecureGrpc,
+		ServerHostname: grpcServerForHostname(hostname),
+		RootDirectory:  rootDirectory,
+		Insecure:       insecure,
+		InsecureGrpc:   insecureGrpc,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
@@ -269,10 +269,10 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	KolideURL     string
-	RootDirectory string
-	InsecureGrpc  bool
-	Insecure      bool
+	ServerHostname string
+	RootDirectory  string
+	InsecureGrpc   bool
+	Insecure       bool
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -288,8 +288,8 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <dict>
             <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
             <string>{{.RootDirectory}}</string>
-            <key>KOLIDE_LAUNCHER_KOLIDE_URL</key>
-            <string>{{.KolideURL}}</string>
+            <key>KOLIDE_LAUNCHER_HOSTNAME</key>
+            <string>{{.ServerHostname}}</string>
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
             <string>/etc/kolide/secret</string>
         </dict>

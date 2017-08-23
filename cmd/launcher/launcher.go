@@ -97,9 +97,9 @@ func parseOptions() (*options, error) {
 			"The URL of the notary update server",
 		)
 		flKolideServerURL = flag.String(
-			"kolide_url",
-			env.String("KOLIDE_LAUNCHER_KOLIDE_URL", ""),
-			"URL of the Kolide server to communicate with",
+			"hostname",
+			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
+			"Hostname of the Kolide server to communicate with",
 		)
 		flEnrollSecret = flag.String(
 			"enroll_secret",
