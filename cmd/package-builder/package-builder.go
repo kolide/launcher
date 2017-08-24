@@ -40,9 +40,9 @@ func runMake(args []string) error {
 			env.String("OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
-		flEnrollmentSecret = flagset.String(
-			"enrollment_secret",
-			env.String("ENROLLMENT_SECRET_SIGNING_KEY", ""),
+		flEnrollSecret = flagset.String(
+			"enroll_secret",
+			env.String("ENROLL_SECRET", ""),
 			"the string to be used as the server enrollment secret",
 		)
 		flMacPackageSigningKey = flagset.String(
@@ -90,7 +90,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollmentSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
@@ -117,9 +117,9 @@ func runDev(args []string) error {
 			env.String("OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
-		flEnrollmentSecretSigningKeyPath = flagset.String(
-			"enrollment_secret_signing_key",
-			env.String("ENROLLMENT_SECRET_SIGNING_KEY", ""),
+		flEnrollSecretSigningKeyPath = flagset.String(
+			"enroll_secret_signing_key",
+			env.String("enroll_secret_signing_key", ""),
 			"the path to the PEM key which is used to sign the enrollment secret JWT token",
 		)
 		flMacPackageSigningKey = flagset.String(
@@ -149,19 +149,19 @@ func runDev(args []string) error {
 		osqueryVersion = "stable"
 	}
 
-	enrollmentSecretSigningKeyPath := *flEnrollmentSecretSigningKeyPath
-	if enrollmentSecretSigningKeyPath == "" {
-		enrollmentSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
+	enrollSecretSigningKeyPath := *flEnrollSecretSigningKeyPath
+	if enrollSecretSigningKeyPath == "" {
+		enrollSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
 	}
 
-	if _, err := os.Stat(enrollmentSecretSigningKeyPath); err != nil {
+	if _, err := os.Stat(enrollSecretSigningKeyPath); err != nil {
 		if os.IsNotExist(err) {
 			return errors.Wrap(err, "key file doesn't exist")
 		} else {
 			return errors.Wrap(err, "could not stat key file")
 		}
 	}
-	pemKey, err := ioutil.ReadFile(enrollmentSecretSigningKeyPath)
+	pemKey, err := ioutil.ReadFile(enrollSecretSigningKeyPath)
 	if err != nil {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
@@ -272,9 +272,9 @@ func runProd(args []string) error {
 			env.String("OSQUERY_VERSION", ""),
 			"the osquery version to include in the resultant packages",
 		)
-		flEnrollmentSecretSigningKeyPath = flagset.String(
-			"enrollment_secret_signing_key",
-			env.String("ENROLLMENT_SECRET_SIGNING_KEY", ""),
+		flEnrollSecretSigningKeyPath = flagset.String(
+			"enroll_secret_signing_key",
+			env.String("enroll_secret_signing_key", ""),
 			"the path to the PEM key which is used to sign the enrollment secret JWT token",
 		)
 		flMacPackageSigningKey = flagset.String(
@@ -304,19 +304,19 @@ func runProd(args []string) error {
 		osqueryVersion = "stable"
 	}
 
-	enrollmentSecretSigningKeyPath := *flEnrollmentSecretSigningKeyPath
-	if enrollmentSecretSigningKeyPath == "" {
-		enrollmentSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
+	enrollSecretSigningKeyPath := *flEnrollSecretSigningKeyPath
+	if enrollSecretSigningKeyPath == "" {
+		enrollSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
 	}
 
-	if _, err := os.Stat(enrollmentSecretSigningKeyPath); err != nil {
+	if _, err := os.Stat(enrollSecretSigningKeyPath); err != nil {
 		if os.IsNotExist(err) {
 			return errors.Wrap(err, "key file doesn't exist")
 		} else {
 			return errors.Wrap(err, "could not stat key file")
 		}
 	}
-	pemKey, err := ioutil.ReadFile(enrollmentSecretSigningKeyPath)
+	pemKey, err := ioutil.ReadFile(enrollSecretSigningKeyPath)
 	if err != nil {
 		return errors.Wrap(err, "could not read the supplied key file")
 	}
