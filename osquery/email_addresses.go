@@ -19,12 +19,16 @@ func generateEmailAddresses(client *osquery.ExtensionManagerClient) table.Genera
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return []map[string]string{
 			map[string]string{
-				"email":  "mike@kolide.co",
+				"email":  "jason@kolide.co",
 				"domain": "kolide.co",
 			},
 			map[string]string{
-				"email":  "mike@arpaia.co",
-				"domain": "arpaia.co",
+				"email":  "jason@kolide.com",
+				"domain": "kolide.com",
+			},
+			map[string]string{
+				"email":  "jason.meller@gmail.com",
+				"domain": "gmail.com",
 			},
 		}, nil
 	}
