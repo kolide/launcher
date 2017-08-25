@@ -171,7 +171,7 @@ func runDev(args []string) error {
 	_ = macPackageSigningKey
 
 	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 465, 500
+	prToStartFrom, prToGenerateUntil := 400, 600
 	firstID, numberOfIDsToGenerate := 100001, 1
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
