@@ -46,6 +46,10 @@ build: launcher extension
 extension: .pre-build
 	go build -i -o build/osquery-extension.ext ./cmd/osquery-extension/
 
+osqueryi: .pre-build
+	go build -i -o build/development-extension.ext ./cmd/development-extension/
+	osqueryi --extension=./build/development-extension.ext
+
 xp-extension: .pre-build
 	GOOS=darwin go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
