@@ -8,13 +8,12 @@ $ make osqueryi
 go build -i -o build/development-extension.ext ./cmd/development-extension/
 osqueryi --extension=./build/development-extension.ext
 Using a virtual database. Need help, type '.help'
-osquery> select * from personal_artifacts;
-+-------+----------------+
-| type  | value          |
-+-------+----------------+
-| email | mike@kolide.co |
-| email | mike@arpaia.co |
-+-------+----------------+
+osquery> select * from email_addresses where domain = "kolide.co";
++----------------+-----------+
+| email          | domain    |
++----------------+-----------+
+| mike@kolide.co | kolide.co |
++----------------+-----------+
 osquery>
 ```
 
