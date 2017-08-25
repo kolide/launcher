@@ -99,17 +99,17 @@ func parseOptions() (*options, error) {
 		flKolideServerURL = flag.String(
 			"hostname",
 			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
-			"Hostname of the Kolide server to communicate with",
+			"Hostname of the remote server to communicate with",
 		)
 		flEnrollSecret = flag.String(
 			"enroll_secret",
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
-			"Enroll secret to authenticate with the Kolide server",
+			"The enrollment secret used to authenticate with the server",
 		)
 		flEnrollSecretPath = flag.String(
 			"enroll_secret_path",
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
-			"Path to a file containing the enroll secret to authenticate with the Kolide server",
+			"Path to a file containing the enrollment secret",
 		)
 		flMirrorURL = flag.String(
 			"mirror_url",

@@ -22,21 +22,20 @@ func main() {
 
 	server, err := osquery.NewExtensionManagerServer("dev_extension", *flSocket)
 	if err != nil {
-		log.Fatalf("Error creating extension: %s\n", err)
+		log.Fatalf("Error creating osquery extension server: %s\n", err)
 	}
 
 	client, err := osquery.NewClient(*flSocket, 3*time.Second)
 	if err != nil {
-		log.Fatalf("Error creating osquery client: %s\n", err)
+		log.Fatalf("Error creating osquery extension client: %s\n", err)
 	}
 
 	plugins := []osquery.OsqueryPlugin{}
 	for _, tablePlugin := range launcher.PlatformTables(client) {
 		plugins = append(plugins, tablePlugin)
 	}
-	server.RegisterPlugin(
-		plugins...,
-	)
+	server.RegisterPlugin(plugins...)
+
 	if err := server.Run(); err != nil {
 		log.Fatal(err)
 	}
