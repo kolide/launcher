@@ -12,7 +12,7 @@ func EmailAddresses(client *osquery.ExtensionManagerClient) *table.Plugin {
 		table.TextColumn("email"),
 		table.TextColumn("domain"),
 	}
-	return table.NewPlugin("email_addresses", columns, generateEmailAddresses(client))
+	return table.NewPlugin("kolide_email_addresses", columns, generateEmailAddresses(client))
 }
 
 func generateEmailAddresses(client *osquery.ExtensionManagerClient) table.GenerateFunc {
