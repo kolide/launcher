@@ -10,7 +10,7 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient) []*table.Plugin {
 	return []*table.Plugin{
 		BestPractices(client),
-		PersonalArtifacts(),
+		EmailAddresses(),
 		Spotlight(),
 	}
 }
