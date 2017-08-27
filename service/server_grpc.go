@@ -1,0 +1,104 @@
+package service
+
+import (
+	"github.com/go-kit/kit/log"
+	grpctransport "github.com/go-kit/kit/transport/grpc"
+	pb "github.com/kolide/agent-api"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+)
+
+func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
+	options := []grpctransport.ServerOption{
+		grpctransport.ServerErrorLogger(logger),
+	}
+	return &grpcServer{
+		enrollment: grpctransport.NewServer(
+			endpoints.RequestEnrollmentEndpoint,
+			decodeGRPCEnrollmentRequest,
+			encodeGRPCEnrollmentResponse,
+			options...,
+		),
+		config: grpctransport.NewServer(
+			endpoints.RequestConfigEndpoint,
+			decodeGRPCAgentAPIRequest,
+			encodeGRPCConfigResponse,
+			options...,
+		),
+		queries: grpctransport.NewServer(
+			endpoints.RequestQueriesEndpoint,
+			decodeGRPCAgentAPIRequest,
+			encodeGRPCQueryCollection,
+			options...,
+		),
+		logs: grpctransport.NewServer(
+			endpoints.PublishLogsEndpoint,
+			decodeGRPCLogCollection,
+			encodeGRPCAgentAPIResponse,
+			options...,
+		),
+		results: grpctransport.NewServer(
+			endpoints.PublishLogsEndpoint,
+			decodeGRPCResultCollection,
+			encodeGRPCAgentAPIResponse,
+			options...,
+		),
+	}
+
+}
+
+type grpcServer struct {
+	enrollment grpctransport.Handler
+	config     grpctransport.Handler
+	queries    grpctransport.Handler
+	logs       grpctransport.Handler
+	results    grpctransport.Handler
+}
+
+func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
+	_, rep, err := s.enrollment.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "request enrollment")
+	}
+	return rep.(*pb.EnrollmentResponse), nil
+}
+
+func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest) (*pb.ConfigResponse, error) {
+	_, rep, err := s.config.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "request config")
+	}
+	return rep.(*pb.ConfigResponse), nil
+}
+
+func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
+	_, rep, err := s.queries.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "request queries")
+	}
+	return rep.(*pb.QueryCollection), nil
+}
+
+func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*pb.AgentApiResponse, error) {
+	_, rep, err := s.logs.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "publish logs")
+	}
+	return rep.(*pb.AgentApiResponse), nil
+}
+
+func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollection) (*pb.AgentApiResponse, error) {
+	_, rep, err := s.results.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "publish results")
+	}
+	return rep.(*pb.AgentApiResponse), nil
+}
+
+func (s *grpcServer) HotConfigure(*pb.AgentApiRequest, pb.Api_HotConfigureServer) error {
+	panic("not implemented")
+}
+
+func (s *grpcServer) HotlineBling(pb.Api_HotlineBlingServer) error {
+	panic("not implemented")
+}
