@@ -1,16 +1,32 @@
 package service
 
 import (
+	stdctx "context"
+
 	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	pb "github.com/kolide/agent-api"
+	"github.com/kolide/launcher/service/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/metadata"
 )
+
+func parseUUID() grpctransport.ServerOption {
+	return grpctransport.ServerBefore(
+		func(ctx stdctx.Context, md metadata.MD) stdctx.Context {
+			if hdr, ok := md["uuid"]; ok {
+				ctx = uuid.NewContext(ctx, hdr[len(hdr)-1])
+			}
+			return ctx
+		},
+	)
+}
 
 func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 	options := []grpctransport.ServerOption{
 		grpctransport.ServerErrorLogger(logger),
+		parseUUID(),
 	}
 	return &grpcServer{
 		enrollment: grpctransport.NewServer(
@@ -38,7 +54,7 @@ func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 			options...,
 		),
 		results: grpctransport.NewServer(
-			endpoints.PublishLogsEndpoint,
+			endpoints.PublishResultsEndpoint,
 			decodeGRPCResultCollection,
 			encodeGRPCAgentAPIResponse,
 			options...,
