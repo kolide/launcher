@@ -122,6 +122,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--config_refresh=10",
 		"--host_identifier=uuid",
 		"--force=true",
+		"--disable_watchdog",
 	)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
