@@ -79,7 +79,7 @@ func findChromeStateFiles() []string {
 	chromeLocalStateFiles := []string{}
 	filesInUser, err := ioutil.ReadDir("/Users")
 	if err != nil {
-		panic(err)
+		return []string{}
 	}
 	for _, f := range filesInUser {
 		if f.IsDir() && (f.Name() != "Guest" || f.Name() != "Shared") {
