@@ -15,7 +15,7 @@ import (
 // CreateKolidePackages will create a launcher macOS package. The output paths
 // of the packages are returned and an error if the operation was not successful.
 func CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant string, pemKey []byte, macPackageSigningKey string) (*PackagePaths, error) {
-	secret, err := enrollSecret(tenant, pemKey)
+	secret, err := EnrollSecret(tenant, pemKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create enrollment secret")
 	}
@@ -84,9 +84,9 @@ func TenantName(id int) string {
 	return m.string()
 }
 
-// enrollSecret will generate an enrollment secret for a tenant given a valid
+// EnrollSecret will generate an enrollment secret for a tenant given a valid
 // signing key
-func enrollSecret(tenantName string, pemKey []byte) (string, error) {
+func EnrollSecret(tenantName string, pemKey []byte) (string, error) {
 	fingerPrint := fmt.Sprintf("% x", md5.Sum([]byte(pemKey)))
 	fingerPrint = strings.Replace(fingerPrint, " ", ":", 15)
 

@@ -22,6 +22,46 @@ func runVersion(args []string) error {
 	return nil
 }
 
+func runEnrollSecret(args []string) error {
+	flagset := flag.NewFlagSet("enroll-secret", flag.ExitOnError)
+	var (
+		flTenant = flagset.String(
+			"tenant",
+			env.String("TENANT", ""),
+			"the tenant name to generate a secret for (example: dababi)",
+		)
+		flEnrollSecretSigningKeyPath = flagset.String(
+			"enroll_secret_signing_key",
+			env.String("ENROLL_SECRET_SIGNING_KEY", ""),
+			"the path to the PEM key which is used to sign the enrollment secret JWT token",
+		)
+	)
+
+	flagset.Usage = usageFor(flagset, "package-builder enroll-secret [flags]")
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
+
+	enrollSecretSigningKeyPath := *flEnrollSecretSigningKeyPath
+	if enrollSecretSigningKeyPath == "" {
+		enrollSecretSigningKeyPath = filepath.Join(packaging.LauncherSource(), "/tools/packaging/example_rsa.pem")
+	}
+
+	pemKey, err := ioutil.ReadFile(enrollSecretSigningKeyPath)
+	if err != nil {
+		return errors.Wrap(err, "could not read the supplied key file")
+	}
+
+	token, err := packaging.EnrollSecret(*flTenant, pemKey)
+	if err != nil {
+		return errors.Wrap(err, "could not generate secret")
+	}
+
+	fmt.Println(token)
+
+	return nil
+}
+
 func runMake(args []string) error {
 	flagset := flag.NewFlagSet("macos", flag.ExitOnError)
 	var (
@@ -421,6 +461,8 @@ func main() {
 		run = runDev
 	case "prod":
 		run = runProd
+	case "enroll-secret":
+		run = runEnrollSecret
 	default:
 		usage()
 		os.Exit(1)
