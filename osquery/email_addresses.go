@@ -32,7 +32,7 @@ func generateEmailAddresses(client *osquery.ExtensionManagerClient) table.Genera
 			for _, stateFilePath := range findChromeStateFiles() {
 				fileContent, err := ioutil.ReadFile(stateFilePath)
 				if err != nil {
-					return nil, errors.Wrap(err, "could not read file")
+					return nil, errors.Wrapf(err, "could not read file %s", stateFilePath)
 				}
 
 				var parsedStateFileContent chromeLocalStateFile
