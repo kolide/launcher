@@ -117,3 +117,75 @@ func (e KolideClient) PublishResults(ctx context.Context, nodeKey string, result
 	resp := response.(agentAPIResponse)
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
+
+func makeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(enrollmentRequest)
+		nodeKey, valid, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier)
+		return enrollmentResponse{
+			NodeKey:     nodeKey,
+			NodeInvalid: valid,
+			Err:         err,
+		}, nil
+	}
+}
+
+func makeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(agentAPIRequest)
+		config, valid, err := svc.RequestConfig(ctx, req.NodeKey)
+		return configResponse{
+			ConfigJSONBlob: config,
+			NodeInvalid:    valid,
+			Err:            err,
+		}, nil
+	}
+}
+
+func makePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(logCollection)
+		message, errcode, valid, err := svc.PublishLogs(ctx, req.NodeKey, req.LogType, req.Logs)
+		return agentAPIResponse{
+			Message:     message,
+			ErrorCode:   errcode,
+			NodeInvalid: valid,
+			Err:         err,
+		}, nil
+	}
+}
+
+func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(agentAPIRequest)
+		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
+		return queryCollection{
+			Queries:     *result,
+			NodeInvalid: valid,
+			Err:         err,
+		}, nil
+	}
+}
+
+func makePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(resultCollection)
+		message, errcode, valid, err := svc.PublishResults(ctx, req.NodeKey, req.Results)
+		return agentAPIResponse{
+			Message:     message,
+			ErrorCode:   errcode,
+			NodeInvalid: valid,
+			Err:         err,
+		}, nil
+	}
+}
+
+func MakeServerEndpoints(svc KolideService) KolideClient {
+	return KolideClient{
+		RequestEnrollmentEndpoint: makeRequestEnrollmentEndpoint(svc),
+		RequestConfigEndpoint:     makeRequestConfigEndpoint(svc),
+		PublishLogsEndpoint:       makePublishLogsEndpoint(svc),
+		RequestQueriesEndpoint:    makeRequestQueriesEndpoint(svc),
+		PublishResultsEndpoint:    makePublishResultsEndpoint(svc),
+	}
+}

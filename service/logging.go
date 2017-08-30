@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/logger"
 )
 
-func loggingMiddleware(logger log.Logger) func(KolideService) KolideService {
+func LoggingMiddleware(logger log.Logger) func(KolideService) KolideService {
 	return func(next KolideService) KolideService {
 		return logmw{logger, next}
 	}
