@@ -53,6 +53,21 @@ To authenticate to GCloud, use the following:
 ```
 gcloud auth application-default login
 ```
+#### Notary Setup
+Notary Client must be properly installed and **be in your search path** in order to publish binaries. Notary Client can be found [here](https://github.com/docker/notary).  Prepare
+Notary Client as follows.
+```
+git clone ssh://git@github.com/docker/notary.git
+cd notary
+make client
+```
+Download `notary.zip` from Kolide 1Password and extract it into your home directory.
+```
+mv notary.zip ~/.
+cd
+unzip notary.zip
+sudo echo '35.196.246.167 notary.kolide.com' >> /etc/hosts
+```
 
 ### Development Packages
 
@@ -69,6 +84,46 @@ To use the tool to generate Kolide production packages, run:
 
 ```
 ./build/package-builder prod --debug \
-  --enroll_secret_signing_key=/path/to/key.pem \
+  --enrollment_secret_signing_key=/path/to/key.pem \
   --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
+```
+
+### Mirror Command
+
+Osquery and Launcher binaries must be available on a remote mirror so the autoupdate can download them. The binaries also need to be available when building a new platform specific package.
+Binaries are packaged in a tarball in the format `<binary-name>-<update-channel or version>.tar.gz`
+Example:
+    ```
+    osqueryd-stable.tar.gz
+    osqueryd-2.6.0.tar.gz
+    ```
+The tarballs are stored in the `gs://binaries-for-launcher` GCS bucket, and exposed at the `https://dl.kolide.com/kolide/<binary>/<platform>/<tarball>` url in the `kolide-website` GCP project.
+
+The `mirror` subcommand may be used to produce tar archives for both Launcher and Osquery, upload them
+to the mirror site, and register them with Notary so that they can be validated as part of the Launcher autoupdate process.  In order to publish releases to Notary using the mirror command the following environment variables should be defined using passwords for respective Notary keys.
+```
+NOTARY_SNAPSHOT_PASSPHRASE=<snapshot secret>
+NOTARY_TARGETS_PASSPHRASE=<targets secret>
+```
+The default `mirror` flag is `-all` which will perform all the steps needed to release new binaries. If `-all=false` individual subcommands can be used to perform a subset of these operations.  For example, you could choose to publish changes for Osquery or only create tarballs for Launcher.  The following commands would download and
+publish the latest version of Osquery, and would publish version 1.2 of Launcher to the `stable` channel for the `darwin` platform.
+```
+$ git tag 1.2
+$ gcloud config set project kolide-website
+$ make package-builder
+$ build/package-builder mirror
+```
+Verify packages were registered with Notary.
+```
+$ notary list kolide/launcher
+
+NAME                             DIGEST                                                              SIZE (BYTES)    ROLE
+----                             ------                                                              ------------    ----
+darwin/launcher-1.2.tar.gz       7504970563e879344ae7a4264e3e13d72dfdb7acab155be18d4971252755326e    4805095         targets
+darwin/launcher-stable.tar.gz    7504970563e879344ae7a4264e3e13d72dfdb7acab155be18d4971252755326e    4805095         targets
+```
+Help is available from the command line.
+
+```
+$ build/package-builder mirror -help
 ```

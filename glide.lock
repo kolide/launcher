@@ -1,6 +1,16 @@
 hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
 updated: 2017-08-28T14:46:19.464289248-06:00
 imports:
+- name: cloud.google.com/go
+  version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
+  subpackages:
+  - '...'
+  - compute/metadata
+  - iam
+  - internal
+  - internal/optional
+  - internal/version
+  - storage
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
   subpackages:
@@ -28,12 +38,17 @@ imports:
   version: ab9f9a6dab164b7d1246e0e688b0ab7b94d8553e
   subpackages:
   - proto
+  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
+- name: github.com/googleapis/gax-go
+  version: 84ed26760e7f6f80887a2fbfb50db3cc415d2cea
+- name: github.com/groob/goxar
+  version: 908d7dee5b14b7157e77d16fef6fa7e33fbcb3d7
 - name: github.com/kolide/agent-api
   version: 7fa34da2e8903787c7a5a3a14fb91892680add1b
   repo: git@github.com:kolide/agent-api.git
@@ -63,17 +78,36 @@ imports:
 - name: github.com/mixer/clock
   version: 3bbc1709cc6e4624b68eb52152cb9add5433c05a
 - name: github.com/pkg/errors
-  version: c605e284fe17294bda444b34710735b29d1a9d90
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: golang.org/x/crypto
+  version: bc89c496413265e715159bdc8478ee9a92fdc265
+  subpackages:
+  - cast5
+  - openpgp
+  - openpgp/armor
+  - openpgp/clearsign
+  - openpgp/elgamal
+  - openpgp/errors
+  - openpgp/packet
+  - openpgp/s2k
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
   - context
+  - context/ctxhttp
   - http2
   - http2/hpack
   - idna
   - internal/timeseries
   - lex/httplex
   - trace
+- name: golang.org/x/oauth2
+  version: 9a379c6b3e95a790ffc43293c2a78dee0d7b6e20
+  subpackages:
+  - google
+  - internal
+  - jws
+  - jwt
 - name: golang.org/x/sys
   version: 07c182904dbd53199946ba614a412c61d3c548f5
   subpackages:
@@ -89,9 +123,35 @@ imports:
   version: 8be79e1e0910c292df4e79c241bb7e8f7e725959
   subpackages:
   - rate
+- name: google.golang.org/api
+  version: dd6bdadc5852eae2d133075a3690d6ad744add48
+  subpackages:
+  - gensupport
+  - googleapi
+  - googleapi/internal/uritemplates
+  - googleapi/transport
+  - internal
+  - iterator
+  - option
+  - storage/v1
+  - transport/http
+- name: google.golang.org/appengine
+  version: d9a072cfa7b9736e44311ef77b3e09d804bfa599
+  subpackages:
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+  - internal/urlfetch
+  - urlfetch
 - name: google.golang.org/genproto
   version: ee236bd376b077c7a89f260c026c4735b195e459
   subpackages:
+  - googleapis/api/annotations
+  - googleapis/iam/v1
   - googleapis/rpc/status
 - name: google.golang.org/grpc
   version: 2308131c44e408bb7a4da392ed6849a0afe85b2f
@@ -110,6 +170,19 @@ imports:
   - status
   - tap
   - transport
+- name: pault.ag/go/debian
+  version: 247d411992777dbb91b2ff8cf344824d08ed4b7d
+  subpackages:
+  - control
+  - deb
+  - dependency
+  - internal
+  - transput
+  - version
+- name: pault.ag/go/topsort
+  version: f98d2ad46e1adcbf8fa59a95a3b5509a7da9c6b5
+- name: xi2.org/x/xz
+  version: 19aeb13c4e7cb6bd3188dfede73840f33455425a
 testImports:
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9

@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/tools/packaging"
+	"github.com/kolide/launcher/tools/packaging/mirror"
 	"github.com/pkg/errors"
 )
 
@@ -140,6 +141,112 @@ func runMake(args []string) error {
 		"rpm", paths.RPM,
 		"mac", paths.MacOS,
 	)
+
+	return nil
+}
+
+func runMirror(args []string) error {
+	flagset := flag.NewFlagSet("mirror", flag.ExitOnError)
+	flags := mirror.Flags{
+		Download: flagset.Bool(
+			"download",
+			false,
+			"Download a fresh copy of Osquery from s3.",
+		),
+		Platform: flagset.String(
+			"platform",
+			mirror.PlatformDarwin,
+			fmt.Sprintf(
+				"Platform to build. Valid values are %s, %s and %s.",
+				mirror.PlatformDarwin,
+				mirror.PlatformLinux,
+				mirror.PlatformWindows,
+			),
+		),
+		Channel: flagset.String(
+			"channel",
+			mirror.ChannelStable,
+			fmt.Sprintf(
+				"Create a tarball for a specific autoupdate channel. Valid values: %s, %s and %s.",
+				mirror.ChannelBeta,
+				mirror.ChannelStable,
+				mirror.ChannelNightly,
+			),
+		),
+		Extract: flagset.Bool(
+			"extract",
+			false,
+			"Extract Osquery binary from package.",
+		),
+		OsqueryTarball: flagset.Bool(
+			"osquery-tarball",
+			false,
+			"Create a tarball from Osquery binary.",
+		),
+		OsqueryMirrorUpload: flagset.Bool(
+			"osquery-upload",
+			false,
+			"Upload Osquery tarball to mirror.",
+		),
+		OsqueryNotaryPublish: flagset.Bool(
+			"osquery-publish",
+			false,
+			"Publish Osquery target to Notary.",
+		),
+		LauncherTarball: flagset.Bool(
+			"launcher-tarball",
+			false,
+			"Create a tarball from Launcher build.",
+		),
+		LauncherUpload: flagset.Bool(
+			"launcher-upload",
+			false,
+			"Upload Launcher tarball to mirror.",
+		),
+		LauncherPublish: flagset.Bool(
+			"launcher-publish",
+			false,
+			"Publish Launcher tarball to Notary.",
+		),
+	}
+
+	var (
+		flDebug = flagset.Bool(
+			"debug",
+			false,
+			"Enable debug logging.",
+		)
+		flAll = flagset.Bool(
+			"all",
+			true,
+			"Complete build and publish of Osquery and Launcher. If false, operations are enabled individually.",
+		)
+	)
+
+	flagset.Usage = usageFor(flagset, "package-builder mirror [flags]")
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
+
+	logger := log.NewJSONLogger(os.Stderr)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+	logger = log.With(logger, "caller", log.Caller(5))
+
+	if *flDebug {
+		logger = level.NewFilter(logger, level.AllowDebug())
+	} else {
+		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	// If 'all' is set, all operations are enabled, platform, debug, and
+	// channel may still be set to non-default values.
+	if *flAll {
+		flags = mirror.ToggleAllOperations(flags)
+	}
+
+	if err := mirror.Publish(logger, flags); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -439,6 +546,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "  dev          Generate development launcher packages and upload them to GCS\n")
 	fmt.Fprintf(os.Stderr, "  prod         Generate production launcher packages and upload them to GCS\n")
 	fmt.Fprintf(os.Stderr, "  version      Print full version information\n")
+	fmt.Fprintf(os.Stderr, "  mirror       Manage the local mirror for binaries.\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "VERSION\n")
 	fmt.Fprintf(os.Stderr, "  %s\n", version.Version().Version)
@@ -455,6 +563,8 @@ func main() {
 	switch strings.ToLower(os.Args[1]) {
 	case "version":
 		run = runVersion
+	case "mirror":
+		run = runMirror
 	case "make":
 		run = runMake
 	case "dev":
