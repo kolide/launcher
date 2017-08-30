@@ -127,12 +127,3 @@ Help is available from the command line.
 ```
 $ build/package-builder mirror -help
 ```
-
-
-### Version info
-
-```
-./build/package-builder prod --debug \
-  --enroll_secret_signing_key=/path/to/key.pem \
-  --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
-```

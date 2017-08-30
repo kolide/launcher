@@ -76,7 +76,12 @@ func add(root **node, n *node) {
 	}
 }
 
-// Check to see if tree is acyclic
+// Check to see if tree is acyclic. Pick a node, if perm=true, we know the subtree that this node
+// is the root of, has no cycles so exit.  Otherwise, set temp flag to true, at this
+// point it will be the only node where temp=true. Now recursively iterate over the subtree.
+// If we encounter a node in the subtree such that temp=true, we know we have a cycle. If
+// not, we know that there are not any cycles in the root node of the current subtree,
+// set perm = true.
 func hasCycle(n *node) error {
 	if n == nil {
 		return nil

@@ -211,17 +211,7 @@ func Publish(logger log.Logger, flags Flags) error {
 			},
 		)
 	}
-	if *flags.LauncherTarball {
-		add(
-			&root,
-			&node{
-				order:  orderLauncherTarball,
-				logger: logger,
-				desc:   "create launcher tarballs",
-				accept: createLauncherTarballs,
-			},
-		)
-	}
+
 	// unlikely but check just in case
 	if err := hasCycle(root); err != nil {
 		level.Error(logger).Log(
@@ -581,7 +571,7 @@ func uploadLauncherTarballs(n *node, props *properties) error {
 	if err != nil {
 		return err
 	}
-	if err := uploadToMirror(n.logger, platform, "launcher", tarball); err != nil {
+	if err = uploadToMirror(n.logger, platform, "launcher", tarball); err != nil {
 		return err
 	}
 	level.Info(n.logger).Log(
@@ -614,7 +604,7 @@ func publishLauncherToNotary(n *node, props *properties) error {
 	if err != nil {
 		return err
 	}
-	if err := publishToNotary(n.logger, platform, "launcher", tarball); err != nil {
+	if err = publishToNotary(n.logger, platform, "launcher", tarball); err != nil {
 		return err
 	}
 	level.Info(n.logger).Log(
@@ -685,8 +675,28 @@ func publishToNotary(logger log.Logger, platform, binary, archive string) error 
 		archive,
 		"-p",
 	)
-	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "publishing target %q to gun %q", target, gun)
+	errNotary := func(err error, t, g string) error {
+		return errors.Wrapf(err, "publishing target %s to gun %s", t, g)
+	}
+	// Notary writes error output to stdout.
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return errNotary(err, target, gun)
+	}
+	if err := cmd.Start(); err != nil {
+		return errNotary(err, target, gun)
+	}
+	var notaryTerminal bytes.Buffer
+	if _, err := io.Copy(&notaryTerminal, stdout); err != nil {
+		return errNotary(err, target, gun)
+	}
+	if err := cmd.Wait(); err != nil {
+		level.Error(logger).Log(
+			"msg", "notary failed",
+			"err", err,
+			"details", notaryTerminal.String(),
+		)
+		return errNotary(err, target, gun)
 	}
 	level.Info(logger).Log(
 		"msg", "published target",
@@ -707,10 +717,8 @@ func createLauncherTarball(logger log.Logger, platform, versionOrChannel string)
 		"output", tarFilePath,
 	)
 	buildDir := filepath.Join(packaging.LauncherSource(), "build")
-	sources := []string{
-		filepath.Join(buildDir, platform, "launcher"),
-		filepath.Join(buildDir, platform, "osquery-extension.ext"),
-	}
+	source := filepath.Join(buildDir, platform, "launcher")
+
 	fWtr, err := os.Create(tarFilePath)
 	if err != nil {
 		return "", errors.Wrapf(err, "creating tarball file %q", tarFilePath)
@@ -720,45 +728,32 @@ func createLauncherTarball(logger log.Logger, platform, versionOrChannel string)
 	defer zipWtr.Close()
 	tarWtr := tar.NewWriter(zipWtr)
 	defer tarWtr.Close()
-	// add files to archive
-	for _, source := range sources {
-		// anonymous function so deferred close works in loop
-		err = func() error {
-			var (
-				fRdr *os.File
-				fi   os.FileInfo
-				hdr  *tar.Header
-			)
-			if fRdr, err = os.Open(source); err != nil {
-				return errors.Wrapf(err, "reading %q", source)
-			}
-			defer fRdr.Close()
-			if fi, err = fRdr.Stat(); err != nil {
-				return errors.Wrap(err, "could not get stat")
-			}
-			if hdr, err = tar.FileInfoHeader(fi, filepath.Base(source)); err != nil {
-				return errors.Wrap(err, "getting file header")
-			}
-			if err = tarWtr.WriteHeader(hdr); err != nil {
-				return errors.Wrap(err, "writing tar header")
-			}
-			if _, err = io.Copy(tarWtr, fRdr); err != nil {
-				return errors.Wrap(err, "writing file to tar archive")
-			}
-			return nil
-		}()
-		if err != nil {
-			return "", err
-		}
-		level.Debug(logger).Log(
-			"msg", "added file to archive",
-			"file", source,
-			"archive", tarFilePath,
-		)
+	// add file to archive
+	var (
+		fRdr *os.File
+		fi   os.FileInfo
+		hdr  *tar.Header
+	)
+	if fRdr, err = os.Open(source); err != nil {
+		return "", errors.Wrapf(err, "reading %q", source)
+	}
+	defer fRdr.Close()
+	if fi, err = fRdr.Stat(); err != nil {
+		return "", errors.Wrap(err, "could not get stat")
+	}
+	if hdr, err = tar.FileInfoHeader(fi, filepath.Base(source)); err != nil {
+		return "", errors.Wrap(err, "getting file header")
+	}
+	if err = tarWtr.WriteHeader(hdr); err != nil {
+		return "", errors.Wrap(err, "writing tar header")
+	}
+	if _, err = io.Copy(tarWtr, fRdr); err != nil {
+		return "", errors.Wrap(err, "writing file to tar archive")
 	}
 	level.Info(logger).Log(
 		"msg", "created archive",
-		"file", tarFilePath,
+		"source", source,
+		"tar", tarFilePath,
 	)
 	return tarFilePath, nil
 }
