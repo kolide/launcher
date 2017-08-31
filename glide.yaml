@@ -10,7 +10,7 @@ import:
 - package: github.com/kolide/agent-api
   repo: git@github.com:kolide/agent-api.git
 - package: github.com/kolide/updater
-  version: 8ff71420c45f358475e14c5c8ddf340a1985c71f
+  version: d0f71da33f898dbbfdceb6e91237d890c5e5e8df
   repo: git@github.com:kolide/updater.git
   subpackages:
   - tuf

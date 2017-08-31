@@ -1,5 +1,5 @@
-hash: cae447fb01c81f6fd985f46324603c2fa57b6ad9482e2b946393cac255053bb8
-updated: 2017-08-28T14:46:19.464289248-06:00
+hash: 6dbb49bb4571d4be3a38de207fd1ca44943854db39c7bc57886ab4829111fa3b
+updated: 2017-08-31T12:49:50.394059709-05:00
 imports:
 - name: cloud.google.com/go
   version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
@@ -69,7 +69,7 @@ imports:
   - plugin/logger
   - plugin/table
 - name: github.com/kolide/updater
-  version: 8ff71420c45f358475e14c5c8ddf340a1985c71f
+  version: d0f71da33f898dbbfdceb6e91237d890c5e5e8df
   repo: git@github.com:kolide/updater.git
   subpackages:
   - tuf
@@ -79,6 +79,8 @@ imports:
   version: 3bbc1709cc6e4624b68eb52152cb9add5433c05a
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: github.com/WatchBeam/clock
+  version: ac3776ffbf764bc40bda24e84184146865d0a46d
 - name: golang.org/x/crypto
   version: bc89c496413265e715159bdc8478ee9a92fdc265
   subpackages:
