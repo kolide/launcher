@@ -31,25 +31,25 @@ func determineIconPath(appPath string) (string, error) {
 		return "", errors.Wrap(err, "could not read Info.plist content")
 	}
 
-	var ip struct {
+	var parsedPlist struct {
 		IconName string `plist:"CFBundleIconFile"`
 	}
 
 	plistDecoder := plist.NewDecoder(bytes.NewReader(infoPlistContent))
-	if err := plistDecoder.Decode(&ip); err != nil {
+	if err := plistDecoder.Decode(&parsedPlist); err != nil {
 		return "", errors.Wrap(err, "could not decode plist")
 	}
 
-	if ip.IconName == "" {
+	if parsedPlist.IconName == "" {
 		return "", errors.New("no icon set for application")
 	}
 
-	iconPath := filepath.Join(appPath, "Contents", "Resources", ip.IconName)
+	iconPath := filepath.Join(appPath, "Contents", "Resources", parsedPlist.IconName)
 	if _, err := os.Stat(iconPath); err == nil {
 		return iconPath, nil
 	}
 
-	iconPathExt := filepath.Join(appPath, "Contents", "Resources", fmt.Sprintf("%s.icns", ip.IconName))
+	iconPathExt := filepath.Join(appPath, "Contents", "Resources", fmt.Sprintf("%s.icns", parsedPlist.IconName))
 	if _, err := os.Stat(iconPathExt); err == nil {
 		return iconPathExt, nil
 	}
