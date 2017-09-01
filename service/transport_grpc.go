@@ -88,6 +88,20 @@ func encodeGRPCAgentAPIResponse(_ context.Context, request interface{}) (interfa
 	}, nil
 }
 
+func decodeGRPCHealthCheckResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+	resp := grpcReq.(*kolide_agent.HealthCheckResponse)
+	return healthcheckResponse{
+		Status: int32(resp.GetStatus()),
+	}, nil
+}
+
+func encodeGRPCHealthcheckResponse(_ context.Context, request interface{}) (interface{}, error) {
+	req := request.(healthcheckResponse)
+	return &kolide_agent.HealthCheckResponse{
+		Status: kolide_agent.HealthCheckResponse_ServingStatus(req.Status),
+	}, nil
+}
+
 func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*kolide_agent.LogCollection)
 	logs := make([]string, 0, len(req.Logs))

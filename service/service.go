@@ -24,4 +24,6 @@ type KolideService interface {
 	RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error)
 	// PublishResults publishes the results of executed distributed queries.
 	PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
+	// CheckHealth returns the status of the remote API, with 1 indicating OK status.
+	CheckHealth(ctx context.Context) (int32, error)
 }

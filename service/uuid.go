@@ -50,3 +50,8 @@ func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []d
 	ctx = uuid.NewContext(ctx, makeUUID())
 	return mw.next.PublishResults(ctx, nodeKey, results)
 }
+
+func (mw uuidmw) CheckHealth(ctx context.Context) (status int32, err error) {
+	ctx = uuid.NewContext(ctx, makeUUID())
+	return mw.next.CheckHealth(ctx)
+}

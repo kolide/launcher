@@ -16,6 +16,7 @@ type KolideClient struct {
 	PublishLogsEndpoint       endpoint.Endpoint
 	RequestQueriesEndpoint    endpoint.Endpoint
 	PublishResultsEndpoint    endpoint.Endpoint
+	CheckHealthEndpoint       endpoint.Endpoint
 }
 
 type enrollmentRequest struct {
@@ -118,6 +119,21 @@ func (e KolideClient) PublishResults(ctx context.Context, nodeKey string, result
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 
+func (e KolideClient) CheckHealth(ctx context.Context) (int32, error) {
+	request := agentAPIRequest{}
+	response, err := e.CheckHealthEndpoint(ctx, request)
+	if err != nil {
+		return 0, err
+	}
+	resp := response.(healthcheckResponse)
+	return resp.Status, resp.Err
+}
+
+type healthcheckResponse struct {
+	Status int32
+	Err    error
+}
+
 func makeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
@@ -180,6 +196,16 @@ func makePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
+func makeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		status, err := svc.CheckHealth(ctx)
+		return healthcheckResponse{
+			Status: status,
+			Err:    err,
+		}, nil
+	}
+}
+
 func MakeServerEndpoints(svc KolideService) KolideClient {
 	return KolideClient{
 		RequestEnrollmentEndpoint: makeRequestEnrollmentEndpoint(svc),
@@ -187,5 +213,6 @@ func MakeServerEndpoints(svc KolideService) KolideClient {
 		PublishLogsEndpoint:       makePublishLogsEndpoint(svc),
 		RequestQueriesEndpoint:    makeRequestQueriesEndpoint(svc),
 		PublishResultsEndpoint:    makePublishResultsEndpoint(svc),
+		CheckHealthEndpoint:       makeCheckHealthEndpoint(svc),
 	}
 }

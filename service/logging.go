@@ -116,3 +116,18 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 	message, errcode, reauth, err = mw.next.PublishResults(ctx, nodeKey, results)
 	return
 }
+
+func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
+	defer func(begin time.Time) {
+		uuid, _ := uuid.FromContext(ctx)
+		level.Debug(mw.logger).Log(
+			"method", "CheckHealth",
+			"uuid", uuid,
+			"status", status,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+	status, err = mw.next.CheckHealth(ctx)
+	return
+}

@@ -59,6 +59,12 @@ func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 			encodeGRPCAgentAPIResponse,
 			options...,
 		),
+		health: grpctransport.NewServer(
+			endpoints.CheckHealthEndpoint,
+			decodeGRPCAgentAPIRequest,
+			encodeGRPCHealthcheckResponse,
+			options...,
+		),
 	}
 
 }
@@ -69,6 +75,7 @@ type grpcServer struct {
 	queries    grpctransport.Handler
 	logs       grpctransport.Handler
 	results    grpctransport.Handler
+	health     grpctransport.Handler
 }
 
 func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
@@ -109,6 +116,14 @@ func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollectio
 		return nil, errors.Wrap(err, "publish results")
 	}
 	return rep.(*pb.AgentApiResponse), nil
+}
+
+func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
+	_, rep, err := s.health.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "check health")
+	}
+	return rep.(*pb.HealthCheckResponse), nil
 }
 
 func (s *grpcServer) HotConfigure(*pb.AgentApiRequest, pb.Api_HotConfigureServer) error {

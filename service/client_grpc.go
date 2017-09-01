@@ -74,12 +74,23 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		attachUUID(),
 	).Endpoint()
 
+	checkHealthEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"CheckHealth",
+		encodeGRPCAgentAPIRequest,
+		decodeGRPCHealthCheckResponse,
+		kolide_agent.HealthCheckResponse{},
+		attachUUID(),
+	).Endpoint()
+
 	var client KolideService = KolideClient{
 		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
+		CheckHealthEndpoint:       checkHealthEndpoint,
 	}
 	client = LoggingMiddleware(logger)(client)
 	// Wrap with UUID middleware after logger so that UUID is available in
