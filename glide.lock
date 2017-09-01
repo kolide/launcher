@@ -1,5 +1,5 @@
-hash: 6dbb49bb4571d4be3a38de207fd1ca44943854db39c7bc57886ab4829111fa3b
-updated: 2017-08-31T12:49:50.394059709-05:00
+hash: 08f41446079d55853d72ba764de5658fcb4f0e782348f09b8b43b644ac39dbba
+updated: 2017-08-31T18:13:25.803659092-06:00
 imports:
 - name: cloud.google.com/go
   version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
@@ -19,6 +19,8 @@ imports:
   version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+- name: github.com/DHowett/go-plist
+  version: 2f847ea62b17703c861484a09f0e5841328a2cb9
 - name: github.com/docker/go
   version: d30aec9fd63c35133f8f79c3412ad91a3b08be06
   subpackages:
