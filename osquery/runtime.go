@@ -117,7 +117,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		fmt.Sprintf("--logger_plugin=%s", loggerPlugin),
 		fmt.Sprintf("--distributed_plugin=%s", distributedPlugin),
 		"--disable_distributed=false",
-		"--distributed_interval=3",
+		"--distributed_interval=5",
 		"--pack_delimiter=:",
 		"--config_refresh=10",
 		"--host_identifier=uuid",
