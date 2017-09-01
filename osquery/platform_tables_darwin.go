@@ -11,6 +11,7 @@ func platformTables(client *osquery.ExtensionManagerClient) []*table.Plugin {
 	return []*table.Plugin{
 		BestPractices(client),
 		EmailAddresses(client),
+		AppIcons(client),
 		Spotlight(),
 	}
 }
