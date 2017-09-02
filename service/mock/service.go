@@ -22,6 +22,8 @@ type RequestQueriesFunc func(ctx context.Context, nodeKey string) (*distributed.
 
 type PublishResultsFunc func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 
+type CheckHealthFunc func(ctx context.Context) (int32, error)
+
 type KolideService struct {
 	RequestEnrollmentFunc        RequestEnrollmentFunc
 	RequestEnrollmentFuncInvoked bool
@@ -37,6 +39,9 @@ type KolideService struct {
 
 	PublishResultsFunc        PublishResultsFunc
 	PublishResultsFuncInvoked bool
+
+	CheckHealthFunc        CheckHealthFunc
+	CheckHealthFuncInvoked bool
 }
 
 func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string) (string, bool, error) {
@@ -62,4 +67,9 @@ func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string) (*di
 func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	s.PublishResultsFuncInvoked = true
 	return s.PublishResultsFunc(ctx, nodeKey, results)
+}
+
+func (s *KolideService) CheckHealth(ctx context.Context) (int32, error) {
+	s.CheckHealthFuncInvoked = true
+	return s.CheckHealthFunc(ctx)
 }

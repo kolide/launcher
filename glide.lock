@@ -1,5 +1,5 @@
 hash: 6dbb49bb4571d4be3a38de207fd1ca44943854db39c7bc57886ab4829111fa3b
-updated: 2017-08-31T12:49:50.394059709-05:00
+updated: 2017-09-01T21:57:24.984980003+03:00
 imports:
 - name: cloud.google.com/go
   version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
@@ -24,7 +24,7 @@ imports:
   subpackages:
   - canonical/json
 - name: github.com/go-kit/kit
-  version: f01651a61ac759c6b508539bddda24f63ea34bbb
+  version: f7593d19082ad15f6376f12c746d71d680aa1666
   subpackages:
   - endpoint
   - log
@@ -35,7 +35,7 @@ imports:
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
-  version: ab9f9a6dab164b7d1246e0e688b0ab7b94d8553e
+  version: 5afd06f9d81a86d6e3bb7dc702d6bd148ea3ff23
   subpackages:
   - proto
   - protoc-gen-go/descriptor
@@ -46,11 +46,11 @@ imports:
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/googleapis/gax-go
-  version: 84ed26760e7f6f80887a2fbfb50db3cc415d2cea
+  version: 2cadd475a3e966ec9b77a21afc530dbacec6d613
 - name: github.com/groob/goxar
   version: 908d7dee5b14b7157e77d16fef6fa7e33fbcb3d7
 - name: github.com/kolide/agent-api
-  version: 7fa34da2e8903787c7a5a3a14fb91892680add1b
+  version: f94ad0917bd4bed7134e310e1354011c520a0243
   repo: git@github.com:kolide/agent-api.git
 - name: github.com/kolide/kit
   version: 65836196b611159ee343be3cc9c856b2e5818276
@@ -76,13 +76,13 @@ imports:
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/mixer/clock
-  version: 3bbc1709cc6e4624b68eb52152cb9add5433c05a
+  version: b08e6b4da7ea8c03e0f0c47fd549d801f52a3019
 - name: github.com/pkg/errors
-  version: 645ef00459ed84a119197bfb8d8205042c6df63d
+  version: c605e284fe17294bda444b34710735b29d1a9d90
 - name: github.com/WatchBeam/clock
-  version: ac3776ffbf764bc40bda24e84184146865d0a46d
+  version: b08e6b4da7ea8c03e0f0c47fd549d801f52a3019
 - name: golang.org/x/crypto
-  version: bc89c496413265e715159bdc8478ee9a92fdc265
+  version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
   - cast5
   - openpgp
@@ -93,7 +93,7 @@ imports:
   - openpgp/packet
   - openpgp/s2k
 - name: golang.org/x/net
-  version: 1c05540f6879653db88113bc4a2b70aec4bd491f
+  version: 66aacef3dd8a676686c7ae3716979581e8b03c47
   subpackages:
   - context
   - context/ctxhttp
@@ -104,18 +104,18 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/oauth2
-  version: 9a379c6b3e95a790ffc43293c2a78dee0d7b6e20
+  version: 3d1522b2688977b7f4598d1f28b5e147c41640e7
   subpackages:
   - google
   - internal
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: 07c182904dbd53199946ba614a412c61d3c548f5
+  version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: e56139fd9c5bc7244c76116c68e500765bb6db6b
+  version: bd91bbf73e9a4a801adbfb97133c992678533126
   subpackages:
   - secure/bidirule
   - transform
@@ -126,7 +126,7 @@ imports:
   subpackages:
   - rate
 - name: google.golang.org/api
-  version: dd6bdadc5852eae2d133075a3690d6ad744add48
+  version: 955a3ae66b420f3adc0d77da3d8ed767a74e2b4f
   subpackages:
   - gensupport
   - googleapi
@@ -156,18 +156,20 @@ imports:
   - googleapis/iam/v1
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 2308131c44e408bb7a4da392ed6849a0afe85b2f
+  version: 8233e124e4634a8313f2c9a1ea7d4db33546b11b
   subpackages:
+  - balancer
   - codes
   - connectivity
   - credentials
-  - grpclb/messages_only/grpc_lb_v1
+  - grpclb/grpc_lb_v1/messages
   - grpclog
   - internal
   - keepalive
   - metadata
   - naming
   - peer
+  - resolver
   - stats
   - status
   - tap
