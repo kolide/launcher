@@ -84,20 +84,57 @@ git clone ssh://git@github.com/docker/notary.git $GOPATH/src/github.com/docker/n
 cd $GOPATH/src/github.com/docker/notary
 make client
 ```
-
-Download the internal `notary.zip` from Kolide and extract it into your home directory.
-
+Configure Notary as follows. Download the internal `notary.zip` from Kolide and extract it into your home directory.
 ```
 unzip ./notary.zip -d ~/
 ```
+#### Initial Repository Setup
+Create environment variables with strong pass phrases to use to encrypt notary keys.
+```
+NOTARY_DELEGATION_PASSPHRASE=<secret>
+NOTARY_ROOT_PASSPHRASE=<secret>
+NOTARY_SNAPSHOT_PASSPHRASE=<secret>
+NOTARY_TARGETS_PASSPHRASE=<secret>
+```
+Define GUNs (Global Unique Identifiers) for two repsitories, one for Launcher and one for Osqueryd.
+```
+notary init kolide/launcher -p
+notary init kolide/osqueryd -p
+```
+Find the ID of the root key. This key will be created automatically when the first repository
+is created.
+```
+notary key list
 
-In order to publish releases to Notary using the mirror command the following environment variables should be defined using passwords for respective Notary keys.
-
+ROLE        GUN                KEY ID                                                              LOCATION
+----        ---                ------                                                              --------
+root                           b8dc5cded1a8522a563a58c3ac7ad2eba51d6945999aa5864678fb5064bb6f9e    /Users/jam/.notary/private
+snapshot    kolide/launcher    5e1221edd379be729f12f3cb69786758ee23a71067b6e25c62d10ccfe0c82f31    /Users/jam/.notary/private
+targets     kolide/launcher    69338c3d0b556af446bba3fb87ca61fcdbcb8ff327a648cd85f1832238438d5e    /Users/jam/.notary/private
+```
+Export the root key.  Remove the root key and keep it somewhere safe along with the pass phrases you defined earlier. DO NOT LOSE IT! There is no way to recover it if it is lost.
+See [Notary Documentation](https://github.com/docker/notary/blob/master/docs/advanced_usage.md) for tips on key management. The root key should not be
+stored on developers workstations unless it is needed to create repositories.
+```
+notary key export --key b8dc5cded1a8522a563a58c3ac7ad2eba51d6945999aa5864678fb5064bb6f9e -o notary-root.key
+```
+Also export the snapshot and target key.  These keys will be needed along with their respective pass phrases to publish content to Notary.
+```
+notary key export --key  5e1221edd379be729f12f3cb69786758ee23a71067b6e25c62d10ccfe0c82f31 -o snapshot.pem                                                                                                                                             
+notary key export --key  69338c3d0b556af446bba3fb87ca61fcdbcb8ff327a648cd85f1832238438d5e  -o targets.pem
+```
+In order to publish releases to Notary using the mirror command the following environment variables must be defined with pass phrases for respective Notary keys.
 ```
 NOTARY_SNAPSHOT_PASSPHRASE=<snapshot secret>
 NOTARY_TARGETS_PASSPHRASE=<targets secret>
 ```
-
+The publisher will also need to import the latest targets and snapshot keys into their local Notary
+configuration if they are not already present. `notary key list` will indicate if the needed
+keys are present. Look for the targets and snapshot key for the GUN you'll be publishing to. If not present
+the following command will import the keys.
+```
+notary key import snapshot.pem targets.pem
+```
 #### Usage
 
 The `mirror` command may be used to do all or some subset of the following actions:
@@ -172,5 +209,3 @@ https://dl.kolide.com/kolide/<binary>/<platform>/<archive>
 ```
 
 For example: https://dl.kolide.com/kolide/osqueryd/darwin/osqueryd-stable.tar.gz
-
-
