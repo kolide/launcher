@@ -274,6 +274,21 @@ func runDev(args []string) error {
 			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
 			"the name of the key that should be used to sign mac packages",
 		)
+		flPRStart = flagset.Int(
+			"pr_start",
+			0,
+			"the PR to start building the dev packages at",
+		)
+		flPREnd = flagset.Int(
+			"pr_end",
+			0,
+			"the PR to build the dev packages to",
+		)
+		flNumberOfTenants = flagset.Int(
+			"number_of_tenants",
+			3,
+			"the number of tenants to generate dev packages for",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder dev [flags]")
@@ -289,6 +304,10 @@ func runDev(args []string) error {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	if *flPRStart == 0 || *flPREnd == 0 {
+		return errors.New("pr_start and pr_end flags must be defined to build dev packages")
 	}
 
 	osqueryVersion := *flOsqueryVersion
@@ -318,8 +337,15 @@ func runDev(args []string) error {
 	_ = macPackageSigningKey
 
 	// Generate packages for PRs
-	prToStartFrom, prToGenerateUntil := 572, 750
-	firstID, numberOfIDsToGenerate := 100001, 3
+	prToStartFrom, prToGenerateUntil := *flPRStart, *flPREnd
+	firstID, numberOfIDsToGenerate := 100001, *flNumberOfTenants
+
+	level.Debug(logger).Log(
+		"msg", "creating packages for PRs",
+		"pr_to_start_from", prToStartFrom,
+		"pr_to_generate_until", prToGenerateUntil,
+		"number_of_tenants_to_generate", numberOfIDsToGenerate,
+	)
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
