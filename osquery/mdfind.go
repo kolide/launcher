@@ -22,7 +22,7 @@ func Spotlight() *table.Plugin {
 		table.TextColumn("query"),
 		table.TextColumn("path"),
 	}
-	return table.NewPlugin("spotlight", columns, generateSpotlight)
+	return table.NewPlugin("kolide_spotlight", columns, generateSpotlight)
 }
 
 func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
