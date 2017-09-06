@@ -60,7 +60,9 @@ To use the tool to generate Kolide internal development packages, run:
 
 ```
 ./build/package-builder dev --debug \
-  --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
+  --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)" \
+	--pr_start=600 \
+	--pr_end=750
 ```
 
 ### Production Packages
