@@ -455,6 +455,11 @@ func runProd(args []string) error {
 			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
 			"the name of the key that should be used to sign mac packages",
 		)
+		flNumberOfTenants = flagset.Int(
+			"number_of_tenants",
+			3,
+			"the number of tenants to generate dev packages for",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder prod [flags]")
@@ -498,7 +503,22 @@ func runProd(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	firstID, numberOfIDsToGenerate := 100001, 10
+	firstID, numberOfIDsToGenerate := 100001, *flNumberOfTenants
+
+	additionalExtras := []int{
+		100155,
+		100164,
+		100174,
+		100184,
+	}
+
+	tenantIDs := []int{}
+	for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
+		tenantIDs = append(tenantIDs, id)
+	}
+	for _, id := range additionalExtras {
+		tenantIDs = append(tenantIDs, id)
+	}
 
 	uploadRoot, err := ioutil.TempDir("", "upload_")
 	if err != nil {
@@ -514,7 +534,7 @@ func runProd(args []string) error {
 		if err := os.MkdirAll(filepath.Join(uploadRoot, strings.Replace(hostname, ":", "-", -1)), packaging.DirMode); err != nil {
 			return err
 		}
-		for id := firstID; id < firstID+numberOfIDsToGenerate; id++ {
+		for _, id := range tenantIDs {
 			tenant := packaging.TenantName(id)
 			paths, err := packaging.CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant, pemKey, macPackageSigningKey)
 			if err != nil {
