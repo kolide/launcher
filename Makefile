@@ -37,6 +37,10 @@ else
 	NOW	= $(shell powershell Get-Date -format s)
 endif
 
+ifeq ($(GOPATH),)
+	GOPATH = $(HOME)/go
+endif
+
 build: launcher extension
 
 .pre-build:
@@ -83,3 +87,8 @@ generate:
 
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
+
+install: build
+	mkdir -p $(GOPATH)/bin
+	cp ./build/launcher $(GOPATH)/bin/launcher
+	cp ./build/osquery-extension.ext $(GOPATH)/bin/osquery-extension.ext
