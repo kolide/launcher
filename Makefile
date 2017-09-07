@@ -2,6 +2,11 @@ all: build
 
 .PHONY: build
 
+ifndef ($(GOPATH))
+	GOPATH = $(HOME)/go
+endif
+
+PATH := $(GOPATH)/bin:$(PATH)
 VERSION = $(shell git describe --tags --always --dirty)
 BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 REVISION = $(shell git rev-parse HEAD)
@@ -35,10 +40,6 @@ else
 	GOVERSION_CMD = "(go version).Split()[2]"
 	GOVERSION = $(shell powershell $(GOVERSION_CMD))
 	NOW	= $(shell powershell Get-Date -format s)
-endif
-
-ifeq ($(GOPATH),)
-	GOPATH = $(HOME)/go
 endif
 
 build: launcher extension
