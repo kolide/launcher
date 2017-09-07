@@ -91,6 +91,11 @@ func runMake(args []string) error {
 			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
 			"the name of the key that should be used to sign mac packages",
 		)
+		flRootDirectory = flagset.String(
+			"root_directory",
+			env.String("ROOT_DIRECTORY", ""),
+			"the root directory of the resultant package",
+		)
 		flInsecure = flagset.Bool(
 			"insecure",
 			env.Bool("INSECURE", false),
@@ -131,7 +136,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flRootDirectory, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
