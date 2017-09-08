@@ -2,6 +2,11 @@ all: build
 
 .PHONY: build
 
+ifndef ($(GOPATH))
+	GOPATH = $(HOME)/go
+endif
+
+PATH := $(GOPATH)/bin:$(PATH)
 VERSION = $(shell git describe --tags --always --dirty)
 BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 REVISION = $(shell git rev-parse HEAD)
@@ -83,3 +88,8 @@ generate:
 
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
+
+install: build
+	mkdir -p $(GOPATH)/bin
+	cp ./build/launcher $(GOPATH)/bin/launcher
+	cp ./build/osquery-extension.ext $(GOPATH)/bin/osquery-extension.ext
