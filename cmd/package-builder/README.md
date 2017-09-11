@@ -73,7 +73,7 @@ To use the tool to generate Kolide production packages, run:
   --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
 ```
 
-### Publishing Automatic Updates With the `mirror` Command
+### Publishing Automatic Updates
 
 The `mirror` command may be used to do all or some subset of the following actions:
 
