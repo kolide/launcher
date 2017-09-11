@@ -135,7 +135,7 @@ notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osquery
 
 ##### TUF Repository Configuration Using Notary
 
-This section can be skipped if `kolide/launcher` and `kolide/osqueryd` have been set up otherwise you need to set up these TUF repositories. This process is explained in the remainder of this section. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up repositories for Osqueryd and Locator.  The first step is to  select strong pass phrases and assign them to the following environment variables:
+This section can be skipped if `kolide/launcher` and `kolide/osqueryd` have been set up otherwise; you need to set up these TUF repositories. This process is explained in the remainder of this section. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up repositories for Osqueryd and Locator.  The first step is to  select strong pass phrases and assign them to the following environment variables:
 ```
 NOTARY_DELEGATION_PASSPHRASE=<secret>
 NOTARY_ROOT_PASSPHRASE=<secret>
