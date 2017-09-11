@@ -90,14 +90,16 @@ USAGE
   package-builder mirror [flags]
 
 FLAGS
-  -all true                Complete build and publish of Osquery and Launcher. If false, operations are enabled individually.
+  -all false               Complete build and publish of Osquery and Launcher. If false, operations are enabled individually.
   -channel stable          Create a tarball for a specific autoupdate channel. Valid values: beta, stable and nightly.
   -debug false             Enable debug logging.
   -download false          Download a fresh copy of Osquery from s3.
   -extract false           Extract Osquery binary from package.
+  -launcher-all false      Complete build and publish of Launcher
   -launcher-publish false  Publish Launcher tarball to Notary.
   -launcher-tarball false  Create a tarball from Launcher build.
   -launcher-upload false   Upload Launcher tarball to mirror.
+  -osquery-all false       Complete build and publish of Osquery
   -osquery-publish false   Publish Osquery target to Notary.
   -osquery-tarball false   Create a tarball from Osquery binary.
   -osquery-upload false    Upload Osquery tarball to mirror.
@@ -106,10 +108,48 @@ FLAGS
 
 #### Examples
 
-Publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pickup and install these changes.
+Publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pick up and install these versions of Launcher and Osqueryd.
 
 ```
 build/package-builder mirror -all -debug
+```
+
+Publish archive containing the latest version of Launcher for autoupdate.
+
+```
+build/package-builder mirror -launcher-all
+```
+
+Publish archive containing latest version of Osquery for autoupdate.
+
+```
+build/package-builder mirror -osquery-all
+```
+
+Suppose that we want to download the latest version of Osquery and create a distribution tarball for testing. We don't want to upload or publish the tarball. The mirror command makes this possible; however if we don't use the **all** commands we must take care to invoke all the prerequisites ourselves.  For example supplying the `-osquery-tarball` command alone will cause the following error because we must download the Osquery package and extract it before we create the tarball.  
+
+```
+build/package-builder mirror -osquery-tarball
+{"caller":"mirror.go:228","err":"missing predecessor","level":"error","method":"Publish","ts":"2017-09-11T20:13:42.815424865Z"}
+missing predecessor
+```
+
+In order to create the tarball, we first need to download the Osquery packages and then extract the `osqueryd` binary that we are interested in. The following command works.
+
+```
+build/package-builder mirror -osquery-tarball -download -extract
+{"caller":"mirror.go:336","level":"info","msg":"completed downloading osquery","ts":"2017-09-11T20:17:46.539922529Z"}
+{"caller":"mirror.go:371","level":"info","msg":"completed extract osquery","ts":"2017-09-11T20:17:46.785266738Z"}
+{"caller":"mirror.go:310","level":"info","msg":"get osquery version","ts":"2017-09-11T20:17:46.840920175Z","version":"2.7.0"}
+{"caller":"mirror.go:445","level":"info","msg":"generate osquery tarball","output":"/tmp/osquery_mirror/binaries-for-launcher/kolide/osqueryd/darwin/osqueryd-2.7.0.tar.gz","ts":"2017-09-11T20:17:47.331453869Z"}
+{"caller":"mirror.go:450","level":"info","msg":"generate osquery tarball","output":"/tmp/osquery_mirror/binaries-for-launcher/kolide/osqueryd/darwin/osqueryd-2.7.0.tar.gz","ts":"2017-09-11T20:17:47.331513564Z"}
+{"caller":"mirror.go:486","level":"info","msg":"generated osquery tagged tarball","output":"/tmp/osquery_mirror/binaries-for-launcher/kolide/osqueryd/darwin/osqueryd-stable.tar.gz","ts":"2017-09-11T20:17:47.342412008Z"}
+```
+
+In this Launcher example we create a distribution tarball and upload it to the mirror.
+
+```
+build/package-builder mirror -launcher-tarball -launcher-upload 
 ```
 
 #### Prerequisites
