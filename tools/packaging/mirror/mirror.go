@@ -253,6 +253,34 @@ func ToggleAllOperations(f Flags) Flags {
 	}
 }
 
+// ToggleAllOsquery sets flags to perform all operations required to download and publish Osquery.
+func ToggleAllOsquery(f Flags) Flags {
+	b := true
+	pTrue := &b
+	return Flags{
+		Platform:             f.Platform,
+		Channel:              f.Channel,
+		OsqueryTarball:       pTrue,
+		OsqueryMirrorUpload:  pTrue,
+		OsqueryNotaryPublish: pTrue,
+		Extract:              pTrue,
+		Download:             pTrue,
+	}
+}
+
+// ToggleAllLauncher set flags to perform all operations required publish Launcher.
+func ToggleAllLauncher(f Flags) Flags {
+	b := true
+	pTrue := &b
+	return Flags{
+		Platform:        f.Platform,
+		Channel:         f.Channel,
+		LauncherTarball: pTrue,
+		LauncherPublish: pTrue,
+		LauncherUpload:  pTrue,
+	}
+}
+
 func getOsqueryVersion(n *node, props *properties) error {
 	level.Debug(n.logger).Log(
 		"msg", n.desc,

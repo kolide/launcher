@@ -216,9 +216,19 @@ func runMirror(args []string) error {
 			false,
 			"Enable debug logging.",
 		)
+		flOsquery = flagset.Bool(
+			"osquery-all",
+			false,
+			"Complete build and publish of Osquery",
+		)
+		flLauncher = flagset.Bool(
+			"launcher-all",
+			false,
+			"Complete build and publish of Launcher",
+		)
 		flAll = flagset.Bool(
 			"all",
-			true,
+			false,
 			"Complete build and publish of Osquery and Launcher. If false, operations are enabled individually.",
 		)
 	)
@@ -238,6 +248,14 @@ func runMirror(args []string) error {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
+	// If 'osquery-all' is set, a full download and publish of Osqueryd will occur.
+	if *flOsquery {
+		flags = mirror.ToggleAllOsquery(flags)
+	}
+	// If 'launcher-all' is set all operations required to publish Launcher will occur.
+	if *flLauncher {
+		flags = mirror.ToggleAllLauncher(flags)
+	}
 	// If 'all' is set, all operations are enabled, platform, debug, and
 	// channel may still be set to non-default values.
 	if *flAll {
