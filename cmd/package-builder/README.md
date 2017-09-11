@@ -103,9 +103,9 @@ FLAGS
 In this example we publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pickup and install the changes.
 ```
 make package-builder
-build/package-builder mirror -all 
+build/package-builder mirror -all
 ```
-#### Prerequisites 
+#### Prerequisites
 
 #### Google Storage
 
@@ -119,7 +119,7 @@ gcloud config set project kolide-website
 
 The Notary Client must be configured. See the instructions in the next section if the TUF repositories `kolide/launcher` and `kolide/osqueryd` have not been set up.
 
-Delegate keys must be installed and pass phrases must be available. Obtain the Notary client configuration and install it into your home directory as follows: 
+Delegate keys must be installed and pass phrases must be available. Obtain the Notary client configuration and install it into your home directory as follows:
 ```
 unzip notary.zip
 ```
@@ -128,7 +128,7 @@ Set the following environment variables and pass phrases.
 NOTARY_DELEGATION_PASSPHRASE=<secret>
 NOTARY_TARGETS_PASSPHRASE=<secret>
 ```
-Import targets and delegate keys.  This will authorize you to use your local Notary client to publish updates.   
+Import targets and delegate keys.  This will authorize you to use your local Notary client to publish updates.
 ```
 notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osqueryd-targets.pem
 ```
@@ -157,18 +157,18 @@ Create keys for delegates. This process will create two x509 certs, `launcher.pe
 notary key generate ecdsa --role targets/releases -o launcher
 notary key generate ecdsa --role targets/releases -o osqueryd
 ```
-Create the delegates, importing the x509 certificates created in the previous step. 
+Create the delegates, importing the x509 certificates created in the previous step.
 ```
 notary delegation add kolide/launcher targets/releases launcher.pem --all-paths -p
 notary delegation add kolide/osqueryd targets/releases osqueryd.pem --all-paths -p
 ```
 Modify the path header of each private key adding the key ID of the associated delegate key. Do this for both `kolide/launcher` and `kolide/osqueryd`. Find the delegate key using `notary delegate list` as in the following example.
 ```
-notary delegation list kolide/launcher                                                         
+notary delegation list kolide/launcher
 
-ROLE                PATHS             KEY IDS                                                             THRESHOLD                          
-----                -----             -------                                                             ---------                          
-targets/releases    "" <all paths>    06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    1         
+ROLE                PATHS             KEY IDS                                                             THRESHOLD
+----                -----             -------                                                             ---------
+targets/releases    "" <all paths>    06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    1
 ```
 Open the private key you created for example `launcher-key.pem` in a text editor and add the Key ID to the path header of the key.
 ```
@@ -183,7 +183,7 @@ iI1fszTUNu8f07bY/u0c36K6LiTQOIxiT5N2YMD5+sb4XRE9KUpSSOEVEWlMGopw
 Xm//qxWRIzC4C5Tc11liQ9gfz3PJ3TX2gOoQJMtfq6k=
 -----END EC PRIVATE KEY-----
 ```
-Export targets keys.  
+Export targets keys.
 ```
 notary key list
 
