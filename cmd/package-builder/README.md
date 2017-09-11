@@ -111,26 +111,20 @@ build/package-builder mirror -all
 
 #### Prerequisites
 
-#### Google Storage
-
-You must be authorized using `gcloud` and be configured to use the `kolide-website` project.
+To use this command, you must be authorized using `gcloud` and be configured to use the `kolide-website` project.
 
 ```
 gcloud auth application-default login
 gcloud config set project kolide-website
 ```
 
-#### Notary Client Configuration
-
-The Notary Client must be configured. See the instructions in the next section if the TUF repositories `kolide/launcher` and `kolide/osqueryd` have not been set up.
-
-Delegate keys must be installed and pass phrases must be available. Obtain the Notary client configuration and install it into your home directory as follows:
+In addition to GCP, the Notary command-line client must also be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available. Obtain the Notary client configuration and install it into your home directory as follows:
 
 ```
-unzip notary.zip
+unzip ./notary.zip -d ~/
 ```
 
-Set the following environment variables and pass phrases.
+Set the following environment variables and passphrases.
 
 ```
 NOTARY_DELEGATION_PASSPHRASE=<secret>
@@ -143,9 +137,9 @@ Import targets and delegate keys.  This will authorize you to use your local Not
 notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osqueryd-targets.pem
 ```
 
-##### TUF Repository Configuration Using Notary
+#### Creating a new GUN
 
-This section can be skipped if `kolide/launcher` and `kolide/osqueryd` have been set up otherwise; you need to set up these TUF repositories. This process is explained in the remainder of this section. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up repositories for Osqueryd and Locator.  The first step is to  select strong pass phrases and assign them to the following environment variables:
+This section can be skipped once `kolide/launcher` and `kolide/osqueryd` have been set up, this is more documentation on how the GUNs were setup as well as how future GUNs should be setup in the future. This process is explained in the remainder of this section. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up repositories for Osqueryd and Launcher.  The first step is to select strong passphrases and assign them to the following environment variables:
 
 ```
 NOTARY_DELEGATION_PASSPHRASE=<secret>
