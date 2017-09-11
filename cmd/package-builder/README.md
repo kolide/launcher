@@ -102,16 +102,17 @@ FLAGS
   -platform darwin         Platform to build. Valid values are darwin, linux and windows.
 ```
 
-In this example we publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pickup and install the changes.
+#### Examples
+
+Publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pickup and install these changes.
 
 ```
-make package-builder
-build/package-builder mirror -all
+build/package-builder mirror -all -debug
 ```
 
 #### Prerequisites
 
-To use this command, you must be authorized using `gcloud` and be configured to use the `kolide-website` project.
+To use this command, you must be authorized using `gcloud` and be configured to use the `kolide-website` GCP project.
 
 ```
 gcloud auth application-default login
