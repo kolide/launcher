@@ -73,80 +73,16 @@ To use the tool to generate Kolide production packages, run:
   --mac_package_signing_key="Developer ID Installer: Acme Inc (ABCDEF123456)"
 ```
 
-### Publishing Updates
-
-#### Configuration
-
-Notary Client must be properly installed and **be in your search path** in order to publish binaries. Notary Client can be found [here](https://github.com/docker/notary).  Prepare Notary Client as follows.
-
-```
-git clone ssh://git@github.com/docker/notary.git $GOPATH/src/github.com/docker/notary
-cd $GOPATH/src/github.com/docker/notary
-make client
-```
-Configure Notary as follows. Download the internal `notary.zip` from Kolide and extract it into your home directory.
-```
-unzip ./notary.zip -d ~/
-```
-#### Initial Repository Setup
-Create environment variables with strong pass phrases to use to encrypt notary keys.
-```
-NOTARY_DELEGATION_PASSPHRASE=<secret>
-NOTARY_ROOT_PASSPHRASE=<secret>
-NOTARY_SNAPSHOT_PASSPHRASE=<secret>
-NOTARY_TARGETS_PASSPHRASE=<secret>
-```
-Define GUNs (Global Unique Identifiers) for two repsitories, one for Launcher and one for Osqueryd.
-```
-notary init kolide/launcher -p
-notary init kolide/osqueryd -p
-```
-Find the ID of the root key. This key will be created automatically when the first repository
-is created.
-```
-notary key list
-
-ROLE        GUN                KEY ID                                                              LOCATION
-----        ---                ------                                                              --------
-root                           b8dc5cded1a8522a563a58c3ac7ad2eba51d6945999aa5864678fb5064bb6f9e    /Users/jam/.notary/private
-snapshot    kolide/launcher    5e1221edd379be729f12f3cb69786758ee23a71067b6e25c62d10ccfe0c82f31    /Users/jam/.notary/private
-targets     kolide/launcher    69338c3d0b556af446bba3fb87ca61fcdbcb8ff327a648cd85f1832238438d5e    /Users/jam/.notary/private
-```
-Export the root key.  Remove the root key and keep it somewhere safe along with the pass phrases you defined earlier. DO NOT LOSE IT! There is no way to recover it if it is lost.
-See [Notary Documentation](https://github.com/docker/notary/blob/master/docs/advanced_usage.md) for tips on key management. The root key should not be
-stored on developers workstations unless it is needed to create repositories.
-```
-notary key export --key b8dc5cded1a8522a563a58c3ac7ad2eba51d6945999aa5864678fb5064bb6f9e -o notary-root.key
-```
-Also export the snapshot and target key.  These keys will be needed along with their respective pass phrases to publish content to Notary.
-```
-notary key export --key  5e1221edd379be729f12f3cb69786758ee23a71067b6e25c62d10ccfe0c82f31 -o snapshot.pem                                                                                                                                             
-notary key export --key  69338c3d0b556af446bba3fb87ca61fcdbcb8ff327a648cd85f1832238438d5e  -o targets.pem
-```
-In order to publish releases to Notary using the mirror command the following environment variables must be defined with pass phrases for respective Notary keys.
-```
-NOTARY_SNAPSHOT_PASSPHRASE=<snapshot secret>
-NOTARY_TARGETS_PASSPHRASE=<targets secret>
-```
-The publisher will also need to import the latest targets and snapshot keys into their local Notary
-configuration if they are not already present. `notary key list` will indicate if the needed
-keys are present. Look for the targets and snapshot key for the GUN you'll be publishing to. If not present
-the following command will import the keys.
-```
-notary key import snapshot.pem targets.pem
-```
-#### Usage
-
+### Publishing Automatic Updates With the `mirror` Command
 The `mirror` command may be used to do all or some subset of the following actions:
 
-- Produce archives for both Launcher and Osqueryd
-- Upload the archives to the highly-available GCP storage bucket
-- Register the releases with https://notary.kolide.com so that they can be validated as part of the Launcher's autoupdate process
-
-By default, the `-all` flag is set, which will perform all the steps needed to release new binaries. If you set `-all=false`, individual subcommands can be used to perform a subset of these operations. For a full list of these subcommands, run `package-builder mirror --help`:
+* Produce archives for both Launcher and Osqueryd
+* Upload the archives to the highly-available GCP storage bucket
+* Register the releases with https://notary.kolide.com so that they can be validated as part of the Launcher's autoupdate process
 
 ```
-$ ./build/package-builder mirror --help
+build/package-builder mirror -help
+
 USAGE
   package-builder mirror [flags]
 
@@ -164,48 +100,104 @@ FLAGS
   -osquery-upload false    Upload Osquery tarball to mirror.
   -platform darwin         Platform to build. Valid values are darwin, linux and windows.
 ```
-
-For example, you could choose to publish changes for Osquery or only create archives for Launcher. The following commands would:
-
-- Download and publish the latest version of Osquery
-- Publish version 1.2.0 of Launcher to the `stable` channel for the `linux` platform.
-
+In this example we publish archives containing latest version of Launcher and Osqueryd. Launcher instances that have autoupdate enabled will pickup and install the changes.
 ```
-git tag 1.2.0
-gcloud config set project kolide-website
 make package-builder
-build/package-builder mirror -platform=linux
+build/package-builder mirror -all 
+```
+#### Prerequisites 
+
+#### Google Storage
+
+You must be authorized using `gcloud` and be configured to use the `kolide-website` project.
+```
+gcloud auth application-default login
+gcloud config set project kolide-website
 ```
 
-#### Notary
+#### Notary Client Configuration
 
-You can use the Notary Client to list the signatures of osqueryd and launcher versions that have been published:
+The Notary Client must be configured. See the instructions in the next section if the TUF repositories `kolide/launcher` and `kolide/osqueryd` have not been set up.
 
+Delegate keys must be installed and pass phrases must be available. Obtain the Notary client configuration and install it into your home directory as follows: 
 ```
-$ notary list kolide/osqueryd
-NAME                             DIGEST                                                              SIZE (BYTES)    ROLE
-----                             ------                                                              ------------    ----
-darwin/osqueryd-2.7.0.tar.gz     ea4efa14edbf8e7d63de2af1cbb8dc6be200b8cb8e76731c04827b40760e6cfc    4252776         targets
-darwin/osqueryd-stable.tar.gz    ea4efa14edbf8e7d63de2af1cbb8dc6be200b8cb8e76731c04827b40760e6cfc    4252776         targets
+unzip notary.zip
 ```
-
-#### Storage
-
-Osquery and Launcher binaries must be available in a .tar.gz archive, on a remote mirror so the Launcher can download them. The `package-builder mirror` command packages binaries into archives and publishes them in the format `<binary-name>-<update-channel or version>.tar.gz`
-
-For example:
-
+Set the following environment variables and pass phrases.
 ```
-osqueryd-stable.tar.gz
-osqueryd-2.6.0.tar.gz
-launcher-stable.tar.gz
-launcher-874e302.tar.gz
+NOTARY_DELEGATION_PASSPHRASE=<secret>
+NOTARY_TARGETS_PASSPHRASE=<secret>
+```
+Import targets and delegate keys.  This will authorize you to use your local Notary client to publish updates.   
+```
+notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osqueryd-targets.pem
 ```
 
-The archives are stored in GCP by Kolide (`gs://binaries-for-launcher`) and they are exposed at a URI formatted like:
+##### TUF Repository Configuration Using Notary
 
+This section can be skipped if `kolide/launcher` and `kolide/osqueryd` have been set up otherwise you need to set up these TUF repositories. This process is explained in the remainder of this section. The initial set up for Notary should be completed and is beyond the scope of this document. Notary usage information can be found [here](https://github.com/kolide/updater) if needed. If Notary is already set up you're ready to set up repositories for Osqueryd and Locator.  The first step is to  select strong pass phrases and assign them to the following environment variables:
 ```
-https://dl.kolide.com/kolide/<binary>/<platform>/<archive>
+NOTARY_DELEGATION_PASSPHRASE=<secret>
+NOTARY_ROOT_PASSPHRASE=<secret>
+NOTARY_SNAPSHOT_PASSPHRASE=<secret>
+NOTARY_TARGETS_PASSPHRASE=<secret>
 ```
+Create GUNs (Global Unique Identifiers) for the repositories.
+```
+notary init kolide/launcher -p
+notary init kolide/osqueryd -p
+```
+Rotate snapshot keys to be managed by Notary server.
+```
+notary key rotate kolide/launcher snapshot -r
+notary key rotate kolide/osqueryd snapshot -r
+```
+Create keys for delegates. This process will create two x509 certs, `launcher.pem` and `osqueryd.pem`.  It will also create private keys `launcher-key.pem` and `osqueryd-key.pem`.
+```
+notary key generate ecdsa --role targets/releases -o launcher
+notary key generate ecdsa --role targets/releases -o osqueryd
+```
+Create the delegates, importing the x509 certificates created in the previous step. 
+```
+notary delegation add kolide/launcher targets/releases launcher.pem --all-paths -p
+notary delegation add kolide/osqueryd targets/releases osqueryd.pem --all-paths -p
+```
+Modify the path header of each private key adding the key ID of the associated delegate key. Do this for both `kolide/launcher` and `kolide/osqueryd`. Find the delegate key using `notary delegate list` as in the following example.
+```
+notary delegation list kolide/launcher                                                         
 
-For example: https://dl.kolide.com/kolide/osqueryd/darwin/osqueryd-stable.tar.gz
+ROLE                PATHS             KEY IDS                                                             THRESHOLD                          
+----                -----             -------                                                             ---------                          
+targets/releases    "" <all paths>    06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    1         
+```
+Open the private key you created for example `launcher-key.pem` in a text editor and add the Key ID to the path header of the key.
+```
+-----BEGIN EC PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-256-CBC,f6aa527f4df1bf0586e5c78a5cf391bc
+role: targets/releases
+path: 06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d
+
+y7yWNcOBsMiY7owqkXVKEzmlIJ4czs2t+oB7MceX7WZrxI3O51Fr2YYX7Q5+jiZF
+iI1fszTUNu8f07bY/u0c36K6LiTQOIxiT5N2YMD5+sb4XRE9KUpSSOEVEWlMGopw
+Xm//qxWRIzC4C5Tc11liQ9gfz3PJ3TX2gOoQJMtfq6k=
+-----END EC PRIVATE KEY-----
+```
+Export targets keys.  
+```
+notary key list
+
+ROLE                GUN                KEY ID                                                              LOCATION
+----                ---                ------                                                              --------
+root                                   548f56d5df437de28204d3f82362c105f2db354f29d6a0a2126a2dabec6a1475    /Users/jam/.notary/private
+targets/releases                       06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    /Users/jam/.notary/private
+targets             kolide/launcher    8193f35f558c57888502479d1db4316eac914e6a0e09ee1f9aec267f28ad0d6b    /Users/jam/.notary/private
+snapshot            kolide/osqueryd    8ba84ba8f874d77f59b123b034068687f9bcfaf4a68eddd01794837210f660f4    /Users/jam/.notary/private
+targets             kolide/osqueryd    9a44fca98f38112cd45069f1edc2623a7ee4ec2dbaf9a51e87c1ba0dc43f4a97    /Users/jam/.notary/private
+
+notary key export --output launcher-targets --key 8193f35f558c57888502479d1db4316eac914e6a0e09ee1f9aec267f28ad0d6b
+notary key export --output osqueryd-targets --key 9a44fca98f38112cd45069f1edc2623a7ee4ec2dbaf9a51e87c1ba0dc43f4a97
+```
+The delegate keys, exported targets keys and passphrases should all be stored safely offline so they are available set up Notary Client.
+
+
