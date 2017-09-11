@@ -14,7 +14,7 @@ REVSHORT = $(shell git rev-parse --short HEAD)
 USER = $(shell whoami)
 
 KIT_VERSION = "\
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=launcher \
+	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=${APP_NAME} \
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
 	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
@@ -60,15 +60,22 @@ xp-extension: .pre-build
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
 	ln -f build/$(CURRENT_PLATFORM)/osquery-extension.ext build/osquery-extension.ext
 
-launcher: .pre-build
+.pre-launcher:
+	$(eval APP_NAME = launcher)
+
+launcher: .pre-build .pre-launcher
 	go build -i -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 
-xp-launcher: .pre-build
+xp-launcher: .pre-build .pre-launcher
 	GOOS=darwin go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	ln -f build/$(CURRENT_PLATFORM)/launcher build/launcher
 
-package-builder: .pre-build xp-launcher xp-extension
+
+.pre-package-builder:
+	$(eval APP_NAME = package-builder)
+
+package-builder: .pre-build xp-launcher xp-extension .pre-package-builder
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 .deps:
