@@ -56,6 +56,12 @@ gcloud auth application-default login
 
 ### Development Packages
 
+Before generating development packages you must set the GCP project.
+
+```
+gcloud config set project kolide-ose-testing_packaging 
+```
+
 To use the tool to generate Kolide internal development packages, run:
 
 ```
@@ -66,6 +72,12 @@ To use the tool to generate Kolide internal development packages, run:
 ```
 
 ### Production Packages
+
+Before generating production packages you must set the GCP project.
+
+```
+gcloud config set project kolide-website_packaging
+```
 
 To use the tool to generate Kolide production packages, run:
 
