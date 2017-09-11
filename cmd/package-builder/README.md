@@ -119,28 +119,32 @@ gcloud auth application-default login
 gcloud config set project kolide-website
 ```
 
-In addition to GCP, the Notary command-line client must also be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available. Obtain the Notary client configuration and install it into your home directory as follows:
+In addition to GCP, the Notary command-line client must also be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available.
+
+Obtain the Notary client configuration and install it into your home directory as follows:
 
 ```
 unzip ./notary.zip -d ~/
 ```
 
-Set the following environment variables and passphrases.
+Set the following environment variables:
 
 ```
 NOTARY_DELEGATION_PASSPHRASE=<secret>
 NOTARY_TARGETS_PASSPHRASE=<secret>
 ```
 
-Import targets and delegate keys.  This will authorize you to use your local Notary client to publish updates.
+Import targets and delegate keys. This will authorize you to use your local Notary client to publish updates.
 
 ```
 notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osqueryd-targets.pem
 ```
 
-#### Creating a new GUN
+#### Creating a new TUF Repository
 
-This section can be skipped once `kolide/launcher` and `kolide/osqueryd` have been set up, this is more documentation on how the GUNs were setup as well as how future GUNs should be setup in the future. This process is explained in the remainder of this section. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up repositories for Osqueryd and Launcher.  The first step is to select strong passphrases and assign them to the following environment variables:
+This section is documentation on how the `kolide/osqueryd` and `kolide/launcher` TUF repositories were setup. This information will be useful when re-configuring a Notary server, creating new TUF repositories, etc. The [initial set up for Notary](https://github.com/kolide/updater) should be completed prior to setting up repositories and is beyond the scope of this document. If Notary is already set up you're ready to set up the new repositories.
+
+The first step is to select strong passphrases and assign them to the following environment variables:
 
 ```
 NOTARY_DELEGATION_PASSPHRASE=<secret>
