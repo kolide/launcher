@@ -282,10 +282,8 @@ func main() {
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	logger = log.With(logger, "caller", log.DefaultCaller)
 
-	if platform, err := osquery.DetectPlatform(); err != nil {
+	if _, err := osquery.DetectPlatform(); err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
-	} else if platform != "darwin" {
-		logFatal(logger, "err", "this tool only works on macOS right now")
 	}
 
 	opts, err := parseOptions()
