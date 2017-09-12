@@ -54,12 +54,17 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
+	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
+	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
+	configurationDirectory := filepath.Join("/etc", identifier)
+	logDirectory := filepath.Join("/var/log", identifier)
 	pathsToCreate := []string{
-		"/etc/kolide",
-		"/var/kolide",
-		"/var/log/kolide",
-		"/usr/local/kolide/bin",
+		rootDirectory,
+		binaryDirectory,
+		configurationDirectory,
+		logDirectory,
 	}
+
 	for _, pathToCreate := range pathsToCreate {
 		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
 		if err != nil {
@@ -76,15 +81,15 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
+	err = CopyFile(osquerydPath, filepath.Join(packageRoot, binaryDirectory, "osqueryd"))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
-	// The initial launcher (and extension) binary
+	// The initial launcher (and extension) binaryt st
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/launcher"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
+		filepath.Join(packageRoot, binaryDirectory, "launcher"),
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
@@ -92,14 +97,14 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/osquery-extension.ext"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
+		filepath.Join(packageRoot, binaryDirectory, "osquery-extension.ext"),
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
 	// The secret which the user will use to authenticate to the cloud
-	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, configurationDirectory, "secret"), []byte(secret), FileMode)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
