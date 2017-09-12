@@ -24,13 +24,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc)
+func CreatePackages(osqueryVersion, hostname, rootDirectory, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, rootDirectory, secret, macPackageSigningKey, insecure, insecureGrpc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc)
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, rootDirectory, secret, insecure, insecureGrpc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -42,7 +42,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc bool) (string, string, error) {
+func createLinuxPackages(osqueryVersion, hostname, rootDirectory, secret string, insecure, insecureGrpc bool) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -157,7 +157,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (string, error) {
+func createMacPackage(osqueryVersion, hostname, rootDirectory, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -173,11 +173,11 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
-	rootDirectory := filepath.Join("/var/kolide", sanitizeHostname(hostname))
+	shardedRootDirectory := filepath.Join(rootDirectory, sanitizeHostname(hostname))
 	pathsToCreate := []string{
 		"/etc/kolide",
 		"/var/kolide",
-		rootDirectory,
+		shardedRootDirectory,
 		"/var/log/kolide",
 		"/usr/local/kolide/bin",
 		"/Library/LaunchDaemons",
