@@ -86,7 +86,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
-	// The initial launcher (and extension) binaryt st
+	// The initial launcher (and extension) binary
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/launcher"),
 		filepath.Join(packageRoot, binaryDirectory, "launcher"),
