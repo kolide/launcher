@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -12,23 +13,28 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// SetGCPProject will set the local GCP project to the supplied project name
+func SetGCPProject(project string) error {
+	cmd := exec.Command("gcloud", "config", "set", "project", project)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // CopyContentsToCloudStorage recursively copies contents of the path uploadRoot to
 // the named cloud storage bucket. Items that exist in cloud storage but not in uploadRoot
 // are removed
-func CopyContentsToCloudStorage(uploadRoot, bucketName, projectName string) error {
+func CopyContentsToCloudStorage(uploadRoot, bucketName string) error {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "preparing to copy %s to storage", uploadRoot)
 	}
 	defer client.Close()
-
-	bucket := client.Bucket(bucketName).UserProject(projectName)
-
 	// Clear out old objects. This is a fairly naive way to do this. We could use paging
 	// to grab batches of object attributes, record their names in a lookup table, and then remove
 	// the name if an object of the same name is uploaded, then delete what's left.
-	iter := bucket.Objects(ctx, nil)
+	iter := client.Bucket(bucketName).Objects(ctx, nil)
 	for {
 		objAttr, err := iter.Next()
 		if err == iterator.Done {
@@ -37,18 +43,17 @@ func CopyContentsToCloudStorage(uploadRoot, bucketName, projectName string) erro
 		if err != nil {
 			return errors.Wrap(err, "deleting existing objects")
 		}
-		if err := bucket.Object(objAttr.Name).Delete(ctx); err != nil {
+		if err := client.Bucket(bucketName).Object(objAttr.Name).Delete(ctx); err != nil {
 			return errors.Wrapf(err, "deleting %s", objAttr.Name)
 		}
 	}
-
 	// recursively upload new objects
 	err = filepath.Walk(uploadRoot, func(path string, info os.FileInfo, _ error) error {
 		if info.IsDir() {
 			return nil
 		}
 		objectName := strings.TrimLeft(strings.Replace(path, uploadRoot, "", 1), "/")
-		obj := bucket.Object(objectName)
+		obj := client.Bucket(bucketName).Object(objectName)
 		rdr, err := os.Open(path)
 		if err != nil {
 			return err
