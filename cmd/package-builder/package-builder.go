@@ -433,6 +433,10 @@ func runDev(args []string) error {
 		"path", uploadRoot,
 	)
 
+	if err := packaging.SetGCPProject("kolide-ose-testing"); err != nil {
+		return errors.Wrap(err, "could not set GCP project")
+	}
+
 	if err := packaging.CopyContentsToCloudStorage(uploadRoot, "kolide-ose-testing_packaging"); err != nil {
 		return errors.Wrap(err, "uploading packages to cloud storage")
 	}
@@ -563,6 +567,10 @@ func runProd(args []string) error {
 				"hostname", hostname,
 			)
 		}
+	}
+
+	if err := packaging.SetGCPProject("kolide-website"); err != nil {
+		return errors.Wrap(err, "could not set GCP project")
 	}
 
 	if err := packaging.CopyContentsToCloudStorage(uploadRoot, "kolide-website_packaging"); err != nil {

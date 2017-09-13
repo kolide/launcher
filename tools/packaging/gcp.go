@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -11,6 +12,14 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
 )
+
+// SetGCPProject will set the local GCP project to the supplied project name
+func SetGCPProject(project string) error {
+	cmd := exec.Command("gcloud", "config", "set", "project", project)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
 
 // CopyContentsToCloudStorage recursively copies contents of the path uploadRoot to
 // the named cloud storage bucket. Items that exist in cloud storage but not in uploadRoot
