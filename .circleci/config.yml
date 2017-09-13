@@ -11,7 +11,7 @@ jobs:
             - vendor-cache-{{ .Branch }}-{{ checksum "glide.lock" }}
             - vendor-cache-{{ .Branch }}
             - vendor-cache
-      - run: make deps
+      - run: UNVALIDATED=true make deps
       - save_cache:
           key: vendor-cache-{{ .Branch }}-{{ checksum "glide.lock" }}
           paths:
@@ -25,7 +25,7 @@ jobs:
           paths:
             - vendor
 
-      - run: make test
+      - run: UNVALIDATED=true make test
       - run: make extension
       - run: make launcher
 

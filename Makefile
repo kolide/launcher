@@ -86,11 +86,14 @@ package-builder: .pre-build xp-launcher xp-extension .pre-package-builder
 deps: .deps generate
 
 INSECURE ?= false
+UNVALIDATED ?= false
 generate:
 	go run ./autoupdate/generate_tuf.go \
-		-binary=osqueryd -notary=${NOTARY_URL} -insecure=${INSECURE}
+		-binary=osqueryd  -insecure=${INSECURE} \
+		-unvalidated=${UNVALIDATED} -url https://notary.kolide.com
 	go run ./autoupdate/generate_tuf.go \
-		-binary=launcher -notary=${NOTARY_URL} -insecure=${INSECURE}
+		-binary=launcher  -insecure=${INSECURE} \
+		-unvalidated=${UNVALIDATED} -url https://notary.kolide.com
 	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/...
 
 test: generate

@@ -1,8 +1,8 @@
-hash: 6dbb49bb4571d4be3a38de207fd1ca44943854db39c7bc57886ab4829111fa3b
-updated: 2017-09-01T21:57:24.984980003+03:00
+hash: f3f8764b01e1c03c13d7a92cc1c53165689b5a5386a9211869fc4012f53a65a8
+updated: 2017-09-12T20:06:53.007940614-05:00
 imports:
 - name: cloud.google.com/go
-  version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
+  version: 5a9e19d4e1e41a734154e44a2132b358afb49a03
   subpackages:
   - '...'
   - compute/metadata
@@ -23,6 +23,10 @@ imports:
   version: d30aec9fd63c35133f8f79c3412ad91a3b08be06
   subpackages:
   - canonical/json
+- name: github.com/docker/notary
+  version: 8a1de3cfc3f1408e54d6364fc949214a4883a9f3
+  subpackages:
+  - client
 - name: github.com/go-kit/kit
   version: f7593d19082ad15f6376f12c746d71d680aa1666
   subpackages:

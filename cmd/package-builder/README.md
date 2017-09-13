@@ -2,6 +2,12 @@
 
 ## Building the tool
 
+If you don't have notary configured, run the following command;
+
+```
+mkdir ~/.notary && echo '{ "remote_server": { "url": "https://notary.kolide.com" } }' > ~/.notary/config.json
+```
+
 From the root of the repository, run the following:
 
 ```
@@ -163,25 +169,25 @@ gcloud auth application-default login
 gcloud config set project kolide-website
 ```
 
-In addition to GCP, the Notary command-line client must also be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available.
+In addition to GCP, the [Notary command-line client](https://github.com/docker/notary) must be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available. See the next section that describes setting up Notary if the TUF respositories haven't been created yet.
 
-Obtain the Notary client configuration and install it into your home directory as follows:
-
-```
-unzip ./notary.zip -d ~/
-```
-
-Set the following environment variables:
+Setup the Notary client configuration.
 
 ```
-NOTARY_DELEGATION_PASSPHRASE=<secret>
-NOTARY_TARGETS_PASSPHRASE=<secret>
+mkdir ~/.notary && echo '{ "remote_server": { "url": "https://notary.kolide.com" } }' > ~/.notary/config.json
 ```
 
-Import targets and delegate keys. This will authorize you to use your local Notary client to publish updates.
+Set the delegation environment variable:
 
 ```
-notary key import launcher-key.pem launcher-targets.pem osqueryd-key.pem osqueryd-targets.pem
+export NOTARY_DELEGATION_PASSPHRASE=<secret>
+```
+
+Import the delegate keys. This will authorize you to use your local Notary client to publish updates.
+
+```
+notary key import launcher-key.pem --role targets/releases --gun kolide/launcher
+notary key import osqueryd-key.pem --role targets/releases --gun kolide/osqueryd
 ```
 
 #### Creating a new TUF Repository
@@ -191,10 +197,10 @@ This section is documentation on how the `kolide/osqueryd` and `kolide/launcher`
 The first step is to select strong passphrases and assign them to the following environment variables:
 
 ```
-NOTARY_DELEGATION_PASSPHRASE=<secret>
-NOTARY_ROOT_PASSPHRASE=<secret>
-NOTARY_SNAPSHOT_PASSPHRASE=<secret>
-NOTARY_TARGETS_PASSPHRASE=<secret>
+export NOTARY_DELEGATION_PASSPHRASE=<secret>
+export NOTARY_ROOT_PASSPHRASE=<secret>
+export NOTARY_SNAPSHOT_PASSPHRASE=<secret>
+export NOTARY_TARGETS_PASSPHRASE=<secret>
 ```
 
 Create GUNs (Global Unique Identifiers) for the repositories.
@@ -204,7 +210,7 @@ notary init kolide/launcher -p
 notary init kolide/osqueryd -p
 ```
 
-Rotate snapshot keys to be managed by Notary server.
+Rotate snapshot keys so that they are managed by Notary server.
 
 ```
 notary key rotate kolide/launcher snapshot -r
@@ -250,22 +256,4 @@ Xm//qxWRIzC4C5Tc11liQ9gfz3PJ3TX2gOoQJMtfq6k=
 -----END EC PRIVATE KEY-----
 ```
 
-Export targets keys.
-
-```
-notary key list
-
-ROLE                GUN                KEY ID                                                              LOCATION
-----                ---                ------                                                              --------
-root                                   548f56d5df437de28204d3f82362c105f2db354f29d6a0a2126a2dabec6a1475    /Users/jam/.notary/private
-targets/releases                       06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    /Users/jam/.notary/private
-targets             kolide/launcher    8193f35f558c57888502479d1db4316eac914e6a0e09ee1f9aec267f28ad0d6b    /Users/jam/.notary/private
-snapshot            kolide/osqueryd    8ba84ba8f874d77f59b123b034068687f9bcfaf4a68eddd01794837210f660f4    /Users/jam/.notary/private
-targets             kolide/osqueryd    9a44fca98f38112cd45069f1edc2623a7ee4ec2dbaf9a51e87c1ba0dc43f4a97    /Users/jam/.notary/private
-
-notary key export --output launcher-targets --key 8193f35f558c57888502479d1db4316eac914e6a0e09ee1f9aec267f28ad0d6b
-notary key export --output osqueryd-targets --key 9a44fca98f38112cd45069f1edc2623a7ee4ec2dbaf9a51e87c1ba0dc43f4a97
-```
-
-The delegate keys, exported targets keys and passphrases should all be stored safely offline so they are available set up Notary Client.
-
+The delegate keys and passphrases should all be stored safely offline so they are available set up Notary Client to publish updates.

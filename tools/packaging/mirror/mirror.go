@@ -253,10 +253,14 @@ func ToggleAllOperations(f Flags) Flags {
 	}
 }
 
+var vTrue = true
+var vFalse = false
+var pTrue = &vTrue
+var pFalse = &vFalse
+
 // ToggleAllOsquery sets flags to perform all operations required to download and publish Osquery.
 func ToggleAllOsquery(f Flags) Flags {
-	b := true
-	pTrue := &b
+
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
@@ -265,19 +269,26 @@ func ToggleAllOsquery(f Flags) Flags {
 		OsqueryNotaryPublish: pTrue,
 		Extract:              pTrue,
 		Download:             pTrue,
+		LauncherTarball:      pFalse,
+		LauncherPublish:      pFalse,
+		LauncherUpload:       pFalse,
 	}
 }
 
 // ToggleAllLauncher set flags to perform all operations required publish Launcher.
 func ToggleAllLauncher(f Flags) Flags {
-	b := true
-	pTrue := &b
+
 	return Flags{
-		Platform:        f.Platform,
-		Channel:         f.Channel,
-		LauncherTarball: pTrue,
-		LauncherPublish: pTrue,
-		LauncherUpload:  pTrue,
+		Platform:             f.Platform,
+		Channel:              f.Channel,
+		LauncherTarball:      pTrue,
+		LauncherPublish:      pTrue,
+		LauncherUpload:       pTrue,
+		Extract:              pFalse,
+		Download:             pFalse,
+		OsqueryTarball:       pFalse,
+		OsqueryMirrorUpload:  pFalse,
+		OsqueryNotaryPublish: pFalse,
 	}
 }
 
@@ -701,6 +712,7 @@ func publishToNotary(logger log.Logger, platform, binary, archive string) error 
 		gun,
 		target,
 		archive,
+		"--roles=targets/releases",
 		"-p",
 	)
 	errNotary := func(err error, t, g string) error {

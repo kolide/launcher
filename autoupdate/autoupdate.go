@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/osquery"
@@ -85,23 +86,72 @@ func NewUpdater(
 
 // bootstraps local TUF metadata from bindata assets.
 func (u *Updater) createLocalTufRepo() error {
+	// We don't want to overwrite an existing repo as it stores state between installations
+	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
+		return nil
+	}
+
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
 		return err
 	}
-
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
-	roles := []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"}
-	for _, role := range roles {
-		asset, err := Asset(path.Join("autoupdate", "assets", localRepo, role))
+	assetPath := path.Join("autoupdate", "assets", localRepo)
+	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir, copier); err != nil {
+		return err
+	}
+	return nil
+}
+
+func copier(source, dest string) (bool, error) {
+	if !regexp.MustCompile(`\.json$`).MatchString(source) {
+		if err := os.MkdirAll(dest, 0755); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	// If it's not a directory, copy the asset contents to the local file system
+	asset, err := Asset(source)
+	if err != nil {
+		return false, err
+	}
+	return false, ioutil.WriteFile(dest, asset, 0644)
+}
+
+// Creates TUF repo including delegate tree structure on local file system.
+// assetDir is the bindata AssetDir function.
+// copier is a function that returns true if the source is a directory, and will create the dest directory
+// on the file system, if source is supposed to be a file, it will be read from bindata and written to
+// to a local file.
+func createTUFRepoDirectory(
+	localPath string,
+	currentAssetPath string,
+	assetDir func(string) ([]string, error),
+	copier func(source, dest string) (bool, error),
+) error {
+	paths, err := assetDir(currentAssetPath)
+	if err != nil {
+		return err
+	}
+	for _, pth := range paths {
+		fullAssetPath := path.Join(currentAssetPath, pth)
+		fullLocalPath := filepath.Join(localPath, pth)
+		isDir, err := copier(fullAssetPath, fullLocalPath)
 		if err != nil {
 			return err
 		}
-		localPath := filepath.Join(u.settings.LocalRepoPath, role)
-		if err := ioutil.WriteFile(localPath, asset, 0644); err != nil {
-			return err
+		if isDir {
+			err := createTUFRepoDirectory(
+				fullLocalPath,
+				fullAssetPath,
+				assetDir,
+				copier,
+			)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
+	}
 	return nil
 }
 
