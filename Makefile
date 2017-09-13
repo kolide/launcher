@@ -100,3 +100,19 @@ install: build
 	mkdir -p $(GOPATH)/bin
 	cp ./build/launcher $(GOPATH)/bin/launcher
 	cp ./build/osquery-extension.ext $(GOPATH)/bin/osquery-extension.ext
+
+CONTAINERS = ubuntu14 ubuntu16 centos6 centos7
+
+.PHONY: push-containers containers $(CONTAINERS)
+
+containers: $(CONTAINERS)
+
+$(CONTAINERS): xp-launcher xp-extension
+	docker build -t kolide/${@}-launcher:latest -f docker/${@}/Dockerfile .
+	VERSION=$$(docker run --rm kolide/${@}-launcher:latest launcher -version | head -1 | sed 's/launcher - version //g')
+	docker tag kolide/${@}-launcher:latest kolide/${@}-launcher:${VERSION}
+
+push-containers: $(CONTAINERS)
+	for container in $(CONTAINERS); do \
+		docker push kolide/$${container}-launcher; \
+	done

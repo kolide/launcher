@@ -78,7 +78,11 @@ type osqueryFilePaths struct {
 // unacceptable.
 func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
 	// Determine the path to the extension
-	extensionPath := filepath.Join(filepath.Dir(os.Args[0]), "osquery-extension.ext")
+	exPath, err := os.Executable()
+	if err != nil {
+		return nil, errors.Wrap(err, "finding path of launcher executable")
+	}
+	extensionPath := filepath.Join(filepath.Dir(exPath), "osquery-extension.ext")
 	if _, err := os.Stat(extensionPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)

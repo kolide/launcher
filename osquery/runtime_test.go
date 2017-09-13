@@ -3,7 +3,6 @@ package osquery
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,34 +13,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// getBinDir finds the directory of the currently running binary (where we will
+// look for the osquery extension)
+func getBinDir(t *testing.T) string {
+	binPath, err := os.Executable()
+	require.NoError(t, err)
+	binDir := filepath.Dir(binPath)
+	return binDir
+}
+
 func TestCalculateOsqueryPaths(t *testing.T) {
-	rootDirectory := filepath.Dir(os.TempDir())
-
-	// the launcher expects an osquery extension to be right next to the launcher
-	// binary on the filesystem so we doctor os.Args here and create a mock file
-	// on the filesystem to satisfy this requirement
-	previousArgs := os.Args
-	os.Args = []string{fmt.Sprintf("%s/launcher", rootDirectory)}
-	defer func() {
-		os.Args = previousArgs
-	}()
-
-	fakeExtensionPath := filepath.Join(rootDirectory, "osquery-extension.ext")
+	t.Parallel()
+	binDir := getBinDir(t)
+	fakeExtensionPath := filepath.Join(binDir, "osquery-extension.ext")
 	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
 
-	paths, err := calculateOsqueryPaths(rootDirectory)
+	paths, err := calculateOsqueryPaths(binDir)
 	require.NoError(t, err)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
 	// dictated
-	require.Equal(t, rootDirectory, filepath.Dir(paths.pidfilePath))
-	require.Equal(t, rootDirectory, filepath.Dir(paths.databasePath))
-	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionPath))
-	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionSocketPath))
-	require.Equal(t, rootDirectory, filepath.Dir(paths.extensionAutoloadPath))
+	require.Equal(t, binDir, filepath.Dir(paths.pidfilePath))
+	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
+	require.Equal(t, binDir, filepath.Dir(paths.extensionPath))
+	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
+	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
+	t.Parallel()
 	paths := &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery.pid",
 		databasePath:          "/foo/bar/osquery.db",
@@ -58,20 +58,10 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
-func falsifyOsArgs(rootDirectory string) func() {
-	// the launcher expects an osquery extension to be right next to the launcher
-	// binary on the filesystem so we doctor os.Args here and create a mock file
-	// on the filesystem to satisfy this requirement
-	previousArgs := os.Args
-	os.Args = []string{fmt.Sprintf("%s/launcher", rootDirectory)}
-	return func() {
-		os.Args = previousArgs
-	}
-}
-
-func buildOsqueryExtensionInTempDir(rootDirectory string) error {
-	// Drop the actual version of our extension on disk so that we can get as
-	// realistic of a test environment as possible
+// buildOsqueryExtensionInBinDir compiles the osquery extension and places it
+// on disk in the same directory as the currently running executable (as
+// expected when running an osquery process)
+func buildOsqueryExtensionInBinDir(rootDirectory string) error {
 	goBinary, err := exec.LookPath("go")
 	if err != nil {
 		return err
@@ -101,15 +91,12 @@ func buildOsqueryExtensionInTempDir(rootDirectory string) error {
 }
 
 func TestOsqueryRuntime(t *testing.T) {
+	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
-	cancelFunc := falsifyOsArgs(rootDirectory)
-	defer cancelFunc()
-
-	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
@@ -121,15 +108,12 @@ func TestOsqueryRuntime(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
-	cancelFunc := falsifyOsArgs(rootDirectory)
-	defer cancelFunc()
-
-	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
@@ -147,15 +131,12 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRecover(t *testing.T) {
+	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	// this could be `defer falsifyOsArgs(rootDirectory)()` but this may be more clear
-	cancelFunc := falsifyOsArgs(rootDirectory)
-	defer cancelFunc()
-
-	require.NoError(t, buildOsqueryExtensionInTempDir(rootDirectory))
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	instance, err := LaunchOsqueryInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
