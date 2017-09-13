@@ -181,6 +181,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
 	launcherPath := filepath.Join(binaryDirectory, "launcher")
+	osquerydPath := filepath.Join(binaryDirectory, "osqueryd")
 	configurationDirectory := filepath.Join("/etc", identifier)
 	secretPath := filepath.Join(configurationDirectory, "secret")
 	logDirectory := filepath.Join("/var/log", identifier)
@@ -204,12 +205,12 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// installation:
 
 	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
+	localOsquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
 	if err != nil {
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, binaryDirectory, "osqueryd"))
+	err = CopyFile(localOsquerydPath, filepath.Join(packageRoot, osquerydPath))
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
@@ -240,6 +241,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		ServerHostname:   grpcServerForHostname(hostname),
 		RootDirectory:    rootDirectory,
 		LauncherPath:     launcherPath,
+		OsquerydPath:     osquerydPath,
 		LogDirectory:     logDirectory,
 		SecretPath:       secretPath,
 		LaunchDaemonName: launchDaemonName,
@@ -312,6 +314,7 @@ type launchDaemonTemplateOptions struct {
 	ServerHostname   string
 	RootDirectory    string
 	LauncherPath     string
+	OsquerydPath     string
 	LogDirectory     string
 	SecretPath       string
 	LaunchDaemonName string
@@ -336,6 +339,8 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <string>{{.ServerHostname}}</string>
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
             <string>{{.SecretPath}}</string>
+            <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
+            <string>{{.OsquerydPath}}</string>
         </dict>
         <key>RunAtLoad</key>
         <true/>
@@ -368,8 +373,7 @@ type postinstallTemplateOptions struct {
 }
 
 func renderPostinstall(w io.Writer, options *postinstallTemplateOptions) error {
-	postinstallTemplate := `
-#!/bin/bash
+	postinstallTemplate := `#!/bin/bash
 
 [[ $3 != "/" ]] && exit 0
 
