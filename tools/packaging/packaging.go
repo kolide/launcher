@@ -258,6 +258,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	if err != nil {
 		return "", errors.Wrap(err, "could not create temp directory for the macOS packaging script directory")
 	}
+	defer os.RemoveAll(scriptDir)
 
 	postinstallFile, err := os.Create(filepath.Join(scriptDir, "postinstall"))
 	if err != nil {
