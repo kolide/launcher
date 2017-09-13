@@ -42,6 +42,8 @@ If you would like the resultant launcher binary to be invoked with the `--insecu
   --insecure_grpc
 ```
 
+By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value.
+
 ## Kolide Usage
 
 ### Authentication
@@ -126,7 +128,7 @@ Publish archive containing latest version of Osquery for autoupdate.
 build/package-builder mirror -osquery-all
 ```
 
-Suppose that we want to download the latest version of Osquery and create a distribution tarball for testing. We don't want to upload or publish the tarball. The mirror command makes this possible; however if we don't use the **all** commands we must take care to invoke all the prerequisites ourselves.  For example supplying the `-osquery-tarball` command alone will cause the following error because we must download the Osquery package and extract it before we create the tarball.  
+Suppose that we want to download the latest version of Osquery and create a distribution tarball for testing. We don't want to upload or publish the tarball. The mirror command makes this possible; however if we don't use the **all** commands we must take care to invoke all the prerequisites ourselves.  For example supplying the `-osquery-tarball` command alone will cause the following error because we must download the Osquery package and extract it before we create the tarball.
 
 ```
 build/package-builder mirror -osquery-tarball
@@ -149,7 +151,7 @@ build/package-builder mirror -osquery-tarball -download -extract
 In this Launcher example we create a distribution tarball and upload it to the mirror.
 
 ```
-build/package-builder mirror -launcher-tarball -launcher-upload 
+build/package-builder mirror -launcher-tarball -launcher-upload
 ```
 
 #### Prerequisites

@@ -24,13 +24,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc)
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool, identifier string) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc)
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -42,7 +42,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc bool) (string, string, error) {
+func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc bool, identifier string) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -54,12 +54,17 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
+	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
+	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
+	configurationDirectory := filepath.Join("/etc", identifier)
+	logDirectory := filepath.Join("/var/log", identifier)
 	pathsToCreate := []string{
-		"/etc/kolide",
-		"/var/kolide",
-		"/var/log/kolide",
-		"/usr/local/kolide/bin",
+		rootDirectory,
+		binaryDirectory,
+		configurationDirectory,
+		logDirectory,
 	}
+
 	for _, pathToCreate := range pathsToCreate {
 		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
 		if err != nil {
@@ -76,7 +81,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
+	err = CopyFile(osquerydPath, filepath.Join(packageRoot, binaryDirectory, "osqueryd"))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
@@ -84,7 +89,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	// The initial launcher (and extension) binary
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/launcher"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
+		filepath.Join(packageRoot, binaryDirectory, "launcher"),
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
@@ -92,14 +97,14 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/osquery-extension.ext"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
+		filepath.Join(packageRoot, binaryDirectory, "osquery-extension.ext"),
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
 	// The secret which the user will use to authenticate to the cloud
-	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, configurationDirectory, "secret"), []byte(secret), FileMode)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
@@ -157,7 +162,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool) (string, error) {
+func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool, identifier string) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -173,14 +178,21 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
-	rootDirectory := filepath.Join("/var/kolide", sanitizeHostname(hostname))
+	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
+	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
+	launcherPath := filepath.Join(binaryDirectory, "launcher")
+	osquerydPath := filepath.Join(binaryDirectory, "osqueryd")
+	configurationDirectory := filepath.Join("/etc", identifier)
+	secretPath := filepath.Join(configurationDirectory, "secret")
+	logDirectory := filepath.Join("/var/log", identifier)
+	launchDaemonDirectory := "/Library/LaunchDaemons"
+	launchDaemonName := fmt.Sprintf("com.%s.launcher", identifier)
 	pathsToCreate := []string{
-		"/etc/kolide",
-		"/var/kolide",
 		rootDirectory,
-		"/var/log/kolide",
-		"/usr/local/kolide/bin",
-		"/Library/LaunchDaemons",
+		binaryDirectory,
+		configurationDirectory,
+		logDirectory,
+		launchDaemonDirectory,
 	}
 	for _, pathToCreate := range pathsToCreate {
 		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
@@ -193,12 +205,12 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// installation:
 
 	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
+	localOsquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
 	if err != nil {
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, "/usr/local/kolide/bin/osqueryd"))
+	err = CopyFile(localOsquerydPath, filepath.Join(packageRoot, osquerydPath))
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
@@ -206,7 +218,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// The initial launcher (and extension) binary
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/darwin/launcher"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/launcher"),
+		filepath.Join(packageRoot, launcherPath),
 	)
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
@@ -214,35 +226,64 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/darwin/osquery-extension.ext"),
-		filepath.Join(packageRoot, "/usr/local/kolide/bin/osquery-extension.ext"),
+		filepath.Join(packageRoot, binaryDirectory, "osquery-extension.ext"),
 	)
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
 	// The LaunchDaemon which will connect the launcher to the cloud
-	launchDaemonFile, err := os.Create(filepath.Join(packageRoot, "/Library/LaunchDaemons/com.kolide.launcher.plist"))
+	launchDaemonFile, err := os.Create(filepath.Join(packageRoot, launchDaemonDirectory, fmt.Sprintf("%s.plist", launchDaemonName)))
 	if err != nil {
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
 	opts := &launchDaemonTemplateOptions{
-		ServerHostname: grpcServerForHostname(hostname),
-		RootDirectory:  rootDirectory,
-		Insecure:       insecure,
-		InsecureGrpc:   insecureGrpc,
+		ServerHostname:   grpcServerForHostname(hostname),
+		RootDirectory:    rootDirectory,
+		LauncherPath:     launcherPath,
+		OsquerydPath:     osquerydPath,
+		LogDirectory:     logDirectory,
+		SecretPath:       secretPath,
+		LaunchDaemonName: launchDaemonName,
+		Insecure:         insecure,
+		InsecureGrpc:     insecureGrpc,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
 	}
 
 	// The secret which the user will use to authenticate to the server
-	err = ioutil.WriteFile(filepath.Join(packageRoot, "/etc/kolide/secret"), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
 	if err != nil {
 		return "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
 
 	// Finally, now that the final directory structure of the package is
 	// represented, we can create the package
+
+	// First, we render the macOS post-install script
+	scriptDir, err := ioutil.TempDir("", "scriptDir")
+	if err != nil {
+		return "", errors.Wrap(err, "could not create temp directory for the macOS packaging script directory")
+	}
+	defer os.RemoveAll(scriptDir)
+
+	postinstallFile, err := os.Create(filepath.Join(scriptDir, "postinstall"))
+	if err != nil {
+		return "", errors.Wrap(err, "could not open the postinstall file for writing")
+	}
+	if err := postinstallFile.Chmod(0755); err != nil {
+		return "", errors.Wrap(err, "could not make postinstall script executable")
+	}
+	postinstallOpts := &postinstallTemplateOptions{
+		LaunchDaemonDirectory: launchDaemonDirectory,
+		LaunchDaemonName:      launchDaemonName,
+	}
+	if err := renderPostinstall(postinstallFile, postinstallOpts); err != nil {
+		return "", errors.Wrap(err, "could not render postinstall script context to file")
+	}
+
+	// Next, we calculate versions and file paths
 	currentVersion := version.Version().Version
 
 	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
@@ -251,10 +292,11 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
+	// Build the macOS package
 	err = pkgbuild(
 		packageRoot,
-		filepath.Join(Gopath(), "src/github.com/kolide/launcher/tools/packaging/macos/scripts"),
-		"com.kolide.launcher",
+		scriptDir,
+		launchDaemonName,
 		currentVersion,
 		macPackageSigningKey,
 		outputPath,
@@ -269,10 +311,15 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	ServerHostname string
-	RootDirectory  string
-	InsecureGrpc   bool
-	Insecure       bool
+	ServerHostname   string
+	RootDirectory    string
+	LauncherPath     string
+	OsquerydPath     string
+	LogDirectory     string
+	SecretPath       string
+	LaunchDaemonName string
+	InsecureGrpc     bool
+	Insecure         bool
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -283,7 +330,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>com.kolide.launcher</string>
+        <string>{{.LaunchDaemonName}}</string>
         <key>EnvironmentVariables</key>
         <dict>
             <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
@@ -291,7 +338,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_HOSTNAME</key>
             <string>{{.ServerHostname}}</string>
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
-            <string>/etc/kolide/secret</string>
+            <string>{{.SecretPath}}</string>
+            <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
+            <string>{{.OsquerydPath}}</string>
         </dict>
         <key>RunAtLoad</key>
         <true/>
@@ -301,14 +350,14 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <integer>60</integer>
         <key>ProgramArguments</key>
         <array>
-            <string>/usr/local/kolide/bin/launcher</string>
+            <string>{{.LauncherPath}}</string>
             {{if .InsecureGrpc}}<string>--insecure_grpc</string>{{end}}
             {{if .Insecure}}<string>--insecure</string>{{end}}
         </array>
         <key>StandardErrorPath</key>
-        <string>/var/log/kolide/launcher-stderr.log</string>
+        <string>{{.LogDirectory}}/launcher-stderr.log</string>
         <key>StandardOutPath</key>
-        <string>/var/log/kolide/launcher-stdout.log</string>
+        <string>{{.LogDirectory}}/launcher-stdout.log</string>
     </dict>
 </plist>`
 	t, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
@@ -316,6 +365,29 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 		return errors.Wrap(err, "not able to parse LaunchDaemon template")
 	}
 	return t.ExecuteTemplate(w, "LaunchDaemon", options)
+}
+
+type postinstallTemplateOptions struct {
+	LaunchDaemonDirectory string
+	LaunchDaemonName      string
+}
+
+func renderPostinstall(w io.Writer, options *postinstallTemplateOptions) error {
+	postinstallTemplate := `#!/bin/bash
+
+[[ $3 != "/" ]] && exit 0
+
+/bin/launchctl stop {{.LaunchDaemonName}}
+
+sleep 5
+
+/bin/launchctl unload {{.LaunchDaemonDirectory}}/{{.LaunchDaemonName}}.plist
+/bin/launchctl load {{.LaunchDaemonDirectory}}/{{.LaunchDaemonName}}.plist`
+	t, err := template.New("postinstall").Parse(postinstallTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse postinstall template")
+	}
+	return t.ExecuteTemplate(w, "postinstall", options)
 }
 
 // pkgbuild runs the following pkgbuild command:

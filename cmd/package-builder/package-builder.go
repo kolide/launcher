@@ -101,6 +101,11 @@ func runMake(args []string) error {
 			env.Bool("INSECURE_GRPC", false),
 			"whether or not the launcher packages should invoke the launcher's --insecure_grpc flag",
 		)
+		flIdentifier = flagset.String(
+			"identifier",
+			env.String("IDENTIFIER", "launcher"),
+			"the name of the directory that the launcher installation will shard into",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -131,7 +136,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flIdentifier)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
