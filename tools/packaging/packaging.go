@@ -180,7 +180,9 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// First, we create all of the directories that we will need:
 	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
+	launcherPath := filepath.Join(binaryDirectory, "launcher")
 	configurationDirectory := filepath.Join("/etc", identifier)
+	secretPath := filepath.Join(configurationDirectory, "secret")
 	logDirectory := filepath.Join("/var/log", identifier)
 	launchDaemonDirectory := "/Library/LaunchDaemons"
 	launchDaemonName := fmt.Sprintf("com.%s.launcher", identifier)
@@ -215,7 +217,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// The initial launcher (and extension) binary
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/darwin/launcher"),
-		filepath.Join(packageRoot, binaryDirectory, "launcher"),
+		filepath.Join(packageRoot, launcherPath),
 	)
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
@@ -235,17 +237,21 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
 	opts := &launchDaemonTemplateOptions{
-		ServerHostname: grpcServerForHostname(hostname),
-		RootDirectory:  rootDirectory,
-		Insecure:       insecure,
-		InsecureGrpc:   insecureGrpc,
+		ServerHostname:   grpcServerForHostname(hostname),
+		RootDirectory:    rootDirectory,
+		LauncherPath:     launcherPath,
+		LogDirectory:     logDirectory,
+		SecretPath:       secretPath,
+		LaunchDaemonName: launchDaemonName,
+		Insecure:         insecure,
+		InsecureGrpc:     insecureGrpc,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
 	}
 
 	// The secret which the user will use to authenticate to the server
-	err = ioutil.WriteFile(filepath.Join(packageRoot, configurationDirectory, "secret"), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
 	if err != nil {
 		return "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
@@ -303,10 +309,14 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	ServerHostname string
-	RootDirectory  string
-	InsecureGrpc   bool
-	Insecure       bool
+	ServerHostname   string
+	RootDirectory    string
+	LauncherPath     string
+	LogDirectory     string
+	SecretPath       string
+	LaunchDaemonName string
+	InsecureGrpc     bool
+	Insecure         bool
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -317,7 +327,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>com.kolide.launcher</string>
+        <string>{{.LaunchDaemonName}}</string>
         <key>EnvironmentVariables</key>
         <dict>
             <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
@@ -325,7 +335,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_HOSTNAME</key>
             <string>{{.ServerHostname}}</string>
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
-            <string>/etc/kolide/secret</string>
+            <string>{{.SecretPath}}</string>
         </dict>
         <key>RunAtLoad</key>
         <true/>
@@ -335,14 +345,14 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <integer>60</integer>
         <key>ProgramArguments</key>
         <array>
-            <string>/usr/local/kolide/bin/launcher</string>
+            <string>{{.LauncherPath}}</string>
             {{if .InsecureGrpc}}<string>--insecure_grpc</string>{{end}}
             {{if .Insecure}}<string>--insecure</string>{{end}}
         </array>
         <key>StandardErrorPath</key>
-        <string>/var/log/kolide/launcher-stderr.log</string>
+        <string>{{.LogDirectory}}/launcher-stderr.log</string>
         <key>StandardOutPath</key>
-        <string>/var/log/kolide/launcher-stdout.log</string>
+        <string>{{.LogDirectory}}/launcher-stdout.log</string>
     </dict>
 </plist>`
 	t, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
