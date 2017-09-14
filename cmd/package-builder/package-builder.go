@@ -535,6 +535,7 @@ func runProd(args []string) error {
 		100184,
 		100203,
 		100223,
+		100224,
 	}
 
 	tenantIDs := []int{}
