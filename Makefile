@@ -108,11 +108,11 @@ CONTAINERS = ubuntu14 ubuntu16 centos6 centos7
 containers: $(CONTAINERS)
 
 $(CONTAINERS): xp-launcher xp-extension
-	docker build -t kolide/${@}-launcher:latest -f docker/${@}/Dockerfile .
-	VERSION=$$(docker run --rm kolide/${@}-launcher:latest launcher -version | head -1 | sed 's/launcher - version //g')
-	docker tag kolide/${@}-launcher:latest kolide/${@}-launcher:${VERSION}
+	docker build -t gcr.io/kolide-ose-testing/${@}-launcher:latest -f docker/${@}/Dockerfile .
+	VERSION=$$(docker run --rm gcr.io/kolide-ose-testing/${@}-launcher:latest launcher -version | head -1 | sed 's/launcher - version //g')
+	docker tag gcr.io/kolide-ose-testing/${@}-launcher:latest gcr.io/kolide-ose-testing/${@}-launcher:${VERSION}
 
 push-containers: $(CONTAINERS)
 	for container in $(CONTAINERS); do \
-		docker push kolide/$${container}-launcher; \
+		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
 	done
