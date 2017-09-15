@@ -235,10 +235,10 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 
 // How long to wait before erroring because we cannot open the osquery
 // extension socket.
-const socketOpenTimeout = 10 * time.Second
+const socketOpenTimeout = 5 * time.Second
 
 // How often to try to open the osquery extension socket
-const socketOpenInterval = 500 * time.Millisecond
+const socketOpenInterval = 200 * time.Millisecond
 
 // LaunchOsqueryInstance will launch an instance of osqueryd via a very
 // configurable API as defined by the various OsqueryInstanceOption functional
@@ -432,6 +432,21 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	return o, nil
 }
 
+// LaunchOsqueryInstanceWithRetry wraps LaunchOsqueryInstance, adding retry
+// upon failure. See the docs for LaunchOsqueryInstance.
+func LaunchOsqueryInstanceWithRetry(retry int, opts ...OsqueryInstanceOption) (inst *OsqueryInstance, err error) {
+	if retry <= 0 {
+		return nil, errors.New("retry count must be positive")
+	}
+	for ; retry > 0; retry-- {
+		inst, err = LaunchOsqueryInstance(opts...)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
 // Helper to check whether teardown should commence. This will atomically set
 // the teardown flag, and return true if teardown should commence, or false if
 // teardown has already begun.
@@ -559,7 +574,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 	for _, plugin := range o.extensionPlugins {
 		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
 	}
-	newInstance, err := LaunchOsqueryInstance(opts...)
+	newInstance, err := LaunchOsqueryInstanceWithRetry(3, opts...)
 	if err != nil {
 		return errors.Wrap(err, "could not launch new osquery instance")
 	}

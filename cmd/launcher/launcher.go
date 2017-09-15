@@ -356,7 +356,8 @@ func main() {
 	ext.Start()
 	defer ext.Shutdown()
 
-	instance, err := osquery.LaunchOsqueryInstance(
+	instance, err := osquery.LaunchOsqueryInstanceWithRetry(
+		3,
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(opts.rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
