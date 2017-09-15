@@ -367,6 +367,7 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
+		osquery.WithRetries(3),
 	)
 	if err != nil {
 		logFatal(logger, errors.Wrap(err, "launching osquery instance"))

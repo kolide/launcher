@@ -47,6 +47,7 @@ type osqueryInstanceFields struct {
 	extensionPlugins      []osquery.OsqueryPlugin
 	stdout                io.Writer
 	stderr                io.Writer
+	retries               uint
 
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
@@ -233,12 +234,20 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 	}
 }
 
+// WithRetries is a functional option which allows the user to define how many
+// retries to make when creating the process.
+func WithRetries(retries uint) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.retries = retries
+	}
+}
+
 // How long to wait before erroring because we cannot open the osquery
 // extension socket.
-const socketOpenTimeout = 10 * time.Second
+const socketOpenTimeout = 5 * time.Second
 
 // How often to try to open the osquery extension socket
-const socketOpenInterval = 500 * time.Millisecond
+const socketOpenInterval = 200 * time.Millisecond
 
 // LaunchOsqueryInstance will launch an instance of osqueryd via a very
 // configurable API as defined by the various OsqueryInstanceOption functional
@@ -270,6 +279,22 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		opt(o)
 	}
 
+	return launchOsqueryInstanceWithRetry(o)
+}
+
+// launchOsqueryInstanceWithRetry wraps launchOsqueryInstance, adding retry
+// upon failure.
+func launchOsqueryInstanceWithRetry(o *OsqueryInstance) (inst *OsqueryInstance, err error) {
+	for try := uint(0); try <= o.retries; try++ {
+		inst, err = launchOsqueryInstance(o)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
 	// try to find it in the path.
 	if o.binaryPath == "" {
@@ -430,6 +455,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	}()
 
 	return o, nil
+
 }
 
 // Helper to check whether teardown should commence. This will atomically set
@@ -552,6 +578,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 		WithConfigPluginFlag(o.configPluginFlag),
 		WithLoggerPluginFlag(o.loggerPluginFlag),
 		WithDistributedPluginFlag(o.distributedPluginFlag),
+		WithRetries(o.retries),
 	}
 	if !o.usingTempDir {
 		opts = append(opts, WithRootDirectory(o.rootDirectory))
