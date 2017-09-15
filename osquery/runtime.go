@@ -47,6 +47,7 @@ type osqueryInstanceFields struct {
 	extensionPlugins      []osquery.OsqueryPlugin
 	stdout                io.Writer
 	stderr                io.Writer
+	retries               uint
 
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
@@ -233,6 +234,14 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 	}
 }
 
+// WithRetries is a functional option which allows the user to define how many
+// retries to make when creating the process.
+func WithRetries(retries uint) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.retries = retries
+	}
+}
+
 // How long to wait before erroring because we cannot open the osquery
 // extension socket.
 const socketOpenTimeout = 5 * time.Second
@@ -270,6 +279,22 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		opt(o)
 	}
 
+	return launchOsqueryInstance(o)
+}
+
+// launchOsqueryInstanceWithRetry wraps launchOsqueryInstance, adding retry
+// upon failure.
+func launchOsqueryInstanceWithRetry(o *OsqueryInstance) (inst *OsqueryInstance, err error) {
+	for try := uint(0); try <= o.retries; try++ {
+		inst, err = launchOsqueryInstance(o)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
 	// try to find it in the path.
 	if o.binaryPath == "" {
@@ -430,21 +455,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	}()
 
 	return o, nil
-}
 
-// LaunchOsqueryInstanceWithRetry wraps LaunchOsqueryInstance, adding retry
-// upon failure. See the docs for LaunchOsqueryInstance.
-func LaunchOsqueryInstanceWithRetry(retry int, opts ...OsqueryInstanceOption) (inst *OsqueryInstance, err error) {
-	if retry <= 0 {
-		return nil, errors.New("retry count must be positive")
-	}
-	for ; retry > 0; retry-- {
-		inst, err = LaunchOsqueryInstance(opts...)
-		if err == nil {
-			return
-		}
-	}
-	return
 }
 
 // Helper to check whether teardown should commence. This will atomically set
@@ -567,6 +578,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 		WithConfigPluginFlag(o.configPluginFlag),
 		WithLoggerPluginFlag(o.loggerPluginFlag),
 		WithDistributedPluginFlag(o.distributedPluginFlag),
+		WithRetries(o.retries),
 	}
 	if !o.usingTempDir {
 		opts = append(opts, WithRootDirectory(o.rootDirectory))
@@ -574,7 +586,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 	for _, plugin := range o.extensionPlugins {
 		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
 	}
-	newInstance, err := LaunchOsqueryInstanceWithRetry(3, opts...)
+	newInstance, err := LaunchOsqueryInstance(opts...)
 	if err != nil {
 		return errors.Wrap(err, "could not launch new osquery instance")
 	}

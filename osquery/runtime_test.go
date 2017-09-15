@@ -97,7 +97,10 @@ func TestOsqueryRuntime(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstanceWithRetry(3, WithRootDirectory(rootDirectory))
+	instance, err := LaunchOsqueryInstance(
+		WithRootDirectory(rootDirectory),
+		WithRetries(3),
+	)
 	require.NoError(t, err)
 
 	healthy, err := instance.Healthy()
@@ -114,7 +117,10 @@ func TestRestart(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstanceWithRetry(3, WithRootDirectory(rootDirectory))
+	instance, err := LaunchOsqueryInstance(
+		WithRootDirectory(rootDirectory),
+		WithRetries(3),
+	)
 	require.NoError(t, err)
 
 	healthy, err := instance.Healthy()
@@ -137,7 +143,10 @@ func TestRecover(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstanceWithRetry(3, WithRootDirectory(rootDirectory))
+	instance, err := LaunchOsqueryInstance(
+		WithRootDirectory(rootDirectory),
+		WithRetries(3),
+	)
 	require.NoError(t, err)
 
 	require.NoError(t, instance.Recover(errors.New("fabricated in a test")))
