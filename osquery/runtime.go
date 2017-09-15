@@ -279,7 +279,7 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 		opt(o)
 	}
 
-	return launchOsqueryInstance(o)
+	return launchOsqueryInstanceWithRetry(o)
 }
 
 // launchOsqueryInstanceWithRetry wraps launchOsqueryInstance, adding retry
