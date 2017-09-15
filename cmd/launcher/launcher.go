@@ -280,12 +280,6 @@ func dialGRPC(
 func main() {
 	logger := log.NewJSONLogger(os.Stderr)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	logger = log.With(logger, "caller", log.DefaultCaller)
-
-	if _, err := osquery.DetectPlatform(); err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
-	}
-
 	opts, err := parseOptions()
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "invalid options"))
@@ -300,6 +294,14 @@ func main() {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	// Note: caller must be added after everything else that decorates the
+	// logger (otherwise we get incorrect line numbers).
+	logger = log.With(logger, "caller", log.DefaultCaller)
+
+	if _, err := osquery.DetectPlatform(); err != nil {
+		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	}
 
 	httpClient := http.DefaultClient
