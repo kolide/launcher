@@ -22,7 +22,6 @@ import (
 	"github.com/docker/notary/client"
 	"github.com/docker/notary/trustpinning"
 	"github.com/docker/notary/tuf/data"
-	//	tools "github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/updater/tuf"
 )
 
