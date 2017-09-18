@@ -26,13 +26,6 @@ Osquery has a very extensible plugin architecture that allow it to be heavily cu
 
 An implementation of the gRPC server is included with the [Kolide Fleet](https://github.com/kolide/fleet) osquery fleet manager. Kolide Fleet implements both the gRPC server as well as the legacy TLS server API, so it presents an easy migration path for existing TLS API users.
 
-### Easy Packaging and Deployment Tooling
-
-
-Deploying osquery and configuring it to communicate with a management server can be complicated, especially if you have to make customized deployment packages. The Launcher includes a tool called `package-builder` which you can use to create Launcher packages for your organization.
-
-Take the headache out of deploying osquery and check out the [documentation](./cmd/package-builder/README.md).
-
 ### Kolide's Best Practices
 
 Osquery allows you to ask a lot of great questions, but sometimes it's hard to know exactly which questions you should ask and what queries will expose the answers. The Launcher includes a table called `kolide_best_practices` which aggregates useful information in an easy "compliant" vs "not compliant" interface. Consider the following queries:
@@ -48,3 +41,15 @@ The following best practices, and many more, are included:
 - Is the firewall enabled?
 - Are [Remote Apple Events](https://support.apple.com/kb/PH18721?locale=en_US) disabled?
 - Is Internet Sharing disabled?
+
+### Reduced Configuration Surface
+
+The osqueryd binary was designed to be very configurable, which allows it to be used in very different environments. The Launcher wraps osqueryd configuration and exposes very high-level options that allow you to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto) (such as [Kolide Fleet](https://github.com/kolide/fleet)).
+
+To learn about The Launcher's command-line interface, see the Launcher [documentation](./cmd/launcher/README.md).
+
+### Easy Packaging and Deployment Tooling
+
+Deploying osquery and configuring it to communicate with a management server can be complicated, especially if you have to make customized deployment packages. The Launcher includes a tool called `package-builder` which you can use to create Launcher packages for your organization.
+
+Take the headache out of deploying osquery and check out the [documentation](./cmd/package-builder/README.md).
