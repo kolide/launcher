@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -208,7 +209,33 @@ func enableAutoUpdate(
 
 	// call this method to restart the launcher when autoupdate completes.
 	launcherFinalizer := func() error {
-		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+		// We have to find the instance of osqueryd and send it an interrupt so it
+		// shuts down it's extensions which are child processes of osqueryd. If we
+		// don't do this the extension continues to run and osqueryd thinks we're trying
+		// to register a duplicate extension and start up of new launcher process fails.
+		pidFilePath := filepath.Join(rootdir, "osquery.pid")
+		sPid, err := ioutil.ReadFile(pidFilePath)
+		if err != nil {
+			return errors.Wrap(err, "finding osquery pid")
+		}
+		pid, err := strconv.Atoi(string(sPid))
+		if err != nil {
+			return errors.Wrap(err, "converting pid")
+		}
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			return errors.Wrap(err, "finding pid")
+		}
+		// TODO: Interrupt doesn't work on Windows?
+		err = p.Signal(os.Interrupt)
+		if err != nil {
+			return errors.Wrap(err, "signal osqueryd failed")
+		}
+		if _, err = p.Wait(); err != nil {
+			return errors.Wrap(err, "shutdown osqueryd fails")
+		}
+		// replace launcher
+		if err = syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 			return errors.Wrap(err, "restarting launcher")
 		}
 		return nil
