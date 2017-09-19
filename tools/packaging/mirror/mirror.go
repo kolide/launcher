@@ -236,27 +236,21 @@ func intPtr(v int) *int { return &v }
 // ToggleAllOperations sets all operations, uploads, publishing etc to true. Channel
 // and Platform settings are retained.
 func ToggleAllOperations(f Flags) Flags {
-	b := true
-	pTrue := &b
-
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
-		Extract:              pTrue,
-		OsqueryTarball:       pTrue,
-		OsqueryMirrorUpload:  pTrue,
-		OsqueryNotaryPublish: pTrue,
-		LauncherTarball:      pTrue,
-		LauncherPublish:      pTrue,
-		LauncherUpload:       pTrue,
-		Download:             pTrue,
+		Extract:              boolPtr(true),
+		OsqueryTarball:       boolPtr(true),
+		OsqueryMirrorUpload:  boolPtr(true),
+		OsqueryNotaryPublish: boolPtr(true),
+		LauncherTarball:      boolPtr(true),
+		LauncherPublish:      boolPtr(true),
+		LauncherUpload:       boolPtr(true),
+		Download:             boolPtr(true),
 	}
 }
 
-var vTrue = true
-var vFalse = false
-var pTrue = &vTrue
-var pFalse = &vFalse
+func boolPtr(v bool) *bool { return &v }
 
 // ToggleAllOsquery sets flags to perform all operations required to download and publish Osquery.
 func ToggleAllOsquery(f Flags) Flags {
@@ -264,14 +258,14 @@ func ToggleAllOsquery(f Flags) Flags {
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
-		OsqueryTarball:       pTrue,
-		OsqueryMirrorUpload:  pTrue,
-		OsqueryNotaryPublish: pTrue,
-		Extract:              pTrue,
-		Download:             pTrue,
-		LauncherTarball:      pFalse,
-		LauncherPublish:      pFalse,
-		LauncherUpload:       pFalse,
+		OsqueryTarball:       boolPtr(true),
+		OsqueryMirrorUpload:  boolPtr(true),
+		OsqueryNotaryPublish: boolPtr(true),
+		Extract:              boolPtr(true),
+		Download:             boolPtr(true),
+		LauncherTarball:      boolPtr(false),
+		LauncherPublish:      boolPtr(false),
+		LauncherUpload:       boolPtr(false),
 	}
 }
 
@@ -281,14 +275,14 @@ func ToggleAllLauncher(f Flags) Flags {
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
-		LauncherTarball:      pTrue,
-		LauncherPublish:      pTrue,
-		LauncherUpload:       pTrue,
-		Extract:              pFalse,
-		Download:             pFalse,
-		OsqueryTarball:       pFalse,
-		OsqueryMirrorUpload:  pFalse,
-		OsqueryNotaryPublish: pFalse,
+		LauncherTarball:      boolPtr(true),
+		LauncherPublish:      boolPtr(true),
+		LauncherUpload:       boolPtr(true),
+		Extract:              boolPtr(false),
+		Download:             boolPtr(false),
+		OsqueryTarball:       boolPtr(false),
+		OsqueryMirrorUpload:  boolPtr(false),
+		OsqueryNotaryPublish: boolPtr(false),
 	}
 }
 

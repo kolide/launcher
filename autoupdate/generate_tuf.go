@@ -118,7 +118,7 @@ func retrieveDelegate(rootURL, rootLocalRepo, role string, client *http.Client) 
 	if err = ioutil.WriteFile(rolePath, data, 0644); err != nil {
 		return err
 	}
-	fmt.Printf("saved %s to %s\n", url, rolePath)
+	log.Printf("saved %s to %s\n", url, rolePath)
 	if len(delegate.Signed.Delegations.Roles) == 0 {
 		return nil
 	}

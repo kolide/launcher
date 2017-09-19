@@ -20,6 +20,12 @@ The Launcher includes the ability to securely manage and autoupdate osquery inst
 
 Because we understand the security implications of an osquery autoupdater, NCC Group was contracted to perform a [security audit]() of our in-house TUF client library. NCC Group has also previously performed assessments on [Docker Notary](https://www.nccgroup.trust/us/our-research/docker-notary/) and [Osquery](https://www.nccgroup.trust/us/about-us/newsroom-and-events/blog/2016/march/ncc-group-reviews-osquery/) as well.
 
+To enable the autoupdater simply pass the notary URL on the command line as in the following example:
+
+```
+build/launcher -hostname niftyhost.com -root_directory launcher-artifacts -enroll_secret ck2av5ucC4Jz825461HvogUEF+gYu12E -notary_url https://notary.kolide.com 
+```
+
 ### gRPC Server Specification and Implementation
 
 Osquery has a very extensible plugin architecture that allow it to be heavily customized with plugins. The included TLS plugins are used by many existing osquery management servers, but the design of the TLS API leaves much to be desired. The Launcher includes a set of gRPC plugins for remote communication with a gRPC server. The [server specification](https://github.com/kolide/agent-api) is independently published and versioned.

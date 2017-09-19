@@ -102,6 +102,9 @@ func (u *Updater) createLocalTufRepo() error {
 	return nil
 }
 
+// If false is returned an asset is copied from a source in bindata to the local filesystem.  If true is
+// returned  source was a directory, which we create on the local filesystem. The caller is responsible for
+// recursing into the asset data.
 func copier(source, dest string) (bool, error) {
 	if !regexp.MustCompile(`\.json$`).MatchString(source) {
 		if err := os.MkdirAll(dest, 0755); err != nil {

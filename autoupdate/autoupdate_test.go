@@ -54,13 +54,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 
 	err := createTUFRepoDirectory("local", "root", assetDir, copier)
 	require.Nil(t, err)
-
-	require.Equal(t, len(expected), len(actual))
-	for k, v := range expected {
-		va, ok := actual[k]
-		assert.True(t, ok)
-		assert.Equal(t, v, va)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestNewUpdater(t *testing.T) {
