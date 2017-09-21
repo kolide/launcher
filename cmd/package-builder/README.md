@@ -165,12 +165,6 @@ gcloud config set project kolide-website
 
 In addition to GCP, the [Notary command-line client](https://github.com/docker/notary) must be configured to communicate with the Kolide notary server. Delegate keys must be installed and passphrases must be available. See the next section that describes setting up Notary if the TUF respositories haven't been created yet.
 
-Setup the Notary client configuration.
-
-```
-mkdir ~/.notary && echo '{ "remote_server": { "url": "https://notary.kolide.com" } }' > ~/.notary/config.json
-```
-
 Set the delegation environment variable:
 
 ```
