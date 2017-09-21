@@ -233,7 +233,7 @@ func enableAutoUpdate(
 	// call this method to restart the launcher when autoupdate completes.
 	launcherFinalizer := func() error {
 
-		if err = shutdownOsQuery(rootdir); err != nil {
+		if err = shutdownOsQuery(rootDirectory); err != nil {
 			level.Warn(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
