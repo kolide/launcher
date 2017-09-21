@@ -174,7 +174,7 @@ func insecureHTTPClient() *http.Client {
 // shuts down it's extensions which are child processes of osqueryd. If we
 // don't do this the extension continues to run and osqueryd thinks we're trying
 // to register a duplicate extension and start up of new launcher process fails.
-func shutdownOsQuery(rootdir string) error {
+func shutdownOsquery(rootdir string) error {
 	pidFilePath := filepath.Join(rootdir, "osquery.pid")
 	sPid, err := ioutil.ReadFile(pidFilePath)
 	if err != nil {
@@ -233,7 +233,7 @@ func enableAutoUpdate(
 	// call this method to restart the launcher when autoupdate completes.
 	launcherFinalizer := func() error {
 
-		if err = shutdownOsQuery(rootDirectory); err != nil {
+		if err = shutdownOsquery(rootDirectory); err != nil {
 			level.Warn(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
