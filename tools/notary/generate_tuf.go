@@ -14,6 +14,7 @@ import (
 	"github.com/docker/notary/trustpinning"
 	"github.com/docker/notary/tuf/data"
 	"github.com/kolide/launcher/tools/packaging"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -30,14 +31,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bootstrapFromNotary(*flNotaryConfigDir, localRepo, gun)
+	if err := bootstrapFromNotary(*flNotaryConfigDir, localRepo, gun); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("successfully bootstrapped and validated TUF repo %q\n", gun)
 }
 
-func bootstrapFromNotary(baseDir, localRepo, gun string) {
+func bootstrapFromNotary(baseDir, localRepo, gun string) error {
 	// Read Notary configuration
 	fin, err := os.Open(filepath.Join(baseDir, "config.json"))
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "opening notary config file")
 	}
 	defer fin.Close()
 
@@ -46,7 +51,7 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) {
 		RemoteServer RemoteServer `json:"remote_server"`
 	}{}
 	if err = json.NewDecoder(fin).Decode(&conf); err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "decoding notary config file")
 	}
 
 	// Safely fetch and validate all TUF metadata from remote Notary server.
@@ -59,20 +64,20 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) {
 		trustpinning.TrustPinConfig{},
 	)
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "create an instance of the TUF repository")
 	}
 
 	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "getting all target metadata")
 	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(baseDir, "tuf", gun, "metadata")
 	if err := packaging.CopyDir(source, localRepo); err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "copying TUF repo metadata")
 	}
 
-	log.Printf("successfully bootstrapped and validated TUF repo %q\n", gun)
+	return nil
 }
 
 type RemoteServer struct {
