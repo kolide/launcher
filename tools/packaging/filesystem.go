@@ -1,11 +1,14 @@
 package packaging
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/kolide/kit/env"
+	"github.com/pkg/errors"
 )
 
 // Gopath will return the current GOPATH as set by environment variables and
@@ -85,4 +88,49 @@ func CopyFile(src, dest string) error {
 	}
 
 	return os.Chmod(dest, sourceinfo.Mode())
+}
+
+// UntarDownload will untar a source tar.gz archive to the supplied destination
+func UntarDownload(destination string, source string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return errors.Wrap(err, "open download source")
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return errors.Wrapf(err, "create gzip reader from %s", source)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errors.Wrap(err, "reading tar file")
+		}
+
+		path := filepath.Join(filepath.Dir(destination), header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return errors.Wrapf(err, "creating directory for tar file: %s", path)
+			}
+			continue
+		}
+
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return errors.Wrapf(err, "open file %s", path)
+		}
+		defer file.Close()
+		if _, err := io.Copy(file, tr); err != nil {
+			return errors.Wrapf(err, "copy tar %s to destination %s", header.FileInfo().Name(), path)
+		}
+	}
+	return nil
 }

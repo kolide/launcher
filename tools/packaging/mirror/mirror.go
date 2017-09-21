@@ -236,48 +236,53 @@ func intPtr(v int) *int { return &v }
 // ToggleAllOperations sets all operations, uploads, publishing etc to true. Channel
 // and Platform settings are retained.
 func ToggleAllOperations(f Flags) Flags {
-	b := true
-	pTrue := &b
-
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
-		Extract:              pTrue,
-		OsqueryTarball:       pTrue,
-		OsqueryMirrorUpload:  pTrue,
-		OsqueryNotaryPublish: pTrue,
-		LauncherTarball:      pTrue,
-		LauncherPublish:      pTrue,
-		LauncherUpload:       pTrue,
-		Download:             pTrue,
+		Extract:              boolPtr(true),
+		OsqueryTarball:       boolPtr(true),
+		OsqueryMirrorUpload:  boolPtr(true),
+		OsqueryNotaryPublish: boolPtr(true),
+		LauncherTarball:      boolPtr(true),
+		LauncherPublish:      boolPtr(true),
+		LauncherUpload:       boolPtr(true),
+		Download:             boolPtr(true),
 	}
 }
 
+func boolPtr(v bool) *bool { return &v }
+
 // ToggleAllOsquery sets flags to perform all operations required to download and publish Osquery.
 func ToggleAllOsquery(f Flags) Flags {
-	b := true
-	pTrue := &b
+
 	return Flags{
 		Platform:             f.Platform,
 		Channel:              f.Channel,
-		OsqueryTarball:       pTrue,
-		OsqueryMirrorUpload:  pTrue,
-		OsqueryNotaryPublish: pTrue,
-		Extract:              pTrue,
-		Download:             pTrue,
+		OsqueryTarball:       boolPtr(true),
+		OsqueryMirrorUpload:  boolPtr(true),
+		OsqueryNotaryPublish: boolPtr(true),
+		Extract:              boolPtr(true),
+		Download:             boolPtr(true),
+		LauncherTarball:      boolPtr(false),
+		LauncherPublish:      boolPtr(false),
+		LauncherUpload:       boolPtr(false),
 	}
 }
 
 // ToggleAllLauncher set flags to perform all operations required publish Launcher.
 func ToggleAllLauncher(f Flags) Flags {
-	b := true
-	pTrue := &b
+
 	return Flags{
-		Platform:        f.Platform,
-		Channel:         f.Channel,
-		LauncherTarball: pTrue,
-		LauncherPublish: pTrue,
-		LauncherUpload:  pTrue,
+		Platform:             f.Platform,
+		Channel:              f.Channel,
+		LauncherTarball:      boolPtr(true),
+		LauncherPublish:      boolPtr(true),
+		LauncherUpload:       boolPtr(true),
+		Extract:              boolPtr(false),
+		Download:             boolPtr(false),
+		OsqueryTarball:       boolPtr(false),
+		OsqueryMirrorUpload:  boolPtr(false),
+		OsqueryNotaryPublish: boolPtr(false),
 	}
 }
 
@@ -701,6 +706,7 @@ func publishToNotary(logger log.Logger, platform, binary, archive string) error 
 		gun,
 		target,
 		archive,
+		"--roles=targets/releases",
 		"-p",
 	)
 	errNotary := func(err error, t, g string) error {

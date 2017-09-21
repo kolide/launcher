@@ -44,6 +44,10 @@ import:
   subpackages:
   - storage
   - '...'
+- package: github.com/docker/notary
+  version: 8a1de3cfc3f1408e54d6364fc949214a4883a9f3
+  subpackages:
+  - client
 testImport:
 - package: github.com/stretchr/testify
   subpackages:

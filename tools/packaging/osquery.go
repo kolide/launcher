@@ -9,7 +9,6 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/kolide/launcher/autoupdate"
 	"github.com/pkg/errors"
 )
 
@@ -85,7 +84,7 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
-	if err := autoupdate.UntarDownload(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
+	if err := UntarDownload(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
 		return "", errors.Wrap(err, "couldn't untar package")
 	}
 

@@ -85,13 +85,22 @@ package-builder: .pre-build xp-launcher xp-extension .pre-package-builder
 
 deps: .deps generate
 
-INSECURE ?= false
+# First, we generate a bindata file from an empty directory so that the symbols
+# are present (Asset, AssetDir, etc). Once the symbols are present, we can run
+# the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
+# the bindata file with the real TUF metadata.
 generate:
-	go run ./autoupdate/generate_tuf.go \
-		-binary=osqueryd -notary=${NOTARY_URL} -insecure=${INSECURE}
-	go run ./autoupdate/generate_tuf.go \
-		-binary=launcher -notary=${NOTARY_URL} -insecure=${INSECURE}
-	go-bindata -o autoupdate/bindata.go -pkg autoupdate autoupdate/assets/...
+	$(eval EMPTY_BINDATA_DIR = $(shell mktemp -d))
+	go-bindata \
+		-o autoupdate/bindata.go \
+		-pkg autoupdate \
+		$(EMPTY_BINDATA_DIR)
+	go run ./tools/notary/generate_tuf.go -binary osqueryd
+	go run ./tools/notary/generate_tuf.go -binary launcher
+	go-bindata \
+		-o autoupdate/bindata.go \
+		-pkg autoupdate \
+		autoupdate/assets/...
 
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)

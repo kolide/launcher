@@ -193,27 +193,28 @@ func shutdownOsQuery(rootdir string) error {
 }
 
 func enableAutoUpdate(
-	notaryURL, mirrorURL, binaryPath, rootdir string,
+	notaryURL, mirrorURL, binaryPath, rootDirectory string,
 	autoupdateInterval time.Duration,
 	restart func() error,
 	client *http.Client,
 	logger log.Logger,
 ) (stop func(), err error) {
-	defaultOpts := []autoupdate.UpdaterOption{
+	autoupdateOpts := []autoupdate.UpdaterOption{
 		autoupdate.WithHTTPClient(client),
 		autoupdate.WithNotaryURL(notaryURL),
 		autoupdate.WithLogger(logger),
 	}
 	if mirrorURL != "" {
-		defaultOpts = append(defaultOpts, autoupdate.WithMirrorURL(mirrorURL))
+		autoupdateOpts = append(autoupdateOpts, autoupdate.WithMirrorURL(mirrorURL))
 	}
 
 	var osquerydUpdaterOpts []autoupdate.UpdaterOption
-	osquerydUpdaterOpts = append(osquerydUpdaterOpts, defaultOpts...)
+	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdateOpts...)
 	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdate.WithFinalizer(restart))
 	osquerydUpdater, err := autoupdate.NewUpdater(
-		autoupdate.Destination(binaryPath),
-		rootdir,
+		binaryPath,
+		rootDirectory,
+		logger,
 		osquerydUpdaterOpts...,
 	)
 	if err != nil {
@@ -246,11 +247,12 @@ func enableAutoUpdate(
 	}
 
 	var launcherUpdaterOpts []autoupdate.UpdaterOption
-	launcherUpdaterOpts = append(launcherUpdaterOpts, defaultOpts...)
+	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdateOpts...)
 	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdate.WithFinalizer(launcherFinalizer))
 	launcherUpdater, err := autoupdate.NewUpdater(
-		autoupdate.Destination(launcherPath),
-		rootdir,
+		launcherPath,
+		rootDirectory,
+		logger,
 		launcherUpdaterOpts...,
 	)
 	if err != nil {

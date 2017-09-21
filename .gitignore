@@ -23,3 +23,5 @@ bin
 # TUF metadata
 autoupdate/assets/
 autoupdate/bindata.go
+tools/notary/config/private
+tools/notary/config/tuf

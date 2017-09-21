@@ -2,13 +2,44 @@ package autoupdate
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCreateTUFRepoDirectory(t *testing.T) {
+	localTUFRepoPath, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+
+	require.Nil(t, createTUFRepoDirectory(localTUFRepoPath, "autoupdate/assets", AssetDir))
+
+	knownFilePaths := []string{
+		"launcher-tuf/root.json",
+		"launcher-tuf/snapshot.json",
+		"launcher-tuf/targets.json",
+		"launcher-tuf/timestamp.json",
+		"launcher-tuf/targets/releases.json",
+		"osqueryd-tuf/root.json",
+		"osqueryd-tuf/snapshot.json",
+		"osqueryd-tuf/targets.json",
+		"osqueryd-tuf/timestamp.json",
+		"osqueryd-tuf/targets/releases.json",
+	}
+
+	for _, knownFilePath := range knownFilePaths {
+		_, err = os.Stat(filepath.Join(localTUFRepoPath, knownFilePath))
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, os.RemoveAll(localTUFRepoPath))
+}
 
 func TestNewUpdater(t *testing.T) {
 	var tests = []struct {
@@ -49,7 +80,7 @@ func TestNewUpdater(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
-			u, err := NewUpdater("/tmp/app", "/tmp/tuf", tt.opts...)
+			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewNopLogger(), tt.opts...)
 			require.Nil(t, err)
 
 			assert.Equal(t, tt.target, u.target)

@@ -6,10 +6,7 @@
 package autoupdate
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -17,9 +14,22 @@ import (
 	"path/filepath"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
+)
+
+// UpdateChannel determines the TUF target for a Updater.
+// The Default UpdateChannel is Stable.
+type UpdateChannel string
+
+const (
+	Stable   UpdateChannel = "stable"
+	Beta                   = "beta"
+	Nightly                = "nightly"
+	localDev               = "development"
 )
 
 const (
@@ -42,25 +52,26 @@ type Updater struct {
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
-func NewUpdater(
-	d Destination,
-	metadataRoot string,
-	opts ...UpdaterOption,
-) (*Updater, error) {
+func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
+	binaryName := filepath.Base(binaryPath)
+	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", binaryName))
+	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
+	gun := fmt.Sprintf("kolide/%s", binaryName)
+
 	settings := tuf.Settings{
-		LocalRepoPath: d.tufRepoPath(metadataRoot),
+		LocalRepoPath: tufRepoPath,
 		NotaryURL:     defaultNotary,
-		GUN:           d.gun(),
+		GUN:           gun,
 		MirrorURL:     defaultMirror,
 	}
 
 	updater := Updater{
 		settings:      &settings,
-		destination:   string(d),
-		stagingPath:   d.stagingPath(),
+		destination:   binaryPath,
+		stagingPath:   stagingPath,
 		updateChannel: Stable,
 		client:        http.DefaultClient,
-		logger:        log.NewNopLogger(),
+		logger:        logger,
 		finalizer:     func() error { return nil },
 	}
 
@@ -74,7 +85,7 @@ func NewUpdater(
 	var err error
 	updater.target, err = updater.setTargetPath()
 	if err != nil {
-		return nil, errors.Wrapf(err, "set updater target for destination %s", d)
+		return nil, errors.Wrapf(err, "set updater target for destination %s", binaryPath)
 	}
 	if err := updater.bootstrapFn(); err != nil {
 		return nil, errors.Wrap(err, "creating local TUF repo")
@@ -85,23 +96,58 @@ func NewUpdater(
 
 // bootstraps local TUF metadata from bindata assets.
 func (u *Updater) createLocalTufRepo() error {
+	// We don't want to overwrite an existing repo as it stores state between installations
+	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
+		level.Debug(u.logger).Log("msg", "not creating new TUF repositories because they already exist")
+		return nil
+	}
+
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
 		return err
 	}
-
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
-	roles := []string{"root.json", "snapshot.json", "timestamp.json", "targets.json"}
-	for _, role := range roles {
-		asset, err := Asset(path.Join("autoupdate", "assets", localRepo, role))
-		if err != nil {
-			return err
-		}
-		localPath := filepath.Join(u.settings.LocalRepoPath, role)
-		if err := ioutil.WriteFile(localPath, asset, 0644); err != nil {
-			return err
-		}
+	assetPath := path.Join("autoupdate", "assets", localRepo)
+	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+type assetDirFunc func(string) ([]string, error)
+
+// Creates TUF repo including delegate tree structure on local file system.
+// assetDir is the bindata AssetDir function.
+func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
+	paths, err := assetDir(currentAssetPath)
+	if err != nil {
+		return err
 	}
 
+	for _, assetPath := range paths {
+		fullAssetPath := path.Join(currentAssetPath, assetPath)
+		fullLocalPath := filepath.Join(localPath, assetPath)
+
+		// if fullAssetPath is a json file, we should copy it to localPath
+		if filepath.Ext(fullAssetPath) == ".json" {
+			asset, err := Asset(fullAssetPath)
+			if err != nil {
+				return errors.Wrap(err, "could not get asset")
+			}
+			if err := ioutil.WriteFile(fullLocalPath, asset, 0644); err != nil {
+				return errors.Wrap(err, "could not write file")
+			}
+			continue
+		}
+
+		// if fullAssetPath is not a JSON file, it's a directory. Create the
+		// directory in localPath and recurse into it
+		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
+			return err
+		}
+		if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
+			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
+		}
+	}
 	return nil
 }
 
@@ -160,35 +206,9 @@ func withoutBootstrap() UpdaterOption {
 	}
 }
 
-// UpdateFinalizer is executed after the Updater updates a Destination.
+// UpdateFinalizer is executed after the Updater updates a destination.
 // The UpdateFinalizer is usually a function which will handle restarting the updated binary.
 type UpdateFinalizer func() error
-
-// Destination is a binary path which will be replaced by the Updater.
-type Destination string
-
-// Before replacing the running binary, the updater must download and untar it from the remote server.
-// The running binary is replaced only if the download is successful.
-func (d Destination) stagingPath() string {
-	bin := string(d)
-	return filepath.Join(
-		filepath.Dir(bin),
-		fmt.Sprintf("%s-staging", filepath.Base(bin)),
-	)
-}
-
-func (d Destination) tufRepoPath(root string) string {
-	return filepath.Join(
-		root,
-		fmt.Sprintf("%s-tuf", filepath.Base(string(d))),
-	)
-}
-
-// The TUF GUN is kolide/<binary_name>
-func (d Destination) gun() string {
-	bin := filepath.Base(string(d))
-	return fmt.Sprintf("kolide/%s", bin)
-}
 
 // Run starts the updater, which will run until the stop function is called.
 func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
@@ -224,7 +244,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
-		if err := UntarDownload(stagingPath, stagingPath); err != nil {
+		if err := packaging.UntarDownload(stagingPath, stagingPath); err != nil {
 			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}
@@ -249,51 +269,6 @@ func (u *Updater) handler() tuf.NotificationHandler {
 	}
 }
 
-// UntarDownload will untar a source tar.gz archive to the supplied destination
-func UntarDownload(destination string, source string) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return errors.Wrap(err, "autoupdate: open download source")
-	}
-	defer f.Close()
-
-	gzr, err := gzip.NewReader(f)
-	if err != nil {
-		return errors.Wrapf(err, "autoupdate: create gzip reader from %s", source)
-	}
-	defer gzr.Close()
-
-	tr := tar.NewReader(gzr)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return errors.Wrap(err, "autoupdate: reading tar file")
-		}
-
-		path := filepath.Join(filepath.Dir(destination), header.Name)
-		info := header.FileInfo()
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return errors.Wrapf(err, "autoupdate: creating directory for tar file: %s", path)
-			}
-			continue
-		}
-
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return errors.Wrapf(err, "autoupdate: open file %s", path)
-		}
-		defer file.Close()
-		if _, err := io.Copy(file, tr); err != nil {
-			return errors.Wrapf(err, "autoupdate: copy tar %s to destination %s", header.FileInfo().Name(), path)
-		}
-	}
-	return nil
-}
-
 // target creates a TUF target for a binary using the Destination.
 // Ex: darwin/osquery-stable.tar.gz
 func (u *Updater) setTargetPath() (string, error) {
@@ -307,14 +282,3 @@ func (u *Updater) setTargetPath() (string, error) {
 	base := path.Join(string(platform), filename)
 	return fmt.Sprintf("%s.tar.gz", base), nil
 }
-
-// UpdateChannel determines the TUF target for a Updater.
-// The Default UpdateChannel is Stable.
-type UpdateChannel string
-
-const (
-	Stable   UpdateChannel = "stable"
-	Beta                   = "beta"
-	Nightly                = "nightly"
-	localDev               = "development"
-)
