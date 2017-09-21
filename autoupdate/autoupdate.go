@@ -15,6 +15,7 @@ import (
 	"regexp"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/updater/tuf"
@@ -52,7 +53,7 @@ type Updater struct {
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
-func NewUpdater(binaryPath string, rootDirectory string, opts ...UpdaterOption) (*Updater, error) {
+func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
 	binaryName := filepath.Base(binaryPath)
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", binaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
@@ -71,7 +72,7 @@ func NewUpdater(binaryPath string, rootDirectory string, opts ...UpdaterOption) 
 		stagingPath:   stagingPath,
 		updateChannel: Stable,
 		client:        http.DefaultClient,
-		logger:        log.NewNopLogger(),
+		logger:        logger,
 		finalizer:     func() error { return nil },
 	}
 
@@ -98,6 +99,7 @@ func NewUpdater(binaryPath string, rootDirectory string, opts ...UpdaterOption) 
 func (u *Updater) createLocalTufRepo() error {
 	// We don't want to overwrite an existing repo as it stores state between installations
 	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
+		level.Debug(u.logger).Log("msg", "not creating new TUF repositories because they already exist")
 		return nil
 	}
 
@@ -106,7 +108,6 @@ func (u *Updater) createLocalTufRepo() error {
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("autoupdate", "assets", localRepo)
-	fmt.Println("assetPath: ", assetPath)
 	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
 		return err
 	}

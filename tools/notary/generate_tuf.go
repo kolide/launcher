@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -13,6 +12,8 @@ import (
 	"github.com/docker/notary/client"
 	"github.com/docker/notary/trustpinning"
 	"github.com/docker/notary/tuf/data"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/tools/packaging"
 	"github.com/pkg/errors"
 )
@@ -24,33 +25,41 @@ func main() {
 	)
 	flag.Parse()
 
+	logger := log.NewJSONLogger(os.Stderr)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+
 	gun := path.Join("kolide", *flBinary)
 	localRepo := filepath.Join("autoupdate", "assets", fmt.Sprintf("%s-tuf", *flBinary))
 
 	if err := os.MkdirAll(localRepo, 0755); err != nil {
-		log.Fatal(err)
+		level.Info(logger).Log("err", err)
+		os.Exit(1)
 	}
 
 	if err := bootstrapFromNotary(*flNotaryConfigDir, localRepo, gun); err != nil {
-		log.Fatal(err)
+		level.Info(logger).Log("err", err)
+		os.Exit(1)
 	}
 
-	log.Printf("successfully bootstrapped and validated TUF repo %q\n", gun)
+	level.Info(logger).Log(
+		"msg", "successfully bootstrapped and validated TUF repo",
+		"gun", gun,
+	)
 }
 
 func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	// Read Notary configuration
-	fin, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
+	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
 	if err != nil {
 		return errors.Wrap(err, "opening notary config file")
 	}
-	defer fin.Close()
+	defer notaryConfigFile.Close()
 
 	// Decode the Notary configuration into a struct
 	conf := struct {
-		RemoteServer RemoteServer `json:"remote_server"`
+		notaryConfig notaryConfig `json:"remote_server"`
 	}{}
-	if err = json.NewDecoder(fin).Decode(&conf); err != nil {
+	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
 		return errors.Wrap(err, "decoding notary config file")
 	}
 
@@ -58,7 +67,7 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	repo, err := client.NewFileCachedRepository(
 		notaryConfigDir,
 		data.GUN(gun),
-		conf.RemoteServer.URL,
+		conf.notaryConfig.URL,
 		&http.Transport{},
 		passwordRetriever,
 		trustpinning.TrustPinConfig{},
@@ -80,7 +89,7 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	return nil
 }
 
-type RemoteServer struct {
+type notaryConfig struct {
 	URL        string `json:"url"`
 	RootCA     string `json:"root_ca"`
 	ClientCert string `json:"tls_client_cert"`

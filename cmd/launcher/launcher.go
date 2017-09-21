@@ -191,6 +191,7 @@ func enableAutoUpdate(
 	osquerydUpdater, err := autoupdate.NewUpdater(
 		binaryPath,
 		rootDirectory,
+		logger,
 		osquerydUpdaterOpts...,
 	)
 	if err != nil {
@@ -220,6 +221,7 @@ func enableAutoUpdate(
 	launcherUpdater, err := autoupdate.NewUpdater(
 		launcherPath,
 		rootDirectory,
+		logger,
 		launcherUpdaterOpts...,
 	)
 	if err != nil {
