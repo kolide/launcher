@@ -56,9 +56,7 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	defer notaryConfigFile.Close()
 
 	// Decode the Notary configuration into a struct
-	conf := struct {
-		notaryConfig notaryConfig `json:"remote_server"`
-	}{}
+	conf := notaryConfig{}
 	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
 		return errors.Wrap(err, "decoding notary config file")
 	}
@@ -67,7 +65,7 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	repo, err := client.NewFileCachedRepository(
 		notaryConfigDir,
 		data.GUN(gun),
-		conf.notaryConfig.URL,
+		conf.RemoteServer.URL,
 		&http.Transport{},
 		passwordRetriever,
 		trustpinning.TrustPinConfig{},
@@ -90,10 +88,9 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 }
 
 type notaryConfig struct {
-	URL        string `json:"url"`
-	RootCA     string `json:"root_ca"`
-	ClientCert string `json:"tls_client_cert"`
-	ClientKey  string `json:"tls_client_key"`
+	RemoteServer struct {
+		URL string `json:"url"`
+	} `json:"remote_server"`
 }
 
 func passwordRetriever(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
