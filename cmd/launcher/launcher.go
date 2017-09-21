@@ -176,17 +176,17 @@ func enableAutoUpdate(
 	client *http.Client,
 	logger log.Logger,
 ) (stop func(), err error) {
-	defaultOpts := []autoupdate.UpdaterOption{
+	autoupdateOpts := []autoupdate.UpdaterOption{
 		autoupdate.WithHTTPClient(client),
 		autoupdate.WithNotaryURL(notaryURL),
 		autoupdate.WithLogger(logger),
 	}
 	if mirrorURL != "" {
-		defaultOpts = append(defaultOpts, autoupdate.WithMirrorURL(mirrorURL))
+		autoupdateOpts = append(autoupdateOpts, autoupdate.WithMirrorURL(mirrorURL))
 	}
 
 	var osquerydUpdaterOpts []autoupdate.UpdaterOption
-	osquerydUpdaterOpts = append(osquerydUpdaterOpts, defaultOpts...)
+	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdateOpts...)
 	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdate.WithFinalizer(restart))
 	osquerydUpdater, err := autoupdate.NewUpdater(
 		autoupdate.Destination(binaryPath),
@@ -215,7 +215,7 @@ func enableAutoUpdate(
 	}
 
 	var launcherUpdaterOpts []autoupdate.UpdaterOption
-	launcherUpdaterOpts = append(launcherUpdaterOpts, defaultOpts...)
+	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdateOpts...)
 	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdate.WithFinalizer(launcherFinalizer))
 	launcherUpdater, err := autoupdate.NewUpdater(
 		autoupdate.Destination(launcherPath),
