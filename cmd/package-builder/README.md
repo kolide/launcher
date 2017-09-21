@@ -2,12 +2,6 @@
 
 ## Building the tool
 
-If you don't have notary configured, run the following command;
-
-```
-mkdir ~/.notary && echo '{ "remote_server": { "url": "https://notary.kolide.com" } }' > ~/.notary/config.json
-```
-
 From the root of the repository, run the following:
 
 ```
