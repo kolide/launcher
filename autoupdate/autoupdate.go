@@ -114,30 +114,22 @@ func (u *Updater) createLocalTufRepo() error {
 	return nil
 }
 
+type assetDirFunc func(string) ([]string, error)
+
 // Creates TUF repo including delegate tree structure on local file system.
 // assetDir is the bindata AssetDir function.
-func createTUFRepoDirectory(
-	localPath string,
-	currentAssetPath string,
-	assetDir func(string) ([]string, error),
-) error {
+func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
 		return err
 	}
-	for _, pth := range paths {
-		fullAssetPath := path.Join(currentAssetPath, pth)
-		fullLocalPath := filepath.Join(localPath, pth)
 
-		if !regexp.MustCompile(`\.json$`).MatchString(fullAssetPath) {
-			if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
-				return err
-			}
-			if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
-				return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
-			}
-		} else {
-			// If it's not a directory, copy the asset contents to the local file system
+	for _, assetPath := range paths {
+		fullAssetPath := path.Join(currentAssetPath, assetPath)
+		fullLocalPath := filepath.Join(localPath, assetPath)
+
+		// if fullAssetPath is a json file, we should copy it to localPath
+		if regexp.MustCompile(`\.json$`).MatchString(fullAssetPath) {
 			asset, err := Asset(fullAssetPath)
 			if err != nil {
 				return errors.Wrap(err, "could not get asset")
@@ -145,6 +137,16 @@ func createTUFRepoDirectory(
 			if err := ioutil.WriteFile(fullLocalPath, asset, 0644); err != nil {
 				return errors.Wrap(err, "could not write file")
 			}
+			continue
+		}
+
+		// if fullAssetPath is not a JSON file, it's a directory. Create the
+		// directory in localPath and recurse into it
+		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
+			return err
+		}
+		if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
+			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
 		}
 	}
 	return nil
