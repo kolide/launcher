@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -129,7 +128,7 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 		fullLocalPath := filepath.Join(localPath, assetPath)
 
 		// if fullAssetPath is a json file, we should copy it to localPath
-		if regexp.MustCompile(`\.json$`).MatchString(fullAssetPath) {
+		if filepath.Ext(fullAssetPath) == ".json" {
 			asset, err := Asset(fullAssetPath)
 			if err != nil {
 				return errors.Wrap(err, "could not get asset")
