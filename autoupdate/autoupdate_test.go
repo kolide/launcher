@@ -2,7 +2,10 @@ package autoupdate
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/kolide/launcher/osquery"
@@ -11,42 +14,30 @@ import (
 )
 
 func TestCreateTUFRepoDirectory(t *testing.T) {
-	td := map[string][]string{
-		"root": []string{
-			"root.json",
-			"snapshot.json",
-			"targets.json",
-			"timestamp.json",
-			"targets",
-		},
-		"root/targets": []string{
-			"releases.json",
-			"betas.json",
-			"releases",
-		},
-		"root/targets/releases": []string{
-			"zippy.json",
-		},
-	}
-	expected := map[string]string{
-		"root/root.json":                   "local/root.json",
-		"root/snapshot.json":               "local/snapshot.json",
-		"root/targets.json":                "local/targets.json",
-		"root/timestamp.json":              "local/timestamp.json",
-		"root/targets/releases.json":       "local/targets/releases.json",
-		"root/targets/betas.json":          "local/targets/betas.json",
-		"root/targets":                     "local/targets",
-		"root/targets/releases":            "local/targets/releases",
-		"root/targets/releases/zippy.json": "local/targets/releases/zippy.json",
-	}
-	actual := map[string]string{}
-	assetDir := func(path string) ([]string, error) {
-		return td[path], nil
+	localTUFRepoPath, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+
+	require.Nil(t, createTUFRepoDirectory(localTUFRepoPath, "autoupdate/assets", AssetDir))
+
+	knownFilePaths := []string{
+		"launcher-tuf/root.json",
+		"launcher-tuf/snapshot.json",
+		"launcher-tuf/targets.json",
+		"launcher-tuf/timestamp.json",
+		"launcher-tuf/targets/releases.json",
+		"osqueryd-tuf/root.json",
+		"osqueryd-tuf/snapshot.json",
+		"osqueryd-tuf/targets.json",
+		"osqueryd-tuf/timestamp.json",
+		"osqueryd-tuf/targets/releases.json",
 	}
 
-	err := createTUFRepoDirectory("local", "root", assetDir)
-	require.Nil(t, err)
-	assert.Equal(t, expected, actual)
+	for _, knownFilePath := range knownFilePaths {
+		_, err = os.Stat(filepath.Join(localTUFRepoPath, knownFilePath))
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, os.RemoveAll(localTUFRepoPath))
 }
 
 func TestNewUpdater(t *testing.T) {

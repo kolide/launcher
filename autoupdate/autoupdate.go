@@ -6,10 +6,7 @@
 package autoupdate
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -19,6 +16,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 )
@@ -257,7 +255,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
-		if err := UntarDownload(stagingPath, stagingPath); err != nil {
+		if err := packaging.UntarDownload(stagingPath, stagingPath); err != nil {
 			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}
@@ -280,51 +278,6 @@ func (u *Updater) handler() tuf.NotificationHandler {
 
 		u.logger.Log("msg", "completed update for binary", "binary", u.destination)
 	}
-}
-
-// UntarDownload will untar a source tar.gz archive to the supplied destination
-func UntarDownload(destination string, source string) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return errors.Wrap(err, "autoupdate: open download source")
-	}
-	defer f.Close()
-
-	gzr, err := gzip.NewReader(f)
-	if err != nil {
-		return errors.Wrapf(err, "autoupdate: create gzip reader from %s", source)
-	}
-	defer gzr.Close()
-
-	tr := tar.NewReader(gzr)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return errors.Wrap(err, "autoupdate: reading tar file")
-		}
-
-		path := filepath.Join(filepath.Dir(destination), header.Name)
-		info := header.FileInfo()
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return errors.Wrapf(err, "autoupdate: creating directory for tar file: %s", path)
-			}
-			continue
-		}
-
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return errors.Wrapf(err, "autoupdate: open file %s", path)
-		}
-		defer file.Close()
-		if _, err := io.Copy(file, tr); err != nil {
-			return errors.Wrapf(err, "autoupdate: copy tar %s to destination %s", header.FileInfo().Name(), path)
-		}
-	}
-	return nil
 }
 
 // target creates a TUF target for a binary using the Destination.
