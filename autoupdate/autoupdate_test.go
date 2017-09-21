@@ -3,7 +3,6 @@ package autoupdate
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"testing"
 
 	"github.com/kolide/launcher/osquery"
@@ -43,13 +42,6 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	actual := map[string]string{}
 	assetDir := func(path string) ([]string, error) {
 		return td[path], nil
-	}
-	copier := func(source, dest string) (bool, error) {
-		actual[source] = dest
-		if !regexp.MustCompile(`\.json$`).MatchString(source) {
-			return true, nil
-		}
-		return false, nil
 	}
 
 	err := createTUFRepoDirectory("local", "root", assetDir)
