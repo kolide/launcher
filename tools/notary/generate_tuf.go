@@ -38,9 +38,9 @@ func main() {
 	log.Printf("successfully bootstrapped and validated TUF repo %q\n", gun)
 }
 
-func bootstrapFromNotary(baseDir, localRepo, gun string) error {
+func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 	// Read Notary configuration
-	fin, err := os.Open(filepath.Join(baseDir, "config.json"))
+	fin, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
 	if err != nil {
 		return errors.Wrap(err, "opening notary config file")
 	}
@@ -56,7 +56,7 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) error {
 
 	// Safely fetch and validate all TUF metadata from remote Notary server.
 	repo, err := client.NewFileCachedRepository(
-		baseDir,
+		notaryConfigDir,
 		data.GUN(gun),
 		conf.RemoteServer.URL,
 		&http.Transport{},
@@ -72,7 +72,7 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) error {
 	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
-	source := filepath.Join(baseDir, "tuf", gun, "metadata")
+	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
 	if err := packaging.CopyDir(source, localRepo); err != nil {
 		return errors.Wrap(err, "copying TUF repo metadata")
 	}
