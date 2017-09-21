@@ -96,40 +96,18 @@ func (u *Updater) createLocalTufRepo() error {
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("autoupdate", "assets", localRepo)
-	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir, copier); err != nil {
+	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
 		return err
 	}
 	return nil
 }
 
-// If false is returned an asset is copied from a source in bindata to the local filesystem.  If true is
-// returned  source was a directory, which we create on the local filesystem. The caller is responsible for
-// recursing into the asset data.
-func copier(source, dest string) (bool, error) {
-	if !regexp.MustCompile(`\.json$`).MatchString(source) {
-		if err := os.MkdirAll(dest, 0755); err != nil {
-			return false, err
-		}
-		return true, nil
-	}
-	// If it's not a directory, copy the asset contents to the local file system
-	asset, err := Asset(source)
-	if err != nil {
-		return false, err
-	}
-	return false, ioutil.WriteFile(dest, asset, 0644)
-}
-
 // Creates TUF repo including delegate tree structure on local file system.
 // assetDir is the bindata AssetDir function.
-// copier is a function that returns true if the source is a directory, and will create the dest directory
-// on the file system, if source is supposed to be a file, it will be read from bindata and written to
-// to a local file.
 func createTUFRepoDirectory(
 	localPath string,
 	currentAssetPath string,
 	assetDir func(string) ([]string, error),
-	copier func(source, dest string) (bool, error),
 ) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
@@ -138,22 +116,24 @@ func createTUFRepoDirectory(
 	for _, pth := range paths {
 		fullAssetPath := path.Join(currentAssetPath, pth)
 		fullLocalPath := filepath.Join(localPath, pth)
-		isDir, err := copier(fullAssetPath, fullLocalPath)
-		if err != nil {
-			return err
-		}
-		if isDir {
-			err := createTUFRepoDirectory(
-				fullLocalPath,
-				fullAssetPath,
-				assetDir,
-				copier,
-			)
-			if err != nil {
+
+		if !regexp.MustCompile(`\.json$`).MatchString(fullAssetPath) {
+			if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
 				return err
 			}
+			if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
+				return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
+			}
+		} else {
+			// If it's not a directory, copy the asset contents to the local file system
+			asset, err := Asset(fullAssetPath)
+			if err != nil {
+				return errors.Wrap(err, "could not get asset")
+			}
+			if err := ioutil.WriteFile(fullLocalPath, asset, 0644); err != nil {
+				return errors.Wrap(err, "could not write file")
+			}
 		}
-
 	}
 	return nil
 }

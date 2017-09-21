@@ -52,7 +52,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		return false, nil
 	}
 
-	err := createTUFRepoDirectory("local", "root", assetDir, copier)
+	err := createTUFRepoDirectory("local", "root", assetDir)
 	require.Nil(t, err)
 	assert.Equal(t, expected, actual)
 }
