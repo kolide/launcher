@@ -189,7 +189,7 @@ func enableAutoUpdate(
 	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdateOpts...)
 	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdate.WithFinalizer(restart))
 	osquerydUpdater, err := autoupdate.NewUpdater(
-		autoupdate.Destination(binaryPath),
+		binaryPath,
 		rootDirectory,
 		osquerydUpdaterOpts...,
 	)
@@ -218,7 +218,7 @@ func enableAutoUpdate(
 	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdateOpts...)
 	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdate.WithFinalizer(launcherFinalizer))
 	launcherUpdater, err := autoupdate.NewUpdater(
-		autoupdate.Destination(launcherPath),
+		launcherPath,
 		rootDirectory,
 		launcherUpdaterOpts...,
 	)

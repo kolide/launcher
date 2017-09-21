@@ -21,6 +21,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// UpdateChannel determines the TUF target for a Updater.
+// The Default UpdateChannel is Stable.
+type UpdateChannel string
+
+const (
+	Stable   UpdateChannel = "stable"
+	Beta                   = "beta"
+	Nightly                = "nightly"
+	localDev               = "development"
+)
+
 const (
 	defaultMirror = "https://dl.kolide.com"
 	defaultNotary = "https://notary.kolide.com"
@@ -41,22 +52,23 @@ type Updater struct {
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
-func NewUpdater(
-	d Destination,
-	rootDirectory string,
-	opts ...UpdaterOption,
-) (*Updater, error) {
+func NewUpdater(binaryPath string, rootDirectory string, opts ...UpdaterOption) (*Updater, error) {
+	binaryName := filepath.Base(binaryPath)
+	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", binaryName))
+	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
+	gun := fmt.Sprintf("kolide/%s", binaryName)
+
 	settings := tuf.Settings{
-		LocalRepoPath: d.tufRepoPath(rootDirectory),
+		LocalRepoPath: tufRepoPath,
 		NotaryURL:     defaultNotary,
-		GUN:           d.gun(),
+		GUN:           gun,
 		MirrorURL:     defaultMirror,
 	}
 
 	updater := Updater{
 		settings:      &settings,
-		destination:   string(d),
-		stagingPath:   d.stagingPath(),
+		destination:   binaryPath,
+		stagingPath:   stagingPath,
 		updateChannel: Stable,
 		client:        http.DefaultClient,
 		logger:        log.NewNopLogger(),
@@ -73,7 +85,7 @@ func NewUpdater(
 	var err error
 	updater.target, err = updater.setTargetPath()
 	if err != nil {
-		return nil, errors.Wrapf(err, "set updater target for destination %s", d)
+		return nil, errors.Wrapf(err, "set updater target for destination %s", binaryPath)
 	}
 	if err := updater.bootstrapFn(); err != nil {
 		return nil, errors.Wrap(err, "creating local TUF repo")
@@ -192,35 +204,9 @@ func withoutBootstrap() UpdaterOption {
 	}
 }
 
-// UpdateFinalizer is executed after the Updater updates a Destination.
+// UpdateFinalizer is executed after the Updater updates a destination.
 // The UpdateFinalizer is usually a function which will handle restarting the updated binary.
 type UpdateFinalizer func() error
-
-// Destination is a binary path which will be replaced by the Updater.
-type Destination string
-
-// Before replacing the running binary, the updater must download and untar it from the remote server.
-// The running binary is replaced only if the download is successful.
-func (d Destination) stagingPath() string {
-	bin := string(d)
-	return filepath.Join(
-		filepath.Dir(bin),
-		fmt.Sprintf("%s-staging", filepath.Base(bin)),
-	)
-}
-
-func (d Destination) tufRepoPath(root string) string {
-	return filepath.Join(
-		root,
-		fmt.Sprintf("%s-tuf", filepath.Base(string(d))),
-	)
-}
-
-// The TUF GUN is kolide/<binary_name>
-func (d Destination) gun() string {
-	bin := filepath.Base(string(d))
-	return fmt.Sprintf("kolide/%s", bin)
-}
 
 // Run starts the updater, which will run until the stop function is called.
 func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
@@ -294,14 +280,3 @@ func (u *Updater) setTargetPath() (string, error) {
 	base := path.Join(string(platform), filename)
 	return fmt.Sprintf("%s.tar.gz", base), nil
 }
-
-// UpdateChannel determines the TUF target for a Updater.
-// The Default UpdateChannel is Stable.
-type UpdateChannel string
-
-const (
-	Stable   UpdateChannel = "stable"
-	Beta                   = "beta"
-	Nightly                = "nightly"
-	localDev               = "development"
-)
