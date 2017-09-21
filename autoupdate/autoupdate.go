@@ -43,11 +43,11 @@ type Updater struct {
 // updated from a TUF mirror.
 func NewUpdater(
 	d Destination,
-	metadataRoot string,
+	rootDirectory string,
 	opts ...UpdaterOption,
 ) (*Updater, error) {
 	settings := tuf.Settings{
-		LocalRepoPath: d.tufRepoPath(metadataRoot),
+		LocalRepoPath: d.tufRepoPath(rootDirectory),
 		NotaryURL:     defaultNotary,
 		GUN:           d.gun(),
 		MirrorURL:     defaultMirror,
@@ -94,6 +94,7 @@ func (u *Updater) createLocalTufRepo() error {
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("autoupdate", "assets", localRepo)
+	fmt.Println("assetPath: ", assetPath)
 	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
 		return err
 	}

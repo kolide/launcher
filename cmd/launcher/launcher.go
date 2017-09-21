@@ -170,7 +170,7 @@ func insecureHTTPClient() *http.Client {
 }
 
 func enableAutoUpdate(
-	notaryURL, mirrorURL, binaryPath, rootdir string,
+	notaryURL, mirrorURL, binaryPath, rootDirectory string,
 	autoupdateInterval time.Duration,
 	restart func() error,
 	client *http.Client,
@@ -190,7 +190,7 @@ func enableAutoUpdate(
 	osquerydUpdaterOpts = append(osquerydUpdaterOpts, autoupdate.WithFinalizer(restart))
 	osquerydUpdater, err := autoupdate.NewUpdater(
 		autoupdate.Destination(binaryPath),
-		rootdir,
+		rootDirectory,
 		osquerydUpdaterOpts...,
 	)
 	if err != nil {
@@ -219,7 +219,7 @@ func enableAutoUpdate(
 	launcherUpdaterOpts = append(launcherUpdaterOpts, autoupdate.WithFinalizer(launcherFinalizer))
 	launcherUpdater, err := autoupdate.NewUpdater(
 		autoupdate.Destination(launcherPath),
-		rootdir,
+		rootDirectory,
 		launcherUpdaterOpts...,
 	)
 	if err != nil {
