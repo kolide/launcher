@@ -1,5 +1,3 @@
-// +build ignore
-
 package main
 
 import (
@@ -8,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -82,7 +79,7 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) {
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(baseDir, "tuf", gun, "metadata")
-	if err := CopyDir(source, localRepo); err != nil {
+	if err := packaging.CopyDir(source, localRepo); err != nil {
 		log.Fatal(err)
 	}
 
@@ -141,62 +138,4 @@ func passwordRetriever(key, alias string, createNew bool, attempts int) (pass st
 		err = fmt.Errorf("Missing pass phrase env var %q", key)
 	}
 	return pass, giveUp, err
-}
-
-// Copied from github.com/kolide/launcher/tools/packaging/filesystem.go because if this is imported go run won't
-// compile this as it builds autoupdater.go which needs bindata.go which we haven't created yet.
-func CopyDir(src, dest string) error {
-	dir, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dest, 0755); err != nil {
-		return err
-	}
-
-	files, err := dir.Readdir(-1)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		srcptr := filepath.Join(src, file.Name())
-		dstptr := filepath.Join(dest, file.Name())
-		if file.IsDir() {
-			if err := CopyDir(srcptr, dstptr); err != nil {
-				return err
-			}
-		} else {
-			if err := CopyFile(srcptr, dstptr); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// Copied from github.com/kolide/launcher/tools/packaging/filesystem.go because if packaging is imported this won't
-// compile.  It references autoupdater.go which needs bindata.go which we haven't created yet.
-func CopyFile(src, dest string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destfile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer destfile.Close()
-
-	_, err = io.Copy(destfile, source)
-	if err != nil {
-		return err
-	}
-	sourceinfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dest, sourceinfo.Mode())
 }
