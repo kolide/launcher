@@ -16,22 +16,18 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/docker/notary/client"
 	"github.com/docker/notary/trustpinning"
 	"github.com/docker/notary/tuf/data"
-	"github.com/kolide/updater/tuf"
+	"github.com/kolide/launcher/tools/packaging"
 )
 
 func main() {
 	var (
-		flBinary      = flag.String("binary", "osqueryd", "which binary to use for assets")
-		flInsecure    = flag.Bool("insecure", false, "use insecure http client")
-		flBaseDir     = flag.String("base-dir", filepath.Join(os.Getenv("HOME"), ".notary"), "notary base directory")
-		flUnvalidated = flag.Bool("unvalidated", false, "does not use notary to validate tuf repo, staging/testing only")
-		flURL         = flag.String("url", "https://notary.kolide.com", "URL to use with unvalidated option")
+		flBinary          = flag.String("binary", "osqueryd", "which binary to use for assets")
+		flNotaryConfigDir = flag.String("notary_config_dir", filepath.Join(packaging.LauncherSource(), "tools/notary/config"), "notary base directory")
 	)
 	flag.Parse()
 
@@ -42,102 +38,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if *flUnvalidated {
-		bootstrapUnvalidated(*flURL, localRepo, gun, *flInsecure)
-		return
-	}
-	if *flInsecure {
-		log.Fatal("tls insecure can't be true if using notary to validate tuf")
-	}
-
-	bootstrapFromNotary(*flBaseDir, localRepo, gun)
-
-}
-
-func bootstrapUnvalidated(url, localRepo, gun string, insecure bool) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	roles := []string{"root.json", "snapshot.json", "timestamp.json"}
-	for _, role := range roles {
-		urlstring := url + path.Join("/v2/", gun, "_trust/tuf", role)
-		resp, err := client.Get(urlstring)
-		if err != nil {
-			log.Fatalf("could not download %s: %s\n", urlstring, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			log.Fatalf("got unexpected http Status %s for %s", resp.Status, urlstring)
-		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		roleFile := filepath.Join(localRepo, role)
-		if err := ioutil.WriteFile(roleFile, data, 0644); err != nil {
-			log.Fatalf("could not save %s to %s: %s\n", urlstring, localRepo, err)
-		}
-		fmt.Printf("saved %s to %s\n", urlstring, roleFile)
-	}
-
-	// We need to recursively decode delegates (target is a special case) and handle each
-	// child delegate
-	err := retrieveDelegate(
-		url+path.Join("/v2/", gun, "_trust/tuf"),
-		localRepo,
-		"targets.json",
-		client,
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func retrieveDelegate(rootURL, rootLocalRepo, role string, client *http.Client) error {
-	// Download the role, write it's content to file  and decode it so we
-	// can easily determine if it has delegates of it's own.
-	url := fmt.Sprintf("%s/%s", rootURL, role)
-	resp, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	var delegate tuf.Targets
-	if err = json.Unmarshal(data, &delegate); err != nil {
-		return err
-	}
-	rolePath := filepath.Join(rootLocalRepo, role)
-	if err = ioutil.WriteFile(rolePath, data, 0644); err != nil {
-		return err
-	}
-	log.Printf("saved %s to %s\n", url, rolePath)
-	if len(delegate.Signed.Delegations.Roles) == 0 {
-		return nil
-	}
-	// If delegate has children get those and build directory structure
-	// The role name is the name of the directory containing all it's children
-	roleName := strings.Replace(role, ".json", "", 1)
-	childrenDir := filepath.Join(rootLocalRepo, roleName)
-	if err = os.MkdirAll(childrenDir, 0755); err != nil {
-		return err
-	}
-	childrenRootURL := fmt.Sprintf("%s/%s", rootURL, roleName)
-	for _, del := range delegate.Signed.Delegations.Roles {
-		childRole := path.Base(del.Name) + ".json"
-		if err = retrieveDelegate(childrenRootURL, childrenDir, childRole, client); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	bootstrapFromNotary(*flNotaryConfigDir, localRepo, gun)
 }
 
 func bootstrapFromNotary(baseDir, localRepo, gun string) {
@@ -147,29 +48,44 @@ func bootstrapFromNotary(baseDir, localRepo, gun string) {
 		log.Fatal(err)
 	}
 	defer fin.Close()
+
+	// Decode the Notary configuration into a struct
 	conf := struct {
 		RemoteServer RemoteServer `json:"remote_server"`
 	}{}
 	if err = json.NewDecoder(fin).Decode(&conf); err != nil {
 		log.Fatal(err)
 	}
-	rt, err := getTransport(baseDir, conf.RemoteServer)
+
+	// Create the transport
+	transport, err := getTransport(baseDir, conf.RemoteServer)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	// Safely fetch and validate all TUF metadata from remote Notary server.
-	repo, err := client.NewFileCachedRepository(baseDir, data.GUN(gun), conf.RemoteServer.URL, rt, passwordRetriever, trustpinning.TrustPinConfig{})
+	repo, err := client.NewFileCachedRepository(
+		baseDir,
+		data.GUN(gun),
+		conf.RemoteServer.URL,
+		transport,
+		passwordRetriever,
+		trustpinning.TrustPinConfig{},
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
 		log.Fatal(err)
 	}
+
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(baseDir, "tuf", gun, "metadata")
 	if err := CopyDir(source, localRepo); err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("successfully bootstrapped and validated TUF repo %q\n", gun)
 }
 
