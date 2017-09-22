@@ -53,6 +53,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if opts.developerUsage {
+		developerUsage()
+		os.Exit(0)
+	}
+
 	if opts.debug {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
