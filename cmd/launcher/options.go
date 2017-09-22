@@ -13,87 +13,6 @@ import (
 	"github.com/kolide/launcher/autoupdate"
 )
 
-func shortUsage() {
-	launcherFlags := map[string]string{}
-	flagAggregator := func(f *flag.Flag) {
-		launcherFlags[f.Name] = f.Usage
-	}
-	flag.VisitAll(flagAggregator)
-
-	printOpt := func(opt string) {
-		fmt.Fprintf(os.Stderr, "  --%s", opt)
-		for i := 0; i < 22-len(opt); i++ {
-			fmt.Fprintf(os.Stderr, " ")
-		}
-		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
-	}
-
-	fmt.Fprintf(os.Stderr, "The Osquery Launcher, by Kolide (version %s)\n", version.Version().Version)
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  Usage: launcher --option=value\n")
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Options:\n")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("hostname")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("enroll_secret")
-	printOpt("enroll_secret_path")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("root_directory")
-	printOpt("osqueryd_path")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("autoupdate")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("version")
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
-	fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("dev_help")
-	fmt.Fprintf(os.Stderr, "\n")
-}
-
-func usage() {
-	shortUsage()
-	usageFooter()
-}
-
-func developerUsage() {
-	launcherFlags := map[string]string{}
-	flagAggregator := func(f *flag.Flag) {
-		launcherFlags[f.Name] = f.Usage
-	}
-	flag.VisitAll(flagAggregator)
-
-	printOpt := func(opt string) {
-		fmt.Fprintf(os.Stderr, "  --%s", opt)
-		for i := 0; i < 22-len(opt); i++ {
-			fmt.Fprintf(os.Stderr, " ")
-		}
-		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
-	}
-
-	shortUsage()
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Development Options:\n")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("debug")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("insecure")
-	printOpt("insecure_grpc")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("notary_url")
-	printOpt("mirror_url")
-	printOpt("autoupdate_interval")
-	fmt.Fprintf(os.Stderr, "\n")
-	usageFooter()
-}
-
-func usageFooter() {
-	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.com/osquery\n")
-	fmt.Fprintf(os.Stderr, "\n")
-}
-
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
@@ -142,7 +61,7 @@ func parseOptions() (*options, error) {
 		flOsquerydPath = flag.String(
 			"osqueryd_path",
 			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
-			"Path to the osqueryd binary to use",
+			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
 		)
 
 		// Autoupdate options
@@ -238,6 +157,87 @@ func parseOptions() (*options, error) {
 	}
 
 	return opts, nil
+}
+
+func shortUsage() {
+	launcherFlags := map[string]string{}
+	flagAggregator := func(f *flag.Flag) {
+		launcherFlags[f.Name] = f.Usage
+	}
+	flag.VisitAll(flagAggregator)
+
+	printOpt := func(opt string) {
+		fmt.Fprintf(os.Stderr, "  --%s", opt)
+		for i := 0; i < 22-len(opt); i++ {
+			fmt.Fprintf(os.Stderr, " ")
+		}
+		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
+	}
+
+	fmt.Fprintf(os.Stderr, "The Osquery Launcher, by Kolide (version %s)\n", version.Version().Version)
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "  Usage: launcher --option=value\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "Options:\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("hostname")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("enroll_secret")
+	printOpt("enroll_secret_path")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("root_directory")
+	printOpt("osqueryd_path")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("autoupdate")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("version")
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
+	fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("dev_help")
+	fmt.Fprintf(os.Stderr, "\n")
+}
+
+func usage() {
+	shortUsage()
+	usageFooter()
+}
+
+func developerUsage() {
+	launcherFlags := map[string]string{}
+	flagAggregator := func(f *flag.Flag) {
+		launcherFlags[f.Name] = f.Usage
+	}
+	flag.VisitAll(flagAggregator)
+
+	printOpt := func(opt string) {
+		fmt.Fprintf(os.Stderr, "  --%s", opt)
+		for i := 0; i < 22-len(opt); i++ {
+			fmt.Fprintf(os.Stderr, " ")
+		}
+		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
+	}
+
+	shortUsage()
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "Development Options:\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("debug")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("insecure")
+	printOpt("insecure_grpc")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("notary_url")
+	printOpt("mirror_url")
+	printOpt("autoupdate_interval")
+	fmt.Fprintf(os.Stderr, "\n")
+	usageFooter()
+}
+
+func usageFooter() {
+	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.com/osquery\n")
+	fmt.Fprintf(os.Stderr, "\n")
 }
 
 // TODO: move to kolide/kit and figure out error handling there.
