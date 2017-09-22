@@ -26,6 +26,7 @@ To use The Launcher to easily connect osquery to a server that is compliant with
 - `--hostname`: the hostname of the gRPC server for your environment
 - `--root_directory`: the location of the local database, pidfiles, etc.
 - `--enroll_secret`: the enroll secret that is used in your environment
+- `--autoupdate`: a boolean flag which controls the osqueryd autoupdater (default: true)
 
 ```
 ./build/launcher \
