@@ -33,8 +33,8 @@ const (
 )
 
 const (
-	defaultMirror = "https://dl.kolide.com"
-	defaultNotary = "https://notary.kolide.com"
+	DefaultMirror = "https://dl.kolide.com"
+	DefaultNotary = "https://notary.kolide.com"
 )
 
 // Updater is a TUF autoupdater.
@@ -60,9 +60,9 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
-		NotaryURL:     defaultNotary,
+		NotaryURL:     DefaultNotary,
 		GUN:           gun,
-		MirrorURL:     defaultMirror,
+		MirrorURL:     DefaultMirror,
 	}
 
 	updater := Updater{
