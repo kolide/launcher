@@ -228,16 +228,6 @@ func parseOptions() (*options, error) {
 	return opts, nil
 }
 
-func insecureHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-}
-
 // We have to find the instance of osqueryd and send it an interrupt so it
 // shuts down it's extensions which are child processes of osqueryd. If we
 // don't do this the extension continues to run and osqueryd thinks we're trying
@@ -407,7 +397,13 @@ func main() {
 
 	httpClient := http.DefaultClient
 	if opts.insecureTLS {
-		httpClient = insecureHTTPClient()
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
 	}
 
 	versionInfo := version.Version()
