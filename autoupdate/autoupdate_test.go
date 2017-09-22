@@ -57,8 +57,8 @@ func TestNewUpdater(t *testing.T) {
 			httpClient:    http.DefaultClient,
 			target:        withPlatform(t, "%s/app-stable.tar.gz"),
 			localRepoPath: "/tmp/tuf/app-tuf",
-			notaryURL:     defaultNotary,
-			mirrorURL:     defaultMirror,
+			notaryURL:     DefaultNotary,
+			mirrorURL:     DefaultMirror,
 		},
 		{
 			name: "with-opts",
