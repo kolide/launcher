@@ -259,8 +259,11 @@ func enableAutoUpdate(
 ) (stop func(), err error) {
 	autoupdateOpts := []autoupdate.UpdaterOption{
 		autoupdate.WithHTTPClient(client),
-		autoupdate.WithNotaryURL(notaryURL),
 		autoupdate.WithLogger(logger),
+	}
+
+	if notaryURL != "" {
+		autoupdateOpts = append(autoupdateOpts, autoupdate.WithNotaryURL(notaryURL))
 	}
 	if mirrorURL != "" {
 		autoupdateOpts = append(autoupdateOpts, autoupdate.WithMirrorURL(mirrorURL))
@@ -470,7 +473,7 @@ func main() {
 		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
 	}
 
-	if opts.notaryServerURL != "" {
+	if opts.autoupdate {
 		stop, err := enableAutoUpdate(
 			opts.notaryServerURL,
 			opts.mirrorServerURL,
@@ -482,7 +485,7 @@ func main() {
 			logger,
 		)
 		if err != nil {
-			logFatal(logger, errors.Wrap(err, "starting autoupdater"))
+			logFatal(logger, "err", errors.Wrap(err, "starting autoupdater"))
 		}
 		defer stop()
 	}
