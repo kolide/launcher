@@ -49,7 +49,7 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
 	fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("dev-help")
+	printOpt("dev_help")
 	fmt.Fprintf(os.Stderr, "\n")
 }
 
@@ -170,31 +170,31 @@ func parseOptions() (*options, error) {
 		// Development options
 		flDebug = flag.Bool(
 			"debug",
-			false,
+			env.Bool("KOLIDE_LAUNCHER_DEBUG", false),
 			"Whether or not debug logging is enabled (default: false)",
 		)
 		flInsecureTLS = flag.Bool(
 			"insecure",
-			false,
+			env.Bool("KOLIDE_LAUNCHER_INSECURE", false),
 			"Do not verify TLS certs for outgoing connections (default: false)",
 		)
 		flInsecureGRPC = flag.Bool(
 			"insecure_grpc",
-			false,
+			env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false),
 			"Dial GRPC without a TLS config (default: false)",
 		)
 
 		// Version command: launcher --version
 		flVersion = flag.Bool(
 			"version",
-			false,
+			env.Bool("KOLIDE_LAUNCHER_VERSION", false),
 			"Print Launcher version and exit",
 		)
 
 		// Developer usage
 		flDeveloperUsage = flag.Bool(
-			"dev-help",
-			false,
+			"dev_help",
+			env.Bool("KOLIDE_LAUNCHER_DEV_HELP", false),
 			"Print full Launcher help, including developer options",
 		)
 	)
