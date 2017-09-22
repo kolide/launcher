@@ -67,8 +67,8 @@ func parseOptions() (*options, error) {
 		// Autoupdate options
 		flAutoupdate = flag.Bool(
 			"autoupdate",
-			env.Bool("KOLIDE_LAUNCHER_AUTOUPDATE", true),
-			"Whether or not the osquery autoupdater is enabled (default: true)",
+			env.Bool("KOLIDE_LAUNCHER_AUTOUPDATE", false),
+			"Whether or not the osquery autoupdater is enabled (default: false)",
 		)
 		flNotaryServerURL = flag.String(
 			"notary_url",
