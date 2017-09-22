@@ -43,18 +43,19 @@ var (
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
-	osquerydPath       string
-	rootDirectory      string
-	notaryServerURL    string
-	mirrorServerURL    string
 	kolideServerURL    string
 	enrollSecret       string
 	enrollSecretPath   string
-	autoupdateInterval time.Duration
-	insecureTLS        bool
-	insecureGRPC       bool
+	rootDirectory      string
+	osquerydPath       string
+	autoupdate         bool
 	printVersion       bool
 	debug              bool
+	insecureTLS        bool
+	insecureGRPC       bool
+	notaryServerURL    string
+	mirrorServerURL    string
+	autoupdateInterval time.Duration
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -62,81 +63,148 @@ type options struct {
 // typed struct of options for further application use
 func parseOptions() (*options, error) {
 	var (
-		flDebug = flag.Bool(
-			"debug",
-			false,
-			"enable debug logging",
-		)
-		flVersion = flag.Bool(
-			"version",
-			false,
-			"print launcher version and exit",
-		)
-		flInsecureTLS = flag.Bool(
-			"insecure",
-			false,
-			"do not verify TLS certs for outgoing connections",
-		)
-		flInsecureGRPC = flag.Bool(
-			"insecure_grpc",
-			false,
-			"dial GRPC without a TLS config",
-		)
-		flOsquerydPath = flag.String(
-			"osqueryd_path",
-			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
-			"path to osqueryd binary",
-		)
+		// Primary options
 		flRootDirectory = flag.String(
 			"root_directory",
 			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", os.TempDir()),
-			"path to the working directory where file artifacts can be stored",
-		)
-		flNotaryServerURL = flag.String(
-			"notary_url",
-			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", ""),
-			"The URL of the notary update server",
+			"The location of the local database, pidfiles, etc.",
 		)
 		flKolideServerURL = flag.String(
 			"hostname",
 			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
-			"Hostname of the remote server to communicate with",
+			"The hostname of the gRPC server",
 		)
 		flEnrollSecret = flag.String(
 			"enroll_secret",
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
-			"The enrollment secret used to authenticate with the server",
+			"The enroll secret that is used in your environment",
 		)
 		flEnrollSecretPath = flag.String(
 			"enroll_secret_path",
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
-			"Path to a file containing the enrollment secret",
+			"Optionally, the path to your enrollment secret",
+		)
+		flOsquerydPath = flag.String(
+			"osqueryd_path",
+			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
+			"Path to the osqueryd binary to use",
+		)
+
+		// Autoupdate options
+		flAutoupdate = flag.Bool(
+			"autoupdate",
+			true,
+			"Whether or not the osquery autoupdater is enabled (default: true)",
+		)
+		flNotaryServerURL = flag.String(
+			"notary_url",
+			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", ""),
+			"The Notary update server (default: https://notary.kolide.com)",
 		)
 		flMirrorURL = flag.String(
 			"mirror_url",
 			env.String("KOLIDE_LAUNCHER_MIRROR_SERVER_URL", ""),
-			"The URL of the mirror server for autoupdates",
+			"The mirror server for autoupdates (default: https://dl.kolide.com)",
 		)
 		flAutoupdateInterval = flag.Duration(
 			"autoupdate_interval",
 			duration("KOLIDE_LAUNCHER_AUTOUPDATE_INTERVAL", 1*time.Hour),
-			"The interval when launcher checks for new updates. Only enabled if notary_url is set.",
+			"The interval to check for updates (default: once every hour)",
+		)
+
+		// Development options
+		flDebug = flag.Bool(
+			"debug",
+			false,
+			"Whether or not debug logging is enabled (default: false)",
+		)
+		flInsecureTLS = flag.Bool(
+			"insecure",
+			false,
+			"Do not verify TLS certs for outgoing connections (default: false)",
+		)
+		flInsecureGRPC = flag.Bool(
+			"insecure_grpc",
+			false,
+			"Dial GRPC without a TLS config (default: false)",
+		)
+
+		// Version command: launcher --version
+		flVersion = flag.Bool(
+			"version",
+			false,
+			"Print Launcher version and exit",
 		)
 	)
+
+	flag.Usage = func() {
+		launcherFlags := map[string]string{}
+		flagAggregator := func(f *flag.Flag) {
+			launcherFlags[f.Name] = f.Usage
+		}
+		flag.VisitAll(flagAggregator)
+
+		printOpt := func(opt string) {
+			fmt.Fprintf(os.Stderr, "  --%s", opt)
+			for i := 0; i < 22-len(opt); i++ {
+				fmt.Fprintf(os.Stderr, " ")
+			}
+			fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
+		}
+
+		fmt.Fprintf(os.Stderr, "The Osquery Launcher, by Kolide (version %s)\n", version.Version().Version)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "  Usage: launcher --option=value\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("hostname")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("enroll_secret")
+		printOpt("enroll_secret_path")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("root_directory")
+		printOpt("osqueryd_path")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("autoupdate")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("version")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "  Additionally, all options can be set as environment variables using the following convention:\n")
+		fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Development Options:\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("debug")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("insecure")
+		printOpt("insecure_grpc")
+		fmt.Fprintf(os.Stderr, "\n")
+		printOpt("notary_url")
+		printOpt("mirror_url")
+		printOpt("autoupdate_interval")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.com/osquery\n")
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
 	flag.Parse()
 
 	opts := &options{
-		osquerydPath:       *flOsquerydPath,
-		rootDirectory:      *flRootDirectory,
-		notaryServerURL:    *flNotaryServerURL,
-		mirrorServerURL:    *flMirrorURL,
-		printVersion:       *flVersion,
 		kolideServerURL:    *flKolideServerURL,
 		enrollSecret:       *flEnrollSecret,
 		enrollSecretPath:   *flEnrollSecretPath,
+		rootDirectory:      *flRootDirectory,
+		osquerydPath:       *flOsquerydPath,
+		autoupdate:         *flAutoupdate,
+		printVersion:       *flVersion,
 		debug:              *flDebug,
 		insecureTLS:        *flInsecureTLS,
 		insecureGRPC:       *flInsecureGRPC,
+		notaryServerURL:    *flNotaryServerURL,
+		mirrorServerURL:    *flMirrorURL,
 		autoupdateInterval: *flAutoupdateInterval,
 	}
 
