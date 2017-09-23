@@ -58,11 +58,13 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
 	configurationDirectory := filepath.Join("/etc", identifier)
 	logDirectory := filepath.Join("/var/log", identifier)
+    systemdDirectory := "/etc/systemd/system"
 	pathsToCreate := []string{
 		rootDirectory,
 		binaryDirectory,
 		configurationDirectory,
 		logDirectory,
+        systemdDirectory,
 	}
 
 	for _, pathToCreate := range pathsToCreate {
@@ -85,6 +87,49 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
+
+    // Create the systemd unit file for the launcher service
+    systemdPath := filepath.Join(systemdDirectory, "launcher.service")
+    secretPath := filepath.Join(configurationDirectory, "secret")
+    systemdLauncherServiceContents := fmt.Sprintf(
+        "[Unit]\n" +
+        "Description=The Kolide Launcher\n" +
+        "After=network.service syslog.service\n\n" +
+        "[Service]\n" +
+        "ExecStart=%s \\\n" +
+        "--hostname=%s \\\n" +
+        "--enroll_secret_path=%s \\\n" +
+        "--insecure \\\n" +
+        "--osqueryd_path=%s\n\n" +
+        "[Install]\n" +
+        "WantedBy=multi-user.target\n",
+        filepath.Join(binaryDirectory, "launcher"),
+        grpcServerForHostname(hostname),
+        secretPath,
+        filepath.Join(binaryDirectory, "osqueryd"),
+    )
+
+    systemdFile, err := os.Create(filepath.Join(packageRoot, systemdPath))
+    if err != nil {
+        return "", "", errors.Wrap(err, "could not create launcher systemd unit file")
+    }
+    fmt.Fprintf(systemdFile, systemdLauncherServiceContents)
+    systemdFile.Close()
+
+    // The launcher-systemd-installer
+    systemdLauncherInstallerContents := fmt.Sprintf(
+        "#/bin/bash\n\n" +
+        "systemctl daemon-reload &&" +
+        "systemctl enable launcher &&" +
+        "systemctl start launcher",
+    )
+
+    systemdLauncherInstallerFile, err := os.Create(filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"))
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not create the launcher-systemd-installer")
+	}
+    fmt.Fprintf(systemdLauncherInstallerFile, systemdLauncherInstallerContents)
+    systemdLauncherInstallerFile.Close()
 
 	// The initial launcher (and extension) binary
 	err = CopyFile(
@@ -125,9 +170,10 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	rpmOutputPath := filepath.Join(outputPathDir, rpmOutputFilename)
 
 	// Create the packages
+    containerPackageRoot := "/pkgroot"
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
+		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
 		"kolide/fpm",
 		"fpm",
@@ -136,7 +182,9 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", debOutputFilename),
-		"/pkgroot=/",
+        "--after-install", filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer"),
+		"-C", containerPackageRoot,
+        ".",
 	)
 	if err := debCmd.Run(); err != nil {
 		return "", "", errors.Wrap(err, "could not create deb package")
@@ -144,7 +192,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	rpmCmd := exec.Command(
 		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
+		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
 		"kolide/fpm",
 		"fpm",
@@ -153,7 +201,9 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", rpmOutputFilename),
-		"/pkgroot=/",
+        "--after-install", filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer"),
+		"-C", containerPackageRoot,
+        ".",
 	)
 	if err := rpmCmd.Run(); err != nil {
 		return "", "", errors.Wrap(err, "could not create rpm package")
