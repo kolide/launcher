@@ -174,8 +174,8 @@ export NOTARY_DELEGATION_PASSPHRASE=<secret>
 Import the delegate keys. This will authorize you to use your local Notary client to publish updates.
 
 ```
-notary key import launcher-key.pem --role targets/releases --gun kolide/launcher
-notary key import osqueryd-key.pem --role targets/releases --gun kolide/osqueryd
+notary key import launcher-delegate-key.pem --role targets/releases --gun kolide/launcher
+notary key import osqueryd-delegate-key.pem --role targets/releases --gun kolide/osqueryd
 ```
 
 #### Creating a new TUF Repository
@@ -219,7 +219,7 @@ notary delegation add kolide/launcher targets/releases launcher.pem --all-paths 
 notary delegation add kolide/osqueryd targets/releases osqueryd.pem --all-paths -p
 ```
 
-Modify the path header of each private key adding the key ID of the associated delegate key. Do this for both `kolide/launcher` and `kolide/osqueryd`. Find the delegate key using `notary delegate list` as in the following example.
+Modify the path header of each private key adding the key ID of the associated delegate key. Do this for both `kolide/launcher` and `kolide/osqueryd`. Find the delegate key using `notary delegation list` as in the following example.
 
 ```
 notary delegation list kolide/launcher
@@ -229,7 +229,20 @@ ROLE                PATHS             KEY IDS                                   
 targets/releases    "" <all paths>    06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    1
 ```
 
-Open the private key you created for example `launcher-key.pem` in a text editor and add the Key ID to the path header of the key.
+Open `launcher-key.pem` in a text editor and add the Key ID to the path header of the key.
+
+```
+notary delegation list kolide/osqueryd
+
+ROLE                PATHS             KEY IDS                                                             THRESHOLD
+----                -----             -------                                                             ---------
+targets/releases    "" <all paths>    06061078b3fefc16d5170cdfc3af6e8881d2d4a283e7a7b894c89402e3a5057d    1
+
+```
+
+Open `osqueryd-key.pem` in a text editor and add the Key ID to the path header of the key.
+
+Now the headers of both of the private keys should look something like:
 
 ```
 -----BEGIN EC PRIVATE KEY-----
@@ -245,3 +258,10 @@ Xm//qxWRIzC4C5Tc11liQ9gfz3PJ3TX2gOoQJMtfq6k=
 ```
 
 The delegate keys and passphrases should all be stored safely offline so they are available set up Notary Client to publish updates.
+
+Finally, import the keys:
+
+```
+notary key import launcher-key.pem --role targets/releases --gun kolide/launcher
+notary key import osqueryd-key.pem --role targets/releases --gun kolide/osqueryd
+```
