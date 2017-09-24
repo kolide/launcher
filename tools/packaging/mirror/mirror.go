@@ -46,6 +46,8 @@ const (
 	propLauncherVersionTarballPath = "launcher-version-tarball-path"
 	propLauncherTaggedTarballPath  = "launcher-tagged-tarball-path"
 
+	notaryDelegationEnvName = "NOTARY_DELEGATION_PASSPHRASE"
+
 	PlatformLinux   = "linux"
 	PlatformDarwin  = "darwin"
 	PlatformWindows = "windows"
@@ -698,6 +700,11 @@ func uploadToMirror(logger log.Logger, platform, binary, source string) error {
 }
 
 func publishToNotary(logger log.Logger, platform, binary, archive string) error {
+	// Check for presence of required environment variable. If it's missing generate a user
+	// friendly error message because the error message that Notary generates is useless.
+	if os.Getenv(notaryDelegationEnvName) == "" {
+		return errors.Errorf("environment variable %s must be defined", notaryDelegationEnvName)
+	}
 	target := path.Join(platform, filepath.Base(archive))
 	gun := path.Join("kolide", binary)
 	cmd := exec.Command(
