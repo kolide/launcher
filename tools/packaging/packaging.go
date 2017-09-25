@@ -57,13 +57,11 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
 	configurationDirectory := filepath.Join("/etc", identifier)
-	logDirectory := filepath.Join("/var/log", identifier)
 	systemdDirectory := "/etc/systemd/system"
 	pathsToCreate := []string{
 		rootDirectory,
 		binaryDirectory,
 		configurationDirectory,
-		logDirectory,
 		systemdDirectory,
 	}
 
