@@ -101,6 +101,16 @@ func runMake(args []string) error {
 			env.Bool("INSECURE_GRPC", false),
 			"whether or not the launcher packages should invoke the launcher's --insecure_grpc flag",
 		)
+		flAutoupdate = flagset.Bool(
+			"autoupdate",
+			env.Bool("AUTOUPDATE", false),
+			"whether or not the launcher packages should invoke the launcher's --autoupdate flag",
+		)
+		flUpdateChannel = flagset.String(
+			"update_channel",
+			env.String("UPDATE_CHANNEL", ""),
+			"the value that should be used when invoking the launcher's --update_channel flag",
+		)
 		flIdentifier = flagset.String(
 			"identifier",
 			env.String("IDENTIFIER", "launcher"),
@@ -136,7 +146,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flIdentifier)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}

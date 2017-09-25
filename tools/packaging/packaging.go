@@ -24,13 +24,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool, identifier string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, identifier)
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string) (*PackagePaths, error) {
+	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, identifier)
+	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -42,7 +42,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc bool, identifier string) (string, string, error) {
+func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -110,6 +110,8 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
 		Insecure:       insecure,
 		InsecureGrpc:   insecureGrpc,
+		Autoupdate:     autoupdate,
+		UpdateChannel:  updateChannel,
 	}
 	if err := renderSystemdService(systemdFile, opts); err != nil {
 		return "", "", errors.Wrap(err, "could not render systemd unit file")
@@ -207,7 +209,7 @@ systemctl start launcher`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool, identifier string) (string, error) {
+func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -292,6 +294,8 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		LaunchDaemonName: launchDaemonName,
 		Insecure:         insecure,
 		InsecureGrpc:     insecureGrpc,
+		Autoupdate:       autoupdate,
+		UpdateChannel:    updateChannel,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
@@ -363,12 +367,14 @@ type systemdTemplateOptions struct {
 	SecretPath     string
 	InsecureGrpc   bool
 	Insecure       bool
+	Autoupdate     bool
+	UpdateChannel  string
 }
 
 // renderSystemdService renders a systemd service to start and schedule the launcher.
 func renderSystemdService(w io.Writer, options *systemdTemplateOptions) error {
 	systemdTemplate :=
-`[Unit]
+		`[Unit]
 Description=The Kolide Launcher
 After=network.service syslog.service
 
@@ -378,7 +384,9 @@ ExecStart={{.LauncherPath}} \
 --hostname={{.ServerHostname}} \
 --enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
 --insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}
+--insecure \{{end}}{{if .Autoupdate}}
+--autoupdate \
+--update_channel={{.UpdateChannel}} \{{end}}
 --osqueryd_path={{.OsquerydPath}}
 
 [Install]
@@ -402,6 +410,8 @@ type launchDaemonTemplateOptions struct {
 	LaunchDaemonName string
 	InsecureGrpc     bool
 	Insecure         bool
+	Autoupdate       bool
+	UpdateChannel    string
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -422,7 +432,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
             <string>{{.SecretPath}}</string>
             <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
-            <string>{{.OsquerydPath}}</string>
+            <string>{{.OsquerydPath}}</string>{{if .Autoupdate}}
+            <key>KOLIDE_LAUNCHER_AUTOUPDATE</key>
+            <string>{{.UpdateChannel}}</string>{{end}}
         </dict>
         <key>RunAtLoad</key>
         <true/>
@@ -433,9 +445,10 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <key>ProgramArguments</key>
         <array>
             <string>{{.LauncherPath}}</string>
-            <string>--debug</string>
-            {{if .InsecureGrpc}}<string>--insecure_grpc</string>{{end}}
-            {{if .Insecure}}<string>--insecure</string>{{end}}
+            <string>--debug</string>{{if .InsecureGrpc}}
+            <string>--insecure_grpc</string>{{end}}{{if .Insecure}}
+            <string>--insecure</string>{{end}}{{if .Autoupdate}}
+            <string>--autoupdate</string>{{end}}
         </array>
         <key>StandardErrorPath</key>
         <string>{{.LogDirectory}}/launcher-stderr.log</string>
