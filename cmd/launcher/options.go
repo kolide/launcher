@@ -30,6 +30,7 @@ type options struct {
 	notaryServerURL    string
 	mirrorServerURL    string
 	autoupdateInterval time.Duration
+	updateChannel      autoupdate.UpdateChannel
 }
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -85,6 +86,11 @@ func parseOptions() (*options, error) {
 			duration("KOLIDE_LAUNCHER_AUTOUPDATE_INTERVAL", 1*time.Hour),
 			"The interval to check for updates (default: once every hour)",
 		)
+		flUpdateChannel = flag.String(
+			"update_channel",
+			env.String("KOLIDE_LAUNCHER_UPDATE_CHANNEL", "stable"),
+			"The channel to pull updates from (options: stable, beta, nightly)",
+		)
 
 		// Development options
 		flDebug = flag.Bool(
@@ -122,12 +128,42 @@ func parseOptions() (*options, error) {
 
 	flag.Parse()
 
+	// if an osqueryd path was not set, it's likely that we want to use the bundled
+	// osqueryd path, but if it cannot be found, we will fail back to using an
+	// osqueryd found in the path
+	osquerydPath := *flOsquerydPath
+	if *flOsquerydPath == "" {
+		if _, err := os.Stat(defaultOsquerydPath); err == nil {
+			osquerydPath = defaultOsquerydPath
+		} else if path, err := exec.LookPath("osqueryd"); err == nil {
+			osquerydPath = path
+		} else {
+			return nil, errors.New("Could not find osqueryd binary")
+		}
+	}
+
+	if *flEnrollSecret != "" && *flEnrollSecretPath != "" {
+		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
+	}
+
+	updateChannel := autoupdate.Stable
+	switch *flUpdateChannel {
+	case "stable":
+		updateChannel = autoupdate.Stable
+	case "beta":
+		updateChannel = autoupdate.Beta
+	case "nightly":
+		updateChannel = autoupdate.Nightly
+	default:
+		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
+	}
+
 	opts := &options{
 		kolideServerURL:    *flKolideServerURL,
 		enrollSecret:       *flEnrollSecret,
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
-		osquerydPath:       *flOsquerydPath,
+		osquerydPath:       osquerydPath,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
@@ -137,25 +173,8 @@ func parseOptions() (*options, error) {
 		notaryServerURL:    *flNotaryServerURL,
 		mirrorServerURL:    *flMirrorURL,
 		autoupdateInterval: *flAutoupdateInterval,
+		updateChannel:      updateChannel,
 	}
-
-	// if an osqueryd path was not set, it's likely that we want to use the bundled
-	// osqueryd path, but if it cannot be found, we will fail back to using an
-	// osqueryd found in the path
-	if opts.osquerydPath == "" {
-		if _, err := os.Stat(defaultOsquerydPath); err == nil {
-			opts.osquerydPath = defaultOsquerydPath
-		} else if path, err := exec.LookPath("osqueryd"); err == nil {
-			opts.osquerydPath = path
-		} else {
-			return nil, errors.New("Could not find osqueryd binary")
-		}
-	}
-
-	if opts.enrollSecret != "" && opts.enrollSecretPath != "" {
-		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
-	}
-
 	return opts, nil
 }
 
@@ -231,6 +250,7 @@ func developerUsage() {
 	printOpt("notary_url")
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
+	printOpt("update_channel")
 	fmt.Fprintf(os.Stderr, "\n")
 	usageFooter()
 }

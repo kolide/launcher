@@ -162,6 +162,7 @@ func main() {
 		stopOsquery, err := enabler.EnableBinary(
 			opts.osquerydPath,
 			autoupdate.WithFinalizer(instance.Restart),
+			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
 			logFatal(logger, err)
@@ -175,6 +176,7 @@ func main() {
 		stopLauncher, err := enabler.EnableBinary(
 			launcherPath,
 			autoupdate.WithFinalizer(launcherFinalizer(logger, opts.rootDirectory)),
+			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
 			logFatal(logger, err)
