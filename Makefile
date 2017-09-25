@@ -71,11 +71,10 @@ xp-launcher: .pre-build .pre-launcher
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	ln -f build/$(CURRENT_PLATFORM)/launcher build/launcher
 
-
 .pre-package-builder:
 	$(eval APP_NAME = package-builder)
 
-package-builder: .pre-build xp-launcher xp-extension .pre-package-builder
+package-builder: .pre-build xp-launcher xp-extension .pre-package-builder generate
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 .deps:
@@ -101,6 +100,24 @@ generate:
 		-o autoupdate/bindata.go \
 		-pkg autoupdate \
 		autoupdate/assets/...
+
+# Publishes osqueryd for autoupdate. NOTARY_DELEGATE_PASSPHRASE must be set
+# and the delegate key must be imported by Notary client.
+publish-osquery: package-builder
+	./build/package-builder mirror -osquery-all -platform darwin
+	./build/package-builder mirror -osquery-all -platform linux
+
+# Publishes launcher for autoupdate. NOTARY_DELEGATE_PASSPHRASE must be set
+# and the delegate key must be imported by Notary client.
+publish-launcher: package-builder
+	./build/package-builder mirror -launcher-all -platform darwin
+	./build/package-builder mirror -launcher-all -platform linux
+
+# Publishes launcher and osqueryd for autoupdate. NOTARY_DELEGATE_PASSPHRASE must be set
+# and the delegate key must be imported by Notary client.
+publish: package-builder
+	./build/package-builder mirror -all -platform darwin
+	./build/package-builder mirror -all -platform linux
 
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
