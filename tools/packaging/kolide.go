@@ -26,7 +26,7 @@ func CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant string, p
 		insecureGrpc = true
 	}
 
-	macPackagePath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, "kolide")
+	macPackagePath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, true, "stable", "kolide")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not make macOS package")
 	}
@@ -42,7 +42,7 @@ func CreateKolidePackages(uploadRoot, osqueryVersion, hostname, tenant string, p
 		return nil, errors.Wrap(err, "could not copy file to upload root")
 	}
 
-	debPath, rpmPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, "kolide")
+	debPath, rpmPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, true, "stable", "kolide")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not make linux packages")
 	}

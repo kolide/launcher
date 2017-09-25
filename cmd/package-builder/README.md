@@ -47,8 +47,8 @@ For example, consider the following usage:
   --enroll_secret=foobar123 \
   --insecure \
   --insecure_grpc \
-	--autoupdate \
-	--update_channel=nightly
+  --autoupdate \
+  --update_channel=nightly
 ```
 
 By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value.
