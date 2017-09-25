@@ -88,41 +88,41 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
-// Create the systemd unit file for the launcher service
-	systemdPath := filepath.Join(systemdDirectory, "launcher.service")
+	// The secret which the user will use to authenticate to the cloud
 	secretPath := filepath.Join(configurationDirectory, "secret")
-	systemdLauncherServiceContents := fmt.Sprintf(
-		"[Unit]\n" +
-		"Description=The Kolide Launcher\n" +
-		"After=network.service syslog.service\n\n" +
-		"[Service]\n" +
-		"ExecStart=%s \\\n" +
-		"--hostname=%s \\\n" +
-		"--enroll_secret_path=%s \\\n" +
-		"--insecure \\\n" +
-		"--osqueryd_path=%s\n\n" +
-		"[Install]\n" +
-		"WantedBy=multi-user.target\n",
-		filepath.Join(binaryDirectory, "launcher"),
-		grpcServerForHostname(hostname),
-		secretPath,
-		filepath.Join(binaryDirectory, "osqueryd"),
-	)
 
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
+	}
+
+	// Create the systemd unit file for the launcher service
+	systemdPath := filepath.Join(systemdDirectory, "launcher.service")
 	systemdFile, err := os.Create(filepath.Join(packageRoot, systemdPath))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not create launcher systemd unit file")
 	}
-	fmt.Fprintf(systemdFile, systemdLauncherServiceContents)
-	systemdFile.Close()
+	defer systemdFile.Close()
+
+	opts := &systemdTemplateOptions{
+		ServerHostname: grpcServerForHostname(hostname),
+		RootDirectory:  rootDirectory,
+		SecretPath:     secretPath,
+		OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
+		LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
+		Insecure:       insecure,
+		InsecureGrpc:   insecureGrpc,
+	}
+	if err := renderSystemdService(systemdFile, opts); err != nil {
+		return "", "", errors.Wrap(err, "could not render systemd unit file")
+	}
 
 	// The launcher-systemd-installer
-	systemdLauncherInstallerContents := fmt.Sprintf(
-		"#/bin/bash\n\n" +
-		"systemctl daemon-reload &&" +
-		"systemctl enable launcher &&" +
-		"systemctl start launcher",
-	)
+	systemdLauncherInstallerContents := `#/bin/bash
+set -e
+systemctl daemon-reload
+systemctl enable launcher
+systemctl start launcher`
 
 	systemdLauncherInstallerFile, err := os.Create(
 		filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"),
@@ -150,12 +150,6 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
-	// The secret which the user will use to authenticate to the cloud
-	err = ioutil.WriteFile(filepath.Join(packageRoot, configurationDirectory, "secret"), []byte(secret), FileMode)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
-	}
-
 	// Finally, now that the final directory structure of the package is
 	// represented, we can create the package
 	currentVersion := version.Version().Version
@@ -173,6 +167,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	// Create the packages
 	containerPackageRoot := "/pkgroot"
+	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer")
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
@@ -184,7 +179,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", debOutputFilename),
-		"--after-install", filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer"),
+		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
 		".",
 	)
@@ -203,7 +198,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", rpmOutputFilename),
-		"--after-install", filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer"),
+		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
 		".",
 	)
@@ -358,6 +353,43 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	return outputPath, nil
+}
+
+// systemdTemplateOptions is a struct which contains dynamic systemd
+// parameters that will be rendered into a template in renderSystemdService
+type systemdTemplateOptions struct {
+	ServerHostname string
+	RootDirectory  string
+	LauncherPath   string
+	OsquerydPath   string
+	SecretPath     string
+	InsecureGrpc   bool
+	Insecure       bool
+}
+
+// renderSystemdService renders a systemd service to start and schedule the launcher.
+func renderSystemdService(w io.Writer, options *systemdTemplateOptions) error {
+	systemdTemplate :=
+`[Unit]
+Description=The Kolide Launcher
+After=network.service syslog.service
+
+[Service]
+ExecStart={{.LauncherPath}} \
+--root_directory={{.RootDirectory}} \
+--hostname={{.ServerHostname}} \
+--enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
+--insecure_grpc \{{end}}{{if .Insecure}}
+--insecure \{{end}}
+--osqueryd_path={{.OsquerydPath}}
+
+[Install]
+WantedBy=multi-user.target`
+	t, err := template.New("systemd").Parse(systemdTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse systemd template")
+	}
+	return t.ExecuteTemplate(w, "systemd", options)
 }
 
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
