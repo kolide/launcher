@@ -57,12 +57,12 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
 	configurationDirectory := filepath.Join("/etc", identifier)
-	logDirectory := filepath.Join("/var/log", identifier)
+	systemdDirectory := "/etc/systemd/system"
 	pathsToCreate := []string{
 		rootDirectory,
 		binaryDirectory,
 		configurationDirectory,
-		logDirectory,
+		systemdDirectory,
 	}
 
 	for _, pathToCreate := range pathsToCreate {
@@ -86,6 +86,51 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
+	// The secret which the user will use to authenticate to the cloud
+	secretPath := filepath.Join(configurationDirectory, "secret")
+
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
+	}
+
+	// Create the systemd unit file for the launcher service
+	systemdPath := filepath.Join(systemdDirectory, "launcher.service")
+	systemdFile, err := os.Create(filepath.Join(packageRoot, systemdPath))
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not create launcher systemd unit file")
+	}
+	defer systemdFile.Close()
+
+	opts := &systemdTemplateOptions{
+		ServerHostname: grpcServerForHostname(hostname),
+		RootDirectory:  rootDirectory,
+		SecretPath:     secretPath,
+		OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
+		LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
+		Insecure:       insecure,
+		InsecureGrpc:   insecureGrpc,
+	}
+	if err := renderSystemdService(systemdFile, opts); err != nil {
+		return "", "", errors.Wrap(err, "could not render systemd unit file")
+	}
+
+	// The launcher-systemd-installer
+	systemdLauncherInstallerContents := `#/bin/bash
+set -e
+systemctl daemon-reload
+systemctl enable launcher
+systemctl start launcher`
+
+	systemdLauncherInstallerFile, err := os.Create(
+		filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"),
+	)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not create the launcher-systemd-installer")
+	}
+	fmt.Fprintf(systemdLauncherInstallerFile, systemdLauncherInstallerContents)
+	systemdLauncherInstallerFile.Close()
+
 	// The initial launcher (and extension) binary
 	err = CopyFile(
 		filepath.Join(LauncherSource(), "build/linux/launcher"),
@@ -101,12 +146,6 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
-	}
-
-	// The secret which the user will use to authenticate to the cloud
-	err = ioutil.WriteFile(filepath.Join(packageRoot, configurationDirectory, "secret"), []byte(secret), FileMode)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
 
 	// Finally, now that the final directory structure of the package is
@@ -125,9 +164,11 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	rpmOutputPath := filepath.Join(outputPathDir, rpmOutputFilename)
 
 	// Create the packages
+	containerPackageRoot := "/pkgroot"
+	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer")
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
+		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
 		"kolide/fpm",
 		"fpm",
@@ -136,7 +177,9 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", debOutputFilename),
-		"/pkgroot=/",
+		"--after-install", afterInstall,
+		"-C", containerPackageRoot,
+		".",
 	)
 	if err := debCmd.Run(); err != nil {
 		return "", "", errors.Wrap(err, "could not create deb package")
@@ -144,7 +187,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	rpmCmd := exec.Command(
 		"docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgroot", packageRoot),
+		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
 		"kolide/fpm",
 		"fpm",
@@ -153,7 +196,9 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		"-n", "launcher",
 		"-v", currentVersion,
 		"-p", filepath.Join("/out", rpmOutputFilename),
-		"/pkgroot=/",
+		"--after-install", afterInstall,
+		"-C", containerPackageRoot,
+		".",
 	)
 	if err := rpmCmd.Run(); err != nil {
 		return "", "", errors.Wrap(err, "could not create rpm package")
@@ -306,6 +351,43 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	return outputPath, nil
+}
+
+// systemdTemplateOptions is a struct which contains dynamic systemd
+// parameters that will be rendered into a template in renderSystemdService
+type systemdTemplateOptions struct {
+	ServerHostname string
+	RootDirectory  string
+	LauncherPath   string
+	OsquerydPath   string
+	SecretPath     string
+	InsecureGrpc   bool
+	Insecure       bool
+}
+
+// renderSystemdService renders a systemd service to start and schedule the launcher.
+func renderSystemdService(w io.Writer, options *systemdTemplateOptions) error {
+	systemdTemplate :=
+`[Unit]
+Description=The Kolide Launcher
+After=network.service syslog.service
+
+[Service]
+ExecStart={{.LauncherPath}} \
+--root_directory={{.RootDirectory}} \
+--hostname={{.ServerHostname}} \
+--enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
+--insecure_grpc \{{end}}{{if .Insecure}}
+--insecure \{{end}}
+--osqueryd_path={{.OsquerydPath}}
+
+[Install]
+WantedBy=multi-user.target`
+	t, err := template.New("systemd").Parse(systemdTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse systemd template")
+	}
+	return t.ExecuteTemplate(w, "systemd", options)
 }
 
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
