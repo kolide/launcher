@@ -24,7 +24,7 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc bool, identifier string) (*PackagePaths, error) {
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string) (*PackagePaths, error) {
 	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
