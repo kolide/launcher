@@ -32,14 +32,23 @@ If you'd like to customize the keys that are used to sign the enrollment secret 
 
 The macOS package will install a LaunchDaemon that will connect the launcher to the server specified by the `--hostname` flag, using an enrollment secret specified by the `--enroll_secret` flag. The Linux packages will currently lay down the launcher and osquery binaries as well as the enrollment secret specified by the `--enroll_secret` flag.
 
-If you would like the resultant launcher binary to be invoked with the `--insecure` or `--insecure_grpc` flags, include them with the invocation of `package-builder`:
+If you would like the resultant launcher binary to be invoked with any of the following flags, include them with the invocation of `package-builder`:
+
+- `--insecure`
+- `--insecure_grpc`
+- `--autoupdate`
+- `--update_channel`
+
+For example, consider the following usage:
 
 ```
 ./build/package-builder make \
   --hostname=localhost:8082 \
   --enroll_secret=foobar123 \
   --insecure \
-  --insecure_grpc
+  --insecure_grpc \
+	--autoupdate \
+	--update_channel=nightly
 ```
 
 By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value.
