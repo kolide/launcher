@@ -102,6 +102,10 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	}
 	defer systemdFile.Close()
 
+	if updateChannel == "" {
+		updateChannel = "stable"
+	}
+
 	opts := &systemdTemplateOptions{
 		ServerHostname: grpcServerForHostname(hostname),
 		RootDirectory:  rootDirectory,
@@ -284,6 +288,11 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	if err != nil {
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
+
+	if updateChannel == "" {
+		updateChannel = "stable"
+	}
+
 	opts := &launchDaemonTemplateOptions{
 		ServerHostname:   grpcServerForHostname(hostname),
 		RootDirectory:    rootDirectory,
@@ -433,7 +442,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <string>{{.SecretPath}}</string>
             <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
             <string>{{.OsquerydPath}}</string>{{if .Autoupdate}}
-            <key>KOLIDE_LAUNCHER_AUTOUPDATE</key>
+            <key>KOLIDE_LAUNCHER_UPDATE_CHANNEL</key>
             <string>{{.UpdateChannel}}</string>{{end}}
         </dict>
         <key>RunAtLoad</key>
