@@ -213,7 +213,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "createKolideMacPackageInTempDir.packageRoot")
+	packageRoot, err := ioutil.TempDir("/tmp", "createMacPackage.packageRoot")
 	if err != nil {
 		return "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
