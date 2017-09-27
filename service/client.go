@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -30,10 +31,16 @@ type enrollmentResponse struct {
 	Err         error
 }
 
+// requestTimeout is duration after which the request is cancelled.
+const requestTimeout = 60 * time.Second
+
 // RequestEnrollment implements KolideService.RequestEnrollment
 func (e KolideClient) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier}
-	response, err := e.RequestEnrollmentEndpoint(ctx, request)
+	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
 	if err != nil {
 		return "", false, err
 	}
@@ -53,8 +60,10 @@ type configResponse struct {
 
 // RequestConfig implements KolideService.RequestConfig.
 func (e KolideClient) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
 	request := agentAPIRequest{NodeKey: nodeKey}
-	response, err := e.RequestConfigEndpoint(ctx, request)
+	response, err := e.RequestConfigEndpoint(newCtx, request)
 	if err != nil {
 		return "", false, err
 	}
@@ -77,8 +86,10 @@ type agentAPIResponse struct {
 
 // PublishLogs implements KolideService.PublishLogs
 func (e KolideClient) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
 	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}
-	response, err := e.PublishLogsEndpoint(ctx, request)
+	response, err := e.PublishLogsEndpoint(newCtx, request)
 	if err != nil {
 		return "", "", false, err
 	}
@@ -94,8 +105,10 @@ type queryCollection struct {
 
 // RequestQueries implements KolideService.RequestQueries
 func (e KolideClient) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
 	request := agentAPIRequest{NodeKey: nodeKey}
-	response, err := e.RequestQueriesEndpoint(ctx, request)
+	response, err := e.RequestQueriesEndpoint(newCtx, request)
 	if err != nil {
 		return nil, false, err
 	}
@@ -110,8 +123,11 @@ type resultCollection struct {
 
 // PublishResults implements KolideService.PublishResults
 func (e KolideClient) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
 	request := resultCollection{NodeKey: nodeKey, Results: results}
-	response, err := e.PublishResultsEndpoint(ctx, request)
+	response, err := e.PublishResultsEndpoint(newCtx, request)
 	if err != nil {
 		return "", "", false, err
 	}
@@ -120,8 +136,10 @@ func (e KolideClient) PublishResults(ctx context.Context, nodeKey string, result
 }
 
 func (e KolideClient) CheckHealth(ctx context.Context) (int32, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
 	request := agentAPIRequest{}
-	response, err := e.CheckHealthEndpoint(ctx, request)
+	response, err := e.CheckHealthEndpoint(newCtx, request)
 	if err != nil {
 		return 0, err
 	}
