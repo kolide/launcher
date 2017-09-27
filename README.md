@@ -46,6 +46,10 @@ The following best practices, and many more, are included:
 
 The osqueryd binary was designed to be very configurable, which allows it to be used in very different environments. The Launcher wraps osqueryd configuration and exposes very high-level options that allow you to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto) (such as [Kolide Fleet](https://github.com/kolide/fleet)).
 
+Consider the following side-by-side example of The Launcher's command-line help versus osqueryd's command-line help. The Launcher exposes the bare essentials as top-level configuration options. This makes getting started with Osquery easier than ever.
+
+[![launcher is simple](./tools/images/help-side-by-side.png)](./cmd/launcher/README.md)
+
 To learn about The Launcher's command-line interface, see the Launcher [documentation](./cmd/launcher/README.md).
 
 ### Easy Packaging and Deployment Tooling
