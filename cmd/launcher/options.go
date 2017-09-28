@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/kolide/kit/env"
@@ -46,7 +45,7 @@ func parseOptions() (*options, error) {
 		// Primary options
 		flRootDirectory = flag.String(
 			"root_directory",
-			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", filepath.Join(os.TempDir(), defaultRootDirectory)),
+			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", ""),
 			"The location of the local database, pidfiles, etc.",
 		)
 		flKolideServerURL = flag.String(

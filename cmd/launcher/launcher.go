@@ -68,6 +68,15 @@ func main() {
 	// logger (otherwise we get incorrect line numbers).
 	logger = log.With(logger, "caller", log.DefaultCaller)
 
+	rootDirectory := opts.rootDirectory
+	if rootDirectory == "" {
+		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
+		level.Info(logger).Log(
+			"msg", "using default system root directory",
+			"path", rootDirectory,
+		)
+	}
+
 	if _, err := osquery.DetectPlatform(); err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	}
@@ -86,7 +95,7 @@ func main() {
 	versionInfo := version.Version()
 	level.Info(logger).Log("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
 
-	db, err := bolt.Open(filepath.Join(opts.rootDirectory, "launcher.db"), 0600, nil)
+	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "open local store"))
 	}
@@ -133,7 +142,7 @@ func main() {
 	// Start the osqueryd instance
 	instance, err := osquery.LaunchOsqueryInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
-		osquery.WithRootDirectory(opts.rootDirectory),
+		osquery.WithRootDirectory(rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
 		osquery.WithLoggerPluginFlag("kolide_grpc"),
 		osquery.WithDistributedPluginFlag("kolide_grpc"),
@@ -152,7 +161,7 @@ func main() {
 	if opts.autoupdate {
 		enabler := &updateEnabler{
 			Logger:             logger,
-			RootDirectory:      opts.rootDirectory,
+			RootDirectory:      rootDirectory,
 			AutoupdateInterval: opts.autoupdateInterval,
 			NotaryURL:          opts.notaryServerURL,
 			MirrorURL:          opts.mirrorServerURL,
@@ -175,7 +184,7 @@ func main() {
 		}
 		stopLauncher, err := enabler.EnableBinary(
 			launcherPath,
-			autoupdate.WithFinalizer(launcherFinalizer(logger, opts.rootDirectory)),
+			autoupdate.WithFinalizer(launcherFinalizer(logger, rootDirectory)),
 			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
