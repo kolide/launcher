@@ -33,6 +33,10 @@ type options struct {
 	updateChannel      autoupdate.UpdateChannel
 }
 
+const (
+	defaultRootDirectory = "launcher-root"
+)
+
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
@@ -41,7 +45,7 @@ func parseOptions() (*options, error) {
 		// Primary options
 		flRootDirectory = flag.String(
 			"root_directory",
-			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", os.TempDir()),
+			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", ""),
 			"The location of the local database, pidfiles, etc.",
 		)
 		flKolideServerURL = flag.String(
