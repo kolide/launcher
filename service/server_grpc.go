@@ -125,11 +125,3 @@ func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (
 	}
 	return rep.(*pb.HealthCheckResponse), nil
 }
-
-func (s *grpcServer) HotConfigure(*pb.AgentApiRequest, pb.Api_HotConfigureServer) error {
-	panic("not implemented")
-}
-
-func (s *grpcServer) HotlineBling(pb.Api_HotlineBlingServer) error {
-	panic("not implemented")
-}

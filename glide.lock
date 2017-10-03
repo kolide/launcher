@@ -1,8 +1,8 @@
-hash: f3f8764b01e1c03c13d7a92cc1c53165689b5a5386a9211869fc4012f53a65a8
-updated: 2017-09-12T20:06:53.007940614-05:00
+hash: acc12fd60b4a03622914c8e6461e633f358c0ea083a3013ead2e0160586a22ff
+updated: 2017-10-03T16:02:51.951619734-06:00
 imports:
 - name: cloud.google.com/go
-  version: 5a9e19d4e1e41a734154e44a2132b358afb49a03
+  version: f6de2c509ed9d2af648c3c147207eaaf97149aed
   subpackages:
   - '...'
   - compute/metadata
@@ -15,10 +15,18 @@ imports:
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
   subpackages:
   - lib/go/thrift
+- name: github.com/agl/ed25519
+  version: 5312a61534124124185d41f09206b9fef1d88403
+  subpackages:
+  - edwards25519
 - name: github.com/boltdb/bolt
-  version: 2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8
+  version: fa5367d20c994db73282594be0146ab221657943
 - name: github.com/dgrijalva/jwt-go
   version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+- name: github.com/docker/distribution
+  version: bb49a1685d2773cb43dacc16e100419f310ba347
+  subpackages:
+  - uuid
 - name: github.com/docker/go
   version: d30aec9fd63c35133f8f79c3412ad91a3b08be06
   subpackages:
@@ -27,8 +35,19 @@ imports:
   version: 8a1de3cfc3f1408e54d6364fc949214a4883a9f3
   subpackages:
   - client
+  - client/changelist
+  - cryptoservice
+  - storage
+  - trustmanager
+  - trustmanager/yubikey
+  - trustpinning
+  - tuf
+  - tuf/data
+  - tuf/signed
+  - tuf/utils
+  - tuf/validation
 - name: github.com/go-kit/kit
-  version: f7593d19082ad15f6376f12c746d71d680aa1666
+  version: 7c0038db5f6361f85f612e4154f61e4f6d6a83b2
   subpackages:
   - endpoint
   - log
@@ -39,7 +58,7 @@ imports:
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
-  version: 5afd06f9d81a86d6e3bb7dc702d6bd148ea3ff23
+  version: 130e6b02ab059e7b717a096f397c5b60111cae74
   subpackages:
   - proto
   - protoc-gen-go/descriptor
@@ -50,14 +69,14 @@ imports:
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
 - name: github.com/googleapis/gax-go
-  version: 2cadd475a3e966ec9b77a21afc530dbacec6d613
+  version: 317e0006254c44a0ac427cc52a0e083ff0b9622f
 - name: github.com/groob/goxar
   version: 908d7dee5b14b7157e77d16fef6fa7e33fbcb3d7
 - name: github.com/kolide/agent-api
-  version: f94ad0917bd4bed7134e310e1354011c520a0243
+  version: f81f25bd36a2e73a762d4a5192d698bae06a7161
   repo: git@github.com:kolide/agent-api.git
 - name: github.com/kolide/kit
-  version: 65836196b611159ee343be3cc9c856b2e5818276
+  version: 8e06c1f728b168b49a12e2716ee5e6370e3e1b41
   repo: git@github.com:kolide/kit.git
   subpackages:
   - env
@@ -79,14 +98,18 @@ imports:
   - tuf
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/miekg/pkcs11
+  version: eda1d775a087f2a96fec7c7876ea94dea43e6027
 - name: github.com/mixer/clock
   version: b08e6b4da7ea8c03e0f0c47fd549d801f52a3019
 - name: github.com/pkg/errors
-  version: c605e284fe17294bda444b34710735b29d1a9d90
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
+- name: github.com/sirupsen/logrus
+  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - name: github.com/WatchBeam/clock
   version: b08e6b4da7ea8c03e0f0c47fd549d801f52a3019
 - name: golang.org/x/crypto
-  version: 81e90905daefcd6fd217b62423c0908922eadb30
+  version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
   subpackages:
   - cast5
   - openpgp
@@ -96,8 +119,10 @@ imports:
   - openpgp/errors
   - openpgp/packet
   - openpgp/s2k
+  - pbkdf2
+  - ssh/terminal
 - name: golang.org/x/net
-  version: 66aacef3dd8a676686c7ae3716979581e8b03c47
+  version: 0a9397675ba34b2845f758fe3cd68828369c6517
   subpackages:
   - context
   - context/ctxhttp
@@ -108,29 +133,30 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/oauth2
-  version: 3d1522b2688977b7f4598d1f28b5e147c41640e7
+  version: bb50c06baba3d0c76f9d125c0719093e315b5b44
   subpackages:
   - google
   - internal
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
+  version: 314a259e304ff91bd6985da2a7149bbf91237993
   subpackages:
   - unix
+  - windows
 - name: golang.org/x/text
-  version: bd91bbf73e9a4a801adbfb97133c992678533126
+  version: 1cbadb444a806fd9430d14ad08967ed91da4fa0a
   subpackages:
   - secure/bidirule
   - transform
   - unicode/bidi
   - unicode/norm
 - name: golang.org/x/time
-  version: 8be79e1e0910c292df4e79c241bb7e8f7e725959
+  version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
   subpackages:
   - rate
 - name: google.golang.org/api
-  version: 955a3ae66b420f3adc0d77da3d8ed767a74e2b4f
+  version: 2ae7de5be730a6b0939fabcd06b18185a8a3e2db
   subpackages:
   - gensupport
   - googleapi
@@ -142,7 +168,7 @@ imports:
   - storage/v1
   - transport/http
 - name: google.golang.org/appengine
-  version: d9a072cfa7b9736e44311ef77b3e09d804bfa599
+  version: 24e4144ec923c2374f6b06610c0df16a9222c3d9
   subpackages:
   - internal
   - internal/app_identity
@@ -154,13 +180,13 @@ imports:
   - internal/urlfetch
   - urlfetch
 - name: google.golang.org/genproto
-  version: ee236bd376b077c7a89f260c026c4735b195e459
+  version: f676e0f3ac6395ff1a529ae59a6670878a8371a6
   subpackages:
   - googleapis/api/annotations
   - googleapis/iam/v1
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 8233e124e4634a8313f2c9a1ea7d4db33546b11b
+  version: 8230f98ef70a01926ff7db24b4884248c13eb2a2
   subpackages:
   - balancer
   - codes
