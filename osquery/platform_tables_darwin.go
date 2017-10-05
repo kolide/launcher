@@ -13,5 +13,6 @@ func platformTables(client *osquery.ExtensionManagerClient) []*table.Plugin {
 		BestPractices(client),
 		EmailAddresses(client),
 		Spotlight(),
+		KolideVulnerabilities(client),
 	}
 }
