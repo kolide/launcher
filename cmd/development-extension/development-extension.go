@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 	"time"
 
+	kitlog "github.com/go-kit/kit/log"
 	launcher "github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go"
 )
@@ -31,7 +33,7 @@ func main() {
 	}
 
 	plugins := []osquery.OsqueryPlugin{}
-	for _, tablePlugin := range launcher.PlatformTables(client) {
+	for _, tablePlugin := range launcher.PlatformTables(client, kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))) {
 		plugins = append(plugins, tablePlugin)
 	}
 	server.RegisterPlugin(plugins...)
