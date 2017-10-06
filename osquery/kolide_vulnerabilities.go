@@ -6,60 +6,71 @@ import (
 	"os/exec"
 	"regexp"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/pkg/errors"
 )
 
-func KolideVulnerabilities(client *osquery.ExtensionManagerClient) *table.Plugin {
+func KolideVulnerabilities(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.IntegerColumn("vulnerable"),
 		table.TextColumn("details"),
 	}
-	return table.NewPlugin("kolide_vulnerabilities", columns, generateKolideVulnerabilities(client))
+	return table.NewPlugin("kolide_vulnerabilities", columns, generateKolideVulnerabilities(client, logger))
 }
 
-var generateFuncs = []func() map[string]string{
+var generateFuncs = []func(log log.Logger) map[string]string{
 	generateCVE_2017_7149,
 }
 
-func generateKolideVulnerabilities(client *osquery.ExtensionManagerClient) table.GenerateFunc {
+func generateKolideVulnerabilities(client *osquery.ExtensionManagerClient, logger log.Logger) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		results := []map[string]string{}
 
 		for _, f := range generateFuncs {
-			results = append(results, f())
+			results = append(results, f(logger))
 		}
 
 		return results, nil
 	}
 }
 
-func generateCVE_2017_7149() map[string]string {
+func generateCVE_2017_7149(logger log.Logger) map[string]string {
 	row := map[string]string{"name": "CVE-2017-7149"}
 	volumes, err := getEncryptedAPFSVolumes()
 	if err != nil {
+		level.Error(logger).Log("err", errors.Wrap(err, "getting encrypted APFS volumes"))
 		return row
 	}
 
-	foo := struct {
+	details := struct {
 		Vulnerable []string `json:"vulnerable"`
 	}{}
 	for _, vol := range volumes {
-		if checkVolumeVulnerability(vol) {
-			foo.Vulnerable = append(foo.Vulnerable, vol)
+		vulnerable, err := checkVolumeVulnerability(vol)
+		if err != nil {
+			level.Error(logger).Log("err", errors.Wrapf(err, "checking volume %s vulnerability", vol))
+			continue
+		}
+
+		if vulnerable {
+			details.Vulnerable = append(details.Vulnerable, vol)
 		}
 	}
 
-	if len(foo.Vulnerable) == 0 {
+	if len(details.Vulnerable) == 0 {
 		row["vulnerable"] = "0"
 		return row
 	}
 
 	row["vulnerable"] = "1"
 
-	detailJSON, err := json.Marshal(foo)
+	detailJSON, err := json.Marshal(details)
 	if err != nil {
+		level.Error(logger).Log("err", errors.Wrap(err, "marshalling CVE_2017_7149 details"))
 		return row
 	}
 	row["details"] = string(detailJSON)
@@ -73,7 +84,7 @@ func getEncryptedAPFSVolumes() ([]string, error) {
 	cmd := exec.Command("diskutil", "apfs", "list")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "execing diskutil apfs list")
 	}
 
 	volumeSection := regexp.MustCompile(`(?s)Volume .+? Encrypted:\s+(Yes|No)`)
@@ -98,11 +109,11 @@ func getEncryptedAPFSVolumes() ([]string, error) {
 	return volumes, nil
 }
 
-func checkVolumeVulnerability(volume string) bool {
+func checkVolumeVulnerability(volume string) (bool, error) {
 	cmd := exec.Command("diskutil", "apfs", "listCryptoUsers", volume)
 	out, err := cmd.Output()
 	if err != nil {
-		return false
+		return false, errors.Wrapf(err, "execing diskutil apfs listCryptoUsers %s", volume)
 	}
 
 	userSectionWithHint := regexp.MustCompile(`(?s) (\S+-\S+-\S+-\S+-\S+).+? Hint: ([^\n]+)`)
@@ -114,11 +125,11 @@ func checkVolumeVulnerability(volume string) bool {
 		passHint := matches[2]
 
 		if testVolumeUser(volume, uuid, passHint) {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 func testVolumeUser(volume, uuid, passHint string) bool {
