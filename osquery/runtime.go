@@ -418,7 +418,7 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 	}
 
 	plugins := o.extensionPlugins
-	for _, t := range PlatformTables(o.extensionManagerClient) {
+	for _, t := range PlatformTables(o.extensionManagerClient, o.logger) {
 		plugins = append(plugins, t)
 	}
 	o.extensionManagerServer.RegisterPlugin(plugins...)
