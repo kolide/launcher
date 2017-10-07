@@ -148,6 +148,7 @@ func main() {
 
 	// Start the osqueryd instance
 	instance, err := osquery.LaunchOsqueryInstance(
+		osquery.WithLogger(logger),
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
