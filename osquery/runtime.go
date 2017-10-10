@@ -477,7 +477,10 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 				level.Error(o.logger).Log("err", errors.Wrap(runtimeError, "osquery runtime error"))
 			}
 
-			if needsRecovery {
+			o.instanceLock.Lock()
+			teardownStarted := o.teardownStarted()
+			o.instanceLock.Unlock()
+			if needsRecovery && !teardownStarted {
 				level.Info(o.logger).Log("msg", "recovering osquery instance")
 				if recoveryError := o.Recover(); recoveryError != nil {
 					// If we were not able to recover the osqueryd process for some reason,
@@ -501,6 +504,11 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 func (o *OsqueryInstance) beginTeardown() bool {
 	begun := atomic.SwapInt32(&o.instance.hasBegunTeardown, 1)
 	return begun == 0
+}
+
+func (o *OsqueryInstance) teardownStarted() bool {
+	begun := atomic.LoadInt32(&o.instance.hasBegunTeardown)
+	return begun != 0
 }
 
 // Recover attempts to launch a new osquery instance if the running instance has
