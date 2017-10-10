@@ -172,8 +172,9 @@ func TestOsqueryDies(t *testing.T) {
 		WithRetries(3),
 	)
 	require.NoError(t, err)
-
-	require.NoError(t, instance.cmd.Process.Kill())
+	instance.instanceLock.Lock()
+	require.NoError(t, instance.instance.cmd.Process.Kill())
+	instance.instanceLock.Unlock()
 	time.Sleep(3 * time.Second)
 
 	healthy, err := instance.Healthy()
