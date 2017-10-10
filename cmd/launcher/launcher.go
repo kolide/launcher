@@ -16,11 +16,11 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
-	"github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
@@ -73,7 +73,7 @@ func main() {
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, packaging.DirMode); err != nil {
+			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
 				logFatal(logger, "err", errors.Wrap(err, "creating temporary root directory"))
 			}
 		}

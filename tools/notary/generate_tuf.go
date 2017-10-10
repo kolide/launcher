@@ -14,14 +14,14 @@ import (
 	"github.com/docker/notary/tuf/data"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/tools/packaging"
+	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
 )
 
 func main() {
 	var (
 		flBinary          = flag.String("binary", "osqueryd", "which binary to use for assets")
-		flNotaryConfigDir = flag.String("notary_config_dir", filepath.Join(packaging.LauncherSource(), "tools/notary/config"), "notary base directory")
+		flNotaryConfigDir = flag.String("notary_config_dir", filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/tools/notary/config"), "notary base directory")
 	)
 	flag.Parse()
 
@@ -80,7 +80,7 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := packaging.CopyDir(source, localRepo); err != nil {
+	if err := fs.CopyDir(source, localRepo); err != nil {
 		return errors.Wrap(err, "copying TUF repo metadata")
 	}
 

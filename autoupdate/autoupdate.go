@@ -15,8 +15,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/osquery"
-	"github.com/kolide/launcher/tools/packaging"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 )
@@ -244,7 +244,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
-		if err := packaging.UntarDownload(stagingPath, stagingPath); err != nil {
+		if err := fs.UntarBundle(stagingPath, stagingPath); err != nil {
 			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}

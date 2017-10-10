@@ -1,15 +1,10 @@
 hash: acc12fd60b4a03622914c8e6461e633f358c0ea083a3013ead2e0160586a22ff
-updated: 2017-10-03T16:02:51.951619734-06:00
+updated: 2017-10-10T10:28:13.156031701-06:00
 imports:
 - name: cloud.google.com/go
-  version: f6de2c509ed9d2af648c3c147207eaaf97149aed
+  version: eaddaf6dd7ee35fd3c2420c8d27478db176b0485
   subpackages:
   - '...'
-  - compute/metadata
-  - iam
-  - internal
-  - internal/optional
-  - internal/version
   - storage
 - name: git.apache.org/thrift.git
   version: 0dd823580c78a79ae9696eb9b3650e400fff140f
@@ -22,7 +17,7 @@ imports:
 - name: github.com/boltdb/bolt
   version: fa5367d20c994db73282594be0146ab221657943
 - name: github.com/dgrijalva/jwt-go
-  version: a539ee1a749a2b895533f979515ac7e6e0f5b650
+  version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
 - name: github.com/docker/distribution
   version: bb49a1685d2773cb43dacc16e100419f310ba347
   subpackages:
@@ -47,7 +42,7 @@ imports:
   - tuf/utils
   - tuf/validation
 - name: github.com/go-kit/kit
-  version: 7c0038db5f6361f85f612e4154f61e4f6d6a83b2
+  version: 4dc7be5d2d12881735283bcab7352178e190fc71
   subpackages:
   - endpoint
   - log
@@ -58,28 +53,26 @@ imports:
 - name: github.com/go-stack/stack
   version: 817915b46b97fd7bb80e8ab6b69f01a53ac3eebf
 - name: github.com/golang/protobuf
-  version: 130e6b02ab059e7b717a096f397c5b60111cae74
+  version: 11b8df160996e00fd4b55cbaafb3d84ec6d50fa8
   subpackages:
   - proto
-  - protoc-gen-go/descriptor
   - ptypes
   - ptypes/any
   - ptypes/duration
   - ptypes/timestamp
 - name: github.com/google/uuid
   version: 064e2069ce9c359c118179501254f67d7d37ba24
-- name: github.com/googleapis/gax-go
-  version: 317e0006254c44a0ac427cc52a0e083ff0b9622f
 - name: github.com/groob/goxar
   version: 908d7dee5b14b7157e77d16fef6fa7e33fbcb3d7
 - name: github.com/kolide/agent-api
   version: f81f25bd36a2e73a762d4a5192d698bae06a7161
   repo: git@github.com:kolide/agent-api.git
 - name: github.com/kolide/kit
-  version: 8e06c1f728b168b49a12e2716ee5e6370e3e1b41
+  version: 5b07277d5e416e72b08f8085b74b45d8e73660c8
   repo: git@github.com:kolide/kit.git
   subpackages:
   - env
+  - fs
   - testutil
   - version
 - name: github.com/kolide/osquery-go
@@ -111,36 +104,20 @@ imports:
 - name: golang.org/x/crypto
   version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
   subpackages:
-  - cast5
-  - openpgp
-  - openpgp/armor
-  - openpgp/clearsign
-  - openpgp/elgamal
-  - openpgp/errors
-  - openpgp/packet
-  - openpgp/s2k
   - pbkdf2
   - ssh/terminal
 - name: golang.org/x/net
-  version: 0a9397675ba34b2845f758fe3cd68828369c6517
+  version: 8351a756f30f1297fe94bbf4b767ec589c6ea6d0
   subpackages:
   - context
-  - context/ctxhttp
   - http2
   - http2/hpack
   - idna
   - internal/timeseries
   - lex/httplex
   - trace
-- name: golang.org/x/oauth2
-  version: bb50c06baba3d0c76f9d125c0719093e315b5b44
-  subpackages:
-  - google
-  - internal
-  - jws
-  - jwt
 - name: golang.org/x/sys
-  version: 314a259e304ff91bd6985da2a7149bbf91237993
+  version: ebfc5b4631820b793c9010c87fd8fef0f39eb082
   subpackages:
   - unix
   - windows
@@ -155,38 +132,12 @@ imports:
   version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
   subpackages:
   - rate
-- name: google.golang.org/api
-  version: 2ae7de5be730a6b0939fabcd06b18185a8a3e2db
-  subpackages:
-  - gensupport
-  - googleapi
-  - googleapi/internal/uritemplates
-  - googleapi/transport
-  - internal
-  - iterator
-  - option
-  - storage/v1
-  - transport/http
-- name: google.golang.org/appengine
-  version: 24e4144ec923c2374f6b06610c0df16a9222c3d9
-  subpackages:
-  - internal
-  - internal/app_identity
-  - internal/base
-  - internal/datastore
-  - internal/log
-  - internal/modules
-  - internal/remote_api
-  - internal/urlfetch
-  - urlfetch
 - name: google.golang.org/genproto
-  version: f676e0f3ac6395ff1a529ae59a6670878a8371a6
+  version: 595979c8a7bf586b2d293fb42246bf91a0b893d9
   subpackages:
-  - googleapis/api/annotations
-  - googleapis/iam/v1
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 8230f98ef70a01926ff7db24b4884248c13eb2a2
+  version: bb78878767b96d411e740439ac820f118e95ae2f
   subpackages:
   - balancer
   - codes
@@ -207,16 +158,7 @@ imports:
 - name: pault.ag/go/debian
   version: 247d411992777dbb91b2ff8cf344824d08ed4b7d
   subpackages:
-  - control
   - deb
-  - dependency
-  - internal
-  - transput
-  - version
-- name: pault.ag/go/topsort
-  version: f98d2ad46e1adcbf8fa59a95a3b5509a7da9c6b5
-- name: xi2.org/x/xz
-  version: 19aeb13c4e7cb6bd3188dfede73840f33455425a
 testImports:
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
