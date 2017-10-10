@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
@@ -25,12 +26,12 @@ type PackagePaths struct {
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
 func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
+	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := createLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -42,11 +43,11 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, string, error) {
+func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "createLinuxPackages.packageRoot_")
+	packageRoot, err := ioutil.TempDir("/tmp", "CreateLinuxPackages.packageRoot_")
 	if err != nil {
 		return "", "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
@@ -66,7 +67,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	}
 
 	for _, pathToCreate := range pathsToCreate {
-		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
+		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), fs.DirMode)
 		if err != nil {
 			return "", "", errors.Wrap(err, fmt.Sprintf("could not make directory %s/%s", packageRoot, pathToCreate))
 		}
@@ -81,7 +82,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(osquerydPath, filepath.Join(packageRoot, binaryDirectory, "osqueryd"))
+	err = fs.CopyFile(osquerydPath, filepath.Join(packageRoot, binaryDirectory, "osqueryd"))
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
@@ -89,7 +90,7 @@ func createLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	// The secret which the user will use to authenticate to the cloud
 	secretPath := filepath.Join(configurationDirectory, "secret")
 
-	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}
@@ -138,16 +139,16 @@ systemctl start launcher`
 	systemdLauncherInstallerFile.Close()
 
 	// The initial launcher (and extension) binary
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/linux/launcher"),
+	err = fs.CopyFile(
+		filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/build/linux/launcher"),
 		filepath.Join(packageRoot, binaryDirectory, "launcher"),
 	)
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
 	}
 
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/linux/osquery-extension.ext"),
+	err = fs.CopyFile(
+		filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/build/linux/osquery-extension.ext"),
 		filepath.Join(packageRoot, binaryDirectory, "osquery-extension.ext"),
 	)
 	if err != nil {
@@ -213,11 +214,11 @@ systemctl start launcher`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, error) {
+func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
-	packageRoot, err := ioutil.TempDir("/tmp", "createMacPackage.packageRoot")
+	packageRoot, err := ioutil.TempDir("/tmp", "CreateMacPackage.packageRoot")
 	if err != nil {
 		return "", errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
@@ -246,7 +247,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		launchDaemonDirectory,
 	}
 	for _, pathToCreate := range pathsToCreate {
-		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), DirMode)
+		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), fs.DirMode)
 		if err != nil {
 			return "", errors.Wrapf(err, "could not make directory %s/%s", packageRoot, pathToCreate)
 		}
@@ -261,22 +262,22 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
 
-	err = CopyFile(localOsquerydPath, filepath.Join(packageRoot, osquerydPath))
+	err = fs.CopyFile(localOsquerydPath, filepath.Join(packageRoot, osquerydPath))
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the osqueryd binary to the packaging root")
 	}
 
 	// The initial launcher (and extension) binary
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/darwin/launcher"),
+	err = fs.CopyFile(
+		filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/build/darwin/launcher"),
 		filepath.Join(packageRoot, launcherPath),
 	)
 	if err != nil {
 		return "", errors.Wrap(err, "could not copy the launcher binary to the packaging root")
 	}
 
-	err = CopyFile(
-		filepath.Join(LauncherSource(), "build/darwin/osquery-extension.ext"),
+	err = fs.CopyFile(
+		filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/build/darwin/osquery-extension.ext"),
 		filepath.Join(packageRoot, binaryDirectory, "osquery-extension.ext"),
 	)
 	if err != nil {
@@ -311,7 +312,7 @@ func createMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	// The secret which the user will use to authenticate to the server
-	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), FileMode)
+	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
 	if err != nil {
 		return "", errors.Wrap(err, "could not write secret string to file for packaging")
 	}

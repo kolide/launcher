@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
 )
 
@@ -55,7 +56,7 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 
 	// Download the package
 	localPackageDownloadPath := filepath.Join(localCacheDir, osqueryTarPath(osqueryVersion, osqueryPlatform))
-	if err := os.MkdirAll(filepath.Dir(localPackageDownloadPath), DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPackageDownloadPath), fs.DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for package")
 	}
 
@@ -80,11 +81,11 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 	// explicitly close the write handle before untaring the archive
 	writeHandle.Close()
 
-	if err := os.MkdirAll(filepath.Dir(localBinaryDownloadPath), DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localBinaryDownloadPath), fs.DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
-	if err := UntarDownload(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
+	if err := fs.UntarBundle(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
 		return "", errors.Wrap(err, "couldn't untar package")
 	}
 
