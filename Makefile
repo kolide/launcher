@@ -78,9 +78,9 @@ package-builder: .pre-build xp-launcher xp-extension .pre-package-builder genera
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 .deps:
-	go get -u github.com/Masterminds/glide
+	go get -u github.com/golang/dep/cmd/dep
 	go get -u github.com/jteeuwen/go-bindata/...
-	glide install
+	dep ensure
 
 deps: .deps generate
 

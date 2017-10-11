@@ -1,0 +1,47 @@
+[[constraint]]
+  name = "github.com/boltdb/bolt"
+
+[[constraint]]
+  name = "github.com/docker/notary"
+
+[[constraint]]
+  name = "github.com/go-kit/kit"
+  version = "0.6.0"
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "0.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/kolide/agent-api"
+  source = "git@github.com:kolide/agent-api.git"
+
+[[constraint]]
+  name = "github.com/kolide/kit"
+  source = "git@github.com:kolide/kit.git"
+
+[[constraint]]
+  name = "github.com/kolide/osquery-go"
+
+[[constraint]]
+  name = "github.com/kolide/updater"
+  source = "git@github.com:kolide/updater.git"
+
+[[constraint]]
+  name = "github.com/mixer/clock"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+
+[[constraint]]
+  name = "golang.org/x/net"
+
+[[constraint]]
+  name = "golang.org/x/time"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
