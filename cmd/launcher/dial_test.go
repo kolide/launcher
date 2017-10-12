@@ -44,15 +44,21 @@ func startServer(t *testing.T, conf *tls.Config) func() {
 	return grpcServer.Stop
 }
 
+const badCert = "testdata/bad-cert.pem"
+const badKey = "testdata/bad-key.pem"
+
+const goodCert = "testdata/good-cert.pem"
+const goodKey = "testdata/good-key.pem"
+
 func TestSwappingCert(t *testing.T) {
-	cert, err := tls.LoadX509KeyPair("bad-cert.pem", "bad-key.pem")
+	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
 
-	pem1, err := ioutil.ReadFile("bad-cert.pem")
+	pem1, err := ioutil.ReadFile(badCert)
 	require.Nil(t, err)
-	pem2, err := ioutil.ReadFile("good-cert.pem")
+	pem2, err := ioutil.ReadFile(goodCert)
 	require.Nil(t, err)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(pem1)
@@ -71,7 +77,7 @@ func TestSwappingCert(t *testing.T) {
 
 	stop()
 
-	cert, err = tls.LoadX509KeyPair("good-cert.pem", "good-key.pem")
+	cert, err = tls.LoadX509KeyPair(goodCert, goodKey)
 	require.Nil(t, err)
 	stop = startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
@@ -83,14 +89,14 @@ func TestSwappingCert(t *testing.T) {
 }
 
 func TestCertRemainsBad(t *testing.T) {
-	cert, err := tls.LoadX509KeyPair("bad-cert.pem", "bad-key.pem")
+	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
 
-	pem1, err := ioutil.ReadFile("bad-cert.pem")
+	pem1, err := ioutil.ReadFile(badCert)
 	require.Nil(t, err)
-	pem2, err := ioutil.ReadFile("good-cert.pem")
+	pem2, err := ioutil.ReadFile(goodCert)
 	require.Nil(t, err)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(pem1)
@@ -109,7 +115,7 @@ func TestCertRemainsBad(t *testing.T) {
 
 	stop()
 
-	cert, err = tls.LoadX509KeyPair("bad-cert.pem", "bad-key.pem")
+	cert, err = tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop = startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)

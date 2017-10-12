@@ -264,6 +264,7 @@ type tlsCreds struct {
 // This is important for reconnecting to the gRPC server after, for example,
 // the certificate being MitMed by a captive portal (without this, gRPC calls
 // will error and never attempt to reconnect).
+// See https://github.com/grpc/grpc-go/issues/1571.
 func (t *tlsCreds) ClientHandshake(ctx context.Context, s string, c net.Conn) (net.Conn, credentials.AuthInfo, error) {
 	conn, info, err := t.TransportCredentials.ClientHandshake(ctx, s, c)
 	if err != nil && strings.Contains(err.Error(), "x509: certificate is valid for ") {
@@ -279,7 +280,7 @@ func dialGRPC(
 	insecureTLS bool,
 	insecureGRPC bool,
 	logger log.Logger,
-	opts ...grpc.DialOption,
+	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 	level.Info(logger).Log(
 		"msg", "dialing grpc server",
