@@ -1,8 +1,8 @@
 version: 2
 jobs:
-  build-go1.8:
+  build-go1.9:
     docker:
-        - image: kolide/launcher-builder:1.8
+        - image: kolide/launcher-builder:1.9
     working_directory: /go/src/github.com/kolide/launcher
     steps: &steps
       - checkout
@@ -29,15 +29,8 @@ jobs:
       - run: make extension
       - run: make launcher
 
-  build-go1.9:
-    docker:
-        - image: kolide/launcher-builder:1.9
-    working_directory: /go/src/github.com/kolide/launcher
-    steps: *steps
-
 workflows:
   version: 2
   build:
     jobs:
-      - build-go1.8
       - build-go1.9
