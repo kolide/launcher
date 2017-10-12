@@ -80,7 +80,7 @@ package-builder: .pre-build xp-launcher xp-extension .pre-package-builder genera
 .deps:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u github.com/jteeuwen/go-bindata/...
-	dep ensure -no-vendor
+	dep ensure -vendor-only
 
 deps: .deps generate
 
