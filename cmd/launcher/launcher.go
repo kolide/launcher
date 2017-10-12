@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -243,12 +244,43 @@ func launcherFinalizer(logger log.Logger, rootDirectory string) func() error {
 	}
 }
 
+// tempErr is a wrapper for errors that are "temporary" and should be retried
+// for gRPC.
+type tempErr struct {
+	error
+}
+
+func (t tempErr) Temporary() bool {
+	return true
+}
+
+// tlsCreds overwrites the ClientHandshake method for specific error handling.
+type tlsCreds struct {
+	credentials.TransportCredentials
+}
+
+// ClientHandshake wraps the normal gRPC ClientHandshake, but treats a
+// certificate with the wrong name as a temporary rather than permanent error.
+// This is important for reconnecting to the gRPC server after, for example,
+// the certificate being MitMed by a captive portal (without this, gRPC calls
+// will error and never attempt to reconnect).
+// See https://github.com/grpc/grpc-go/issues/1571.
+func (t *tlsCreds) ClientHandshake(ctx context.Context, s string, c net.Conn) (net.Conn, credentials.AuthInfo, error) {
+	conn, info, err := t.TransportCredentials.ClientHandshake(ctx, s, c)
+	if err != nil && strings.Contains(err.Error(), "x509: certificate is valid for ") {
+		err = &tempErr{err}
+	}
+
+	return conn, info, err
+}
+
 // dialGRPC creates a grpc client connection.
 func dialGRPC(
 	serverURL string,
 	insecureTLS bool,
 	insecureGRPC bool,
 	logger log.Logger,
+	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 	level.Info(logger).Log(
 		"msg", "dialing grpc server",
@@ -266,15 +298,15 @@ func dialGRPC(
 		if err != nil {
 			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
 		}
-		creds := credentials.NewTLS(&tls.Config{
+		creds := &tlsCreds{credentials.NewTLS(&tls.Config{
 			ServerName:         host,
 			InsecureSkipVerify: insecureTLS,
-		})
+		})}
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 	}
-	conn, err := grpc.Dial(
-		serverURL,
-		grpcOpts...,
-	)
+
+	grpcOpts = append(grpcOpts, opts...)
+
+	conn, err := grpc.Dial(serverURL, grpcOpts...)
 	return conn, err
 }
