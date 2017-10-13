@@ -158,3 +158,31 @@ func TestRecover(t *testing.T) {
 
 	require.NoError(t, instance.Kill())
 }
+
+func TestOsqueryDies(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
+	instance, err := LaunchOsqueryInstance(
+		WithRootDirectory(rootDirectory),
+		WithRetries(3),
+	)
+	require.NoError(t, err)
+	healthy, err := instance.Healthy()
+	require.NoError(t, err)
+	require.True(t, healthy)
+
+	instance.instanceLock.Lock()
+	require.NoError(t, instance.cmd.Process.Kill())
+	instance.instanceLock.Unlock()
+	time.Sleep(3 * time.Second)
+
+	healthy, err = instance.Healthy()
+	require.NoError(t, err)
+	require.True(t, healthy)
+
+	require.NoError(t, instance.Kill())
+}

@@ -129,8 +129,13 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--force=true",
 		"--disable_watchdog",
 	)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+
+	if stdout != nil {
+		cmd.Stdout = stdout
+	}
+	if stderr != nil {
+		cmd.Stderr = stderr
+	}
 
 	return cmd, nil
 }
@@ -267,8 +272,6 @@ func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, err
 	// caller.
 	o := &OsqueryInstance{
 		osqueryInstanceFields: &osqueryInstanceFields{
-			stdout:          ioutil.Discard,
-			stderr:          ioutil.Discard,
 			rmRootDirectory: func() {},
 			errs:            make(chan error),
 			clientLock:      new(sync.Mutex),
@@ -375,8 +378,10 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 	errChannel := o.errs
 	go func() {
 		if err := cmd.Wait(); err != nil {
+			fmt.Println("wait returned err")
 			errChannel <- errors.Wrap(err, "osqueryd processes died")
 		} else {
+			fmt.Println("wait returned non-err")
 			// Close the channel so that the goroutine blocked
 			// waiting for errors will be able to exit
 			close(errChannel)
@@ -426,8 +431,10 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 	// Launch the extension manager server asynchronously.
 	go func() {
 		if err := o.extensionManagerServer.Start(); err != nil {
+			fmt.Println("start returned err")
 			errChannel <- errors.Wrap(err, "the extension server died")
 		}
+		fmt.Println("start returned non-err")
 	}()
 
 	// Briefly sleep so that osqueryd has time to register all extensions
@@ -441,10 +448,14 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 		// runtime produces an error, it's likely that all of the other components
 		// will produce errors as well since everything is so interconnected. For
 		// this reason, when any error occurs, we attempt a total recovery.
-		runtimeError, done := <-errChannel
-		if done {
+		fmt.Println("in go func")
+		runtimeError, open := <-errChannel
+		fmt.Println("whoa")
+		if !open {
+			fmt.Println("returning")
 			return
 		}
+		fmt.Println("recovering")
 		if recoveryError := o.Recover(runtimeError); recoveryError != nil {
 			// If we were not able to recover the osqueryd process for some reason,
 			// kill the process and hope that the operating system scheduling
@@ -472,6 +483,8 @@ func (o *OsqueryInstance) beginTeardown() bool {
 // whereas Recover() expects a hostile environment and is slightly more
 // defensive in it's actions.
 func (o *OsqueryInstance) Recover(runtimeError error) error {
+	o.instanceLock.Lock()
+	defer o.instanceLock.Unlock()
 	// If the user explicitly calls o.Kill(), as the components are shutdown, they
 	// may exit with errors. In this case, we shouldn't recover the
 	// instance.
@@ -508,11 +521,11 @@ func (o *OsqueryInstance) Kill() error {
 		return errors.New("Will not kill osqueryd instance because teardown has already begun somewhere else")
 	}
 
-	if ok, err := o.Healthy(); err != nil {
-		return errors.Wrap(err, "an error occured trying to determine osquery's health")
-	} else if !ok {
-		return errors.Wrap(err, "osquery is not healthy")
-	}
+	// if ok, err := o.Healthy(); err != nil {
+	// 	return errors.Wrap(err, "an error occured trying to determine osquery's health")
+	// } else if !ok {
+	// 	return errors.Wrap(err, "osquery is not healthy")
+	// }
 
 	if err := o.cmd.Process.Kill(); err != nil {
 		return errors.Wrap(err, "could not kill the osqueryd process")
@@ -530,6 +543,9 @@ func (o *OsqueryInstance) Kill() error {
 // Restart allows you to cleanly shutdown the current osquery instance and launch
 // a new osquery instance with the same configurations.
 func (o *OsqueryInstance) Restart() error {
+	o.instanceLock.Lock()
+	defer o.instanceLock.Unlock()
+
 	if err := o.Kill(); err != nil {
 		return errors.Wrap(err, "could not kill the osqueryd instance")
 	}
@@ -545,11 +561,18 @@ func (o *OsqueryInstance) Restart() error {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy.
 func (o *OsqueryInstance) Healthy() (bool, error) {
-	status, err := o.extensionManagerServer.Ping()
+	o.instanceLock.Lock()
+	defer o.instanceLock.Unlock()
+	serverStatus, err := o.extensionManagerServer.Ping()
 	if err != nil {
-		return false, errors.Wrap(err, "could not ping osquery through extension interface")
+		return false, errors.Wrap(err, "could not ping extension server")
 	}
-	return status.Code == 0, nil
+
+	clientStatus, err := o.extensionManagerClient.Ping()
+	if err != nil {
+		return false, errors.Wrap(err, "could not ping osquery extension client")
+	}
+	return serverStatus.Code == 0 && clientStatus.Code == 0, nil
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
@@ -594,9 +617,7 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 	// Now that we have a new running osquery instance, we replace the fields of
 	// our old instance with a pointer to the fields of the new instance so that
 	// existing references still work properly.
-	o.instanceLock.Lock()
 	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
-	o.instanceLock.Unlock()
 
 	return nil
 }
