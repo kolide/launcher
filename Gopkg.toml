@@ -11,6 +11,10 @@
   name = "github.com/go-kit/kit"
   version = "0.6.0"
 
+[[override]]
+  name = "git.apache.org/thrift.git"
+  revision = "0dd823580c78a79ae9696eb9b3650e400fff140f"
+
 [[constraint]]
   name = "github.com/google/uuid"
   version = "0.2.0"
