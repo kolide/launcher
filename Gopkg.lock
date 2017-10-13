@@ -8,12 +8,6 @@
   version = "0.10.0"
 
 [[projects]]
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
-  version = "v1.0.3"
-
-[[projects]]
   branch = "master"
   name = "github.com/WatchBeam/clock"
   packages = ["."]
@@ -52,8 +46,7 @@
 [[projects]]
   name = "github.com/docker/notary"
   packages = [".","client","client/changelist","cryptoservice","storage","trustmanager","trustmanager/yubikey","trustpinning","tuf","tuf/data","tuf/signed","tuf/utils","tuf/validation"]
-  revision = "ab64f58d0c021b2bea19236039a4a79d99f4b773"
-  version = "v0.5.1"
+  revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
 
 [[projects]]
   name = "github.com/go-kit/kit"
@@ -143,6 +136,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
+  version = "v1.0.3"
+
+[[projects]]
   name = "github.com/stretchr/testify"
   packages = ["assert","require"]
   revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
@@ -164,7 +163,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "ebfc5b4631820b793c9010c87fd8fef0f39eb082"
+  revision = "43eea11bc92608addb41b8a406b0407495c106f6"
 
 [[projects]]
   branch = "master"
@@ -193,6 +192,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2436d3598069c0104d6371b2e316ddce376953c50158e6f052d76a406d1b6ca3"
+  inputs-digest = "7af77697afb359df91245a5f8a75a9d99544064229a96d23e00c5a9660de4621"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -3,6 +3,9 @@
 
 [[constraint]]
   name = "github.com/docker/notary"
+  # pin to the revision because there has not been a new release
+  # in 6 months and we depend on changes in master.
+  revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
 
 [[constraint]]
   name = "github.com/go-kit/kit"
