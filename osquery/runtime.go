@@ -247,6 +247,8 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 	}
 }
 
+// Shutdown instructs the runner to permanently stop the running instance (no
+// restart will be attempted).
 func (r *OsqueryRunner) Shutdown() error {
 	close(r.shutdown)
 	r.instanceLock.Lock()
@@ -258,6 +260,8 @@ func (r *OsqueryRunner) Shutdown() error {
 	return nil
 }
 
+// Healthy checks the health of the instance and returns an error describing
+// any problem.
 func (r *OsqueryRunner) Healthy() error {
 	r.instanceLock.RLock()
 	defer r.instanceLock.RUnlock()
@@ -562,6 +566,10 @@ func (r *OsqueryRunner) Restart() error {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (o *OsqueryInstance) Healthy() error {
+	if o.extensionManagerServer == nil || o.extensionManagerClient == nil {
+		return errors.New("instance not started")
+	}
+
 	serverStatus, err := o.extensionManagerServer.Ping()
 	if err != nil {
 		return errors.Wrap(err, "could not ping extension server")

@@ -171,3 +171,17 @@ func TestOsqueryDies(t *testing.T) {
 
 	require.NoError(t, runner.Shutdown())
 }
+
+func TestNotStarted(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
+	runner := NewRunner(WithRootDirectory(rootDirectory))
+	require.NoError(t, err)
+
+	assert.Error(t, runner.Healthy())
+	assert.NoError(t, runner.Shutdown())
+}
