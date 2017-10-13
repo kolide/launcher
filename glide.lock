@@ -1,5 +1,5 @@
-hash: acc12fd60b4a03622914c8e6461e633f358c0ea083a3013ead2e0160586a22ff
-updated: 2017-10-10T10:28:13.156031701-06:00
+hash: 2515b8936d59fde25eb77d51d75fff67399ebf5430bdde6c785817dfa2a34de9
+updated: 2017-10-12T13:18:48.123477-04:00
 imports:
 - name: cloud.google.com/go
   version: eaddaf6dd7ee35fd3c2420c8d27478db176b0485
@@ -116,6 +116,10 @@ imports:
   - internal/timeseries
   - lex/httplex
   - trace
+- name: golang.org/x/sync
+  version: 8e0aa688b654ef28caa72506fa5ec8dba9fc7690
+  subpackages:
+  - errgroup
 - name: golang.org/x/sys
   version: ebfc5b4631820b793c9010c87fd8fef0f39eb082
   subpackages:

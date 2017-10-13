@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
 	"github.com/go-kit/kit/log"
@@ -24,19 +24,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// OsqueryInstance is the type which represents a currently running instance
-// of osqueryd.
-type OsqueryInstance struct {
-	*osqueryInstanceFields
-	instanceLock sync.Mutex
-	logger       log.Logger
+type OsqueryRunner struct {
+	instance     *OsqueryInstance
+	instanceLock sync.RWMutex
+	shutdown     chan struct{}
 }
 
-// osqueryInstanceFields is a type which is embedded in OsqueryInstance so that
-// in the event that the underlying process instance changes, the fields can be
-// updated wholesale without updating the actual OsqueryInstance pointer which
-// may be held by the original caller.
-type osqueryInstanceFields struct {
+type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
 	binaryPath            string
@@ -48,16 +42,23 @@ type osqueryInstanceFields struct {
 	stdout                io.Writer
 	stderr                io.Writer
 	retries               uint
+}
 
+// OsqueryInstance is the type which represents a currently running instance
+// of osqueryd.
+type OsqueryInstance struct {
+	opts   osqueryOptions
+	logger log.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
+	eg                     *errgroup.Group
+	doneCtx                context.Context
+	cancel                 context.CancelFunc
 	cmd                    *exec.Cmd
-	errs                   chan error
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
-	clientLock             *sync.Mutex
+	clientLock             sync.Mutex
 	paths                  *osqueryFilePaths
-	hasBegunTeardown       int32
 	rmRootDirectory        func()
 	usingTempDir           bool
 }
@@ -129,8 +130,12 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--force=true",
 		"--disable_watchdog",
 	)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+	if stdout != nil {
+		cmd.Stdout = stdout
+	}
+	if stderr != nil {
+		cmd.Stderr = stderr
+	}
 
 	return cmd, nil
 }
@@ -158,7 +163,7 @@ type OsqueryInstanceOption func(*OsqueryInstance)
 // many plugins as you'd like.
 func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.extensionPlugins = append(i.extensionPlugins, plugin)
+		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugin)
 	}
 }
 
@@ -169,7 +174,7 @@ func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOpt
 // binary will be looked for in the current $PATH.
 func WithOsquerydBinary(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.binaryPath = path
+		i.opts.binaryPath = path
 	}
 }
 
@@ -179,7 +184,7 @@ func WithOsquerydBinary(path string) OsqueryInstanceOption {
 // will be used.
 func WithRootDirectory(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.rootDirectory = path
+		i.opts.rootDirectory = path
 	}
 }
 
@@ -190,7 +195,7 @@ func WithRootDirectory(path string) OsqueryInstanceOption {
 // osqueryd is running.
 func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.configPluginFlag = plugin
+		i.opts.configPluginFlag = plugin
 	}
 }
 
@@ -201,7 +206,7 @@ func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
 // osqueryd execution lifecycle by defining the option via the config.
 func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.loggerPluginFlag = plugin
+		i.opts.loggerPluginFlag = plugin
 	}
 }
 
@@ -212,7 +217,7 @@ func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
 // osqueryd execution lifecycle by defining the option via the config.
 func WithDistributedPluginFlag(plugin string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.distributedPluginFlag = plugin
+		i.opts.distributedPluginFlag = plugin
 	}
 }
 
@@ -221,7 +226,7 @@ func WithDistributedPluginFlag(plugin string) OsqueryInstanceOption {
 // be discarded. This should only be configured once.
 func WithStdout(w io.Writer) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.stdout = w
+		i.opts.stdout = w
 	}
 }
 
@@ -230,16 +235,33 @@ func WithStdout(w io.Writer) OsqueryInstanceOption {
 // be discarded. This should only be configured once.
 func WithStderr(w io.Writer) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.stderr = w
+		i.opts.stderr = w
 	}
 }
 
-// WithRetries is a functional option which allows the user to define how many
-// retries to make when creating the process.
-func WithRetries(retries uint) OsqueryInstanceOption {
+// WithLogger is a functional option which allows the user to pass a log.Logger
+// to be used for logging osquery instance status.
+func WithLogger(logger log.Logger) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.retries = retries
+		i.logger = logger
 	}
+}
+
+func (r *OsqueryRunner) Shutdown() error {
+	close(r.shutdown)
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
+	r.instance.cancel()
+	if err := r.instance.eg.Wait(); err != context.Canceled {
+		return errors.Wrap(err, "while shutting down instance")
+	}
+	return nil
+}
+
+func (r *OsqueryRunner) Healthy() error {
+	r.instanceLock.RLock()
+	defer r.instanceLock.RUnlock()
+	return r.instance.Healthy()
 }
 
 // How long to wait before erroring because we cannot open the osquery
@@ -248,6 +270,33 @@ const socketOpenTimeout = 5 * time.Second
 
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
+
+func NewRunner(opts ...OsqueryInstanceOption) *OsqueryRunner {
+	// Create an OsqueryInstance and apply the functional options supplied by the
+	// caller.
+	i := newInstance()
+
+	for _, opt := range opts {
+		opt(i)
+	}
+
+	return &OsqueryRunner{
+		instance: i,
+		shutdown: make(chan struct{}),
+	}
+}
+
+func newInstance() *OsqueryInstance {
+	i := &OsqueryInstance{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	i.cancel = cancel
+	i.eg, i.doneCtx = errgroup.WithContext(ctx)
+
+	i.logger = log.NewNopLogger()
+
+	return i
+}
 
 // LaunchOsqueryInstance will launch an instance of osqueryd via a very
 // configurable API as defined by the various OsqueryInstanceOption functional
@@ -262,126 +311,155 @@ const socketOpenInterval = 200 * time.Millisecond
 //     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
 //     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
 //   )
-func LaunchOsqueryInstance(opts ...OsqueryInstanceOption) (*OsqueryInstance, error) {
-	// Create an OsqueryInstance and apply the functional options supplied by the
-	// caller.
-	o := &OsqueryInstance{
-		osqueryInstanceFields: &osqueryInstanceFields{
-			stdout:          ioutil.Discard,
-			stderr:          ioutil.Discard,
-			rmRootDirectory: func() {},
-			errs:            make(chan error),
-			clientLock:      new(sync.Mutex),
-		},
+func (r *OsqueryRunner) Start() error {
+	if err := r.launchOsqueryInstance(); err != nil {
+		return errors.Wrap(err, "starting instance")
 	}
+	go func() {
+		for {
+			// Wait for async processes to exit
+			<-r.instance.doneCtx.Done()
 
-	for _, opt := range opts {
-		opt(o)
-	}
+			select {
+			case <-r.shutdown:
+				// Intentional shutdown, this loop can exit
+				return
+			default:
+				// Don't block
+			}
 
-	return launchOsqueryInstanceWithRetry(o)
-}
+			r.instanceLock.Lock()
 
-// launchOsqueryInstanceWithRetry wraps launchOsqueryInstance, adding retry
-// upon failure.
-func launchOsqueryInstanceWithRetry(o *OsqueryInstance) (inst *OsqueryInstance, err error) {
-	for try := uint(0); try <= o.retries; try++ {
-		inst, err = launchOsqueryInstance(o)
-		if err == nil {
-			return
+			// Error case
+			err := r.instance.eg.Wait()
+			level.Error(r.instance.logger).Log(
+				"msg", "unexpected restart of instance",
+				"err", err,
+			)
+
+			opts := r.instance.opts
+			r.instance = newInstance()
+			r.instance.opts = opts
+			if err := r.launchOsqueryInstance(); err != nil {
+				level.Error(r.instance.logger).Log(
+					"msg", "fatal error restarting instance",
+					"err", err,
+				)
+				os.Exit(1)
+			}
+
+			r.instanceLock.Unlock()
+
 		}
-	}
-	return
+	}()
+	return nil
 }
 
-func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
+func (r *OsqueryRunner) GetInstance() *OsqueryInstance {
+	return r.instance
+}
+
+const healthCheckInterval = 10 * time.Second
+
+func (r *OsqueryRunner) launchOsqueryInstance() error {
+	o := r.instance
 	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
 	// try to find it in the path.
-	if o.binaryPath == "" {
+	if o.opts.binaryPath == "" {
 		path, err := exec.LookPath("osqueryd")
 		if err != nil {
-			return nil, errors.Wrap(err, "osqueryd not supplied and not found")
+			return errors.Wrap(err, "osqueryd not supplied and not found")
 		}
-		o.binaryPath = path
+		o.opts.binaryPath = path
 	}
 
 	// If the caller did not define the directory which all of the osquery file
 	// artifacts should be stored in, use a temporary directory.
-	if o.rootDirectory == "" {
+	if o.opts.rootDirectory == "" {
 		rootDirectory, rmRootDirectory, err := osqueryTempDir()
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't create temp directory for osquery instance")
+			return errors.Wrap(err, "couldn't create temp directory for osquery instance")
 		}
-		o.rootDirectory = rootDirectory
+		o.opts.rootDirectory = rootDirectory
 		o.rmRootDirectory = rmRootDirectory
 		o.usingTempDir = true
 	}
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(o.rootDirectory)
+	paths, err := calculateOsqueryPaths(o.opts.rootDirectory)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not calculate osquery file paths")
+		return errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	// If a config plugin has not been set by the caller, then it is likely that
-	// the instance will just be used for executing queries, so we will use a
-	// minimal config plugin that basically is a no-op.
-	if o.configPluginFlag == "" {
+	// If a config plugin has not been set by the caller, then it is likely
+	// that the instance will just be used for executing queries, so we
+	// will use a minimal config plugin that basically is a no-op.
+	if o.opts.configPluginFlag == "" {
 		generateConfigs := func(ctx context.Context) (map[string]string, error) {
 			return map[string]string{}, nil
 		}
-		o.extensionPlugins = append(o.extensionPlugins, config.NewPlugin("internal_noop", generateConfigs))
-		o.configPluginFlag = "internal_noop"
+		o.opts.extensionPlugins = append(o.opts.extensionPlugins, config.NewPlugin("internal_noop", generateConfigs))
+		o.opts.configPluginFlag = "internal_noop"
 	}
 
-	// If a logger plugin has not been set by the caller, we set a logger plugin
-	// that outputs logs to the default application logger.
-	if o.loggerPluginFlag == "" {
+	// If a logger plugin has not been set by the caller, we set a logger
+	// plugin that outputs logs to the default application logger.
+	if o.opts.loggerPluginFlag == "" {
 		logString := func(ctx context.Context, typ logger.LogType, logText string) error {
 			return nil
 		}
-		o.extensionPlugins = append(o.extensionPlugins, logger.NewPlugin("internal_noop", logString))
-		o.loggerPluginFlag = "internal_noop"
+		o.opts.extensionPlugins = append(o.opts.extensionPlugins, logger.NewPlugin("internal_noop", logString))
+		o.opts.loggerPluginFlag = "internal_noop"
 	}
 
-	// If a distributed plugin has not been set by the caller, we set a distributed plugin
-	// that outputs logs to the default application distributed.
-	if o.distributedPluginFlag == "" {
+	// If a distributed plugin has not been set by the caller, we set a
+	// distributed plugin that returns no queries.
+	if o.opts.distributedPluginFlag == "" {
 		getQueries := func(ctx context.Context) (*distributed.GetQueriesResult, error) {
 			return &distributed.GetQueriesResult{}, nil
 		}
 		writeResults := func(ctx context.Context, results []distributed.Result) error {
 			return nil
 		}
-		o.extensionPlugins = append(o.extensionPlugins, distributed.NewPlugin("internal_noop", getQueries, writeResults))
-		o.distributedPluginFlag = "internal_noop"
+		o.opts.extensionPlugins = append(o.opts.extensionPlugins, distributed.NewPlugin("internal_noop", getQueries, writeResults))
+		o.opts.distributedPluginFlag = "internal_noop"
 	}
 
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = createOsquerydCommand(o.binaryPath, paths, o.configPluginFlag, o.loggerPluginFlag, o.distributedPluginFlag, o.stdout, o.stderr)
+	o.cmd, err = createOsquerydCommand(o.opts.binaryPath, paths, o.opts.configPluginFlag, o.opts.loggerPluginFlag, o.opts.distributedPluginFlag, o.opts.stdout, o.opts.stderr)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't create osqueryd command")
+		return errors.Wrap(err, "couldn't create osqueryd command")
 	}
 
-	if err := o.cmd.Start(); err != nil {
-		return nil, errors.Wrap(err, "couldn't start osqueryd command")
+	// Launch osquery process (async)
+	err = o.cmd.Start()
+	if err != nil {
+		return errors.Wrap(err, "starting osqueryd process")
 	}
-
-	// Launch a long running goroutine to monitor the osqueryd process.
-	cmd := o.cmd
-	errChannel := o.errs
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			errChannel <- errors.Wrap(err, "osqueryd processes died")
-		} else {
-			// Close the channel so that the goroutine blocked
-			// waiting for errors will be able to exit
-			close(errChannel)
+	o.eg.Go(func() error {
+		if err := o.cmd.Wait(); err != nil {
+			return errors.Wrap(err, "running osqueryd command")
 		}
-	}()
+		return errors.New("osquery process exited")
+	})
+
+	// Kill osquery process on shutdown
+	o.eg.Go(func() error {
+		<-o.doneCtx.Done()
+		if o.cmd.Process != nil {
+			if err := o.cmd.Process.Kill(); err != nil {
+				if !strings.Contains(err.Error(), "process already finished") {
+					level.Error(o.logger).Log(
+						"err", errors.Wrap(err, "killing osquery process"),
+					)
+				}
+			}
+		}
+		return o.doneCtx.Err()
+	})
 
 	// Because we "invert" the control of the osquery process and the
 	// extension (we are running the extension from the process that starts
@@ -408,148 +486,107 @@ func launchOsqueryInstance(o *OsqueryInstance) (*OsqueryInstance, error) {
 			// This means that our timeout expired. Return the
 			// error from creating the server, not the error from
 			// the timeout expiration.
-			return nil, errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
+			return errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 		}
 	}
 
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create an extension client")
+		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	plugins := o.extensionPlugins
+	plugins := o.opts.extensionPlugins
 	for _, t := range PlatformTables(o.extensionManagerClient, o.logger) {
 		plugins = append(plugins, t)
 	}
 	o.extensionManagerServer.RegisterPlugin(plugins...)
 
 	// Launch the extension manager server asynchronously.
-	go func() {
+	o.eg.Go(func() error {
+		time.Sleep(1 * time.Second)
 		if err := o.extensionManagerServer.Start(); err != nil {
-			errChannel <- errors.Wrap(err, "the extension server died")
+			return errors.Wrap(err, "running extension server")
 		}
-	}()
+		return errors.New("extension manager server exited")
+	})
 
-	// Briefly sleep so that osqueryd has time to register all extensions
-	time.Sleep(2 * time.Second)
-
-	// Launch a long-running recovery goroutine which can handle various errors
-	// that can occur
-	go func() {
-		// Block until an error is generated by the osqueryd process itself or the
-		// extension manager server. We don't select, because if one element of the
-		// runtime produces an error, it's likely that all of the other components
-		// will produce errors as well since everything is so interconnected. For
-		// this reason, when any error occurs, we attempt a total recovery.
-		runtimeError, done := <-errChannel
-		if done {
-			return
+	// Cleanup extension manager server on shutdown
+	o.eg.Go(func() error {
+		<-o.doneCtx.Done()
+		if err := o.extensionManagerServer.Shutdown(); err != nil {
+			level.Error(o.logger).Log("err", errors.Wrap(err, "shutting down extension server"))
 		}
-		if recoveryError := o.Recover(runtimeError); recoveryError != nil {
-			// If we were not able to recover the osqueryd process for some reason,
-			// kill the process and hope that the operating system scheduling
-			// mechanism (launchd, etc) can relaunch the tool cleanly.
-			level.Info(o.logger).Log("err", errors.Wrap(recoveryError, "could not recover the osqueryd process"))
-			os.Exit(1)
-		}
-	}()
+		return o.doneCtx.Err()
+	})
 
-	return o, nil
-
-}
-
-// Helper to check whether teardown should commence. This will atomically set
-// the teardown flag, and return true if teardown should commence, or false if
-// teardown has already begun.
-func (o *OsqueryInstance) beginTeardown() bool {
-	begun := atomic.SwapInt32(&o.hasBegunTeardown, 1)
-	return begun == 0
-}
-
-// Recover attempts to launch a new osquery instance if the running instance has
-// failed for some reason. Note that this function does not call o.Kill() to
-// release resources because Kill() expects the osquery instance to be healthy,
-// whereas Recover() expects a hostile environment and is slightly more
-// defensive in it's actions.
-func (o *OsqueryInstance) Recover(runtimeError error) error {
-	// If the user explicitly calls o.Kill(), as the components are shutdown, they
-	// may exit with errors. In this case, we shouldn't recover the
-	// instance.
-	if !o.beginTeardown() {
-		return nil
-	}
-
-	// First, we try to kill the osqueryd process if it isn't already dead.
-	if o.cmd.Process != nil {
-		if err := o.cmd.Process.Kill(); err != nil {
-			if !strings.Contains(err.Error(), "process already finished") {
-				return errors.Wrap(err, "could not kill the osquery process during recovery")
+	// Health check on interval
+	o.eg.Go(func() error {
+		ticker := time.NewTicker(healthCheckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-o.doneCtx.Done():
+				return o.doneCtx.Err()
+			case <-ticker.C:
+				if err := o.Healthy(); err != nil {
+					return errors.Wrap(err, "health check failed")
+				}
 			}
 		}
-	}
+	})
 
-	// Next, we try to kill the osquery extension manager server if it isn't
-	// already dead.
-	status, err := o.extensionManagerServer.Ping()
-	if err == nil && status.Code == int32(0) {
-		if err := o.extensionManagerServer.Shutdown(); err != nil {
-			return errors.Wrap(err, "could not kill the extension manager server")
+	// Cleanup temp dir
+	o.eg.Go(func() error {
+		<-o.doneCtx.Done()
+		if o.usingTempDir && o.rmRootDirectory != nil {
+			o.rmRootDirectory()
 		}
-	}
-
-	return o.relaunchAndReplace()
-}
-
-// Kill will terminate all osquery processes managed by the OsqueryInstance
-// instance and release all resources that have been acquired throughout the
-// process lifecycle.
-func (o *OsqueryInstance) Kill() error {
-	if !o.beginTeardown() {
-		return errors.New("Will not kill osqueryd instance because teardown has already begun somewhere else")
-	}
-
-	if ok, err := o.Healthy(); err != nil {
-		return errors.Wrap(err, "an error occured trying to determine osquery's health")
-	} else if !ok {
-		return errors.Wrap(err, "osquery is not healthy")
-	}
-
-	if err := o.cmd.Process.Kill(); err != nil {
-		return errors.Wrap(err, "could not kill the osqueryd process")
-	}
-
-	if err := o.extensionManagerServer.Shutdown(); err != nil {
-		return errors.Wrap(err, "could not kill the extension manager server")
-	}
-
-	o.rmRootDirectory()
+		return o.doneCtx.Err()
+	})
 
 	return nil
 }
 
 // Restart allows you to cleanly shutdown the current osquery instance and launch
 // a new osquery instance with the same configurations.
-func (o *OsqueryInstance) Restart() error {
-	if err := o.Kill(); err != nil {
-		return errors.Wrap(err, "could not kill the osqueryd instance")
-	}
-
-	if err := o.relaunchAndReplace(); err != nil {
-		return errors.Wrap(err, "could not relaunch osquery instance")
-	}
-
+func (r *OsqueryRunner) Restart() error {
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
+	// Cancelling will cause all of the cleanup routines to execute, and a
+	// new instance will start.
+	r.instance.cancel()
 	return nil
 }
 
 // Healthy will check to determine whether or not the osquery process that is
 // being managed by the current instantiation of this OsqueryInstance is
-// healthy.
-func (o *OsqueryInstance) Healthy() (bool, error) {
-	status, err := o.extensionManagerServer.Ping()
+// healthy. If the instance is healthy, it returns nil.
+func (o *OsqueryInstance) Healthy() error {
+	serverStatus, err := o.extensionManagerServer.Ping()
 	if err != nil {
-		return false, errors.Wrap(err, "could not ping osquery through extension interface")
+		return errors.Wrap(err, "could not ping extension server")
 	}
-	return status.Code == 0, nil
+	if serverStatus.Code != 0 {
+		return errors.Errorf("ping extension server returned %d: %s",
+			serverStatus.Code,
+			serverStatus.Message,
+		)
+	}
+
+	o.clientLock.Lock()
+	defer o.clientLock.Unlock()
+	clientStatus, err := o.extensionManagerClient.Ping()
+	if err != nil {
+		return errors.Wrap(err, "could not ping osquery extension client")
+	}
+	if clientStatus.Code != 0 {
+		return errors.Errorf("ping extension client returned %d: %s",
+			serverStatus.Code,
+			serverStatus.Message,
+		)
+	}
+
+	return nil
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
@@ -574,29 +611,21 @@ func (o *OsqueryInstance) relaunchAndReplace() error {
 	// configuration, we define a set of OsqueryInstanceOptions based on the
 	// configuration of the previous OsqueryInstance.
 	opts := []OsqueryInstanceOption{
-		WithOsquerydBinary(o.binaryPath),
-		WithConfigPluginFlag(o.configPluginFlag),
-		WithLoggerPluginFlag(o.loggerPluginFlag),
-		WithDistributedPluginFlag(o.distributedPluginFlag),
-		WithRetries(o.retries),
+		WithOsquerydBinary(o.opts.binaryPath),
+		WithConfigPluginFlag(o.opts.configPluginFlag),
+		WithLoggerPluginFlag(o.opts.loggerPluginFlag),
+		WithDistributedPluginFlag(o.opts.distributedPluginFlag),
 	}
 	if !o.usingTempDir {
-		opts = append(opts, WithRootDirectory(o.rootDirectory))
+		opts = append(opts, WithRootDirectory(o.opts.rootDirectory))
 	}
-	for _, plugin := range o.extensionPlugins {
+	for _, plugin := range o.opts.extensionPlugins {
 		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
 	}
-	newInstance, err := LaunchOsqueryInstance(opts...)
-	if err != nil {
-		return errors.Wrap(err, "could not launch new osquery instance")
-	}
-
-	// Now that we have a new running osquery instance, we replace the fields of
-	// our old instance with a pointer to the fields of the new instance so that
-	// existing references still work properly.
-	o.instanceLock.Lock()
-	o.osqueryInstanceFields = newInstance.osqueryInstanceFields
-	o.instanceLock.Unlock()
+	// newInstance, err := LaunchOsqueryInstance(opts...)
+	// if err != nil {
+	// return errors.Wrap(err, "could not launch new osquery instance")
+	// }
 
 	return nil
 }

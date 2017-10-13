@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -90,24 +91,37 @@ func buildOsqueryExtensionInBinDir(rootDirectory string) error {
 	return cmd.Run()
 }
 
-func TestOsqueryRuntime(t *testing.T) {
+func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstance(
+	runner := NewRunner(
 		WithRootDirectory(rootDirectory),
-		WithRetries(3),
+		WithOsquerydBinary("/foobar"),
 	)
+	err = runner.Start()
+	assert.Error(t, err)
+	assert.NoError(t, runner.Shutdown())
+}
+
+func TestSimplePath(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
+	runner := NewRunner(WithRootDirectory(rootDirectory))
+	err = runner.Start()
 	require.NoError(t, err)
 
-	healthy, err := instance.Healthy()
+	err = runner.Healthy()
 	require.NoError(t, err)
-	require.True(t, healthy)
 
-	require.NoError(t, instance.Kill())
+	require.NoError(t, runner.Shutdown())
 }
 
 func TestRestart(t *testing.T) {
@@ -117,44 +131,43 @@ func TestRestart(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstance(
-		WithRootDirectory(rootDirectory),
-		WithRetries(3),
-	)
+	runner := NewRunner(WithRootDirectory(rootDirectory))
+	err = runner.Start()
 	require.NoError(t, err)
 
-	healthy, err := instance.Healthy()
-	require.NoError(t, err)
-	require.True(t, healthy)
+	require.NoError(t, runner.Healthy())
 
-	require.NoError(t, instance.Restart())
+	require.NoError(t, runner.Restart())
+	time.Sleep(2 * time.Second)
+	require.NoError(t, runner.Healthy())
 
-	healthy, err = instance.Healthy()
-	require.NoError(t, err)
-	require.True(t, healthy)
+	require.NoError(t, runner.Restart())
+	time.Sleep(2 * time.Second)
+	require.NoError(t, runner.Healthy())
 
-	require.NoError(t, instance.Kill())
+	require.NoError(t, runner.Shutdown())
 }
 
-func TestRecover(t *testing.T) {
+func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	instance, err := LaunchOsqueryInstance(
-		WithRootDirectory(rootDirectory),
-		WithRetries(3),
-	)
+	runner := NewRunner(WithRootDirectory(rootDirectory))
+	err = runner.Start()
 	require.NoError(t, err)
 
-	require.NoError(t, instance.Recover(errors.New("fabricated in a test")))
-	require.NoError(t, instance.Recover(errors.New("fabricated in a test")))
+	require.NoError(t, runner.Healthy())
 
-	healthy, err := instance.Healthy()
-	require.NoError(t, err)
-	require.True(t, healthy)
+	// Simulate the osquery process unexpectedly dying
+	runner.instanceLock.Lock()
+	require.NoError(t, runner.instance.cmd.Process.Kill())
+	runner.instanceLock.Unlock()
 
-	require.NoError(t, instance.Kill())
+	time.Sleep(2 * time.Second)
+	require.NoError(t, runner.Healthy())
+
+	require.NoError(t, runner.Shutdown())
 }
