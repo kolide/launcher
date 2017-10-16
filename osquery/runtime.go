@@ -51,7 +51,7 @@ type OsqueryInstance struct {
 	logger log.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
-	eg                     *errgroup.Group
+	errgroup               *errgroup.Group
 	doneCtx                context.Context
 	cancel                 context.CancelFunc
 	cmd                    *exec.Cmd
@@ -254,7 +254,7 @@ func (r *OsqueryRunner) Shutdown() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	r.instance.cancel()
-	if err := r.instance.eg.Wait(); err != context.Canceled {
+	if err := r.instance.errgroup.Wait(); err != context.Canceled {
 		return errors.Wrap(err, "while shutting down instance")
 	}
 	return nil
@@ -295,7 +295,7 @@ func newInstance() *OsqueryInstance {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	i.cancel = cancel
-	i.eg, i.doneCtx = errgroup.WithContext(ctx)
+	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
 	i.logger = log.NewNopLogger()
 
@@ -332,20 +332,19 @@ func (r *OsqueryRunner) Start() error {
 				// Don't block
 			}
 
-			r.instanceLock.Lock()
-
 			// Error case
-			err := r.instance.eg.Wait()
-			level.Error(r.instance.logger).Log(
+			err := r.instance.errgroup.Wait()
+			level.Info(r.instance.logger).Log(
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
 
+			r.instanceLock.Lock()
 			opts := r.instance.opts
 			r.instance = newInstance()
 			r.instance.opts = opts
 			if err := r.launchOsqueryInstance(); err != nil {
-				level.Error(r.instance.logger).Log(
+				level.Info(r.instance.logger).Log(
 					"msg", "fatal error restarting instance",
 					"err", err,
 				)
@@ -443,7 +442,7 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	if err != nil {
 		return errors.Wrap(err, "starting osqueryd process")
 	}
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		if err := o.cmd.Wait(); err != nil {
 			return errors.Wrap(err, "running osqueryd command")
 		}
@@ -451,13 +450,14 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	})
 
 	// Kill osquery process on shutdown
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		if o.cmd.Process != nil {
 			if err := o.cmd.Process.Kill(); err != nil {
 				if !strings.Contains(err.Error(), "process already finished") {
-					level.Error(o.logger).Log(
-						"err", errors.Wrap(err, "killing osquery process"),
+					level.Info(o.logger).Log(
+						"msg", "killing osquery process",
+						"err", err,
 					)
 				}
 			}
@@ -506,7 +506,7 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	o.extensionManagerServer.RegisterPlugin(plugins...)
 
 	// Launch the extension manager server asynchronously.
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		time.Sleep(1 * time.Second)
 		if err := o.extensionManagerServer.Start(); err != nil {
 			return errors.Wrap(err, "running extension server")
@@ -515,16 +515,19 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	})
 
 	// Cleanup extension manager server on shutdown
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		if err := o.extensionManagerServer.Shutdown(); err != nil {
-			level.Error(o.logger).Log("err", errors.Wrap(err, "shutting down extension server"))
+			level.Info(o.logger).Log(
+				"msg", "shutting down extension server",
+				"err", err,
+			)
 		}
 		return o.doneCtx.Err()
 	})
 
 	// Health check on interval
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		ticker := time.NewTicker(healthCheckInterval)
 		defer ticker.Stop()
 		for {
@@ -540,7 +543,7 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	})
 
 	// Cleanup temp dir
-	o.eg.Go(func() error {
+	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		if o.usingTempDir && o.rmRootDirectory != nil {
 			o.rmRootDirectory()
