@@ -20,11 +20,6 @@
   version = "0.2.0"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/kolide/agent-api"
-  source = "git@github.com:kolide/agent-api.git"
-
-[[constraint]]
   name = "github.com/kolide/kit"
   source = "git@github.com:kolide/kit.git"
 

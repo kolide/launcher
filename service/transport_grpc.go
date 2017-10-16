@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/kolide/agent-api"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+
+	"github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

@@ -79,13 +79,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/kolide/agent-api"
-  packages = ["."]
-  revision = "f81f25bd36a2e73a762d4a5192d698bae06a7161"
-  source = "git@github.com:kolide/agent-api.git"
-
-[[projects]]
-  branch = "master"
   name = "github.com/kolide/kit"
   packages = ["env","fs","testutil","version"]
   revision = "19dfff12e00e1d46d30636b9150ca5b9f9f05325"
@@ -191,6 +184,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a9b95675137152b3ebcc7c873483a74ee30626674d5c9c37afe6d9ec0ffe8571"
+  inputs-digest = "9b93fa6b95834d91afd47af38176c482cd5f54df69089807d31e72fc9fb8dd16"
   solver-name = "gps-cdcl"
   solver-version = 1
