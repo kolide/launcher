@@ -5,11 +5,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
-	pb "github.com/kolide/agent-api"
-	"github.com/kolide/launcher/service/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/launcher/service/uuid"
 )
 
 func parseUUID() grpctransport.ServerOption {
@@ -124,4 +126,8 @@ func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (
 		return nil, errors.Wrap(err, "check health")
 	}
 	return rep.(*pb.HealthCheckResponse), nil
+}
+
+func RegisterGRPCServer(grpcServer *grpc.Server, apiServer pb.ApiServer) {
+	pb.RegisterApiServer(grpcServer, apiServer)
 }

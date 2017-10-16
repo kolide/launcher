@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 
-	"github.com/kolide/agent-api"
-	"github.com/kolide/launcher/service/uuid"
-
 	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/launcher/service/uuid"
 )
 
 func attachUUID() grpctransport.ClientOption {
