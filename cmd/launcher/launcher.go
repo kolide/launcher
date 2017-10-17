@@ -147,7 +147,7 @@ func main() {
 	defer ext.Shutdown()
 
 	// Start the osqueryd instance
-	runner := osquery.NewRunner(
+	runner, err := osquery.LaunchInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
@@ -160,7 +160,6 @@ func main() {
 		osquery.WithStderr(os.Stderr),
 		osquery.WithLogger(logger),
 	)
-	err = runner.Start()
 	if err != nil {
 		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
 	}

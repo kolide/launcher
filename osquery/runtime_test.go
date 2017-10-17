@@ -98,13 +98,12 @@ func TestBadBinaryPath(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := NewRunner(
+	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
 	)
-	err = runner.Start()
 	assert.Error(t, err)
-	assert.NoError(t, runner.Shutdown())
+	assert.Nil(t, runner)
 }
 
 func TestSimplePath(t *testing.T) {
@@ -114,8 +113,7 @@ func TestSimplePath(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := NewRunner(WithRootDirectory(rootDirectory))
-	err = runner.Start()
+	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	err = runner.Healthy()
@@ -131,8 +129,7 @@ func TestRestart(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := NewRunner(WithRootDirectory(rootDirectory))
-	err = runner.Start()
+	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	require.NoError(t, runner.Healthy())
@@ -155,8 +152,7 @@ func TestOsqueryDies(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := NewRunner(WithRootDirectory(rootDirectory))
-	err = runner.Start()
+	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	require.NoError(t, runner.Healthy())
@@ -179,7 +175,7 @@ func TestNotStarted(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := NewRunner(WithRootDirectory(rootDirectory))
+	runner := newRunner(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	assert.Error(t, runner.Healthy())

@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type OsqueryRunner struct {
+type Runner struct {
 	instance     *OsqueryInstance
 	instanceLock sync.RWMutex
 	shutdown     chan struct{}
@@ -249,7 +249,7 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
-func (r *OsqueryRunner) Shutdown() error {
+func (r *Runner) Shutdown() error {
 	close(r.shutdown)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
@@ -262,7 +262,7 @@ func (r *OsqueryRunner) Shutdown() error {
 
 // Healthy checks the health of the instance and returns an error describing
 // any problem.
-func (r *OsqueryRunner) Healthy() error {
+func (r *Runner) Healthy() error {
 	r.instanceLock.RLock()
 	defer r.instanceLock.RUnlock()
 	return r.instance.Healthy()
@@ -275,7 +275,28 @@ const socketOpenTimeout = 5 * time.Second
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
 
-func NewRunner(opts ...OsqueryInstanceOption) *OsqueryRunner {
+// LaunchInstance will launch an instance of osqueryd via a very configurable
+// API as defined by the various OsqueryInstanceOption functional options. The
+// returned instance should be shut down via the Shutdown() method.
+// For example, a more customized caller might do something like the following:
+//
+//   instance, err := LaunchInstance(
+//     WithOsquerydBinary("/usr/local/bin/osqueryd"),
+//     WithRootDirectory("/var/foobar"),
+//     WithOsqueryExtensionPlugin(config.NewPlugin("custom", custom.GenerateConfigs)),
+//     WithConfigPluginFlag("custom"),
+//     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
+//     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
+//   )
+func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
+	runner := newRunner(opts...)
+	if err := runner.start(); err != nil {
+		return nil, err
+	}
+	return runner, nil
+}
+
+func newRunner(opts ...OsqueryInstanceOption) *Runner {
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
 	i := newInstance()
@@ -284,7 +305,7 @@ func NewRunner(opts ...OsqueryInstanceOption) *OsqueryRunner {
 		opt(i)
 	}
 
-	return &OsqueryRunner{
+	return &Runner{
 		instance: i,
 		shutdown: make(chan struct{}),
 	}
@@ -302,24 +323,14 @@ func newInstance() *OsqueryInstance {
 	return i
 }
 
-// LaunchOsqueryInstance will launch an instance of osqueryd via a very
-// configurable API as defined by the various OsqueryInstanceOption functional
-// options. For example, a more customized caller might do something like the
-// following:
-//
-//   instance, err := LaunchOsqueryInstance(
-//     WithOsquerydBinary("/usr/local/bin/osqueryd"),
-//     WithRootDirectory("/var/foobar"),
-//     WithOsqueryExtensionPlugin(config.NewPlugin("custom", custom.GenerateConfigs)),
-//     WithConfigPluginFlag("custom"),
-//     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
-//     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
-//   )
-func (r *OsqueryRunner) Start() error {
+func (r *Runner) start() error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return errors.Wrap(err, "starting instance")
 	}
 	go func() {
+		// This loop waits for the completion of the async routines,
+		// and either restarts the instance (if Shutdown was not
+		// called), or stops (if Shutdown was called).
 		for {
 			// Wait for async processes to exit
 			<-r.instance.doneCtx.Done()
@@ -358,13 +369,9 @@ func (r *OsqueryRunner) Start() error {
 	return nil
 }
 
-func (r *OsqueryRunner) GetInstance() *OsqueryInstance {
-	return r.instance
-}
+const healthCheckInterval = 60 * time.Second
 
-const healthCheckInterval = 10 * time.Second
-
-func (r *OsqueryRunner) launchOsqueryInstance() error {
+func (r *Runner) launchOsqueryInstance() error {
 	o := r.instance
 	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
 	// try to find it in the path.
@@ -554,9 +561,9 @@ func (r *OsqueryRunner) launchOsqueryInstance() error {
 	return nil
 }
 
-// Restart allows you to cleanly shutdown the current osquery instance and launch
-// a new osquery instance with the same configurations.
-func (r *OsqueryRunner) Restart() error {
+// Restart allows you to cleanly shutdown the current instance and launch a new
+// instance with the same configurations.
+func (r *Runner) Restart() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	// Cancelling will cause all of the cleanup routines to execute, and a
@@ -612,31 +619,4 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
-}
-
-// relaunchAndReplace is an internal helper for launching a new osquery
-// instance with the same options as the existing instance and replacing the
-// internal o.osqueryInstanceFields with the new instance.
-func (o *OsqueryInstance) relaunchAndReplace() error {
-	// In order to be sure we are launching a new osquery instance with the same
-	// configuration, we define a set of OsqueryInstanceOptions based on the
-	// configuration of the previous OsqueryInstance.
-	opts := []OsqueryInstanceOption{
-		WithOsquerydBinary(o.opts.binaryPath),
-		WithConfigPluginFlag(o.opts.configPluginFlag),
-		WithLoggerPluginFlag(o.opts.loggerPluginFlag),
-		WithDistributedPluginFlag(o.opts.distributedPluginFlag),
-	}
-	if !o.usingTempDir {
-		opts = append(opts, WithRootDirectory(o.opts.rootDirectory))
-	}
-	for _, plugin := range o.opts.extensionPlugins {
-		opts = append(opts, WithOsqueryExtensionPlugin(plugin))
-	}
-	// newInstance, err := LaunchOsqueryInstance(opts...)
-	// if err != nil {
-	// return errors.Wrap(err, "could not launch new osquery instance")
-	// }
-
-	return nil
 }
