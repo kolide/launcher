@@ -1,0 +1,49 @@
+[[constraint]]
+  name = "github.com/boltdb/bolt"
+
+[[constraint]]
+  name = "github.com/docker/notary"
+  # pin to the revision because there has not been a new release
+  # in 6 months and we depend on changes in master.
+  revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
+
+[[constraint]]
+  name = "github.com/go-kit/kit"
+  version = "0.6.0"
+
+[[override]]
+  name = "git.apache.org/thrift.git"
+  revision = "0dd823580c78a79ae9696eb9b3650e400fff140f"
+
+[[constraint]]
+  name = "github.com/google/uuid"
+  version = "0.2.0"
+
+[[constraint]]
+  name = "github.com/kolide/kit"
+  source = "git@github.com:kolide/kit.git"
+
+[[constraint]]
+  name = "github.com/kolide/osquery-go"
+
+[[constraint]]
+  name = "github.com/kolide/updater"
+  source = "git@github.com:kolide/updater.git"
+
+[[constraint]]
+  name = "github.com/mixer/clock"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+
+[[constraint]]
+  name = "golang.org/x/net"
+
+[[constraint]]
+  name = "golang.org/x/time"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
