@@ -88,7 +88,7 @@
   branch = "master"
   name = "github.com/kolide/osquery-go"
   packages = [".","gen/osquery","gen/osquery/mock","plugin/config","plugin/distributed","plugin/logger","plugin/table"]
-  revision = "8c8fd2cb76a1ab5f8feb631826bd832e22df1005"
+  revision = "8725947d91d9a04c5d46ab87a5e67ee7053f7cde"
 
 [[projects]]
   branch = "master"
@@ -149,19 +149,25 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "a04bdaca5b32abe1c069418fb7088ae607de5bd0"
+  revision = "1087133bc4af3073e18add999345c6ae75918503"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  revision = "8e0aa688b654ef28caa72506fa5ec8dba9fc7690"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "43eea11bc92608addb41b8a406b0407495c106f6"
+  revision = "8dbc5d05d6edcc104950cc299a1ce6641235bc86"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "825fc78a2fd6fa0a5447e300189e3219e05e1f25"
+  revision = "c01e4764d870b77f8abe5096ee19ad20d80e8075"
 
 [[projects]]
   branch = "master"
@@ -184,6 +190,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9b93fa6b95834d91afd47af38176c482cd5f54df69089807d31e72fc9fb8dd16"
+  inputs-digest = "a12ecfacf98b591cb99d0624b8010ae95b874e3c86380649b204b710460d9c42"
   solver-name = "gps-cdcl"
   solver-version = 1

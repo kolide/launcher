@@ -147,7 +147,7 @@ func main() {
 	defer ext.Shutdown()
 
 	// Start the osqueryd instance
-	instance, err := osquery.LaunchOsqueryInstance(
+	runner, err := osquery.LaunchInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
 		osquery.WithRootDirectory(rootDirectory),
 		osquery.WithConfigPluginFlag("kolide_grpc"),
@@ -158,7 +158,7 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		osquery.WithStdout(os.Stdout),
 		osquery.WithStderr(os.Stderr),
-		osquery.WithRetries(3),
+		osquery.WithLogger(logger),
 	)
 	if err != nil {
 		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
@@ -177,7 +177,7 @@ func main() {
 
 		stopOsquery, err := enabler.EnableBinary(
 			opts.osquerydPath,
-			autoupdate.WithFinalizer(instance.Restart),
+			autoupdate.WithFinalizer(runner.Restart),
 			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
