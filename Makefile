@@ -66,6 +66,8 @@ xp-extension: .pre-build
 launcher: .pre-build .pre-launcher
 	go build -i -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 
+xp: xp-launcher xp-extension
+
 xp-launcher: .pre-build .pre-launcher
 	GOOS=darwin go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
