@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/agent-api"
 	"github.com/kolide/launcher/service"
 	"github.com/stretchr/testify/require"
 
@@ -20,16 +19,21 @@ import (
 )
 
 type mockApiServer struct {
-	kolide_agent.ApiServer
+	service.KolideService
 }
 
-func (m *mockApiServer) RequestEnrollment(context.Context, *kolide_agent.EnrollmentRequest) (*kolide_agent.EnrollmentResponse, error) {
-	return &kolide_agent.EnrollmentResponse{}, nil
+func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+	return "", false, nil
 }
 
 func startServer(t *testing.T, conf *tls.Config) func() {
+	svc := &mockApiServer{}
+	logger := log.NewNopLogger()
+	e := service.MakeServerEndpoints(svc)
+	apiServer := service.NewGRPCServer(e, logger)
+
 	grpcServer := grpc.NewServer()
-	kolide_agent.RegisterApiServer(grpcServer, &mockApiServer{})
+	service.RegisterGRPCServer(grpcServer, apiServer)
 	var listener net.Listener
 	var err error
 	listener, err = net.Listen("tcp", "localhost:8443")
