@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/service/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -26,7 +25,7 @@ type logmw struct {
 func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "RequestEnrollment",
 			"uuid", uuid,
 			"enrollSecret", enrollSecret,
@@ -45,7 +44,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "RequestConfig",
 			"uuid", uuid,
 			"config", config,
@@ -62,7 +61,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,
@@ -83,7 +82,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "RequestQueries",
 			"uuid", uuid,
 			"res", string(resJSON),
@@ -101,7 +100,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(results)
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "PublishResults",
 			"uuid", uuid,
 			"results", string(resJSON),
@@ -120,7 +119,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		level.Debug(mw.logger).Log(
+		mw.logger.Log(
 			"method", "CheckHealth",
 			"uuid", uuid,
 			"status", status,
