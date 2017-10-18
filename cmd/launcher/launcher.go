@@ -102,6 +102,10 @@ func main() {
 	versionInfo := version.Version()
 	level.Info(logger).Log("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
 
+	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
+		logFatal(logger, "err", errors.Wrap(err, "creating root directory"))
+	}
+
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "open local store"))
