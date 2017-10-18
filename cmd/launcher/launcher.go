@@ -84,6 +84,10 @@ func main() {
 		)
 	}
 
+	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
+		logFatal(logger, "err", errors.Wrap(err, "creating root directory"))
+	}
+
 	if _, err := osquery.DetectPlatform(); err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	}
