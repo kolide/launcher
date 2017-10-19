@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
+	"github.com/kolide/launcher/debug"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -90,6 +91,11 @@ func main() {
 
 	if _, err := osquery.DetectPlatform(); err != nil {
 		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
+	}
+
+	debugTokenPath := filepath.Join(rootDirectory, "debug_token")
+	if err := debug.StartDebugServer("localhost:5097", debugTokenPath, logger); err != nil {
+		logFatal(logger, "err", errors.Wrap(err, "starting debug server"))
 	}
 
 	httpClient := http.DefaultClient
