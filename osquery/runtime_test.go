@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,6 +107,16 @@ func TestBadBinaryPath(t *testing.T) {
 	assert.Nil(t, runner)
 }
 
+// waitHealthy expects the instance to be healthy within 30 seconds, or else
+// fatals the test
+func waitHealthy(t *testing.T, runner *Runner) {
+	testutil.FatalAfterFunc(t, 30*time.Second, func() {
+		for runner.Healthy() != nil {
+			time.Sleep(500 * time.Millisecond)
+		}
+	})
+}
+
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
@@ -116,8 +127,7 @@ func TestSimplePath(t *testing.T) {
 	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
-	err = runner.Healthy()
-	require.NoError(t, err)
+	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Shutdown())
 }
@@ -132,15 +142,13 @@ func TestRestart(t *testing.T) {
 	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
-	require.NoError(t, runner.Healthy())
+	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Restart())
-	time.Sleep(2 * time.Second)
-	require.NoError(t, runner.Healthy())
+	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Restart())
-	time.Sleep(2 * time.Second)
-	require.NoError(t, runner.Healthy())
+	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Shutdown())
 }
@@ -155,15 +163,14 @@ func TestOsqueryDies(t *testing.T) {
 	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
-	require.NoError(t, runner.Healthy())
+	waitHealthy(t, runner)
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, runner.instance.cmd.Process.Kill())
 	runner.instanceLock.Unlock()
 
-	time.Sleep(2 * time.Second)
-	require.NoError(t, runner.Healthy())
+	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Shutdown())
 }
