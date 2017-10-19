@@ -144,3 +144,16 @@ push-containers: $(CONTAINERS)
 	for container in $(CONTAINERS); do \
 		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
 	done
+
+binary-bundle: xp
+	rm -rf build/binary-bundle
+	mkdir -p build/binary-bundle/linux
+	mkdir -p build/binary-bundle/darwin
+	cp build/linux/launcher build/binary-bundle/linux/launcher
+	cp build/linux/osquery-extension.ext build/binary-bundle/linux/osquery-extension.ext
+	go run ./tools/download-osquery.go --platform=linux --output=build/binary-bundle/linux/osqueryd
+	cp build/darwin/launcher build/binary-bundle/darwin/launcher
+	cp build/darwin/osquery-extension.ext build/binary-bundle/darwin/osquery-extension.ext
+	go run ./tools/download-osquery.go --platform=darwin --output=build/binary-bundle/darwin/osqueryd
+	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" linux/ darwin/
+	cp build/binary-bundle/launcher_${VERSION}.zip build/binary-bundle/launcher_latest.zip
