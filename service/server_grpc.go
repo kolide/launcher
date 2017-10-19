@@ -1,12 +1,11 @@
 package service
 
 import (
-	stdctx "context"
+	"context"
 
 	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -16,7 +15,7 @@ import (
 
 func parseUUID() grpctransport.ServerOption {
 	return grpctransport.ServerBefore(
-		func(ctx stdctx.Context, md metadata.MD) stdctx.Context {
+		func(ctx context.Context, md metadata.MD) context.Context {
 			if hdr, ok := md["uuid"]; ok {
 				ctx = uuid.NewContext(ctx, hdr[len(hdr)-1])
 			}
