@@ -7,6 +7,12 @@
   revision = "0dd823580c78a79ae9696eb9b3650e400fff140f"
 
 [[projects]]
+  name = "github.com/Microsoft/go-winio"
+  packages = ["."]
+  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+  version = "v0.4.5"
+
+[[projects]]
   branch = "master"
   name = "github.com/WatchBeam/clock"
   packages = ["."]
@@ -81,21 +87,19 @@
   branch = "master"
   name = "github.com/kolide/kit"
   packages = ["env","fs","testutil","version"]
-  revision = "19dfff12e00e1d46d30636b9150ca5b9f9f05325"
-  source = "git@github.com:kolide/kit.git"
+  revision = "566c8f56a6ff7daba204818fbab0f2cb854b3310"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
-  packages = [".","gen/osquery","gen/osquery/mock","plugin/config","plugin/distributed","plugin/logger","plugin/table"]
-  revision = "8725947d91d9a04c5d46ab87a5e67ee7053f7cde"
+  packages = [".","gen/osquery","gen/osquery/mock","plugin/config","plugin/distributed","plugin/logger","plugin/table","transport"]
+  revision = "03a792fcca9a86c9a717109c2ad8763d0759105b"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/updater"
   packages = ["tuf"]
-  revision = "9d05ccd3132584e745a3ab9e2a28041cf957f37f"
-  source = "git@github.com:kolide/updater.git"
+  revision = "ec5168a7b81bf57730f1a16fb6c36f9374f0874a"
 
 [[projects]]
   branch = "master"
@@ -143,13 +147,13 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["pbkdf2","ssh/terminal"]
-  revision = "9419663f5a44be8b34ca85f08abc5fe1be11f8a3"
+  revision = "541b9d50ad47e36efd8fb423e938e59ff1691f68"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "1087133bc4af3073e18add999345c6ae75918503"
+  revision = "aabf50738bcdd9b207582cbe796b59ed65d56680"
 
 [[projects]]
   branch = "master"
@@ -190,6 +194,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a12ecfacf98b591cb99d0624b8010ae95b874e3c86380649b204b710460d9c42"
+  inputs-digest = "1c1aaef7211b2a2a41be582cbe36547df6ef364b5f2e13aeaeb54bd1ff9c8ed8"
   solver-name = "gps-cdcl"
   solver-version = 1
