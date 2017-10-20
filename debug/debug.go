@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -30,6 +31,11 @@ func StartDebugServer(addr, tokenPath string, logger log.Logger) error {
 			level.Info(logger).Log("msg", "starting debug server failed", "err", err)
 		}
 	}()
+
+	level.Info(logger).Log(
+		"msg",
+		fmt.Sprintf("debug server available at http://%s/debug/?token=%s", addr, token.String()),
+	)
 
 	return nil
 }
