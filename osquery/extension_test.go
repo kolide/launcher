@@ -506,19 +506,19 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(m, db, ExtensionOpts{
-		EnrollSecret:    "enroll_secret",
-		MaxLogsPerBatch: 10,
+		EnrollSecret:     "enroll_secret",
+		MaxBytesPerBatch: 100,
 	})
 	require.Nil(t, err)
 
 	expectedStatusLogs := []string{}
 	expectedResultLogs := []string{}
 	for i := 0; i < 20; i++ {
-		status := fmt.Sprintf("status_%d", i)
+		status := fmt.Sprintf("status_%3d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
 		e.LogString(context.Background(), logger.LogTypeStatus, status)
 
-		result := fmt.Sprintf("result_%d", i)
+		result := fmt.Sprintf("result_%3d", i)
 		expectedResultLogs = append(expectedResultLogs, result)
 		e.LogString(context.Background(), logger.LogTypeString, result)
 	}
@@ -551,6 +551,59 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	assert.Nil(t, gotResultLogs)
 }
 
+func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
+	var gotStatusLogs, gotResultLogs []string
+	m := &mock.KolideService{
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			switch logType {
+			case logger.LogTypeStatus:
+				gotStatusLogs = logs
+			case logger.LogTypeString:
+				gotResultLogs = logs
+			default:
+				t.Error("Unkown log type")
+			}
+			return "", "", false, nil
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	e, err := NewExtension(m, db, ExtensionOpts{
+		EnrollSecret:     "enroll_secret",
+		MaxBytesPerBatch: 15,
+	})
+	require.Nil(t, err)
+
+	expectedResultLogs := []string{"res1", "res2", "res3", "res4"}
+	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! oh noes")
+	e.LogString(context.Background(), logger.LogTypeString, "res1")
+	e.LogString(context.Background(), logger.LogTypeString, "res2")
+	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! wow")
+	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! scheiße")
+	e.LogString(context.Background(), logger.LogTypeString, "res3")
+	e.LogString(context.Background(), logger.LogTypeString, "res4")
+	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
+
+	// Should write first 3 logs
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.True(t, m.PublishLogsFuncInvoked)
+	assert.Equal(t, expectedResultLogs[:3], gotResultLogs)
+
+	// Should write last log
+	m.PublishLogsFuncInvoked = false
+	gotResultLogs = nil
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.True(t, m.PublishLogsFuncInvoked)
+	assert.Equal(t, expectedResultLogs[3:], gotResultLogs)
+
+	// No more logs to write
+	m.PublishLogsFuncInvoked = false
+	gotResultLogs = nil
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.False(t, m.PublishLogsFuncInvoked)
+	assert.Nil(t, gotResultLogs)
+}
+
 func TestExtensionWriteLogsLoop(t *testing.T) {
 	var gotStatusLogs, gotResultLogs []string
 	var funcInvokedStatus, funcInvokedResult bool
@@ -577,21 +630,21 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(m, db, ExtensionOpts{
-		EnrollSecret:    "enroll_secret",
-		MaxLogsPerBatch: 10,
-		Clock:           mockClock,
-		LoggingInterval: expectedLoggingInterval,
+		EnrollSecret:     "enroll_secret",
+		MaxBytesPerBatch: 200,
+		Clock:            mockClock,
+		LoggingInterval:  expectedLoggingInterval,
 	})
 	require.Nil(t, err)
 
 	expectedStatusLogs := []string{}
 	expectedResultLogs := []string{}
 	for i := 0; i < 20; i++ {
-		status := fmt.Sprintf("status_%d", i)
+		status := fmt.Sprintf("status_%013d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
 		e.LogString(context.Background(), logger.LogTypeStatus, status)
 
-		result := fmt.Sprintf("result_%d", i)
+		result := fmt.Sprintf("result_%013d", i)
 		expectedResultLogs = append(expectedResultLogs, result)
 		e.LogString(context.Background(), logger.LogTypeString, result)
 	}
