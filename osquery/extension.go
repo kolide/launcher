@@ -27,6 +27,7 @@ type Extension struct {
 	enrollMutex   sync.Mutex
 	done          chan struct{}
 	wg            sync.WaitGroup
+	logger        log.Logger
 }
 
 const (
@@ -44,9 +45,10 @@ const (
 	// DB key for last retrieved config
 	configKey = "config"
 
-	// Default maximum number of logs per batch (used if not specified in
-	// options)
-	defaultMaxLogsPerBatch = 500
+	// Default maximum number of bytes per batch (used if not specified in
+	// options). This 4MB limit is chosen based on the default grpc-go
+	// limit specified in https://github.com/grpc/grpc-go/blob/master/server.go#L51
+	defaultMaxBytesPerBatch = 4 << 20
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 1 * time.Minute
@@ -60,9 +62,9 @@ type ExtensionOpts struct {
 	// EnrollSecret is the (mandatory) enroll secret used for
 	// enrolling with the server.
 	EnrollSecret string
-	// MaxLogsPerBatch is the maximum number of logs that should be sent in
-	// one batch logging request.
-	MaxLogsPerBatch int
+	// MaxBytesPerBatch is the maximum number of bytes that should be sent in
+	// one batch logging request. Any log larger than this will be dropped.
+	MaxBytesPerBatch int
 	// LoggingInterval is the interval at which logs should be flushed to
 	// the server.
 	LoggingInterval time.Duration
@@ -90,8 +92,8 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		return nil, errors.New("empty enroll secret")
 	}
 
-	if opts.MaxLogsPerBatch == 0 {
-		opts.MaxLogsPerBatch = defaultMaxLogsPerBatch
+	if opts.MaxBytesPerBatch == 0 {
+		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
 	}
 
 	if opts.LoggingInterval == 0 {
@@ -104,9 +106,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 
 	if opts.Logger == nil {
 		// Nop logger
-		opts.Logger = log.LoggerFunc(func(...interface{}) error {
-			return nil
-		})
+		opts.Logger = log.NewNopLogger()
 	}
 
 	if opts.MaxBufferedLogs == 0 {
@@ -346,9 +346,9 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 }
 
 // writeAndPurgeLogs flushes the log buffers, writing up to
-// Opts.MaxLogsPerBatch in one run. If the logs write successfully, they will
-// be deleted from the buffer. After writing (whether success or failure), logs
-// over the maximum count will be purged to avoid unbounded growth of the
+// Opts.MaxBytesPerBatch bytes in one run. If the logs write successfully, they
+// will be deleted from the buffer. After writing (whether success or failure),
+// logs over the maximum count will be purged to avoid unbounded growth of the
 // buffers.
 func (e *Extension) writeAndPurgeLogs() {
 	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
@@ -390,8 +390,8 @@ func (e *Extension) writeLogsLoopRunner() {
 }
 
 // writeBufferedLogs flushes the log buffers, writing up to
-// Opts.MaxLogsPerBatch in one run. If the logs write successfully, they will
-// be deleted from the buffer.
+// Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
+// successfully, they will be deleted from the buffer.
 func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
@@ -403,8 +403,22 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		logs := []string{}
 		c := b.Cursor()
 		k, v := c.First()
-		for total := 0; k != nil && total < e.Opts.MaxLogsPerBatch; total++ {
-			logs = append(logs, string(v))
+		for totalBytes := 0; k != nil; {
+			if len(v) > e.Opts.MaxBytesPerBatch {
+				// Discard logs that are too big
+				level.Info(e.Opts.Logger).Log(
+					"msg", "dropped log",
+					"size", len(v),
+					"limit", e.Opts.MaxBytesPerBatch,
+				)
+			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+				// Buffer is filled
+				break
+			} else {
+				logs = append(logs, string(v))
+				totalBytes += len(v)
+			}
+
 			c.Delete() // Note: This advances the cursor
 			k, v = c.First()
 		}
