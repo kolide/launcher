@@ -3,7 +3,6 @@ package osquery
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"sync"
 	"time"
 
@@ -49,7 +48,7 @@ const (
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 4MB limit is chosen based on the default grpc-go
 	// limit specified in https://github.com/grpc/grpc-go/blob/master/server.go#L51
-	defaultMaxBytesPerBatch = 4 * 1024 * 1024
+	defaultMaxBytesPerBatch = 4 << 20
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 1 * time.Minute
@@ -408,12 +407,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
 				level.Info(e.Opts.Logger).Log(
-					"msg",
-					fmt.Sprintf(
-						"dropped %d byte log over %d byte limit",
-						len(v),
-						e.Opts.MaxBytesPerBatch,
-					),
+					"msg", "dropped log",
+					"size", len(v),
+					"limit", e.Opts.MaxBytesPerBatch,
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
 				// Buffer is filled
