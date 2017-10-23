@@ -94,9 +94,7 @@ func main() {
 	}
 
 	debugTokenPath := filepath.Join(rootDirectory, "debug_token")
-	if err := debug.StartDebugServer("localhost:5097", debugTokenPath, logger); err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "starting debug server"))
-	}
+	debug.AttachDebugHandler(debugTokenPath, logger)
 
 	httpClient := http.DefaultClient
 	if opts.insecureTLS {

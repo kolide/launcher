@@ -1,9 +1,14 @@
 package debug
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/e-dard/netbug"
 	"github.com/go-kit/kit/log"
@@ -12,30 +17,75 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AttachDebugEndpoints will attach the
-func StartDebugServer(addr, tokenPath string, logger log.Logger) error {
-	// Generate new (random) UUID
+const debugSignal = syscall.SIGUSR1
+
+// AttachDebugHandler will attach a signal handler that will toggle the debug
+// server state when SIGUSR1 is sent to the process.
+func AttachDebugHandler(tokenPath string, logger log.Logger) {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, debugSignal)
+	go func() {
+		for {
+			// Start server on first signal
+			<-sig
+			serv, err := startDebugServer(tokenPath, logger)
+			if err != nil {
+				level.Info(logger).Log(
+					"msg", "starting debug server",
+					"err", err,
+				)
+				continue
+			}
+
+			// Stop server on next signal
+			<-sig
+			if err := serv.Shutdown(context.Background()); err != nil {
+				level.Info(logger).Log(
+					"msg", "error shutting down debug server",
+					"err", err,
+				)
+			} else {
+				level.Info(logger).Log(
+					"msg", "shutdown debug server",
+				)
+			}
+		}
+	}()
+}
+
+func startDebugServer(tokenPath string, logger log.Logger) (*http.Server, error) {
+	// Generate new (random) token to use for debug server auth
 	token, err := uuid.NewRandom()
 	if err != nil {
-		return errors.Wrap(err, "generating debug token")
+		return nil, errors.Wrap(err, "generating debug token")
 	}
 
-	if err := ioutil.WriteFile(tokenPath, []byte(token.String()), 0600); err != nil {
-		return errors.Wrap(err, "writing debug token")
-	}
-
+	// Start the debug server
 	r := http.NewServeMux()
 	netbug.RegisterAuthHandler(token.String(), "/debug/", r)
+	serv := http.Server{
+		Handler: r,
+	}
+	listener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		return nil, errors.Wrap(err, "opening socket")
+	}
 	go func() {
-		if err := http.ListenAndServe(addr, r); err != nil {
-			level.Info(logger).Log("msg", "starting debug server failed", "err", err)
+		if err := serv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			level.Info(logger).Log("msg", "debug server failed", "err", err)
 		}
 	}()
 
+	addr := fmt.Sprintf("http://%s/debug/?token=%s", listener.Addr().String(), token.String())
+	// Write the token to a file for easy access by users
+	if err := ioutil.WriteFile(tokenPath, []byte(addr), 0600); err != nil {
+		return nil, errors.Wrap(err, "writing debug token")
+	}
+
 	level.Info(logger).Log(
-		"msg",
-		fmt.Sprintf("debug server available at http://%s/debug/?token=%s", addr, token.String()),
+		"msg", "debug server started",
+		"addr", addr,
 	)
 
-	return nil
+	return &serv, nil
 }
