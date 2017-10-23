@@ -54,12 +54,6 @@
   revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/e-dard/netbug"
-  packages = ["."]
-  revision = "e64d308a0b205c901264e88a10e70d64acb1810d"
-
-[[projects]]
   name = "github.com/go-kit/kit"
   packages = ["endpoint","log","log/level","transport/grpc"]
   revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
@@ -200,6 +194,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "40165f65135cf5c4a677395ad6c4675aa3d322a8b618dca1e5e49ae89b29d253"
+  inputs-digest = "1c1aaef7211b2a2a41be582cbe36547df6ef364b5f2e13aeaeb54bd1ff9c8ed8"
   solver-name = "gps-cdcl"
   solver-version = 1

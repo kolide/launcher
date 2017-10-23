@@ -45,7 +45,3 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/e-dard/netbug"
