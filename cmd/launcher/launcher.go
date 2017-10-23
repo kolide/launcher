@@ -93,8 +93,9 @@ func main() {
 		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	}
 
-	debugTokenPath := filepath.Join(rootDirectory, "debug_token")
-	debug.AttachDebugHandler(debugTokenPath, logger)
+	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
+	debug.AttachDebugHandler(debugAddrPath, logger)
+	defer os.Remove(debugAddrPath)
 
 	httpClient := http.DefaultClient
 	if opts.insecureTLS {

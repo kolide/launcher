@@ -21,14 +21,14 @@ const debugSignal = syscall.SIGUSR1
 
 // AttachDebugHandler will attach a signal handler that will toggle the debug
 // server state when SIGUSR1 is sent to the process.
-func AttachDebugHandler(tokenPath string, logger log.Logger) {
+func AttachDebugHandler(addrPath string, logger log.Logger) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, debugSignal)
 	go func() {
 		for {
 			// Start server on first signal
 			<-sig
-			serv, err := startDebugServer(tokenPath, logger)
+			serv, err := startDebugServer(addrPath, logger)
 			if err != nil {
 				level.Info(logger).Log(
 					"msg", "starting debug server",
@@ -53,7 +53,7 @@ func AttachDebugHandler(tokenPath string, logger log.Logger) {
 	}()
 }
 
-func startDebugServer(tokenPath string, logger log.Logger) (*http.Server, error) {
+func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) {
 	// Generate new (random) token to use for debug server auth
 	token, err := uuid.NewRandom()
 	if err != nil {
@@ -70,6 +70,7 @@ func startDebugServer(tokenPath string, logger log.Logger) (*http.Server, error)
 	if err != nil {
 		return nil, errors.Wrap(err, "opening socket")
 	}
+
 	go func() {
 		if err := serv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			level.Info(logger).Log("msg", "debug server failed", "err", err)
@@ -77,9 +78,9 @@ func startDebugServer(tokenPath string, logger log.Logger) (*http.Server, error)
 	}()
 
 	addr := fmt.Sprintf("http://%s/debug/?token=%s", listener.Addr().String(), token.String())
-	// Write the token to a file for easy access by users
-	if err := ioutil.WriteFile(tokenPath, []byte(addr), 0600); err != nil {
-		return nil, errors.Wrap(err, "writing debug token")
+	// Write the address to a file for easy access by users
+	if err := ioutil.WriteFile(addrPath, []byte(addr), 0600); err != nil {
+		return nil, errors.Wrap(err, "writing debug address")
 	}
 
 	level.Info(logger).Log(
