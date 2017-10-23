@@ -2,7 +2,6 @@ package debug
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net"
@@ -72,6 +71,9 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	serv := http.Server{
 		Handler: r,
 	}
+	// Allow the OS to pick an open port. Not intended to be a security
+	// mechanism, only intended to ensure we don't try to bind to an
+	// already used port.
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, errors.Wrap(err, "opening socket")
@@ -83,7 +85,13 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 		}
 	}()
 
-	addr := fmt.Sprintf("http://%s/debug/?token=%s", listener.Addr().String(), token.String())
+	url := url.URL{
+		Scheme:   "http",
+		Host:     listener.Addr().String(),
+		Path:     "/debug/",
+		RawQuery: "token=" + token.String(),
+	}
+	addr := url.String()
 	// Write the address to a file for easy access by users
 	if err := ioutil.WriteFile(addrPath, []byte(addr), 0600); err != nil {
 		return nil, errors.Wrap(err, "writing debug address")
@@ -98,7 +106,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 }
 
 // The below handler code is adapted from MIT licensed github.com/e-dard/netbug
-func handler(token string, logger log.Logger) http.Handler {
+func handler(token string, logger log.Logger) http.HandlerFunc {
 	info := struct {
 		Profiles []*pprof.Profile
 		Token    string
@@ -107,7 +115,7 @@ func handler(token string, logger log.Logger) http.Handler {
 		Token:    url.QueryEscape(token),
 	}
 
-	h := func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/")
 		switch name {
 		case "":
@@ -132,24 +140,20 @@ func handler(token string, logger log.Logger) http.Handler {
 			nhpprof.Handler(name).ServeHTTP(w, r)
 		}
 	}
-	return http.HandlerFunc(h)
 }
 
-func authHandler(token string, logger log.Logger) http.Handler {
-	h := handler(token, logger)
-	ah := func(w http.ResponseWriter, r *http.Request) {
+func authHandler(token string, logger log.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.FormValue("token") == token {
-			h.ServeHTTP(w, r)
+			handler(token, logger).ServeHTTP(w, r)
 		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintln(w, "Unauthorized.")
+			http.Error(w, "Request must include valid token.", http.StatusUnauthorized)
 		}
 	}
-	return http.HandlerFunc(ah)
 }
 
 func registerAuthHandler(token string, mux *http.ServeMux, logger log.Logger) {
-	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, authHandler(token, logger)))
+	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, http.HandlerFunc(authHandler(token, logger))))
 }
 
 var indexTmpl = template.Must(template.New("index").Parse(`<html>
@@ -158,7 +162,7 @@ var indexTmpl = template.Must(template.New("index").Parse(`<html>
   </head>
   <br>
   <body>
-    profiles:<br>
+    Profiles:<br>
     <table>
     {{range .Profiles}}
       <tr><td align=right>{{.Count}}<td><a href="{{.Name}}?debug=1&token={{$.Token}}">{{.Name}}</a>
@@ -168,7 +172,7 @@ var indexTmpl = template.Must(template.New("index").Parse(`<html>
     <tr><td align=right><td><a href="trace?seconds=30&token={{.Token}}">30-second trace</a>
     </table>
     <br>
-    debug information:<br>
+    Debug information:<br>
     <table>
       <tr><td align=right><td><a href="cmdline?token={{.Token}}">cmdline</a>
       <tr><td align=right><td><a href="symbol?token={{.Token}}">symbol</a>
