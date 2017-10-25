@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -43,16 +42,17 @@ func TestConcurrentLogging(t *testing.T) {
 }
 
 func TestCaller(t *testing.T) {
+	// Ensure the correct caller is returned with all the crazy wrapping
+	// of loggers
 	buf := &bytes.Buffer{}
 	l := NewLogger(buf)
 
-	parsedLog := struct {
+	var parsedLog struct {
 		Caller string `json:"caller"`
-	}{}
+	}
 
 	l.Info("foo", "bar")
 
-	fmt.Println(buf.String())
 	err := json.Unmarshal(buf.Bytes(), &parsedLog)
 	require.Nil(t, err)
 	// This line could fail if the filename for these tests changes from

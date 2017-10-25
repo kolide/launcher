@@ -57,17 +57,7 @@ func main() {
 	if opts.debug {
 		logger.AllowDebug()
 	}
-
-	go func() {
-		for {
-			time.Sleep(10 * time.Second)
-			logger.AllowDebug()
-			logger.Debug("foo", "bar")
-			time.Sleep(10 * time.Second)
-			logger.AllowInfo()
-			logger.Debug("baz", "ing")
-		}
-	}()
+	startDebugToggle(logger, opts.debug)
 
 	rootDirectory := opts.rootDirectory
 	if rootDirectory == "" {
@@ -316,4 +306,23 @@ func dialGRPC(
 
 	conn, err := grpc.Dial(serverURL, grpcOpts...)
 	return conn, err
+}
+
+func startDebugToggle(logger log.Logger, debug bool) {
+	// Start a loop that will toggle the log level when SIGUSR2 is sent to
+	// the process.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGUSR2)
+	go func() {
+		for {
+			<-sigChan
+			if debug {
+				logger.AllowInfo()
+			} else {
+				logger.AllowDebug()
+			}
+
+			debug = !debug
+		}
+	}()
 }
