@@ -270,7 +270,7 @@ func (r *Runner) Healthy() error {
 
 // How long to wait before erroring because we cannot open the osquery
 // extension socket.
-const socketOpenTimeout = 5 * time.Second
+const socketOpenTimeout = 10 * time.Second
 
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
