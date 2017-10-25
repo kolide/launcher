@@ -15,8 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/log"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -318,7 +317,7 @@ func newInstance() *OsqueryInstance {
 	i.cancel = cancel
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
-	i.logger = log.NewNopLogger()
+	i.logger = log.NewLogger(ioutil.Discard)
 
 	return i
 }
@@ -345,7 +344,7 @@ func (r *Runner) start() error {
 
 			// Error case
 			err := r.instance.errgroup.Wait()
-			level.Info(r.instance.logger).Log(
+			r.instance.logger.Info(
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
@@ -355,7 +354,7 @@ func (r *Runner) start() error {
 			r.instance = newInstance()
 			r.instance.opts = opts
 			if err := r.launchOsqueryInstance(); err != nil {
-				level.Info(r.instance.logger).Log(
+				r.instance.logger.Info(
 					"msg", "fatal error restarting instance",
 					"err", err,
 				)
@@ -462,7 +461,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		if o.cmd.Process != nil {
 			if err := o.cmd.Process.Kill(); err != nil {
 				if !strings.Contains(err.Error(), "process already finished") {
-					level.Info(o.logger).Log(
+					o.logger.Info(
 						"msg", "killing osquery process",
 						"err", err,
 					)
@@ -525,7 +524,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		if err := o.extensionManagerServer.Shutdown(); err != nil {
-			level.Info(o.logger).Log(
+			o.logger.Info(
 				"msg", "shutting down extension server",
 				"err", err,
 			)

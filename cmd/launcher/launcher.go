@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	kitlog "github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
@@ -79,7 +77,7 @@ func main() {
 				logger.Fatal("err", errors.Wrap(err, "creating temporary root directory"))
 			}
 		}
-		level.Info(logger).Log(
+		logger.Info(
 			"msg", "using default system root directory",
 			"path", rootDirectory,
 		)
@@ -109,7 +107,7 @@ func main() {
 	}
 
 	versionInfo := version.Version()
-	level.Info(logger).Log("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
+	logger.Info("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
 
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
@@ -123,7 +121,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := service.New(conn, level.Debug(logger))
+	client := service.New(conn, logger)
 
 	var enrollSecret string
 	if opts.enrollSecret != "" {
@@ -237,10 +235,10 @@ func shutdownOsquery(rootdir string) error {
 	return nil
 }
 
-func launcherFinalizer(logger kitlog.Logger, rootDirectory string) func() error {
+func launcherFinalizer(logger log.Logger, rootDirectory string) func() error {
 	return func() error {
 		if err := shutdownOsquery(rootDirectory); err != nil {
-			level.Warn(logger).Log(
+			logger.Info(
 				"method", "launcherFinalizer",
 				"err", err,
 			)
@@ -288,10 +286,10 @@ func dialGRPC(
 	serverURL string,
 	insecureTLS bool,
 	insecureGRPC bool,
-	logger kitlog.Logger,
+	logger log.Logger,
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
-	level.Info(logger).Log(
+	logger.Info(
 		"msg", "dialing grpc server",
 		"server", serverURL,
 		"tls_secure", insecureTLS == false,

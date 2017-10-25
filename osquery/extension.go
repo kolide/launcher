@@ -3,13 +3,13 @@ package osquery
 import (
 	"context"
 	"encoding/binary"
+	"io/ioutil"
 	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -106,7 +106,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 
 	if opts.Logger == nil {
 		// Nop logger
-		opts.Logger = log.NewNopLogger()
+		opts.Logger = log.NewLogger(ioutil.Discard)
 	}
 
 	if opts.MaxBufferedLogs == 0 {
@@ -355,7 +355,7 @@ func (e *Extension) writeAndPurgeLogs() {
 		// Write logs
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
-			level.Info(e.Opts.Logger).Log(
+			e.Opts.Logger.Info(
 				"err",
 				errors.Wrapf(err, "sending %v logs", typ),
 			)
@@ -364,7 +364,7 @@ func (e *Extension) writeAndPurgeLogs() {
 		// Purge overflow
 		err = e.purgeBufferedLogsForType(typ)
 		if err != nil {
-			level.Info(e.Opts.Logger).Log(
+			e.Opts.Logger.Info(
 				"err",
 				errors.Wrapf(err, "purging %v logs", typ),
 			)
@@ -406,7 +406,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		for totalBytes := 0; k != nil; {
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
-				level.Info(e.Opts.Logger).Log(
+				e.Opts.Logger.Info(
 					"msg", "dropped log",
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
@@ -490,7 +490,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 			return nil
 		}
 
-		level.Info(e.Opts.Logger).Log(
+		e.Opts.Logger.Info(
 			"msg", "Buffered logs limit exceeded. Purging excess.",
 			"limit", e.Opts.MaxBufferedLogs,
 			"purge_count", deleteCount,
@@ -523,7 +523,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
-		level.Info(e.Opts.Logger).Log(
+		e.Opts.Logger.Info(
 			"msg", "Received unknown log type",
 			"log_type", typ,
 		)

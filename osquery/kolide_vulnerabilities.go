@@ -6,8 +6,7 @@ import (
 	"os/exec"
 	"regexp"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/log"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -42,7 +41,7 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 	row := map[string]string{"name": "CVE-2017-7149"}
 	volumes, err := getEncryptedAPFSVolumes()
 	if err != nil {
-		level.Error(logger).Log("err", errors.Wrap(err, "getting encrypted APFS volumes"))
+		logger.Info("err", err, "msg", "getting encrypted APFS volumes")
 		return row
 	}
 
@@ -52,7 +51,11 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 	for _, vol := range volumes {
 		vulnerable, err := checkVolumeVulnerability(vol)
 		if err != nil {
-			level.Error(logger).Log("err", errors.Wrapf(err, "checking volume %s vulnerability", vol))
+			logger.Info(
+				"err", err,
+				"msg", "checking volume vulnerability",
+				"volume", vol,
+			)
 			continue
 		}
 
@@ -70,7 +73,7 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 
 	detailJSON, err := json.Marshal(details)
 	if err != nil {
-		level.Error(logger).Log("err", errors.Wrap(err, "marshalling CVE_2017_7149 details"))
+		logger.Info("err", err, "msg", "marshalling CVE_2017_7149 details")
 		return row
 	}
 	row["details"] = string(detailJSON)

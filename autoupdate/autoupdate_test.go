@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +80,7 @@ func TestNewUpdater(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
-			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewNopLogger(), tt.opts...)
+			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewLogger(ioutil.Discard), tt.opts...)
 			require.Nil(t, err)
 
 			assert.Equal(t, tt.target, u.target)

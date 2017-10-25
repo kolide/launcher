@@ -1,15 +1,24 @@
 package log
 
 import (
-	"os"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConcurrentLogging(t *testing.T) {
-	l := NewLogger(os.Stderr)
-
+	// Validate that the logging level can be changed while multiple
+	// goroutines are logging without races.
+	l := NewLogger(ioutil.Discard)
 	var wg sync.WaitGroup
+
+	// Write via multiple goroutines
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -19,5 +28,34 @@ func TestConcurrentLogging(t *testing.T) {
 			wg.Done()
 		}(i)
 	}
+
+	// Change log level in separate goroutine
+	wg.Add(1)
+	go func() {
+		for i := 0; i < 10; i++ {
+			l.AllowDebug()
+			l.AllowInfo()
+		}
+		wg.Done()
+	}()
+
 	wg.Wait()
+}
+
+func TestCaller(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf)
+
+	parsedLog := struct {
+		Caller string `json:"caller"`
+	}{}
+
+	l.Info("foo", "bar")
+
+	fmt.Println(buf.String())
+	err := json.Unmarshal(buf.Bytes(), &parsedLog)
+	require.Nil(t, err)
+	// This line could fail if the filename for these tests changes from
+	// "log_test"
+	assert.Contains(t, parsedLog.Caller, "log_test.go:")
 }

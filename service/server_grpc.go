@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
+	"github.com/kolide/launcher/log"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -26,7 +26,6 @@ func parseUUID() grpctransport.ServerOption {
 
 func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 	options := []grpctransport.ServerOption{
-		grpctransport.ServerErrorLogger(logger),
 		parseUUID(),
 	}
 	return &grpcServer{

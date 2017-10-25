@@ -14,9 +14,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/log"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +33,7 @@ func AttachDebugHandler(addrPath string, logger log.Logger) {
 			<-sig
 			serv, err := startDebugServer(addrPath, logger)
 			if err != nil {
-				level.Info(logger).Log(
+				logger.Info(
 					"msg", "starting debug server",
 					"err", err,
 				)
@@ -44,14 +43,14 @@ func AttachDebugHandler(addrPath string, logger log.Logger) {
 			// Stop server on next signal
 			<-sig
 			if err := serv.Shutdown(context.Background()); err != nil {
-				level.Info(logger).Log(
+				logger.Info(
 					"msg", "error shutting down debug server",
 					"err", err,
 				)
 				continue
 			}
 
-			level.Info(logger).Log(
+			logger.Info(
 				"msg", "shutdown debug server",
 			)
 		}
@@ -81,7 +80,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 
 	go func() {
 		if err := serv.Serve(listener); err != nil && err != http.ErrServerClosed {
-			level.Info(logger).Log("msg", "debug server failed", "err", err)
+			logger.Info("msg", "debug server failed", "err", err)
 		}
 	}()
 
@@ -97,7 +96,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 		return nil, errors.Wrap(err, "writing debug address")
 	}
 
-	level.Info(logger).Log(
+	logger.Info(
 		"msg", "debug server started",
 		"addr", addr,
 	)
@@ -121,7 +120,7 @@ func handler(token string, logger log.Logger) http.HandlerFunc {
 		case "":
 			// Index page.
 			if err := indexTmpl.Execute(w, info); err != nil {
-				level.Info(logger).Log(
+				logger.Info(
 					"msg", "error rendering debug template",
 					"err", err,
 				)
