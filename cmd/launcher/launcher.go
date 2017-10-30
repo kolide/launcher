@@ -72,6 +72,7 @@ func main() {
 			"path", rootDirectory,
 		)
 	}
+	logger.Log("foo", "bar")
 
 	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
 		logger.Fatal("err", errors.Wrap(err, "creating root directory"))
