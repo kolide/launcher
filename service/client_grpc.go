@@ -92,6 +92,7 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
 	}
+
 	client = LoggingMiddleware(logger)(client)
 	// Wrap with UUID middleware after logger so that UUID is available in
 	// the logger context.

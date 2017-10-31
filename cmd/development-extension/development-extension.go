@@ -2,11 +2,10 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"time"
 
-	kitlog "github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/log"
 	launcher "github.com/kolide/launcher/osquery"
 	"github.com/kolide/osquery-go"
 )
@@ -18,27 +17,29 @@ func main() {
 	flag.Bool("verbose", false, "")
 	flag.Parse()
 
+	logger := log.NewLogger(os.Stderr)
+
 	if *flSocket == "" {
-		log.Fatalln("--socket flag cannot be empty")
+		logger.Fatal("msg", "--socket flag cannot be empty")
 	}
 
 	server, err := osquery.NewExtensionManagerServer("dev_extension", *flSocket)
 	if err != nil {
-		log.Fatalf("Error creating osquery extension server: %s\n", err)
+		logger.Fatal("err", err, "msg", "creating osquery extension server")
 	}
 
 	client, err := osquery.NewClient(*flSocket, 3*time.Second)
 	if err != nil {
-		log.Fatalf("Error creating osquery extension client: %s\n", err)
+		logger.Fatal("err", err, "creating osquery extension client")
 	}
 
 	plugins := []osquery.OsqueryPlugin{}
-	for _, tablePlugin := range launcher.PlatformTables(client, kitlog.NewLogfmtLogger(kitlog.NewSyncWriter(os.Stderr))) {
+	for _, tablePlugin := range launcher.PlatformTables(client, logger) {
 		plugins = append(plugins, tablePlugin)
 	}
 	server.RegisterPlugin(plugins...)
 
 	if err := server.Run(); err != nil {
-		log.Fatal(err)
+		logger.Fatal("err", err)
 	}
 }

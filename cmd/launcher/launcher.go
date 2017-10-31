@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
 	"github.com/kolide/launcher/debug"
+	kolidelog "github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -38,17 +39,11 @@ var (
 	defaultOsquerydPath = filepath.Join(applicationRoot, "bin/osqueryd")
 )
 
-func logFatal(logger log.Logger, args ...interface{}) {
-	level.Info(logger).Log(args...)
-	os.Exit(1)
-}
-
 func main() {
-	logger := log.NewJSONLogger(os.Stderr)
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+	logger := kolidelog.NewLogger(os.Stderr)
 	opts, err := parseOptions()
 	if err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "invalid options"))
+		logger.Fatal("err", errors.Wrap(err, "invalid options"))
 	}
 
 	if opts.printVersion {
@@ -62,21 +57,16 @@ func main() {
 	}
 
 	if opts.debug {
-		logger = level.NewFilter(logger, level.AllowDebug())
-	} else {
-		logger = level.NewFilter(logger, level.AllowInfo())
+		logger.AllowDebug()
 	}
-
-	// Note: caller must be added after everything else that decorates the
-	// logger (otherwise we get incorrect line numbers).
-	logger = log.With(logger, "caller", log.DefaultCaller)
+	debug.AttachLogToggle(logger, opts.debug)
 
 	rootDirectory := opts.rootDirectory
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
 			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
-				logFatal(logger, "err", errors.Wrap(err, "creating temporary root directory"))
+				logger.Fatal("err", errors.Wrap(err, "creating temporary root directory"))
 			}
 		}
 		level.Info(logger).Log(
@@ -86,11 +76,11 @@ func main() {
 	}
 
 	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "creating root directory"))
+		logger.Fatal("err", errors.Wrap(err, "creating root directory"))
 	}
 
 	if _, err := osquery.DetectPlatform(); err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "detecting platform"))
+		logger.Fatal("err", errors.Wrap(err, "detecting platform"))
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
@@ -109,17 +99,21 @@ func main() {
 	}
 
 	versionInfo := version.Version()
-	level.Info(logger).Log("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
+	level.Info(logger).Log(
+		"msg", "started kolide launcher",
+		"version", versionInfo.Version,
+		"build", versionInfo.Revision,
+	)
 
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "open local store"))
+		logger.Fatal("err", errors.Wrap(err, "open local store"))
 	}
 	defer db.Close()
 
 	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
 	if err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "dialing grpc server"))
+		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
 	}
 	defer conn.Close()
 
@@ -131,7 +125,7 @@ func main() {
 	} else if opts.enrollSecretPath != "" {
 		content, err := ioutil.ReadFile(opts.enrollSecretPath)
 		if err != nil {
-			logFatal(logger, "err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", opts.enrollSecretPath)
+			logger.Fatal("err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", opts.enrollSecretPath)
 		}
 		enrollSecret = string(content)
 	}
@@ -142,15 +136,15 @@ func main() {
 	}
 	ext, err := osquery.NewExtension(client, db, extOpts)
 	if err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "starting grpc extension"))
+		logger.Fatal("err", errors.Wrap(err, "starting grpc extension"))
 	}
 
 	_, invalid, err := ext.Enroll(context.Background())
 	if err != nil {
-		logFatal(logger, "err", errors.Wrap(err, "enrolling host"))
+		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
 	}
 	if invalid {
-		logFatal(logger, errors.Wrap(err, "invalid enroll secret"))
+		logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
 	}
 	ext.Start()
 	defer ext.Shutdown()
@@ -170,7 +164,7 @@ func main() {
 		osquery.WithLogger(logger),
 	)
 	if err != nil {
-		logFatal(logger, errors.Wrap(err, "launching osquery instance"))
+		logger.Fatal(errors.Wrap(err, "launching osquery instance"))
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
@@ -190,13 +184,13 @@ func main() {
 			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
-			logFatal(logger, err)
+			logger.Fatal(err)
 		}
 		defer stopOsquery()
 
 		launcherPath, err := os.Executable()
 		if err != nil {
-			logFatal(logger, err)
+			logger.Fatal(err)
 		}
 		stopLauncher, err := enabler.EnableBinary(
 			launcherPath,
@@ -204,7 +198,7 @@ func main() {
 			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
-			logFatal(logger, err)
+			logger.Fatal(err)
 		}
 		defer stopLauncher()
 	}
@@ -240,7 +234,7 @@ func shutdownOsquery(rootdir string) error {
 func launcherFinalizer(logger log.Logger, rootDirectory string) func() error {
 	return func() error {
 		if err := shutdownOsquery(rootDirectory); err != nil {
-			level.Warn(logger).Log(
+			level.Info(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
 			)
