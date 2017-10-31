@@ -193,6 +193,9 @@ func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(agentAPIRequest)
 		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
+		if err != nil {
+			return queryCollection{Err: err}, nil
+		}
 		return queryCollection{
 			Queries:     *result,
 			NodeInvalid: valid,
