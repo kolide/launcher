@@ -7,6 +7,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/pkg/errors"
 )
 
 // KolideClient is the implementation of the KolideService interface, intended
@@ -193,6 +194,14 @@ func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(agentAPIRequest)
 		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
+		if err != nil {
+			return queryCollection{Err: err}, nil
+		}
+		if result == nil {
+			return queryCollection{
+				Err: errors.New("unexpeted nil result from RequestQueries"),
+			}, nil
+		}
 		return queryCollection{
 			Queries:     *result,
 			NodeInvalid: valid,
