@@ -13,8 +13,9 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
@@ -97,7 +98,7 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 func (u *Updater) createLocalTufRepo() error {
 	// We don't want to overwrite an existing repo as it stores state between installations
 	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
-		u.logger.Debug("msg", "not creating new TUF repositories because they already exist")
+		level.Debug(u.logger).Log("msg", "not creating new TUF repositories because they already exist")
 		return nil
 	}
 
@@ -236,35 +237,35 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 // 3) call the Updater's finalizer method, usually a restart function for the running binary.
 func (u *Updater) handler() tuf.NotificationHandler {
 	return func(stagingPath string, err error) {
-		u.logger.Debug("msg", "new staged tuf file", "file", stagingPath, "target", u.target, "binary", u.destination)
+		u.logger.Log("msg", "new staged tuf file", "file", stagingPath, "target", u.target, "binary", u.destination)
 
 		if err != nil {
-			u.logger.Debug("msg", "download failed", "target", u.target, "err", err)
+			u.logger.Log("msg", "download failed", "target", u.target, "err", err)
 			return
 		}
 
 		if err := fs.UntarBundle(stagingPath, stagingPath); err != nil {
-			u.logger.Debug("msg", "untar downloaded target", "binary", u.target, "err", err)
+			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}
 
 		binary := filepath.Join(filepath.Dir(stagingPath), filepath.Base(u.destination))
 		if err := os.Rename(binary, u.destination); err != nil {
-			u.logger.Debug("msg", "update binary from staging dir", "binary", u.destination, "err", err)
+			u.logger.Log("msg", "update binary from staging dir", "binary", u.destination, "err", err)
 			return
 		}
 
 		if err := os.Chmod(u.destination, 0755); err != nil {
-			u.logger.Debug("msg", "setting +x permissions on binary", "binary", u.destination, "err", err)
+			u.logger.Log("msg", "setting +x permissions on binary", "binary", u.destination, "err", err)
 			return
 		}
 
 		if err := u.finalizer(); err != nil {
-			u.logger.Debug("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
+			u.logger.Log("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
 			return
 		}
 
-		u.logger.Info("msg", "completed update for binary", "binary", u.destination)
+		u.logger.Log("msg", "completed update for binary", "binary", u.destination)
 	}
 }
 

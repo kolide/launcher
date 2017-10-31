@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 
+	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/service/internal/launcherproto"
 	"github.com/kolide/launcher/service/uuid"
 )
@@ -92,6 +92,7 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
 	}
+
 	client = LoggingMiddleware(logger)(client)
 	// Wrap with UUID middleware after logger so that UUID is available in
 	// the logger context.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/log"
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/service"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +28,7 @@ func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hos
 
 func startServer(t *testing.T, conf *tls.Config) func() {
 	svc := &mockApiServer{}
-	logger := log.NewLogger(ioutil.Discard)
+	logger := log.NewNopLogger()
 	e := service.MakeServerEndpoints(svc)
 	apiServer := service.NewGRPCServer(e, logger)
 
@@ -68,13 +68,13 @@ func TestSwappingCert(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, log.NewLogger(ioutil.Discard),
+	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewLogger(ioutil.Discard))
+	client := service.New(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "")
 	require.NotNil(t, err)
@@ -106,13 +106,13 @@ func TestCertRemainsBad(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, log.NewLogger(ioutil.Discard),
+	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewLogger(ioutil.Discard))
+	client := service.New(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "")
 	require.NotNil(t, err)

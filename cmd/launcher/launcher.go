@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
 	"github.com/kolide/launcher/debug"
-	"github.com/kolide/launcher/log"
+	kolidelog "github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -38,7 +40,7 @@ var (
 )
 
 func main() {
-	logger := log.NewLogger(os.Stderr)
+	logger := kolidelog.NewLogger(os.Stderr)
 	opts, err := parseOptions()
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "invalid options"))
@@ -67,12 +69,11 @@ func main() {
 				logger.Fatal("err", errors.Wrap(err, "creating temporary root directory"))
 			}
 		}
-		logger.Info(
+		level.Info(logger).Log(
 			"msg", "using default system root directory",
 			"path", rootDirectory,
 		)
 	}
-	logger.Log("foo", "bar")
 
 	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
 		logger.Fatal("err", errors.Wrap(err, "creating root directory"))
@@ -98,7 +99,11 @@ func main() {
 	}
 
 	versionInfo := version.Version()
-	logger.Info("msg", "started kolide launcher", "version", versionInfo.Version, "build", versionInfo.Revision)
+	level.Info(logger).Log(
+		"msg", "started kolide launcher",
+		"version", versionInfo.Version,
+		"build", versionInfo.Revision,
+	)
 
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
@@ -112,7 +117,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := service.New(conn, logger)
+	client := service.New(conn, level.Debug(logger))
 
 	var enrollSecret string
 	if opts.enrollSecret != "" {
@@ -229,7 +234,7 @@ func shutdownOsquery(rootdir string) error {
 func launcherFinalizer(logger log.Logger, rootDirectory string) func() error {
 	return func() error {
 		if err := shutdownOsquery(rootDirectory); err != nil {
-			logger.Info(
+			level.Info(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
 			)
@@ -280,7 +285,7 @@ func dialGRPC(
 	logger log.Logger,
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
-	logger.Info(
+	level.Info(logger).Log(
 		"msg", "dialing grpc server",
 		"server", serverURL,
 		"tls_secure", insecureTLS == false,
@@ -309,7 +314,7 @@ func dialGRPC(
 	return conn, err
 }
 
-func startDebugToggle(logger log.Logger, debug bool) {
+func startDebugToggle(logger *kolidelog.Logger, debug bool) {
 	// Start a loop that will toggle the log level when SIGUSR2 is sent to
 	// the process.
 	sigChan := make(chan os.Signal, 1)

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func TestConcurrentLogging(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			for j := 0; j < 10; j++ {
-				l.Info(i, j)
+				level.Info(l).Log(i, j)
 			}
 			wg.Done()
 		}(i)
@@ -51,7 +52,7 @@ func TestCaller(t *testing.T) {
 		Caller string `json:"caller"`
 	}
 
-	l.Info("foo", "bar")
+	level.Info(l).Log("foo", "bar")
 
 	err := json.Unmarshal(buf.Bytes(), &parsedLog)
 	require.Nil(t, err)

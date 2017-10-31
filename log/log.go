@@ -8,23 +8,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// Logger is the interface exposed to users of this launcher logger package.
-type Logger interface {
-	kitlog.Logger
-	// Debug logs keyvals at the "debug" level
-	Debug(keyvals ...interface{}) error
-	// Info logs keyvals at the "info" level
-	Info(keyvals ...interface{}) error
-	// Fatal logs keyvals at the "info" level, and then exits with error code 1.
-	Fatal(keyvals ...interface{}) error
-
-	// AllowDebug sets the allowed log level to include debug logs and above (info).
-	AllowDebug()
-	// AllowInfo sets the allowed log level to include info logs.
-	AllowInfo()
-}
-
-type logger struct {
+type Logger struct {
 	// baseLogger stores the un-leveled logger. Writes should not be done
 	// directly to this logger.
 	baseLogger kitlog.Logger
@@ -34,18 +18,18 @@ type logger struct {
 	swapLogger kitlog.SwapLogger
 }
 
-func (l *logger) AllowDebug() {
+func (l *Logger) AllowDebug() {
 	l.allowedLevel(level.AllowDebug(), "debug")
 }
 
-func (l *logger) AllowInfo() {
+func (l *Logger) AllowInfo() {
 	l.allowedLevel(level.AllowInfo(), "info")
 }
 
-func (l *logger) allowedLevel(lev level.Option, name string) {
+func (l *Logger) allowedLevel(lev level.Option, name string) {
 	newLogger := level.NewFilter(l.baseLogger, lev)
 	l.swapLogger.Swap(newLogger)
-	l.Info(
+	level.Info(&l.swapLogger).Log(
 		"msg", "allowed log level set",
 		"allowed_level", name,
 	)
@@ -53,22 +37,12 @@ func (l *logger) allowedLevel(lev level.Option, name string) {
 
 // Log will log with level: unknown (filtered as if it were info). Prefer using
 // an explicitly leveled log.Debug or log.Info.
-func (l *logger) Log(keyvals ...interface{}) error {
-	return level.Info(&l.swapLogger).Log(append(keyvals, "level", "unknown")...)
-}
-
-// Debug will log with level: debug
-func (l *logger) Debug(keyvals ...interface{}) error {
-	return level.Debug(&l.swapLogger).Log(keyvals...)
-}
-
-// Info will log with level: info
-func (l *logger) Info(keyvals ...interface{}) error {
-	return level.Info(&l.swapLogger).Log(keyvals...)
+func (l *Logger) Log(keyvals ...interface{}) error {
+	return l.swapLogger.Log(keyvals...)
 }
 
 // Fatal will log with level: fatal and exit with a status 1
-func (l *logger) Fatal(keyvals ...interface{}) error {
+func (l *Logger) Fatal(keyvals ...interface{}) error {
 	// Call this directly instead of using l.Info so that we get the
 	// correct caller.
 	level.Info(&l.swapLogger).Log(keyvals...)
@@ -77,9 +51,10 @@ func (l *logger) Fatal(keyvals ...interface{}) error {
 	return nil
 }
 
-func NewLogger(w io.Writer) Logger {
+func NewLogger(w io.Writer) *Logger {
 	base := kitlog.NewJSONLogger(kitlog.NewSyncWriter(w))
 	base = kitlog.With(base, "ts", kitlog.DefaultTimestampUTC)
+	base = level.NewInjector(base, level.InfoValue())
 
 	// The constant in log.Caller is fragile and must be set
 	// appropriately based on the level of wrapping of the logger. If the
@@ -87,7 +62,7 @@ func NewLogger(w io.Writer) Logger {
 	// should fail.
 	base = kitlog.With(base, "caller", kitlog.Caller(7))
 
-	l := &logger{
+	l := &Logger{
 		baseLogger: base,
 	}
 	l.swapLogger.Swap(level.NewFilter(l.baseLogger, level.AllowInfo()))

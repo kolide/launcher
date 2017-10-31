@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/autoupdate"
-	"github.com/kolide/launcher/log"
 	"github.com/kolide/updater/tuf"
 )
 
