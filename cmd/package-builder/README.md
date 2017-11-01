@@ -51,4 +51,4 @@ For example, consider the following usage:
   --update_channel=nightly
 ```
 
-By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value.
+By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value. If you would like the resultant packages to not contain the enroll secret (so that you can distribute it via another mechanism), you can use the `--omit_secret` flag.

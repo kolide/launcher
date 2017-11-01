@@ -25,13 +25,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool) (*PackagePaths, error) {
+	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -43,7 +43,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, string, error) {
+func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -90,9 +90,11 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	// The secret which the user will use to authenticate to the cloud
 	secretPath := filepath.Join(configurationDirectory, "secret")
 
-	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
+	if !omitSecret {
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
+		if err != nil {
+			return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
+		}
 	}
 
 	// Create the systemd unit file for the launcher service
@@ -214,7 +216,7 @@ systemctl start launcher`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string) (string, error) {
+func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -312,9 +314,11 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	// The secret which the user will use to authenticate to the server
-	err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
-	if err != nil {
-		return "", errors.Wrap(err, "could not write secret string to file for packaging")
+	if !omitSecret {
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
+		if err != nil {
+			return "", errors.Wrap(err, "could not write secret string to file for packaging")
+		}
 	}
 
 	// Finally, now that the final directory structure of the package is
