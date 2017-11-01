@@ -73,6 +73,11 @@ func runMake(args []string) error {
 			env.String("IDENTIFIER", "launcher"),
 			"the name of the directory that the launcher installation will shard into",
 		)
+		flOmitSecret = flagset.Bool(
+			"omit_secret",
+			env.Bool("OMIT_SECRET", false),
+			"omit the enroll secret in the resultant package (default: false)",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -103,7 +108,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
