@@ -450,19 +450,27 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_UPDATE_CHANNEL</key>
             <string>{{.UpdateChannel}}</string>{{end}}
         </dict>
-        <key>RunAtLoad</key>
-        <true/>
         <key>KeepAlive</key>
-        <true/>
+        <dict>
+            <key>PathState</key>
+            <dict>
+                <key>{{.SecretPath}}</key>
+                <true/>
+            </dict>
+        </dict>
         <key>ThrottleInterval</key>
         <integer>60</integer>
         <key>ProgramArguments</key>
         <array>
             <string>{{.LauncherPath}}</string>
-            <string>--debug</string>{{if .InsecureGrpc}}
-            <string>--insecure_grpc</string>{{end}}{{if .Insecure}}
-            <string>--insecure</string>{{end}}{{if .Autoupdate}}
-            <string>--autoupdate</string>{{end}}
+            {{if .InsecureGrpc}}
+            <string>--insecure_grpc</string>
+			{{end}}
+			{{if .Insecure}}
+            <string>--insecure</string>{{end}}
+			{{if .Autoupdate}}
+            <string>--autoupdate</string>
+			{{end}}
         </array>
         <key>StandardErrorPath</key>
         <string>{{.LogDirectory}}/launcher-stderr.log</string>
