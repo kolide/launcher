@@ -54,6 +54,7 @@ func (l *Logger) Fatal(keyvals ...interface{}) error {
 func NewLogger(w io.Writer) *Logger {
 	base := kitlog.NewJSONLogger(kitlog.NewSyncWriter(w))
 	base = kitlog.With(base, "ts", kitlog.DefaultTimestampUTC)
+	base = kitlog.With(base, "component", "launcher")
 	base = level.NewInjector(base, level.InfoValue())
 
 	// The constant in log.Caller is fragile and must be set
@@ -68,4 +69,17 @@ func NewLogger(w io.Writer) *Logger {
 	l.swapLogger.Swap(level.NewFilter(l.baseLogger, level.AllowInfo()))
 
 	return l
+}
+
+// OsqueryLogAdapater creates an io.Writer implementation useful for attaching
+// to the osquery stdout/stderr
+type OsqueryLogAdapter struct {
+	kitlog.Logger
+}
+
+func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
+	if err := l.Logger.Log("msg", string(p)); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
