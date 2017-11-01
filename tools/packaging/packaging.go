@@ -450,8 +450,6 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_UPDATE_CHANNEL</key>
             <string>{{.UpdateChannel}}</string>{{end}}
         </dict>
-        <key>RunAtLoad</key>
-        <true/>
         <key>KeepAlive</key>
         <dict>
             <key>PathState</key>
