@@ -453,7 +453,13 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
         <key>RunAtLoad</key>
         <true/>
         <key>KeepAlive</key>
-        <true/>
+        <dict>
+            <key>PathState</key>
+            <dict>
+                <key>{{.SecretPath}}</key>
+                <true/>
+            </dict>
+        </dict>
         <key>ThrottleInterval</key>
         <integer>60</integer>
         <key>ProgramArguments</key>
