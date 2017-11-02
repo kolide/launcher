@@ -149,6 +149,10 @@ func main() {
 	ext.Start()
 	defer ext.Shutdown()
 
+	osqueryLogger := &kolidelog.OsqueryLogAdapter{
+		level.Debug(log.With(logger, "component", "osquery")),
+	}
+
 	// Start the osqueryd instance
 	runner, err := osquery.LaunchInstance(
 		osquery.WithOsquerydBinary(opts.osquerydPath),
@@ -159,8 +163,8 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
 		osquery.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
-		osquery.WithStdout(os.Stdout),
-		osquery.WithStderr(os.Stderr),
+		osquery.WithStdout(osqueryLogger),
+		osquery.WithStderr(osqueryLogger),
 		osquery.WithLogger(logger),
 	)
 	if err != nil {
