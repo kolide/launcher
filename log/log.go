@@ -82,11 +82,7 @@ type OsqueryLogAdapter struct {
 var callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
 
 func extractOsqueryCaller(msg string) string {
-	if match := callerRegexp.FindString(msg); len(match) > 0 {
-		return strings.TrimSuffix(string(match), "]")
-	} else {
-		return ""
-	}
+	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
 }
 
 func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
