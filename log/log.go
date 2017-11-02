@@ -3,6 +3,8 @@ package log
 import (
 	"io"
 	"os"
+	"regexp"
+	"strings"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -77,8 +79,20 @@ type OsqueryLogAdapter struct {
 	kitlog.Logger
 }
 
+var callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
+
+func extractOsqueryCaller(msg string) string {
+	if match := callerRegexp.FindString(msg); len(match) > 0 {
+		return strings.TrimSuffix(string(match), "]")
+	} else {
+		return ""
+	}
+}
+
 func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
-	if err := l.Logger.Log("msg", string(p)); err != nil {
+	msg := strings.TrimSpace(string(p))
+	caller := extractOsqueryCaller(msg)
+	if err := l.Logger.Log("msg", msg, "caller", caller); err != nil {
 		return 0, err
 	}
 	return len(p), nil

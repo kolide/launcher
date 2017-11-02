@@ -149,7 +149,9 @@ func main() {
 	ext.Start()
 	defer ext.Shutdown()
 
-	osqueryLogger := &kolidelog.OsqueryLogAdapter{level.Debug(log.With(logger, "component", "osquery"))}
+	osqueryLogger := &kolidelog.OsqueryLogAdapter{
+		level.Debug(log.With(logger, "component", "osquery")),
+	}
 
 	// Start the osqueryd instance
 	runner, err := osquery.LaunchInstance(
