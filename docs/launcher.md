@@ -12,7 +12,7 @@ make launcher
 ./build/launcher --help
 ```
 
-Note that this style of build is generally only for development instances of Launcher. You should have `osqueryd` already installed on your system, as `launcher` will fall-back to looking for it in your `$PATH` in this case. For additional, more distributable, build options and commands, see the [Additional Build Options](#Additional Build Options) section.
+Note that this style of build is generally only for development instances of Launcher. You should have `osqueryd` already installed on your system, as `launcher` will fall-back to looking for it in your `$PATH` in this case. For additional, more distributable, build options and commands, see the [Additional Build Options](#additional-build-options) section.
 
 For more distributable packages of Launcher and Osquery, consider using the [`package-builder`](./package-builder.md) tool that is provided with this repository.
 
