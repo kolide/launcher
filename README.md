@@ -10,6 +10,10 @@ The Osquery Launcher is a lightweight launcher/manager which offers a few extra 
 
 [![osquery is lightweight](./tools/images/lightweight.png)](https://kolide.com/osquery)
 
+### Documentation
+
+The documentation for this project is included on GitHub in the [`docs`](./docs/README.md) subdirectory of the repository.
+
 ## Features
 
 ### Secure Osquery Autoupdater
@@ -48,12 +52,12 @@ The osqueryd binary was designed to be very configurable, which allows it to be 
 
 Consider the following side-by-side example of The Launcher's command-line help versus osqueryd's command-line help. The Launcher exposes the bare essentials as top-level configuration options. This makes getting started with Osquery easier than ever.
 
-[![launcher is simple](./tools/images/help-side-by-side.png)](./cmd/launcher/README.md)
+[![launcher is simple](./tools/images/help-side-by-side.png)](./docs/launcher.md)
 
-To learn about The Launcher's command-line interface, see the Launcher [documentation](./cmd/launcher/README.md).
+To learn about The Launcher's command-line interface, see the Launcher [documentation](./docs/launcher.md).
 
 ### Easy Packaging and Deployment Tooling
 
 Deploying osquery and configuring it to communicate with a management server can be complicated, especially if you have to make customized deployment packages. The Launcher includes a tool called `package-builder` which you can use to create Launcher packages for your organization.
 
-Take the headache out of deploying osquery and check out the [documentation](./cmd/package-builder/README.md).
+To learn more about using `package-builder` to package and deploy osquery, check out the [documentation](./docs/package-builder.md).
