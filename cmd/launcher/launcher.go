@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"io/ioutil"
@@ -127,7 +128,7 @@ func main() {
 		if err != nil {
 			logger.Fatal("err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", opts.enrollSecretPath)
 		}
-		enrollSecret = string(content)
+		enrollSecret = string(bytes.TrimSpace(content))
 	}
 
 	extOpts := osquery.ExtensionOpts{
