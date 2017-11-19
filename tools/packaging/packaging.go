@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -190,7 +191,10 @@ systemctl start launcher`
 		"-C", containerPackageRoot,
 		".",
 	)
+	stderr := new(bytes.Buffer)
+	debCmd.Stderr = stderr
 	if err := debCmd.Run(); err != nil {
+		io.Copy(os.Stderr, stderr)
 		return "", "", errors.Wrap(err, "could not create deb package")
 	}
 
@@ -209,7 +213,10 @@ systemctl start launcher`
 		"-C", containerPackageRoot,
 		".",
 	)
+	stderr = new(bytes.Buffer)
+	rpmCmd.Stderr = stderr
 	if err := rpmCmd.Run(); err != nil {
+		io.Copy(os.Stderr, stderr)
 		return "", "", errors.Wrap(err, "could not create rpm package")
 	}
 
@@ -529,7 +536,13 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 
 	args = append(args, outputPath)
 	cmd := exec.Command("pkgbuild", args...)
-	return cmd.Run()
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		io.Copy(os.Stderr, stderr)
+		return err
+	}
+	return nil
 }
 
 // grpcServerForHostname returns the gRPC server hostname given a web address
