@@ -5,16 +5,16 @@ import (
 	"sync"
 )
 
-// FakeHost is the interface which defines the pluggable behavior of a simulated
+// QueryRunner is the interface which defines the pluggable behavior of a simulated
 // host. Each "type" of host may have their own implementation of this interface.
-type FakeHost interface {
+type QueryRunner interface {
 	RunQuery(sql string) (results []map[string]string, err error)
 }
 
 // HostSimulation is the type which contains the state of a simulated host
 type HostSimulation struct {
 	// the following define the configurable aspects of the simulation
-	host         FakeHost
+	host         QueryRunner
 	insecure     bool
 	insecureGrpc bool
 
@@ -46,7 +46,7 @@ type SimulationOption func(*HostSimulation)
 
 // WithHost is a functional option which allows the user to declare the behavior
 // of the simulated host
-func WithHost(host FakeHost) SimulationOption {
+func WithHost(host QueryRunner) SimulationOption {
 	return func(i *HostSimulation) {
 		i.host = host
 	}

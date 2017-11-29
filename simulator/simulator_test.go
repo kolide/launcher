@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockFakeHost struct{}
+type mockQueryRunner struct{}
 
-func (h *mockFakeHost) RunQuery(sql string) (results []map[string]string, err error) {
+func (h *mockQueryRunner) RunQuery(sql string) (results []map[string]string, err error) {
 	return []map[string]string{}, nil
 }
 
