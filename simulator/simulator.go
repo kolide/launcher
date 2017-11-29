@@ -14,9 +14,12 @@ type QueryRunner interface {
 // HostSimulation is the type which contains the state of a simulated host
 type HostSimulation struct {
 	// the following define the configurable aspects of the simulation
-	host         QueryRunner
-	insecure     bool
-	insecureGrpc bool
+	host                   QueryRunner
+	insecure               bool
+	insecureGrpc           bool
+	requestQueriesInterval int
+	requestConfigInterval  int
+	publishResultsInterval int
 
 	// The state of the simulation is gated with a read/write lock.
 	// To read something in state:
@@ -44,11 +47,37 @@ type hostSimulationState struct {
 // https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
 type SimulationOption func(*HostSimulation)
 
-// WithHost is a functional option which allows the user to declare the behavior
-// of the simulated host
-func WithHost(host QueryRunner) SimulationOption {
+// WithQueryRunner is a functional option which allows the user to declare the
+// behavior of the simulated host
+func WithQueryRunner(host QueryRunner) SimulationOption {
 	return func(i *HostSimulation) {
 		i.host = host
+	}
+}
+
+// WithRequestQueriesInterval is a functional option which allows the user to
+// specify how often the simulation host should check-in to the server and ask
+// for queries to run
+func WithRequestQueriesInterval(interval int) SimulationOption {
+	return func(i *HostSimulation) {
+		i.requestQueriesInterval = interval
+	}
+}
+
+// WithRequestConfigInterval is a functional option which allows the user to
+// specify how often the simulation host should check-in to the server and ask
+// for a new config
+func WithRequestConfigInterval(interval int) SimulationOption {
+	return func(i *HostSimulation) {
+		i.requestConfigInterval = interval
+	}
+}
+
+// WithPublishResultsInterval is a functional option which allows the user to
+// specify how often the simulation host should log status and results logs
+func WithPublishResultsInterval(interval int) SimulationOption {
+	return func(i *HostSimulation) {
+		i.publishResultsInterval = interval
 	}
 }
 
@@ -116,9 +145,11 @@ func (h *HostSimulation) Healthy() bool {
 func (h *HostSimulation) run() error {
 	// we're going to be writing the state of the instance, so we first must
 	// acquire a write lock on the state
-	h.state.lock.Lock()
-	defer h.state.lock.Unlock()
+	{
+		h.state.lock.Lock()
+		defer h.state.lock.Unlock()
+		h.state.started = true
+	}
 
-	h.state.started = true
 	return errors.New("unimplemented")
 }
