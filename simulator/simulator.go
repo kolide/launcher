@@ -1,6 +1,9 @@
 package simulator
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
 
 // FakeHost is the interface which defines the pluggable behavior of a simulated
 // host. Each "type" of host may have their own implementation of this interface.
@@ -15,7 +18,12 @@ type HostSimulation struct {
 	insecure     bool
 	insecureGrpc bool
 
-	// the following define the operating state of the simulation
+	state *hostSimulationState
+}
+
+// hostSimulationState is a light container around simulation state management
+type hostSimulationState struct {
+	lock    sync.RWMutex
 	failed  bool
 	started bool
 }
@@ -53,7 +61,9 @@ func WithInsecureGrpc() SimulationOption {
 // createSimulationRuntime is an internal helper which creates an instance of
 // *HostSimulation given a set of supplied functional options
 func createSimulationRuntime(opts ...SimulationOption) *HostSimulation {
-	h := &HostSimulation{}
+	h := &HostSimulation{
+		state: &hostSimulationState{},
+	}
 	for _, opt := range opts {
 		opt(h)
 	}
@@ -67,7 +77,9 @@ func LaunchSimulation(opts ...SimulationOption) *HostSimulation {
 	h := createSimulationRuntime(opts...)
 	go func() {
 		if err := h.run(); err != nil {
-			h.failed = true
+			h.state.lock.Lock()
+			defer h.state.lock.Unlock()
+			h.state.failed = true
 		}
 	}()
 	return h
@@ -76,14 +88,18 @@ func LaunchSimulation(opts ...SimulationOption) *HostSimulation {
 // Healthy is a helper which performs an introspection on the simulation
 // instance to determine whether or not it is healthy
 func (h *HostSimulation) Healthy() bool {
-	if h.started {
-		return !h.failed
+	h.state.lock.RLock()
+	defer h.state.lock.RUnlock()
+	if h.state.started {
+		return !h.state.failed
 	}
 	return true
 }
 
 // run launches the simulation synchronously
 func (h *HostSimulation) run() error {
-	h.started = true
+	h.state.lock.Lock()
+	defer h.state.lock.Unlock()
+	h.state.started = true
 	return errors.New("unimplemented")
 }

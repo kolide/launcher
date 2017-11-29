@@ -24,7 +24,7 @@ func TestFunctionalOptions(t *testing.T) {
 
 	// we haven't started the simulation yet, so the instance should think it's
 	// healthy still
-	require.False(t, simulation.started)
+	require.False(t, simulation.state.started)
 	require.True(t, simulation.Healthy())
 }
 
