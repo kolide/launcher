@@ -1,0 +1,9 @@
+name:
+  foo
+queries:
+  - pattern: "select hour, minutes from time"
+    results:
+      - {"hour":"19","minutes":"34"}
+  - pattern: "select platform from osquery_info"
+    results:
+      - {"platform": "darwin"}

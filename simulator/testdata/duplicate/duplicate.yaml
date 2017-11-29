@@ -1,0 +1,5 @@
+name:
+  foobar
+queries:
+  - pattern: ".*time.*"
+    results:

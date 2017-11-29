@@ -54,6 +54,12 @@
   revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
 
 [[projects]]
+  name = "github.com/ghodss/yaml"
+  packages = ["."]
+  revision = "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/go-kit/kit"
   packages = ["endpoint","log","log/level","transport/grpc"]
   revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
@@ -191,9 +197,15 @@
   revision = "f7bf885db0b7479a537ec317c6e48ce53145f3db"
   version = "v1.7.0"
 
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "287cf08546ab5e7e37d55a84f7ed3fd1db036de5"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1c1aaef7211b2a2a41be582cbe36547df6ef364b5f2e13aeaeb54bd1ff9c8ed8"
+  inputs-digest = "ac70924b5d0ae7a7fa29944cb7e9ce29a259639cf625ee387080aa332b2c0016"
   solver-name = "gps-cdcl"
   solver-version = 1

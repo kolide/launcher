@@ -1,0 +1,8 @@
+name:
+  bar
+parent:
+  foo
+queries:
+  - pattern: "select version from osquery_info"
+    results:
+      - {"version":"2.10.2"}

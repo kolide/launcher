@@ -1,0 +1,8 @@
+name:
+  bar
+parent:
+  foo
+queries:
+  - pattern: "select version ("
+    results:
+      - {"version":"2.10.2"}
