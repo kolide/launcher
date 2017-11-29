@@ -18,6 +18,16 @@ type HostSimulation struct {
 	insecure     bool
 	insecureGrpc bool
 
+	// The state of the simulation is gated with a read/write lock.
+	// To read something in state:
+	//
+	//   h.state.lock.RLock()
+	//   defer h.state.lock.RUnlock()
+	//
+	// To write state based on the on-going simulation:
+	//
+	//   h.state.lock.Lock()
+	//   defer h.state.lock.Unlock()
 	state *hostSimulationState
 }
 
@@ -77,8 +87,11 @@ func LaunchSimulation(opts ...SimulationOption) *HostSimulation {
 	h := createSimulationRuntime(opts...)
 	go func() {
 		if err := h.run(); err != nil {
+			// running the instance failed. we must annotate the state of the instance
+			// with the failure, but first we must acquire a write lock on the state.
 			h.state.lock.Lock()
 			defer h.state.lock.Unlock()
+
 			h.state.failed = true
 		}
 	}()
@@ -88,8 +101,11 @@ func LaunchSimulation(opts ...SimulationOption) *HostSimulation {
 // Healthy is a helper which performs an introspection on the simulation
 // instance to determine whether or not it is healthy
 func (h *HostSimulation) Healthy() bool {
+	// we're going to be reading the state of the instance, so we first must
+	// acquire a read lock on the state
 	h.state.lock.RLock()
 	defer h.state.lock.RUnlock()
+
 	if h.state.started {
 		return !h.state.failed
 	}
@@ -98,8 +114,11 @@ func (h *HostSimulation) Healthy() bool {
 
 // run launches the simulation synchronously
 func (h *HostSimulation) run() error {
+	// we're going to be writing the state of the instance, so we first must
+	// acquire a write lock on the state
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
+
 	h.state.started = true
 	return errors.New("unimplemented")
 }
