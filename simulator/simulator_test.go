@@ -28,12 +28,14 @@ func TestFunctionalOptions(t *testing.T) {
 	require.True(t, simulation.Healthy())
 }
 
-func TestLaunchFailsWithNoConfiguration(t *testing.T) {
-	simulation := LaunchSimulation()
+func TestShutdownSimulation(t *testing.T) {
+	simulation := LaunchSimulation(
+		WithQueryRunner(&mockQueryRunner{}),
+	)
 
-	// Sleep briefly so that the async startup can fail
+	// Sleep briefly so that everything can start up
 	time.Sleep(100 * time.Millisecond)
 
-	// The instance should no be healthy
-	require.False(t, simulation.Healthy())
+	require.True(t, simulation.Healthy())
+	require.NoError(t, simulation.Shutdown())
 }

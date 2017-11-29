@@ -2,7 +2,9 @@ package simulator
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 )
 
 // QueryRunner is the interface which defines the pluggable behavior of a simulated
@@ -17,9 +19,9 @@ type HostSimulation struct {
 	host                   QueryRunner
 	insecure               bool
 	insecureGrpc           bool
-	requestQueriesInterval int
-	requestConfigInterval  int
-	publishResultsInterval int
+	requestQueriesInterval time.Duration
+	requestConfigInterval  time.Duration
+	publishResultsInterval time.Duration
 
 	// The state of the simulation is gated with a read/write lock.
 	// To read something in state:
@@ -32,6 +34,9 @@ type HostSimulation struct {
 	//   h.state.lock.Lock()
 	//   defer h.state.lock.Unlock()
 	state *hostSimulationState
+
+	shutdown chan bool
+	done     chan bool
 }
 
 // hostSimulationState is a light container around simulation state management
@@ -58,7 +63,7 @@ func WithQueryRunner(host QueryRunner) SimulationOption {
 // WithRequestQueriesInterval is a functional option which allows the user to
 // specify how often the simulation host should check-in to the server and ask
 // for queries to run
-func WithRequestQueriesInterval(interval int) SimulationOption {
+func WithRequestQueriesInterval(interval time.Duration) SimulationOption {
 	return func(i *HostSimulation) {
 		i.requestQueriesInterval = interval
 	}
@@ -67,7 +72,7 @@ func WithRequestQueriesInterval(interval int) SimulationOption {
 // WithRequestConfigInterval is a functional option which allows the user to
 // specify how often the simulation host should check-in to the server and ask
 // for a new config
-func WithRequestConfigInterval(interval int) SimulationOption {
+func WithRequestConfigInterval(interval time.Duration) SimulationOption {
 	return func(i *HostSimulation) {
 		i.requestConfigInterval = interval
 	}
@@ -75,7 +80,7 @@ func WithRequestConfigInterval(interval int) SimulationOption {
 
 // WithPublishResultsInterval is a functional option which allows the user to
 // specify how often the simulation host should log status and results logs
-func WithPublishResultsInterval(interval int) SimulationOption {
+func WithPublishResultsInterval(interval time.Duration) SimulationOption {
 	return func(i *HostSimulation) {
 		i.publishResultsInterval = interval
 	}
@@ -101,7 +106,12 @@ func WithInsecureGrpc() SimulationOption {
 // *HostSimulation given a set of supplied functional options
 func createSimulationRuntime(opts ...SimulationOption) *HostSimulation {
 	h := &HostSimulation{
-		state: &hostSimulationState{},
+		requestQueriesInterval: 2 * time.Second,
+		requestConfigInterval:  5 * time.Second,
+		publishResultsInterval: 10 * time.Second,
+		shutdown:               make(chan bool),
+		done:                   make(chan bool),
+		state:                  &hostSimulationState{},
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -115,14 +125,28 @@ func createSimulationRuntime(opts ...SimulationOption) *HostSimulation {
 func LaunchSimulation(opts ...SimulationOption) *HostSimulation {
 	h := createSimulationRuntime(opts...)
 	go func() {
-		if err := h.run(); err != nil {
-			// running the instance failed. we must annotate the state of the instance
-			// with the failure, but first we must acquire a write lock on the state.
-			h.state.lock.Lock()
-			defer h.state.lock.Unlock()
+		h.state.lock.Lock()
+		h.state.started = true
+		h.state.lock.Unlock()
 
-			h.state.failed = true
+		requestQueriesTicker := time.NewTicker(h.requestQueriesInterval)
+		requestConfigTicker := time.NewTicker(h.requestConfigInterval)
+		publishResultsTicker := time.NewTicker(h.publishResultsInterval)
+
+		for {
+			select {
+			case <-requestQueriesTicker.C:
+				fmt.Println("requestQueries")
+			case <-requestConfigTicker.C:
+				fmt.Println("requestConfig")
+			case <-publishResultsTicker.C:
+				fmt.Println("publishResults")
+			case <-h.shutdown:
+				h.done <- true
+				return
+			}
 		}
+
 	}()
 	return h
 }
@@ -141,15 +165,15 @@ func (h *HostSimulation) Healthy() bool {
 	return true
 }
 
-// run launches the simulation synchronously
-func (h *HostSimulation) run() error {
-	// we're going to be writing the state of the instance, so we first must
-	// acquire a write lock on the state
-	{
-		h.state.lock.Lock()
-		defer h.state.lock.Unlock()
-		h.state.started = true
+func (h *HostSimulation) Shutdown() error {
+	h.shutdown <- true
+
+	timer := time.NewTimer(time.Second)
+	select {
+	case <-h.done:
+		return nil
+	case <-timer.C:
 	}
 
-	return errors.New("unimplemented")
+	return errors.New("simulation did not shut down in time")
 }
