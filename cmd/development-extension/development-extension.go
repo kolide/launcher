@@ -12,7 +12,7 @@ import (
 
 func main() {
 	flSocket := flag.String("socket", "", "")
-	flag.Int("timeout", 0, "")
+	flTimeout := flag.Int("timeout", 3, "")
 	flag.Int("interval", 0, "")
 	flag.Bool("verbose", false, "")
 	flag.Parse()
@@ -28,7 +28,8 @@ func main() {
 		logger.Fatal("err", err, "msg", "creating osquery extension server")
 	}
 
-	client, err := osquery.NewClient(*flSocket, 3*time.Second)
+	timeout := time.Duration(*flTimeout) * time.Second
+	client, err := osquery.NewClient(*flSocket, timeout)
 	if err != nil {
 		logger.Fatal("err", err, "creating osquery extension client")
 	}
