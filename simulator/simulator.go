@@ -52,6 +52,7 @@ type HostSimulation struct {
 	done     chan bool
 }
 
+// Enroll is the implementation of the host simulation's enrollment functionality
 func (h *HostSimulation) Enroll() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
@@ -68,6 +69,8 @@ func (h *HostSimulation) Enroll() error {
 	return nil
 }
 
+// RequestConfig is the implementation of the host simulation's config retrieval
+// functionality
 func (h *HostSimulation) RequestConfig() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
@@ -85,6 +88,8 @@ func (h *HostSimulation) RequestConfig() error {
 	return nil
 }
 
+// PublishLogs is the implementation of the host simulation's log publishing
+// functionality
 func (h *HostSimulation) PublishLogs() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
@@ -100,6 +105,8 @@ func (h *HostSimulation) PublishLogs() error {
 	return nil
 }
 
+// RequestQueries is the implementation of the host simulation's request new
+// queries functionality
 func (h *HostSimulation) RequestQueries() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
@@ -307,6 +314,7 @@ func (h *HostSimulation) Healthy() bool {
 	return true
 }
 
+// Shutdown will attempt to gracefully shutdown the simulation
 func (h *HostSimulation) Shutdown() error {
 	h.shutdown <- true
 
