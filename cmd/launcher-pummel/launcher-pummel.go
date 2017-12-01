@@ -40,6 +40,11 @@ func main() {
 			env.String("ENROLL_SECRET", ""),
 			"Enroll secret for host enrollment (required)",
 		)
+		flHosts = flag.String(
+			"hosts",
+			env.String("HOSTS", ""),
+			"Comma-seperated list of host type and quantity i.e.: linux:1000,macos:200",
+		)
 	)
 	flag.Parse()
 
@@ -65,25 +70,26 @@ func main() {
 		"msg", "starting load testing tool",
 	)
 
+	hostList := strings.Split(*flHosts, ",")
 	if len(flag.Args()) == 0 {
 		logutil.Fatal(logger, "msg", "no hosts specified")
 	}
 
-	for _, arg := range flag.Args() {
-		s := strings.Split(arg, ":")
-		if len(s) != 2 {
+	for _, hostSimulation := range hostList {
+		simulationParts := strings.Split(hostSimulation, ":")
+		if len(simulationParts) != 2 {
 			logutil.Fatal(logger,
 				"msg", "arguments should be of the form host_type:count",
-				"arg", arg,
+				"arg", hostSimulation,
 			)
 		}
-		hostType, countStr := s[0], s[1]
+		hostType, countStr := simulationParts[0], simulationParts[1]
 
 		count, err := strconv.Atoi(countStr)
 		if err != nil {
 			logutil.Fatal(logger,
 				"msg", "unable to parse count",
-				"arg", arg,
+				"arg", hostSimulation,
 			)
 		}
 
