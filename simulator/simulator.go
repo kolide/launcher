@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -57,16 +58,27 @@ func (h *HostSimulation) Enroll() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
 
-	nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid)
-	if err != nil {
-		return errors.Wrap(err, "transport error in enrollment")
-	}
-	if invalid {
-		return fmt.Errorf("enrollment invalid for host with uuid: %s", h.uuid)
+	enrollmentAttempts := 5
+
+	var err error
+	for currentAttempt := 1; currentAttempt <= enrollmentAttempts; currentAttempt++ {
+		if currentAttempt != 1 {
+			time.Sleep(time.Duration(math.Pow(2, float64(currentAttempt))) * time.Second)
+		}
+		nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid)
+		if err != nil {
+			err = errors.Wrap(err, "transport error in enrollment")
+			continue
+		}
+		if invalid {
+			err = fmt.Errorf("enrollment invalid for host with uuid: %s", h.uuid)
+			continue
+		}
+		h.state.nodeKey = nodeKey
+		return nil
 	}
 
-	h.state.nodeKey = nodeKey
-	return nil
+	return err
 }
 
 // RequestConfig is the implementation of the host simulation's config retrieval
@@ -294,6 +306,7 @@ func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts
 				return
 			}
 			if err != nil {
+				fmt.Println(err)
 				h.state.lock.Lock()
 				h.state.failed = true
 				h.state.lock.Unlock()
