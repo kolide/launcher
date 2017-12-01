@@ -149,7 +149,7 @@ func main() {
 				host,
 				*flServerURL,
 				fmt.Sprintf("%s_%d", hostType, i),
-				*flEnrollSecret,
+				enrollSecret,
 				opts...,
 			)
 			time.Sleep(10 * time.Millisecond)
