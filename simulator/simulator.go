@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -62,7 +63,7 @@ func (h *HostSimulation) Enroll() error {
 		return errors.Wrap(err, "transport error in enrollment")
 	}
 	if invalid {
-		return errors.New("enrollment invalid")
+		return fmt.Errorf("enrollment invalid for host with uuid: %s", h.uuid)
 	}
 
 	h.state.nodeKey = nodeKey
