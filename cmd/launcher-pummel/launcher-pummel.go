@@ -90,7 +90,7 @@ func main() {
 	)
 
 	hostList := strings.Split(*flHosts, ",")
-	if len(flag.Args()) == 0 {
+	if len(hostList) == 0 {
 		logutil.Fatal(logger, "msg", "no hosts specified")
 	}
 
