@@ -24,6 +24,7 @@
 
 [[constraint]]
   name = "github.com/kolide/osquery-go"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/kolide/updater"

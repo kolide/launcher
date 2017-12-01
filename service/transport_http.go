@@ -32,6 +32,14 @@ func decodeHTTPLogCollectionRequest(ctx context.Context, r *http.Request) (inter
 	return req, nil
 }
 
+func decodeHTTPResultCollectionRequest(ctx context.Context, r *http.Request) (interface{}, error) {
+	var req resultCollection
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return nil, errors.Wrap(err, "decode result collection request")
+	}
+	return req, nil
+}
+
 func decodeHTTPEnrollmentResponse(_ context.Context, r *http.Response) (interface{}, error) {
 	if r.StatusCode != http.StatusOK {
 		return nil, errorDecoder(r)

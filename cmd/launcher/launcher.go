@@ -112,13 +112,25 @@ func main() {
 	}
 	defer db.Close()
 
-	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
+	var client service.KolideService
+	{
+		// configure the client with gRPC or HTTP Transport.
+		userGRPC := !opts.transportHTTP
+		if userGRPC {
+			conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
+			if err != nil {
+				logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
+			}
+			defer conn.Close()
+			client = service.New(conn, level.Debug(logger))
+		} else {
+			httpClient, err := service.NewHTTPClient(opts.kolideServerURL, level.Debug(logger))
+			if err != nil {
+				logger.Fatal("err", errors.Wrap(err, "create HTTP Client"))
+			}
+			client = httpClient
+		}
 	}
-	defer conn.Close()
-
-	client := service.New(conn, level.Debug(logger))
 
 	var enrollSecret string
 	if opts.enrollSecret != "" {
