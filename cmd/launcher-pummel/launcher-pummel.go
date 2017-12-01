@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -16,6 +18,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/simulator"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -38,7 +41,12 @@ func main() {
 		flEnrollSecret = flag.String(
 			"enroll_secret",
 			env.String("ENROLL_SECRET", ""),
-			"Enroll secret for host enrollment (required)",
+			"The enroll secret that is used in your environment",
+		)
+		flEnrollSecretPath = flag.String(
+			"enroll_secret_path",
+			env.String("ENROLL_SECRET_PATH", ""),
+			"Optionally, the path to your enrollment secret",
 		)
 		flHosts = flag.String(
 			"hosts",
@@ -62,7 +70,18 @@ func main() {
 		)
 	}
 
-	if len(*flEnrollSecret) == 0 {
+	var enrollSecret string
+	if *flEnrollSecret != "" {
+		enrollSecret = *flEnrollSecret
+	} else if *flEnrollSecretPath != "" {
+		content, err := ioutil.ReadFile(*flEnrollSecretPath)
+		if err != nil {
+			logutil.Fatal(logger, "err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", *flEnrollSecretPath)
+		}
+		enrollSecret = string(bytes.TrimSpace(content))
+	}
+
+	if len(enrollSecret) == 0 {
 		logutil.Fatal(logger, "msg", "--enroll_secret cannot be empty")
 	}
 
