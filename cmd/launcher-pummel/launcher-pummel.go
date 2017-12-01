@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -114,8 +115,9 @@ func main() {
 		"msg", "all hosts started",
 	)
 
-	sleep := make(chan struct{})
-	<-sleep
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
 }
 
 func newLogger(w io.Writer) log.Logger {
