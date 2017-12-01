@@ -192,8 +192,9 @@ func WithPublishLogsInterval(interval time.Duration) SimulationOption {
 	}
 }
 
-// WithInsecure is a functional option which allows the user to declare that the
-// remote API should be connected to over an insecure channel
+// WithInsecure is a functional option which allows the user to declare that
+// when connecting to the remote API, the client should skip TLS certificate
+// verification but still use TLS
 func WithInsecure() SimulationOption {
 	return func(i *HostSimulation) {
 		i.insecure = true
@@ -201,7 +202,8 @@ func WithInsecure() SimulationOption {
 }
 
 // WithInsecureGrpc is a functional option which allows the user to declare that
-// the remote API should be connected to over an insecure gRPC channel
+// WithInsecure is a functional option which allows the user to declare that
+// when connecting to the remote API, the client should turn off TLS entirely
 func WithInsecureGrpc() SimulationOption {
 	return func(i *HostSimulation) {
 		i.insecureGrpc = true
