@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
+	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/simulator"
 )
@@ -49,16 +50,14 @@ func main() {
 
 	hosts, err := simulator.LoadHosts(*flHostPath, logger)
 	if err != nil {
-		level.Info(logger).Log(
+		logutil.Fatal(logger,
 			"msg", "error loading host definitions",
 			"err", err,
 		)
-		os.Exit(1)
 	}
 
 	if len(*flEnrollSecret) == 0 {
-		level.Info(logger).Log("msg", "--enroll_secret cannot be empty")
-		os.Exit(1)
+		logutil.Fatal(logger, "msg", "--enroll_secret cannot be empty")
 	}
 
 	level.Info(logger).Log(
@@ -66,37 +65,33 @@ func main() {
 	)
 
 	if len(flag.Args()) == 0 {
-		level.Info(logger).Log("msg", "no hosts specified")
-		os.Exit(1)
+		logutil.Fatal(logger, "msg", "no hosts specified")
 	}
 
 	for _, arg := range flag.Args() {
 		s := strings.Split(arg, ":")
 		if len(s) != 2 {
-			level.Info(logger).Log(
+			logutil.Fatal(logger,
 				"msg", "arguments should be of the form host_type:count",
 				"arg", arg,
 			)
-			os.Exit(1)
 		}
 		hostType, countStr := s[0], s[1]
 
 		count, err := strconv.Atoi(countStr)
 		if err != nil {
-			level.Info(logger).Log(
+			logutil.Fatal(logger,
 				"msg", "unable to parse count",
 				"arg", arg,
 			)
-			os.Exit(1)
 		}
 
 		host, ok := hosts[hostType]
 		if !ok {
-			level.Info(logger).Log(
+			logutil.Fatal(logger,
 				"msg", "unrecognized host type",
 				"type", hostType,
 			)
-			os.Exit(1)
 		}
 
 		level.Info(logger).Log(
