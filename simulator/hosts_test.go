@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +43,7 @@ func TestLoadHostsErrors(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.matchErr, func(t *testing.T) {
-			hosts, err := LoadHosts(tt.dir)
+			hosts, err := LoadHosts(tt.dir, log.NewNopLogger())
 			assert.Nil(t, hosts)
 			if assert.NotNil(t, err) {
 				assert.Contains(t, err.Error(), tt.matchErr)
@@ -52,7 +53,7 @@ func TestLoadHostsErrors(t *testing.T) {
 }
 
 func TestLoadHosts(t *testing.T) {
-	hosts, err := LoadHosts("testdata/valid1")
+	hosts, err := LoadHosts("testdata/valid1", log.NewNopLogger())
 	require.Nil(t, err)
 
 	foo, bar := hosts["foo"], hosts["bar"]
@@ -93,19 +94,25 @@ func TestRunQuery(t *testing.T) {
 		Queries: []matcher{
 			{*regexp.MustCompile(".*time.*"), []map[string]string{{"foo": "bar"}}},
 		},
+		unmatchedQueries: make(map[string]bool),
+		logger:           log.NewNopLogger(),
 	}
 	h2 := Host{
 		Queries: []matcher{
 			{*regexp.MustCompile("select \\* from osquery_info"), []map[string]string{{"osquery": "info"}}},
 		},
-		parent: &h1,
+		parent:           &h1,
+		unmatchedQueries: make(map[string]bool),
+		logger:           log.NewNopLogger(),
 	}
 	h3 := Host{
 		Queries: []matcher{
 			{*regexp.MustCompile("select hour from time"), []map[string]string{{"hour": "12"}}},
 			{*regexp.MustCompile("select .* from time"), []map[string]string{{"minute": "36"}}},
 		},
-		parent: &h1,
+		parent:           &h1,
+		unmatchedQueries: make(map[string]bool),
+		logger:           log.NewNopLogger(),
 	}
 
 	testCases := []struct {

@@ -2,7 +2,6 @@ package simulator
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +14,7 @@ func (h *mockQueryRunner) RunQuery(sql string) (results []map[string]string, err
 
 func TestFunctionalOptions(t *testing.T) {
 	simulation := createSimulationRuntime(
+		nil, "", "",
 		WithInsecure(),
 	)
 
@@ -26,16 +26,4 @@ func TestFunctionalOptions(t *testing.T) {
 	// healthy still
 	require.False(t, simulation.state.started)
 	require.True(t, simulation.Healthy())
-}
-
-func TestShutdownSimulation(t *testing.T) {
-	simulation := LaunchSimulation(
-		WithQueryRunner(&mockQueryRunner{}),
-	)
-
-	// Sleep briefly so that everything can start up
-	time.Sleep(100 * time.Millisecond)
-
-	require.True(t, simulation.Healthy())
-	require.NoError(t, simulation.Shutdown())
 }

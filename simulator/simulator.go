@@ -3,7 +3,6 @@ package simulator
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -197,14 +196,6 @@ func WithInsecureGrpc() SimulationOption {
 	}
 }
 
-// WithUUID is a functional option that sets the UUID the fake host provides to
-// the server.
-func WithUUID() SimulationOption {
-	return func(i *HostSimulation) {
-		i.insecureGrpc = true
-	}
-}
-
 // createSimulationRuntime is an internal helper which creates an instance of
 // *HostSimulation given a set of supplied functional options
 func createSimulationRuntime(host QueryRunner, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
@@ -230,12 +221,10 @@ func createSimulationRuntime(host QueryRunner, uuid, enrollSecret string, opts .
 // asynchronous instance of a host simulation given a set of functional options
 func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
 	h := createSimulationRuntime(host, uuid, enrollSecret, opts...)
-	fmt.Println(h)
 	go func() {
 		h.state.lock.Lock()
 		h.state.started = true
 
-		fmt.Println("in goroutine")
 		grpcOpts := []grpc.DialOption{
 			grpc.WithTimeout(time.Second),
 		}
@@ -257,20 +246,17 @@ func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts
 		}
 		conn, err := grpc.Dial(grpcURL, grpcOpts...)
 		if err != nil {
-			fmt.Println(err)
 			h.state.failed = true
 			h.state.lock.Unlock()
 			return
 		}
 		defer conn.Close()
-		fmt.Println("created conn")
 
 		h.state.serviceClient = service.New(conn, log.NewNopLogger())
 
 		h.state.lock.Unlock()
 
 		err = h.Enroll()
-		fmt.Println("enroll", err)
 		if err != nil {
 			h.state.lock.Lock()
 			h.state.failed = true

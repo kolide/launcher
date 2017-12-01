@@ -5,9 +5,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/ghodss/yaml"
-
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +24,11 @@ type Host struct {
 	//QueryResults maps from regexp pattern to query results that should be
 	//returned.
 	Queries []matcher `json:"queries"`
+
+	// The following members facilitate logging unmatched queries.
+	logger           log.Logger
+	unmatchedMutex   sync.Mutex
+	unmatchedQueries map[string]bool
 }
 
 type matcher struct {
@@ -40,7 +47,7 @@ type hostYAML struct {
 	} `json:"queries"`
 }
 
-func LoadHosts(dir string) (map[string]*Host, error) {
+func LoadHosts(dir string, logger log.Logger) (map[string]*Host, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrap(err, "listing hosts directory")
@@ -64,13 +71,15 @@ func LoadHosts(dir string) (map[string]*Host, error) {
 			}
 
 			host := Host{
-				Name:       h.Name,
-				ParentName: h.ParentName,
-				Queries:    []matcher{},
+				Name:             h.Name,
+				ParentName:       h.ParentName,
+				Queries:          []matcher{},
+				unmatchedQueries: make(map[string]bool),
+				logger:           logger,
 			}
 
 			for _, q := range h.Queries {
-				re, err := regexp.Compile(q.Pattern)
+				re, err := regexp.Compile(strings.ToLower(q.Pattern))
 				if err != nil {
 					return nil, errors.Wrapf(err, "compile regexp for %s", path)
 				}
@@ -104,7 +113,34 @@ func LoadHosts(dir string) (map[string]*Host, error) {
 	return hostMap, nil
 }
 
-func (h *Host) RunQuery(sql string) ([]map[string]string, error) {
+func (h *Host) RunQuery(sql string) (rows []map[string]string, err error) {
+	sql = strings.ToLower(sql)
+	defer func() {
+		if err == nil {
+			// Query was matched
+			return
+		}
+
+		h.unmatchedMutex.Lock()
+		defer h.unmatchedMutex.Unlock()
+
+		if h.unmatchedQueries[sql] {
+			// Already logged this one
+			return
+		}
+
+		h.unmatchedQueries[sql] = true
+		level.Info(h.logger).Log(
+			"msg", "host has no match for query",
+			"host_type", h.Name,
+			"sql", sql,
+		)
+	}()
+
+	return h.runQueryRecurse(sql)
+}
+
+func (h *Host) runQueryRecurse(sql string) ([]map[string]string, error) {
 	// Try matching patterns
 	for _, q := range h.Queries {
 		if q.Pattern.MatchString(sql) {
@@ -119,5 +155,5 @@ func (h *Host) RunQuery(sql string) ([]map[string]string, error) {
 	}
 
 	// Recursive call to inherited patterns of parent
-	return h.parent.RunQuery(sql)
+	return h.parent.runQueryRecurse(sql)
 }
