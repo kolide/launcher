@@ -44,7 +44,6 @@ func (m *MunkiInfo) ManagedInstalls(client *osquery.ExtensionManagerClient, logg
 }
 
 func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-
 	if err := m.loadReport(); err != nil {
 		return nil, err
 	}
@@ -67,15 +66,8 @@ func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.
 		return nil, err
 	}
 
-	var errors string
-	if len(m.report.Errors) != 0 {
-		errors = strings.Join(m.report.Errors, ";")
-	}
-
-	var warnings string
-	if len(m.report.Warnings) != 0 {
-		warnings = strings.Join(m.report.Warnings, ";")
-	}
+	errors := strings.Join(m.report.Errors, ";")
+	warnings := strings.Join(m.report.Warnings, ";")
 
 	results := []map[string]string{
 		map[string]string{
