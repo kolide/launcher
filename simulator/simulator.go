@@ -76,7 +76,13 @@ func (h *HostSimulation) RequestConfig() error {
 	h.state.lock.Lock()
 	defer h.state.lock.Unlock()
 
-	config, invalid, err := h.state.serviceClient.RequestConfig(context.Background(), h.state.nodeKey)
+	// TODO: When we request the config, we are throwing away what the server
+	// returns. An enhancement to this simulator should take the packs in the
+	// config and execute the queries on a realistic schedule.
+	// Further, the config may contain options as well which could influence the
+	// desired rate at which a host should be checking in to the server which has
+	// an obvious effect on the integrity of a load test.
+	_, invalid, err := h.state.serviceClient.RequestConfig(context.Background(), h.state.nodeKey)
 	if err != nil {
 		return errors.Wrap(err, "transport error retrieving config")
 	}
@@ -84,8 +90,6 @@ func (h *HostSimulation) RequestConfig() error {
 		return errors.New("enrollment invalid in request config")
 	}
 
-	// Ignore actual config. Someday we may do something with the config.
-	_ = config
 	return nil
 }
 
