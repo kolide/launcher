@@ -17,6 +17,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		Spotlight(),
 		munki.MunkiReport(client, logger),
 		munki.ManagedInstalls(client, logger),
+		MDMInfo(logger),
 		KolideVulnerabilities(client, logger),
 	}
 }

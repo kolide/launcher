@@ -91,8 +91,14 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/groob/plist"
+  packages = ["."]
+  revision = "63337f8a3d790883921bfaa0d54fd16d0baba0e0"
+
+[[projects]]
+  branch = "master"
   name = "github.com/kolide/kit"
-  packages = ["env","fs","testutil","version"]
+  packages = ["env","fs","logutil","testutil","version"]
   revision = "566c8f56a6ff7daba204818fbab0f2cb854b3310"
 
 [[projects]]
@@ -206,6 +212,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ac70924b5d0ae7a7fa29944cb7e9ce29a259639cf625ee387080aa332b2c0016"
+  inputs-digest = "c0db9c24953f899c2d13f2557389a680202dfccf193b4dfa736efdb641b33b8b"
   solver-name = "gps-cdcl"
   solver-version = 1
