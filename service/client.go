@@ -21,15 +21,17 @@ type KolideClient struct {
 }
 
 type enrollmentRequest struct {
-	EnrollSecret   string
-	HostIdentifier string
+	EnrollSecret   string `json:"enroll_secret"`
+	HostIdentifier string `json:"host_identifier"`
 }
 
 type enrollmentResponse struct {
-	NodeKey     string
-	NodeInvalid bool
-	Err         error
+	NodeKey     string `json:"node_key"`
+	NodeInvalid bool   `json:"node_invalid"`
+	Err         error  `json:"err,omitempty"`
 }
+
+func (r enrollmentResponse) error() error { return r.Err }
 
 // requestTimeout is duration after which the request is cancelled.
 const requestTimeout = 60 * time.Second
@@ -49,14 +51,16 @@ func (e KolideClient) RequestEnrollment(ctx context.Context, enrollSecret, hostI
 }
 
 type agentAPIRequest struct {
-	NodeKey string
+	NodeKey string `json:"node_key"`
 }
 
 type configResponse struct {
-	ConfigJSONBlob string
-	NodeInvalid    bool
-	Err            error
+	ConfigJSONBlob string `json:"config_json_blob"`
+	NodeInvalid    bool   `json:"node_invalid"`
+	Err            error  `json:"err,omitempty"`
 }
+
+func (r configResponse) error() error { return r.Err }
 
 // RequestConfig implements KolideService.RequestConfig.
 func (e KolideClient) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
@@ -72,17 +76,19 @@ func (e KolideClient) RequestConfig(ctx context.Context, nodeKey string) (string
 }
 
 type logCollection struct {
-	NodeKey string
-	LogType logger.LogType
-	Logs    []string
+	NodeKey string         `json:"node_key"`
+	LogType logger.LogType `json:"log_type"`
+	Logs    []string       `json:"logs"`
 }
 
 type agentAPIResponse struct {
-	Message     string
-	ErrorCode   string
-	NodeInvalid bool
-	Err         error
+	Message     string `json:"message"`
+	ErrorCode   string `json:"error_code"`
+	NodeInvalid bool   `json:"node_invalid"`
+	Err         error  `json:"err,omitempty"`
 }
+
+func (r agentAPIResponse) error() error { return r.Err }
 
 // PublishLogs implements KolideService.PublishLogs
 func (e KolideClient) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -98,10 +104,12 @@ func (e KolideClient) PublishLogs(ctx context.Context, nodeKey string, logType l
 }
 
 type queryCollection struct {
-	Queries     distributed.GetQueriesResult
-	NodeInvalid bool
-	Err         error
+	Queries     distributed.GetQueriesResult `json:"queries"`
+	NodeInvalid bool                         `json:"node_invalid"`
+	Err         error                        `json:"err,omitempty"`
 }
+
+func (r queryCollection) error() error { return r.Err }
 
 // RequestQueries implements KolideService.RequestQueries
 func (e KolideClient) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
@@ -117,8 +125,8 @@ func (e KolideClient) RequestQueries(ctx context.Context, nodeKey string) (*dist
 }
 
 type resultCollection struct {
-	NodeKey string
-	Results []distributed.Result
+	NodeKey string               `json:"node_key"`
+	Results []distributed.Result `json:"results"`
 }
 
 // PublishResults implements KolideService.PublishResults
@@ -148,8 +156,8 @@ func (e KolideClient) CheckHealth(ctx context.Context) (int32, error) {
 }
 
 type healthcheckResponse struct {
-	Status int32
-	Err    error
+	Status int32 `json:"status"`
+	Err    error `json:"err,omitempty"`
 }
 
 func makeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
