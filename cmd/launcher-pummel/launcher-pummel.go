@@ -127,7 +127,7 @@ func main() {
 		// Start hosts
 		for i := 0; i < count; i++ {
 			simulator.LaunchSimulation(
-				&host,
+				host,
 				*flServerURL,
 				fmt.Sprintf("%s_%d", hostType, i),
 				*flEnrollSecret,

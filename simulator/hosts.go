@@ -54,13 +54,13 @@ type querySpec struct {
 
 // LoadHosts will load the host specifications and return a map of the
 // queryRunners representing these host types.
-func LoadHosts(dir string, logger log.Logger) (map[string]queryRunner, error) {
+func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrap(err, "listing hosts directory")
 	}
 
-	hostMap := map[string]queryRunner{}
+	hostMap := map[string]*queryRunner{}
 
 	// Load all files
 	for _, file := range files {
@@ -77,7 +77,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]queryRunner, error) {
 				return nil, errors.Wrapf(err, "unmarshal yaml for %s", path)
 			}
 
-			runner := queryRunner{
+			runner := &queryRunner{
 				Name:             h.Name,
 				ParentName:       h.ParentName,
 				Queries:          []matcher{},
@@ -114,7 +114,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]queryRunner, error) {
 		if !ok {
 			return nil, errors.Errorf("missing parent named: %s", runner.ParentName)
 		}
-		runner.parent = &parent
+		runner.parent = parent
 	}
 
 	// TODO check for cycles

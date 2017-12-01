@@ -90,14 +90,14 @@ func TestLoadHosts(t *testing.T) {
 }
 
 func TestRunQuery(t *testing.T) {
-	h1 := Host{
+	h1 := queryRunner{
 		Queries: []matcher{
 			{*regexp.MustCompile(".*time.*"), []map[string]string{{"foo": "bar"}}},
 		},
 		unmatchedQueries: make(map[string]bool),
 		logger:           log.NewNopLogger(),
 	}
-	h2 := Host{
+	h2 := queryRunner{
 		Queries: []matcher{
 			{*regexp.MustCompile("select \\* from osquery_info"), []map[string]string{{"osquery": "info"}}},
 		},
@@ -105,7 +105,7 @@ func TestRunQuery(t *testing.T) {
 		unmatchedQueries: make(map[string]bool),
 		logger:           log.NewNopLogger(),
 	}
-	h3 := Host{
+	h3 := queryRunner{
 		Queries: []matcher{
 			{*regexp.MustCompile("select hour from time"), []map[string]string{{"hour": "12"}}},
 			{*regexp.MustCompile("select .* from time"), []map[string]string{{"minute": "36"}}},
@@ -116,7 +116,7 @@ func TestRunQuery(t *testing.T) {
 	}
 
 	testCases := []struct {
-		Host   Host
+		Host   queryRunner
 		Query  string
 		Result []map[string]string
 	}{
