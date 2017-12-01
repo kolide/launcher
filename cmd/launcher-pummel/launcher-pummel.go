@@ -122,8 +122,10 @@ func main() {
 
 func newLogger(w io.Writer) log.Logger {
 	logger := log.NewJSONLogger(log.NewSyncWriter(w))
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	logger = log.With(logger, "component", "simulator")
+	logger = log.With(logger,
+		"ts", log.DefaultTimestampUTC,
+		"component", "simulator",
+	)
 	logger = level.NewInjector(logger, level.InfoValue())
 	logger = log.With(logger, "caller", log.DefaultCaller)
 	return logger
