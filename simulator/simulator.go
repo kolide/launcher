@@ -49,8 +49,7 @@ type HostSimulation struct {
 	//   defer h.state.lock.Unlock()
 	state *hostSimulationState
 
-	shutdown chan bool
-	done     chan bool
+	shutdown chan chan struct{}
 }
 
 // Enroll is the implementation of the host simulation's enrollment functionality
@@ -220,8 +219,7 @@ func createSimulationRuntime(host QueryRunner, uuid, enrollSecret string, opts .
 		requestQueriesInterval: 2 * time.Second,
 		requestConfigInterval:  5 * time.Second,
 		publishLogsInterval:    10 * time.Second,
-		shutdown:               make(chan bool),
-		done:                   make(chan bool),
+		shutdown:               make(chan chan struct{}),
 		state:                  &hostSimulationState{},
 	}
 	for _, opt := range opts {
@@ -291,8 +289,8 @@ func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts
 				err = h.RequestConfig()
 			case <-publishLogsTicker.C:
 				err = h.PublishLogs()
-			case <-h.shutdown:
-				h.done <- true
+			case done := <-h.shutdown:
+				close(done)
 				return
 			}
 			if err != nil {
@@ -323,11 +321,12 @@ func (h *HostSimulation) Healthy() bool {
 
 // Shutdown will attempt to gracefully shutdown the simulation
 func (h *HostSimulation) Shutdown() error {
-	h.shutdown <- true
+	done := make(chan struct{})
+	h.shutdown <- done
 
 	timer := time.NewTimer(time.Second)
 	select {
-	case <-h.done:
+	case <-done:
 		return nil
 	case <-timer.C:
 	}
