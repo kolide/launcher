@@ -53,6 +53,16 @@ func main() {
 			env.String("HOSTS", ""),
 			"Comma-seperated list of host type and quantity i.e.: linux:1000,macos:200",
 		)
+		flInsecureTLS = flag.Bool(
+			"insecure",
+			env.Bool("INSECURE", false),
+			"Do not verify TLS certs for outgoing connections (default: false)",
+		)
+		flInsecureGRPC = flag.Bool(
+			"insecure_grpc",
+			env.Bool("INSECURE_GRPC", false),
+			"Dial GRPC without a TLS config (default: false)",
+		)
 	)
 	flag.Parse()
 
@@ -124,6 +134,15 @@ func main() {
 			"msg", "starting hosts",
 			"count", count,
 		)
+
+		opts := []simulator.SimulationOption{}
+		if *flInsecureTLS {
+			opts = append(opts, simulator.WithInsecure())
+		}
+		if *flInsecureGRPC {
+			opts = append(opts, simulator.WithInsecureGrpc())
+		}
+
 		// Start hosts
 		for i := 0; i < count; i++ {
 			simulator.LaunchSimulation(
@@ -131,7 +150,7 @@ func main() {
 				*flServerURL,
 				fmt.Sprintf("%s_%d", hostType, i),
 				*flEnrollSecret,
-				simulator.WithInsecure(),
+				opts...,
 			)
 			time.Sleep(10 * time.Millisecond)
 		}
