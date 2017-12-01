@@ -9,11 +9,14 @@ import (
 )
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+	munki := new(MunkiInfo)
 	return []*table.Plugin{
 		LauncherInfo(client),
 		BestPractices(client),
 		EmailAddresses(client),
 		Spotlight(),
+		munki.MunkiReport(client, logger),
+		munki.ManagedInstalls(client, logger),
 		KolideVulnerabilities(client, logger),
 	}
 }
