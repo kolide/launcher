@@ -1,0 +1,31 @@
+name:
+  base_darwin
+queries:
+  - pattern: select 1$
+    results: [
+      {"1":"1"}
+    ]
+
+  - pattern: select \* from interface_details id join interface_addresses ia
+    results: [
+      {"address":"192.168.2.9","broadcast":"192.168.2.255","collisions":"0","flags":"34915","ibytes":"1355573248","idrops":"0","ierrors":"0","interface":"en0","ipackets":"1549777","last_change":"1512082514","mac":"f3:0f:23:34:e3:ef","mask":"255.255.255.0","metric":"0","mtu":"1500","obytes":"225253376","odrops":"0","oerrors":"0","opackets":"923337","point_to_point":"","type":""}
+    ]
+
+  - pattern: select \* from os_version
+    results: [
+       {"build":"17B1002","codename":"","major":"10","minor":"13","name":"Mac OS X","patch":"1","platform":"darwin","platform_like":"darwin","version":"10.13.1"}
+    ]
+  - pattern: select \* from osquery_info
+    results: [
+      {"build_distro":"10.12","build_platform":"darwin","config_hash":"","config_valid":"0","extensions":"inactive","instance_id":"70ccb066-10f7-455c-8da1-c50e2e12d807","pid":"38454","start_time":"1512083519","uuid":"47F44EDB-237A-5DA1-904A-F05F62ECF4D9","version":"2.10.2","watcher":"-1"}
+    ]
+
+  - pattern: select \* from system_info
+    results: [
+      {"computer_name":"mac","cpu_brand":"Intel(R) Core(TM) i7-6820HQ CPU @ 2.70GHz","cpu_logical_cores":"8","cpu_physical_cores":"4","cpu_subtype":"Intel x86-64h Haswell","cpu_type":"x86_64h","hardware_model":"MacBookPro13,3 ","hardware_serial":"C02SQ1ALH040","hardware_vendor":"Apple Inc. ","hardware_version":"1.0 ","hostname":"mac.local","local_hostname":"mac","physical_memory":"17179869184","uuid":"47F44EDB-237A-5DA1-904A-F05F62ECF4D9"}
+    ]
+
+  - pattern: select \* from uptime
+    results: [
+      {"days":"0","hours":"6","minutes":"40","seconds":"4","total_seconds":"24004"}
+    ]

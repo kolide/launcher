@@ -1,0 +1,14 @@
+name:
+  out_of_date_darwin
+parent:
+  base_darwin
+queries:
+  - pattern: select \* from os_version
+    results: [
+       {"build":"16B2657","codename":"","major":"10","minor":"12","name":"Mac OS X","patch":"1","platform":"darwin","platform_like":"darwin","version":"10.12.1"}
+    ]
+
+  - pattern: select 1 from os_version where minor < 13
+    results: [
+      {"1": "1"}
+    ]

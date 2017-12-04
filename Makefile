@@ -79,6 +79,12 @@ xp-launcher: .pre-build .pre-launcher
 package-builder: .pre-build xp-launcher xp-extension .pre-package-builder generate
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
+.pre-launcher-pummel:
+	$(eval APP_NAME = launcher-pummel)
+
+launcher-pummel:
+	go build -i -o build/launcher-pummel -ldflags ${KIT_VERSION} ./cmd/launcher-pummel/
+
 .deps:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u github.com/jteeuwen/go-bindata/...
