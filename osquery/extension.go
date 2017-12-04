@@ -399,8 +399,8 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	// Collect up logs to be sent
-	logs := []string{}
-	logIDs := [][]byte{}
+	var logs []string
+	var logIDs [][]byte
 	err = e.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
@@ -545,6 +545,9 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	err = e.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
+		// Log keys are generated with the auto-incrementing sequence
+		// number provided by BoltDB. These must be converted to []byte
+		// (which we do with byteKeyFromUint64 function).
 		key, err := b.NextSequence()
 		if err != nil {
 			return errors.Wrap(err, "generating key")
