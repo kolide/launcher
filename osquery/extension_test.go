@@ -488,6 +488,39 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	assert.Nil(t, gotResultLogs)
 }
 
+func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
+	// Test for https://github.com/kolide/launcher/issues/219 in which a
+	// call to writeBufferedLogsForType with an invalid node key causes a
+	// deadlock.
+	const expectedNodeKey = "good_node_key"
+	var gotNodeKey string
+	m := &mock.KolideService{
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			gotNodeKey = nodeKey
+			return "", "", nodeKey != expectedNodeKey, nil
+
+		},
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+			return expectedNodeKey, false, nil
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.Nil(t, err)
+
+	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
+	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
+
+	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+		err = e.writeBufferedLogsForType(logger.LogTypeStatus)
+	})
+	assert.Nil(t, err)
+	assert.True(t, m.PublishLogsFuncInvoked)
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, expectedNodeKey, gotNodeKey)
+}
+
 func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{

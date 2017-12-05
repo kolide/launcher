@@ -397,10 +397,13 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	if err != nil {
 		return err
 	}
-	err = e.db.Update(func(tx *bolt.Tx) error {
+
+	// Collect up logs to be sent
+	var logs []string
+	var logIDs [][]byte
+	err = e.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
-		logs := []string{}
 		c := b.Cursor()
 		k, v := c.First()
 		for totalBytes := 0; k != nil; {
@@ -417,30 +420,38 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			} else {
 				logs = append(logs, string(v))
 				totalBytes += len(v)
+				logIDs = append(logIDs, k)
 			}
-
-			c.Delete() // Note: This advances the cursor
-			k, v = c.First()
+			k, v = c.Next()
 		}
-
-		if len(logs) == 0 {
-			// Nothing to send
-			return nil
-		}
-
-		err := e.writeLogsWithReenroll(context.Background(), typ, logs, true)
-		if err != nil {
-			// Returning an error will cancel the
-			// transaction and the logs will not be
-			// deleted.
-			return errors.Wrap(err, "writing logs")
-		}
-
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "writing buffered logs")
+		return errors.Wrap(err, "reading buffered logs")
 	}
+
+	if len(logs) == 0 {
+		// Nothing to send
+		return nil
+	}
+
+	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+	if err != nil {
+		return errors.Wrap(err, "writing logs")
+	}
+
+	// Delete logs that were successfully sent
+	err = e.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		for _, k := range logIDs {
+			b.Delete(k)
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "deleting sent logs")
+	}
+
 	return nil
 }
 
@@ -534,6 +545,9 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	err = e.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
+		// Log keys are generated with the auto-incrementing sequence
+		// number provided by BoltDB. These must be converted to []byte
+		// (which we do with byteKeyFromUint64 function).
 		key, err := b.NextSequence()
 		if err != nil {
 			return errors.Wrap(err, "generating key")
