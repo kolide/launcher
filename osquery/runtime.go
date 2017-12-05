@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -444,6 +445,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "couldn't create osqueryd command")
 	}
 
+	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
+	o.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	// Launch osquery process (async)
 	err = o.cmd.Start()
 	if err != nil {
@@ -460,7 +464,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		if o.cmd.Process != nil {
-			if err := o.cmd.Process.Kill(); err != nil {
+			// kill osqueryd and children
+			if err := killProcessGroup(o.cmd); err != nil {
 				if !strings.Contains(err.Error(), "process already finished") {
 					level.Info(o.logger).Log(
 						"msg", "killing osquery process",
@@ -569,6 +574,8 @@ func (r *Runner) Restart() error {
 	// Cancelling will cause all of the cleanup routines to execute, and a
 	// new instance will start.
 	r.instance.cancel()
+	r.instance.errgroup.Wait()
+
 	return nil
 }
 
@@ -619,4 +626,13 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
+}
+
+// kill process group kills a process and all its children.
+func killProcessGroup(cmd *exec.Cmd) error {
+	pgid, err := syscall.Getpgid(cmd.Process.Pid)
+	if err == nil {
+		return syscall.Kill(-pgid, 15)
+	}
+	return errors.Wrap(err, "get PGID")
 }

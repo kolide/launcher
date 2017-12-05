@@ -111,7 +111,7 @@ func TestBadBinaryPath(t *testing.T) {
 // fatals the test
 func waitHealthy(t *testing.T, runner *Runner) {
 	testutil.FatalAfterFunc(t, 30*time.Second, func() {
-		for runner.Healthy() != nil {
+		for err := runner.Healthy(); err != nil; {
 			time.Sleep(500 * time.Millisecond)
 		}
 	})
@@ -167,7 +167,8 @@ func TestOsqueryDies(t *testing.T) {
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
-	require.NoError(t, runner.instance.cmd.Process.Kill())
+	require.NoError(t, killProcessGroup(runner.instance.cmd))
+	runner.instance.errgroup.Wait()
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner)
