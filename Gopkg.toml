@@ -2,10 +2,10 @@
   name = "github.com/boltdb/bolt"
 
 [[constraint]]
-  name = "github.com/docker/notary"
+  name = "github.com/theupdateframework/notary"
   # pin to the revision because there has not been a new release
   # in 6 months and we depend on changes in master.
-  revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
+  revision = "332094e0c1c45a46b4c3be9fe239672d900a2fea"
 
 [[constraint]]
   name = "github.com/go-kit/kit"
