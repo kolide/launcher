@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -199,7 +198,7 @@ func main() {
 		}
 		stopLauncher, err := enabler.EnableBinary(
 			launcherPath,
-			autoupdate.WithFinalizer(launcherFinalizer(logger, rootDirectory)),
+			autoupdate.WithFinalizer(launcherFinalizer(logger, runner.Shutdown)),
 			autoupdate.WithUpdateChannel(opts.updateChannel),
 		)
 		if err != nil {
@@ -210,35 +209,16 @@ func main() {
 
 	// Wait forever
 	sig := make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
 	<-sig
+
+	// allow for graceful termination.
+	runner.Shutdown()
 }
 
-// We have to find the instance of osqueryd and send it an interrupt so it
-// shuts down it's extensions which are child processes of osqueryd. If we
-// don't do this the extension continues to run and osqueryd thinks we're trying
-// to register a duplicate extension and start up of new launcher process fails.
-func shutdownOsquery(rootdir string) error {
-	pidFilePath := filepath.Join(rootdir, "osquery.pid")
-	sPid, err := ioutil.ReadFile(pidFilePath)
-	if err != nil {
-		return errors.Wrap(err, "finding osquery pid")
-	}
-	pid, err := strconv.Atoi(string(sPid))
-	if err != nil {
-		return errors.Wrap(err, "converting pid to int")
-	}
-	sigTerm := syscall.Signal(15)
-	if err := syscall.Kill(pid, sigTerm); err != nil {
-		return errors.Wrap(err, "killing osqueryd")
-	}
-	time.Sleep(5 * time.Second)
-	return nil
-}
-
-func launcherFinalizer(logger log.Logger, rootDirectory string) func() error {
+func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
 	return func() error {
-		if err := shutdownOsquery(rootDirectory); err != nil {
+		if err := shutdownOsquery(); err != nil {
 			level.Info(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
