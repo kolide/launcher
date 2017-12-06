@@ -16,6 +16,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	// Enroll secret should be readable only by root
+	secretPerms = 0600
+)
+
 // PackagePaths is a simple wrapper for passing around the paths of packages for
 // various platforms
 type PackagePaths struct {
@@ -92,7 +97,7 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	secretPath := filepath.Join(configurationDirectory, "secret")
 
 	if !omitSecret {
-		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), secretPerms)
 		if err != nil {
 			return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 		}
@@ -322,7 +327,7 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 
 	// The secret which the user will use to authenticate to the server
 	if !omitSecret {
-		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), fs.FileMode)
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), secretPerms)
 		if err != nil {
 			return "", errors.Wrap(err, "could not write secret string to file for packaging")
 		}
