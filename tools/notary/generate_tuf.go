@@ -9,13 +9,13 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/docker/notary/client"
-	"github.com/docker/notary/trustpinning"
-	"github.com/docker/notary/tuf/data"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
+	"github.com/theupdateframework/notary/client"
+	"github.com/theupdateframework/notary/trustpinning"
+	"github.com/theupdateframework/notary/tuf/data"
 )
 
 func main() {

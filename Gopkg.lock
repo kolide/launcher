@@ -49,11 +49,6 @@
   version = "v1.5.1-1"
 
 [[projects]]
-  name = "github.com/docker/notary"
-  packages = [".","client","client/changelist","cryptoservice","storage","trustmanager","trustmanager/yubikey","trustpinning","tuf","tuf/data","tuf/signed","tuf/utils","tuf/validation"]
-  revision = "fab4c6708bc200c4cfe56c74f902d6e8bb26c803"
-
-[[projects]]
   name = "github.com/ghodss/yaml"
   packages = ["."]
   revision = "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
@@ -156,6 +151,11 @@
   version = "v1.1.4"
 
 [[projects]]
+  name = "github.com/theupdateframework/notary"
+  packages = [".","client","client/changelist","cryptoservice","storage","trustmanager","trustmanager/yubikey","trustpinning","tuf","tuf/data","tuf/signed","tuf/utils","tuf/validation"]
+  revision = "332094e0c1c45a46b4c3be9fe239672d900a2fea"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["pbkdf2","ssh/terminal"]
@@ -212,6 +212,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c0db9c24953f899c2d13f2557389a680202dfccf193b4dfa736efdb641b33b8b"
+  inputs-digest = "8cf760970570ea8f1a6757d9031181c48917bbbd43fff6fb680317caf5410c39"
   solver-name = "gps-cdcl"
   solver-version = 1
