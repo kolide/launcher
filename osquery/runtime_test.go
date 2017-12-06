@@ -111,7 +111,7 @@ func TestBadBinaryPath(t *testing.T) {
 // fatals the test
 func waitHealthy(t *testing.T, runner *Runner) {
 	testutil.FatalAfterFunc(t, 30*time.Second, func() {
-		for err := runner.Healthy(); err != nil; {
+		for runner.Healthy() != nil {
 			time.Sleep(500 * time.Millisecond)
 		}
 	})
