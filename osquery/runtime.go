@@ -630,9 +630,6 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 
 // kill process group kills a process and all its children.
 func killProcessGroup(cmd *exec.Cmd) error {
-	pgid, err := syscall.Getpgid(cmd.Process.Pid)
-	if err == nil {
-		return syscall.Kill(-pgid, 15)
-	}
-	return errors.Wrap(err, "get PGID")
+	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	return errors.Wrapf(err, "kill process group %s", cmd.Process.Pid)
 }
