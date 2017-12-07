@@ -1,12 +1,18 @@
 package osquery
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
@@ -188,4 +194,87 @@ func TestNotStarted(t *testing.T) {
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
+}
+
+func TestExtensionIsCleanedUp(t *testing.T) {
+	t.Parallel()
+
+	runner, extensionPid, teardown := setupOsqueryInstanceForTests(t)
+	defer teardown()
+
+	osqueryPID := runner.instance.cmd.Process.Pid
+
+	pgid, err := syscall.Getpgid(osqueryPID)
+	require.NoError(t, err)
+	require.Equal(t, pgid, osqueryPID, "pgid must be set")
+
+	// kill the current osquery process but not the extension
+	err = syscall.Kill(osqueryPID, syscall.SIGKILL)
+	require.NoError(t, err)
+
+	waitHealthy(t, runner)
+
+	// check that the extension process is no longer running
+	extpgid, err := syscall.Getpgid(extensionPid)
+	require.EqualError(t, err, "no such process")
+	require.Equal(t, extpgid, -1)
+
+}
+
+// sets up an osquery instance with a running extension to be used in tests.
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid int, teardown func()) {
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
+	runner, err = LaunchInstance(WithRootDirectory(rootDirectory))
+	require.NoError(t, err)
+	waitHealthy(t, runner)
+
+	osqueryPID := runner.instance.cmd.Process.Pid
+
+	pgid, err := syscall.Getpgid(osqueryPID)
+	require.NoError(t, err)
+	require.Equal(t, pgid, osqueryPID)
+
+	extensionPid = getExtensionPid(t, rootDirectory, pgid)
+
+	teardown = func() {
+		defer rmRootDirectory()
+		require.NoError(t, runner.Shutdown())
+	}
+	return runner, extensionPid, teardown
+}
+
+// get the osquery-extension.ext process' PID
+func getExtensionPid(t *testing.T, rootDirectory string, pgid int) int {
+	out, err := exec.Command("ps", "xao", "pid,ppid,pgid,comm").CombinedOutput()
+	require.NoError(t, err)
+
+	var extensionPid int
+	r := bufio.NewReader(bytes.NewReader(out))
+	for {
+		line, _, err := r.ReadLine()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		// some versions of the ps command truncate the comm field, using osquery-extensi
+		// instead of the full command name.
+		if bytes.Contains(line, []byte(`osquery-extensi`)) &&
+			bytes.Contains(line, []byte(fmt.Sprintf("%d", pgid))) {
+			line = bytes.TrimSpace(line)
+
+			cols := bytes.Split(line, []byte(" "))
+			require.NotEqual(t, len(cols), 0)
+
+			pid, err := strconv.Atoi(string(cols[0]))
+			require.NoError(t, err)
+			extensionPid = pid
+		}
+	}
+
+	require.NotZero(t, extensionPid)
+	return extensionPid
 }
