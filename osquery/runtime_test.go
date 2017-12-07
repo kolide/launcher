@@ -140,23 +140,14 @@ func TestSimplePath(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
-
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
-	require.NoError(t, err)
-
-	waitHealthy(t, runner)
+	runner, _, teardown := setupOsqueryInstanceForTests(t)
+	defer teardown()
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner)
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner)
-
-	require.NoError(t, runner.Shutdown())
 }
 
 func TestOsqueryDies(t *testing.T) {
