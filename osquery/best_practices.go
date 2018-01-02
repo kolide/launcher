@@ -19,9 +19,6 @@ var bestPracticesSimpleColumns = map[string]string{
 	"gatekeeper_enabled": "SELECT assessments_enabled AS compliant FROM gatekeeper",
 	"filevault_enabled":  "SELECT de.encrypted AS compliant FROM mounts m join disk_encryption de ON m.device_alias = de.name WHERE m.path = '/'",
 	"firewall_enabled":   "SELECT global_state AS compliant FROM alf",
-	// TODO account for possibility of multiple logged in
-	// users for screensaver password
-	"screensaver_password_enabled": "SELECT value AS compliant FROM preferences WHERE domain='com.apple.screensaver' AND key='askForPassword' AND username in (SELECT user FROM logged_in_users) LIMIT 1",
 	// Sharing prefs
 	"screen_sharing_disabled":      "SELECT screen_sharing = 0 AS compliant FROM sharing_preferences",
 	"file_sharing_disabled":        "SELECT file_sharing = 0 AS compliant FROM sharing_preferences",
