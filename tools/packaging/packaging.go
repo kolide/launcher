@@ -555,7 +555,7 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 func grpcServerForHostname(hostname string) string {
 	switch hostname {
 	case "localhost:5000":
-		return "localhost:8082"
+		return "localhost:8800"
 	case "master.cloud.kolide.net":
 		return "master-grpc.cloud.kolide.net:443"
 	case "kolide.co", "kolide.com":
