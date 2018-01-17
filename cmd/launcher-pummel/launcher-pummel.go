@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -27,6 +26,16 @@ func main() {
 			"version",
 			env.Bool("VERSION", false),
 			"Print version and exit",
+		)
+		flDebug = flag.Bool(
+			"debug",
+			env.Bool("DEBUG", false),
+			"Print debug logs",
+		)
+		flJson = flag.Bool(
+			"json",
+			env.Bool("JSON", false),
+			"Print logs in JSON format",
 		)
 		flHostPath = flag.String(
 			"host_path",
@@ -66,7 +75,26 @@ func main() {
 	)
 	flag.Parse()
 
-	logger := newLogger(os.Stderr)
+	var logger log.Logger
+
+	if *flJson {
+		logger = log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
+	} else {
+		logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
+	}
+	logger = log.With(logger,
+		"ts", log.DefaultTimestampUTC,
+		"component", "simulator",
+	)
+	logger = level.NewInjector(logger, level.InfoValue())
+	logger = log.With(logger, "caller", log.DefaultCaller)
+
+	if *flDebug {
+		logger = level.NewFilter(logger, level.AllowDebug())
+	} else {
+		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
 	if *flVersion {
 		version.PrintFull()
 		os.Exit(0)
@@ -146,6 +174,7 @@ func main() {
 		// Start hosts
 		for i := 0; i < count; i++ {
 			simulator.LaunchSimulation(
+				logger,
 				host,
 				*flServerURL,
 				fmt.Sprintf("%s_%d", hostType, i),
@@ -155,6 +184,7 @@ func main() {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+
 	level.Info(logger).Log(
 		"msg", "all hosts started",
 	)
@@ -162,15 +192,4 @@ func main() {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-}
-
-func newLogger(w io.Writer) log.Logger {
-	logger := log.NewJSONLogger(log.NewSyncWriter(w))
-	logger = log.With(logger,
-		"ts", log.DefaultTimestampUTC,
-		"component", "simulator",
-	)
-	logger = level.NewInjector(logger, level.InfoValue())
-	logger = log.With(logger, "caller", log.DefaultCaller)
-	return logger
 }

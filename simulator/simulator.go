@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -37,6 +38,7 @@ type HostSimulation struct {
 	requestQueriesInterval time.Duration
 	requestConfigInterval  time.Duration
 	publishLogsInterval    time.Duration
+	logger                 log.Logger
 
 	// The state of the simulation is gated with a read/write lock.
 	// To read something in state:
@@ -63,20 +65,38 @@ func (h *HostSimulation) Enroll() error {
 	var err error
 	for currentAttempt := 1; currentAttempt <= enrollmentAttempts; currentAttempt++ {
 		if currentAttempt != 1 {
+			level.Debug(h.logger).Log(
+				"msg", "first enrollment attempt failed, re-trying enrollment",
+				"attempt", currentAttempt,
+			)
 			time.Sleep(time.Duration(math.Pow(2, float64(currentAttempt))) * time.Second)
 		}
 		nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid)
 		if err != nil {
+			level.Debug(h.logger).Log(
+				"msg", "transport error in enrollment",
+				"err", err.Error(),
+				"uuid", h.uuid,
+			)
 			err = errors.Wrap(err, "transport error in enrollment")
 			continue
 		}
 		if invalid {
+			level.Debug(h.logger).Log(
+				"msg", "server responded that enrollment was invalid",
+				"uuid", h.uuid,
+			)
 			err = fmt.Errorf("enrollment invalid for host with uuid: %s", h.uuid)
 			continue
 		}
 		h.state.nodeKey = nodeKey
 		return nil
 	}
+
+	level.Debug(h.logger).Log(
+		"msg", "successfully enrolled host",
+		"uuid", h.uuid,
+	)
 
 	return err
 }
@@ -93,13 +113,28 @@ func (h *HostSimulation) RequestConfig() error {
 	// Further, the config may contain options as well which could influence the
 	// desired rate at which a host should be checking in to the server which has
 	// an obvious effect on the integrity of a load test.
-	_, invalid, err := h.state.serviceClient.RequestConfig(context.Background(), h.state.nodeKey)
+	config, invalid, err := h.state.serviceClient.RequestConfig(context.Background(), h.state.nodeKey)
 	if err != nil {
+		level.Debug(h.logger).Log(
+			"msg", "transport error requesting config",
+			"err", err.Error(),
+			"uuid", h.uuid,
+		)
 		return errors.Wrap(err, "transport error retrieving config")
 	}
 	if invalid {
+		level.Debug(h.logger).Log(
+			"msg", "server responded that config request was invalid",
+			"uuid", h.uuid,
+		)
 		return errors.New("enrollment invalid in request config")
 	}
+
+	level.Debug(h.logger).Log(
+		"msg", "successfully requested config",
+		"config", config,
+		"uuid", h.uuid,
+	)
 
 	return nil
 }
@@ -113,11 +148,26 @@ func (h *HostSimulation) PublishLogs() error {
 	logs := []string{"foo", "bar", "baz"}
 	_, _, invalid, err := h.state.serviceClient.PublishLogs(context.Background(), h.state.nodeKey, logger.LogTypeStatus, logs)
 	if err != nil {
+		level.Debug(h.logger).Log(
+			"msg", "transport error publishing logs",
+			"err", err.Error(),
+			"uuid", h.uuid,
+		)
 		return errors.Wrap(err, "transport error publishing logs")
 	}
 	if invalid {
+		level.Debug(h.logger).Log(
+			"msg", "server responded that log publish was invalid",
+			"uuid", h.uuid,
+		)
 		return errors.New("enrollment invalid in publish logs")
 	}
+
+	level.Debug(h.logger).Log(
+		"msg", "successfully published logs",
+		"uuid", h.uuid,
+	)
+
 	return nil
 }
 
@@ -129,9 +179,18 @@ func (h *HostSimulation) RequestQueries() error {
 
 	queries, invalid, err := h.state.serviceClient.RequestQueries(context.Background(), h.state.nodeKey)
 	if err != nil {
+		level.Debug(h.logger).Log(
+			"msg", "transport error requesting queries",
+			"err", err.Error(),
+			"uuid", h.uuid,
+		)
 		return errors.Wrap(err, "transport error requesting queries")
 	}
 	if invalid {
+		level.Debug(h.logger).Log(
+			"msg", "server responded that requesting queries was invalid",
+			"uuid", h.uuid,
+		)
 		return errors.New("enrollment invalid in request queries")
 	}
 
@@ -142,8 +201,19 @@ func (h *HostSimulation) RequestQueries() error {
 
 	results := []distributed.Result{}
 	for name, sql := range queries.Queries {
+		level.Debug(h.logger).Log(
+			"msg", "running live query",
+			"name", name,
+			"sql", sql,
+			"uuid", h.uuid,
+		)
 		rows, err := h.host.RunQuery(sql)
 		if err != nil {
+			level.Debug(h.logger).Log(
+				"msg", "error running query",
+				"err", err.Error(),
+				"uuid", h.uuid,
+			)
 			rows = []map[string]string{}
 		}
 		results = append(results,
@@ -151,11 +221,25 @@ func (h *HostSimulation) RequestQueries() error {
 		)
 	}
 
+	level.Debug(h.logger).Log(
+		"msg", "publishing results for live queries",
+		"uuid", h.uuid,
+	)
+
 	_, _, invalid, err = h.state.serviceClient.PublishResults(context.Background(), h.state.nodeKey, results)
 	if err != nil {
+		level.Debug(h.logger).Log(
+			"msg", "transport error publishing distributed query results",
+			"err", err.Error(),
+			"uuid", h.uuid,
+		)
 		return errors.Wrap(err, "transport error publishing results")
 	}
 	if invalid {
+		level.Debug(h.logger).Log(
+			"msg", "server responded that publishing distributed query results was invalid",
+			"uuid", h.uuid,
+		)
 		return errors.New("enrollment invalid in publish results")
 	}
 
@@ -223,8 +307,9 @@ func WithInsecureGrpc() SimulationOption {
 
 // createSimulationRuntime is an internal helper which creates an instance of
 // *HostSimulation given a set of supplied functional options
-func createSimulationRuntime(host QueryRunner, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
+func createSimulationRuntime(logger log.Logger, host QueryRunner, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
 	h := &HostSimulation{
+		logger:                 logger,
 		host:                   host,
 		uuid:                   uuid,
 		enrollSecret:           enrollSecret,
@@ -243,8 +328,8 @@ func createSimulationRuntime(host QueryRunner, uuid, enrollSecret string, opts .
 
 // LaunchSimulation is a utility which allows the user to configure and run an
 // asynchronous instance of a host simulation given a set of functional options
-func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
-	h := createSimulationRuntime(host, uuid, enrollSecret, opts...)
+func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enrollSecret string, opts ...SimulationOption) *HostSimulation {
+	h := createSimulationRuntime(logger, host, uuid, enrollSecret, opts...)
 	go func() {
 		h.state.lock.Lock()
 		h.state.started = true
@@ -283,6 +368,10 @@ func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts
 		err = h.Enroll()
 		if err != nil {
 			h.state.lock.Lock()
+			level.Debug(h.logger).Log(
+				"msg", "enrollment failed",
+				"uuid", h.uuid,
+			)
 			h.state.failed = true
 			h.state.lock.Unlock()
 			return
@@ -306,7 +395,11 @@ func LaunchSimulation(host QueryRunner, grpcURL, uuid, enrollSecret string, opts
 				return
 			}
 			if err != nil {
-				fmt.Println(err)
+				level.Debug(h.logger).Log(
+					"msg", "an error occured in simulation",
+					"err", err.Error(),
+					"uuid", h.uuid,
+				)
 				h.state.lock.Lock()
 				h.state.failed = true
 				h.state.lock.Unlock()

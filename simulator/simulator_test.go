@@ -3,6 +3,7 @@ package simulator
 import (
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,6 +15,7 @@ func (h *mockQueryRunner) RunQuery(sql string) (results []map[string]string, err
 
 func TestFunctionalOptions(t *testing.T) {
 	simulation := createSimulationRuntime(
+		log.NewNopLogger(),
 		nil, "", "",
 		WithInsecure(),
 	)
