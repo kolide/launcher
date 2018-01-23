@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -43,15 +44,100 @@ var (
 	defaultOsquerydPath = filepath.Join(applicationRoot, "bin/osqueryd")
 )
 
-func runSocket(args []string) error {
+type queryFile struct {
+	Queries map[string]string `json:"queries"`
+}
+
+func runQuery(args []string) error {
+	flagset := flag.NewFlagSet("launcher query", flag.ExitOnError)
 	var (
-		flPath = flag.String(
+		flQueries = flagset.String(
+			"queries",
+			env.String("QUERIES", ""),
+			"A file containing queries to run",
+		)
+		flSocket = flagset.String(
+			"socket",
+			env.String("SOCKET", ""),
+			"The path to the socket",
+		)
+	)
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
+
+	queries := queryFile{}
+
+	if _, err := os.Stat(*flQueries); err == nil {
+		data, err := ioutil.ReadFile(*flQueries)
+		if err != nil {
+			return errors.Wrap(err, "reading supplied queries file")
+		}
+		if err := json.Unmarshal(data, &queries); err != nil {
+			return errors.Wrap(err, "unmarshaling queries file json")
+		}
+	}
+
+	if *flQueries == "" {
+		stdinQueries, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return errors.Wrap(err, "reading stdin")
+		}
+		if err := json.Unmarshal(stdinQueries, &queries); err != nil {
+			return errors.Wrap(err, "unmarshaling stdin queries json")
+		}
+	}
+
+	if *flSocket == "" {
+		return errors.New("--socket must be defined")
+	}
+
+	client, err := osquerygo.NewClient(*flSocket, 5*time.Second)
+	if err != nil {
+		return errors.Wrap(err, "opening osquery client connection on "+*flSocket)
+	}
+	defer client.Close()
+
+	results := struct {
+		Results map[string]interface{} `json:"results"`
+	}{
+		Results: map[string]interface{}{},
+	}
+
+	for name, query := range queries.Queries {
+		resp, err := client.Query(query)
+		if err != nil {
+			return errors.Wrap(err, "running query")
+		}
+
+		if resp.Status.Code != int32(0) {
+			fmt.Println("Error running query:", resp.Status.Message)
+		}
+
+		results.Results[name] = resp.Response
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "    ")
+	if err := enc.Encode(results); err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+func runSocket(args []string) error {
+	flagset := flag.NewFlagSet("launcher socket", flag.ExitOnError)
+	var (
+		flPath = flagset.String(
 			"path",
 			env.String("SOCKET_PATH", filepath.Join(os.TempDir(), "osquery.sock")),
 			"The path to the socket",
 		)
 	)
-	flag.Parse()
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
 
 	if _, err := os.Stat(filepath.Dir(*flPath)); os.IsNotExist(err) {
 		if err := os.Mkdir(filepath.Dir(*flPath), fs.DirMode); err != nil {
@@ -65,12 +151,6 @@ func runSocket(args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "creating osquery instance")
 	}
-
-	client, err := osquerygo.NewClient(*flPath, 5*time.Second)
-	if err != nil {
-		return errors.Wrap(err, "connecting to osquery socket")
-	}
-	_ = client
 
 	fmt.Println(*flPath)
 
@@ -102,6 +182,15 @@ func main() {
 				logger.Fatal("err", errors.Wrap(err, "launching socket command"))
 			}
 			fmt.Println("\nexiting...")
+			os.Exit(0)
+		case "query":
+			var args []string
+			if len(os.Args) > 2 {
+				args = os.Args[2:]
+			}
+			if err := runQuery(args); err != nil {
+				logger.Fatal("err", errors.Wrap(err, "launching query command"))
+			}
 			os.Exit(0)
 		}
 	}
