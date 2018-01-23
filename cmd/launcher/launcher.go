@@ -83,7 +83,7 @@ func runQuery(args []string) error {
 		return err
 	}
 
-	queries := queryFile{}
+	var queries queryFile
 
 	if _, err := os.Stat(*flQueries); err == nil {
 		data, err := ioutil.ReadFile(*flQueries)
@@ -137,7 +137,7 @@ func runQuery(args []string) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "    ")
 	if err := enc.Encode(results); err != nil {
-		panic(err)
+		return errors.Wrap(err, "encoding JSON query results")
 	}
 
 	return nil
