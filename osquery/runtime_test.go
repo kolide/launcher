@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/testutil"
+	osquery "github.com/kolide/osquery-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -209,7 +210,33 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	extpgid, err := syscall.Getpgid(extensionPid)
 	require.EqualError(t, err, "no such process")
 	require.Equal(t, extpgid, -1)
+}
 
+func TestExtensionSocketPath(t *testing.T) {
+	t.Parallel()
+
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
+	extensionSocketPath := filepath.Join(rootDirectory, "sock")
+	runner, err := LaunchInstance(WithRootDirectory(rootDirectory), WithExtensionSocketPath(extensionSocketPath))
+	require.NoError(t, err)
+
+	waitHealthy(t, runner)
+
+	// wait for the launcher-provided extension to register
+	time.Sleep(2 * time.Second)
+
+	client, err := osquery.NewClient(extensionSocketPath, 5*time.Second)
+	require.NoError(t, err)
+	defer client.Close()
+
+	resp, err := client.Query("select * from kolide_best_practices")
+	require.NoError(t, err)
+	assert.Equal(t, int32(0), resp.Status.Code)
+	assert.Equal(t, "OK", resp.Status.Message)
 }
 
 // sets up an osquery instance with a running extension to be used in tests.

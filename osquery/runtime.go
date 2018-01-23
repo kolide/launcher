@@ -111,7 +111,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 		databasePath:          filepath.Join(rootDir, "osquery.db"),
 		extensionPath:         extensionPath,
 		extensionAutoloadPath: extensionAutoloadPath,
-		extensionSocketPath:   filepath.Join(rootDir, "osquery.sock"),
+		extensionSocketPath:   extensionSocketPath,
 	}, nil
 }
 
