@@ -195,6 +195,15 @@ func WithRootDirectory(path string) OsqueryInstanceOption {
 	}
 }
 
+// WithExtensionSocketPath is a functional option which allows the user to
+// define the path of the extension socket path that osqueryd will open to
+// communicate with other processes.
+func WithExtensionSocketPath(path string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.extensionSocketPath = path
+	}
+}
+
 // WithConfigPluginFlag is a functional option which allows the user to define
 // which config plugin osqueryd should use to retrieve the config. If this is not
 // defined, it is assumed that no configuration is needed and a no-op config
