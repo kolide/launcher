@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -48,6 +49,21 @@ type queryFile struct {
 	Queries map[string]string `json:"queries"`
 }
 
+func commandUsage(fs *flag.FlagSet, short string) func() {
+	return func() {
+		fmt.Fprintf(os.Stderr, "  Usage:\n")
+		fmt.Fprintf(os.Stderr, "    %s\n", short)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "  Flags:\n")
+		w := tabwriter.NewWriter(os.Stderr, 0, 2, 2, ' ', 0)
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(w, "    --%s %s\t%s\n", f.Name, f.DefValue, f.Usage)
+		})
+		w.Flush()
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+}
+
 func runQuery(args []string) error {
 	flagset := flag.NewFlagSet("launcher query", flag.ExitOnError)
 	var (
@@ -62,6 +78,7 @@ func runQuery(args []string) error {
 			"The path to the socket",
 		)
 	)
+	flagset.Usage = commandUsage(flagset, "launcher query")
 	if err := flagset.Parse(args); err != nil {
 		return err
 	}
@@ -135,6 +152,7 @@ func runSocket(args []string) error {
 			"The path to the socket",
 		)
 	)
+	flagset.Usage = commandUsage(flagset, "launcher socket")
 	if err := flagset.Parse(args); err != nil {
 		return err
 	}
@@ -176,7 +194,7 @@ func main() {
 		case "socket":
 			var args []string
 			if len(os.Args) > 2 {
-				args = os.Args[2 : len(os.Args)-1]
+				args = os.Args[2:]
 			}
 			if err := runSocket(args); err != nil {
 				logger.Fatal("err", errors.Wrap(err, "launching socket command"))
