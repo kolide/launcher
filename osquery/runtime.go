@@ -36,6 +36,7 @@ type osqueryOptions struct {
 	// options included by the caller of LaunchOsqueryInstance
 	binaryPath            string
 	rootDirectory         string
+	extensionSocketPath   string
 	configPluginFlag      string
 	loggerPluginFlag      string
 	distributedPluginFlag string
@@ -79,7 +80,7 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePaths, error) {
 	// Determine the path to the extension
 	exPath, err := os.Executable()
 	if err != nil {
@@ -92,6 +93,11 @@ func calculateOsqueryPaths(rootDir string) (*osqueryFilePaths, error) {
 		} else {
 			return nil, errors.Wrapf(err, "could not stat extension path")
 		}
+	}
+
+	// Determine the path to the extension socket
+	if extensionSocketPath == "" {
+		extensionSocketPath = filepath.Join(rootDir, "osquery.sock")
 	}
 
 	// Write the autoload file
@@ -398,7 +404,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(o.opts.rootDirectory)
+	paths, err := calculateOsqueryPaths(o.opts.rootDirectory, o.opts.extensionSocketPath)
 	if err != nil {
 		return errors.Wrap(err, "could not calculate osquery file paths")
 	}

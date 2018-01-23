@@ -36,7 +36,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	fakeExtensionPath := filepath.Join(binDir, "osquery-extension.ext")
 	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
 
-	paths, err := calculateOsqueryPaths(binDir)
+	paths, err := calculateOsqueryPaths(binDir, "")
 	require.NoError(t, err)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
