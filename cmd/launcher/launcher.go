@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
@@ -24,6 +27,7 @@ import (
 	kolidelog "github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
+	osquerygo "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
@@ -39,8 +43,69 @@ var (
 	defaultOsquerydPath = filepath.Join(applicationRoot, "bin/osqueryd")
 )
 
+func runSocket(args []string) error {
+	var (
+		flPath = flag.String(
+			"path",
+			env.String("SOCKET_PATH", filepath.Join(os.TempDir(), "osquery.sock")),
+			"The path to the socket",
+		)
+	)
+	flag.Parse()
+
+	if _, err := os.Stat(filepath.Dir(*flPath)); os.IsNotExist(err) {
+		if err := os.Mkdir(filepath.Dir(*flPath), fs.DirMode); err != nil {
+			return errors.Wrap(err, "creating socket path base directory")
+		}
+	}
+
+	runner, err := osquery.LaunchInstance(
+		osquery.WithExtensionSocketPath(*flPath),
+	)
+	if err != nil {
+		return errors.Wrap(err, "creating osquery instance")
+	}
+
+	client, err := osquerygo.NewClient(*flPath, 5*time.Second)
+	if err != nil {
+		return errors.Wrap(err, "connecting to osquery socket")
+	}
+	_ = client
+
+	fmt.Println(*flPath)
+
+	// Wait forever
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
+	<-sig
+
+	// allow for graceful termination.
+	runner.Shutdown()
+
+	return nil
+}
+
 func main() {
 	logger := kolidelog.NewLogger(os.Stderr)
+
+	// if the launcher is being ran with a positional argument, handle that
+	// argument. If a known positional argument is not supplied, fall-back to
+	// running an osquery instance.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "socket":
+			var args []string
+			if len(os.Args) > 2 {
+				args = os.Args[2 : len(os.Args)-1]
+			}
+			if err := runSocket(args); err != nil {
+				logger.Fatal("err", errors.Wrap(err, "launching socket command"))
+			}
+			fmt.Println("\nexiting...")
+			os.Exit(0)
+		}
+	}
+
 	opts, err := parseOptions()
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "invalid options"))
