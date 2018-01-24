@@ -16,6 +16,7 @@ type KolideClient struct {
 	RequestConfigEndpoint     endpoint.Endpoint
 	PublishLogsEndpoint       endpoint.Endpoint
 	RequestQueriesEndpoint    endpoint.Endpoint
+	RequestPracticesEndpoint  endpoint.Endpoint
 	PublishResultsEndpoint    endpoint.Endpoint
 	CheckHealthEndpoint       endpoint.Endpoint
 }
@@ -116,6 +117,19 @@ func (e KolideClient) RequestQueries(ctx context.Context, nodeKey string) (*dist
 	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 
+// RequestPractices implements KolideService.RequestPractices
+func (e KolideClient) RequestPractices(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	request := agentAPIRequest{NodeKey: nodeKey}
+	response, err := e.RequestPracticesEndpoint(newCtx, request)
+	if err != nil {
+		return nil, false, err
+	}
+	resp := response.(queryCollection)
+	return &resp.Queries, resp.NodeInvalid, resp.Err
+}
+
 type resultCollection struct {
 	NodeKey string
 	Results []distributed.Result
@@ -204,6 +218,21 @@ func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
+func makeRequestPracticesEndpoint(svc KolideService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(agentAPIRequest)
+		result, valid, err := svc.RequestPractices(ctx, req.NodeKey)
+		if err != nil {
+			return queryCollection{Err: err}, nil
+		}
+		return queryCollection{
+			Queries:     *result,
+			NodeInvalid: valid,
+			Err:         err,
+		}, nil
+	}
+}
+
 func makePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(resultCollection)
@@ -233,6 +262,7 @@ func MakeServerEndpoints(svc KolideService) KolideClient {
 		RequestConfigEndpoint:     makeRequestConfigEndpoint(svc),
 		PublishLogsEndpoint:       makePublishLogsEndpoint(svc),
 		RequestQueriesEndpoint:    makeRequestQueriesEndpoint(svc),
+		RequestPracticesEndpoint:  makeRequestPracticesEndpoint(svc),
 		PublishResultsEndpoint:    makePublishResultsEndpoint(svc),
 		CheckHealthEndpoint:       makeCheckHealthEndpoint(svc),
 	}

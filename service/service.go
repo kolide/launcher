@@ -17,6 +17,8 @@ type KolideService interface {
 	RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error)
 	// RequestConfig requests the osquery config for the host.
 	RequestConfig(ctx context.Context, nodeKey string) (string, bool, error)
+	// RequestPractices requests a set of query to broadcast the results of locally
+	RequestPractices(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error)
 	// PublishLogs publishes logs from the osquery process. These may be
 	// status logs or result logs from scheduled queries.
 	PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error)

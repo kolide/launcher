@@ -96,6 +96,24 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	return
 }
 
+func (mw logmw) RequestPractices(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
+	defer func(begin time.Time) {
+		resJSON, _ := json.Marshal(res)
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "RequestPractices",
+			"uuid", uuid,
+			"res", string(resJSON),
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	res, reauth, err = mw.next.RequestPractices(ctx, nodeKey)
+	return
+}
+
 func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(results)

@@ -253,6 +253,43 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	})
 }
 
+func (e *Extension) RequestPractices(ctx context.Context) (map[string]string, error) {
+	return e.requestPracticesWithReenroll(ctx, true)
+}
+
+func (e *Extension) requestPracticesWithReenroll(ctx context.Context, reenroll bool) (map[string]string, error) {
+	resp, invalid, err := e.serviceClient.RequestPractices(ctx, e.NodeKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "transport error requesting practices")
+	}
+
+	if invalid {
+		if !reenroll {
+			return nil, errors.New("enrollment invalid, reenroll disabled")
+		}
+
+		e.RequireReenroll(ctx)
+		_, invalid, err := e.Enroll(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
+		}
+		if invalid {
+			return nil, errors.New("enrollment invalid, reenrollment invalid")
+		}
+
+		// Don't attempt reenroll after first attempt
+		return e.requestPracticesWithReenroll(ctx, false)
+	}
+
+	practices := make(map[string]string)
+	if resp != nil {
+		for name, query := range resp.Queries {
+			practices[name] = query
+		}
+	}
+	return practices, nil
+}
+
 // GenerateConfigs will request the osquery configuration from the server. If
 // retrieving the configuration from the server fails, the locally stored
 // configuration will be returned. If that fails, this method will return an

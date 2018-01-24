@@ -46,6 +46,11 @@ func (mw uuidmw) RequestQueries(ctx context.Context, nodeKey string) (res *distr
 	return mw.next.RequestQueries(ctx, nodeKey)
 }
 
+func (mw uuidmw) RequestPractices(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, makeUUID())
+	return mw.next.RequestPractices(ctx, nodeKey)
+}
+
 func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
 	ctx = uuid.NewContext(ctx, makeUUID())
 	return mw.next.PublishResults(ctx, nodeKey, results)

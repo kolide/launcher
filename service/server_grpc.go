@@ -48,6 +48,12 @@ func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 			encodeGRPCQueryCollection,
 			options...,
 		),
+		practices: grpctransport.NewServer(
+			endpoints.RequestPracticesEndpoint,
+			decodeGRPCAgentAPIRequest,
+			encodeGRPCQueryCollection,
+			options...,
+		),
 		logs: grpctransport.NewServer(
 			endpoints.PublishLogsEndpoint,
 			decodeGRPCLogCollection,
@@ -74,6 +80,7 @@ type grpcServer struct {
 	enrollment grpctransport.Handler
 	config     grpctransport.Handler
 	queries    grpctransport.Handler
+	practices  grpctransport.Handler
 	logs       grpctransport.Handler
 	results    grpctransport.Handler
 	health     grpctransport.Handler
@@ -99,6 +106,14 @@ func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest
 	_, rep, err := s.queries.ServeGRPC(ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "request queries")
+	}
+	return rep.(*pb.QueryCollection), nil
+}
+
+func (s *grpcServer) RequestPractices(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
+	_, rep, err := s.practices.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "request practices")
 	}
 	return rep.(*pb.QueryCollection), nil
 }
