@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/mixer/clock"
 	"github.com/pkg/errors"
 )
 
@@ -34,15 +35,17 @@ type Runner struct {
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
-	binaryPath            string
-	rootDirectory         string
-	configPluginFlag      string
-	loggerPluginFlag      string
-	distributedPluginFlag string
-	extensionPlugins      []osquery.OsqueryPlugin
-	stdout                io.Writer
-	stderr                io.Writer
-	retries               uint
+	binaryPath              string
+	rootDirectory           string
+	configPluginFlag        string
+	loggerPluginFlag        string
+	distributedPluginFlag   string
+	requestPractices        func(context.Context) (map[string]string, error)
+	requestPracticesEnabled bool
+	extensionPlugins        []osquery.OsqueryPlugin
+	stdout                  io.Writer
+	stderr                  io.Writer
+	retries                 uint
 }
 
 // OsqueryInstance is the type which represents a currently running instance
@@ -165,6 +168,15 @@ type OsqueryInstanceOption func(*OsqueryInstance)
 func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugin)
+	}
+}
+
+// WithPracticeGetter is a functional option which allows the user to declare a
+// function which can be used to request practice queries from a remote source
+func WithPracticeGetter(requestPractices func(context.Context) (map[string]string, error)) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.requestPractices = requestPractices
+		i.opts.requestPracticesEnabled = true
 	}
 }
 
@@ -324,6 +336,90 @@ func newInstance() *OsqueryInstance {
 	return i
 }
 
+func (i *OsqueryInstance) practiceRunner() {
+	ticker := clock.DefaultClock{}.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	tickerCount := 1
+
+	requestQueriesInterval := 5
+	executeQueriesInterval := 2
+
+	ctx := context.Background()
+
+	practices := make(map[string]string)
+	practiceServer := NewPracticeServer()
+	go func() {
+		backoff := time.Second
+		for {
+			if err := practiceServer.Serve(":9924"); err != nil {
+				level.Info(i.logger).Log(
+					"msg", "the practice server failed",
+					"err", err,
+				)
+			}
+			time.Sleep(backoff)
+			backoff = backoff * 2
+		}
+	}()
+
+	for {
+		tickerCount = tickerCount + 1
+
+		// if it's time to fetch new practice queries, do that first
+		if tickerCount%requestQueriesInterval == 0 {
+			resp, err := i.opts.requestPractices(ctx)
+			if err != nil {
+				level.Info(i.logger).Log(
+					"msg", "error requesting practices",
+					"err", err,
+				)
+				continue
+			}
+
+			newPractices := make(map[string]string)
+			for name, query := range resp {
+				newPractices[name] = query
+			}
+			practices = newPractices
+		}
+
+		// if it's time to run the practice queries, do that
+		if tickerCount%executeQueriesInterval == 0 {
+			results := make(map[string]OsqueryQueryResults)
+			for name, query := range practices {
+				level.Debug(i.logger).Log(
+					"msg", "executing practice query",
+					"name", name,
+					"query", query,
+				)
+				rows, err := i.Query(query)
+				if err != nil {
+					level.Info(i.logger).Log(
+						"msg", "error running practice query",
+						"name", name,
+						"query", query,
+					)
+					continue
+				}
+				results[name] = rows
+			}
+
+			if err := practiceServer.SetQueryResults(results); err != nil {
+				level.Info(i.logger).Log(
+					"msg", "error setting practice query results",
+					"err", err,
+				)
+			}
+		}
+
+		// select to either exit or continue
+		select {
+		case <-ticker.Chan():
+			// Resume loop
+		}
+	}
+}
+
 func (r *Runner) start() error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return errors.Wrap(err, "starting instance")
@@ -459,6 +555,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return errors.New("osquery process exited")
 	})
+
+	// Launch the practice server if enabled
+	if o.opts.requestPracticesEnabled {
+		go o.practiceRunner()
+	}
 
 	// Kill osquery process on shutdown
 	o.errgroup.Go(func() error {

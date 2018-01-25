@@ -19,6 +19,9 @@ service Api {
     // a generic request object is sent
     rpc RequestQueries(AgentApiRequest) returns (QueryCollection) {}
 
+    // request practice queries which should be published for local consumption
+    rpc RequestPractices(AgentApiRequest) returns (QueryCollection) {}
+
     // publish logs from osqueryd to kolide/cloud
     // a generic response object is returned
     rpc PublishLogs(LogCollection) returns (AgentApiResponse) {}
@@ -120,7 +123,6 @@ message QueryCollection {
         string query = 2;
     }
 }
-
 
 //////////////////////
 // Query Results

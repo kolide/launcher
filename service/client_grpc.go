@@ -64,6 +64,16 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		attachUUID(),
 	).Endpoint()
 
+	requestPracticesEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"RequestPractices",
+		encodeGRPCAgentAPIRequest,
+		decodeGRPCQueryCollection,
+		kolide_agent.QueryCollection{},
+		attachUUID(),
+	).Endpoint()
+
 	publishResultsEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
@@ -89,6 +99,7 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
+		RequestPracticesEndpoint:  requestPracticesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
 	}

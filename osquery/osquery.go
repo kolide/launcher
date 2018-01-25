@@ -2,7 +2,10 @@ package osquery
 
 // OsqueryDistributedQueryResults represents the format of the results of an
 // osquery distributed query
-type OsqueryDistributedQueryResults map[string][]map[string]string
+type OsqueryDistributedQueryResults map[string]OsqueryQueryResults
+
+// OsqueryQueryResults respresents the results of an osquery query
+type OsqueryQueryResults []map[string]string
 
 // QueryContent is the format of a query stanza in an osquery configuration
 type QueryContent struct {

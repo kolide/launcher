@@ -20,6 +20,8 @@ type PublishLogsFunc func(ctx context.Context, nodeKey string, logType logger.Lo
 
 type RequestQueriesFunc func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error)
 
+type RequestPracticesFunc func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error)
+
 type PublishResultsFunc func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 
 type CheckHealthFunc func(ctx context.Context) (int32, error)
@@ -36,6 +38,9 @@ type KolideService struct {
 
 	RequestQueriesFunc        RequestQueriesFunc
 	RequestQueriesFuncInvoked bool
+
+	RequestPracticesFunc        RequestQueriesFunc
+	RequestPracticesFuncInvoked bool
 
 	PublishResultsFunc        PublishResultsFunc
 	PublishResultsFuncInvoked bool
@@ -62,6 +67,11 @@ func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, logType
 func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 	s.RequestQueriesFuncInvoked = true
 	return s.RequestQueriesFunc(ctx, nodeKey)
+}
+
+func (s *KolideService) RequestPractices(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	s.RequestPracticesFuncInvoked = true
+	return s.RequestPracticesFunc(ctx, nodeKey)
 }
 
 func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
