@@ -111,13 +111,25 @@ func main() {
 	}
 	defer db.Close()
 
-	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
+	var client service.KolideService
+	{
+		// configure the client with gRPC or Twirp.
+		useGRPC := !opts.transportTwirp
+		if useGRPC {
+			conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
+			if err != nil {
+				logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
+			}
+			defer conn.Close()
+			client = service.NewGRPCClient(conn, level.Debug(logger))
+		} else {
+			twirpClient := service.NewTwirpHTTPClient(opts.kolideServerURL, opts.insecureTLS, logger)
+			if err != nil {
+				logger.Fatal("err", errors.Wrap(err, "create Twirp Client"))
+			}
+			client = twirpClient
+		}
 	}
-	defer conn.Close()
-
-	client := service.New(conn, level.Debug(logger))
 
 	var enrollSecret string
 	if opts.enrollSecret != "" {

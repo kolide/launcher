@@ -27,6 +27,7 @@ type options struct {
 	debug              bool
 	insecureTLS        bool
 	insecureGRPC       bool
+	transportTwirp     bool
 	notaryServerURL    string
 	mirrorServerURL    string
 	autoupdateInterval time.Duration
@@ -113,6 +114,12 @@ func parseOptions() (*options, error) {
 			"Dial GRPC without a TLS config (default: false)",
 		)
 
+		flTransportTwirp = flag.Bool(
+			"transport_twirp",
+			env.Bool("KOLIDE_LAUNCHER_TRANSPORT_TWIRP", false),
+			"Use Twirp over HTTP instead of gRPC (default: false)",
+		)
+
 		// Version command: launcher --version
 		flVersion = flag.Bool(
 			"version",
@@ -174,6 +181,7 @@ func parseOptions() (*options, error) {
 		debug:              *flDebug,
 		insecureTLS:        *flInsecureTLS,
 		insecureGRPC:       *flInsecureGRPC,
+		transportTwirp:     *flTransportTwirp,
 		notaryServerURL:    *flNotaryServerURL,
 		mirrorServerURL:    *flMirrorURL,
 		autoupdateInterval: *flAutoupdateInterval,
@@ -213,6 +221,7 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
 	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("transport_twirp")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")

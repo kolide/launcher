@@ -1,3 +1,9 @@
+# TODO remove
+[[override]]
+  name = "github.com/go-kit/kit"
+  source = "github.com/austinylin/kit"
+  branch = "twirp"
+
 [[constraint]]
   name = "github.com/boltdb/bolt"
 
@@ -10,7 +16,7 @@
 [[constraint]]
   name = "github.com/go-kit/kit"
   version = "0.6.0"
-
+  
 [[override]]
   name = "git.apache.org/thrift.git"
   revision = "0dd823580c78a79ae9696eb9b3650e400fff140f"
@@ -45,3 +51,6 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
+
+[[constraint]]
+  name = "github.com/twitchtv/twirp"
