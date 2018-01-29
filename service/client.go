@@ -152,7 +152,7 @@ type healthcheckResponse struct {
 	Err    error
 }
 
-func makeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
+func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
 		nodeKey, valid, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier)
@@ -164,7 +164,7 @@ func makeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
-func makeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
+func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(agentAPIRequest)
 		config, valid, err := svc.RequestConfig(ctx, req.NodeKey)
@@ -176,7 +176,7 @@ func makeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
-func makePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
+func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(logCollection)
 		message, errcode, valid, err := svc.PublishLogs(ctx, req.NodeKey, req.LogType, req.Logs)
@@ -189,7 +189,7 @@ func makePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
-func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
+func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(agentAPIRequest)
 		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
@@ -204,7 +204,7 @@ func makeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
-func makePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
+func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(resultCollection)
 		message, errcode, valid, err := svc.PublishResults(ctx, req.NodeKey, req.Results)
@@ -217,7 +217,7 @@ func makePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	}
 }
 
-func makeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
+func MakeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		status, err := svc.CheckHealth(ctx)
 		return healthcheckResponse{
@@ -229,11 +229,11 @@ func makeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
 
 func MakeServerEndpoints(svc KolideService) KolideClient {
 	return KolideClient{
-		RequestEnrollmentEndpoint: makeRequestEnrollmentEndpoint(svc),
-		RequestConfigEndpoint:     makeRequestConfigEndpoint(svc),
-		PublishLogsEndpoint:       makePublishLogsEndpoint(svc),
-		RequestQueriesEndpoint:    makeRequestQueriesEndpoint(svc),
-		PublishResultsEndpoint:    makePublishResultsEndpoint(svc),
-		CheckHealthEndpoint:       makeCheckHealthEndpoint(svc),
+		RequestEnrollmentEndpoint: MakeRequestEnrollmentEndpoint(svc),
+		RequestConfigEndpoint:     MakeRequestConfigEndpoint(svc),
+		PublishLogsEndpoint:       MakePublishLogsEndpoint(svc),
+		RequestQueriesEndpoint:    MakeRequestQueriesEndpoint(svc),
+		PublishResultsEndpoint:    MakePublishResultsEndpoint(svc),
+		CheckHealthEndpoint:       MakeCheckHealthEndpoint(svc),
 	}
 }
