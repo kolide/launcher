@@ -31,13 +31,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
+func CreatePackages(osqueryVersion, hostname, transport, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool) (*PackagePaths, error) {
+	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, transport, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, transport, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -49,7 +49,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, string, error) {
+func CreateLinuxPackages(osqueryVersion, hostname, transport, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -116,8 +116,9 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	}
 
 	opts := &systemdTemplateOptions{
-		ServerHostname: grpcServerForHostname(hostname),
+		ServerHostname: serverForHostname(hostname, transport),
 		RootDirectory:  rootDirectory,
+		Transport:      transport,
 		SecretPath:     secretPath,
 		OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
 		LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
@@ -228,7 +229,7 @@ systemctl start launcher`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, error) {
+func CreateMacPackage(osqueryVersion, hostname, transport, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -309,8 +310,9 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	}
 
 	opts := &launchDaemonTemplateOptions{
-		ServerHostname:   grpcServerForHostname(hostname),
+		ServerHostname:   serverForHostname(hostname, transport),
 		RootDirectory:    rootDirectory,
+		Transport:        transport,
 		LauncherPath:     launcherPath,
 		OsquerydPath:     osquerydPath,
 		LogDirectory:     logDirectory,
@@ -388,6 +390,7 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 type systemdTemplateOptions struct {
 	ServerHostname string
 	RootDirectory  string
+	Transport      string
 	LauncherPath   string
 	OsquerydPath   string
 	SecretPath     string
@@ -410,7 +413,8 @@ ExecStart={{.LauncherPath}} \
 --hostname={{.ServerHostname}} \
 --enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
 --insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}{{if .Autoupdate}}
+--insecure \{{end}}{{if .Transport}}
+--transport={{.Transport}} \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}
 --osqueryd_path={{.OsquerydPath}}
@@ -429,6 +433,7 @@ WantedBy=multi-user.target`
 type launchDaemonTemplateOptions struct {
 	ServerHostname   string
 	RootDirectory    string
+	Transport        string
 	LauncherPath     string
 	OsquerydPath     string
 	LogDirectory     string
@@ -480,6 +485,8 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 			{{end}}
 			{{if .Insecure}}
             <string>--insecure</string>{{end}}
+			{{if .Transport}}
+            <string>--transport={{.Transport}}</string>{{end}}
 			{{if .Autoupdate}}
             <string>--autoupdate</string>
 			{{end}}
@@ -550,22 +557,30 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 	return nil
 }
 
-// grpcServerForHostname returns the gRPC server hostname given a web address
+// serverForHostname returns the server hostname given a web address
 // that was serving the website itself
-func grpcServerForHostname(hostname string) string {
-	switch hostname {
-	case "localhost:5000":
-		return "localhost:8800"
-	case "master.cloud.kolide.net":
-		return "master-grpc.cloud.kolide.net:443"
-	case "kolide.co", "kolide.com":
-		return "launcher.kolide.com:443"
-	default:
-		if strings.Contains(hostname, ":") {
-			return hostname
-		} else {
-			return fmt.Sprintf("%s:443", hostname)
+func serverForHostname(hostname string, transport string) string {
+	switch transport {
+	case "grpc":
+		switch hostname {
+		case "localhost:5000":
+			return "localhost:8800"
+		case "master.cloud.kolide.net":
+			return "master-grpc.cloud.kolide.net:443"
+		case "kolide.co", "kolide.com":
+			return "launcher.kolide.com:443"
+		default:
+			if strings.Contains(hostname, ":") {
+				return hostname
+			} else {
+				return fmt.Sprintf("%s:443", hostname)
+			}
 		}
+	case "twirp":
+		return hostname
+	default:
+		// "grpc" is the default transport.
+		return serverForHostname(hostname, "grpc")
 	}
 }
 

@@ -33,6 +33,11 @@ func runMake(args []string) error {
 			env.String("HOSTNAME", ""),
 			"the hostname of the gRPC server",
 		)
+		flTransport = flagset.String(
+			"transport",
+			env.String("TRANSPORT", "grpc"),
+			"The transport protocol that should be used to communicate with Fleet (default: grpc)",
+		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
 			env.String("OSQUERY_VERSION", ""),
@@ -108,7 +113,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flTransport, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
