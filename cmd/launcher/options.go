@@ -21,13 +21,13 @@ type options struct {
 	enrollSecretPath   string
 	rootDirectory      string
 	osquerydPath       string
+	transport          string
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
 	debug              bool
 	insecureTLS        bool
 	insecureGRPC       bool
-	transportTwirp     bool
 	notaryServerURL    string
 	mirrorServerURL    string
 	autoupdateInterval time.Duration
@@ -68,6 +68,11 @@ func parseOptions() (*options, error) {
 			"osqueryd_path",
 			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
 			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
+		)
+		flTransport = flag.String(
+			"transport",
+			env.String("KOLIDE_LAUNCHER_TRANSPORT", "grpc"),
+			"The transport protocol that should be used to communicate with Fleet (default: grpc)",
 		)
 
 		// Autoupdate options
@@ -113,13 +118,6 @@ func parseOptions() (*options, error) {
 			env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false),
 			"Dial GRPC without a TLS config (default: false)",
 		)
-
-		flTransportTwirp = flag.Bool(
-			"transport_twirp",
-			env.Bool("KOLIDE_LAUNCHER_TRANSPORT_TWIRP", false),
-			"Use Twirp over HTTP instead of gRPC (default: false)",
-		)
-
 		// Version command: launcher --version
 		flVersion = flag.Bool(
 			"version",
@@ -175,13 +173,13 @@ func parseOptions() (*options, error) {
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
 		osquerydPath:       osquerydPath,
+		transport:          *flTransport,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
 		debug:              *flDebug,
 		insecureTLS:        *flInsecureTLS,
 		insecureGRPC:       *flInsecureGRPC,
-		transportTwirp:     *flTransportTwirp,
 		notaryServerURL:    *flNotaryServerURL,
 		mirrorServerURL:    *flMirrorURL,
 		autoupdateInterval: *flAutoupdateInterval,
@@ -216,12 +214,13 @@ func shortUsage() {
 	printOpt("enroll_secret")
 	printOpt("enroll_secret_path")
 	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("transport")
+	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("root_directory")
 	printOpt("osqueryd_path")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("transport_twirp")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
