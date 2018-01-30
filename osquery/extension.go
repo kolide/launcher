@@ -3,7 +3,6 @@ package osquery
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"sync"
 	"time"
 
@@ -567,8 +566,6 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
 	q, err := e.getQueriesWithReenroll(ctx, true)
-	// TODO: Remove
-	fmt.Println(q.Queries)
 	return q, err
 }
 
