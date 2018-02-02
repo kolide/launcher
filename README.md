@@ -8,7 +8,7 @@ The Osquery Launcher is a lightweight launcher/manager which offers a few extra 
 - a curated `kolide_best_practices` table which includes a curated set of standards for the modern enterprise
 - tooling to generate deployment packages for a variety of platforms
 
-[![osquery is lightweight](./tools/images/lightweight.png)](https://kolide.com/osquery)
+[![osquery is lightweight](./tools/images/lightweight.png)](https://kolide.co/osquery)
 
 ### Documentation
 

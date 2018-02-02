@@ -52,7 +52,7 @@ func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error)
 	}
 
 	// If not we have to download the package. First, create download URI
-	url := fmt.Sprintf("https://dl.kolide.com/%s", osqueryTarPath(osqueryVersion, osqueryPlatform))
+	url := fmt.Sprintf("https://dl.kolide.co/%s", osqueryTarPath(osqueryVersion, osqueryPlatform))
 
 	// Download the package
 	localPackageDownloadPath := filepath.Join(localCacheDir, osqueryTarPath(osqueryVersion, osqueryPlatform))

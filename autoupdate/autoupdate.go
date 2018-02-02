@@ -33,8 +33,8 @@ const (
 )
 
 const (
-	DefaultMirror = "https://dl.kolide.com"
-	DefaultNotary = "https://notary.kolide.com"
+	DefaultMirror = "https://dl.kolide.co"
+	DefaultNotary = "https://notary.kolide.co"
 )
 
 // Updater is a TUF autoupdater.

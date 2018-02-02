@@ -559,7 +559,7 @@ func grpcServerForHostname(hostname string) string {
 	case "master.cloud.kolide.net":
 		return "master-grpc.cloud.kolide.net:443"
 	case "kolide.co", "kolide.com":
-		return "launcher.kolide.com:443"
+		return "launcher.kolide.co:443"
 	default:
 		if strings.Contains(hostname, ":") {
 			return hostname
