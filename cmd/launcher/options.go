@@ -21,6 +21,7 @@ type options struct {
 	enrollSecretPath   string
 	rootDirectory      string
 	osquerydPath       string
+	transport          string
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
@@ -68,6 +69,11 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
 			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
 		)
+		flTransport = flag.String(
+			"transport",
+			env.String("KOLIDE_LAUNCHER_TRANSPORT", "grpc"),
+			"The transport protocol that should be used to communicate with Fleet (default: grpc)",
+		)
 
 		// Autoupdate options
 		flAutoupdate = flag.Bool(
@@ -112,7 +118,6 @@ func parseOptions() (*options, error) {
 			env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false),
 			"Dial GRPC without a TLS config (default: false)",
 		)
-
 		// Version command: launcher --version
 		flVersion = flag.Bool(
 			"version",
@@ -168,6 +173,7 @@ func parseOptions() (*options, error) {
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
 		osquerydPath:       osquerydPath,
+		transport:          *flTransport,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
@@ -207,6 +213,8 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("enroll_secret")
 	printOpt("enroll_secret_path")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("transport")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("root_directory")
 	printOpt("osqueryd_path")

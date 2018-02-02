@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/service/uuid"
 )
 
-func parseUUID() grpctransport.ServerOption {
+func parseUUIDHeaderGRPC() grpctransport.ServerOption {
 	return grpctransport.ServerBefore(
 		func(ctx context.Context, md metadata.MD) context.Context {
 			if hdr, ok := md["uuid"]; ok {
@@ -27,43 +27,43 @@ func parseUUID() grpctransport.ServerOption {
 func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
 	options := []grpctransport.ServerOption{
 		grpctransport.ServerErrorLogger(logger),
-		parseUUID(),
+		parseUUIDHeaderGRPC(),
 	}
 	return &grpcServer{
 		enrollment: grpctransport.NewServer(
 			endpoints.RequestEnrollmentEndpoint,
-			decodeGRPCEnrollmentRequest,
-			encodeGRPCEnrollmentResponse,
+			decodeProtobufEnrollmentRequest,
+			encodeProtobufEnrollmentResponse,
 			options...,
 		),
 		config: grpctransport.NewServer(
 			endpoints.RequestConfigEndpoint,
-			decodeGRPCAgentAPIRequest,
-			encodeGRPCConfigResponse,
+			decodeProtobufAgentAPIRequest,
+			encodeProtobufConfigResponse,
 			options...,
 		),
 		queries: grpctransport.NewServer(
 			endpoints.RequestQueriesEndpoint,
-			decodeGRPCAgentAPIRequest,
-			encodeGRPCQueryCollection,
+			decodeProtobufAgentAPIRequest,
+			encodeProtobufQueryCollection,
 			options...,
 		),
 		logs: grpctransport.NewServer(
 			endpoints.PublishLogsEndpoint,
-			decodeGRPCLogCollection,
-			encodeGRPCAgentAPIResponse,
+			decodeProtobufLogCollection,
+			encodeProtobufAgentAPIResponse,
 			options...,
 		),
 		results: grpctransport.NewServer(
 			endpoints.PublishResultsEndpoint,
-			decodeGRPCResultCollection,
-			encodeGRPCAgentAPIResponse,
+			decodeProtobufResultCollection,
+			encodeProtobufAgentAPIResponse,
 			options...,
 		),
 		health: grpctransport.NewServer(
 			endpoints.CheckHealthEndpoint,
-			decodeGRPCAgentAPIRequest,
-			encodeGRPCHealthcheckResponse,
+			decodeProtobufAgentAPIRequest,
+			encodeProtobufHealthcheckResponse,
 			options...,
 		),
 	}

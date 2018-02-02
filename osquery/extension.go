@@ -565,7 +565,8 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
-	return e.getQueriesWithReenroll(ctx, true)
+	q, err := e.getQueriesWithReenroll(ctx, true)
+	return q, err
 }
 
 // Helper to allow for a single attempt at re-enrollment

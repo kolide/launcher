@@ -21,7 +21,10 @@
 [[projects]]
   branch = "master"
   name = "github.com/agl/ed25519"
-  packages = [".","edwards25519"]
+  packages = [
+    ".",
+    "edwards25519"
+  ]
   revision = "5312a61534124124185d41f09206b9fef1d88403"
 
 [[projects]]
@@ -55,10 +58,17 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "twirp"
   name = "github.com/go-kit/kit"
-  packages = ["endpoint","log","log/level","transport/grpc"]
-  revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
-  version = "v0.6.0"
+  packages = [
+    "endpoint",
+    "log",
+    "log/level",
+    "transport/grpc",
+    "transport/twirp"
+  ]
+  revision = "3d612bdbb67f3bebde657a3204be9a7acd814c96"
+  source = "github.com/austinylin/kit"
 
 [[projects]]
   name = "github.com/go-logfmt/logfmt"
@@ -75,7 +85,15 @@
 [[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
-  packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
+  packages = [
+    "jsonpb",
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/struct",
+    "ptypes/timestamp"
+  ]
   revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
 
 [[projects]]
@@ -93,13 +111,28 @@
 [[projects]]
   branch = "master"
   name = "github.com/kolide/kit"
-  packages = ["env","fs","logutil","testutil","version"]
+  packages = [
+    "env",
+    "fs",
+    "logutil",
+    "testutil",
+    "version"
+  ]
   revision = "566c8f56a6ff7daba204818fbab0f2cb854b3310"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
-  packages = [".","gen/osquery","gen/osquery/mock","plugin/config","plugin/distributed","plugin/logger","plugin/table","transport"]
+  packages = [
+    ".",
+    "gen/osquery",
+    "gen/osquery/mock",
+    "plugin/config",
+    "plugin/distributed",
+    "plugin/logger",
+    "plugin/table",
+    "transport"
+  ]
   revision = "77394894ef63b4ea25e1c0c4f8a8b3d1919e1aa6"
 
 [[projects]]
@@ -146,25 +179,63 @@
 
 [[projects]]
   name = "github.com/stretchr/testify"
-  packages = ["assert","require"]
+  packages = [
+    "assert",
+    "require"
+  ]
   revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
   version = "v1.1.4"
 
 [[projects]]
   name = "github.com/theupdateframework/notary"
-  packages = [".","client","client/changelist","cryptoservice","storage","trustmanager","trustmanager/yubikey","trustpinning","tuf","tuf/data","tuf/signed","tuf/utils","tuf/validation"]
+  packages = [
+    ".",
+    "client",
+    "client/changelist",
+    "cryptoservice",
+    "storage",
+    "trustmanager",
+    "trustmanager/yubikey",
+    "trustpinning",
+    "tuf",
+    "tuf/data",
+    "tuf/signed",
+    "tuf/utils",
+    "tuf/validation"
+  ]
   revision = "332094e0c1c45a46b4c3be9fe239672d900a2fea"
+
+[[projects]]
+  name = "github.com/twitchtv/twirp"
+  packages = [
+    ".",
+    "ctxsetters",
+    "internal/contextkeys"
+  ]
+  revision = "dff337b186d4ea1ada1d1e54ef422fdbcfa3113d"
+  version = "v5.1.0"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["pbkdf2","ssh/terminal"]
+  packages = [
+    "pbkdf2",
+    "ssh/terminal"
+  ]
   revision = "94eea52f7b742c7cbe0b03b22f0c4c8631ece122"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  packages = [
+    "context",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "lex/httplex",
+    "trace"
+  ]
   revision = "a8b9294777976932365dabb6640cf1468d95c70f"
 
 [[projects]]
@@ -176,13 +247,31 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
+  packages = [
+    "unix",
+    "windows"
+  ]
   revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable"
+  ]
   revision = "57961680700a5336d15015c8c50686ca5ba362a4"
 
 [[projects]]
@@ -199,7 +288,30 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/manual","resolver/passthrough","stats","status","tap","transport"]
+  packages = [
+    ".",
+    "balancer",
+    "balancer/roundrobin",
+    "codes",
+    "connectivity",
+    "credentials",
+    "encoding",
+    "grpclb/grpc_lb_v1/messages",
+    "grpclog",
+    "internal",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/manual",
+    "resolver/passthrough",
+    "stats",
+    "status",
+    "tap",
+    "transport"
+  ]
   revision = "be077907e29fdb945d351e4284eb5361e7f8924e"
   version = "v1.8.1"
 
@@ -212,6 +324,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8cf760970570ea8f1a6757d9031181c48917bbbd43fff6fb680317caf5410c39"
+  inputs-digest = "924adfe413862cc2a5ea73ccb122e5cc1af7a17a8d72b3043e5baefece1d8f59"
   solver-name = "gps-cdcl"
   solver-version = 1

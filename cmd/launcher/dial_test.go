@@ -74,7 +74,7 @@ func TestSwappingCert(t *testing.T) {
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewNopLogger())
+	client := service.NewGRPCClient(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "")
 	require.NotNil(t, err)
@@ -112,7 +112,7 @@ func TestCertRemainsBad(t *testing.T) {
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewNopLogger())
+	client := service.NewGRPCClient(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "")
 	require.NotNil(t, err)

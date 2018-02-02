@@ -361,7 +361,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		}
 		defer conn.Close()
 
-		h.state.serviceClient = service.New(conn, log.NewNopLogger())
+		h.state.serviceClient = service.NewGRPCClient(conn, log.NewNopLogger())
 
 		h.state.lock.Unlock()
 

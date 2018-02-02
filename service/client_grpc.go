@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/service/uuid"
 )
 
-func attachUUID() grpctransport.ClientOption {
+func attachUUIDHeaderGRPC() grpctransport.ClientOption {
 	return grpctransport.ClientBefore(
 		func(ctx context.Context, md *metadata.MD) context.Context {
 			uuid, _ := uuid.FromContext(ctx)
@@ -23,65 +23,65 @@ func attachUUID() grpctransport.ClientOption {
 
 // New creates a new KolideClient (implementation of the KolideService
 // interface) using the provided gRPC client connection.
-func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
+func NewGRPCClient(conn *grpc.ClientConn, logger log.Logger) KolideService {
 	requestEnrollmentEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"RequestEnrollment",
-		encodeGRPCEnrollmentRequest,
-		decodeGRPCEnrollmentResponse,
+		encodeProtobufEnrollmentRequest,
+		decodeProtobufEnrollmentResponse,
 		kolide_agent.EnrollmentResponse{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	requestConfigEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"RequestConfig",
-		encodeGRPCAgentAPIRequest,
-		decodeGRPCConfigResponse,
+		encodeProtobufAgentAPIRequest,
+		decodeProtobufConfigResponse,
 		kolide_agent.ConfigResponse{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	publishLogsEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"PublishLogs",
-		encodeGRPCLogCollection,
-		decodeGRPCAgentAPIResponse,
+		encodeProtobufLogCollection,
+		decodeProtobufAgentAPIResponse,
 		kolide_agent.AgentApiResponse{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	requestQueriesEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"RequestQueries",
-		encodeGRPCAgentAPIRequest,
-		decodeGRPCQueryCollection,
+		encodeProtobufAgentAPIRequest,
+		decodeProtobufQueryCollection,
 		kolide_agent.QueryCollection{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	publishResultsEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"PublishResults",
-		encodeGRPCResultCollection,
-		decodeGRPCAgentAPIResponse,
+		encodeProtobufResultCollection,
+		decodeProtobufAgentAPIResponse,
 		kolide_agent.AgentApiResponse{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	checkHealthEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",
 		"CheckHealth",
-		encodeGRPCAgentAPIRequest,
-		decodeGRPCHealthCheckResponse,
+		encodeProtobufAgentAPIRequest,
+		decodeProtobufHealthCheckResponse,
 		kolide_agent.HealthCheckResponse{},
-		attachUUID(),
+		attachUUIDHeaderGRPC(),
 	).Endpoint()
 
 	var client KolideService = KolideClient{
