@@ -135,7 +135,7 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 set -e
 systemctl daemon-reload
 systemctl enable launcher
-systemctl start launcher`
+systemctl restart launcher`
 
 	systemdLauncherInstallerFile, err := os.Create(
 		filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"),
@@ -414,6 +414,8 @@ ExecStart={{.LauncherPath}} \
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}
 --osqueryd_path={{.OsquerydPath}}
+Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target`
