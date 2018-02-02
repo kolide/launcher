@@ -50,6 +50,7 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 }
 
 func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool, systemd bool) (string, string, error) {
+	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -144,10 +145,10 @@ systemctl enable launcher
 systemctl start launcher`
 
 		systemdLauncherInstallerFile, err := os.Create(
-			filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"),
+			filepath.Join(packageRoot, binaryDirectory, postInstallScript),
 		)
 		if err != nil {
-			return "", "", errors.Wrap(err, "could not create the launcher-systemd-installer")
+			return "", "", errors.Wrap(err, "could not create the" + postInstallScript)
 		}
 		fmt.Fprintf(systemdLauncherInstallerFile, systemdLauncherInstallerContents)
 		systemdLauncherInstallerFile.Close()
@@ -157,7 +158,11 @@ systemctl start launcher`
 		if err != nil {
 			return "", "", errors.Wrap(err, "could not create launcher init file")
 		}
-		defer initFile.Close()
+
+		if err := initFile.Chmod(0755); err != nil {
+			return "", "", errors.Wrap(err, "could not make postinstall script executable")
+		}
+
 
 		if updateChannel == "" {
 			updateChannel = "stable"
@@ -173,11 +178,26 @@ systemctl start launcher`
 			InsecureGrpc:   insecureGrpc,
 			Autoupdate:     autoupdate,
 			UpdateChannel:  updateChannel,
+			LaunchDaemonName: "launcher",
 		}
-
+		//add this for symmetry -- we may use it in the future for post-install work
 		if err := renderInitService(initFile, opts); err != nil {
 			return "", "", errors.Wrap(err, "could not render init file")
 		}
+		defer initFile.Close()
+
+		// The post install step
+		systemdLauncherInstallerContents := "#/bin/bash"
+
+		postInstallScript, err := os.Create(
+			filepath.Join(packageRoot, binaryDirectory, postInstallScript),
+		)
+		if err != nil {
+			return "", "", errors.Wrap(err, "could not create the post install script")
+		}
+		fmt.Fprintf(postInstallScript, systemdLauncherInstallerContents)
+		postInstallScript.Close()
+
 	}
 
 
@@ -215,7 +235,9 @@ systemctl start launcher`
 
 	// Create the packages
 	containerPackageRoot := "/pkgroot"
-	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer")
+
+	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, postInstallScript)
+
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
@@ -438,41 +460,36 @@ func renderInitService(w io.Writer, options *initTemplateOptions) error {
 	initdTemplate := `
 #!/bin/sh
 set -e
-NAME={{.LaunchDaemonName}}
-PIDFILE=/var/run/$NAME.pid
-DAEMON={{.LauncherPath}}
-DAEMON_OPTS= --root_directory={{.RootDirectory}} \
+NAME="{{.LaunchDaemonName}}"
+DAEMON="{{.LauncherPath}}"
+DAEMON_OPTS="--root_directory={{.RootDirectory}} \
 --hostname={{.ServerHostname}} \
 --enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
 --insecure_grpc \{{end}}{{if .Insecure}}
 --insecure \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}
---osqueryd_path={{.OsquerydPath}}
+--osqueryd_path={{.OsquerydPath}}"
 
 export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
 
 is_running() {
-    [ -f "$PIDFILE" ] && ps -p $PIDFILE > /dev/null 2>&1
+    start-stop-daemon --status --exec $DAEMON
 }
-
 case "$1" in
   start)
-        echo -n "Starting daemon: "$NAME
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
-        echo "."
-	;;
+        echo "Starting daemon: "$NAME
+        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
+        ;;
   stop)
-        echo -n "Stopping daemon: "$NAME
-	start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE
-        echo "."
-	;;
+        echo "Stopping daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --exec $DAEMON
+        ;;
   restart)
-        echo -n "Restarting daemon: "$NAME
-	start-stop-daemon --stop --quiet --oknodo --retry 30 --pidfile $PIDFILE
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_OPTS
-	echo "."
-	;;
+        echo "Restarting daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --retry 30 --exec $DAEMON
+        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
+        ;;
   status)
     if is_running; then
         echo "Running"
@@ -482,12 +499,13 @@ case "$1" in
     fi
     ;;
   *)
-	echo "Usage: "$1" {start|stop|restart|status}"
-	exit 1
+        echo "Usage: "$1" {start|stop|restart|status}"
+        exit 1
 esac
 
 exit 0
 `
+
 	t, err := template.New("initd").Parse(initdTemplate)
 	if err != nil {
 		return errors.Wrap(err, "not able to parse initd template")
