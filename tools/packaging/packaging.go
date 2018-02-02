@@ -414,6 +414,8 @@ ExecStart={{.LauncherPath}} \
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}
 --osqueryd_path={{.OsquerydPath}}
+Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target`
