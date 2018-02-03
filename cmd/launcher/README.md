@@ -39,6 +39,83 @@ You can also define the enroll secret via a file path (`--enroll_secret_path`) o
 
 You may need to define the `--insecure` and/or `--insecure_grpc` flag depending on your server configurations.
 
+### Running an extension socket
+
+To run a launcher-powered extension socket, run `launcher socket` and the path of the socket will be printed to stdout:
+
+```
+./build/launcher socket
+/var/folders/wp/6fkmvjf11gv18tdprv4g2mk40000gn/T/osquery.sock
+^C
+exiting...
+```
+
+To run the socket at a defined path, use the `--path` flag:
+
+```
+./build/launcher socket --path=/tmp/sock
+/tmp/sock
+```
+
+### Querying an extension socket
+
+To run queries against an existing extension socket, use `launcher query`. You must define the socket path via the `--socket` flag. Query JSON can be provided via stdin or a file specified via the `--queries` flag. Consider an example querying the socket via queries defined in a file:
+
+```
+$ cat queries.json
+{
+  "queries": {
+    "apps": "select name, path from apps limit 2",
+    "hostname": "select hostname from system_info"
+  }
+}
+$ ./build/launcher query --socket=/tmp/osquery.sock --queries=./queries.json
+{
+    "results": {
+        "apps": [
+            {
+                "name": "1Password 6.app",
+                "path": "/Applications/1Password 6.app"
+            },
+            {
+                "name": "2BUA8C4S2C.com.agilebits.onepassword4-helper.app",
+                "path": "/Applications/1Password 6.app/Contents/Library/LoginItems/2BUA8C4S2C.com.agilebits.onepassword4-helper.app"
+            }
+        ],
+        "hostname": [
+            {
+                "hostname": "marpaia"
+            }
+        ]
+    }
+}
+```
+
+Now consider an example using stdin:
+
+```
+$ cat queries.json | ./build/launcher query --socket=/tmp/osquery.sock
+{
+    "results": {
+        "apps": [
+            {
+                "name": "1Password 6.app",
+                "path": "/Applications/1Password 6.app"
+            },
+            {
+                "name": "2BUA8C4S2C.com.agilebits.onepassword4-helper.app",
+                "path": "/Applications/1Password 6.app/Contents/Library/LoginItems/2BUA8C4S2C.com.agilebits.onepassword4-helper.app"
+            }
+        ],
+        "hostname": [
+            {
+                "hostname": "marpaia"
+            }
+        ]
+    }
+}
+```
+
 ## Examples
 
 ### Connecting to Fleet
