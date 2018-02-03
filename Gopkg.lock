@@ -9,8 +9,8 @@
 [[projects]]
   name = "github.com/Microsoft/go-winio"
   packages = ["."]
-  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
-  version = "v0.4.5"
+  revision = "7da180ee92d8bd8bb8c37fc560e673e6557c392f"
+  version = "v0.4.7"
 
 [[projects]]
   branch = "master"
@@ -21,7 +21,10 @@
 [[projects]]
   branch = "master"
   name = "github.com/agl/ed25519"
-  packages = [".","edwards25519"]
+  packages = [
+    ".",
+    "edwards25519"
+  ]
   revision = "5312a61534124124185d41f09206b9fef1d88403"
 
 [[projects]]
@@ -56,7 +59,12 @@
 
 [[projects]]
   name = "github.com/go-kit/kit"
-  packages = ["endpoint","log","log/level","transport/grpc"]
+  packages = [
+    "endpoint",
+    "log",
+    "log/level",
+    "transport/grpc"
+  ]
   revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
   version = "v0.6.0"
 
@@ -73,10 +81,16 @@
   version = "v1.7.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
-  packages = ["proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
-  revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
+  packages = [
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/timestamp"
+  ]
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/google/uuid"
@@ -93,13 +107,28 @@
 [[projects]]
   branch = "master"
   name = "github.com/kolide/kit"
-  packages = ["env","fs","logutil","testutil","version"]
-  revision = "566c8f56a6ff7daba204818fbab0f2cb854b3310"
+  packages = [
+    "env",
+    "fs",
+    "logutil",
+    "testutil",
+    "version"
+  ]
+  revision = "d4b803f4eea66a463259243f2e95bad5124b7310"
 
 [[projects]]
   branch = "master"
   name = "github.com/kolide/osquery-go"
-  packages = [".","gen/osquery","gen/osquery/mock","plugin/config","plugin/distributed","plugin/logger","plugin/table","transport"]
+  packages = [
+    ".",
+    "gen/osquery",
+    "gen/osquery/mock",
+    "plugin/config",
+    "plugin/distributed",
+    "plugin/logger",
+    "plugin/table",
+    "transport"
+  ]
   revision = "77394894ef63b4ea25e1c0c4f8a8b3d1919e1aa6"
 
 [[projects]]
@@ -118,7 +147,7 @@
   branch = "master"
   name = "github.com/miekg/pkcs11"
   packages = ["."]
-  revision = "694c80ab67e3b197690c5ba8a11f0ecdf7a90c93"
+  revision = "57296583125bf58643f8bac3635bc1af1d65a6df"
 
 [[projects]]
   branch = "master"
@@ -141,31 +170,60 @@
 [[projects]]
   name = "github.com/sirupsen/logrus"
   packages = ["."]
-  revision = "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
-  version = "v1.0.4"
+  revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
+  version = "v1.0.3"
 
 [[projects]]
   name = "github.com/stretchr/testify"
-  packages = ["assert","require"]
-  revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
-  version = "v1.1.4"
+  packages = [
+    "assert",
+    "require"
+  ]
+  revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
+  version = "v1.2.1"
 
 [[projects]]
+  branch = "master"
   name = "github.com/theupdateframework/notary"
-  packages = [".","client","client/changelist","cryptoservice","storage","trustmanager","trustmanager/yubikey","trustpinning","tuf","tuf/data","tuf/signed","tuf/utils","tuf/validation"]
-  revision = "332094e0c1c45a46b4c3be9fe239672d900a2fea"
+  packages = [
+    ".",
+    "client",
+    "client/changelist",
+    "cryptoservice",
+    "storage",
+    "trustmanager",
+    "trustmanager/yubikey",
+    "trustpinning",
+    "tuf",
+    "tuf/data",
+    "tuf/signed",
+    "tuf/utils",
+    "tuf/validation"
+  ]
+  revision = "f234167994cf57f642519a8122a8d6e7b6e5fd11"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["pbkdf2","ssh/terminal"]
-  revision = "94eea52f7b742c7cbe0b03b22f0c4c8631ece122"
+  packages = [
+    "pbkdf2",
+    "ssh/terminal"
+  ]
+  revision = "1875d0a70c90e57f11972aefd42276df65e895b9"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
+  packages = [
+    "context",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "lex/httplex",
+    "trace"
+  ]
+  revision = "b417086c80e91bfa321ef761574721644b8b9f61"
 
 [[projects]]
   branch = "master"
@@ -176,14 +234,32 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
-  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
+  packages = [
+    "unix",
+    "windows"
+  ]
+  revision = "8f27ce8a604014414f8dfffc25cbcde83a3f2216"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
-  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "57961680700a5336d15015c8c50686ca5ba362a4"
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable"
+  ]
+  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
   branch = "master"
@@ -195,23 +271,46 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "7f0da29060c682909f650ad8ed4e515bd74fa12a"
+  revision = "4eb30f4778eed4c258ba66527a0d4f9ec8a36c45"
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","balancer/roundrobin","codes","connectivity","credentials","encoding","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/manual","resolver/passthrough","stats","status","tap","transport"]
-  revision = "be077907e29fdb945d351e4284eb5361e7f8924e"
-  version = "v1.8.1"
+  packages = [
+    ".",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
+    "codes",
+    "connectivity",
+    "credentials",
+    "encoding",
+    "grpclb/grpc_lb_v1/messages",
+    "grpclog",
+    "internal",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/passthrough",
+    "stats",
+    "status",
+    "tap",
+    "transport"
+  ]
+  revision = "6b51017f791ae1cfbec89c52efdf444b13b550ef"
+  version = "v1.9.2"
 
 [[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "287cf08546ab5e7e37d55a84f7ed3fd1db036de5"
+  revision = "d670f9405373e636a5a2765eea47fac0c9bc91a4"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8cf760970570ea8f1a6757d9031181c48917bbbd43fff6fb680317caf5410c39"
+  inputs-digest = "5dfdaf89f5ab8d40f5118732e0b2f1b72edbc9f38c14a3817c271ddb3be19b4a"
   solver-name = "gps-cdcl"
   solver-version = 1
