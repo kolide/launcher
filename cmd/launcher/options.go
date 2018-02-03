@@ -78,12 +78,12 @@ func parseOptions() (*options, error) {
 		flNotaryServerURL = flag.String(
 			"notary_url",
 			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", autoupdate.DefaultNotary),
-			"The Notary update server (default: https://notary.kolide.com)",
+			"The Notary update server (default: https://notary.kolide.co)",
 		)
 		flMirrorURL = flag.String(
 			"mirror_url",
 			env.String("KOLIDE_LAUNCHER_MIRROR_SERVER_URL", autoupdate.DefaultMirror),
-			"The mirror server for autoupdates (default: https://dl.kolide.com)",
+			"The mirror server for autoupdates (default: https://dl.kolide.co)",
 		)
 		flAutoupdateInterval = flag.Duration(
 			"autoupdate_interval",
@@ -260,7 +260,7 @@ func developerUsage() {
 }
 
 func usageFooter() {
-	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.com/osquery\n")
+	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.co/osquery\n")
 	fmt.Fprintf(os.Stderr, "\n")
 }
 

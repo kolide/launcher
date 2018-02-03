@@ -146,6 +146,7 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	}
 
 	opts := &initTemplateOptions{
+		LaunchDaemonName: "launcher",
 		ServerHostname: grpcServerForHostname(hostname),
 		RootDirectory:  rootDirectory,
 		SecretPath:     secretPath,
@@ -163,13 +164,14 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 set -e
 systemctl daemon-reload
 systemctl enable launcher
-systemctl start launcher`
+systemctl restart launcher`
 		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 
 	} else { //not systemd, so assume init
 		initFileName := "launcher"
 		// The post install step
-		postInstallLauncherContents := "#/bin/bash"
+		postInstallLauncherContents := `#/bin/bash
+sudo service launcher restart`
 		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 	}
 
@@ -430,8 +432,7 @@ type initTemplateOptions struct {
 
 //renderInitService renders an init service to start and schedule the launcher
 func renderInitService(w io.Writer, options *initTemplateOptions) error {
-	initdTemplate := `
-#!/bin/sh
+	initdTemplate := `#!/bin/sh
 set -e
 NAME="{{.LaunchDaemonName}}"
 DAEMON="{{.LauncherPath}}"
@@ -503,6 +504,8 @@ ExecStart={{.LauncherPath}} \
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}
 --osqueryd_path={{.OsquerydPath}}
+Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target`
@@ -648,7 +651,7 @@ func grpcServerForHostname(hostname string) string {
 	case "master.cloud.kolide.net":
 		return "master-grpc.cloud.kolide.net:443"
 	case "kolide.co", "kolide.com":
-		return "launcher.kolide.com:443"
+		return "launcher.kolide.co:443"
 	default:
 		if strings.Contains(hostname, ":") {
 			return hostname
