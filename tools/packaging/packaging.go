@@ -49,6 +49,38 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
+func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFileName string, packageRoot string, binaryDirectory string, postInstallScript string, postInstallLauncherContents string, systemd bool) (error) {
+	// Create the init file for the launcher service
+	initPath := filepath.Join(serviceDirectory, initFileName)
+	initFile, err := os.Create(filepath.Join(packageRoot, initPath))
+	if err != nil {
+		return errors.Wrap(err, "could not create init system file")
+	}
+	defer initFile.Close()
+	if err := initFile.Chmod(0755); err != nil {
+		return errors.Wrap(err, "could not make postinstall script executable")
+	}
+	if systemd {
+		if err := renderSystemdService(initFile, opts); err != nil {
+			return errors.Wrap(err, "could not render init system file")
+		}
+	} else {
+		if err := renderInitService(initFile, opts); err != nil {
+			return errors.Wrap(err, "could not render init system file")
+		}
+	}
+
+	postInstallLauncherFile, err := os.Create(
+		filepath.Join(packageRoot, binaryDirectory, postInstallScript),
+	)
+	if err != nil {
+		return errors.Wrap(err, "could not create the post install script")
+	}
+	fmt.Fprintf(postInstallLauncherFile, postInstallLauncherContents)
+	postInstallLauncherFile.Close()
+	return nil
+}
+
 func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool, systemd bool) (string, string, error) {
 	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
@@ -109,97 +141,37 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		}
 	}
 
+	if updateChannel == "" {
+		updateChannel = "stable"
+	}
+
+	opts := &initTemplateOptions{
+		ServerHostname: grpcServerForHostname(hostname),
+		RootDirectory:  rootDirectory,
+		SecretPath:     secretPath,
+		OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
+		LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
+		Insecure:       insecure,
+		InsecureGrpc:   insecureGrpc,
+		Autoupdate:     autoupdate,
+		UpdateChannel:  updateChannel,
+	}
+
 	if systemd {
-		// Create the systemd unit file for the launcher service
-		systemdPath := filepath.Join(serviceDirectory, "launcher.service")
-		systemdFile, err := os.Create(filepath.Join(packageRoot, systemdPath))
-		if err != nil {
-			return "", "", errors.Wrap(err, "could not create launcher systemd unit file")
-		}
-		defer systemdFile.Close()
-
-		if updateChannel == "" {
-			updateChannel = "stable"
-		}
-
-		opts := &systemdTemplateOptions{
-			ServerHostname: grpcServerForHostname(hostname),
-			RootDirectory:  rootDirectory,
-			SecretPath:     secretPath,
-			OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
-			LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
-			Insecure:       insecure,
-			InsecureGrpc:   insecureGrpc,
-			Autoupdate:     autoupdate,
-			UpdateChannel:  updateChannel,
-		}
-		if err := renderSystemdService(systemdFile, opts); err != nil {
-			return "", "", errors.Wrap(err, "could not render systemd unit file")
-		}
-
-		// The launcher-systemd-installer
-		systemdLauncherInstallerContents := `#/bin/bash
+		initFileName := "launcher.service"
+		postInstallLauncherContents := `#/bin/bash
 set -e
 systemctl daemon-reload
 systemctl enable launcher
 systemctl start launcher`
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 
-		systemdLauncherInstallerFile, err := os.Create(
-			filepath.Join(packageRoot, binaryDirectory, postInstallScript),
-		)
-		if err != nil {
-			return "", "", errors.Wrap(err, "could not create the" + postInstallScript)
-		}
-		fmt.Fprintf(systemdLauncherInstallerFile, systemdLauncherInstallerContents)
-		systemdLauncherInstallerFile.Close()
 	} else { //not systemd, so assume init
-		initPath := filepath.Join(serviceDirectory, "launcher")
-		initFile, err := os.Create(filepath.Join(packageRoot, initPath))
-		if err != nil {
-			return "", "", errors.Wrap(err, "could not create launcher init file")
-		}
-
-		if err := initFile.Chmod(0755); err != nil {
-			return "", "", errors.Wrap(err, "could not make postinstall script executable")
-		}
-
-
-		if updateChannel == "" {
-			updateChannel = "stable"
-		}
-
-		opts := &initTemplateOptions {
-			ServerHostname: grpcServerForHostname(hostname),
-			RootDirectory:  rootDirectory,
-			SecretPath:     secretPath,
-			OsquerydPath:   filepath.Join(binaryDirectory, "osqueryd"),
-			LauncherPath:   filepath.Join(binaryDirectory, "launcher"),
-			Insecure:       insecure,
-			InsecureGrpc:   insecureGrpc,
-			Autoupdate:     autoupdate,
-			UpdateChannel:  updateChannel,
-			LaunchDaemonName: "launcher",
-		}
-		//add this for symmetry -- we may use it in the future for post-install work
-		if err := renderInitService(initFile, opts); err != nil {
-			return "", "", errors.Wrap(err, "could not render init file")
-		}
-		defer initFile.Close()
-
+		initFileName := "launcher"
 		// The post install step
-		systemdLauncherInstallerContents := "#/bin/bash"
-
-		postInstallScript, err := os.Create(
-			filepath.Join(packageRoot, binaryDirectory, postInstallScript),
-		)
-		if err != nil {
-			return "", "", errors.Wrap(err, "could not create the post install script")
-		}
-		fmt.Fprintf(postInstallScript, systemdLauncherInstallerContents)
-		postInstallScript.Close()
-
+		postInstallLauncherContents := "#/bin/bash"
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 	}
-
 
 	// The initial launcher (and extension) binary
 	err = fs.CopyFile(
@@ -440,7 +412,8 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 	return outputPath, nil
 }
 
-
+// systemdTemplateOptions is a struct which contains dynamic systemd
+// parameters that will be rendered into a template in renderInitdService
 type initTemplateOptions struct {
 	ServerHostname   string
 	RootDirectory    string
@@ -513,22 +486,8 @@ exit 0
 	return t.ExecuteTemplate(w, "initd", options)
 }
 
-// systemdTemplateOptions is a struct which contains dynamic systemd
-// parameters that will be rendered into a template in renderSystemdService
-type systemdTemplateOptions struct {
-	ServerHostname string
-	RootDirectory  string
-	LauncherPath   string
-	OsquerydPath   string
-	SecretPath     string
-	InsecureGrpc   bool
-	Insecure       bool
-	Autoupdate     bool
-	UpdateChannel  string
-}
-
 // renderSystemdService renders a systemd service to start and schedule the launcher.
-func renderSystemdService(w io.Writer, options *systemdTemplateOptions) error {
+func renderSystemdService(w io.Writer, options *initTemplateOptions) error {
 	systemdTemplate :=
 		`[Unit]
 Description=The Kolide Launcher
