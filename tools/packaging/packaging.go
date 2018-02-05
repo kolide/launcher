@@ -31,13 +31,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool) (*PackagePaths, error) {
+func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool, systemd bool) (*PackagePaths, error) {
 	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, systemd)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -49,7 +49,40 @@ func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey strin
 	}, nil
 }
 
-func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool) (string, string, error) {
+func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFileName string, packageRoot string, binaryDirectory string, postInstallScript string, postInstallLauncherContents string, systemd bool) (error) {
+	// Create the init file for the launcher service
+	initPath := filepath.Join(serviceDirectory, initFileName)
+	initFile, err := os.Create(filepath.Join(packageRoot, initPath))
+	if err != nil {
+		return errors.Wrap(err, "could not create init system file")
+	}
+	defer initFile.Close()
+	if err := initFile.Chmod(0755); err != nil {
+		return errors.Wrap(err, "could not make postinstall script executable")
+	}
+	if systemd {
+		if err := renderSystemdService(initFile, opts); err != nil {
+			return errors.Wrap(err, "could not render init system file")
+		}
+	} else {
+		if err := renderInitService(initFile, opts); err != nil {
+			return errors.Wrap(err, "could not render init system file")
+		}
+	}
+
+	postInstallLauncherFile, err := os.Create(
+		filepath.Join(packageRoot, binaryDirectory, postInstallScript),
+	)
+	if err != nil {
+		return errors.Wrap(err, "could not create the post install script")
+	}
+	fmt.Fprintf(postInstallLauncherFile, postInstallLauncherContents)
+	postInstallLauncherFile.Close()
+	return nil
+}
+
+func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool, systemd bool) (string, string, error) {
+	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -64,12 +97,17 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
 	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
 	configurationDirectory := filepath.Join("/etc", identifier)
-	systemdDirectory := "/etc/systemd/system"
+	serviceDirectory := "/etc/systemd/system"
+
+	if !systemd {
+		serviceDirectory = "/etc/init.d/"
+	}
+
 	pathsToCreate := []string{
 		rootDirectory,
 		binaryDirectory,
 		configurationDirectory,
-		systemdDirectory,
+		serviceDirectory,
 	}
 
 	for _, pathToCreate := range pathsToCreate {
@@ -103,19 +141,12 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		}
 	}
 
-	// Create the systemd unit file for the launcher service
-	systemdPath := filepath.Join(systemdDirectory, "launcher.service")
-	systemdFile, err := os.Create(filepath.Join(packageRoot, systemdPath))
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not create launcher systemd unit file")
-	}
-	defer systemdFile.Close()
-
 	if updateChannel == "" {
 		updateChannel = "stable"
 	}
 
-	opts := &systemdTemplateOptions{
+	opts := &initTemplateOptions{
+		LaunchDaemonName: "launcher",
 		ServerHostname: grpcServerForHostname(hostname),
 		RootDirectory:  rootDirectory,
 		SecretPath:     secretPath,
@@ -126,25 +157,23 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		Autoupdate:     autoupdate,
 		UpdateChannel:  updateChannel,
 	}
-	if err := renderSystemdService(systemdFile, opts); err != nil {
-		return "", "", errors.Wrap(err, "could not render systemd unit file")
-	}
 
-	// The launcher-systemd-installer
-	systemdLauncherInstallerContents := `#/bin/bash
+	if systemd {
+		initFileName := "launcher.service"
+		postInstallLauncherContents := `#/bin/bash
 set -e
 systemctl daemon-reload
 systemctl enable launcher
 systemctl restart launcher`
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 
-	systemdLauncherInstallerFile, err := os.Create(
-		filepath.Join(packageRoot, binaryDirectory, "launcher-systemd-installer"),
-	)
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not create the launcher-systemd-installer")
+	} else { //not systemd, so assume init
+		initFileName := "launcher"
+		// The post install step
+		postInstallLauncherContents := `#/bin/bash
+sudo service launcher restart`
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 	}
-	fmt.Fprintf(systemdLauncherInstallerFile, systemdLauncherInstallerContents)
-	systemdLauncherInstallerFile.Close()
 
 	// The initial launcher (and extension) binary
 	err = fs.CopyFile(
@@ -180,7 +209,9 @@ systemctl restart launcher`
 
 	// Create the packages
 	containerPackageRoot := "/pkgroot"
-	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, "launcher-systemd-installer")
+
+	afterInstall := filepath.Join(containerPackageRoot, binaryDirectory, postInstallScript)
+
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
@@ -384,21 +415,80 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 }
 
 // systemdTemplateOptions is a struct which contains dynamic systemd
-// parameters that will be rendered into a template in renderSystemdService
-type systemdTemplateOptions struct {
-	ServerHostname string
-	RootDirectory  string
-	LauncherPath   string
-	OsquerydPath   string
-	SecretPath     string
-	InsecureGrpc   bool
-	Insecure       bool
-	Autoupdate     bool
-	UpdateChannel  string
+// parameters that will be rendered into a template in renderInitdService
+type initTemplateOptions struct {
+	ServerHostname   string
+	RootDirectory    string
+	LauncherPath     string
+	OsquerydPath     string
+	LogDirectory     string
+	SecretPath       string
+	LaunchDaemonName string
+	InsecureGrpc     bool
+	Insecure         bool
+	Autoupdate       bool
+	UpdateChannel    string
+}
+
+//renderInitService renders an init service to start and schedule the launcher
+func renderInitService(w io.Writer, options *initTemplateOptions) error {
+	initdTemplate := `#!/bin/sh
+set -e
+NAME="{{.LaunchDaemonName}}"
+DAEMON="{{.LauncherPath}}"
+DAEMON_OPTS="--root_directory={{.RootDirectory}} \
+--hostname={{.ServerHostname}} \
+--enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
+--insecure_grpc \{{end}}{{if .Insecure}}
+--insecure \{{end}}{{if .Autoupdate}}
+--autoupdate \
+--update_channel={{.UpdateChannel}} \{{end}}
+--osqueryd_path={{.OsquerydPath}}"
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+
+is_running() {
+    start-stop-daemon --status --exec $DAEMON
+}
+case "$1" in
+  start)
+        echo "Starting daemon: "$NAME
+        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
+        ;;
+  stop)
+        echo "Stopping daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --exec $DAEMON
+        ;;
+  restart)
+        echo "Restarting daemon: "$NAME
+        start-stop-daemon --stop --quiet --oknodo --retry 30 --exec $DAEMON
+        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
+        ;;
+  status)
+    if is_running; then
+        echo "Running"
+    else
+        echo "Stopped"
+        exit 1
+    fi
+    ;;
+  *)
+        echo "Usage: "$1" {start|stop|restart|status}"
+        exit 1
+esac
+
+exit 0
+`
+
+	t, err := template.New("initd").Parse(initdTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse initd template")
+	}
+	return t.ExecuteTemplate(w, "initd", options)
 }
 
 // renderSystemdService renders a systemd service to start and schedule the launcher.
-func renderSystemdService(w io.Writer, options *systemdTemplateOptions) error {
+func renderSystemdService(w io.Writer, options *initTemplateOptions) error {
 	systemdTemplate :=
 		`[Unit]
 Description=The Kolide Launcher

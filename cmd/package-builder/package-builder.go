@@ -78,6 +78,11 @@ func runMake(args []string) error {
 			env.Bool("OMIT_SECRET", false),
 			"omit the enroll secret in the resultant package (default: false)",
 		)
+		flSystemd = flagset.Bool(
+			"systemd",
+			env.Bool("SYSTEMD", true),
+			"weather or not the launcher packages should be built to target systems with systemd (default: true)",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -108,7 +113,7 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret, *flSystemd)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
