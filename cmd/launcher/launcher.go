@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -283,7 +286,7 @@ func main() {
 	}
 	defer db.Close()
 
-	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger)
+	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger, nil)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
 	}
@@ -440,6 +443,7 @@ func dialGRPC(
 	insecureTLS bool,
 	insecureGRPC bool,
 	logger log.Logger,
+	certPins []string,
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 	level.Info(logger).Log(
@@ -447,6 +451,7 @@ func dialGRPC(
 		"server", serverURL,
 		"tls_secure", insecureTLS == false,
 		"grpc_secure", insecureGRPC == false,
+		"cert_pinning", len(certPins) > 0,
 	)
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTimeout(time.Second),
@@ -458,10 +463,8 @@ func dialGRPC(
 		if err != nil {
 			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
 		}
-		creds := &tlsCreds{credentials.NewTLS(&tls.Config{
-			ServerName:         host,
-			InsecureSkipVerify: insecureTLS,
-		})}
+
+		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins))}
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 	}
 
@@ -469,4 +472,43 @@ func dialGRPC(
 
 	conn, err := grpc.Dial(serverURL, grpcOpts...)
 	return conn, err
+}
+
+func makeTLSConfig(host string, insecureTLS bool, certPins []string) *tls.Config {
+	conf := &tls.Config{
+		ServerName:         host,
+		InsecureSkipVerify: insecureTLS,
+	}
+
+	if len(certPins) > 0 {
+		var certPinBytes [][]byte
+		for _, pin := range certPins {
+			dec, err := hex.DecodeString(pin)
+			if err != nil {
+				panic(err)
+			}
+			certPinBytes = append(certPinBytes, dec)
+		}
+
+		conf.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			for _, chain := range verifiedChains {
+				for _, cert := range chain {
+					// Compare SHA256 hash of
+					// SubjectPublicKeyInfo with each of
+					// the pinned hashes.
+					hash := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
+					for _, pin := range certPinBytes {
+						if bytes.Equal(pin, hash[:]) {
+							// Cert matches pin.
+							return nil
+						}
+					}
+				}
+			}
+
+			return errors.New("no match found with pinned cert")
+		}
+	}
+
+	return conf
 }
