@@ -463,7 +463,7 @@ func dialGRPC(
 			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
 		}
 
-		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins))}
+		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins, logger))}
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 	}
 
@@ -473,7 +473,7 @@ func dialGRPC(
 	return conn, err
 }
 
-func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte) *tls.Config {
+func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, logger log.Logger) *tls.Config {
 	conf := &tls.Config{
 		ServerName:         host,
 		InsecureSkipVerify: insecureTLS,
@@ -496,6 +496,14 @@ func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte) *tls.Config
 				}
 			}
 
+			// Normally we wouldn't log and return an error, but
+			// gRPC does not seem to expose the error in a way that
+			// we can get at it later. At least this provides some
+			// feedback to the user about what is going wrong.
+			level.Info(logger).Log(
+				"msg", "no match found with pinned certificates",
+				"err", "certificate pin validationf failed",
+			)
 			return errors.New("no match found with pinned cert")
 		}
 	}

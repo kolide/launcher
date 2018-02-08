@@ -180,7 +180,7 @@ func TestCertPinning(t *testing.T) {
 			certPins, err := parseCertPins(tt.pins)
 			require.NoError(t, err)
 
-			tlsconf := makeTLSConfig("localhost", false, certPins)
+			tlsconf := makeTLSConfig("localhost", false, certPins, log.NewNopLogger())
 			tlsconf.RootCAs = pool
 
 			conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(), nil,
