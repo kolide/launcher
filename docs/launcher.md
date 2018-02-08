@@ -62,6 +62,19 @@ launcher \
 
 Note the `--insecure` flag.
 
+### Certificate Pinning
+
+Launcher supports pinning to the `SubjectPublicKeyInfo` of certificates in the verified chain. To enable this feature, provide the SHA256 hashes of the `SubjectPublicKeyInfo` that should be pinned as comma-separated hex-encoded values to the `cert_pins` flag.
+
+For example, to pin to `intermediate.crt` we could do the following:
+
+```
+openssl x509 -in intermediate.crt -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256
+b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b
+
+launcher --cert_pins=b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b
+```
+
 ## Additional Build Options
 
 ### Normal development build
@@ -127,5 +140,3 @@ make install
 ```
 
 You *could* run `go get github.com/kolide/launcher/cmd/...` to install the binaries but it is not recommended because the binaries will not be built with version information when you run `launcher --version`.
-
-

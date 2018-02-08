@@ -1,16 +1,18 @@
 package main
 
 import (
-	"errors"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
+	"github.com/pkg/errors"
 )
 
 // options is the set of configurable options that may be set when launching this
@@ -21,6 +23,7 @@ type options struct {
 	enrollSecretPath   string
 	rootDirectory      string
 	osquerydPath       string
+	certPins           [][]byte
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
@@ -67,6 +70,11 @@ func parseOptions() (*options, error) {
 			"osqueryd_path",
 			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
 			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
+		)
+		flCertPins = flag.String(
+			"cert_pins",
+			env.String("KOLIDE_LAUNCHER_CERT_PINS", ""),
+			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
 		)
 
 		// Autoupdate options
@@ -162,12 +170,18 @@ func parseOptions() (*options, error) {
 		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
 	}
 
+	certPins, err := parseCertPins(*flCertPins)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := &options{
 		kolideServerURL:    *flKolideServerURL,
 		enrollSecret:       *flEnrollSecret,
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
 		osquerydPath:       osquerydPath,
+		certPins:           certPins,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
@@ -275,4 +289,18 @@ func duration(key string, def time.Duration) time.Duration {
 		return t
 	}
 	return def
+}
+
+func parseCertPins(pins string) ([][]byte, error) {
+	var certPins [][]byte
+	if pins != "" {
+		for _, hexPin := range strings.Split(pins, ",") {
+			pin, err := hex.DecodeString(hexPin)
+			if err != nil {
+				return nil, errors.Wrap(err, "decoding cert pin")
+			}
+			certPins = append(certPins, pin)
+		}
+	}
+	return certPins, nil
 }

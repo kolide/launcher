@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -286,7 +285,7 @@ func main() {
 	}
 	defer db.Close()
 
-	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger, nil)
+	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger, opts.certPins)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
 	}
@@ -443,7 +442,7 @@ func dialGRPC(
 	insecureTLS bool,
 	insecureGRPC bool,
 	logger log.Logger,
-	certPins []string,
+	certPins [][]byte,
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 	level.Info(logger).Log(
@@ -474,22 +473,13 @@ func dialGRPC(
 	return conn, err
 }
 
-func makeTLSConfig(host string, insecureTLS bool, certPins []string) *tls.Config {
+func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte) *tls.Config {
 	conf := &tls.Config{
 		ServerName:         host,
 		InsecureSkipVerify: insecureTLS,
 	}
 
 	if len(certPins) > 0 {
-		var certPinBytes [][]byte
-		for _, pin := range certPins {
-			dec, err := hex.DecodeString(pin)
-			if err != nil {
-				panic(err)
-			}
-			certPinBytes = append(certPinBytes, dec)
-		}
-
 		conf.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			for _, chain := range verifiedChains {
 				for _, cert := range chain {
@@ -497,7 +487,7 @@ func makeTLSConfig(host string, insecureTLS bool, certPins []string) *tls.Config
 					// SubjectPublicKeyInfo with each of
 					// the pinned hashes.
 					hash := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
-					for _, pin := range certPinBytes {
+					for _, pin := range certPins {
 						if bytes.Equal(pin, hash[:]) {
 							// Cert matches pin.
 							return nil

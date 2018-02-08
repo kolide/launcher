@@ -154,35 +154,33 @@ func TestCertPinning(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 
 	testCases := []struct {
-		pins    []string
+		pins    string
 		success bool
 	}{
 		// Success cases
 		// pin leaf
-		{[]string{"eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92"}, true},
+		{"eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
 		// pin leaf + extra garbage
-		{[]string{"deadb33f", "eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92"}, true},
+		{"deadb33f,eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
 		// pin intermediate
-		{[]string{"73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e"}, true},
+		{"73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e", true},
 		// pin root
-		{[]string{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b"}, true},
+		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
 		// pin all three
-		{[]string{
-			"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b",
-			"73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e",
-			"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b",
-		}, true},
+		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b,73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e,b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
 
 		// Failure cases
-		{[]string{"deadb33f"}, false},
-		{[]string{"deadb33f", "34567fff"}, false},
-		{[]string{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281"}, false},
+		{"deadb33f", false},
+		{"deadb33f,34567fff", false},
+		{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281", false},
 	}
 
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
+			certPins, err := parseCertPins(tt.pins)
+			require.NoError(t, err)
 
-			tlsconf := makeTLSConfig("localhost", false, tt.pins)
+			tlsconf := makeTLSConfig("localhost", false, certPins)
 			tlsconf.RootCAs = pool
 
 			conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(), nil,
