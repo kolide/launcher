@@ -48,11 +48,21 @@ func startServer(t *testing.T, conf *tls.Config) func() {
 	return grpcServer.Stop
 }
 
-const badCert = "testdata/bad-cert.pem"
-const badKey = "testdata/bad-key.pem"
+const (
+	badCert = "testdata/bad-cert.pem"
+	badKey  = "testdata/bad-key.pem"
 
-const goodCert = "testdata/good-cert.pem"
-const goodKey = "testdata/good-key.pem"
+	goodCert = "testdata/good-cert.pem"
+	goodKey  = "testdata/good-key.pem"
+
+	leafCert = "testdata/certchain/leaf.crt"
+	leafKey  = "testdata/certchain/leaf.key"
+
+	rootCert = "testdata/certchain/root.crt"
+	rootKey  = "testdata/certchain/root.key"
+
+	chainPem = "testdata/certchain/chain.pem"
+)
 
 func TestSwappingCert(t *testing.T) {
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
@@ -68,7 +78,7 @@ func TestSwappingCert(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(),
+	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(), nil,
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
@@ -106,7 +116,7 @@ func TestCertRemainsBad(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(),
+	conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(), nil,
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
@@ -129,4 +139,64 @@ func TestCertRemainsBad(t *testing.T) {
 	require.NotNil(t, err)
 
 	stop()
+}
+
+func TestCertPinning(t *testing.T) {
+	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
+	require.Nil(t, err)
+	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
+	defer stop()
+	time.Sleep(1 * time.Second)
+
+	pem1, err := ioutil.ReadFile(rootCert)
+	require.Nil(t, err)
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(pem1)
+
+	testCases := []struct {
+		pins    string
+		success bool
+	}{
+		// Success cases
+		// pin leaf
+		{"eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
+		// pin leaf + extra garbage
+		{"deadb33f,eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
+		// pin intermediate
+		{"73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e", true},
+		// pin root
+		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
+		// pin all three
+		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b,73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e,b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
+
+		// Failure cases
+		{"deadb33f", false},
+		{"deadb33f,34567fff", false},
+		{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281", false},
+	}
+
+	for _, tt := range testCases {
+		t.Run("", func(t *testing.T) {
+			certPins, err := parseCertPins(tt.pins)
+			require.NoError(t, err)
+
+			tlsconf := makeTLSConfig("localhost", false, certPins, log.NewNopLogger())
+			tlsconf.RootCAs = pool
+
+			conn, err := dialGRPC("localhost:8443", false, false, log.NewNopLogger(), nil,
+				grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(tlsconf)}),
+			)
+			require.Nil(t, err)
+			defer conn.Close()
+
+			client := service.New(conn, log.NewNopLogger())
+
+			_, _, err = client.RequestEnrollment(context.Background(), "", "")
+			if tt.success {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 }
