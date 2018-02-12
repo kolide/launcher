@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -111,23 +110,9 @@ func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 		logs = append(logs, log.Data)
 	}
 
-	// Note: The conversion here is lossy because the osquery-go logType has more
-	// enum values than kolide_agent.
-	// For now this should be enough because we don't use the Agent LogType anywhere.
-	// A more robust fix should come from fixing https://github.com/kolide/launcher/issues/183
-	var typ logger.LogType
-	switch req.LogType {
-	case kolide_agent.LogCollection_STATUS:
-		typ = logger.LogTypeStatus
-	case kolide_agent.LogCollection_RESULT:
-		typ = logger.LogTypeSnapshot
-	default:
-		panic(fmt.Sprintf("logType %d not implemented", req.LogType))
-	}
-
 	return logCollection{
 		NodeKey: req.NodeKey,
-		LogType: typ,
+		LogType: logger.LogType(req.OsqueryLogType),
 		Logs:    logs,
 	}, nil
 }
@@ -150,11 +135,11 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 	}
 
 	return &kolide_agent.LogCollection{
-		NodeKey: req.NodeKey,
-		LogType: typ,
-		Logs:    logs,
+		NodeKey:        req.NodeKey,
+		LogType:        typ,
+		Logs:           logs,
+		OsqueryLogType: int32(req.LogType),
 	}, nil
-
 }
 
 func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
