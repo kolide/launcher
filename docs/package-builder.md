@@ -7,7 +7,7 @@ Right now, `package-builder` will build a macOS package (.pkg), a debian package
 To build the Linux packages, `package-builder` will execute a docker container which contains the [`fpm`](https://github.com/jordansissel/fpm) tool. Thus, you must also have docker installed and working correctly. If you would like to test this, run the following:
 
 ```
-docker run -it kolide/fpm echo "it works"
+docker run --rm -it kolide/fpm echo "it works"
 ```
 
 Finally, like any Go project, you must have this repo checked out to `$GOPATH/src/github.com/kolide/launcher`. If you're new to Go and you don't know about `$GOPATH`, then check out the repo to `$HOME/go/src/github.com/kolide/launcher`.
@@ -56,6 +56,7 @@ If you would like the resultant launcher binary to be invoked with any of the fo
 - `--insecure_grpc`
 - `--autoupdate`
 - `--update_channel`
+- `--cert_pins`
 
 For example, consider the following usage:
 
@@ -66,7 +67,8 @@ For example, consider the following usage:
   --insecure \
   --insecure_grpc \
   --autoupdate \
-  --update_channel=nightly
+  --update_channel=nightly \
+  --cert_pins=5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281
 ```
 
 By default, binaries will be installed to `/usr/local/launcher/bin`, configuration will be installed to `/etc/launcher`, logs will be outputted to `/var/log/launcher`, etc. If you'd like the `launcher` string to be something else (for example, your company name), you can use the `--identifier` flag to specify this value. If you would like the resultant packages to not contain the enroll secret (so that you can distribute it via another mechanism), you can use the `--omit_secret` flag.

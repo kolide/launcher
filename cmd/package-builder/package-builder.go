@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -83,6 +84,11 @@ func runMake(args []string) error {
 			env.Bool("SYSTEMD", true),
 			"weather or not the launcher packages should be built to target systems with systemd (default: true)",
 		)
+		flCertPins = flagset.String(
+			"cert_pins",
+			env.String("CERT_PINS", ""),
+			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -113,7 +119,14 @@ func runMake(args []string) error {
 	macPackageSigningKey := *flMacPackageSigningKey
 	_ = macPackageSigningKey
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret, *flSystemd)
+	// Validate that pinned certs are valid hex
+	for _, pin := range strings.Split(*flCertPins, ",") {
+		if _, err := hex.DecodeString(pin); err != nil {
+			return errors.Wrap(err, "unable to parse cert pins")
+		}
+	}
+
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret, *flSystemd, *flCertPins)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
