@@ -7,7 +7,6 @@ import (
 	"github.com/go-kit/kit/log"
 	twirptransport "github.com/go-kit/kit/transport/twirp"
 	"github.com/pkg/errors"
-	"github.com/twitchtv/twirp"
 
 	pb "github.com/kolide/launcher/service/internal/launcherproto"
 	"github.com/kolide/launcher/service/uuid"
@@ -17,11 +16,8 @@ const TwirpHTTPApiPathPrefix = pb.ApiPathPrefix
 
 func parseUUIDHeaderTwirp() twirptransport.ServerOption {
 	return twirptransport.ServerBefore(
-		func(ctx context.Context) context.Context {
-			if hdr, ok := twirp.HTTPRequestHeaders(ctx); ok {
-				ctx = uuid.NewContext(ctx, hdr.Get("uuid"))
-			}
-			return ctx
+		func(ctx context.Context, header http.Header) context.Context {
+			return uuid.NewContext(ctx, header.Get("uuid"))
 		},
 	)
 }

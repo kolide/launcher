@@ -67,7 +67,7 @@
     "transport/grpc",
     "transport/twirp"
   ]
-  revision = "3d612bdbb67f3bebde657a3204be9a7acd814c96"
+  revision = "36868d3b32a694d9c109080f843b9a8c8426c4db"
   source = "github.com/austinylin/kit"
 
 [[projects]]

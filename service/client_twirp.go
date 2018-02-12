@@ -14,9 +14,9 @@ import (
 
 func attachUUIDHeaderTwirp() twirptransport.ClientOption {
 	return twirptransport.ClientBefore(
-		func(ctx context.Context) (context.Context, error) {
+		func(ctx context.Context, h *http.Header) context.Context {
 			uuid, _ := uuid.FromContext(ctx)
-			return twirptransport.SetRequestHeader("uuid", uuid)(ctx)
+			return twirptransport.SetRequestHeader("uuid", uuid)(ctx, h)
 		},
 	)
 }
@@ -38,60 +38,48 @@ func NewTwirpHTTPClient(kolideServerURL string, insecureTLS bool, logger log.Log
 	apiClient := pb.NewApiProtobufClient(kolideServerURL, httpClient)
 
 	requestEnrollmentEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.EnrollmentRequest)
-			return apiClient.RequestEnrollment(ctx, req)
-		},
+		apiClient,
+		"RequestEnrollment",
 		encodeProtobufEnrollmentRequest,
 		decodeProtobufEnrollmentResponse,
 		attachUUIDHeaderTwirp(),
 	).Endpoint()
 
 	requestConfigEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.AgentApiRequest)
-			return apiClient.RequestConfig(ctx, req)
-		},
+		apiClient,
+		"RequestConfig",
 		encodeProtobufAgentAPIRequest,
 		decodeProtobufConfigResponse,
 		attachUUIDHeaderTwirp(),
 	).Endpoint()
 
 	publishLogsEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.LogCollection)
-			return apiClient.PublishLogs(ctx, req)
-		},
+		apiClient,
+		"PublishLogs",
 		encodeProtobufLogCollection,
 		decodeProtobufAgentAPIResponse,
 		attachUUIDHeaderTwirp(),
 	).Endpoint()
 
 	requestQueriesEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.AgentApiRequest)
-			return apiClient.RequestQueries(ctx, req)
-		},
+		apiClient,
+		"RequestQueries",
 		encodeProtobufAgentAPIRequest,
 		decodeProtobufQueryCollection,
 		attachUUIDHeaderTwirp(),
 	).Endpoint()
 
 	publishResultsEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.ResultCollection)
-			return apiClient.PublishResults(ctx, req)
-		},
+		apiClient,
+		"PublishResults",
 		encodeProtobufResultCollection,
 		decodeProtobufAgentAPIResponse,
 		attachUUIDHeaderTwirp(),
 	).Endpoint()
 
 	checkHealthEndpoint := twirptransport.NewClient(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
-			req := request.(*pb.AgentApiRequest)
-			return apiClient.CheckHealth(ctx, req)
-		},
+		apiClient,
+		"CheckHealth",
 		encodeProtobufAgentAPIRequest,
 		decodeProtobufHealthCheckResponse,
 		attachUUIDHeaderTwirp(),
