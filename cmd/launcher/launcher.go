@@ -285,7 +285,26 @@ func main() {
 	}
 	defer db.Close()
 
-	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, logger, opts.certPins)
+	var rootPool *x509.CertPool
+	if opts.rootPEM != "" {
+		rootPool = x509.NewCertPool()
+
+		pemContents, err := ioutil.ReadFile(opts.rootPEM)
+		if err != nil {
+			logger.Fatal(
+				"err", errors.Wrap(err, "reading root certs PEM"),
+				"path", opts.rootPEM,
+			)
+		}
+		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
+			logger.Fatal(
+				"err", "found no valid certs in PEM",
+				"path", opts.rootPEM,
+			)
+		}
+	}
+
+	conn, err := dialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
 	}
@@ -441,8 +460,9 @@ func dialGRPC(
 	serverURL string,
 	insecureTLS bool,
 	insecureGRPC bool,
-	logger log.Logger,
 	certPins [][]byte,
+	rootPool *x509.CertPool,
+	logger log.Logger,
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 	level.Info(logger).Log(
@@ -463,7 +483,7 @@ func dialGRPC(
 			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
 		}
 
-		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins, logger))}
+		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins, rootPool, logger))}
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 	}
 
@@ -473,10 +493,11 @@ func dialGRPC(
 	return conn, err
 }
 
-func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, logger log.Logger) *tls.Config {
+func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x509.CertPool, logger log.Logger) *tls.Config {
 	conf := &tls.Config{
 		ServerName:         host,
 		InsecureSkipVerify: insecureTLS,
+		RootCAs:            rootPool,
 	}
 
 	if len(certPins) > 0 {
