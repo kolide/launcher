@@ -24,6 +24,7 @@ type options struct {
 	rootDirectory      string
 	osquerydPath       string
 	certPins           [][]byte
+	rootPEM            string
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
@@ -75,6 +76,11 @@ func parseOptions() (*options, error) {
 			"cert_pins",
 			env.String("KOLIDE_LAUNCHER_CERT_PINS", ""),
 			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
+		)
+		flRootPEM = flag.String(
+			"root_pem",
+			env.String("KOLIDE_LAUNCHER_ROOT_PEM", ""),
+			"Path to PEM file including root certificates to verify against",
 		)
 
 		// Autoupdate options
@@ -182,6 +188,7 @@ func parseOptions() (*options, error) {
 		rootDirectory:      *flRootDirectory,
 		osquerydPath:       osquerydPath,
 		certPins:           certPins,
+		rootPEM:            *flRootPEM,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,

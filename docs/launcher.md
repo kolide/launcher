@@ -75,6 +75,17 @@ b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b
 launcher --cert_pins=b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b
 ```
 
+### Specify Root CAs
+
+If your server TLS certificate is signed by a root that is not recognized by the system trust store, you will need to manually point launcher at the appropriate root to use. Note, if you specify any roots with this method, _only_ those roots will be used, and the system store will be ignored.
+
+The PEM file should contain all of the root authorities you would like launcher to be able to validate against.
+
+
+```
+launcher --root_pem=root.pem
+```
+
 ## Additional Build Options
 
 ### Normal development build
