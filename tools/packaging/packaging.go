@@ -161,7 +161,7 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	if systemd {
 		initFileName := "launcher.service"
-		postInstallLauncherContents := `#/bin/bash
+		postInstallLauncherContents := `#!/bin/bash
 set -e
 systemctl daemon-reload
 systemctl enable launcher
@@ -171,7 +171,7 @@ systemctl restart launcher`
 	} else { //not systemd, so assume init
 		initFileName := "launcher"
 		// The post install step
-		postInstallLauncherContents := `#/bin/bash
+		postInstallLauncherContents := `#!/bin/bash
 sudo service launcher restart`
 		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
 	}
