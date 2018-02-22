@@ -89,6 +89,11 @@ func runMake(args []string) error {
 			env.String("CERT_PINS", ""),
 			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
 		)
+		flRootPEM = flagset.String(
+			"root_pem",
+			env.String("ROOT_PEM", ""),
+			"Path to PEM file including root certificates to verify against",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -126,7 +131,7 @@ func runMake(args []string) error {
 		}
 	}
 
-	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret, *flSystemd, *flCertPins)
+	paths, err := packaging.CreatePackages(osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flIdentifier, *flOmitSecret, *flSystemd, *flCertPins, *flRootPEM)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
