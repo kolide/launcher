@@ -143,10 +143,13 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 
 	var rootPEMPath string
 	if rootPEM != "" {
-		rootPEMPath = filepath.Join(packageRoot, configurationDirectory, "roots.pem")
+		rootPEMPath = filepath.Join(configurationDirectory, "roots.pem")
 
-		if err := fs.CopyFile(rootPEM, rootPEMPath); err != nil {
+		if err := fs.CopyFile(rootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
 			return "", "", errors.Wrap(err, "copy root PEM")
+		}
+		if err := os.Chmod(filepath.Join(packageRoot, rootPEMPath), 0600); err != nil {
+			return "", "", errors.Wrap(err, "chmod root PEM")
 		}
 	}
 
@@ -342,10 +345,14 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 
 	var rootPEMPath string
 	if rootPEM != "" {
-		rootPEMPath = filepath.Join(packageRoot, configurationDirectory, "roots.pem")
+		rootPEMPath = filepath.Join(configurationDirectory, "roots.pem")
 
-		if err := fs.CopyFile(rootPEM, rootPEMPath); err != nil {
+		if err := fs.CopyFile(rootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
 			return "", errors.Wrap(err, "copy root PEM")
+		}
+
+		if err := os.Chmod(filepath.Join(packageRoot, rootPEMPath), 0600); err != nil {
+			return "", errors.Wrap(err, "chmod root PEM")
 		}
 	}
 
@@ -375,7 +382,7 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		RootPEM:          rootPEMPath,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
-		return "", errors.Wrap(err, "could not write LaunchDeamon content to file")
+		return "", errors.Wrap(err, "could not write LaunchDaemon content to file")
 	}
 
 	// The secret which the user will use to authenticate to the server
