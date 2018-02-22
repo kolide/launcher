@@ -1,0 +1,12 @@
+steps:
+    - name: 'gcr.io/cloud-builders/go'
+      entrypoint: 'sh'
+      args: ['-c', '/workspace/build.sh']
+      env: ['PROJECT_ROOT=github.com/kolide/launcher']
+
+    - name: 'gcr.io/cloud-builders/gsutil'
+      entrypoint: 'bash'
+      args:
+      - '-c'
+      - '/workspace/tarbin.sh'
+
