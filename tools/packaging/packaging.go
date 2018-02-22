@@ -141,7 +141,7 @@ func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, inse
 		}
 	}
 
-	rootPEMPath := ""
+	var rootPEMPath string
 	if rootPEM != "" {
 		rootPEMPath = filepath.Join(packageRoot, configurationDirectory, "roots.pem")
 
@@ -340,7 +340,7 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
-	rootPEMPath := ""
+	var rootPEMPath string
 	if rootPEM != "" {
 		rootPEMPath = filepath.Join(packageRoot, configurationDirectory, "roots.pem")
 
