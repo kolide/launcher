@@ -46,9 +46,10 @@ const (
 	configKey = "config"
 
 	// Default maximum number of bytes per batch (used if not specified in
-	// options). This 4MB limit is chosen based on the default grpc-go
+	// options). This 2MB limit is chosen based on the default grpc-go
 	// limit specified in https://github.com/grpc/grpc-go/blob/master/server.go#L51
-	defaultMaxBytesPerBatch = 4 << 20
+	// which is 4MB. We use 2MB to be conservative.
+	defaultMaxBytesPerBatch = 2 << 20
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 1 * time.Minute
