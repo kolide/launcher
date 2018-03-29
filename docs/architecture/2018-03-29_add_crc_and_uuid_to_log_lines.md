@@ -2,7 +2,7 @@
 
 ## Authors
 
-- Nick Esposito (@nicktitle)
+- Nick Esposito ([@nicktitle](https://github.com/nicktitle))
 
 ## Status
 
