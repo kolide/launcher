@@ -22,7 +22,7 @@ type logmw struct {
 	next   KolideService
 }
 
-func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (errcode string, reauth bool, err error) {
+func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (nodekey string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 		mw.logger.Log(
@@ -30,14 +30,14 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			"uuid", uuid,
 			"enrollSecret", enrollSecret,
 			"hostIdentifier", hostIdentifier,
-			"errcode", errcode,
+			"nodekey", nodekey,
 			"reauth", reauth,
 			"err", err,
 			"took", time.Since(begin),
 		)
 	}(time.Now())
 
-	errcode, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
+	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
 	return
 }
 
