@@ -155,8 +155,12 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
+	return getIdentifierFromDB(e.db)
+}
+
+func getIdentifierFromDB(db *bolt.DB) (string, error) {
 	var identifier string
-	err := e.db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		uuidBytes := b.Get([]byte(uuidKey))
 		gotID, err := uuid.ParseBytes(uuidBytes)
