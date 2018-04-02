@@ -356,6 +356,7 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
 		osquery.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
+		osquery.WithOsqueryExtensionPlugin(osquery.LauncherIdentifierTable(db)),
 		osquery.WithStdout(osqueryLogger),
 		osquery.WithStderr(osqueryLogger),
 		osquery.WithLogger(logger),
