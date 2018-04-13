@@ -129,7 +129,7 @@
     "plugin/table",
     "transport"
   ]
-  revision = "77394894ef63b4ea25e1c0c4f8a8b3d1919e1aa6"
+  revision = "e17dfe8f44e7ac06fb2bd1cccbf64dbfbc9e5757"
 
 [[projects]]
   branch = "master"
