@@ -25,6 +25,8 @@ jobs:
           paths:
             - vendor
 
+      - run: make deps
+      - run: make install
       - run: make test
       - run: make extension
       - run: make launcher
