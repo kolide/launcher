@@ -66,7 +66,13 @@ xp-extension: .pre-build
 launcher: .pre-build .pre-launcher
 	go build -i -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 
+codesign-darwin:
+	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
+	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
+
 xp: xp-launcher xp-extension
+
+xp-codesign: xp codesign-darwin
 
 xp-launcher: .pre-build .pre-launcher
 	GOOS=darwin go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
@@ -151,7 +157,7 @@ push-containers: $(CONTAINERS)
 		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
 	done
 
-binary-bundle: xp
+binary-bundle: xp-codesign
 	rm -rf build/binary-bundle
 	mkdir -p build/binary-bundle/linux
 	mkdir -p build/binary-bundle/darwin
