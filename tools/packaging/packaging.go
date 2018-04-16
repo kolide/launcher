@@ -12,7 +12,6 @@ import (
 	"text/template"
 
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
 
@@ -31,13 +30,28 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel string, identifier string, omitSecret bool, systemd bool, certPins, rootPEM string) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, certPins, rootPEM)
+func CreatePackages(
+	packageVersion,
+	osqueryVersion,
+	hostname,
+	secret,
+	macPackageSigningKey string,
+	insecure,
+	insecureGrpc,
+	autoupdate bool,
+	updateChannel string,
+	identifier string,
+	omitSecret bool,
+	systemd bool,
+	certPins,
+	rootPEM string,
+) (*PackagePaths, error) {
+	macPkgDestinationPath, err := CreateMacPackage(packageVersion, osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, certPins, rootPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, systemd, certPins, rootPEM)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(packageVersion, osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, systemd, certPins, rootPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -81,7 +95,21 @@ func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFil
 	return nil
 }
 
-func CreateLinuxPackages(osqueryVersion, hostname, secret string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool, systemd bool, certPins, rootPEM string) (string, string, error) {
+func CreateLinuxPackages(
+	packageVersion,
+	osqueryVersion,
+	hostname,
+	secret string,
+	insecure,
+	insecureGrpc,
+	autoupdate bool,
+	updateChannel,
+	identifier string,
+	omitSecret bool,
+	systemd bool,
+	certPins,
+	rootPEM string,
+) (string, string, error) {
 	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
@@ -206,19 +234,15 @@ sudo service launcher restart`
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
-	// Finally, now that the final directory structure of the package is
-	// represented, we can create the package
-	currentVersion := version.Version().Version
-
 	outputPathDir, err := ioutil.TempDir("/tmp", "packages_")
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
-	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", currentVersion)
+	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", packageVersion)
 	debOutputPath := filepath.Join(outputPathDir, debOutputFilename)
 
-	rpmOutputFilename := fmt.Sprintf("launcher-linux-%s.rpm", currentVersion)
+	rpmOutputFilename := fmt.Sprintf("launcher-linux-%s.rpm", packageVersion)
 	rpmOutputPath := filepath.Join(outputPathDir, rpmOutputFilename)
 
 	// Create the packages
@@ -235,7 +259,7 @@ sudo service launcher restart`
 		"-s", "dir",
 		"-t", "deb",
 		"-n", "launcher",
-		"-v", currentVersion,
+		"-v", packageVersion,
 		"-p", filepath.Join("/out", debOutputFilename),
 		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
@@ -257,7 +281,7 @@ sudo service launcher restart`
 		"-s", "dir",
 		"-t", "rpm",
 		"-n", "launcher",
-		"-v", currentVersion,
+		"-v", packageVersion,
 		"-p", filepath.Join("/out", rpmOutputFilename),
 		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
@@ -273,7 +297,21 @@ sudo service launcher restart`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey string, insecure, insecureGrpc, autoupdate bool, updateChannel, identifier string, omitSecret bool, certPins, rootPEM string) (string, error) {
+func CreateMacPackage(
+	packageVersion,
+	osqueryVersion,
+	hostname,
+	secret,
+	macPackageSigningKey string,
+	insecure,
+	insecureGrpc,
+	autoupdate bool,
+	updateChannel,
+	identifier string,
+	omitSecret bool,
+	certPins,
+	rootPEM string,
+) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -418,11 +456,8 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		return "", errors.Wrap(err, "could not render postinstall script context to file")
 	}
 
-	// Next, we calculate versions and file paths
-	currentVersion := version.Version().Version
-
 	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
-	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", currentVersion))
+	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
@@ -432,7 +467,7 @@ func CreateMacPackage(osqueryVersion, hostname, secret, macPackageSigningKey str
 		packageRoot,
 		scriptDir,
 		launchDaemonName,
-		currentVersion,
+		packageVersion,
 		macPackageSigningKey,
 		outputPath,
 	)
