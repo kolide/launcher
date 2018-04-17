@@ -1,48 +1,14 @@
 steps:
-- name: 'gcr.io/cloud-builders/gsutil'
-  id: get_encrypted_key
-  args: [
-            'cp',
-            'gs://encrypted-build-secrets/github-ssh/github_deploy_key.enc',
-            'github_deploy_key.enc'
-        ]
-
-- name: 'gcr.io/cloud-builders/gcloud'
-  args: [
-         'kms',
-         'decrypt',
-         '--project=kms-github-keys',
-         '--location=global',
-         '--keyring=container-builder',
-         '--key=github-ssh',
-         '--ciphertext-file=github_deploy_key.enc',
-         '--plaintext-file=/root/.ssh/id_rsa'
-        ]
-  id: decrypt_private_key
-  waitFor: ['get_encrypted_key']
-  volumes:
-  - name: 'ssh'
-    path: /root/.ssh
-
 - name: 'gcr.io/cloud-builders/git'
   id: checkout_repo
-  waitFor: ['decrypt_private_key']
   env:
   - 'SHORT_SHA=${SHORT_SHA}'
   entrypoint: 'bash'
   args:
     - '-c'
     - |
-        chmod 0600 /root/.ssh/id_rsa
-        cat <<EOF >/root/.ssh/config
-        Hostname github.com
-        IdentityFile /root/.ssh/id_rsa
-        EOF
-        cat <<EOF >/root/.ssh/known_hosts
-        github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
-        EOF
         mkdir -p $_REPO && cd $_REPO && git init
-        git remote add origin git@github.com:$_OWNER/$_REPO.git
+        git remote add origin https://github.com/$_OWNER/$_REPO.git
         if [ -z "$_PR_NUMBER" ]; then
             echo "checking out branch $_BRANCH_NAME"
             git fetch --depth 20 origin $_BRANCH_NAME:checkout_branch && git checkout -b $_BRANCH_NAME $_GIT_SHA
@@ -50,17 +16,14 @@ steps:
             echo "checking out PR $_PR_NUMBER"
             git fetch --depth 20 origin pull/$_PR_NUMBER/head:checkout_pr && git checkout -b $_BRANCH_NAME $_GIT_SHA
         fi
-  volumes:
-  - name: 'ssh'
-    path: /root/.ssh
 
 - name: 'gcr.io/cloud-builders/docker'
   dir: '$_REPO/tools/builders/launcher-builder/1.10.1'
   args: [
             'build',
-            '--tag=gcr.io/kolide-private-containers/launcher-builder:1.10.1',
+            '--tag=gcr.io/kolide-public-containers/launcher-builder:1.10.1',
             '.'
         ]
 
 images:
-        - 'gcr.io/kolide-private-containers/launcher-builder:1.10.1'
+        - 'gcr.io/kolide-public-containers/launcher-builder:1.10.1'
