@@ -1,6 +1,5 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  dir: '$_REPO/tools/builders/launcher-builder/1.10.1'
   args: [
             'build',
             '--tag=gcr.io/kolide-public-containers/launcher-builder:1.10.1',
