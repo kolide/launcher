@@ -156,6 +156,9 @@ push-containers: $(CONTAINERS)
 	for container in $(CONTAINERS); do \
 		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
 	done
+builder:
+	cd tools/builders/launcher-builder/1.10.1/ && gcloud container builds submit --project=kolide-public-containers --config=cloudbuild.yml
+	cd -
 
 binary-bundle: xp-codesign
 	rm -rf build/binary-bundle
