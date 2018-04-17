@@ -1,22 +1,4 @@
 steps:
-- name: 'gcr.io/cloud-builders/git'
-  id: checkout_repo
-  env:
-  - 'SHORT_SHA=${SHORT_SHA}'
-  entrypoint: 'bash'
-  args:
-    - '-c'
-    - |
-        mkdir -p $_REPO && cd $_REPO && git init
-        git remote add origin https://github.com/$_OWNER/$_REPO.git
-        if [ -z "$_PR_NUMBER" ]; then
-            echo "checking out branch $_BRANCH_NAME"
-            git fetch --depth 20 origin $_BRANCH_NAME:checkout_branch && git checkout -b $_BRANCH_NAME $_GIT_SHA
-        else
-            echo "checking out PR $_PR_NUMBER"
-            git fetch --depth 20 origin pull/$_PR_NUMBER/head:checkout_pr && git checkout -b $_BRANCH_NAME $_GIT_SHA
-        fi
-
 - name: 'gcr.io/cloud-builders/docker'
   dir: '$_REPO/tools/builders/launcher-builder/1.10.1'
   args: [
