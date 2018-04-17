@@ -1,0 +1,11 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  dir: '$_REPO'
+  args: [
+            'build',
+            '--tag=gcr.io/kolide-private-containers/launcher-builder',
+            '.'
+        ]
+
+images:
+    - 'gcr.io/kolide-private-containers/launcher-builder'

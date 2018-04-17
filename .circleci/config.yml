@@ -2,7 +2,7 @@ version: 2
 jobs:
   build-go1.10.1:
     docker:
-        - image: golang:1.10.1
+        - image: kolide/launcher-builder:1.10.1
     working_directory: /go/src/github.com/kolide/launcher
     steps: &steps
       - checkout
@@ -25,8 +25,6 @@ jobs:
           paths:
             - vendor
 
-      - run: make deps
-      - run: make install
       - run: make test
       - run: make extension
       - run: make launcher
