@@ -66,7 +66,9 @@ func bootstrapFromNotary(notaryConfigDir, localRepo, gun string) error {
 		notaryConfigDir,
 		data.GUN(gun),
 		conf.RemoteServer.URL,
-		&http.Transport{},
+		&http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
 		passwordRetriever,
 		trustpinning.TrustPinConfig{},
 	)
