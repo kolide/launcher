@@ -19,6 +19,9 @@ type QueryContent struct {
 // Queries is a helper which represents the format of a set of queries in a pack
 type Queries map[string]QueryContent
 
+// Rows is a type often used to represent osquery query results
+type Rows []map[string]string
+
 // PackContent is the format of an osquery query pack
 type PackContent struct {
 	Platform  string   `json:"platform,omitempty"`
@@ -51,14 +54,24 @@ type OsqueryConfig struct {
 type OsqueryResultLog struct {
 	Name           string `json:"name"`
 	HostIdentifier string `json:"hostIdentifier"`
-	UnixTime       string `json:"unixTime"`
+	UnixTime       int    `json:"unixTime"`
 	CalendarTime   string `json:"calendarTime"`
+	Epoch          int    `json:"epoch"`
+	Counter        int    `json:"counter"`
 	// Columns stores the columns of differential queries
 	Columns map[string]string `json:"columns,omitempty"`
 	// Snapshot stores the rows and columns of snapshot queries
 	Snapshot    []map[string]string `json:"snapshot,omitempty"`
-	Action      string              `json:"action"`
-	Decorations map[string]string   `json:"decorations"`
+	DiffResults *DiffResults        `json:"diffResults",omitempty`
+	Action      string              `json:"action",omitempty`
+	Decorations map[string]string   `json:"decorations",omitempty`
+}
+
+// DiffResults is the format of osquery log results when --log_result_event is
+// set to false
+type DiffResults struct {
+	Added   Rows `json:"added"`
+	Removed Rows `json:"removed"`
 }
 
 // OsqueryStatusLog is the format of an osquery status log
