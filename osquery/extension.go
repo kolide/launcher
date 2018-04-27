@@ -52,7 +52,7 @@ const (
 	defaultMaxBytesPerBatch = 2 << 20
 	// Default logging interval (used if not specified in
 	// options)
-	defaultLoggingInterval = 1 * time.Minute
+	defaultLoggingInterval = 60 * time.Second
 	// Default maximum number of logs to buffer before purging oldest logs
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000

@@ -25,6 +25,7 @@ type options struct {
 	osquerydPath       string
 	certPins           [][]byte
 	rootPEM            string
+	loggingInterval    time.Duration
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
@@ -81,6 +82,11 @@ func parseOptions() (*options, error) {
 			"root_pem",
 			env.String("KOLIDE_LAUNCHER_ROOT_PEM", ""),
 			"Path to PEM file including root certificates to verify against",
+		)
+		flLoggingInterval = flag.Duration(
+			"logging_interval",
+			env.Duration("KOLIDE_LAUNCHER_LOGGING_INTERVAL", 60*time.Second),
+			"The interval at which logs should be flushed to the server",
 		)
 
 		// Autoupdate options
@@ -189,6 +195,7 @@ func parseOptions() (*options, error) {
 		osquerydPath:       osquerydPath,
 		certPins:           certPins,
 		rootPEM:            *flRootPEM,
+		loggingInterval:    *flLoggingInterval,
 		autoupdate:         *flAutoupdate,
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
@@ -271,6 +278,8 @@ func developerUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("insecure")
 	printOpt("insecure_grpc")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("logging_interval")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("notary_url")
 	printOpt("mirror_url")
