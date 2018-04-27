@@ -324,8 +324,9 @@ func main() {
 	}
 
 	extOpts := osquery.ExtensionOpts{
-		EnrollSecret: enrollSecret,
-		Logger:       logger,
+		EnrollSecret:    enrollSecret,
+		Logger:          logger,
+		LoggingInterval: opts.loggingInterval,
 	}
 	ext, err := osquery.NewExtension(client, db, extOpts)
 	if err != nil {
