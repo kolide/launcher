@@ -87,9 +87,12 @@ message ConfigResponse {
 
 message LogCollection {
     string node_key = 1;
-    LogType log_type = 2;
+    LogType log_type = 2; // deprecated
     repeated Log logs = 3;
     string error_code = 4;
+    // osquery_log_type matches the logs from 
+    // https://github.com/kolide/osquery-go/blob/dc07ffdf186374c0a1328bb181e5f11d854508a2/plugin/logger/logger.go#L118
+    int32 osquery_log_type = 5;
 
     // AGENT is added as a new log type, for adding new
     // logging capabilities from kolide/agent
