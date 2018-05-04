@@ -25,9 +25,6 @@ func main() {
 
 	timeout := time.Duration(*flTimeout) * time.Second
 
-	// allow for osqueryd to create the socket path
-	time.Sleep(2 * time.Second)
-
 	// create an extension server
 	server, err := osquery.NewExtensionManagerServer(
 		"com.kolide.standalone_extension",

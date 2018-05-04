@@ -24,7 +24,8 @@ func EmailAddresses(client *osquery.ExtensionManagerClient) *table.Plugin {
 
 func generateEmailAddresses(client *osquery.ExtensionManagerClient) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		results := []map[string]string{}
+		results := []map[string]string{map[string]string{"email": "", "domain": ""}}
+		return results, nil
 
 		switch runtime.GOOS {
 		case "darwin":
