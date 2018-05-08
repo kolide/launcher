@@ -61,3 +61,9 @@ To learn about The Launcher's command-line interface, see the Launcher [document
 Deploying osquery and configuring it to communicate with a management server can be complicated, especially if you have to make customized deployment packages. The Launcher includes a tool called `package-builder` which you can use to create Launcher packages for your organization.
 
 To learn more about using `package-builder` to package and deploy osquery, check out the [documentation](./docs/package-builder.md).
+
+## Kolide Cloud
+
+Want to go directly to insights? Not sure how to package Launcher or manage your Fleet?
+
+Try our [osquery SaaS platform](https://kolide.com) providing insights, alerting, fleet management and user-driven security tools. We also support advanced aggregation of osquery results for power users. Get started immediately, and your first 10 hosts are free. Launcher packages customized for your organization can be downloaded in-app after signup.
