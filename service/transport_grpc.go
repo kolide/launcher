@@ -136,7 +136,7 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 	req := request.(logCollection)
 	logs := make([]*kolide_agent.LogCollection_Log, 0, len(req.Logs))
 	for _, log := range req.Logs {
-		logs = append(logs, &kolide_agent.LogCollection_Log{log})
+		logs = append(logs, &kolide_agent.LogCollection_Log{Data: log})
 	}
 
 	var typ kolide_agent.LogCollection_LogType
@@ -235,7 +235,7 @@ func encodeGRPCResultCollection(_ context.Context, request interface{}) (interfa
 					Value: val,
 				})
 			}
-			rows = append(rows, &kolide_agent.ResultCollection_Result_ResultRow{rowCols})
+			rows = append(rows, &kolide_agent.ResultCollection_Result_ResultRow{Columns: rowCols})
 		}
 		results = append(results,
 			&kolide_agent.ResultCollection_Result{
