@@ -45,7 +45,6 @@ void softwareUpdate(
 		*doesOSXAutoUpdates = 1;
 	}
 
-
 	val = [manager doesAutomaticCriticalUpdateInstall];
 	if (val) {
 		*doesAutomaticCriticalUpdateInstall = 1;
@@ -65,9 +64,9 @@ func MacUpdate() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("autoupdate_managed"),
 		table.IntegerColumn("autoupdate_enabled"),
-		table.IntegerColumn("background_download"),
-		table.IntegerColumn("app_store_apps_autoupdate"),
-		table.IntegerColumn("macos_autoupdate"),
+		table.IntegerColumn("download"),
+		table.IntegerColumn("app_updates"),
+		table.IntegerColumn("os_updates"),
 		table.IntegerColumn("critical_updates"),
 	}
 	return table.NewPlugin("kolide_macos_software_update", columns, generateMacUpdate)
@@ -93,12 +92,12 @@ func generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]
 
 	resp := []map[string]string{
 		map[string]string{
-			"autoupdate_managed":        fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
-			"autoupdate_enabled":        fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
-			"background_download":       fmt.Sprintf("%d", doesBackgroundDownload),
-			"app_store_apps_autoupdate": fmt.Sprintf("%d", doesAppStoreAutoUpdates),
-			"macos_autoupdate":          fmt.Sprintf("%d", doesOSXAutoUpdates),
-			"critical_updates":          fmt.Sprintf("%d", doesAutomaticCriticalUpdateInstall),
+			"autoupdate_managed": fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
+			"autoupdate_enabled": fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
+			"download":           fmt.Sprintf("%d", doesBackgroundDownload),
+			"app_updates":        fmt.Sprintf("%d", doesAppStoreAutoUpdates),
+			"os_updates":         fmt.Sprintf("%d", doesOSXAutoUpdates),
+			"critical_updates":   fmt.Sprintf("%d", doesAutomaticCriticalUpdateInstall),
 		},
 	}
 	return resp, nil
