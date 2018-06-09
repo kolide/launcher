@@ -14,14 +14,10 @@ To remove `launcher` and **preserve** configuration files execute `sudo dpkg --r
 
 To remove `launcher` and **remove** configuration files exeute `sudo dpkg --purge launcher`.
 
-`dpkg --purge` will not delete directories which are not empty. As a result you will likely see the following warning: 
+`dpkg --purge` will not delete directories which are not empty. As a result you might see a warning which looks like: 
 
 ```
-dpkg: warning: while removing launcher, directory '/usr/local/kolide/bin' not empty so not removed
-dpkg: warning: while removing launcher, directory '/var/kolide/dichiye.launcher.kolide.com-443' not empty so not removed
+dpkg: warning: while removing launcher, directory '/foo/bar/kolide/bin' not empty so not removed
+dpkg: warning: while removing launcher, directory '/dir/kolide/' not empty so not removed
 ```
-
-To remove these leftover directories execute:
-- `sudo rm -rf /usr/local/kolide`
-- `sudo rm -rf /var/kolide`
-
+The left over directories mentioned in the `dpkg` warning can be removed with `sudo rm -rf`
