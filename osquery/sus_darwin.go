@@ -11,7 +11,8 @@ void softwareUpdate(
 	int *doesBackgroundDownload,
 	int *doesAppStoreAutoUpdates,
 	int *doesOSXAutoUpdates,
-	int *doesAutomaticCriticalUpdateInstall
+	int *doesAutomaticCriticalUpdateInstall,
+	int *lastCheckTimestamp
 ) {
 	NSBundle *bundle;
 	bundle = [NSBundle bundleWithPath:@"/System/Library/PrivateFrameworks/SoftwareUpdate.framework"];
@@ -49,6 +50,8 @@ void softwareUpdate(
 	if (val) {
 		*doesAutomaticCriticalUpdateInstall = 1;
 	}
+	NSDate * lastCheckSuccessfulDate = (NSDate *)[manager lastCheckSuccessfulDate];
+	*lastCheckTimestamp = [lastCheckSuccessfulDate timeIntervalSince1970];
 	return;
 }
 */
@@ -68,6 +71,7 @@ func MacUpdate() *table.Plugin {
 		table.IntegerColumn("app_updates"),
 		table.IntegerColumn("os_updates"),
 		table.IntegerColumn("critical_updates"),
+		table.IntegerColumn("last_successful_check_timestamp"),
 	}
 	return table.NewPlugin("kolide_macos_software_update", columns, generateMacUpdate)
 }
@@ -80,6 +84,7 @@ func generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]
 		doesAppStoreAutoUpdates               = C.int(0)
 		doesOSXAutoUpdates                    = C.int(0)
 		doesAutomaticCriticalUpdateInstall    = C.int(0)
+		lastCheckTimestamp                    = C.int(0)
 	)
 	C.softwareUpdate(
 		&isAutomaticallyCheckForUpdatesManaged,
@@ -88,16 +93,18 @@ func generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]
 		&doesAppStoreAutoUpdates,
 		&doesOSXAutoUpdates,
 		&doesAutomaticCriticalUpdateInstall,
+		&lastCheckTimestamp,
 	)
 
 	resp := []map[string]string{
 		map[string]string{
-			"autoupdate_managed": fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
-			"autoupdate_enabled": fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
-			"download":           fmt.Sprintf("%d", doesBackgroundDownload),
-			"app_updates":        fmt.Sprintf("%d", doesAppStoreAutoUpdates),
-			"os_updates":         fmt.Sprintf("%d", doesOSXAutoUpdates),
-			"critical_updates":   fmt.Sprintf("%d", doesAutomaticCriticalUpdateInstall),
+			"autoupdate_managed":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
+			"autoupdate_enabled":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
+			"download":                        fmt.Sprintf("%d", doesBackgroundDownload),
+			"app_updates":                     fmt.Sprintf("%d", doesAppStoreAutoUpdates),
+			"os_updates":                      fmt.Sprintf("%d", doesOSXAutoUpdates),
+			"critical_updates":                fmt.Sprintf("%d", doesAutomaticCriticalUpdateInstall),
+			"last_successful_check_timestamp": fmt.Sprintf("%d", lastCheckTimestamp),
 		},
 	}
 	return resp, nil
