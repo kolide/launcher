@@ -42,6 +42,7 @@
 - (void)messageTraceAppStorePrefs;
 - (BOOL)shouldScanAfterSystemVersionChanged;
 - (void)setOSXAutoUpdates:(BOOL)arg1;
+- (BOOL)doesMacOSAutoUpdate;
 - (BOOL)doesOSXAutoUpdates;
 - (void)setAppStoreAutoUpdates:(BOOL)arg1;
 - (BOOL)doesAppStoreAutoUpdates;
