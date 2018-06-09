@@ -11,6 +11,7 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	munki := new(MunkiInfo)
 	return []*table.Plugin{
+		MacUpdate(client),
 		MachOInfo(),
 		LauncherInfo(client),
 		BestPractices(client),
