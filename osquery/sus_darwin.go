@@ -43,7 +43,7 @@ void softwareUpdate(
 	}
 
 	// before 10.13 the method was called doesOSXAutoUpdates, since 10.14 it's called doesMacOSAutoUpdate.
-	if (os_version >=14) {
+	if (os_version >= 14) {
 		val = [manager doesMacOSAutoUpdate];
 		if (val) {
 			*doesOSXAutoUpdates = 1;
@@ -70,7 +70,7 @@ import (
 	"fmt"
 	"strconv"
 
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
