@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -528,7 +529,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	plugins := o.opts.extensionPlugins
-	for _, t := range PlatformTables(o.extensionManagerClient, o.logger) {
+	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger) {
 		plugins = append(plugins, t)
 	}
 	o.extensionManagerServer.RegisterPlugin(plugins...)

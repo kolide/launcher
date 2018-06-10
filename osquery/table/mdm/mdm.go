@@ -1,4 +1,4 @@
-package osquery
+package mdm
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func MDMInfo(logger log.Logger) *table.Plugin {
+func Info(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("enrolled"),
 		table.TextColumn("server_url"),

@@ -1,4 +1,4 @@
-package osquery
+package email
 
 import (
 	"context"
@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
-func EmailAddresses(client *osquery.ExtensionManagerClient) *table.Plugin {
+func Addresses(client *osquery.ExtensionManagerClient) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("email"),
 		table.TextColumn("domain"),

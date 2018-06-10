@@ -1,4 +1,4 @@
-package osquery
+package macho
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func MachOInfo() *table.Plugin {
+func Info() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("cpu"),

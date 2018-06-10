@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/debug"
 	kolidelog "github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
+	"github.com/kolide/launcher/osquery/table/launcher"
 	"github.com/kolide/launcher/service"
 	osquerygo "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -357,7 +358,7 @@ func main() {
 		osquery.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
 		osquery.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
 		osquery.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
-		osquery.WithOsqueryExtensionPlugin(osquery.LauncherIdentifierTable(db)),
+		osquery.WithOsqueryExtensionPlugin(launcher.LauncherIdentifierTable(db)),
 		osquery.WithStdout(osqueryLogger),
 		osquery.WithStderr(osqueryLogger),
 		osquery.WithLogger(logger),

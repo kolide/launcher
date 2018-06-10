@@ -1,6 +1,6 @@
 // +build darwin
 
-package osquery
+package munki
 
 import (
 	"context"

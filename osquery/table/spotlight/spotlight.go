@@ -1,6 +1,6 @@
 // +build darwin
 
-package osquery
+package spotlight
 
 import (
 	"context"

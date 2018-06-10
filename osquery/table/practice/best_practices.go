@@ -1,4 +1,4 @@
-package osquery
+package practice
 
 import (
 	"context"

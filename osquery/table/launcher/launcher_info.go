@@ -1,4 +1,4 @@
-package osquery
+package launcher
 
 import (
 	"context"
