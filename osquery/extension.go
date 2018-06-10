@@ -155,10 +155,12 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return getIdentifierFromDB(e.db)
+	return IdentifierFromDB(e.db)
 }
 
-func getIdentifierFromDB(db *bolt.DB) (string, error) {
+// IdentifierFromDB returns the built-in launcher identifier from the config bucket.
+// The function is exported to allow for building the kolide_launcher_identifier table.
+func IdentifierFromDB(db *bolt.DB) (string, error) {
 	var identifier string
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
