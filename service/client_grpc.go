@@ -21,7 +21,7 @@ func attachUUID() grpctransport.ClientOption {
 	)
 }
 
-// New creates a new KolideClient (implementation of the KolideService
+// New creates a new Kolide Client (implementation of the KolideService
 // interface) using the provided gRPC client connection.
 func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 	requestEnrollmentEndpoint := grpctransport.NewClient(
@@ -84,7 +84,7 @@ func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
 		attachUUID(),
 	).Endpoint()
 
-	var client KolideService = KolideClient{
+	var client KolideService = Endpoints{
 		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,

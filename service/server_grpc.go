@@ -24,7 +24,7 @@ func parseUUID() grpctransport.ServerOption {
 	)
 }
 
-func NewGRPCServer(endpoints KolideClient, logger log.Logger) pb.ApiServer {
+func NewGRPCServer(endpoints Endpoints, logger log.Logger) pb.ApiServer {
 	options := []grpctransport.ServerOption{
 		grpctransport.ServerErrorLogger(logger),
 		parseUUID(),
@@ -77,46 +77,6 @@ type grpcServer struct {
 	logs       grpctransport.Handler
 	results    grpctransport.Handler
 	health     grpctransport.Handler
-}
-
-func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
-	_, rep, err := s.enrollment.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "request enrollment")
-	}
-	return rep.(*pb.EnrollmentResponse), nil
-}
-
-func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest) (*pb.ConfigResponse, error) {
-	_, rep, err := s.config.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "request config")
-	}
-	return rep.(*pb.ConfigResponse), nil
-}
-
-func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
-	_, rep, err := s.queries.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "request queries")
-	}
-	return rep.(*pb.QueryCollection), nil
-}
-
-func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*pb.AgentApiResponse, error) {
-	_, rep, err := s.logs.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "publish logs")
-	}
-	return rep.(*pb.AgentApiResponse), nil
-}
-
-func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollection) (*pb.AgentApiResponse, error) {
-	_, rep, err := s.results.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "publish results")
-	}
-	return rep.(*pb.AgentApiResponse), nil
 }
 
 func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
