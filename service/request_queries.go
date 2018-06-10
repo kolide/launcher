@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/pkg/errors"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 type queriesRequest struct {
@@ -17,6 +21,20 @@ type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool
 	Err         error
+}
+
+func decodeGRPCQueriesRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
+	req := grpcReq.(*pb.AgentApiRequest)
+	return queriesRequest{
+		NodeKey: req.NodeKey,
+	}, nil
+}
+
+func encodeGRPCQueriesRequest(_ context.Context, request interface{}) (interface{}, error) {
+	req := request.(queriesRequest)
+	return &pb.AgentApiRequest{
+		NodeKey: req.NodeKey,
+	}, nil
 }
 
 func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -85,4 +103,27 @@ func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest
 		return nil, errors.Wrap(err, "request queries")
 	}
 	return rep.(*pb.QueryCollection), nil
+}
+
+func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
+	defer func(begin time.Time) {
+		resJSON, _ := json.Marshal(res)
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "RequestQueries",
+			"uuid", uuid,
+			"res", string(resJSON),
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)
+	return
+}
+
+func (mw uuidmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.RequestQueries(ctx, nodeKey)
 }

@@ -1,41 +1,90 @@
 package service
 
 import (
-	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log"
+	grpctransport "github.com/go-kit/kit/transport/grpc"
+	"github.com/kolide/kit/contexts/uuid"
+	"google.golang.org/grpc"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
-// KolideClient is an alias for the Endpoints type.
-// It's added to aid in maintaining backwards compatibility for imports.
-type KolideClient = Endpoints
+// New creates a new Kolide Client (implementation of the KolideService
+// interface) using the provided gRPC client connection.
+func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
+	requestEnrollmentEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"RequestEnrollment",
+		encodeGRPCEnrollmentRequest,
+		decodeGRPCEnrollmentResponse,
+		pb.EnrollmentResponse{},
+		uuid.Attach(),
+	).Endpoint()
 
-// Endpoints defines the endpoints implemented by the Kolide remote extension servers and clients.
-type Endpoints struct {
-	RequestEnrollmentEndpoint endpoint.Endpoint
-	RequestConfigEndpoint     endpoint.Endpoint
-	PublishLogsEndpoint       endpoint.Endpoint
-	RequestQueriesEndpoint    endpoint.Endpoint
-	PublishResultsEndpoint    endpoint.Endpoint
-	CheckHealthEndpoint       endpoint.Endpoint
-}
+	requestConfigEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"RequestConfig",
+		encodeGRPCConfigRequest,
+		decodeGRPCConfigResponse,
+		pb.ConfigResponse{},
+		uuid.Attach(),
+	).Endpoint()
 
-type agentAPIRequest struct {
-	NodeKey string
-}
+	publishLogsEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"PublishLogs",
+		encodeGRPCLogCollection,
+		decodeGRPCPublishLogsResponse,
+		pb.AgentApiResponse{},
+		uuid.Attach(),
+	).Endpoint()
 
-type agentAPIResponse struct {
-	Message     string
-	ErrorCode   string
-	NodeInvalid bool
-	Err         error
-}
+	requestQueriesEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"RequestQueries",
+		encodeGRPCQueriesRequest,
+		decodeGRPCQueryCollection,
+		pb.QueryCollection{},
+		uuid.Attach(),
+	).Endpoint()
 
-func MakeServerEndpoints(svc KolideService) Endpoints {
-	return Endpoints{
-		RequestEnrollmentEndpoint: MakeRequestEnrollmentEndpoint(svc),
-		RequestConfigEndpoint:     MakeRequestConfigEndpoint(svc),
-		PublishLogsEndpoint:       MakePublishLogsEndpoint(svc),
-		RequestQueriesEndpoint:    MakeRequestQueriesEndpoint(svc),
-		PublishResultsEndpoint:    MakePublishResultsEndpoint(svc),
-		CheckHealthEndpoint:       MakeCheckHealthEndpoint(svc),
+	publishResultsEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"PublishResults",
+		encodeGRPCResultCollection,
+		decodeGRPCPublishResultsResponse,
+		pb.AgentApiResponse{},
+		uuid.Attach(),
+	).Endpoint()
+
+	checkHealthEndpoint := grpctransport.NewClient(
+		conn,
+		"kolide.agent.Api",
+		"CheckHealth",
+		encodeGRPCHealcheckRequest,
+		decodeGRPCHealthCheckResponse,
+		pb.HealthCheckResponse{},
+		uuid.Attach(),
+	).Endpoint()
+
+	var client KolideService = Endpoints{
+		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
+		RequestConfigEndpoint:     requestConfigEndpoint,
+		PublishLogsEndpoint:       publishLogsEndpoint,
+		RequestQueriesEndpoint:    requestQueriesEndpoint,
+		PublishResultsEndpoint:    publishResultsEndpoint,
+		CheckHealthEndpoint:       checkHealthEndpoint,
 	}
+
+	client = LoggingMiddleware(logger)(client)
+	// Wrap with UUID middleware after logger so that UUID is available in
+	// the logger context.
+	client = uuidMiddleware(client)
+
+	return client
 }

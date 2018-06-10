@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 type logCollection struct {
@@ -73,7 +76,24 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 		LogType: typ,
 		Logs:    logs,
 	}, nil
+}
 
+func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+	req := grpcReq.(*pb.AgentApiResponse)
+	return publishLogsResponse{
+		Message:     req.Message,
+		ErrorCode:   req.ErrorCode,
+		NodeInvalid: req.NodeInvalid,
+	}, nil
+}
+
+func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (interface{}, error) {
+	req := request.(publishLogsResponse)
+	return &pb.AgentApiResponse{
+		Message:     req.Message,
+		ErrorCode:   req.ErrorCode,
+		NodeInvalid: req.NodeInvalid,
+	}, nil
 }
 
 func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
@@ -108,4 +128,29 @@ func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*p
 		return nil, errors.Wrap(err, "publish logs")
 	}
 	return rep.(*pb.AgentApiResponse), nil
+}
+
+func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
+	defer func(begin time.Time) {
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "PublishLogs",
+			"uuid", uuid,
+			"logType", logType,
+			"log_count", len(logs),
+			"message", message,
+			"errcode", errcode,
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	message, errcode, reauth, err = mw.next.PublishLogs(ctx, nodeKey, logType, logs)
+	return
+}
+
+func (mw uuidmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.PublishLogs(ctx, nodeKey, logType, logs)
 }

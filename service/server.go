@@ -3,14 +3,14 @@ package service
 import (
 	"context"
 
+	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
-	"github.com/pkg/errors"
+	"github.com/kolide/kit/contexts/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	pb "github.com/kolide/launcher/service/internal/launcherproto"
-	"github.com/kolide/launcher/service/uuid"
 )
 
 func parseUUID() grpctransport.ServerOption {
@@ -22,6 +22,31 @@ func parseUUID() grpctransport.ServerOption {
 			return ctx
 		},
 	)
+}
+
+// KolideClient is an alias for the Endpoints type.
+// It's added to aid in maintaining backwards compatibility for imports.
+type KolideClient = Endpoints
+
+// Endpoints defines the endpoints implemented by the Kolide remote extension servers and clients.
+type Endpoints struct {
+	RequestEnrollmentEndpoint endpoint.Endpoint
+	RequestConfigEndpoint     endpoint.Endpoint
+	PublishLogsEndpoint       endpoint.Endpoint
+	RequestQueriesEndpoint    endpoint.Endpoint
+	PublishResultsEndpoint    endpoint.Endpoint
+	CheckHealthEndpoint       endpoint.Endpoint
+}
+
+func MakeServerEndpoints(svc KolideService) Endpoints {
+	return Endpoints{
+		RequestEnrollmentEndpoint: MakeRequestEnrollmentEndpoint(svc),
+		RequestConfigEndpoint:     MakeRequestConfigEndpoint(svc),
+		PublishLogsEndpoint:       MakePublishLogsEndpoint(svc),
+		RequestQueriesEndpoint:    MakeRequestQueriesEndpoint(svc),
+		PublishResultsEndpoint:    MakePublishResultsEndpoint(svc),
+		CheckHealthEndpoint:       MakeCheckHealthEndpoint(svc),
+	}
 }
 
 func NewGRPCServer(endpoints Endpoints, logger log.Logger) pb.ApiServer {
@@ -38,36 +63,35 @@ func NewGRPCServer(endpoints Endpoints, logger log.Logger) pb.ApiServer {
 		),
 		config: grpctransport.NewServer(
 			endpoints.RequestConfigEndpoint,
-			decodeGRPCAgentAPIRequest,
+			decodeGRPCConfigRequest,
 			encodeGRPCConfigResponse,
 			options...,
 		),
 		queries: grpctransport.NewServer(
 			endpoints.RequestQueriesEndpoint,
-			decodeGRPCAgentAPIRequest,
+			decodeGRPCQueriesRequest,
 			encodeGRPCQueryCollection,
 			options...,
 		),
 		logs: grpctransport.NewServer(
 			endpoints.PublishLogsEndpoint,
 			decodeGRPCLogCollection,
-			encodeGRPCAgentAPIResponse,
+			encodeGRPCPublishLogsResponse,
 			options...,
 		),
 		results: grpctransport.NewServer(
 			endpoints.PublishResultsEndpoint,
 			decodeGRPCResultCollection,
-			encodeGRPCAgentAPIResponse,
+			encodeGRPCPublishResultsResponse,
 			options...,
 		),
 		health: grpctransport.NewServer(
 			endpoints.CheckHealthEndpoint,
-			decodeGRPCAgentAPIRequest,
+			decodeGRPCHealthCheckRequest,
 			encodeGRPCHealthcheckResponse,
 			options...,
 		),
 	}
-
 }
 
 type grpcServer struct {
@@ -77,14 +101,6 @@ type grpcServer struct {
 	logs       grpctransport.Handler
 	results    grpctransport.Handler
 	health     grpctransport.Handler
-}
-
-func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
-	_, rep, err := s.health.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, "check health")
-	}
-	return rep.(*pb.HealthCheckResponse), nil
 }
 
 func RegisterGRPCServer(grpcServer *grpc.Server, apiServer pb.ApiServer) {

@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/kit/contexts/uuid"
 	"github.com/pkg/errors"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 type enrollmentRequest struct {
@@ -87,4 +89,28 @@ func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRe
 		return nil, errors.Wrap(err, "request enrollment")
 	}
 	return rep.(*pb.EnrollmentResponse), nil
+}
+
+func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (nodekey string, reauth bool, err error) {
+	defer func(begin time.Time) {
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "RequestEnrollment",
+			"uuid", uuid,
+			"enrollSecret", enrollSecret,
+			"hostIdentifier", hostIdentifier,
+			"nodekey", nodekey,
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
+	return
+}
+
+func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (errcode string, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
 }

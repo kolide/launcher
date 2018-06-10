@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/kit/contexts/uuid"
 	"github.com/pkg/errors"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 type configRequest struct {
@@ -79,4 +82,26 @@ func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest)
 		return nil, errors.Wrap(err, "request config")
 	}
 	return rep.(*pb.ConfigResponse), nil
+}
+
+func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
+	defer func(begin time.Time) {
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "RequestConfig",
+			"uuid", uuid,
+			"config", config,
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	config, reauth, err = mw.next.RequestConfig(ctx, nodeKey)
+	return
+}
+
+func (mw uuidmw) RequestConfig(ctx context.Context, nodeKey string) (errcode string, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.RequestConfig(ctx, nodeKey)
 }

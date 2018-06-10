@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	pb "github.com/kolide/launcher/service/internal/launcherproto"
+	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/pkg/errors"
+
+	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
 type resultCollection struct {
@@ -84,6 +88,24 @@ func encodeGRPCResultCollection(_ context.Context, request interface{}) (interfa
 	}, nil
 }
 
+func decodeGRPCPublishResultsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
+	req := grpcReq.(*pb.AgentApiResponse)
+	return publishResultsResponse{
+		Message:     req.Message,
+		ErrorCode:   req.ErrorCode,
+		NodeInvalid: req.NodeInvalid,
+	}, nil
+}
+
+func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (interface{}, error) {
+	req := request.(publishLogsResponse)
+	return &pb.AgentApiResponse{
+		Message:     req.Message,
+		ErrorCode:   req.ErrorCode,
+		NodeInvalid: req.NodeInvalid,
+	}, nil
+}
+
 func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(resultCollection)
@@ -117,4 +139,29 @@ func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollectio
 		return nil, errors.Wrap(err, "publish results")
 	}
 	return rep.(*pb.AgentApiResponse), nil
+}
+
+func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
+	defer func(begin time.Time) {
+		resJSON, _ := json.Marshal(results)
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "PublishResults",
+			"uuid", uuid,
+			"results", string(resJSON),
+			"message", message,
+			"errcode", errcode,
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	message, errcode, reauth, err = mw.next.PublishResults(ctx, nodeKey, results)
+	return
+}
+
+func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.PublishResults(ctx, nodeKey, results)
 }

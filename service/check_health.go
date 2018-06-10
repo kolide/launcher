@@ -2,8 +2,13 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/kolide/kit/contexts/uuid"
+
+	"github.com/pkg/errors"
+
 	pb "github.com/kolide/launcher/service/internal/launcherproto"
 )
 
@@ -55,4 +60,32 @@ func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 	}
 	resp := response.(healthcheckResponse)
 	return resp.Status, resp.Err
+}
+
+func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
+	_, rep, err := s.health.ServeGRPC(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "check health")
+	}
+	return rep.(*pb.HealthCheckResponse), nil
+}
+
+func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
+	defer func(begin time.Time) {
+		uuid, _ := uuid.FromContext(ctx)
+		mw.logger.Log(
+			"method", "CheckHealth",
+			"uuid", uuid,
+			"status", status,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+	status, err = mw.next.CheckHealth(ctx)
+	return
+}
+
+func (mw uuidmw) CheckHealth(ctx context.Context) (status int32, err error) {
+	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
+	return mw.next.CheckHealth(ctx)
 }
