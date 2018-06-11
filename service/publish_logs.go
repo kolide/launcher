@@ -118,7 +118,7 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 	if err != nil {
 		return "", "", false, err
 	}
-	resp := response.(publishResultsResponse)
+	resp := response.(publishLogsResponse)
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 
