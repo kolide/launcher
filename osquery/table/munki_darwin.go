@@ -1,6 +1,6 @@
 // +build darwin
 
-package munki
+package table
 
 import (
 	"context"

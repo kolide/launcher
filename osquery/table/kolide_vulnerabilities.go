@@ -1,4 +1,4 @@
-package vulnerability
+package table
 
 import (
 	"context"

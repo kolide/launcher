@@ -1,6 +1,6 @@
 // +build darwin !cgo
 
-package spotlight
+package table
 
 import (
 	"bufio"

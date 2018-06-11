@@ -1,6 +1,6 @@
 // +build darwin
 
-package mdm
+package table
 
 import (
 	"testing"

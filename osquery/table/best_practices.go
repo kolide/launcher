@@ -1,4 +1,4 @@
-package practice
+package table
 
 import (
 	"context"

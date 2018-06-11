@@ -1,6 +1,6 @@
 // +build darwin
 
-package spotlight
+package table
 
 import (
 	"context"

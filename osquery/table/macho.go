@@ -1,4 +1,4 @@
-package macho
+package table
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Info() *table.Plugin {
+func MachoInfo() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("cpu"),

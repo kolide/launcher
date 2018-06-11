@@ -1,4 +1,4 @@
-package email
+package table
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Addresses(client *osquery.ExtensionManagerClient) *table.Plugin {
+func EmailAddresses(client *osquery.ExtensionManagerClient) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("email"),
 		table.TextColumn("domain"),
