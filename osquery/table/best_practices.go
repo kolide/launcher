@@ -1,4 +1,4 @@
-package osquery
+package table
 
 import (
 	"context"

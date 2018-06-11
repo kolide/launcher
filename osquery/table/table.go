@@ -1,8 +1,8 @@
-package osquery
+package table
 
 import (
 	"github.com/go-kit/kit/log"
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 )
 

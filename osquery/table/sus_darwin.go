@@ -1,4 +1,4 @@
-package osquery
+package table
 
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
@@ -75,7 +75,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func MacUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
+func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("autoupdate_managed"),
 		table.IntegerColumn("autoupdate_enabled"),

@@ -1,4 +1,4 @@
-package osquery
+package table
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )

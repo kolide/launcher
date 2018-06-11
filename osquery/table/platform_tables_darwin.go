@@ -1,25 +1,25 @@
 // +build darwin
 
-package osquery
+package table
 
 import (
 	"github.com/go-kit/kit/log"
-	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	munki := new(MunkiInfo)
 	return []*table.Plugin{
-		MacUpdate(client),
-		MachOInfo(),
-		LauncherInfo(client),
-		BestPractices(client),
-		EmailAddresses(client),
-		Spotlight(),
 		munki.MunkiReport(client, logger),
 		munki.ManagedInstalls(client, logger),
 		MDMInfo(logger),
+		MachoInfo(),
+		MacOSUpdate(client),
+		LauncherInfo(client),
+		EmailAddresses(client),
+		Spotlight(),
 		KolideVulnerabilities(client, logger),
+		BestPractices(client),
 	}
 }
