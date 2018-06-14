@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"debug/macho"
+	"strings"
 
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -11,6 +12,7 @@ import (
 func MachoInfo() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
+		table.TextColumn("name"),
 		table.TextColumn("cpu"),
 	}
 
@@ -32,7 +34,19 @@ func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[
 	var results []map[string]string
 	results = append(results, map[string]string{
 		"path": path,
+		"name": appFromPath(path),
 		"cpu":  f.Cpu.String(),
 	})
 	return results, nil
+}
+
+func appFromPath(path string) string {
+	parts := strings.Split(path, "/")
+	for _, part := range parts {
+		if strings.HasSuffix(part, ".app") {
+			return part
+		}
+	}
+
+	return ""
 }
