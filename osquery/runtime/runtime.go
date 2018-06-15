@@ -32,6 +32,10 @@ type Runner struct {
 	shutdown     chan struct{}
 }
 
+func (r *Runner) Query(query string) ([]map[string]string, error) {
+	return r.instance.Query(query)
+}
+
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance

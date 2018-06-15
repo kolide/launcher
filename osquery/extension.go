@@ -28,6 +28,17 @@ type Extension struct {
 	done          chan struct{}
 	wg            sync.WaitGroup
 	logger        log.Logger
+
+	osqueryClient Querier
+}
+
+func (e *Extension) SetQuerier(client Querier) {
+	e.osqueryClient = client
+}
+
+// Querier allows querying osquery.
+type Querier interface {
+	Query(sql string) ([]map[string]string, error)
 }
 
 const (
@@ -225,8 +236,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "generating UUID")
 	}
 
+	enrollDetails, err := getEnrollDetails(e.osqueryClient)
+	if err != nil {
+		return "", true, errors.Wrap(err, "query enrollment details")
+	}
+
 	// If no cached node key, enroll for new node key
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.Opts.EnrollSecret, identifier)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.Opts.EnrollSecret, identifier, enrollDetails)
 	if err != nil {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
@@ -635,4 +651,40 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	return nil
+}
+
+func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	query := `
+	SELECT 
+		osquery_info.version as osquery_version,
+		platform,
+		hostname,
+		hardware_vendor,
+		hardware_serial,
+		hardware_model,
+		os_version.version as os_version, 
+		build as os_build 
+		kolide_launcher_info.version as launcher_version,
+	FROM 
+		os_version, 
+		system_info,
+		osquery_info
+		kolide_launcher_info;
+`
+	resp, err := client.Query(query)
+	if err != nil {
+		return service.EnrollmentDetails{}, errors.Wrap(err, "query enrollment details")
+	}
+	details := service.EnrollmentDetails{
+		OSVersion:       resp[0]["os_version"],
+		OSBuildID:       resp[0]["os_build"],
+		OSPlatform:      resp[0]["platform"],
+		Hostname:        resp[0]["hostname"],
+		HardwareVendor:  resp[0]["hardware_vendor"],
+		HardwareSerial:  resp[0]["hardware_serial"],
+		HardwareModel:   resp[0]["hardware_model"],
+		OsqueryVersion:  resp[0]["osquery_version"],
+		LauncherVersion: resp[0]["launcher_version"],
+	}
+	return details, nil
 }

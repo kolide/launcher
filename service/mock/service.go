@@ -12,7 +12,7 @@ import (
 
 var _ service.KolideService = (*KolideService)(nil)
 
-type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostIdentifier string) (string, bool, error)
+type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error)
 
 type RequestConfigFunc func(ctx context.Context, nodeKey string) (string, bool, error)
 
@@ -44,9 +44,9 @@ type KolideService struct {
 	CheckHealthFuncInvoked bool
 }
 
-func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string) (string, bool, error) {
+func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 	s.RequestEnrollmentFuncInvoked = true
-	return s.RequestEnrollmentFunc(ctx, enrollSecret, hostIdentifier)
+	return s.RequestEnrollmentFunc(ctx, enrollSecret, hostIdentifier, details)
 }
 
 func (s *KolideService) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {

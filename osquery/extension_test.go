@@ -14,6 +14,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/service"
 	"github.com/kolide/launcher/service/mock"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -122,7 +123,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 
 func TestExtensionEnrollTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", false, errors.New("transport")
 		},
 	}
@@ -130,6 +131,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	defer cleanup()
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
+	e.SetQuerier(mockClient{})
 
 	key, invalid, err := e.Enroll(context.Background())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
@@ -138,9 +140,26 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+type mockClient struct{}
+
+func (mockClient) Query(sql string) ([]map[string]string, error) {
+	return []map[string]string{
+		map[string]string{
+			"os_version":       "",
+			"launcher_version": "",
+			"os_build":         "",
+			"platform":         "",
+			"hostname":         "",
+			"hardware_vendor":  "",
+			"hardware_model":   "",
+			"osquery_version":  "",
+		},
+	}, nil
+}
+
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", true, nil
 		},
 	}
@@ -148,6 +167,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	defer cleanup()
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
+	e.SetQuerier(mockClient{})
 
 	key, invalid, err := e.Enroll(context.Background())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
@@ -160,7 +180,7 @@ func TestExtensionEnroll(t *testing.T) {
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			gotEnrollSecret = enrollSecret
 			return expectedNodeKey, false, nil
 		},
@@ -170,6 +190,7 @@ func TestExtensionEnroll(t *testing.T) {
 	expectedEnrollSecret := "foo_secret"
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
 	require.Nil(t, err)
+	e.SetQuerier(mockClient{})
 
 	key, invalid, err := e.Enroll(context.Background())
 	require.Nil(t, err)
@@ -189,6 +210,7 @@ func TestExtensionEnroll(t *testing.T) {
 
 	e, err = NewExtension(m, db, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
 	require.Nil(t, err)
+	e.SetQuerier(mockClient{})
 	// Still should not re-enroll (because node key stored in DB)
 	key, invalid, err = e.Enroll(context.Background())
 	require.Nil(t, err)
@@ -266,7 +288,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -275,6 +297,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
+	e.SetQuerier(mockClient{})
 
 	configs, err := e.GenerateConfigs(context.Background())
 	assert.True(t, m.RequestConfigFuncInvoked)
@@ -326,7 +349,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -335,6 +358,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
+	e.SetQuerier(mockClient{})
 
 	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeString, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
@@ -500,7 +524,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 			return "", "", nodeKey != expectedNodeKey, nil
 
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -508,6 +532,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	defer cleanup()
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
+	e.SetQuerier(mockClient{})
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
 	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
@@ -805,7 +830,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return nil, true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -814,6 +839,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
+	e.SetQuerier(mockClient{})
 
 	queries, err := e.GetQueries(context.Background())
 	assert.True(t, m.RequestQueriesFuncInvoked)
@@ -870,7 +896,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return expectedNodeKey, false, nil
 		},
 	}
@@ -879,6 +905,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	e, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
+	e.SetQuerier(mockClient{})
 
 	err = e.WriteResults(context.Background(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)

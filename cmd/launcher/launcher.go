@@ -330,20 +330,11 @@ func main() {
 		Logger:          logger,
 		LoggingInterval: opts.loggingInterval,
 	}
+
 	ext, err := osquery.NewExtension(client, db, extOpts)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "starting grpc extension"))
 	}
-
-	_, invalid, err := ext.Enroll(context.Background())
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
-	}
-	if invalid {
-		logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
-	}
-	ext.Start()
-	defer ext.Shutdown()
 
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{
 		level.Debug(log.With(logger, "component", "osquery")),
@@ -367,6 +358,18 @@ func main() {
 	if err != nil {
 		logger.Fatal(errors.Wrap(err, "launching osquery instance"))
 	}
+
+	ext.SetQuerier(runner)
+
+	_, invalid, err := ext.Enroll(context.Background())
+	if err != nil {
+		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
+	}
+	if invalid {
+		logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
+	}
+	ext.Start()
+	defer ext.Shutdown()
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.autoupdate {

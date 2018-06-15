@@ -12,8 +12,21 @@ import (
 )
 
 type enrollmentRequest struct {
-	EnrollSecret   string
-	HostIdentifier string
+	EnrollSecret      string
+	HostIdentifier    string
+	EnrollmentDetails EnrollmentDetails
+}
+
+type EnrollmentDetails struct {
+	OSVersion       string
+	OSBuildID       string
+	OSPlatform      string
+	Hostname        string
+	HardwareVendor  string
+	HardwareModel   string
+	HardwareSerial  string
+	OsqueryVersion  string
+	LauncherVersion string
 }
 
 type enrollmentResponse struct {
@@ -24,17 +37,41 @@ type enrollmentResponse struct {
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.EnrollmentRequest)
+	enrollDetails := req.GetEnrollmentDetails()
 	return enrollmentRequest{
 		EnrollSecret:   req.EnrollSecret,
 		HostIdentifier: req.HostIdentifier,
+		EnrollmentDetails: EnrollmentDetails{
+			OSVersion:       enrollDetails.OsVersion,
+			OSBuildID:       enrollDetails.OsBuild,
+			OSPlatform:      enrollDetails.OsPlatform,
+			Hostname:        enrollDetails.Hostname,
+			HardwareVendor:  enrollDetails.HardwareVendor,
+			HardwareModel:   enrollDetails.HardwareModel,
+			HardwareSerial:  enrollDetails.HardwareSerial,
+			OsqueryVersion:  enrollDetails.OsqueryVersion,
+			LauncherVersion: enrollDetails.LauncherVersion,
+		},
 	}, nil
 }
 
 func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentRequest)
+	enrollDetails := &pb.EnrollmentDetails{
+		OsVersion:       req.EnrollmentDetails.OSVersion,
+		OsBuild:         req.EnrollmentDetails.OSBuildID,
+		OsPlatform:      req.EnrollmentDetails.OSPlatform,
+		Hostname:        req.EnrollmentDetails.Hostname,
+		HardwareVendor:  req.EnrollmentDetails.HardwareVendor,
+		HardwareModel:   req.EnrollmentDetails.HardwareModel,
+		HardwareSerial:  req.EnrollmentDetails.HardwareSerial,
+		OsqueryVersion:  req.EnrollmentDetails.OsqueryVersion,
+		LauncherVersion: req.EnrollmentDetails.LauncherVersion,
+	}
 	return &pb.EnrollmentRequest{
-		EnrollSecret:   req.EnrollSecret,
-		HostIdentifier: req.HostIdentifier,
+		EnrollSecret:      req.EnrollSecret,
+		HostIdentifier:    req.HostIdentifier,
+		EnrollmentDetails: enrollDetails,
 	}, nil
 }
 
@@ -57,7 +94,7 @@ func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (inter
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
-		nodeKey, valid, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier)
+		nodeKey, valid, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
 		return enrollmentResponse{
 			NodeKey:     nodeKey,
 			NodeInvalid: valid,
@@ -70,7 +107,7 @@ func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
@@ -91,7 +128,7 @@ func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRe
 	return rep.(*pb.EnrollmentResponse), nil
 }
 
-func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (nodekey string, reauth bool, err error) {
+func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 		mw.logger.Log(
@@ -106,11 +143,11 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		)
 	}(time.Now())
 
-	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
+	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
 	return
 }
 
-func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (errcode string, reauth bool, err error) {
+func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, err error) {
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
-	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier)
+	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
 }

@@ -22,7 +22,7 @@ type mockApiServer struct {
 	service.KolideService
 }
 
-func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string) (string, bool, error) {
+func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 	return "", false, nil
 }
 
@@ -86,7 +86,7 @@ func TestSwappingCert(t *testing.T) {
 
 	client := service.New(conn, log.NewNopLogger())
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "")
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -96,7 +96,7 @@ func TestSwappingCert(t *testing.T) {
 	stop = startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "")
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 	require.Nil(t, err)
 
 	stop()
@@ -124,7 +124,7 @@ func TestCertRemainsBad(t *testing.T) {
 
 	client := service.New(conn, log.NewNopLogger())
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "")
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -135,7 +135,7 @@ func TestCertRemainsBad(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Should still fail with bad cert
-	_, _, err = client.RequestEnrollment(context.Background(), "", "")
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -192,7 +192,7 @@ func TestCertPinning(t *testing.T) {
 
 			client := service.New(conn, log.NewNopLogger())
 
-			_, _, err = client.RequestEnrollment(context.Background(), "", "")
+			_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 			if tt.success {
 				require.NoError(t, err)
 			} else {
@@ -251,7 +251,7 @@ func TestRootCAs(t *testing.T) {
 
 			client := service.New(conn, log.NewNopLogger())
 
-			_, _, err = client.RequestEnrollment(context.Background(), "", "")
+			_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
 			if tt.success {
 				require.NoError(t, err)
 			} else {
