@@ -60,6 +60,9 @@ func GoString(ref C.CFStringRef) string {
 }
 
 func fromCFPlistRef(ref C.CFPropertyListRef) interface{} {
+	if C.CFTypeRef(ref) == 0 {
+		return "Unknown"
+	}
 	switch typeID := C.CFGetTypeID(C.CFTypeRef(ref)); typeID {
 	case C.CFBooleanGetTypeID():
 		return GoBoolean(C.CFBooleanRef(ref))

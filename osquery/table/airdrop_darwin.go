@@ -23,6 +23,7 @@ type airdropTable struct {
 }
 
 func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	// cache the primary user if unset
 	if t.primaryUser == "" {
 		username, err := queryPrimaryUser(t.client)
 		if err != nil {
@@ -31,10 +32,22 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 		t.primaryUser = username
 	}
 
-	discover := fromCFPlistRef(copyValue("DiscoverableMode", "com.apple.sharingd", t.primaryUser)).(string)
+	// use the username from the query context if provide, otherwise default to primary user
+	var username string
+	q, ok := queryContext.Constraints["username"]
+	if ok && len(q.Constraints) != 0 {
+		username = q.Constraints[0].Expression
+	} else {
+		username = t.primaryUser
+	}
+
+	discover := "Unknown"
+	if val, ok := fromCFPlistRef(copyValue("DiscoverableMode", "com.apple.sharingd", username)).(string); ok {
+		discover = val
+	}
 	return []map[string]string{
 		map[string]string{
-			"username":    t.primaryUser,
+			"username":    username,
 			"discover_by": discover,
 		},
 	}, nil
