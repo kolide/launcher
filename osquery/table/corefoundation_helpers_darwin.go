@@ -11,12 +11,16 @@ import (
 	"unsafe"
 )
 
+// Functions with "Create" or "Copy" in the name return references that need to
+// be CFReleased. See
+// https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
+
 func copyPreferenceValue(key, domain, username string) interface{} {
-	keyCFString := CFStringRef(key)
+	keyCFString := cFStringRef(key)
 	defer C.CFRelease((C.CFTypeRef)(keyCFString))
-	domainCFString := CFStringRef(domain)
+	domainCFString := cFStringRef(domain)
 	defer C.CFRelease((C.CFTypeRef)(domainCFString))
-	usernameCFString := CFStringRef(username)
+	usernameCFString := cFStringRef(username)
 	defer C.CFRelease((C.CFTypeRef)(usernameCFString))
 
 	val := C.CFPreferencesCopyValue(
@@ -26,22 +30,22 @@ func copyPreferenceValue(key, domain, username string) interface{} {
 	return goValueFromCFPlistRef(val)
 }
 
-// CFStringRef returns a C.CFStringRef which must be released with C.CFRelease
-func CFStringRef(s string) C.CFStringRef {
+// cFStringRef returns a C.CFStringRef which must be released with C.CFRelease
+func cFStringRef(s string) C.CFStringRef {
 	return C.CFStringCreateWithCString(C.kCFAllocatorDefault, C.CString(s), C.kCFStringEncodingUTF8)
 }
 
-func GoBoolean(ref C.CFBooleanRef) bool {
+func goBoolean(ref C.CFBooleanRef) bool {
 	return ref == C.kCFBooleanTrue
 }
 
-func GoInt(ref C.CFNumberRef) int {
+func goInt(ref C.CFNumberRef) int {
 	var n int
 	C.CFNumberGetValue(ref, C.CFNumberGetType(ref), unsafe.Pointer(&n))
 	return n
 }
 
-func GoString(ref C.CFStringRef) string {
+func goString(ref C.CFStringRef) string {
 	length := C.CFStringGetLength(ref)
 	if length == 0 {
 		// empty string
@@ -72,11 +76,11 @@ func goValueFromCFPlistRef(ref C.CFPropertyListRef) interface{} {
 	}
 	switch typeID := C.CFGetTypeID(C.CFTypeRef(ref)); typeID {
 	case C.CFBooleanGetTypeID():
-		return GoBoolean(C.CFBooleanRef(ref))
+		return goBoolean(C.CFBooleanRef(ref))
 	case C.CFNumberGetTypeID():
-		return GoInt(C.CFNumberRef(ref))
+		return goInt(C.CFNumberRef(ref))
 	case C.CFStringGetTypeID():
-		return GoString(C.CFStringRef(ref))
+		return goString(C.CFStringRef(ref))
 	default:
 		panic(fmt.Sprintf("unknown CF type id %v", typeID))
 	}
