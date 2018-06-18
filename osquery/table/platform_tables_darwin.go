@@ -21,5 +21,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		Spotlight(),
 		KolideVulnerabilities(client, logger),
 		BestPractices(client),
+		Airdrop(client),
 	}
 }
