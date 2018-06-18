@@ -1,4 +1,4 @@
-# A Title Which Summarizes The Decision
+# Sending initial host details during the enrollment request.
 
 ## Authors
 

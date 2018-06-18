@@ -37,21 +37,22 @@ type enrollmentResponse struct {
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.EnrollmentRequest)
-	enrollDetails := req.GetEnrollmentDetails()
+	pbEnrollDetails := req.GetEnrollmentDetails()
+	enrollDetails := EnrollmentDetails{
+		OSVersion:       pbEnrollDetails.OsVersion,
+		OSBuildID:       pbEnrollDetails.OsBuild,
+		OSPlatform:      pbEnrollDetails.OsPlatform,
+		Hostname:        pbEnrollDetails.Hostname,
+		HardwareVendor:  pbEnrollDetails.HardwareVendor,
+		HardwareModel:   pbEnrollDetails.HardwareModel,
+		HardwareSerial:  pbEnrollDetails.HardwareSerial,
+		OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
+		LauncherVersion: pbEnrollDetails.LauncherVersion,
+	}
 	return enrollmentRequest{
-		EnrollSecret:   req.EnrollSecret,
-		HostIdentifier: req.HostIdentifier,
-		EnrollmentDetails: EnrollmentDetails{
-			OSVersion:       enrollDetails.OsVersion,
-			OSBuildID:       enrollDetails.OsBuild,
-			OSPlatform:      enrollDetails.OsPlatform,
-			Hostname:        enrollDetails.Hostname,
-			HardwareVendor:  enrollDetails.HardwareVendor,
-			HardwareModel:   enrollDetails.HardwareModel,
-			HardwareSerial:  enrollDetails.HardwareSerial,
-			OsqueryVersion:  enrollDetails.OsqueryVersion,
-			LauncherVersion: enrollDetails.LauncherVersion,
-		},
+		EnrollSecret:      req.EnrollSecret,
+		HostIdentifier:    req.HostIdentifier,
+		EnrollmentDetails: enrollDetails,
 	}, nil
 }
 

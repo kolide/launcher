@@ -359,9 +359,12 @@ func main() {
 		logger.Fatal(errors.Wrap(err, "launching osquery instance"))
 	}
 
+	// The runner allows querying the osqueryd instance from the extension.
+	// Used by the Enroll method below to get initial enrollment details.
 	ext.SetQuerier(runner)
 
-	_, invalid, err := ext.Enroll(context.Background())
+	ctx := context.Background()
+	_, invalid, err := ext.Enroll(ctx)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
 	}
