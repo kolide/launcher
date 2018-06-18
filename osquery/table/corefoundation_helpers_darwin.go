@@ -11,15 +11,22 @@ import (
 	"unsafe"
 )
 
-func copyValue(key, domain, username string) C.CFPropertyListRef {
-	return C.CFPreferencesCopyValue(
-		CFStringRef(key),
-		CFStringRef(domain),
-		CFStringRef(username),
-		C.kCFPreferencesAnyHost,
+func copyPreferenceValue(key, domain, username string) interface{} {
+	keyCFString := CFStringRef(key)
+	defer C.CFRelease((C.CFTypeRef)(keyCFString))
+	domainCFString := CFStringRef(domain)
+	defer C.CFRelease((C.CFTypeRef)(domainCFString))
+	usernameCFString := CFStringRef(username)
+	defer C.CFRelease((C.CFTypeRef)(usernameCFString))
+
+	val := C.CFPreferencesCopyValue(
+		keyCFString, domainCFString, usernameCFString, C.kCFPreferencesAnyHost,
 	)
+	defer C.CFRelease((C.CFTypeRef)(val))
+	return goValueFromCFPlistRef(val)
 }
 
+// CFStringRef returns a C.CFStringRef which must be released with C.CFRelease
 func CFStringRef(s string) C.CFStringRef {
 	return C.CFStringCreateWithCString(C.kCFAllocatorDefault, C.CString(s), C.kCFStringEncodingUTF8)
 }
@@ -59,7 +66,7 @@ func GoString(ref C.CFStringRef) string {
 	return ""
 }
 
-func fromCFPlistRef(ref C.CFPropertyListRef) interface{} {
+func goValueFromCFPlistRef(ref C.CFPropertyListRef) interface{} {
 	if C.CFTypeRef(ref) == 0 {
 		return "Unknown"
 	}

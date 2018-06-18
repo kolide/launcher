@@ -42,7 +42,7 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 	}
 
 	discover := "Unknown"
-	if val, ok := fromCFPlistRef(copyValue("DiscoverableMode", "com.apple.sharingd", username)).(string); ok {
+	if val, ok := copyPreferenceValue("DiscoverableMode", "com.apple.sharingd", username).(string); ok {
 		discover = val
 	}
 	return []map[string]string{
