@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -28,6 +29,19 @@ type Extension struct {
 	done          chan struct{}
 	wg            sync.WaitGroup
 	logger        log.Logger
+
+	osqueryClient Querier
+}
+
+// SetQuerier sets an osquery client on the extension, allowing
+// the extension to query the running osqueryd instance.
+func (e *Extension) SetQuerier(client Querier) {
+	e.osqueryClient = client
+}
+
+// Querier allows querying osquery.
+type Querier interface {
+	Query(sql string) ([]map[string]string, error)
 }
 
 const (
@@ -225,8 +239,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "generating UUID")
 	}
 
+	enrollDetails, err := getEnrollDetails(e.osqueryClient)
+	if err != nil {
+		return "", true, errors.Wrap(err, "query enrollment details")
+	}
+
 	// If no cached node key, enroll for new node key
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(context.Background(), e.Opts.EnrollSecret, identifier)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
 	if err != nil {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
@@ -635,4 +654,62 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	return nil
+}
+
+func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	query := `
+	SELECT 
+		osquery_info.version as osquery_version,
+		os_version.platform,
+		os_version.version as os_version, 
+		os_version.build as os_build,
+		system_info.hostname,
+		system_info.hardware_vendor,
+		system_info.hardware_serial,
+		system_info.hardware_model
+	FROM 
+		os_version, 
+		system_info,
+		osquery_info;
+`
+	var details service.EnrollmentDetails
+	resp, err := client.Query(query)
+	if err != nil {
+		return details, errors.Wrap(err, "query enrollment details")
+	}
+
+	if len(resp) < 1 {
+		return details, errors.New("expected at least one row from the enrollment details query")
+	}
+
+	if val, ok := resp[0]["os_version"]; ok {
+		details.OSVersion = val
+	}
+	if val, ok := resp[0]["os_build"]; ok {
+		details.OSBuildID = val
+	}
+	if val, ok := resp[0]["platform"]; ok {
+		details.OSPlatform = val
+	}
+	if val, ok := resp[0]["hostname"]; ok {
+		details.Hostname = val
+	}
+	if val, ok := resp[0]["hardware_vendor"]; ok {
+		details.HardwareVendor = val
+	}
+	if val, ok := resp[0]["hardware_model"]; ok {
+		details.HardwareModel = val
+	}
+	if val, ok := resp[0]["hardware_serial"]; ok {
+		details.HardwareSerial = val
+	}
+	if val, ok := resp[0]["osquery_version"]; ok {
+		details.OsqueryVersion = val
+	}
+
+	// Using the version field from the binary.
+	// The extension uses the same value to build the table, but the query runs before the extension tables are registered.
+	details.LauncherVersion = version.Version().Version
+
+	return details, nil
 }

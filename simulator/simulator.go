@@ -71,7 +71,7 @@ func (h *HostSimulation) Enroll() error {
 			)
 			time.Sleep(time.Duration(math.Pow(2, float64(currentAttempt))) * time.Second)
 		}
-		nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid)
+		nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid, service.EnrollmentDetails{})
 		if err != nil {
 			level.Debug(h.logger).Log(
 				"msg", "transport error in enrollment",

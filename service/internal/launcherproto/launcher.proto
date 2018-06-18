@@ -58,6 +58,19 @@ message AgentApiResponse {
 message EnrollmentRequest {
     string enroll_secret = 1;
     string host_identifier = 2;
+    EnrollmentDetails enrollment_details = 3;
+}
+
+message EnrollmentDetails {
+    string os_version = 1;
+    string os_build = 2;
+    string os_platform = 3;
+    string hostname = 4;
+    string hardware_vendor = 5;
+    string hardware_model = 6;
+    string hardware_serial = 7;
+    string osquery_version = 8;
+    string launcher_version = 9;
 }
 
 message EnrollmentResponse {
