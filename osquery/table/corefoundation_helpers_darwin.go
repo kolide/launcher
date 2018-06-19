@@ -26,7 +26,10 @@ func copyPreferenceValue(key, domain, username string) interface{} {
 	val := C.CFPreferencesCopyValue(
 		keyCFString, domainCFString, usernameCFString, C.kCFPreferencesAnyHost,
 	)
-	defer C.CFRelease((C.CFTypeRef)(val))
+	if C.CFTypeRef(val) != 0 {
+		// will panic if the is NULL
+		defer C.CFRelease((C.CFTypeRef)(val))
+	}
 	return goValueFromCFPlistRef(val)
 }
 
