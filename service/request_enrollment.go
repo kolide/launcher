@@ -112,7 +112,7 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
-	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier}
+	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier, EnrollmentDetails: details}
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
 	if err != nil {
 		return "", false, err
