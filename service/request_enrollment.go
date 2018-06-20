@@ -38,16 +38,19 @@ type enrollmentResponse struct {
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.EnrollmentRequest)
 	pbEnrollDetails := req.GetEnrollmentDetails()
-	enrollDetails := EnrollmentDetails{
-		OSVersion:       pbEnrollDetails.OsVersion,
-		OSBuildID:       pbEnrollDetails.OsBuild,
-		OSPlatform:      pbEnrollDetails.OsPlatform,
-		Hostname:        pbEnrollDetails.Hostname,
-		HardwareVendor:  pbEnrollDetails.HardwareVendor,
-		HardwareModel:   pbEnrollDetails.HardwareModel,
-		HardwareSerial:  pbEnrollDetails.HardwareSerial,
-		OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
-		LauncherVersion: pbEnrollDetails.LauncherVersion,
+	var enrollDetails EnrollmentDetails
+	if pbEnrollDetails != nil {
+		enrollDetails = EnrollmentDetails{
+			OSVersion:       pbEnrollDetails.OsVersion,
+			OSBuildID:       pbEnrollDetails.OsBuild,
+			OSPlatform:      pbEnrollDetails.OsPlatform,
+			Hostname:        pbEnrollDetails.Hostname,
+			HardwareVendor:  pbEnrollDetails.HardwareVendor,
+			HardwareModel:   pbEnrollDetails.HardwareModel,
+			HardwareSerial:  pbEnrollDetails.HardwareSerial,
+			OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
+			LauncherVersion: pbEnrollDetails.LauncherVersion,
+		}
 	}
 	return enrollmentRequest{
 		EnrollSecret:      req.EnrollSecret,
