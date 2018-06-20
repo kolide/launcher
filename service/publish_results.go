@@ -98,7 +98,7 @@ func decodeGRPCPublishResultsResponse(_ context.Context, grpcReq interface{}) (i
 }
 
 func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(publishLogsResponse)
+	req := request.(publishResultsResponse)
 	return &pb.AgentApiResponse{
 		Message:     req.Message,
 		ErrorCode:   req.ErrorCode,
