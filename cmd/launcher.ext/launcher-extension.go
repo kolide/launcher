@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -11,6 +12,21 @@ import (
 )
 
 func main() {
+	// if the extension is launched with a positional argument, handle that entrypoint first.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "cf_preference":
+			if len(os.Args) != 4 {
+				fmt.Println("the cf_preference command requires 2 arguments", len(os.Args))
+				os.Exit(2)
+			}
+			key, domain := os.Args[2], os.Args[3]
+			table.PrintPreferenceValue(key, domain)
+			os.Exit(0)
+		}
+	}
+
+	// standard entrypoint to the extension called by osqueryd
 	var (
 		flSocketPath = flag.String("socket", "", "")
 		flTimeout    = flag.Int("timeout", 0, "")

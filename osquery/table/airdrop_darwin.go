@@ -41,14 +41,15 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 		username = t.primaryUser
 	}
 
-	discover := "Unknown"
-	if val, ok := copyPreferenceValue("DiscoverableMode", "com.apple.sharingd", username).(string); ok {
-		discover = val
+	out, err := execPreferenceAsUser(ctx, username, "DiscoverableMode", "com.apple.sharingd")
+	if err != nil {
+		return nil, err
 	}
+
 	return []map[string]string{
 		map[string]string{
 			"username":    username,
-			"discover_by": discover,
+			"discover_by": string(out),
 		},
 	}, nil
 }
