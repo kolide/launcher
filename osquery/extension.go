@@ -658,17 +658,19 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	query := `
-	SELECT 
+	SELECT
 		osquery_info.version as osquery_version,
-		os_version.platform,
-		os_version.version as os_version, 
 		os_version.build as os_build,
-		system_info.hostname,
-		system_info.hardware_vendor,
+		os_version.name as os_name,
+		os_version.platform as os_platform,
+		os_version.platform_like as os_platform_like,
+		os_version.version as os_version,
+		system_info.hardware_model,
 		system_info.hardware_serial,
-		system_info.hardware_model
-	FROM 
-		os_version, 
+		system_info.hardware_vendor,
+		system_info.hostname
+	FROM
+		os_version,
 		system_info,
 		osquery_info;
 `
@@ -688,14 +690,14 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["os_build"]; ok {
 		details.OSBuildID = val
 	}
-	if val, ok := resp[0]["platform"]; ok {
+	if val, ok := resp[0]["os_name"]; ok {
+		details.OSName = val
+	}
+	if val, ok := resp[0]["os_platform"]; ok {
 		details.OSPlatform = val
 	}
-	if val, ok := resp[0]["hostname"]; ok {
-		details.Hostname = val
-	}
-	if val, ok := resp[0]["hardware_vendor"]; ok {
-		details.HardwareVendor = val
+	if val, ok := resp[0]["os_platform_like"]; ok {
+		details.OSPlatformLike = val
 	}
 	if val, ok := resp[0]["hardware_model"]; ok {
 		details.HardwareModel = val
@@ -703,8 +705,11 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["hardware_serial"]; ok {
 		details.HardwareSerial = val
 	}
-	if val, ok := resp[0]["osquery_version"]; ok {
-		details.OsqueryVersion = val
+	if val, ok := resp[0]["hardware_vendor"]; ok {
+		details.HardwareVendor = val
+	}
+	if val, ok := resp[0]["hostname"]; ok {
+		details.Hostname = val
 	}
 
 	// Using the version field from the binary.

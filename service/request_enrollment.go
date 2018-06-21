@@ -27,6 +27,8 @@ type EnrollmentDetails struct {
 	HardwareSerial  string
 	OsqueryVersion  string
 	LauncherVersion string
+	OSName          string
+	OSPlatformLike  string
 }
 
 type enrollmentResponse struct {
@@ -50,6 +52,8 @@ func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interf
 			HardwareSerial:  pbEnrollDetails.HardwareSerial,
 			OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
 			LauncherVersion: pbEnrollDetails.LauncherVersion,
+			OSName:          pbEnrollDetails.OsName,
+			OSPlatformLike:  pbEnrollDetails.OsPlatformLike,
 		}
 	}
 	return enrollmentRequest{
@@ -71,6 +75,8 @@ func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interf
 		HardwareSerial:  req.EnrollmentDetails.HardwareSerial,
 		OsqueryVersion:  req.EnrollmentDetails.OsqueryVersion,
 		LauncherVersion: req.EnrollmentDetails.LauncherVersion,
+		OsName:          req.EnrollmentDetails.OSName,
+		OsPlatformLike:  req.EnrollmentDetails.OSPlatformLike,
 	}
 	return &pb.EnrollmentRequest{
 		EnrollSecret:      req.EnrollSecret,
