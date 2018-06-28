@@ -213,11 +213,14 @@ func NodeKeyFromDB(db *bolt.DB) (string, error) {
 	}
 
 	var key []byte
-	db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		key = b.Get([]byte(nodeKeyKey))
 		return nil
 	})
+	if err != nil {
+		return "", errors.Wrap(err, "error reading node key from db")
+	}
 	if key != nil {
 		return string(key), nil
 	} else {
