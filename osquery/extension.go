@@ -699,6 +699,9 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["os_platform_like"]; ok {
 		details.OSPlatformLike = val
 	}
+	if val, ok := resp[0]["osquery_version"]; ok {
+		details.OsqueryVersion = val
+	}
 	if val, ok := resp[0]["hardware_model"]; ok {
 		details.HardwareModel = val
 	}
