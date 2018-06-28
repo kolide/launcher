@@ -6,14 +6,73 @@ package table
 */
 import "C"
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
 	"reflect"
+	"strconv"
+	"syscall"
 	"unsafe"
+
+	"github.com/pkg/errors"
 )
 
 // Functions with "Create" or "Copy" in the name return references that need to
 // be CFReleased. See
 // https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
+
+func execPreferenceAsUser(ctx context.Context, username, key, domain string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, os.Args[0], "cf_preference", key, domain)
+
+	current, err := user.Current()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting current user for exec")
+	}
+
+	if current.Uid == "0" {
+		usr, err := user.Lookup(username)
+		if err != nil {
+			return nil, errors.Wrapf(err, "looking up username %s", username)
+		}
+
+		uid, err := strconv.Atoi(usr.Uid)
+		if err != nil {
+			return nil, errors.Wrapf(err, "converting user uid %s to int", usr.Uid)
+		}
+
+		gid, err := strconv.Atoi(usr.Gid)
+		if err != nil {
+			return nil, errors.Wrapf(err, "converting user gid %s to int", usr.Gid)
+		}
+
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+	}
+
+	out, err := cmd.CombinedOutput()
+	return bytes.TrimSpace(out), err
+}
+
+// PrintPreferenceValue calls the CoreFoundation API to get a preference value and prints to stdout.
+// Used by the cf_preference entrypoint when dropping privileges from root to a user context.
+func PrintPreferenceValue(key, domain string) {
+	keyCFString := cFStringRef(key)
+	defer C.CFRelease((C.CFTypeRef)(keyCFString))
+
+	domainCFString := cFStringRef(domain)
+	defer C.CFRelease((C.CFTypeRef)(domainCFString))
+
+	val := C.CFPreferencesCopyAppValue(keyCFString, domainCFString)
+	if C.CFTypeRef(val) != 0 {
+		// will panic if the is NULL
+		defer C.CFRelease((C.CFTypeRef)(val))
+	}
+
+	fmt.Println(goValueFromCFPlistRef(val))
+}
 
 func copyPreferenceValue(key, domain, username string) interface{} {
 	keyCFString := cFStringRef(key)
