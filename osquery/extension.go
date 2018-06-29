@@ -206,6 +206,28 @@ func IdentifierFromDB(db *bolt.DB) (string, error) {
 	return identifier, nil
 }
 
+// NodeKeyFromDB returns the device node key from a local bolt DB
+func NodeKeyFromDB(db *bolt.DB) (string, error) {
+	if db == nil {
+		return "", errors.New("received a nil db")
+	}
+
+	var key []byte
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		key = b.Get([]byte(nodeKeyKey))
+		return nil
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "error reading node key from db")
+	}
+	if key != nil {
+		return string(key), nil
+	} else {
+		return "", nil
+	}
+}
+
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
@@ -222,15 +244,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	var key []byte
-	e.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		key = b.Get([]byte(nodeKeyKey))
-		return nil
+	key, err := NodeKeyFromDB(e.db)
+	if err != nil {
+		return "", false, errors.Wrap(err, "error reading node key from db")
+	}
 
-	})
-	if key != nil {
-		e.NodeKey = string(key)
+	if key != "" {
+		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
 
