@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"flag"
 	"os"
 	"path/filepath"
 	"time"
-
-	"google.golang.org/grpc"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log/level"
@@ -45,8 +44,24 @@ func main() {
 		logger.Fatal("err", err, "creating osquery extension client")
 	}
 
-	var conn *grpc.ClientConn
-	var enrollSecret string
+	var (
+		enrollSecret  string
+		rootDirectory string
+
+		serverURL    string
+		insecureTLS  bool
+		insecureGRPC bool
+		certPins     [][]byte
+		rootPool     *x509.CertPool
+	)
+	conn, err := service.DialGRPC(
+		serverURL,
+		insecureTLS,
+		insecureGRPC,
+		certPins,
+		rootPool,
+		logger,
+	)
 	remote := service.New(conn, level.Debug(logger))
 
 	extOpts := grpcext.ExtensionOpts{
@@ -55,7 +70,6 @@ func main() {
 		LoggingInterval: 30 * time.Second,
 	}
 
-	var rootDirectory string
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "open local store"))
