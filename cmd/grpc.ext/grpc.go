@@ -10,6 +10,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/env"
 	kolidelog "github.com/kolide/launcher/log"
 	grpcext "github.com/kolide/launcher/osquery"
 	"github.com/kolide/launcher/service"
@@ -45,14 +46,17 @@ func main() {
 	}
 
 	var (
-		enrollSecret  string
-		rootDirectory string
+		enrollSecret  = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "")
+		rootDirectory = env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", "")
 
-		serverURL    string
-		insecureTLS  bool
-		insecureGRPC bool
-		certPins     [][]byte
-		rootPool     *x509.CertPool
+		serverURL    = env.String("KOLIDE_LAUNCHER_HOSTNAME", "")
+		insecureTLS  = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
+		insecureGRPC = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
+
+		// TODO(future pr): these values are unset
+		// they'll have to be parsed from a string
+		certPins [][]byte
+		rootPool *x509.CertPool
 	)
 	conn, err := service.DialGRPC(
 		serverURL,
