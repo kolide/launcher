@@ -27,6 +27,7 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/autoupdate"
+	"github.com/kolide/launcher/control"
 	"github.com/kolide/launcher/debug"
 	kolidelog "github.com/kolide/launcher/log"
 	"github.com/kolide/launcher/osquery"
@@ -377,6 +378,12 @@ func main() {
 	// If the control server has been opted-in to, run it
 	if opts.enableControl {
 		level.Debug(logger).Log("msg", "starting control server")
+		controlClient, err := control.NewControlClient(logger, db, opts.controlServerURL)
+		if err != nil {
+			logger.Fatal(errors.Wrap(err, "starting control client"))
+		}
+		controlClient.Start(ctx)
+		defer controlClient.Stop()
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
