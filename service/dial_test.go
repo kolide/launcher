@@ -1,9 +1,10 @@
-package main
+package service
 
 import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"io/ioutil"
 	"net"
 	"strings"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/service"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc"
@@ -19,21 +20,21 @@ import (
 )
 
 type mockApiServer struct {
-	service.KolideService
+	KolideService
 }
 
-func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
+func (m *mockApiServer) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
 	return "", false, nil
 }
 
 func startServer(t *testing.T, conf *tls.Config) func() {
 	svc := &mockApiServer{}
 	logger := log.NewNopLogger()
-	e := service.MakeServerEndpoints(svc)
-	apiServer := service.NewGRPCServer(e, logger)
+	e := MakeServerEndpoints(svc)
+	apiServer := NewGRPCServer(e, logger)
 
 	grpcServer := grpc.NewServer()
-	service.RegisterGRPCServer(grpcServer, apiServer)
+	RegisterGRPCServer(grpcServer, apiServer)
 	var listener net.Listener
 	var err error
 	listener, err = net.Listen("tcp", "localhost:8443")
@@ -78,15 +79,15 @@ func TestSwappingCert(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
+	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewNopLogger())
+	client := New(conn, log.NewNopLogger())
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -96,7 +97,7 @@ func TestSwappingCert(t *testing.T) {
 	stop = startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.Nil(t, err)
 
 	stop()
@@ -116,15 +117,15 @@ func TestCertRemainsBad(t *testing.T) {
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := dialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
+	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := service.New(conn, log.NewNopLogger())
+	client := New(conn, log.NewNopLogger())
 
-	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -135,7 +136,7 @@ func TestCertRemainsBad(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Should still fail with bad cert
-	_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.NotNil(t, err)
 
 	stop()
@@ -184,15 +185,15 @@ func TestCertPinning(t *testing.T) {
 			tlsconf := makeTLSConfig("localhost", false, certPins, nil, log.NewNopLogger())
 			tlsconf.RootCAs = pool
 
-			conn, err := dialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
+			conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 				grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(tlsconf)}),
 			)
 			require.Nil(t, err)
 			defer conn.Close()
 
-			client := service.New(conn, log.NewNopLogger())
+			client := New(conn, log.NewNopLogger())
 
-			_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {
 				require.NoError(t, err)
 			} else {
@@ -245,13 +246,13 @@ func TestRootCAs(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
-			conn, err := dialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
+			conn, err := DialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
 			require.Nil(t, err)
 			defer conn.Close()
 
-			client := service.New(conn, log.NewNopLogger())
+			client := New(conn, log.NewNopLogger())
 
-			_, _, err = client.RequestEnrollment(context.Background(), "", "", service.EnrollmentDetails{})
+			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {
 				require.NoError(t, err)
 			} else {
@@ -259,4 +260,18 @@ func TestRootCAs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func parseCertPins(pins string) ([][]byte, error) {
+	var certPins [][]byte
+	if pins != "" {
+		for _, hexPin := range strings.Split(pins, ",") {
+			pin, err := hex.DecodeString(hexPin)
+			if err != nil {
+				return nil, errors.Wrap(err, "decoding cert pin")
+			}
+			certPins = append(certPins, pin)
+		}
+	}
+	return certPins, nil
 }
