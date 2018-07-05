@@ -99,10 +99,38 @@
   version = "0.2"
 
 [[projects]]
+  name = "github.com/gorilla/context"
+  packages = ["."]
+  revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
+  version = "v1.1.1"
+
+[[projects]]
+  name = "github.com/gorilla/mux"
+  packages = ["."]
+  revision = "e3702bed27f0d39777b0b37b664b6280e8ef8fbf"
+  version = "v1.6.2"
+
+[[projects]]
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
+  version = "v1.2.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/groob/plist"
   packages = ["."]
   revision = "2805b357fb2349d3a53ad2d5a5d00d191d9a37c9"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/kolide/broker"
+  packages = [
+    "pkg/ptycmd",
+    "pkg/webtty",
+    "pkg/wsrelay"
+  ]
+  revision = "355e163e023f36a4a7851e6ec09d95c62a1ffb08"
 
 [[projects]]
   branch = "master"
@@ -143,6 +171,12 @@
   name = "github.com/kr/logfmt"
   packages = ["."]
   revision = "b84e30acd515aadc4b783ad4ff83aff3299bdfe0"
+
+[[projects]]
+  name = "github.com/kr/pty"
+  packages = ["."]
+  revision = "fa756f09eeb418bf1cc6268c66ceaad9bb98f598"
+  version = "v1.1.2"
 
 [[projects]]
   branch = "master"
@@ -314,6 +348,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0e6f6d62cd2e942ca8647795294479b6d0635f6a81ab13ebebe26e7e18fc0faa"
+  inputs-digest = "2a1233b0abc752d9f02e8219851b9cd31618d34efee8950f55a198670994bde1"
   solver-name = "gps-cdcl"
   solver-version = 1
