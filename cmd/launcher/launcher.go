@@ -378,7 +378,7 @@ func main() {
 	// If the control server has been opted-in to, run it
 	if opts.enableControl {
 		level.Debug(logger).Log("msg", "starting control server")
-		controlClient, err := control.NewControlClient(logger, db, opts.controlServerURL)
+		controlClient, err := control.NewControlClient(logger, db, opts.controlServerURL, opts.insecureTLS)
 		if err != nil {
 			logger.Fatal(errors.Wrap(err, "starting control client"))
 		}
