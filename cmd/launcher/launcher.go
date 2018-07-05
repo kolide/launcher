@@ -374,6 +374,11 @@ func main() {
 	ext.Start()
 	defer ext.Shutdown()
 
+	// If the control server has been opted-in to, run it
+	if opts.enableControl {
+		level.Debug(logger).Log("msg", "starting control server")
+	}
+
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.autoupdate {
 		enabler := &updateEnabler{
