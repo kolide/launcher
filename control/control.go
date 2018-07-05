@@ -134,6 +134,18 @@ func (c *Client) getShells(ctx context.Context) {
 				)
 				return
 			}
+
+			secret, ok := session["secret"]
+			if !ok {
+				level.Info(c.logger).Log(
+					"msg", "session didn't contain secret",
+				)
+				return
+			}
+
+			// TODO(logan): modify the wsrelay code and use the secret
+			_ = secret
+
 			client, err := wsrelay.NewClient(c.addr, room)
 			if err != nil {
 				level.Info(c.logger).Log(
