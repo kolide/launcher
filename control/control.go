@@ -12,9 +12,9 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/broker/pkg/ptycmd"
-	"github.com/kolide/broker/pkg/webtty"
-	"github.com/kolide/broker/pkg/wsrelay"
+	"github.com/kolide/launcher/control/ptycmd"
+	"github.com/kolide/launcher/control/webtty"
+	"github.com/kolide/launcher/control/wsrelay"
 	"github.com/kolide/launcher/osquery"
 	"github.com/pkg/errors"
 )
@@ -146,7 +146,7 @@ func (c *Client) getShells(ctx context.Context) {
 			// TODO(logan): modify the wsrelay code and use the secret
 			_ = secret
 
-			client, err := wsrelay.NewClient(c.addr, room)
+			client, err := wsrelay.NewClient(c.addr, room, c.logger)
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating client",
@@ -165,7 +165,7 @@ func (c *Client) getShells(ctx context.Context) {
 				return
 			}
 
-			TTY, err := webtty.New(client, pty, webtty.WithPermitWrite())
+			TTY, err := webtty.New(client, pty, webtty.WithPermitWrite(), webtty.WithLogger(c.logger))
 			if err := TTY.Run(ctx); err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating web TTY",
