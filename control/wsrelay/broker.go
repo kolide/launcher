@@ -169,3 +169,10 @@ func (b *Broker) Handler(w http.ResponseWriter, r *http.Request) {
 	// handle the reads
 	sub.relayReads(b)
 }
+
+// SetRoom sets the room variable on the request, so that the handler can access it
+// TODO: remove or set the room in the context directly... needs more exploration
+func (b *Broker) SetRoom(room string, r *http.Request) *http.Request {
+	req := mux.SetURLVars(r, map[string]string{"room": room})
+	return req
+}
