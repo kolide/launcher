@@ -1,9 +1,10 @@
 package wsrelay
 
 import (
-	"log"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/gorilla/websocket"
 )
 
@@ -57,11 +58,19 @@ func (s *subscription) relayReads(b *Broker) {
 		if err != nil {
 			// if the client closed the connection
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				log.Printf("Client closed the connection to room %s", s.room)
+				level.Info(b.logger).Log(
+					"msg", "client closed connection",
+					"err", err,
+					"room", s.room,
+				)
 				break
 			}
 			// if there was an error that isn't the websocket closing
-			log.Printf("unexpected error reading websocket: %v", err)
+			level.Info(b.logger).Log(
+				"msg", "unexpected error reading websocket",
+				"err", err,
+				"room", s.room,
+			)
 			break
 		}
 		// send the message
@@ -70,7 +79,7 @@ func (s *subscription) relayReads(b *Broker) {
 }
 
 // relayWrites relays messages from the broker to the websocket connection.
-func (s *subscription) relayWrites() {
+func (s *subscription) relayWrites(logger log.Logger) {
 	conn := s.conn
 	// create a ticker to send pings
 	ticker := time.NewTicker(pingPeriod)
@@ -87,14 +96,20 @@ func (s *subscription) relayWrites() {
 				return
 			}
 			if err := conn.write(websocket.TextMessage, message); err != nil {
-				log.Printf("error writing message to websocket: %v", err)
+				level.Info(logger).Log(
+					"msg", "error writing message to websocket",
+					"err", err,
+				)
 				return
 			}
 
 		// on tick
 		case <-ticker.C:
 			if err := conn.write(websocket.PingMessage, []byte{}); err != nil {
-				log.Printf("error writing ping to websocket: %v", err)
+				level.Info(logger).Log(
+					"msg", "error writing ping to websocket",
+					"err", err,
+				)
 				return
 			}
 		}
