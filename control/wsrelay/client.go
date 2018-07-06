@@ -1,9 +1,9 @@
 package wsrelay
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 
 	"github.com/gorilla/websocket"
@@ -16,17 +16,25 @@ type Client struct {
 
 // NewClient creates a new websocket client that can be interrupted
 // via SIGINT
-func NewClient(brokerAddr, room string) (*Client, error) {
+func NewClient(brokerAddr, path, secret string, useTLS bool) (*Client, error) {
+	// determine the scheme
+	var scheme string
+	if useTLS {
+		scheme = "wss"
+	} else {
+		scheme = "ws"
+	}
 	// construct the URL to connect to
 	u := url.URL{
-		Scheme: "ws",
+		Scheme: scheme,
 		Host:   brokerAddr,
-		Path:   fmt.Sprintf("/%s/ws", room),
+		Path:   path,
 	}
 	log.Printf("connecting to %s", u.String())
 
+	authHeader := http.Header{"Authorization": {"Bearer " + secret}}
 	// connect to the websocket at the given URL
-	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), authHeader)
 	if err != nil {
 		if err == websocket.ErrBadHandshake {
 			log.Printf("handshake failed with status %d", resp.StatusCode)
