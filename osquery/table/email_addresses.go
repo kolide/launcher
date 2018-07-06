@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/kolide/osquery-go"
@@ -26,24 +23,21 @@ func generateEmailAddresses(client *osquery.ExtensionManagerClient) table.Genera
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		results := []map[string]string{}
 
-		switch runtime.GOOS {
-		case "darwin":
-			// Google Chrome State Files
-			for _, stateFilePath := range findChromeStateFiles() {
-				fileContent, err := ioutil.ReadFile(stateFilePath)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not read file %s", stateFilePath)
-				}
-
-				var parsedStateFileContent chromeLocalStateFile
-				if err := json.Unmarshal(fileContent, &parsedStateFileContent); err != nil {
-					return nil, errors.Wrap(err, "could not unmarshal json file")
-				}
-
-				for _, profile := range parsedStateFileContent.Profile.InfoCache {
-					results = addEmailToResults(profile.Username, results)
-				}
+		for _, stateFilePath := range findChromeStateFiles() {
+			fileContent, err := ioutil.ReadFile(stateFilePath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "could not read file %s", stateFilePath)
 			}
+
+			var parsedStateFileContent chromeLocalStateFile
+			if err := json.Unmarshal(fileContent, &parsedStateFileContent); err != nil {
+				return nil, errors.Wrap(err, "could not unmarshal json file")
+			}
+
+			for _, profile := range parsedStateFileContent.Profile.InfoCache {
+				results = addEmailToResults(profile.Username, results)
+			}
+
 		}
 
 		return results, nil
@@ -73,22 +67,4 @@ func addEmailToResults(email string, results []map[string]string) []map[string]s
 		"email":  email,
 		"domain": emailDomain(email),
 	})
-}
-
-func findChromeStateFiles() []string {
-	chromeLocalStateFiles := []string{}
-	filesInUser, err := ioutil.ReadDir("/Users")
-	if err != nil {
-		return []string{}
-	}
-	for _, f := range filesInUser {
-		if f.IsDir() && (f.Name() != "Guest" || f.Name() != "Shared") {
-			stateFilePath := filepath.Join("/Users", f.Name(), "Library/Application Support/Google/Chrome/Local State")
-			if _, err := os.Stat(stateFilePath); err == nil {
-				chromeLocalStateFiles = append(chromeLocalStateFiles, stateFilePath)
-			}
-		}
-	}
-
-	return chromeLocalStateFiles
 }
