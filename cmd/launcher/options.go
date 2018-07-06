@@ -19,6 +19,7 @@ import (
 // program
 type options struct {
 	kolideServerURL    string
+	controlServerURL   string
 	enrollSecret       string
 	enrollSecretPath   string
 	rootDirectory      string
@@ -27,6 +28,7 @@ type options struct {
 	rootPEM            string
 	loggingInterval    time.Duration
 	autoupdate         bool
+	enableControl      bool
 	printVersion       bool
 	developerUsage     bool
 	debug              bool
@@ -57,6 +59,17 @@ func parseOptions() (*options, error) {
 			"hostname",
 			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
 			"The hostname of the gRPC server",
+		)
+
+		flEnableControl = flag.Bool(
+			"control",
+			env.Bool("KOLIDE_CONTROL", false),
+			"Whether or not the control server is enabled (default: false)",
+		)
+		flControlServerURL = flag.String(
+			"control_hostname",
+			env.String("KOLIDE_CONTROL_HOSTNAME", ""),
+			"The hostname of the control server",
 		)
 		flEnrollSecret = flag.String(
 			"enroll_secret",
@@ -189,6 +202,8 @@ func parseOptions() (*options, error) {
 
 	opts := &options{
 		kolideServerURL:    *flKolideServerURL,
+		enableControl:      *flEnableControl,
+		controlServerURL:   *flControlServerURL,
 		enrollSecret:       *flEnrollSecret,
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
@@ -240,6 +255,7 @@ func shortUsage() {
 	printOpt("osqueryd_path")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
+	printOpt("control")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
@@ -285,6 +301,8 @@ func developerUsage() {
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
 	printOpt("update_channel")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("control_hostname")
 	fmt.Fprintf(os.Stderr, "\n")
 	usageFooter()
 }
