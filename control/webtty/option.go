@@ -3,6 +3,7 @@ package webtty
 import (
 	"encoding/json"
 
+	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
 )
 
@@ -57,6 +58,14 @@ func WithTTYPreferences(preferences interface{}) Option {
 			return errors.Wrapf(err, "failed to marshal preferences as JSON")
 		}
 		wt.ttyPreferences = prefs
+		return nil
+	}
+}
+
+// WithLogger sets the logger to use
+func WithLogger(logger log.Logger) Option {
+	return func(wt *WebTTY) error {
+		wt.logger = logger
 		return nil
 	}
 }

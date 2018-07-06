@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
-	"log"
 	"sync"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 )
 
@@ -84,6 +86,9 @@ type WebTTY struct {
 
 	// lock to ensure threadsafe
 	writeMutex sync.Mutex
+
+	// injectable, structured logger
+	logger log.Logger
 }
 
 // TTY represents a TTY connection, typically a websocket
@@ -110,8 +115,8 @@ func New(tty TTY, pty PTY, options ...Option) (*WebTTY, error) {
 		permitWrite: false,
 		columns:     0,
 		rows:        0,
-
-		bufferSize: 2048,
+		bufferSize:  2048,
+		logger:      log.NewNopLogger(),
 	}
 
 	for _, option := range options {
@@ -163,7 +168,6 @@ func (wt *WebTTY) Run(ctx context.Context) error {
 			for {
 				n, err := wt.tty.Read(buffer)
 				if err != nil {
-					log.Println(err)
 					return ErrTTYClosed
 				}
 
@@ -292,8 +296,10 @@ func (wt *WebTTY) relayToPTY(data []byte) error {
 
 	// catch all to handle unknown messages
 	default:
-		// return errors.Errorf("unknown message type `%c`", data[0])
-		log.Printf("unknown message type `%v`", string(data))
+		level.Info(wt.logger).Log(
+			"msg", "unknown message type",
+			"type", fmt.Sprintf("%c", data[0]),
+		)
 	}
 
 	return nil

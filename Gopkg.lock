@@ -124,16 +124,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/kolide/broker"
-  packages = [
-    "pkg/ptycmd",
-    "pkg/webtty",
-    "pkg/wsrelay"
-  ]
-  revision = "355e163e023f36a4a7851e6ec09d95c62a1ffb08"
-
-[[projects]]
-  branch = "master"
   name = "github.com/kolide/kit"
   packages = [
     "contexts/uuid",
@@ -348,6 +338,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2a1233b0abc752d9f02e8219851b9cd31618d34efee8950f55a198670994bde1"
+  inputs-digest = "237e817ef368c18b590ee73c0dc2793cd681bde1ea7462222fb605762d3146a1"
   solver-name = "gps-cdcl"
   solver-version = 1

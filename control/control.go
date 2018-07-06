@@ -3,7 +3,6 @@ package control
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -29,24 +28,25 @@ type Client struct {
 	cancel            context.CancelFunc
 }
 
-func NewControlClient(logger log.Logger, db *bolt.DB, addr string, insecureSkipVerify bool) (*Client, error) {
-	baseURL, err := url.Parse("https://" + addr)
+func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
+	baseURL, err := url.Parse(addr)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing URL")
 	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify},
-		},
-	}
-	return &Client{
-		logger:            logger,
+	c := &Client{
+		logger:            log.NewNopLogger(),
 		baseURL:           baseURL,
-		client:            client,
+		client:            &http.Client{},
 		db:                db,
 		addr:              addr,
 		getShellsInterval: 5 * time.Second,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c, nil
 }
 
 func (c *Client) Start(ctx context.Context) {
@@ -162,7 +162,7 @@ func (c *Client) getShells(ctx context.Context) {
 				return
 			}
 
-			TTY, err := webtty.New(client, pty, webtty.WithPermitWrite())
+			TTY, err := webtty.New(client, pty, webtty.WithPermitWrite(), webtty.WithLogger(c.logger))
 			if err := TTY.Run(ctx); err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating web TTY",

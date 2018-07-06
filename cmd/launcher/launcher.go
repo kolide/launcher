@@ -371,12 +371,21 @@ func main() {
 	defer ext.Shutdown()
 
 	// If the control server has been opted-in to, run it
-	if opts.enableControl {
-		level.Debug(logger).Log("msg", "starting control server")
-		controlClient, err := control.NewControlClient(logger, db, opts.controlServerURL, opts.insecureTLS)
+	if opts.control {
+		level.Debug(logger).Log("msg", "creating control client")
+
+		controlOpts := []control.Option{
+			control.WithLogger(logger),
+			control.WithGetShellsInterval(opts.getShellsInterval),
+		}
+		if opts.insecureTLS {
+			controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
+		}
+		controlClient, err := control.NewControlClient(db, opts.controlServerURL, controlOpts...)
 		if err != nil {
 			logger.Fatal(errors.Wrap(err, "starting control client"))
 		}
+
 		controlClient.Start(ctx)
 		defer controlClient.Stop()
 	}

@@ -1,9 +1,10 @@
 package wsrelay
 
 import (
-	"log"
 	"net/http"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -44,10 +45,13 @@ type Broker struct {
 
 	// Upgrader for upgrading http requests to websockets
 	upgrader *websocket.Upgrader
+
+	// Injectable, structured logger
+	logger log.Logger
 }
 
 // NewBroker returns a new Broker
-func NewBroker() *Broker {
+func NewBroker(logger log.Logger) *Broker {
 	return &Broker{
 		broadcast:  make(chan message),
 		register:   make(chan subscription),
@@ -57,6 +61,7 @@ func NewBroker() *Broker {
 			ReadBufferSize:  2048,
 			WriteBufferSize: 2048,
 		},
+		logger: logger,
 	}
 }
 
@@ -70,14 +75,20 @@ func (b *Broker) Start() {
 
 			// create a set for connections if it doesn't exist
 			if connections == nil {
-				log.Printf("Creating room %s", sub.room)
+				level.Debug(b.logger).Log(
+					"msg", "creating room",
+					"name", sub.room,
+				)
 				b.rooms[sub.room] = make(map[*connection]bool)
 			}
 
 			// put connection in the set of connections
 			b.rooms[sub.room][sub.conn] = true
 
-			log.Printf("Client joined room %s", sub.room)
+			level.Debug(b.logger).Log(
+				"msg", "client joined room",
+				"name", sub.room,
+			)
 
 		case sub := <-b.unregister:
 			// get the connections for a room
@@ -98,13 +109,13 @@ func (b *Broker) Start() {
 				close(sub.conn.send)
 			}
 
-			log.Printf("Client left room %s", sub.room)
+			level.Debug(b.logger).Log("msg", "client left room", "name", sub.room)
 
 			// remove room if empty
 			if len(connections) == 0 {
 				delete(b.rooms, sub.room)
 
-				log.Printf("Closed room %s", sub.room)
+				level.Debug(b.logger).Log("msg", "closed room", "name", sub.room)
 			}
 
 		case msg := <-b.broadcast:
@@ -147,7 +158,10 @@ func (b *Broker) Handler(w http.ResponseWriter, r *http.Request) {
 	// upgrade connection to a websocket
 	ws, err := b.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("error upgrading to websocket: %v", err)
+		level.Info(b.logger).Log(
+			"msg", "error upgrading to websocket",
+			"err", err,
+		)
 		return
 	}
 
