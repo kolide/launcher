@@ -1,8 +1,7 @@
 package wsrelay
 
 import (
-	"io/ioutil"
-	"net/http"
+	"crypto/tls"
 	"net/url"
 
 	"github.com/gorilla/websocket"
@@ -16,7 +15,7 @@ type Client struct {
 
 // NewClient creates a new websocket client that can be interrupted
 // via SIGINT
-func NewClient(brokerAddr, path, secret string, useTLS bool) (*Client, error) {
+func NewClient(brokerAddr, path, secret string, useTLS bool, insecure bool) (*Client, error) {
 	// determine the scheme
 	var scheme string
 	if useTLS {
@@ -24,6 +23,7 @@ func NewClient(brokerAddr, path, secret string, useTLS bool) (*Client, error) {
 	} else {
 		scheme = "ws"
 	}
+
 	// construct the URL to connect to
 	u := url.URL{
 		Scheme: scheme,
@@ -31,20 +31,21 @@ func NewClient(brokerAddr, path, secret string, useTLS bool) (*Client, error) {
 		Path:   path,
 	}
 
-	authHeader := http.Header{"Authorization": {"Bearer " + secret}}
+	// set the secret in the query params
+	// Note: we use this instead of an auth header because browser clients
+	// can't use headers
+	q := u.Query()
+	q.Set("secret", secret)
+	u.RawQuery = q.Encode()
+
 	// connect to the websocket at the given URL
-	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), authHeader)
+	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}}
+	conn, resp, err := dialer.Dial(u.String(), nil)
+
+	println(u.String())
 	if err != nil {
 		if err == websocket.ErrBadHandshake {
 			return nil, errors.Wrapf(err, "handshake failed with status %d", resp.StatusCode)
-		}
-		if resp != nil {
-			if resp.Body != nil {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					return nil, errors.Wrapf(err, "handshake failed with body: %s", string(body))
-				}
-			}
 		}
 
 		return nil, err

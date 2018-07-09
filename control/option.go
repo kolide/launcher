@@ -23,6 +23,7 @@ func WithInsecureSkipVerify() Option {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
+		c.insecure = true
 	}
 }
 

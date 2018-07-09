@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -23,13 +24,14 @@ type Client struct {
 	baseURL           *url.URL
 	client            *http.Client
 	db                *bolt.DB
+	insecure          bool
 	addr              string
 	getShellsInterval time.Duration
 	cancel            context.CancelFunc
 }
 
 func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
-	baseURL, err := url.Parse(addr)
+	baseURL, err := url.Parse("https://" + addr)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing URL")
 	}
@@ -143,7 +145,8 @@ func (c *Client) getShells(ctx context.Context) {
 				return
 			}
 
-			client, err := wsrelay.NewClient(c.addr, "/api/v1/shells/"+room, secret, true)
+			wsPath := fmt.Sprintf("/api/v1/shells/%s", room)
+			client, err := wsrelay.NewClient(c.addr, wsPath, secret, true, c.insecure)
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating client",
@@ -153,7 +156,7 @@ func (c *Client) getShells(ctx context.Context) {
 			}
 			defer client.Close()
 
-			pty, err := ptycmd.NewCmd("/bin/bash", []string{})
+			pty, err := ptycmd.NewCmd("/bin/bash", []string{"--login"})
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating PTY command",
