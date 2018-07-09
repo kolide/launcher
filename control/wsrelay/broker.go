@@ -181,7 +181,7 @@ func (b *Broker) Handler(w http.ResponseWriter, r *http.Request) {
 	b.register <- sub
 
 	// create a goroutine to handle writes
-	go sub.relayWrites()
+	go sub.relayWrites(b.logger)
 
 	// handle the reads
 	sub.relayReads(b)

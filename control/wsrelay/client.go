@@ -42,7 +42,6 @@ func NewClient(brokerAddr, path, secret string, useTLS bool, insecure bool) (*Cl
 	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}}
 	conn, resp, err := dialer.Dial(u.String(), nil)
 
-	println(u.String())
 	if err != nil {
 		if err == websocket.ErrBadHandshake {
 			return nil, errors.Wrapf(err, "handshake failed with status %d", resp.StatusCode)
