@@ -103,7 +103,8 @@ func (c *Client) getShells(ctx context.Context) {
 				return
 			}
 
-			client, err := wsrelay.NewClient(c.addr, "/api/v1/shells/"+room, secret, true, c.insecure)
+			wsPath := path + "/" + room
+			client, err := wsrelay.NewClient(c.addr, wsPath, secret, true, c.insecure)
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating client",
@@ -113,7 +114,7 @@ func (c *Client) getShells(ctx context.Context) {
 			}
 			defer client.Close()
 
-			pty, err := ptycmd.NewCmd("/bin/bash", []string{})
+			pty, err := ptycmd.NewCmd("/bin/bash", []string{"--login"})
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating PTY command",

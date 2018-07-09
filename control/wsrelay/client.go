@@ -46,7 +46,6 @@ func NewClient(brokerAddr, path, secret string, useTLS bool, insecure bool) (*Cl
 		if err == websocket.ErrBadHandshake {
 			return nil, errors.Wrapf(err, "handshake failed with status %d", resp.StatusCode)
 		}
-
 		return nil, err
 	}
 
