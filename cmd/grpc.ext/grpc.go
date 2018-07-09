@@ -67,6 +67,9 @@ func main() {
 		rootPool,
 		logger,
 	)
+	if err != nil {
+		logger.Fatal("err", err, "failed to connect to grpc host")
+	}
 	remote := service.New(conn, level.Debug(logger))
 
 	extOpts := grpcext.ExtensionOpts{
