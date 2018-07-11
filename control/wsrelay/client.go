@@ -17,11 +17,9 @@ type Client struct {
 // via SIGINT
 func NewClient(brokerAddr, path string, useTLS bool, insecure bool) (*Client, error) {
 	// determine the scheme
-	var scheme string
+	scheme := "ws"
 	if useTLS {
 		scheme = "wss"
-	} else {
-		scheme = "ws"
 	}
 
 	// construct the URL to connect to
