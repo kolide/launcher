@@ -98,6 +98,7 @@ func (c *Client) url(path string) *url.URL {
 	return &u
 }
 
+// Stop stops the client
 func (c *Client) Stop() {
 	c.cancel()
 }
