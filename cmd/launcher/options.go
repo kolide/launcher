@@ -18,14 +18,19 @@ import (
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
-	kolideServerURL    string
-	enrollSecret       string
-	enrollSecretPath   string
-	rootDirectory      string
-	osquerydPath       string
-	certPins           [][]byte
-	rootPEM            string
-	loggingInterval    time.Duration
+	kolideServerURL  string
+	enrollSecret     string
+	enrollSecretPath string
+	rootDirectory    string
+	osquerydPath     string
+	certPins         [][]byte
+	rootPEM          string
+	loggingInterval  time.Duration
+
+	control           bool
+	controlServerURL  string
+	getShellsInterval time.Duration
+
 	autoupdate         bool
 	printVersion       bool
 	developerUsage     bool
@@ -58,6 +63,23 @@ func parseOptions() (*options, error) {
 			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
 			"The hostname of the gRPC server",
 		)
+
+		flControl = flag.Bool(
+			"control",
+			env.Bool("KOLIDE_CONTROL", false),
+			"Whether or not the control server is enabled (default: false)",
+		)
+		flControlServerURL = flag.String(
+			"control_hostname",
+			env.String("KOLIDE_CONTROL_HOSTNAME", ""),
+			"The hostname of the control server",
+		)
+		flGetShellsInterval = flag.Duration(
+			"control_get_shells_interval",
+			env.Duration("KOLIDE_CONTROL_GET_SHELLS_INTERVAL", time.Minute),
+			"The interval at which the get shells request will be made",
+		)
+
 		flEnrollSecret = flag.String(
 			"enroll_secret",
 			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
@@ -189,6 +211,9 @@ func parseOptions() (*options, error) {
 
 	opts := &options{
 		kolideServerURL:    *flKolideServerURL,
+		control:            *flControl,
+		controlServerURL:   *flControlServerURL,
+		getShellsInterval:  *flGetShellsInterval,
 		enrollSecret:       *flEnrollSecret,
 		enrollSecretPath:   *flEnrollSecretPath,
 		rootDirectory:      *flRootDirectory,
@@ -241,6 +266,9 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
 	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("control")
+	printOpt("control_hostname")
+	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
@@ -285,6 +313,8 @@ func developerUsage() {
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
 	printOpt("update_channel")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("control_get_shells_interval")
 	fmt.Fprintf(os.Stderr, "\n")
 	usageFooter()
 }

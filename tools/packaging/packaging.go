@@ -40,18 +40,20 @@ func CreatePackages(
 	insecureGrpc,
 	autoupdate bool,
 	updateChannel string,
+	control bool,
+	controlHostname string,
 	identifier string,
 	omitSecret bool,
 	systemd bool,
 	certPins,
 	rootPEM string,
 ) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(packageVersion, osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, certPins, rootPEM)
+	macPkgDestinationPath, err := CreateMacPackage(packageVersion, osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, control, controlHostname, identifier, omitSecret, certPins, rootPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(packageVersion, osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, identifier, omitSecret, systemd, certPins, rootPEM)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(packageVersion, osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, control, controlHostname, identifier, omitSecret, systemd, certPins, rootPEM)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -103,7 +105,9 @@ func CreateLinuxPackages(
 	insecure,
 	insecureGrpc,
 	autoupdate bool,
-	updateChannel,
+	updateChannel string,
+	control bool,
+	controlHostname string,
 	identifier string,
 	omitSecret bool,
 	systemd bool,
@@ -196,6 +200,8 @@ func CreateLinuxPackages(
 		InsecureGrpc:     insecureGrpc,
 		Autoupdate:       autoupdate,
 		UpdateChannel:    updateChannel,
+		Control:          control,
+		ControlHostname:  controlHostname,
 		CertPins:         certPins,
 		RootPEM:          rootPEMPath,
 	}
@@ -306,7 +312,9 @@ func CreateMacPackage(
 	insecure,
 	insecureGrpc,
 	autoupdate bool,
-	updateChannel,
+	updateChannel string,
+	control bool,
+	controlHostname string,
 	identifier string,
 	omitSecret bool,
 	certPins,
@@ -416,6 +424,8 @@ func CreateMacPackage(
 		InsecureGrpc:     insecureGrpc,
 		Autoupdate:       autoupdate,
 		UpdateChannel:    updateChannel,
+		Control:          control,
+		ControlHostname:  controlHostname,
 		CertPins:         certPins,
 		RootPEM:          rootPEMPath,
 	}
@@ -492,6 +502,8 @@ type initTemplateOptions struct {
 	Insecure         bool
 	Autoupdate       bool
 	UpdateChannel    string
+	Control          bool
+	ControlHostname  string
 	CertPins         string
 	RootPEM          string
 }
@@ -568,7 +580,9 @@ ExecStart={{.LauncherPath}} \
 --hostname={{.ServerHostname}} \
 --enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
 --insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}{{if .Autoupdate}}
+--insecure \{{end}}{{if .Control}}
+--control \
+--control_hostname={{.ControlHostname}} \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins }}
 --cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
@@ -600,6 +614,8 @@ type launchDaemonTemplateOptions struct {
 	Insecure         bool
 	Autoupdate       bool
 	UpdateChannel    string
+	Control          bool
+	ControlHostname  string
 	CertPins         string
 	RootPEM          string
 }
@@ -622,7 +638,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
             <string>{{.SecretPath}}</string>
             <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
-            <string>{{.OsquerydPath}}</string>{{if .Autoupdate}}
+            <string>{{.OsquerydPath}}</string>{{if .Control}}
+            <key>KOLIDE_CONTROL_HOSTNAME</key>
+            <string>{{.ControlHostname}}</string>{{end}}{{if .Autoupdate}}
             <key>KOLIDE_LAUNCHER_UPDATE_CHANNEL</key>
             <string>{{.UpdateChannel}}</string>{{end}}{{if .CertPins }}
             <key>KOLIDE_LAUNCHER_CERT_PINS</key>
@@ -650,6 +668,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <string>--insecure</string>{{end}}
 			{{if .Autoupdate}}
             <string>--autoupdate</string>
+			{{end}}
+			{{if .Control}}
+            <string>--control</string>
 			{{end}}
         </array>
         <key>StandardErrorPath</key>
