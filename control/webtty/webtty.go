@@ -28,8 +28,8 @@ const (
 
 	// INCOMING MESSAGE TYPES
 
-	// UnknownInput is an unknown message type, maybe sent by a bug
-	UnknownInput = '0'
+	// AuthenticateTTY is sent by the TTY to negotiate authentication
+	AuthenticateTTY = '0'
 	// Input is user input typically from a keyboard
 	Input = '1'
 	// Ping to the server
@@ -39,8 +39,8 @@ const (
 
 	// OUTGOING MESSAGE TYPES
 
-	// UnknownOutput is an unknown message type, maybe sent by a bug
-	UnknownOutput = '0'
+	// AuthenticatePTY is sent by the PTY to negotiate authentication
+	AuthenticatePTY = '0'
 	// Output is normal output to the terminal
 	Output = '1'
 	// Pong to the browser
@@ -62,6 +62,9 @@ type WebTTY struct {
 
 	// the PTY that the TTY is proxied to
 	pty PTY
+
+	// the secret that the TTY uses to authenticate
+	secret string
 
 	// the title of the TTY
 	title []byte
@@ -107,10 +110,11 @@ type PTY interface {
 
 // New creates a new instance of WebTTY,
 // given a connection to the TTY and a PTY to connect it to.
-func New(tty TTY, pty PTY, options ...Option) (*WebTTY, error) {
+func New(tty TTY, pty PTY, secret string, options ...Option) (*WebTTY, error) {
 	wt := &WebTTY{
 		tty:         tty,
 		pty:         pty,
+		secret:      secret,
 		title:       []byte(pty.Title()),
 		permitWrite: false,
 		columns:     0,
@@ -192,8 +196,13 @@ func (wt *WebTTY) Run(ctx context.Context) error {
 // sendInitializeMessage sends the title, reconnect time,
 // and preferences to the TTY on startup
 func (wt *WebTTY) sendInitializeMessage() error {
-	err := wt.writeTTY(append([]byte{SetTitle}, wt.title...))
-	if err != nil {
+	// send the authticate message with the secret
+	if err := wt.writeTTY(append([]byte{AuthenticatePTY}, wt.secret...)); err != nil {
+		return errors.Wrapf(err, "failed to authenticate")
+	}
+
+	// send the settitle message
+	if err := wt.writeTTY(append([]byte{SetTitle}, wt.title...)); err != nil {
 		return errors.Wrapf(err, "failed to send window title")
 	}
 

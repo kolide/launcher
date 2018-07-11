@@ -15,7 +15,7 @@ type Client struct {
 
 // NewClient creates a new websocket client that can be interrupted
 // via SIGINT
-func NewClient(brokerAddr, path, secret string, useTLS bool, insecure bool) (*Client, error) {
+func NewClient(brokerAddr, path string, useTLS bool, insecure bool) (*Client, error) {
 	// determine the scheme
 	var scheme string
 	if useTLS {
@@ -30,13 +30,6 @@ func NewClient(brokerAddr, path, secret string, useTLS bool, insecure bool) (*Cl
 		Host:   brokerAddr,
 		Path:   path,
 	}
-
-	// set the secret in the query params
-	// Note: we use this instead of an auth header because browser clients
-	// can't use headers
-	q := u.Query()
-	q.Set("secret", secret)
-	u.RawQuery = q.Encode()
 
 	// connect to the websocket at the given URL
 	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}}

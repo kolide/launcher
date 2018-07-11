@@ -104,7 +104,7 @@ func (c *Client) getShells(ctx context.Context) {
 			}
 
 			wsPath := path + "/" + room
-			client, err := wsrelay.NewClient(c.addr, wsPath, secret, true, c.insecure)
+			client, err := wsrelay.NewClient(c.addr, wsPath, true, c.insecure)
 			if err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating client",
@@ -123,7 +123,7 @@ func (c *Client) getShells(ctx context.Context) {
 				return
 			}
 
-			TTY, err := webtty.New(client, pty, webtty.WithPermitWrite(), webtty.WithLogger(c.logger))
+			TTY, err := webtty.New(client, pty, secret, webtty.WithPermitWrite(), webtty.WithLogger(c.logger))
 			if err := TTY.Run(ctx); err != nil {
 				level.Info(c.logger).Log(
 					"msg", "error creating web TTY",
