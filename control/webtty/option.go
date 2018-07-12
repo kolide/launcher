@@ -2,6 +2,7 @@ package webtty
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
@@ -58,6 +59,20 @@ func WithTTYPreferences(preferences interface{}) Option {
 			return errors.Wrapf(err, "failed to marshal preferences as JSON")
 		}
 		wt.ttyPreferences = prefs
+		return nil
+	}
+}
+
+// WithKeepAliveDeadline specifies the duration to time out
+// after the last message was received
+func WithKeepAliveDeadline() Option {
+	// TODO: make this a flag and not a magic number
+	deadline := time.Second * 30
+	return func(wt *WebTTY) error {
+		wt.deadliner = deadliner{
+			period: deadline,
+			ticker: *time.NewTicker(deadline),
+		}
 		return nil
 	}
 }

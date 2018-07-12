@@ -86,51 +86,63 @@ func (c *Client) getShells(ctx context.Context) {
 			"count", len(responseBody.Sessions),
 		)
 
+		// for every shell, handle the shell in a goroutine
 		for _, session := range responseBody.Sessions {
-			room, ok := session["session_id"]
-			if !ok {
-				level.Info(c.logger).Log(
-					"msg", "session didn't contain id",
-				)
-				return
-			}
-
-			secret, ok := session["secret"]
-			if !ok {
-				level.Info(c.logger).Log(
-					"msg", "session didn't contain secret",
-				)
-				return
-			}
-
-			wsPath := path + "/" + room
-			client, err := wsrelay.NewClient(c.addr, wsPath, true, c.insecure)
-			if err != nil {
-				level.Info(c.logger).Log(
-					"msg", "error creating client",
-					"err", err,
-				)
-				return
-			}
-			defer client.Close()
-
-			pty, err := ptycmd.NewCmd("/bin/bash", []string{"--login"})
-			if err != nil {
-				level.Info(c.logger).Log(
-					"msg", "error creating PTY command",
-					"err", err,
-				)
-				return
-			}
-
-			TTY, err := webtty.New(client, pty, secret, webtty.WithPermitWrite(), webtty.WithLogger(c.logger))
-			if err := TTY.Run(ctx); err != nil {
-				level.Info(c.logger).Log(
-					"msg", "error creating web TTY",
-					"err", err,
-				)
-				return
-			}
+			go c.connectToShell(ctx, path, session)
 		}
+	}
+}
+
+func (c *Client) connectToShell(ctx context.Context, path string, session map[string]string) {
+	room, ok := session["session_id"]
+	if !ok {
+		level.Info(c.logger).Log(
+			"msg", "session didn't contain id",
+		)
+		return
+	}
+
+	secret, ok := session["secret"]
+	if !ok {
+		level.Info(c.logger).Log(
+			"msg", "session didn't contain secret",
+		)
+		return
+	}
+
+	wsPath := path + "/" + room
+	client, err := wsrelay.NewClient(c.addr, wsPath, true, c.insecure)
+	if err != nil {
+		level.Info(c.logger).Log(
+			"msg", "error creating client",
+			"err", err,
+		)
+		return
+	}
+	defer client.Close()
+
+	pty, err := ptycmd.NewCmd("/bin/bash", []string{"--login"})
+	if err != nil {
+		level.Info(c.logger).Log(
+			"msg", "error creating PTY command",
+			"err", err,
+		)
+		return
+	}
+
+	TTY, err := webtty.New(
+		client,
+		pty,
+		secret,
+		webtty.WithPermitWrite(),
+		webtty.WithLogger(c.logger),
+		webtty.WithKeepAliveDeadline(),
+	)
+	if err := TTY.Run(ctx); err != nil {
+		level.Info(c.logger).Log(
+			"msg", "error creating web TTY",
+			"err", err,
+		)
+		return
 	}
 }

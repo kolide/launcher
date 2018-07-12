@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -78,6 +79,11 @@ type WebTTY struct {
 	// TTY height
 	rows int
 
+	keepAlive chan bool
+
+	// the deadliner
+	deadliner deadliner
+
 	// how many seconds to reconnect after
 	reconnect int
 
@@ -92,6 +98,13 @@ type WebTTY struct {
 
 	// injectable, structured logger
 	logger log.Logger
+}
+
+// deadliner is a ticker that ticks after the keep alive duration,
+// and gets reset when we get a ping from the client
+type deadliner struct {
+	period time.Duration
+	ticker time.Ticker
 }
 
 // TTY represents a TTY connection, typically a websocket
@@ -120,6 +133,7 @@ func New(tty TTY, pty PTY, secret string, options ...Option) (*WebTTY, error) {
 		columns:     0,
 		rows:        0,
 		bufferSize:  2048,
+		keepAlive:   make(chan bool),
 		logger:      log.NewNopLogger(),
 	}
 
@@ -175,6 +189,9 @@ func (wt *WebTTY) Run(ctx context.Context) error {
 					return ErrTTYClosed
 				}
 
+				// we received a message, so reset the deadliner
+				wt.keepAlive <- true
+
 				err = wt.relayToPTY(buffer[:n])
 				if err != nil {
 					return err
@@ -184,13 +201,26 @@ func (wt *WebTTY) Run(ctx context.Context) error {
 	}()
 
 	// wait for the context to be closed, returning any errors
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-	case err = <-errs:
-	}
+	for {
+		select {
 
-	return err
+		case <-ctx.Done():
+			err = ctx.Err()
+			return err
+		case <-wt.keepAlive:
+			wt.deadliner.Reset()
+		case <-wt.deadliner.ticker.C:
+			level.Debug(wt.logger).Log(
+				"msg", "tty deadline exceeded",
+				"title", wt.title,
+			)
+			wt.tty.Close()
+			wt.pty.Close()
+			return nil
+		case err = <-errs:
+			return err
+		}
+	}
 }
 
 // sendInitializeMessage sends the title, reconnect time,
@@ -312,4 +342,9 @@ func (wt *WebTTY) relayToPTY(data []byte) error {
 	}
 
 	return nil
+}
+
+func (d *deadliner) Reset() {
+	d.ticker.Stop()
+	d.ticker = *time.NewTicker(d.period)
 }
