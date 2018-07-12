@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"runtime"
 
 	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
@@ -472,19 +473,20 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
+	if runtime.GOOS == "darwin" {
 	// Build the macOS package
-	err = pkgbuild(
-		packageRoot,
-		scriptDir,
-		launchDaemonName,
-		packageVersion,
-		macPackageSigningKey,
-		outputPath,
-	)
-	if err != nil {
-		return "", errors.Wrap(err, "could not create macOS package")
+		err = pkgbuild(
+			packageRoot,
+			scriptDir,
+			launchDaemonName,
+			packageVersion,
+			macPackageSigningKey,
+			outputPath,
+		)
+		if err != nil {
+			return "", errors.Wrap(err, "could not create macOS package")
+		}
 	}
-
 	return outputPath, nil
 }
 
