@@ -21,6 +21,7 @@ type Client struct {
 	db                *bolt.DB
 	getShellsInterval time.Duration
 	insecure          bool
+	disableTLS        bool
 	logger            log.Logger
 }
 

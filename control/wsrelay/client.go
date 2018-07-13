@@ -15,11 +15,11 @@ type Client struct {
 
 // NewClient creates a new websocket client that can be interrupted
 // via SIGINT
-func NewClient(brokerAddr, path string, useTLS bool, insecure bool) (*Client, error) {
+func NewClient(brokerAddr, path string, disableTLS bool, insecure bool) (*Client, error) {
 	// determine the scheme
-	scheme := "ws"
-	if useTLS {
-		scheme = "wss"
+	scheme := "wss"
+	if disableTLS {
+		scheme = "ws"
 	}
 
 	// construct the URL to connect to

@@ -32,3 +32,9 @@ func WithGetShellsInterval(i time.Duration) Option {
 		c.getShellsInterval = i
 	}
 }
+
+func WithDisableTLS() Option {
+	return func(c *Client) {
+		c.disableTLS = true
+	}
+}
