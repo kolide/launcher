@@ -381,7 +381,7 @@ func main() {
 		if opts.insecureTLS {
 			controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
 		}
-		if opts.disableTLS {
+		if opts.disableControlTLS {
 			controlOpts = append(controlOpts, control.WithDisableTLS())
 		}
 		controlClient, err := control.NewControlClient(db, opts.controlServerURL, controlOpts...)

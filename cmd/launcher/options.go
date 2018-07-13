@@ -35,7 +35,7 @@ type options struct {
 	printVersion       bool
 	developerUsage     bool
 	debug              bool
-	disableTLS         bool
+	disableControlTLS  bool
 	insecureTLS        bool
 	insecureGRPC       bool
 	notaryServerURL    string
@@ -145,10 +145,10 @@ func parseOptions() (*options, error) {
 			env.Bool("KOLIDE_LAUNCHER_DEBUG", false),
 			"Whether or not debug logging is enabled (default: false)",
 		)
-		flDisableTLS = flag.Bool(
-			"disable_tls",
-			env.Bool("KOLIDE_LAUNCHER_DISABLE_TLS", false),
-			"Disable TLS encryption",
+		flDisableControlTLS = flag.Bool(
+			"disable_control_tls",
+			env.Bool("KOLIDE_LAUNCHER_DISABLE_CONTROL_TLS", false),
+			"Disable TLS encryption for the control features",
 		)
 		flInsecureTLS = flag.Bool(
 			"insecure",
@@ -231,7 +231,7 @@ func parseOptions() (*options, error) {
 		printVersion:       *flVersion,
 		developerUsage:     *flDeveloperUsage,
 		debug:              *flDebug,
-		disableTLS:         *flDisableTLS,
+		disableControlTLS:  *flDisableControlTLS,
 		insecureTLS:        *flInsecureTLS,
 		insecureGRPC:       *flInsecureGRPC,
 		notaryServerURL:    *flNotaryServerURL,
