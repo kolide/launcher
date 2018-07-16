@@ -1,4 +1,4 @@
-package osqtable
+package table
 
 import (
 	"io/ioutil"
@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	usersDir = "/Users"
-	userData = "Library/Application Support/Google/Chrome/Local State"
+	usersDir = `C:\Users`
+	userData = `AppData\Local\Google\Chrome\User Data\Local State`
 )
 
 func findChromeStateFiles() []string {
@@ -17,8 +17,9 @@ func findChromeStateFiles() []string {
 	if err != nil {
 		return []string{}
 	}
+
 	for _, f := range filesInUser {
-		if f.IsDir() && (f.Name() != "Guest" || f.Name() != "Shared") {
+		if f.IsDir() && (f.Name() != "Public") {
 			stateFilePath := filepath.Join(usersDir, f.Name(), userData)
 			if _, err := os.Stat(stateFilePath); err == nil {
 				chromeLocalStateFiles = append(chromeLocalStateFiles, stateFilePath)

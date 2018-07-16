@@ -1,4 +1,4 @@
-package osqruntime
+package runtime
 
 import (
 	"bufio"

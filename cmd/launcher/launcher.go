@@ -27,9 +27,9 @@ import (
 	"github.com/kolide/launcher/pkg/control"
 	"github.com/kolide/launcher/pkg/debug"
 	kolidelog "github.com/kolide/launcher/pkg/log"
-	"github.com/kolide/launcher/pkg/osqruntime"
-	"github.com/kolide/launcher/pkg/osqtable"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/osquery/runtime"
+	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
 	osquerygo "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
@@ -163,8 +163,8 @@ func runSocket(args []string) error {
 		}
 	}
 
-	runner, err := osqruntime.LaunchInstance(
-		osqruntime.WithExtensionSocketPath(*flPath),
+	runner, err := runtime.LaunchInstance(
+		runtime.WithExtensionSocketPath(*flPath),
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating osquery instance")
@@ -337,19 +337,19 @@ func main() {
 	}
 
 	// Start the osqueryd instance
-	runner, err := osqruntime.LaunchInstance(
-		osqruntime.WithOsquerydBinary(opts.osquerydPath),
-		osqruntime.WithRootDirectory(rootDirectory),
-		osqruntime.WithConfigPluginFlag("kolide_grpc"),
-		osqruntime.WithLoggerPluginFlag("kolide_grpc"),
-		osqruntime.WithDistributedPluginFlag("kolide_grpc"),
-		osqruntime.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
-		osqruntime.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
-		osqruntime.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
-		osqruntime.WithOsqueryExtensionPlugin(osqtable.LauncherIdentifierTable(db)),
-		osqruntime.WithStdout(osqueryLogger),
-		osqruntime.WithStderr(osqueryLogger),
-		osqruntime.WithLogger(logger),
+	runner, err := runtime.LaunchInstance(
+		runtime.WithOsquerydBinary(opts.osquerydPath),
+		runtime.WithRootDirectory(rootDirectory),
+		runtime.WithConfigPluginFlag("kolide_grpc"),
+		runtime.WithLoggerPluginFlag("kolide_grpc"),
+		runtime.WithDistributedPluginFlag("kolide_grpc"),
+		runtime.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
+		runtime.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
+		runtime.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
+		runtime.WithOsqueryExtensionPlugin(table.LauncherIdentifierTable(db)),
+		runtime.WithStdout(osqueryLogger),
+		runtime.WithStderr(osqueryLogger),
+		runtime.WithLogger(logger),
 	)
 	if err != nil {
 		logger.Fatal(errors.Wrap(err, "launching osquery instance"))

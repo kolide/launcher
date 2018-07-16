@@ -1,6 +1,6 @@
 // +build !darwin
 
-package osqtable
+package table
 
 import (
 	"github.com/go-kit/kit/log"

@@ -1,4 +1,4 @@
-package osqtable
+package table
 
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c

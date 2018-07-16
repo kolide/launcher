@@ -1,6 +1,6 @@
 // +build darwin !cgo
 
-package osqtable
+package table
 
 import (
 	"bufio"

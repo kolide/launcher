@@ -1,4 +1,4 @@
-package osqtable
+package table
 
 import (
 	"bytes"
