@@ -106,7 +106,7 @@ generate:
 	$(eval EMPTY_BINDATA_DIR = $(shell mktemp -d))
 	go-bindata \
 		-o pkg/autoupdate/bindata.go \
-		-pkg pkg/autoupdate \
+		-pkg autoupdate \
 		$(EMPTY_BINDATA_DIR)
 	go run ./tools/notary/generate_tuf.go -binary osqueryd
 	go run ./tools/notary/generate_tuf.go -binary launcher
