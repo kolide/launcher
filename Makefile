@@ -111,9 +111,9 @@ generate:
 	go run ./tools/notary/generate_tuf.go -binary osqueryd
 	go run ./tools/notary/generate_tuf.go -binary launcher
 	go-bindata \
-		-o autoupdate/bindata.go \
+		-o pkg/autoupdate/bindata.go \
 		-pkg autoupdate \
-		autoupdate/assets/...
+		pkg/autoupdate/assets/...
 
 # Publishes osqueryd for autoupdate. NOTARY_DELEGATE_PASSPHRASE must be set
 # and the delegate key must be imported by Notary client.

@@ -21,7 +21,7 @@ bin
 .glide/
 
 # TUF metadata
-autoupdate/assets/
-autoupdate/bindata.go
+pkg/autoupdate/assets/
+pkg/autoupdate/bindata.go
 tools/notary/config/private
 tools/notary/config/tuf

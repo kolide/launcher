@@ -16,7 +16,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/simulator"
+	"github.com/kolide/launcher/pkg/simulator"
 	"github.com/pkg/errors"
 )
 

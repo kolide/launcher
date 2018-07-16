@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/updater/tuf"
 )
 

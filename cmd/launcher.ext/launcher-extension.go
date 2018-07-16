@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/kolide/launcher/log"
-	"github.com/kolide/launcher/osquery/table"
+	"github.com/kolide/launcher/pkg/log"
+	"github.com/kolide/launcher/pkg/osqtable"
 	osquery "github.com/kolide/osquery-go"
 )
 
@@ -44,7 +44,7 @@ func main() {
 	}
 
 	var plugins []osquery.OsqueryPlugin
-	for _, tablePlugin := range table.PlatformTables(client, logger) {
+	for _, tablePlugin := range osqtable.PlatformTables(client, logger) {
 		plugins = append(plugins, tablePlugin)
 	}
 	server.RegisterPlugin(plugins...)

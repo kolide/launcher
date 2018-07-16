@@ -11,7 +11,7 @@ import (
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/pkg/errors"
 )
 
