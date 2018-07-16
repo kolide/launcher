@@ -105,8 +105,8 @@ deps: .deps generate
 generate:
 	$(eval EMPTY_BINDATA_DIR = $(shell mktemp -d))
 	go-bindata \
-		-o autoupdate/bindata.go \
-		-pkg autoupdate \
+		-o pkg/autoupdate/bindata.go \
+		-pkg pkg/autoupdate \
 		$(EMPTY_BINDATA_DIR)
 	go run ./tools/notary/generate_tuf.go -binary osqueryd
 	go run ./tools/notary/generate_tuf.go -binary launcher

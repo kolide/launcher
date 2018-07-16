@@ -29,7 +29,7 @@ func main() {
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 
 	gun := path.Join("kolide", *flBinary)
-	localRepo := filepath.Join("autoupdate", "assets", fmt.Sprintf("%s-tuf", *flBinary))
+	localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", *flBinary))
 
 	if err := os.MkdirAll(localRepo, 0755); err != nil {
 		level.Info(logger).Log("err", err)
