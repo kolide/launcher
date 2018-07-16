@@ -106,7 +106,7 @@ func (u *Updater) createLocalTufRepo() error {
 		return err
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
-	assetPath := path.Join("autoupdate", "assets", localRepo)
+	assetPath := path.Join("pkg", "autoupdate", "assets", localRepo)
 	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
 		return err
 	}
