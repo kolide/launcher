@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/kolide/launcher/log"
-	"github.com/kolide/launcher/osquery/table"
+	"github.com/kolide/launcher/pkg/log"
+	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/kolide/osquery-go"
 )
 

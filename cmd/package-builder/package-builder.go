@@ -12,7 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/tools/packaging"
+	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/pkg/errors"
 )
 
