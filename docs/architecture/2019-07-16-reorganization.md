@@ -24,8 +24,6 @@ Source code that was more analogous to a script that would be run, or some minor
 
 This subjectively allows for a clean separation of source code for libraries, source code for applications/binaries, and tooling/documentation files and folders.
 
-This also pulls nested packages (for example, `osquery/table` and `osquery/runtime`) into the pkg folder, and names them according to [Go package naming best practices](https://blog.golang.org/package-names).
-
 ## Consequences
 
 This should hopefully provide some clarity around where source code for different use-cases belongs to newcomers and infrequent contributors to the project.
