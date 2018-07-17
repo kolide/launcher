@@ -115,6 +115,10 @@ generate:
 		-pkg autoupdate \
 		pkg/autoupdate/assets/...
 
+proto:
+	@(cd pkg/pb/launcher; go generate)
+	@echo "Generated code from proto definitions."
+
 # Publishes osqueryd for autoupdate. NOTARY_DELEGATE_PASSPHRASE must be set
 # and the delegate key must be imported by Notary client.
 publish-osquery: package-builder
