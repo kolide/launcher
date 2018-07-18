@@ -322,6 +322,7 @@ func developerUsage() {
 	printOpt("update_channel")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
+	printOpt("disable_control_tls")
 	fmt.Fprintf(os.Stderr, "\n")
 	usageFooter()
 }
