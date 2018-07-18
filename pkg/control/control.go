@@ -33,7 +33,7 @@ func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error)
 	c := &Client{
 		logger:            log.NewNopLogger(),
 		baseURL:           baseURL,
-		client:            &http.Client{},
+		client:            http.DefaultClient,
 		db:                db,
 		addr:              addr,
 		getShellsInterval: 5 * time.Second,
@@ -41,6 +41,10 @@ func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error)
 
 	for _, opt := range opts {
 		opt(c)
+	}
+
+	if c.disableTLS {
+		c.baseURL.Scheme = "http"
 	}
 
 	return c, nil
