@@ -21,9 +21,9 @@ import (
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
-// New creates a new Kolide Client (implementation of the KolideService
+// NewClient creates a new Kolide Client (implementation of the KolideService
 // interface) using the provided gRPC client connection.
-func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
+func NewClient(conn *grpc.ClientConn, logger log.Logger) KolideService {
 	requestEnrollmentEndpoint := grpctransport.NewClient(
 		conn,
 		"kolide.agent.Api",

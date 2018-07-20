@@ -59,6 +59,7 @@ type OsqueryInstance struct {
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	errgroup               *errgroup.Group
+	ctx                    context.Context
 	doneCtx                context.Context
 	cancel                 context.CancelFunc
 	cmd                    *exec.Cmd
@@ -164,121 +165,18 @@ func osqueryTempDir() (string, func(), error) {
 	}, nil
 }
 
-// OsqueryInstanceOption is a functional option pattern for defining how an
-// osqueryd instance should be configured. For more information on this pattern,
-// see the following blog post:
-// https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
-type OsqueryInstanceOption func(*OsqueryInstance)
-
-// WithOsqueryExtensionPlugin is a functional option which allows the user to
-// declare a number of osquery plugins (ie: config plugin, logger plugin, tables,
-// etc) which can be loaded when calling LaunchOsqueryInstance. You can load as
-// many plugins as you'd like.
-func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugin)
-	}
-}
-
-// WithOsquerydBinary is a functional option which allows the user to define the
-// path of the osqueryd binary which will be launched. This should only be called
-// once as only one binary will be executed. Defining the path to the osqueryd
-// binary is optional. If it is not explicitly defined by the caller, an osqueryd
-// binary will be looked for in the current $PATH.
-func WithOsquerydBinary(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.binaryPath = path
-	}
-}
-
-// WithRootDirectory is a functional option which allows the user to define the
-// path where filesystem artifacts will be stored. This may include pidfiles,
-// RocksDB database files, etc. If this is not defined, a temporary directory
-// will be used.
-func WithRootDirectory(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.rootDirectory = path
-	}
-}
-
-// WithExtensionSocketPath is a functional option which allows the user to
-// define the path of the extension socket path that osqueryd will open to
-// communicate with other processes.
-func WithExtensionSocketPath(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.extensionSocketPath = path
-	}
-}
-
-// WithConfigPluginFlag is a functional option which allows the user to define
-// which config plugin osqueryd should use to retrieve the config. If this is not
-// defined, it is assumed that no configuration is needed and a no-op config
-// will be used. This should only be configured once and cannot be changed once
-// osqueryd is running.
-func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.configPluginFlag = plugin
-	}
-}
-
-// WithLoggerPluginFlag is a functional option which allows the user to define
-// which logger plugin osqueryd should use to log status and result logs. If this
-// is not defined, logs will be logged via the application's default logger. The
-// logger plugin which osquery uses can be changed at any point during the
-// osqueryd execution lifecycle by defining the option via the config.
-func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.loggerPluginFlag = plugin
-	}
-}
-
-// WithDistributedPluginFlag is a functional option which allows the user to define
-// which distributed plugin osqueryd should use to log status and result logs. If this
-// is not defined, logs will be logged via the application's default distributed. The
-// distributed plugin which osquery uses can be changed at any point during the
-// osqueryd execution lifecycle by defining the option via the config.
-func WithDistributedPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.distributedPluginFlag = plugin
-	}
-}
-
-// WithStdout is a functional option which allows the user to define where the
-// stdout of the osquery process should be directed. By default, the output will
-// be discarded. This should only be configured once.
-func WithStdout(w io.Writer) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.stdout = w
-	}
-}
-
-// WithStderr is a functional option which allows the user to define where the
-// stderr of the osquery process should be directed. By default, the output will
-// be discarded. This should only be configured once.
-func WithStderr(w io.Writer) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.stderr = w
-	}
-}
-
-// WithLogger is a functional option which allows the user to pass a log.Logger
-// to be used for logging osquery instance status.
-func WithLogger(logger log.Logger) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.logger = logger
-	}
-}
-
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
 func (r *Runner) Shutdown() error {
 	close(r.shutdown)
 	r.instanceLock.Lock()
+	println("got here")
 	defer r.instanceLock.Unlock()
 	r.instance.cancel()
 	if err := r.instance.errgroup.Wait(); err != context.Canceled {
 		return errors.Wrap(err, "while shutting down instance")
 	}
+	println("but not here")
 	return nil
 }
 
@@ -297,9 +195,8 @@ const socketOpenTimeout = 10 * time.Second
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
 
-// LaunchInstance will launch an instance of osqueryd via a very configurable
-// API as defined by the various OsqueryInstanceOption functional options. The
-// returned instance should be shut down via the Shutdown() method.
+// New will create an instance of osqueryd via a very configurable
+// API as defined by the various OsqueryInstanceOption functional options.
 // For example, a more customized caller might do something like the following:
 //
 //   instance, err := LaunchInstance(
@@ -310,85 +207,68 @@ const socketOpenInterval = 200 * time.Millisecond
 //     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
 //     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
 //   )
-func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
-	runner := newRunner(opts...)
-	if err := runner.start(); err != nil {
-		return nil, err
-	}
-	return runner, nil
-}
-
-func newRunner(opts ...OsqueryInstanceOption) *Runner {
-	// Create an OsqueryInstance and apply the functional options supplied by the
-	// caller.
-	i := newInstance()
-
+func New(ctx context.Context, opts ...OsqueryInstanceOption) *Runner {
+	instance := newInstance(ctx)
 	for _, opt := range opts {
-		opt(i)
+		opt(instance)
 	}
-
 	return &Runner{
-		instance: i,
+		instance: instance,
 		shutdown: make(chan struct{}),
 	}
 }
 
-func newInstance() *OsqueryInstance {
-	i := &OsqueryInstance{}
+func newInstance(ctx context.Context) *OsqueryInstance {
+	instance := &OsqueryInstance{}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	i.cancel = cancel
-	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
+	instance.ctx, instance.cancel = context.WithCancel(ctx)
+	instance.errgroup, instance.doneCtx = errgroup.WithContext(ctx)
+	instance.logger = log.NewNopLogger()
 
-	i.logger = log.NewNopLogger()
-
-	return i
+	return instance
 }
 
-func (r *Runner) start() error {
+// Start the osqueryd instance
+func (r *Runner) Start() error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return errors.Wrap(err, "starting instance")
 	}
-	go func() {
-		// This loop waits for the completion of the async routines,
-		// and either restarts the instance (if Shutdown was not
-		// called), or stops (if Shutdown was called).
-		for {
-			// Wait for async processes to exit
-			<-r.instance.doneCtx.Done()
+	// This loop waits for the completion of the async routines,
+	// and either restarts the instance (if Shutdown was not
+	// called), or stops (if Shutdown was called).
+	for {
+		// Wait for async processes to exit
+		<-r.instance.doneCtx.Done()
 
-			select {
-			case <-r.shutdown:
-				// Intentional shutdown, this loop can exit
-				return
-			default:
-				// Don't block
-			}
+		select {
+		case <-r.shutdown:
+			// Intentional shutdown, this loop can exit
+			return nil
+		default:
+			// Don't block
+		}
 
-			// Error case
-			err := r.instance.errgroup.Wait()
+		// Error case
+		err := r.instance.errgroup.Wait()
+		level.Info(r.instance.logger).Log(
+			"msg", "unexpected restart of instance",
+			"err", err,
+		)
+
+		r.instanceLock.Lock()
+		defer r.instanceLock.Unlock()
+		opts := r.instance.opts
+		r.instance = newInstance(r.instance.ctx)
+		r.instance.opts = opts
+		if err := r.launchOsqueryInstance(); err != nil {
 			level.Info(r.instance.logger).Log(
-				"msg", "unexpected restart of instance",
+				"msg", "fatal error restarting instance",
 				"err", err,
 			)
-
-			r.instanceLock.Lock()
-			opts := r.instance.opts
-			r.instance = newInstance()
-			r.instance.opts = opts
-			if err := r.launchOsqueryInstance(); err != nil {
-				level.Info(r.instance.logger).Log(
-					"msg", "fatal error restarting instance",
-					"err", err,
-				)
-				os.Exit(1)
-			}
-
-			r.instanceLock.Unlock()
-
+			os.Exit(1)
 		}
-	}()
-	return nil
+
+	}
 }
 
 const healthCheckInterval = 60 * time.Second
