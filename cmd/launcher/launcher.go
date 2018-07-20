@@ -378,9 +378,6 @@ func main() {
 			control.WithLogger(logger),
 			control.WithGetShellsInterval(opts.getShellsInterval),
 		}
-		if opts.insecureTLS {
-			controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
-		}
 		if opts.disableControlTLS {
 			controlOpts = append(controlOpts, control.WithDisableTLS())
 		}

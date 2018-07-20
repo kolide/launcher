@@ -111,7 +111,7 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 	}
 
 	wsPath := path + "/" + room
-	client, err := wsrelay.NewClient(c.addr, wsPath, c.disableTLS, c.insecure)
+	client, err := wsrelay.NewClient(c.addr, wsPath, c.disableTLS)
 	if err != nil {
 		level.Info(c.logger).Log(
 			"msg", "error creating client",
