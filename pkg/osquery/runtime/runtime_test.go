@@ -106,19 +106,21 @@ func TestBadBinaryPath(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(
+	runner := New(
+		context.Background(),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
 	)
+	err = runner.Start()
 	assert.Error(t, err)
-	assert.Nil(t, runner)
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test
 func waitHealthy(t *testing.T, runner *Runner) {
-	testutil.FatalAfterFunc(t, 30*time.Second, func() {
+	testutil.FatalAfterFunc(t, 10*time.Second, func() {
 		for runner.Healthy() != nil {
+			println("trying again...")
 			time.Sleep(500 * time.Millisecond)
 		}
 	})
@@ -131,8 +133,8 @@ func TestSimplePath(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
-	require.NoError(t, err)
+	runner := New(context.Background(), WithRootDirectory(rootDirectory))
+	go runner.Start()
 
 	waitHealthy(t, runner)
 
@@ -158,8 +160,8 @@ func TestOsqueryDies(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
-	require.NoError(t, err)
+	runner := New(context.Background(), WithRootDirectory(rootDirectory))
+	go runner.Start()
 
 	waitHealthy(t, runner)
 
@@ -181,7 +183,7 @@ func TestNotStarted(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner := newRunner(WithRootDirectory(rootDirectory))
+	runner := New(context.Background(), WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	assert.Error(t, runner.Healthy())
@@ -221,8 +223,9 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory), WithExtensionSocketPath(extensionSocketPath))
-	require.NoError(t, err)
+	runner := New(context.Background(), WithRootDirectory(rootDirectory), WithExtensionSocketPath(extensionSocketPath))
+	// go runner.Start()
+	defer runner.Shutdown()
 
 	waitHealthy(t, runner)
 
@@ -245,7 +248,8 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	require.NoError(t, err)
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err = LaunchInstance(WithRootDirectory(rootDirectory))
+	runner = New(context.Background(), WithRootDirectory(rootDirectory))
+	// go runner.Start()
 	require.NoError(t, err)
 	waitHealthy(t, runner)
 

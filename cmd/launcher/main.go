@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -18,23 +16,16 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/kolide/launcher/pkg/control"
 	"github.com/kolide/launcher/pkg/debug"
 	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
-	"github.com/kolide/launcher/pkg/osquery/table"
-	"github.com/kolide/launcher/pkg/service"
 	osquerygo "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/config"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
+	"github.com/oklog/run"
 	"github.com/pkg/errors"
 )
 
@@ -218,21 +209,25 @@ func main() {
 		logger.Fatal("err", errors.Wrap(err, "invalid options"))
 	}
 
+	// handle --version
 	if opts.printVersion {
 		version.PrintFull()
 		os.Exit(0)
 	}
 
+	// handle --usage
 	if opts.developerUsage {
 		developerUsage()
 		os.Exit(0)
 	}
 
+	// handle --debug
 	if opts.debug {
 		logger.AllowDebug()
 	}
 	debug.AttachLogToggle(logger, opts.debug)
 
+	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.rootDirectory
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
@@ -259,6 +254,7 @@ func main() {
 	debug.AttachDebugHandler(debugAddrPath, logger)
 	defer os.Remove(debugAddrPath)
 
+	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
 	if opts.insecureTLS {
 		httpClient = &http.Client{
@@ -270,6 +266,70 @@ func main() {
 		}
 	}
 
+	// open the database for storing launcher data, we do it here because it's passed
+	// to multiple actors
+	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
+	if err != nil {
+		logger.Fatal("err", errors.Wrap(err, "open local store"))
+	}
+	defer db.Close()
+
+	// create a context for all the asynchronous stuff we are starting
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	var runGroup run.Group
+
+	// create the osquery extension and the launcher client
+	client, err := createClient(ctx, rootDirectory, db, logger, opts)
+	if err != nil {
+		logger.Fatal("err", errors.Wrap(err, "creating extension and service"))
+	}
+	runGroup.Add(client.Execute, client.Interrupt)
+
+	// If the control server has been opted-in to, run it
+	if opts.control {
+		control, err := createControl(ctx, db, logger, opts)
+		if err != nil {
+			logger.Fatal(errors.Wrap(err, "creating control actor"))
+		}
+		runGroup.Add(control.Execute, control.Interrupt)
+	}
+
+	// If the autoupdater is enabled, enable it for both osquery and launcher
+	if opts.autoupdate {
+		config := &updaterConfig{
+			Logger:             logger,
+			RootDirectory:      rootDirectory,
+			AutoupdateInterval: opts.autoupdateInterval,
+			UpdateChannel:      opts.updateChannel,
+			NotaryURL:          opts.notaryServerURL,
+			MirrorURL:          opts.mirrorServerURL,
+			HTTPClient:         httpClient,
+		}
+
+		// create an updater for osquery
+		osqueryUpdater, err := createUpdater(opts.osquerydPath, client.Restart, config)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
+
+		launcherPath, err := os.Executable()
+		if err != nil {
+			logger.Fatal(err)
+		}
+		launcherUpdater, err := createUpdater(
+			launcherPath,
+			launcherFinalizer(logger, client.Shutdown),
+			config,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
+	}
+
 	versionInfo := version.Version()
 	level.Info(logger).Log(
 		"msg", "started kolide launcher",
@@ -277,179 +337,32 @@ func main() {
 		"build", versionInfo.Revision,
 	)
 
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "open local store"))
-	}
-	defer db.Close()
-
-	var rootPool *x509.CertPool
-	if opts.rootPEM != "" {
-		rootPool = x509.NewCertPool()
-
-		pemContents, err := ioutil.ReadFile(opts.rootPEM)
-		if err != nil {
-			logger.Fatal(
-				"err", errors.Wrap(err, "reading root certs PEM"),
-				"path", opts.rootPEM,
-			)
-		}
-		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			logger.Fatal(
-				"err", "found no valid certs in PEM",
-				"path", opts.rootPEM,
-			)
-		}
-	}
-
-	conn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "dialing grpc server"))
-	}
-	defer conn.Close()
-
-	client := service.New(conn, level.Debug(logger))
-
-	var enrollSecret string
-	if opts.enrollSecret != "" {
-		enrollSecret = opts.enrollSecret
-	} else if opts.enrollSecretPath != "" {
-		content, err := ioutil.ReadFile(opts.enrollSecretPath)
-		if err != nil {
-			logger.Fatal("err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", opts.enrollSecretPath)
-		}
-		enrollSecret = string(bytes.TrimSpace(content))
-	}
-
-	extOpts := osquery.ExtensionOpts{
-		EnrollSecret:    enrollSecret,
-		Logger:          logger,
-		LoggingInterval: opts.loggingInterval,
-	}
-
-	ext, err := osquery.NewExtension(client, db, extOpts)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "starting grpc extension"))
-	}
-
-	osqueryLogger := &kolidelog.OsqueryLogAdapter{
-		level.Debug(log.With(logger, "component", "osquery")),
-	}
-
-	// Start the osqueryd instance
-	runner, err := runtime.LaunchInstance(
-		runtime.WithOsquerydBinary(opts.osquerydPath),
-		runtime.WithRootDirectory(rootDirectory),
-		runtime.WithConfigPluginFlag("kolide_grpc"),
-		runtime.WithLoggerPluginFlag("kolide_grpc"),
-		runtime.WithDistributedPluginFlag("kolide_grpc"),
-		runtime.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
-		runtime.WithOsqueryExtensionPlugin(osquery_logger.NewPlugin("kolide_grpc", ext.LogString)),
-		runtime.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
-		runtime.WithOsqueryExtensionPlugin(table.LauncherIdentifierTable(db)),
-		runtime.WithStdout(osqueryLogger),
-		runtime.WithStderr(osqueryLogger),
-		runtime.WithLogger(logger),
-	)
-	if err != nil {
-		logger.Fatal(errors.Wrap(err, "launching osquery instance"))
-	}
-
-	// The runner allows querying the osqueryd instance from the extension.
-	// Used by the Enroll method below to get initial enrollment details.
-	ext.SetQuerier(runner)
-
-	ctx := context.Background()
-	_, invalid, err := ext.Enroll(ctx)
-	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
-	}
-	if invalid {
-		logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
-	}
-	ext.Start()
-	defer ext.Shutdown()
-
-	// If the control server has been opted-in to, run it
-	if opts.control {
-		level.Debug(logger).Log("msg", "creating control client")
-
-		controlOpts := []control.Option{
-			control.WithLogger(logger),
-			control.WithGetShellsInterval(opts.getShellsInterval),
-		}
-		if opts.insecureTLS {
-			controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
-		}
-		if opts.disableControlTLS {
-			controlOpts = append(controlOpts, control.WithDisableTLS())
-		}
-		controlClient, err := control.NewControlClient(db, opts.controlServerURL, controlOpts...)
-		if err != nil {
-			logger.Fatal(errors.Wrap(err, "starting control client"))
-		}
-
-		controlClient.Start(ctx)
-		defer controlClient.Stop()
-	}
-
-	// If the autoupdater is enabled, enable it for both osquery and launcher
-	if opts.autoupdate {
-		enabler := &updateEnabler{
-			Logger:             logger,
-			RootDirectory:      rootDirectory,
-			AutoupdateInterval: opts.autoupdateInterval,
-			NotaryURL:          opts.notaryServerURL,
-			MirrorURL:          opts.mirrorServerURL,
-			HttpClient:         httpClient,
-		}
-
-		stopOsquery, err := enabler.EnableBinary(
-			opts.osquerydPath,
-			autoupdate.WithFinalizer(runner.Restart),
-			autoupdate.WithUpdateChannel(opts.updateChannel),
-		)
-		if err != nil {
+	// start the rungroup
+	go func() {
+		if err := runGroup.Run(); err != nil {
 			logger.Fatal(err)
 		}
-		defer stopOsquery()
-
-		launcherPath, err := os.Executable()
-		if err != nil {
-			logger.Fatal(err)
-		}
-		stopLauncher, err := enabler.EnableBinary(
-			launcherPath,
-			autoupdate.WithFinalizer(launcherFinalizer(logger, runner.Shutdown)),
-			autoupdate.WithUpdateChannel(opts.updateChannel),
-		)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		defer stopLauncher()
-	}
+	}()
 
 	// Wait forever
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
 	<-sig
 
-	// allow for graceful termination.
-	runner.Shutdown()
-}
+	fmt.Println("\nWaiting for all components to stop...\n")
 
-func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
-	return func() error {
-		if err := shutdownOsquery(); err != nil {
-			level.Info(logger).Log(
-				"method", "launcherFinalizer",
-				"err", err,
-			)
-		}
-		// replace launcher
-		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-			return errors.Wrap(err, "restarting launcher")
-		}
-		return nil
+	// allow for graceful termination.
+	// this will trigger the termination of everything else through the rungroup
+	client.Shutdown()
+
+	// cancel the context
+	cancel()
+
+	// wait for a shutdown
+	select {
+	case <-time.After(30 * time.Second):
+		return
+	case <-sig:
+		return
 	}
 }

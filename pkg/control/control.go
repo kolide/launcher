@@ -25,7 +25,7 @@ type Client struct {
 	logger            log.Logger
 }
 
-func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
+func NewClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
 	baseURL, err := url.Parse("https://" + addr)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing URL")
