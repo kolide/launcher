@@ -1,7 +1,6 @@
 package wsrelay
 
 import (
-	"crypto/tls"
 	"net/url"
 
 	"github.com/gorilla/websocket"
@@ -15,7 +14,7 @@ type Client struct {
 
 // NewClient creates a new websocket client that can be interrupted
 // via SIGINT
-func NewClient(brokerAddr, path string, disableTLS bool, insecure bool) (*Client, error) {
+func NewClient(brokerAddr, path string, disableTLS bool) (*Client, error) {
 	// determine the scheme
 	scheme := "wss"
 	if disableTLS {
@@ -30,8 +29,7 @@ func NewClient(brokerAddr, path string, disableTLS bool, insecure bool) (*Client
 	}
 
 	// connect to the websocket at the given URL
-	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}}
-	conn, resp, err := dialer.Dial(u.String(), nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 
 	if err != nil {
 		if err == websocket.ErrBadHandshake {
