@@ -316,7 +316,7 @@ func main() {
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := createUpdater(opts.osquerydPath, extension.Restart, config)
+		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, extension.Restart, logger, config)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -327,8 +327,10 @@ func main() {
 			logger.Fatal(err)
 		}
 		launcherUpdater, err := createUpdater(
+			ctx,
 			launcherPath,
 			launcherFinalizer(logger, extension.Shutdown),
+			logger,
 			config,
 		)
 		if err != nil {
@@ -349,11 +351,10 @@ func main() {
 	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
 	<-sig
 
-	fmt.Println("\nWaiting for all components to stop...")
+	fmt.Print("\n\nWaiting for all components to stop...\n\n")
 
 	// cancel the context to allow for graceful termination.
 	// this will trigger the termination of everything else through the rungroup
-	//
 	cancel()
 
 	// wait for a shutdown
@@ -363,5 +364,4 @@ func main() {
 	case <-sig:
 		return
 	}
-
 }

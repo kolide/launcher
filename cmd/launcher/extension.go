@@ -28,7 +28,7 @@ type extension struct {
 }
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, logger *kolidelog.Logger, opts *options) (*extension, error) {
+func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, opts *options) (*extension, error) {
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
 	if opts.enrollSecret != "" {
@@ -86,7 +86,6 @@ func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, log
 		Runner: runner,
 		// and the methods for starting and stopping the extension
 		Execute: func() error {
-			println("\nextension started\n")
 			// Start the osqueryd instance
 			runner, err = runtime.LaunchInstance(
 				runtime.WithOsquerydBinary(opts.osquerydPath),
@@ -103,34 +102,39 @@ func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, log
 				runtime.WithLogger(logger),
 			)
 			if err != nil {
-				logger.Fatal(errors.Wrap(err, "launching osquery instance"))
+				return errors.Wrap(err, "launching osquery instance")
 			}
 
 			// The runner allows querying the osqueryd instance from the extension.
 			// Used by the Enroll method below to get initial enrollment details.
 			ext.SetQuerier(runner)
 
+			// enroll this launcher with the server
 			_, invalid, err := ext.Enroll(ctx)
 			if err != nil {
-				logger.Fatal("err", errors.Wrap(err, "enrolling host"))
+				return errors.Wrap(err, "enrolling host")
 			}
 			if invalid {
-				logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
+				return errors.Wrap(err, "invalid enroll secret")
 			}
+
+			// start the extension
 			ext.Start()
 
-			// TODO: remove when underlying libs are refactors
+			level.Info(logger).Log("msg", "extension started")
+
+			// TODO: remove when underlying libs are refactored
 			// everything exits right now, so block this actor on the context finishing
 			<-ctx.Done()
 			return nil
 		},
 		Interrupt: func(err error) {
-			println("\nextension interrupted\n")
+			level.Info(logger).Log("msg", "extension interrupted")
 			grpcConn.Close()
 			ext.Shutdown()
 			if runner != nil {
 				if err := runner.Shutdown(); err != nil {
-					logger.Fatal(errors.Wrap(err, "shutting down runtime"))
+					level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
 				}
 			}
 		},

@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/control"
-	kolideLog "github.com/kolide/launcher/pkg/log"
 	"github.com/pkg/errors"
 )
 
-func createControl(ctx context.Context, db *bolt.DB, logger *kolideLog.Logger, opts *options) (*actor.Actor, error) {
+func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *options) (*actor.Actor, error) {
 	level.Debug(logger).Log("msg", "creating control client")
 
 	controlOpts := []control.Option{
@@ -26,17 +26,17 @@ func createControl(ctx context.Context, db *bolt.DB, logger *kolideLog.Logger, o
 	}
 	controlClient, err := control.NewControlClient(db, opts.controlServerURL, controlOpts...)
 	if err != nil {
-		logger.Fatal(errors.Wrap(err, "creating control client"))
+		return nil, errors.Wrap(err, "creating control client")
 	}
 
 	return &actor.Actor{
 		Execute: func() error {
-			println("\ncontrol started\n")
+			level.Info(logger).Log("msg", "control started")
 			controlClient.Start(ctx)
 			return nil
 		},
 		Interrupt: func(err error) {
-			println("\ncontrol interrupted\n")
+			level.Info(logger).Log("msg", "control interrupted")
 			controlClient.Stop()
 		},
 	}, nil
