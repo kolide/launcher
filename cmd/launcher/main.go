@@ -281,7 +281,7 @@ func main() {
 	var runGroup run.Group
 
 	// create the osquery extension for launcher
-	extension, err := createExtension(ctx, rootDirectory, db, logger, opts)
+	extension, err := createExtensionRuntime(ctx, rootDirectory, db, logger, opts)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "creating extension and service"))
 	}
@@ -322,6 +322,7 @@ func main() {
 		}
 		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
 
+		// create an updater for launcher
 		launcherPath, err := os.Executable()
 		if err != nil {
 			logger.Fatal(err)
@@ -339,23 +340,23 @@ func main() {
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	// start the rungroup
-	go func() {
-		if err := runGroup.Run(); err != nil {
-			logger.Fatal(err)
-		}
-	}()
-
-	// Wait forever
+	// Create the signal notifier and add it to the rungroup
 	sig := make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
-	<-sig
+	runGroup.Add(func() error {
+		signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
+		<-sig
+		level.Info(logger).Log("msg", "beginnning shutdown")
+		return nil
+	}, func(err error) {
+		level.Info(logger).Log("msg", "signal notifier interrupted")
+		// cancel the context to allow for graceful termination.
+		cancel()
+	})
 
-	fmt.Print("\n\nWaiting for all components to stop...\n\n")
-
-	// cancel the context to allow for graceful termination.
-	// this will trigger the termination of everything else through the rungroup
-	cancel()
+	// start the rungroup
+	if err := runGroup.Run(); err != nil {
+		logger.Fatal(err)
+	}
 
 	// wait for a shutdown
 	select {

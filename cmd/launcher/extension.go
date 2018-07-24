@@ -28,7 +28,7 @@ type extension struct {
 }
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, opts *options) (*extension, error) {
+func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, opts *options) (*extension, error) {
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
 	if opts.enrollSecret != "" {
@@ -79,6 +79,8 @@ func createExtension(ctx context.Context, rootDirectory string, db *bolt.DB, log
 	// create the logging adapter for osquery
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
 
+	// initialize a var for the runner here, so we can start it in execute
+	// and still use it in the interrupt function
 	var runner *runtime.Runner
 
 	return &extension{
