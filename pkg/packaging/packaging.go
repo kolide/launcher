@@ -42,18 +42,53 @@ func CreatePackages(
 	updateChannel string,
 	control bool,
 	controlHostname string,
+	disableControlTLS bool,
 	identifier string,
 	omitSecret bool,
 	systemd bool,
 	certPins,
 	rootPEM string,
 ) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(packageVersion, osqueryVersion, hostname, secret, macPackageSigningKey, insecure, insecureGrpc, autoupdate, updateChannel, control, controlHostname, identifier, omitSecret, certPins, rootPEM)
+	macPkgDestinationPath, err := CreateMacPackage(
+		packageVersion,
+		osqueryVersion,
+		hostname,
+		secret,
+		macPackageSigningKey,
+		insecure,
+		insecureGrpc,
+		autoupdate,
+		updateChannel,
+		control,
+		controlHostname,
+		disableControlTLS,
+		identifier,
+		omitSecret,
+		certPins,
+		rootPEM,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(packageVersion, osqueryVersion, hostname, secret, insecure, insecureGrpc, autoupdate, updateChannel, control, controlHostname, identifier, omitSecret, systemd, certPins, rootPEM)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(
+		packageVersion,
+		osqueryVersion,
+		hostname,
+		secret,
+		insecure,
+		insecureGrpc,
+		autoupdate,
+		updateChannel,
+		control,
+		controlHostname,
+		disableControlTLS,
+		identifier,
+		omitSecret,
+		systemd,
+		certPins,
+		rootPEM,
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -108,6 +143,7 @@ func CreateLinuxPackages(
 	updateChannel string,
 	control bool,
 	controlHostname string,
+	disableControlTLS bool,
 	identifier string,
 	omitSecret bool,
 	systemd bool,
@@ -190,20 +226,21 @@ func CreateLinuxPackages(
 	}
 
 	opts := &initTemplateOptions{
-		LaunchDaemonName: "launcher",
-		ServerHostname:   grpcServerForHostname(hostname),
-		RootDirectory:    rootDirectory,
-		SecretPath:       secretPath,
-		OsquerydPath:     filepath.Join(binaryDirectory, "osqueryd"),
-		LauncherPath:     filepath.Join(binaryDirectory, "launcher"),
-		Insecure:         insecure,
-		InsecureGrpc:     insecureGrpc,
-		Autoupdate:       autoupdate,
-		UpdateChannel:    updateChannel,
-		Control:          control,
-		ControlHostname:  controlHostname,
-		CertPins:         certPins,
-		RootPEM:          rootPEMPath,
+		LaunchDaemonName:  "launcher",
+		ServerHostname:    grpcServerForHostname(hostname),
+		RootDirectory:     rootDirectory,
+		SecretPath:        secretPath,
+		OsquerydPath:      filepath.Join(binaryDirectory, "osqueryd"),
+		LauncherPath:      filepath.Join(binaryDirectory, "launcher"),
+		Insecure:          insecure,
+		InsecureGrpc:      insecureGrpc,
+		Autoupdate:        autoupdate,
+		UpdateChannel:     updateChannel,
+		Control:           control,
+		ControlHostname:   controlHostname,
+		DisableControlTLS: disableControlTLS,
+		CertPins:          certPins,
+		RootPEM:           rootPEMPath,
 	}
 
 	if systemd {
@@ -315,6 +352,7 @@ func CreateMacPackage(
 	updateChannel string,
 	control bool,
 	controlHostname string,
+	disableControlTLS bool,
 	identifier string,
 	omitSecret bool,
 	certPins,
@@ -413,21 +451,22 @@ func CreateMacPackage(
 	}
 
 	opts := &launchDaemonTemplateOptions{
-		ServerHostname:   grpcServerForHostname(hostname),
-		RootDirectory:    rootDirectory,
-		LauncherPath:     launcherPath,
-		OsquerydPath:     osquerydPath,
-		LogDirectory:     logDirectory,
-		SecretPath:       secretPath,
-		LaunchDaemonName: launchDaemonName,
-		Insecure:         insecure,
-		InsecureGrpc:     insecureGrpc,
-		Autoupdate:       autoupdate,
-		UpdateChannel:    updateChannel,
-		Control:          control,
-		ControlHostname:  controlHostname,
-		CertPins:         certPins,
-		RootPEM:          rootPEMPath,
+		ServerHostname:    grpcServerForHostname(hostname),
+		RootDirectory:     rootDirectory,
+		LauncherPath:      launcherPath,
+		OsquerydPath:      osquerydPath,
+		LogDirectory:      logDirectory,
+		SecretPath:        secretPath,
+		LaunchDaemonName:  launchDaemonName,
+		Insecure:          insecure,
+		InsecureGrpc:      insecureGrpc,
+		Autoupdate:        autoupdate,
+		UpdateChannel:     updateChannel,
+		Control:           control,
+		ControlHostname:   controlHostname,
+		DisableControlTLS: disableControlTLS,
+		CertPins:          certPins,
+		RootPEM:           rootPEMPath,
 	}
 	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDaemon content to file")
@@ -491,21 +530,22 @@ func CreateMacPackage(
 // systemdTemplateOptions is a struct which contains dynamic systemd
 // parameters that will be rendered into a template in renderInitdService
 type initTemplateOptions struct {
-	ServerHostname   string
-	RootDirectory    string
-	LauncherPath     string
-	OsquerydPath     string
-	LogDirectory     string
-	SecretPath       string
-	LaunchDaemonName string
-	InsecureGrpc     bool
-	Insecure         bool
-	Autoupdate       bool
-	UpdateChannel    string
-	Control          bool
-	ControlHostname  string
-	CertPins         string
-	RootPEM          string
+	ServerHostname    string
+	RootDirectory     string
+	LauncherPath      string
+	OsquerydPath      string
+	LogDirectory      string
+	SecretPath        string
+	LaunchDaemonName  string
+	InsecureGrpc      bool
+	Insecure          bool
+	Autoupdate        bool
+	UpdateChannel     string
+	Control           bool
+	ControlHostname   string
+	DisableControlTLS bool
+	CertPins          string
+	RootPEM           string
 }
 
 //renderInitService renders an init service to start and schedule the launcher
@@ -582,7 +622,8 @@ ExecStart={{.LauncherPath}} \
 --insecure_grpc \{{end}}{{if .Insecure}}
 --insecure \{{end}}{{if .Control}}
 --control \
---control_hostname={{.ControlHostname}} \{{end}}{{if .Autoupdate}}
+--control_hostname={{.ControlHostname}} \{{end}}{{if .DisableControlTLS}}
+--disable_control_tls \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins }}
 --cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
@@ -603,21 +644,22 @@ WantedBy=multi-user.target`
 // launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
 // parameters that will be rendered into a template in renderLaunchDaemon
 type launchDaemonTemplateOptions struct {
-	ServerHostname   string
-	RootDirectory    string
-	LauncherPath     string
-	OsquerydPath     string
-	LogDirectory     string
-	SecretPath       string
-	LaunchDaemonName string
-	InsecureGrpc     bool
-	Insecure         bool
-	Autoupdate       bool
-	UpdateChannel    string
-	Control          bool
-	ControlHostname  string
-	CertPins         string
-	RootPEM          string
+	ServerHostname    string
+	RootDirectory     string
+	LauncherPath      string
+	OsquerydPath      string
+	LogDirectory      string
+	SecretPath        string
+	LaunchDaemonName  string
+	InsecureGrpc      bool
+	Insecure          bool
+	Autoupdate        bool
+	UpdateChannel     string
+	Control           bool
+	ControlHostname   string
+	DisableControlTLS bool
+	CertPins          string
+	RootPEM           string
 }
 
 // renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
@@ -671,6 +713,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 			{{end}}
 			{{if .Control}}
             <string>--control</string>
+			{{end}}
+			{{if .DisableControlTLS}}
+						<string>--disable_control_tls</string>
 			{{end}}
         </array>
         <key>StandardErrorPath</key>
