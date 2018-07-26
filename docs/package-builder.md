@@ -10,7 +10,7 @@ To build the Linux packages, `package-builder` will execute a docker container w
 docker run --rm -it kolide/fpm echo "it works"
 ```
 
-Finally, like any Go project, you must have this repo checked out to `$GOPATH/src/github.com/kolide/launcher`. If you're new to Go and you don't know about `$GOPATH`, then check out the repo to `$HOME/go/src/github.com/kolide/launcher`.
+Finally, like any Go project, you must have this repo checked out to `$GOPATH/src/github.com/kolide/launcher`. If you're new to Go and you don't know about `$GOPATH`, then check out the repo to `$HOME/go/src/github.com/kolide/launcher`. Also, verify that `$HOME/go/bin` is listed in your `$PATH`.
 
 So to recap, to use `package-builder`, you must:
 
