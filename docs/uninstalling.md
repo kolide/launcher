@@ -36,3 +36,24 @@ dpkg: warning: while removing launcher, directory '/var/kolide/launcher.example.
 ```
 
 Based on the configurations used when the Launcher package was created, the specific paths printed may look slightly different. In any case, these left over directories mentioned in the `dpkg` warning can be removed with `sudo rm -rf`.
+
+## macOS
+
+### Launcher (`kolide-osquery-launcher.pkg`)
+
+Directories:
+- `$HOME/Applications/Kolide.app`
+- `$HOME/Library/Application Support/Kolide`
+
+To remove the `.app` bundle, run the following:
+
+```
+rm -r `$HOME/Applications/Kolide.app`
+```
+
+To remove the preferences, cache and other supporting files, run the following:
+
+```
+rm -r `$HOME/Library/Application Support/Kolide`
+```
+
