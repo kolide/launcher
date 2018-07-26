@@ -42,8 +42,28 @@ Based on the configurations used when the Launcher package was created, the spec
 ### Launcher (`kolide-osquery-launcher.pkg`)
 
 Directories:
+
+- `/usr/local/kolide`
+- `/var/kolide`
+- `/etc/kolide`
+
+Files:
+- `/Library/LaunchDaemons/com.kolide.launcher.plist`
+
+To remove the binaries and other supporting files, run the following:
+
+```
+sudo rm -r /usr/local/kolide
+sudo rm -r /var/kolide
+sudo rm -r /etc/kolide
+sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
+```
+
+### App (`kolide-desktop-app.pkg`)
+
+Directories:
 - `$HOME/Applications/Kolide.app`
-- `$HOME/Library/Application Support/Kolide`
+- `"$HOME/Library/Application Support/Kolide"`
 - `/usr/local/kolide`
 - `/var/kolide`
 - `/etc/kolide`
@@ -61,9 +81,8 @@ To remove the preferences, cache and other supporting files, run the following:
 
 ```
 rm -r $HOME/Library/Application Support/Kolide
-rm -r /usr/local/kolide
-rm -r /var/kolide
-rm -r /etc/kolide
-rm  /Library/LaunchDaemons/com.kolide.launcher.plist
+sudo rm -r /usr/local/kolide
+sudo rm -r /var/kolide
+sudo rm -r /etc/kolide
+sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 ```
-
