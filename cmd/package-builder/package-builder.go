@@ -79,6 +79,11 @@ func runMake(args []string) error {
 			env.String("CONTROL_HOSTNAME", ""),
 			"the value that should be used when invoking the launcher's --control_hostname flag",
 		)
+		flDisableControlTLS = flagset.Bool(
+			"disable_control_tls",
+			env.Bool("DISABLE_CONTROL_TLS", false),
+			"whether or not the launcher packages should invoke the launcher's --disable_control_tls flag",
+		)
 		flIdentifier = flagset.String(
 			"identifier",
 			env.String("IDENTIFIER", "launcher"),
@@ -142,7 +147,25 @@ func runMake(args []string) error {
 	}
 
 	currentVersion := version.Version().Version
-	paths, err := packaging.CreatePackages(currentVersion, osqueryVersion, *flHostname, *flEnrollSecret, macPackageSigningKey, *flInsecure, *flInsecureGrpc, *flAutoupdate, *flUpdateChannel, *flControl, *flControlHostname, *flIdentifier, *flOmitSecret, *flSystemd, *flCertPins, *flRootPEM)
+	paths, err := packaging.CreatePackages(
+		currentVersion,
+		osqueryVersion,
+		*flHostname,
+		*flEnrollSecret,
+		macPackageSigningKey,
+		*flInsecure,
+		*flInsecureGrpc,
+		*flAutoupdate,
+		*flUpdateChannel,
+		*flControl,
+		*flControlHostname,
+		*flDisableControlTLS,
+		*flIdentifier,
+		*flOmitSecret,
+		*flSystemd,
+		*flCertPins,
+		*flRootPEM,
+	)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
