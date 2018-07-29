@@ -65,8 +65,7 @@ Directories:
 - `$HOME/Applications/Kolide.app`
 - `"$HOME/Library/Application Support/Kolide"`
 - `/usr/local/kolide`
-- `/var/kolide`
-- `/etc/kolide`
+
 
 Files:
 - `/Library/LaunchDaemons/com.kolide.launcher.plist`
@@ -74,15 +73,13 @@ Files:
 To remove the `.app` bundle, run the following:
 
 ```
-rm -r $HOME/Applications/Kolide.app
+sudo rm -r /Applications/Kolide.app
 ```
 
 To remove the preferences, cache and other supporting files, run the following:
 
 ```
-rm -r $HOME/Library/Application Support/Kolide
+sudo rm -r "$HOME/Library/Application Support/Kolide"
 sudo rm -r /usr/local/kolide
-sudo rm -r /var/kolide
-sudo rm -r /etc/kolide
 sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 ```
