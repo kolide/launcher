@@ -131,6 +131,9 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 			return nil
 		},
 		Interrupt: func(err error) {
+			if err != nil {
+				level.Info(logger).Log("err", err)
+			}
 			level.Info(logger).Log("msg", "extension interrupted")
 			grpcConn.Close()
 			ext.Shutdown()

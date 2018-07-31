@@ -77,7 +77,7 @@ func parseOptions() (*options, error) {
 		)
 		flGetShellsInterval = flag.Duration(
 			"control_get_shells_interval",
-			env.Duration("KOLIDE_CONTROL_GET_SHELLS_INTERVAL", time.Minute),
+			env.Duration("KOLIDE_CONTROL_GET_SHELLS_INTERVAL", 3*time.Second),
 			"The interval at which the get shells request will be made",
 		)
 

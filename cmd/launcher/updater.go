@@ -71,6 +71,9 @@ func createUpdater(
 			return nil
 		},
 		Interrupt: func(err error) {
+			if err != nil {
+				level.Info(logger).Log("err", err)
+			}
 			level.Info(logger).Log("msg", "updater interrupted")
 			if stop != nil {
 				stop()

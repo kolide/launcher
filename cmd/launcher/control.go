@@ -36,6 +36,9 @@ func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *op
 			return nil
 		},
 		Interrupt: func(err error) {
+			if err != nil {
+				level.Info(logger).Log("err", err)
+			}
 			level.Info(logger).Log("msg", "control interrupted")
 			controlClient.Stop()
 		},
