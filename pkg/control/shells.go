@@ -138,9 +138,15 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 		webtty.WithLogger(c.logger),
 		webtty.WithKeepAliveDeadline(),
 	)
+	if err != nil {
+		level.Info(c.logger).Log(
+			"msg", "error creating TTY",
+			"err", err,
+		)
+	}
 	if err := TTY.Run(ctx); err != nil {
 		level.Info(c.logger).Log(
-			"msg", "error creating web TTY",
+			"msg", "error running TTY",
 			"err", err,
 		)
 		return
