@@ -41,11 +41,23 @@ func NewCmd(command string, argv []string, options ...Option) (*Cmd, error) {
 	// create the command
 	cmd := exec.Command(command, argv...)
 
-	// attach the pty to the command
-	pty, err := pty.Start(cmd)
+	// open a pty
+	pty, tty, err := pty.Open()
 	if err != nil {
-		return nil, errors.Wrapf(err, "starting  command `%s`", command)
+		return nil, errors.Wrap(err, "opening pty")
 	}
+	defer tty.Close()
+
+	// attach the stdin/stdout/stderr of the pty's tty to the cmd
+	cmd.Stdout = tty
+	cmd.Stdin = tty
+	cmd.Stderr = tty
+
+	// start the cmd, closing the PTY if there's an error
+	if err := cmd.Start(); err != nil {
+		return nil, errors.Wrapf(err, "starting command  `%s`", command)
+	}
+
 	ptyClosed := make(chan struct{})
 
 	// create the command with default options
@@ -98,7 +110,8 @@ func (c *Cmd) Close() error {
 
 		// or timeout
 		case <-time.After(c.closeTimeout):
-			c.cmd.Process.Signal(syscall.SIGILL)
+			c.cmd.Process.Signal(syscall.SIGKILL)
+			return nil
 		}
 	}
 }
