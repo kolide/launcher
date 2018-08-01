@@ -715,7 +715,7 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
             <string>--control</string>
 			{{end}}
 			{{if .DisableControlTLS}}
-						<string>--disable_control_tls</string>
+            <string>--disable_control_tls</string>
 			{{end}}
         </array>
         <key>StandardErrorPath</key>

@@ -18,7 +18,7 @@ type getShellsRequest struct {
 
 type getShellsResponse struct {
 	Sessions    []map[string]string `json:"sessions"`
-	Err         error               `json:"error,omitempty"`
+	Err         string              `json:"error,omitempty"`
 	NodeInvalid bool                `json:"node_invalid,omitempty"`
 }
 
@@ -72,7 +72,7 @@ func (c *Client) getShells(ctx context.Context) {
 		return
 	}
 
-	if responseBody.Err != nil {
+	if responseBody.Err != "" {
 		level.Info(c.logger).Log(
 			"msg", "response body contained error",
 			"err", responseBody.Err,
