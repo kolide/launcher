@@ -512,7 +512,11 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
-  distributionFile, err := os.Create(filepath.Join(packageRoot, "distribution.xml"))
+	distributionFileName := "distribution.xml"
+	distributionFilePath := filepath.Join(outputPathDir, distributionFileName)
+  distributionFile, err := os.Create(distributionFilePath)
+	distrOutputFile := fmt.Sprintf("launcher-darwin-%s-distribution.pkg", packageVersion)
+	distrOutputPath := filepath.Join(outputPathDir, distrOutputFile)
 	distributionOpts := &distributionTemplateOptions{
 		PackageVersion:    packageVersion,
 		PackageFileName:   outputFile,
@@ -534,7 +538,19 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "could not create macOS package")
 	}
 
-	return outputPath, nil
+	// Add the distribution file
+	err = productbuild(
+		outputPathDir,
+		distributionFileName,
+		outputFile,
+		macPackageSigningKey,
+		distrOutputPath,
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not add the distribution file")
+	}
+
+	return distrOutputPath, nil
 }
 
 // systemdTemplateOptions is a struct which contains dynamic systemd
@@ -762,6 +778,29 @@ sleep 5
 		return errors.Wrap(err, "not able to parse postinstall template")
 	}
 	return t.ExecuteTemplate(w, "postinstall", options)
+}
+
+func productbuild(packageDir, distributionFile, packageFile, macPackageSigningKey, outputPath string) error {
+	args := []string{
+		"--distribution", distributionFile,
+		"--package-path", packageFile,
+	}
+
+	if macPackageSigningKey != "" {
+		args = append(args, "--sign", macPackageSigningKey)
+	}
+
+	args = append(args, outputPath)
+  fmt.Printf("productbuild %s", args)
+	cmd := exec.Command("productbuild", args...)
+	cmd.Dir = packageDir
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		io.Copy(os.Stderr, stderr)
+		return err
+	}
+	return nil
 }
 
 // pkgbuild runs the following pkgbuild command:
