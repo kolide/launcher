@@ -524,6 +524,19 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "could not create macOS package")
 	}
 
+	// Build the macOS package
+	err = pkgbuild(
+		packageRoot,
+		scriptDir,
+		launchDaemonName,
+		packageVersion,
+		macPackageSigningKey,
+		outputPath,
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not create macOS package")
+	}
+
 	return outputPath, nil
 }
 
@@ -782,6 +795,36 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 		return err
 	}
 	return nil
+}
+
+// renderDistributionFile renders a distribution file to add to launcher's template.
+func renderDistributionFile(w io.Writer, options *distributionTemplateOptions) error {
+	distributionTemplate :=
+		`<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <pkg-ref id="com.launcher.launcher"/>
+    <options customize="never" require-scripts="false"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.launcher.launcher"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.launcher.launcher" visible="false">
+        <pkg-ref id="com.launcher.launcher"/>
+    </choice>
+    <pkg-ref id="com.launcher.launcher" version="0.5.5-19-ga7b9229" onConclusion="none">launcher-darwin-0.5.5-19-ga7b9229.pkg</pkg-ref>
+</installer-gui-script>`
+	t, err := template.New("Distribution").Parse(launchDaemonTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse Distribution template")
+	}
+	return t.ExecuteTemplate(w, "distribution.xml", options)
+}
+
+type postinstallTemplateOptions struct {
+LaunchDaemonDirectory string
+LaunchDaemonName      string
 }
 
 // grpcServerForHostname returns the gRPC server hostname given a web address
