@@ -506,22 +506,19 @@ func CreateMacPackage(
 	}
 
 	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
-	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion))
+	outputFile := fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion)
+	outputPath := filepath.Join(outputPathDir, outputFile)
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
 
-	// Build the macOS package
-	err = pkgbuild(
-		packageRoot,
-		scriptDir,
-		launchDaemonName,
-		packageVersion,
-		macPackageSigningKey,
-		outputPath,
-	)
-	if err != nil {
-		return "", errors.Wrap(err, "could not create macOS package")
+  distributionFile, err := os.Create(filepath.Join(packageRoot, "distribution.xml"))
+	distributionOpts := &distributionTemplateOptions{
+		PackageVersion:    packageVersion,
+		PackageFileName:   outputFile,
+	}
+	if err := renderDistributionFile(distributionFile, distributionOpts); err != nil {
+		return "", errors.Wrap(err, "could not render distribution file to disk")
 	}
 
 	// Build the macOS package
@@ -797,6 +794,13 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 	return nil
 }
 
+// distributionTemplateOptions is a struct which contains dynamic distribution
+// file parameters that will be rendered into a template.
+type distributionTemplateOptions struct {
+	PackageVersion    string
+	PackageFileName   string
+}
+
 // renderDistributionFile renders a distribution file to add to launcher's template.
 func renderDistributionFile(w io.Writer, options *distributionTemplateOptions) error {
 	distributionTemplate :=
@@ -813,18 +817,13 @@ func renderDistributionFile(w io.Writer, options *distributionTemplateOptions) e
     <choice id="com.launcher.launcher" visible="false">
         <pkg-ref id="com.launcher.launcher"/>
     </choice>
-    <pkg-ref id="com.launcher.launcher" version="0.5.5-19-ga7b9229" onConclusion="none">launcher-darwin-0.5.5-19-ga7b9229.pkg</pkg-ref>
+    <pkg-ref id="com.launcher.launcher" version="{{.PackageVersion}}" onConclusion="none">{{.PackageFileName}}</pkg-ref>
 </installer-gui-script>`
-	t, err := template.New("Distribution").Parse(launchDaemonTemplate)
+	t, err := template.New("Distribution").Parse(distributionTemplate)
 	if err != nil {
 		return errors.Wrap(err, "not able to parse Distribution template")
 	}
-	return t.ExecuteTemplate(w, "distribution.xml", options)
-}
-
-type postinstallTemplateOptions struct {
-LaunchDaemonDirectory string
-LaunchDaemonName      string
+	return t.ExecuteTemplate(w, "Distribution", options)
 }
 
 // grpcServerForHostname returns the gRPC server hostname given a web address
