@@ -514,7 +514,7 @@ func CreateMacPackage(
 
 	distributionFileName := "distribution.xml"
 	distributionFilePath := filepath.Join(outputPathDir, distributionFileName)
-  distributionFile, err := os.Create(distributionFilePath)
+	distributionFile, err := os.Create(distributionFilePath)
 	distrOutputFile := fmt.Sprintf("launcher-darwin-%s-distribution.pkg", packageVersion)
 	distrOutputPath := filepath.Join(outputPathDir, distrOutputFile)
 	distributionOpts := &distributionTemplateOptions{
@@ -547,7 +547,7 @@ func CreateMacPackage(
 		distrOutputPath,
 	)
 	if err != nil {
-		return "", errors.Wrap(err, "could not add the distribution file")
+		return "", errors.Wrap(err, "could not produce a macOS distribution package")
 	}
 
 	return distrOutputPath, nil
@@ -780,6 +780,12 @@ sleep 5
 	return t.ExecuteTemplate(w, "postinstall", options)
 }
 
+// productbuild runs the following productbuild command:
+//   productbuild \
+//     --distribution ${distributionFile} \
+//     --package-path ${packageFile} \
+//     [--sign ${macPackageSigningKey}] \
+//     ${outputPath}
 func productbuild(packageDir, distributionFile, packageFile, macPackageSigningKey, outputPath string) error {
 	args := []string{
 		"--distribution", distributionFile,
@@ -791,7 +797,6 @@ func productbuild(packageDir, distributionFile, packageFile, macPackageSigningKe
 	}
 
 	args = append(args, outputPath)
-  fmt.Printf("productbuild %s", args)
 	cmd := exec.Command("productbuild", args...)
 	cmd.Dir = packageDir
 	stderr := new(bytes.Buffer)
