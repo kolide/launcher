@@ -520,6 +520,7 @@ func CreateMacPackage(
 	distributionOpts := &distributionTemplateOptions{
 		PackageVersion:    packageVersion,
 		PackageFileName:   outputFile,
+		Identifier:        identifier,
 	}
 	if err := renderDistributionFile(distributionFile, distributionOpts); err != nil {
 		return "", errors.Wrap(err, "could not render distribution file to disk")
@@ -843,6 +844,7 @@ func pkgbuild(packageRoot, scriptsRoot, identifier, version, macPackageSigningKe
 type distributionTemplateOptions struct {
 	PackageVersion    string
 	PackageFileName   string
+	Identifier        string
 }
 
 // renderDistributionFile renders a distribution file to add to launcher's template.
@@ -850,18 +852,18 @@ func renderDistributionFile(w io.Writer, options *distributionTemplateOptions) e
 	distributionTemplate :=
 		`<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <pkg-ref id="com.launcher.launcher"/>
+    <pkg-ref id="com.{{.Identifier}}.launcher"/>
     <options customize="never" require-scripts="false"/>
     <choices-outline>
         <line choice="default">
-            <line choice="com.launcher.launcher"/>
+            <line choice="com.{{.Identifier}}.launcher"/>
         </line>
     </choices-outline>
     <choice id="default"/>
-    <choice id="com.launcher.launcher" visible="false">
-        <pkg-ref id="com.launcher.launcher"/>
+    <choice id="com.{{.Identifier}}.launcher" visible="false">
+        <pkg-ref id="com.{{.Identifier}}.launcher"/>
     </choice>
-    <pkg-ref id="com.launcher.launcher" version="{{.PackageVersion}}" onConclusion="none">{{.PackageFileName}}</pkg-ref>
+    <pkg-ref id="com.{{.Identifier}}.launcher" version="{{.PackageVersion}}" onConclusion="none">{{.PackageFileName}}</pkg-ref>
 </installer-gui-script>`
 	t, err := template.New("Distribution").Parse(distributionTemplate)
 	if err != nil {
