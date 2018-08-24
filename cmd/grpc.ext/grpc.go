@@ -40,7 +40,10 @@ func main() {
 
 	logdestination := os.Stderr
 	if runtime.GOOS == "windows" {
-		f, err := os.Create(` C:\Windows\Temp\kolide\grpc.log`)
+		logdir := `C:\Windows\Temp\kolide`
+		logfile := filepath.Join(logdir, "grpc.log")
+		os.MkdirAll(logdir, os.ModeDir)
+		f, err := os.Create(logfile)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
