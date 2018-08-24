@@ -4,21 +4,24 @@ import (
 	"context"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
-	kolidelog "github.com/kolide/launcher/pkg/log"
-	grpcext "github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+
+	"github.com/kolide/launcher/pkg/log"
+	grpcext "github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/service"
 )
 
 func main() {
@@ -35,7 +38,17 @@ func main() {
 	// allow for osqueryd to create the socket path
 	time.Sleep(2 * time.Second)
 
-	logger := kolidelog.NewLogger(os.Stderr)
+	logdestination := os.Stderr
+	if runtime.GOOS == "windows" {
+		f, err := os.Create(` C:\Windows\Temp\kolide\grpc.log`)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		logdestination = f
+	}
+	logger := log.NewLogger(logdestination)
 	if *flVerbose {
 		logger.AllowDebug()
 	}
