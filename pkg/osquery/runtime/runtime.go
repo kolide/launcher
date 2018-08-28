@@ -550,7 +550,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Cleanup extension manager server on shutdown
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
-		if err := o.extensionManagerServer.Shutdown(); err != nil {
+		if err := o.extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			level.Info(o.logger).Log(
 				"msg", "shutting down extension server",
 				"err", err,
@@ -608,7 +608,7 @@ func (o *OsqueryInstance) Healthy() error {
 		return errors.New("instance not started")
 	}
 
-	serverStatus, err := o.extensionManagerServer.Ping()
+	serverStatus, err := o.extensionManagerServer.Ping(context.TODO())
 	if err != nil {
 		return errors.Wrap(err, "could not ping extension server")
 	}

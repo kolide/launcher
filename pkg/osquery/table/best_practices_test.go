@@ -32,7 +32,7 @@ func TestBestPractices(t *testing.T) {
 		queryValues[query] = val
 	}
 
-	mock.QueryFunc = func(sql string) (*osquery.ExtensionResponse, error) {
+	mock.QueryFunc = func(ctx context.Context, sql string) (*osquery.ExtensionResponse, error) {
 		val, ok := queryValues[sql]
 		if !ok {
 			return &osquery.ExtensionResponse{
