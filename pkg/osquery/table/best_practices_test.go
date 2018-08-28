@@ -8,7 +8,7 @@ import (
 
 	osquery_client "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/gen/osquery"
-	"github.com/kolide/osquery-go/gen/osquery/mock"
+	"github.com/kolide/osquery-go/mock"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +32,7 @@ func TestBestPractices(t *testing.T) {
 		queryValues[query] = val
 	}
 
-	mock.QueryFunc = func(sql string) (*osquery.ExtensionResponse, error) {
+	mock.QueryFunc = func(ctx context.Context, sql string) (*osquery.ExtensionResponse, error) {
 		val, ok := queryValues[sql]
 		if !ok {
 			return &osquery.ExtensionResponse{
