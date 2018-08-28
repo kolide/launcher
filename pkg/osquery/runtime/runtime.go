@@ -318,6 +318,13 @@ func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
 	return runner, nil
 }
 
+// LaunchUnstartedInstance sets up a osqueryd instance similar to LaunchInstance, but gives the caller control over
+// when the instance will run. Useful for controlling startup and shutdown goroutines.
+func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) (*Runner, func() error) {
+	runner := newRunner(opts...)
+	return runner, runner.start
+}
+
 func newRunner(opts ...OsqueryInstanceOption) *Runner {
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
