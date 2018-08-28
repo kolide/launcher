@@ -657,9 +657,11 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	// No more logs to write
 	m.PublishLogsFuncInvoked = false
 	gotResultLogs = nil
+	gotStatusLogs = nil
 	e.writeBufferedLogsForType(logger.LogTypeString)
 	assert.False(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, gotResultLogs)
+	assert.Nil(t, gotStatusLogs)
 }
 
 func TestExtensionWriteLogsLoop(t *testing.T) {
