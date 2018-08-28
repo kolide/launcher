@@ -8,7 +8,7 @@ import (
 
 	osquery_client "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/gen/osquery"
-	"github.com/kolide/osquery-go/gen/osquery/mock"
+	"github.com/kolide/osquery-go/mock"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
