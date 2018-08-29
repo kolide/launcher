@@ -281,7 +281,7 @@ func main() {
 	var runGroup run.Group
 
 	// create the osquery extension for launcher
-	extension, err := createExtensionRuntime(ctx, rootDirectory, db, logger, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, opts)
 	if err != nil {
 		logger.Fatal("err", errors.Wrap(err, "creating extension and service"))
 	}
@@ -316,7 +316,7 @@ func main() {
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, extension.Restart, logger, config)
+		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, runnerRestart, logger, config)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -330,7 +330,7 @@ func main() {
 		launcherUpdater, err := createUpdater(
 			ctx,
 			launcherPath,
-			launcherFinalizer(logger, extension.Shutdown),
+			launcherFinalizer(logger, runnerShutdown),
 			logger,
 			config,
 		)
