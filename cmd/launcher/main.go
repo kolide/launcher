@@ -276,6 +276,7 @@ func main() {
 
 	// create a context for all the asynchronous stuff we are starting
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
@@ -341,19 +342,18 @@ func main() {
 	}
 
 	// Create the signal notifier and add it to the rungroup
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	runGroup.Add(func() error {
-		signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
-		<-sig
-		level.Info(logger).Log("msg", "beginnning shutdown")
-		return nil
-	}, func(err error) {
-		if err != nil {
-			level.Info(logger).Log("err", err)
+		signal.Notify(sig, os.Interrupt)
+		select {
+		case <-sig:
+			level.Info(logger).Log("msg", "beginnning shutdown")
+			return nil
 		}
-		level.Info(logger).Log("msg", "signal notifier interrupted")
-		// cancel the context to allow for graceful termination.
+	}, func(err error) {
+		level.Info(logger).Log("msg", "interrupted", "err", err)
 		cancel()
+		close(sig)
 	})
 
 	// start the rungroup
@@ -361,11 +361,4 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	// wait for a shutdown
-	select {
-	case <-time.After(5 * time.Second):
-		return
-	case <-sig:
-		return
-	}
 }
