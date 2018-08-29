@@ -312,7 +312,7 @@ const socketOpenInterval = 200 * time.Millisecond
 //   )
 func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
 	runner := newRunner(opts...)
-	if err := runner.start(); err != nil {
+	if err := runner.Start(); err != nil {
 		return nil, err
 	}
 	return runner, nil
@@ -320,9 +320,9 @@ func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
 
 // LaunchUnstartedInstance sets up a osqueryd instance similar to LaunchInstance, but gives the caller control over
 // when the instance will run. Useful for controlling startup and shutdown goroutines.
-func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) (*Runner, func() error) {
+func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) *Runner {
 	runner := newRunner(opts...)
-	return runner, runner.start
+	return runner
 }
 
 func newRunner(opts ...OsqueryInstanceOption) *Runner {
@@ -352,7 +352,7 @@ func newInstance() *OsqueryInstance {
 	return i
 }
 
-func (r *Runner) start() error {
+func (r *Runner) Start() error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return errors.Wrap(err, "starting instance")
 	}
@@ -659,5 +659,5 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 // kill process group kills a process and all its children.
 func killProcessGroup(cmd *exec.Cmd) error {
 	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	return errors.Wrapf(err, "kill process group %s", cmd.Process.Pid)
+	return errors.Wrapf(err, "kill process group %d", cmd.Process.Pid)
 }

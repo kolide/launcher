@@ -23,10 +23,10 @@ import (
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
 func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, opts *options) (
-	*actor.Actor,
-	func() error, // restart osqueryd runner
-	func() error, // shutdown osqueryd runner
-	error,
+	run *actor.Actor,
+	restart func() error, // restart osqueryd runner
+	shutdown func() error, // shutdown osqueryd runner
+	err error,
 ) {
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
@@ -78,7 +78,7 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 	// create the logging adapter for osquery
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
 
-	runner, start := runtime.LaunchUnstartedInstance(
+	runner := runtime.LaunchUnstartedInstance(
 		runtime.WithOsquerydBinary(opts.osquerydPath),
 		runtime.WithRootDirectory(rootDirectory),
 		runtime.WithConfigPluginFlag("kolide_grpc"),
@@ -98,7 +98,7 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 			Execute: func() error {
 
 				// Start the osqueryd instance
-				if err := start(); err != nil {
+				if err := runner.Start(); err != nil {
 					return errors.Wrap(err, "launching osquery instance")
 				}
 
