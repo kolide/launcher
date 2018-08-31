@@ -101,7 +101,7 @@ func runFlare(args []string) error {
 	if err != nil {
 		fatal(b, err)
 	}
-	output(b, stdout, string(jsonVersion))
+	output(b, stdout, "%v\n", string(jsonVersion))
 
 	logger := log.NewLogfmtLogger(b)
 	err = reportGRPCNetwork(
