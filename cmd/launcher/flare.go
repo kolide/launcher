@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/user"
+	"path/filepath"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -39,9 +40,10 @@ func runFlare(args []string) error {
 	tw := tar.NewWriter(tarOut)
 
 	// create directory at root of tar file
+	baseDir := filepath.ToSlash(reportName)
 	hdr := &tar.Header{
-		Name:     fmt.Sprintf("%s_", reportName),
-		Mode:     int64(os.ModeDir),
+		Name:     baseDir + "/",
+		Mode:     0755,
 		ModTime:  time.Now().UTC(),
 		Typeflag: tar.TypeDir,
 	}
@@ -52,7 +54,7 @@ func runFlare(args []string) error {
 
 	defer func() {
 		hdr := &tar.Header{
-			Name: fmt.Sprintf("%s_%s.log", reportName, id),
+			Name: filepath.Join(baseDir, fmt.Sprintf("%s.log", id)),
 			Mode: int64(os.ModePerm),
 			Size: int64(b.Len()),
 		}
