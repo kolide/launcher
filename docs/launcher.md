@@ -85,6 +85,9 @@ The PEM file should contain all of the root authorities you would like launcher 
 ```
 launcher --root_pem=root.pem
 ```
+## Running Launcher with systemd
+See [systemd](./systemd.md) for documentation on running launcher as a background process.
+
 
 ## Additional Build Options
 
