@@ -3,6 +3,8 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"context"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,13 +14,28 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/service"
+	"github.com/pkg/errors"
 )
 
 func runFlare(args []string) error {
 	flagset := flag.NewFlagSet("launcher flare", flag.ExitOnError)
-	var ()
+	var (
+		flHostname = flag.String("hostname", "dababe.launcher.kolide.com:443", "")
+
+		// not documented via flags on purpose
+		enrollSecret = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
+		serverURL    = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
+		insecureTLS  = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
+		insecureGRPC = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
+
+		certPins [][]byte
+		rootPool *x509.CertPool
+	)
 	flagset.Usage = commandUsage(flagset, "launcher flare")
 	if err := flagset.Parse(args); err != nil {
 		return err
@@ -86,6 +103,21 @@ func runFlare(args []string) error {
 	}
 	output(b, stdout, string(jsonVersion))
 
+	logger := log.NewLogfmtLogger(b)
+	err = reportGRPCNetwork(
+		logger,
+		serverURL,
+		insecureTLS,
+		insecureGRPC,
+		enrollSecret,
+		certPins,
+		rootPool,
+	)
+	output(b, stdout, "GRPC Connection ...%v\n", err == nil)
+	if err != nil {
+		output(b, fileOnly, "reportGRPCNetwork error: %s", err)
+	}
+
 	return nil
 }
 
@@ -108,4 +140,62 @@ func output(w io.Writer, printTo outputDestination, f string, a ...interface{}) 
 
 	_, err := fmt.Fprintf(w, f, a...)
 	return err
+}
+
+// uses grpc to test connectivity. Does not depend on the osquery runtime for this test.
+func reportGRPCNetwork(
+	logger log.Logger,
+	serverURL string,
+	insecureTLS bool,
+	insecureGRPC bool,
+	enrollSecret string,
+	certPins [][]byte,
+	rootPool *x509.CertPool,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := service.DialGRPC(
+		serverURL,
+		insecureTLS,
+		insecureGRPC,
+		certPins,
+		rootPool,
+		logger,
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "establishing grpc connection to server")
+	}
+	remote := service.New(conn, logger)
+
+	logger.Log(
+		"flare", "reportGRPCNetwork",
+		"msg", "attempting RequestConfig with invalid nodeKey",
+		"server_url", serverURL,
+	)
+
+	config, invalid, err := remote.RequestConfig(ctx, "flare_ping")
+	logger.Log(
+		"flare", "reportGRPCNetwork",
+		"msg", "done with RequestConfig",
+		"server_url", serverURL,
+		"err", err,
+		"invalid", invalid,
+		"config", config,
+	)
+
+	nodeKey, invalid, err := remote.RequestEnrollment(
+		ctx, enrollSecret, "flare_host", service.EnrollmentDetails{Hostname: "flare_host"},
+	)
+	logger.Log(
+		"flare", "reportGRPCNetwork",
+		"msg", "done with RequestEnrollment",
+		"server_url", serverURL,
+		"invalid", invalid,
+		"err", err,
+		"nodeKey", nodeKey,
+	)
+
+	return nil
 }
