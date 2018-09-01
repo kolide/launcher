@@ -31,7 +31,7 @@ sudo systemctl status launcher.service
 sudo journalctl -u launcher.service -f
 ```
 
-If running launcher for tests purposes and using local or insecure certificates, include the option `--insecure`.
+If running launcher for tests purposes, using local or insecure certificates, include the option `--insecure`.
 
 ## Making changes
 Sometimes you'll need to update the systemd unit file defining the service. To do that, first open `/etc/systemd/system/launcher.service` in a text editor, and make your modifications.
