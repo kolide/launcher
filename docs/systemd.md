@@ -13,7 +13,6 @@ Below is a sample unit file.
  ExecStart= $LauncherPath \
  --hostname=$FleetServer:FleetPort \
  --enroll_secret=$FleetSecret \
- --insecure \
  --autoupdate \
 --osqueryd_path=$OsquerydPath
 Restart=on-failure
@@ -32,6 +31,8 @@ sudo systemctl status launcher.service
 sudo journalctl -u launcher.service -f
 ```
 
+If running launcher for tests purposes and not using certificates for secure communication use include the option `--insecure`
+
 ## Making changes
 Sometimes you'll need to update the systemd unit file defining the service. To do that, first open `/etc/systemd/system/launcher.service` in a text editor, and make your modifications.
 
@@ -39,5 +40,5 @@ Then, run
 
 ```
 sudo systemctl daemon-reload
-sudo systemctl restart fleet.service
+sudo systemctl restart launcher.service
 ```
