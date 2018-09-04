@@ -158,6 +158,11 @@ func reportOsqueryProcessInfo(
 	socketPath string,
 	output io.Writer,
 ) error {
+	logger.Log(
+		"flare", "reportOsqueryProcessInfo",
+		"msg", "creating osquery runner",
+		"socketPath", socketPath,
+	)
 	// create the osquery runtime socket directory
 	if _, err := os.Stat(filepath.Dir(socketPath)); os.IsNotExist(err) {
 		if err := os.Mkdir(filepath.Dir(socketPath), fs.DirMode); err != nil {
@@ -181,6 +186,12 @@ func reportOsqueryProcessInfo(
 		}
 	}()
 
+	logger.Log(
+		"flare", "reportOsqueryProcessInfo",
+		"msg", "creating osquery-go client",
+		"socketPath", socketPath,
+	)
+
 	// start a client and query it
 	client, err := osquerygo.NewClient(socketPath, 5*time.Second)
 	if err != nil {
@@ -188,11 +199,21 @@ func reportOsqueryProcessInfo(
 	}
 	defer client.Close()
 
+	logger.Log(
+		"flare", "reportOsqueryProcessInfo",
+		"msg", "running query with osquery-go",
+	)
+
 	const query = `select * from processes where name like '%osqueryd%' OR name like '%launcher%';`
 	resp, err := client.Query(query)
 	if err != nil {
 		return errors.Wrap(err, "running osquery query for process info")
 	}
+
+	logger.Log(
+		"flare", "reportOsqueryProcessInfo",
+		"status_code", resp.Status.Code,
+	)
 
 	if resp.Status.Code != int32(0) {
 		return errors.Errorf("Error running query: %s", resp.Status.Message)
