@@ -16,9 +16,12 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
+	osquerygo "github.com/kolide/osquery-go"
 	"github.com/pkg/errors"
 )
 
@@ -28,10 +31,11 @@ func runFlare(args []string) error {
 		flHostname = flag.String("hostname", "dababe.launcher.kolide.com:443", "")
 
 		// not documented via flags on purpose
-		enrollSecret = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
-		serverURL    = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
-		insecureTLS  = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
-		insecureGRPC = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
+		enrollSecret    = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
+		serverURL       = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
+		insecureTLS     = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
+		insecureGRPC    = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
+		flareSocketPath = env.String("FLARE_SOCKET_PATH", filepath.Join(os.TempDir(), "flare.sock"))
 
 		certPins [][]byte
 		rootPool *x509.CertPool
@@ -118,6 +122,12 @@ func runFlare(args []string) error {
 		output(b, fileOnly, "reportGRPCNetwork error: %s", err)
 	}
 
+	err = reportOsqueryProcessInfo(logger, flareSocketPath, b)
+	if err != nil {
+		output(b, fileOnly, "reportOsqueryProcessInfo error: %s", err)
+	}
+	output(b, stdout, "Osqueryi ProcessInfo ...%v\n", err == nil)
+
 	return nil
 }
 
@@ -140,6 +150,68 @@ func output(w io.Writer, printTo outputDestination, f string, a ...interface{}) 
 
 	_, err := fmt.Fprintf(w, f, a...)
 	return err
+}
+
+// starts an osqueryd runtime, and then connects an osquery client and runs queries to check and log process info.
+func reportOsqueryProcessInfo(
+	logger log.Logger,
+	socketPath string,
+	output io.Writer,
+) error {
+	// create the osquery runtime socket directory
+	if _, err := os.Stat(filepath.Dir(socketPath)); os.IsNotExist(err) {
+		if err := os.Mkdir(filepath.Dir(socketPath), fs.DirMode); err != nil {
+			return errors.Wrap(err, "creating socket path base directory")
+		}
+	}
+
+	// start a osquery runtime
+	runner, err := runtime.LaunchInstance(
+		runtime.WithExtensionSocketPath(socketPath),
+	)
+	if err != nil {
+		return errors.Wrap(err, "creating osquery instance for process info query")
+	}
+	defer func() {
+		if err := runner.Shutdown(); err != nil {
+			logger.Log(
+				"msg", "shutting down runner from reportOsqueryProcessInfo",
+				"err", err,
+			)
+		}
+	}()
+
+	// start a client and query it
+	client, err := osquerygo.NewClient(socketPath, 5*time.Second)
+	if err != nil {
+		return errors.Wrapf(err, "creating osquerygo client with socket path %s", socketPath)
+	}
+	defer client.Close()
+
+	const query = `select * from processes where name like '%osqueryd%' OR name like '%launcher%';`
+	resp, err := client.Query(query)
+	if err != nil {
+		return errors.Wrap(err, "running osquery query for process info")
+	}
+
+	if resp.Status.Code != int32(0) {
+		return errors.Errorf("Error running query: %s", resp.Status.Message)
+	}
+
+	results := struct {
+		Results map[string]interface{} `json:"osquery_results"`
+	}{
+		Results: map[string]interface{}{},
+	}
+	results.Results["process_info"] = resp.Response
+
+	enc := json.NewEncoder(output)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(results); err != nil {
+		return errors.Wrap(err, "encoding JSON query results")
+	}
+
+	return nil
 }
 
 // uses grpc to test connectivity. Does not depend on the osquery runtime for this test.
