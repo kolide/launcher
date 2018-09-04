@@ -9,6 +9,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -19,6 +21,7 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
 	osquerygo "github.com/kolide/osquery-go"
@@ -127,6 +130,12 @@ func runFlare(args []string) error {
 		output(b, fileOnly, "reportOsqueryProcessInfo error: %s", err)
 	}
 	output(b, stdout, "Osqueryi ProcessInfo ...%v\n", err == nil)
+
+	err = reportNotaryPing(logger)
+	if err != nil {
+		output(b, fileOnly, "reportNotaryPing error: %s", err)
+	}
+	output(b, stdout, "Osqueryi Ping Notary ...%v\n", err == nil)
 
 	return nil
 }
@@ -290,5 +299,33 @@ func reportGRPCNetwork(
 		"nodeKey", nodeKey,
 	)
 
+	return nil
+}
+
+func reportNotaryPing(
+	logger log.Logger,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	notaryURL, _ := url.Parse(autoupdate.DefaultNotary)
+	notaryURL.Path = "/_notary_server/health"
+	req, err := http.NewRequest(http.MethodGet, notaryURL.String(), nil)
+	if err != nil {
+		return errors.Wrapf(err, "create http request to %s", notaryURL)
+	}
+	req = req.WithContext(ctx)
+	resp, err := http.DefaultClient.Do(req)
+	keyvals := []interface{}{
+		"flare", "reportNotaryPing",
+		"msg", "ping notary server",
+		"server_url", notaryURL,
+	}
+	if err != nil {
+		keyvals = append(keyvals, "err", err)
+	} else {
+		keyvals = append(keyvals, "response_code", resp.StatusCode)
+	}
+	logger.Log(keyvals...)
 	return nil
 }
