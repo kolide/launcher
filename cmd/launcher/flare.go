@@ -179,10 +179,20 @@ func reportOsqueryProcessInfo(
 		}
 	}
 
-	// start a osquery runtime
-	runner, err := runtime.LaunchInstance(
+	opts := []runtime.OsqueryInstanceOption{
 		runtime.WithExtensionSocketPath(socketPath),
-	)
+	}
+
+	defaultBinaryPath := "/usr/local/kolide/bin/osqueryd"
+	if _, err := os.Stat(defaultBinaryPath); err == nil {
+		// try to use the default binary location. Can improve on this in the future by checking launchd/systemd
+		// for the value in the package.
+		// if dfault path not found, will default to PATH.
+		opts = append(opts, runtime.WithOsquerydBinary(defaultBinaryPath))
+	}
+
+	// start a osquery runtime
+	runner, err := runtime.LaunchInstance(opts...)
 	if err != nil {
 		return errors.Wrap(err, "creating osquery instance for process info query")
 	}
