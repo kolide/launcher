@@ -144,7 +144,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:797a68baf50272f47c391f40c71f35cf20484432d357efcb0d538d320a3b1298"
+  digest = "1:246fdffb2af051769734df58f4654b72cb6ccda71e72aa49adafa1b0825f38f4"
   name = "github.com/kolide/kit"
   packages = [
     "actor",
@@ -153,6 +153,7 @@
     "fs",
     "logutil",
     "testutil",
+    "ulid",
     "version",
   ]
   pruneopts = "UT"
@@ -222,6 +223,14 @@
   pruneopts = "UT"
   revision = "4dadeb3030eda0273a12382bb2348ffc7c9d1a39"
   version = "v1.0.0"
+
+[[projects]]
+  digest = "1:e25f71dc198d4f3285f663d1d32b90b219a5e680ac5cc77ace86f663f6d68baf"
+  name = "github.com/oklog/ulid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d311cb43c92434ec4072dfbbda3400741d0a6337"
+  version = "v0.3.0"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
@@ -426,6 +435,7 @@
     "github.com/kolide/kit/fs",
     "github.com/kolide/kit/logutil",
     "github.com/kolide/kit/testutil",
+    "github.com/kolide/kit/ulid",
     "github.com/kolide/kit/version",
     "github.com/kolide/osquery-go",
     "github.com/kolide/osquery-go/gen/osquery",

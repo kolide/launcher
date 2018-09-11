@@ -201,6 +201,15 @@ func main() {
 				logger.Fatal("err", errors.Wrap(err, "launching query command"))
 			}
 			os.Exit(0)
+		case "flare":
+			var args []string
+			if len(os.Args) > 2 {
+				args = os.Args[2:]
+			}
+			if err := runFlare(args); err != nil {
+				logger.Fatal("err", errors.Wrap(err, "launching flare command"))
+			}
+			os.Exit(0)
 		}
 	}
 
