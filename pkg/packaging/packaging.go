@@ -382,12 +382,14 @@ func CreateMacPackage(
 	logDirectory := filepath.Join("/var/log", identifier)
 	launchDaemonDirectory := "/Library/LaunchDaemons"
 	launchDaemonName := fmt.Sprintf("com.%s.launcher", identifier)
+	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
 	pathsToCreate := []string{
 		rootDirectory,
 		binaryDirectory,
 		configurationDirectory,
 		logDirectory,
 		launchDaemonDirectory,
+		newSysLogDirectory,
 	}
 	for _, pathToCreate := range pathsToCreate {
 		err = os.MkdirAll(filepath.Join(packageRoot, pathToCreate), fs.DirMode)
@@ -503,6 +505,21 @@ func CreateMacPackage(
 	}
 	if err := renderPostinstall(postinstallFile, postinstallOpts); err != nil {
 		return "", errors.Wrap(err, "could not render postinstall script context to file")
+	}
+
+	// create newsyslog.d config file
+	newSysLogPath := filepath.Join(packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", identifier))
+	newSyslogFile, err := os.Create(newSysLogPath)
+	if err != nil {
+		return "", errors.Wrap(err, "creating newsyslog config")
+	}
+	defer newSyslogFile.Close()
+	logOptions := newSyslogTemplateOptions{
+		LogPath: filepath.Join(logDirectory, "*.log"),
+		PidPath: filepath.Join(rootDirectory, "launcher.pid"),
+	}
+	if err := renderNewSyslogConfig(newSyslogFile, &logOptions); err != nil {
+		return "", errors.Wrap(err, "rendering newsyslog.d config")
 	}
 
 	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
@@ -752,6 +769,21 @@ sleep 5
 		return errors.Wrap(err, "not able to parse postinstall template")
 	}
 	return t.ExecuteTemplate(w, "postinstall", options)
+}
+
+type newSyslogTemplateOptions struct {
+	LogPath string
+	PidPath string
+}
+
+func renderNewSyslogConfig(w io.Writer, options *newSyslogTemplateOptions) error {
+	syslogTemplate := `# logfilename          [owner:group]    mode count size when  flags [/pid_file] [sig_num]
+{{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
+	t, err := template.New("syslog").Parse(syslogTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse postinstall template")
+	}
+	return t.ExecuteTemplate(w, "syslog", options)
 }
 
 // pkgbuild runs the following pkgbuild command:

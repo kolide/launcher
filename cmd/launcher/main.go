@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -283,6 +284,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
+		logger.Fatal("err", err)
+	}
+
 	// create a context for all the asynchronous stuff we are starting
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -370,4 +375,9 @@ func main() {
 		logger.Fatal(err)
 	}
 
+}
+
+func writePidFile(path string) error {
+	err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600)
+	return errors.Wrap(err, "writing pidfile")
 }
