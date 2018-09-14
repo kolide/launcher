@@ -25,7 +25,7 @@ type getShellsResponse struct {
 func (c *Client) getShells(ctx context.Context) {
 	nodeKey, err := osquery.NodeKeyFromDB(c.db)
 	if err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error getting node key from db to request shells",
 			"err", err,
 		)
@@ -38,7 +38,7 @@ func (c *Client) getShells(ctx context.Context) {
 	}
 	response, err := c.do(verb, path, params)
 	if err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error making request to get shells endpoint",
 			"err", err,
 		)
@@ -48,7 +48,7 @@ func (c *Client) getShells(ctx context.Context) {
 
 	switch response.StatusCode {
 	case http.StatusNotFound:
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "got 404 making get shells request",
 			"err", err,
 		)
@@ -56,7 +56,7 @@ func (c *Client) getShells(ctx context.Context) {
 	}
 
 	if response.StatusCode != http.StatusOK {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "got not-ok status code getting shells",
 			"response_code", response.StatusCode,
 		)
@@ -65,7 +65,7 @@ func (c *Client) getShells(ctx context.Context) {
 
 	var responseBody getShellsResponse
 	if err := json.NewDecoder(response.Body).Decode(&responseBody); err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error decoding get shells json",
 			"err", err,
 		)
@@ -73,7 +73,7 @@ func (c *Client) getShells(ctx context.Context) {
 	}
 
 	if responseBody.Err != "" {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "response body contained error",
 			"err", responseBody.Err,
 		)
@@ -96,7 +96,7 @@ func (c *Client) getShells(ctx context.Context) {
 func (c *Client) connectToShell(ctx context.Context, path string, session map[string]string) {
 	room, ok := session["session_id"]
 	if !ok {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "session didn't contain id",
 		)
 		return
@@ -104,7 +104,7 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 
 	secret, ok := session["secret"]
 	if !ok {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "session didn't contain secret",
 		)
 		return
@@ -113,7 +113,7 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 	wsPath := path + "/" + room
 	client, err := wsrelay.NewClient(c.addr, wsPath, c.disableTLS, c.insecure)
 	if err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error creating client",
 			"err", err,
 		)
@@ -123,7 +123,7 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 
 	pty, err := ptycmd.NewCmd("/bin/bash", []string{"--login"})
 	if err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error creating PTY command",
 			"err", err,
 		)
@@ -139,13 +139,13 @@ func (c *Client) connectToShell(ctx context.Context, path string, session map[st
 		webtty.WithKeepAliveDeadline(),
 	)
 	if err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error creating TTY",
 			"err", err,
 		)
 	}
 	if err := TTY.Run(ctx); err != nil {
-		level.Info(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error running TTY",
 			"err", err,
 		)
