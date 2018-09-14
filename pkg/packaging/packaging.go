@@ -778,7 +778,7 @@ type newSyslogTemplateOptions struct {
 
 func renderNewSyslogConfig(w io.Writer, options *newSyslogTemplateOptions) error {
 	syslogTemplate := `# logfilename          [owner:group]    mode count size when  flags [/pid_file] [sig_num]
-{{.LogPath}}               640  4000     3   *   G  {{.PidPath}} 15`
+{{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
 	t, err := template.New("syslog").Parse(syslogTemplate)
 	if err != nil {
 		return errors.Wrap(err, "not able to parse postinstall template")
