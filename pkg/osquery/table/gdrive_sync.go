@@ -1,6 +1,30 @@
+package table
+
+import (
+	"context"
+	"encoding/json"
+	"io/ioutil"
+	"strings"
+
+	"github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/pkg/errors"
+)
+
 func GDrivePlugin(client *osquery.ExtensionManagerClient) *table.Plugin {
-	paths := queryDbPath...
-	database, _ := sql.Open("sqlite3", path)
+	t := &gDriveTable{client: client}
+	paths, err := queryDbPath(t.client)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	database, err := sql.Open("sqlite3", path)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
 	g := &gdrive{
 		db: database,
 	}
@@ -9,7 +33,7 @@ func GDrivePlugin(client *osquery.ExtensionManagerClient) *table.Plugin {
 		table.TextColumn("user_email"),
 		table.TextColumn("local_sync_root_path"),
 	}
-	return table.NewPlugin("kolide_gdrive_sync_config", columns, generate)
+	return table.NewPlugin("kolide_gdrive_sync_config", columns, g.generate)
 }
 
 type gdrive struct {
