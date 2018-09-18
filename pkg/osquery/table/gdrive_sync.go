@@ -2,32 +2,19 @@ package table
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"strings"
+	"database/sql"
+	"path/filepath"
 
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func GDrivePlugin(client *osquery.ExtensionManagerClient) *table.Plugin {
-	t := &gDriveTable{client: client}
-	paths, err := queryDbPath(t.client)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	database, err := sql.Open("sqlite3", path)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
+func GDriveSyncConfig(client *osquery.ExtensionManagerClient) *table.Plugin {
 	g := &gdrive{
-		db: database,
+		client: client,
 	}
 
 	columns := []table.ColumnDefinition{
@@ -38,21 +25,43 @@ func GDrivePlugin(client *osquery.ExtensionManagerClient) *table.Plugin {
 }
 
 type gdrive struct {
-	db *sql.DB
+	client *osquery.ExtensionManagerClient
 }
 
 // GdriveGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	rows, _ := g.db.Query("SELECT entry_key, data_key, data_value FROM data")
+	paths, err := queryDbPath(g.client)
+	if err != nil {
+		return nil, err
+	}
+
+	// we chose to open the db every time. we don't own this sqlite db
+	db, err := sql.Open("sqlite3", paths)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	db.Exec("PRAGMA journal_mode=WAL;")
+
+	rows, err := db.Query("SELECT entry_key, data_key, data_value FROM data")
+	if err != nil {
+		return nil, errors.Wrap(err, "query rows from gdrive sync config db")
+	}
 	defer rows.Close()
+
 	var email string
 	var localsyncpath string
 	for rows.Next() {
-		var entry_key string
-		var data_key string
-		var data_value string
-		rows.Scan(&entry_key, &data_key, &data_value)
+		var (
+			entry_key  string
+			data_key   string
+			data_value string
+		)
+		if err := rows.Scan(&entry_key, &data_key, &data_value); err != nil {
+			return nil, errors.Wrap(err, "scanning gdrive sync config db row")
+		}
 
 		switch entry_key {
 		case "user_email":
@@ -68,7 +77,7 @@ func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) 
 			"user_email":           email,
 			"local_sync_root_path": localsyncpath,
 		},
-	},nil
+	}, nil
 }
 
 func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
@@ -81,6 +90,6 @@ func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
 	if val, ok := row["username"]; ok {
 		username = val
 	}
-	path := filepath.Join("/Users", username,"/Library/Application Support/Google/Drive/user_default/sync_config.db")
+	path := filepath.Join("/Users", username, "/Library/Application Support/Google/Drive/user_default/sync_config.db")
 	return path, nil
 }
