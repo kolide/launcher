@@ -9,6 +9,7 @@ import (
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func GDrivePlugin(client *osquery.ExtensionManagerClient) *table.Plugin {
