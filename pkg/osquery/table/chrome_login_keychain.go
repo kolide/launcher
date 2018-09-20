@@ -3,10 +3,13 @@ package table
 import (
 	"context"
 	"database/sql"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 
@@ -47,8 +50,19 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 	if err != nil {
 		return nil, err
 	}
+
+	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir) // clean up
+
+	dst := filepath.Join(dir, "tmpfile")
+	if err := fs.CopyFile(paths, dst); err != nil {
+		return nil, err
+	}
 	// open and close db here, same as other table
-	db, err := sql.Open("sqlite3", paths)
+	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +83,6 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 		var origin_url string
 		var action_url string
 		var username_value string
-		rows.Scan(&origin_url, &action_url, &username_value) // handle this error
 		if err := rows.Scan(&origin_url, &action_url, &username_value); err != nil {
 			return nil, errors.Wrap(err, "scanning chrome login keychain db row")
 		}
