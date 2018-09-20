@@ -17,7 +17,6 @@ import (
 )
 
 func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
-	//figure it out
 	c := &ChromeLoginKeychain{
 		client: client,
 	}
@@ -30,18 +29,8 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plug
 }
 
 type ChromeLoginKeychain struct {
-	// take a client instead of db
 	client *osquery.ExtensionManagerClient
 }
-
-// this function is not necessary, use columns := to just return the column definition in the top function
-/* func (c *ChromeLoginKeychain) ChromeLoginKeychainColumns() []table.ColumnDefinition {
-	return []table.ColumnDefinition{
-		table.TextColumn("origin_url"),
-		table.TextColumn("action_url"),
-		table.TextColumn("username_value"),
-	}
-} */
 
 // ChromeLoginKeychainGenerate will be called whenever the table is queried. It should return
 // a full table scan.
@@ -61,7 +50,7 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 	if err := fs.CopyFile(paths, dst); err != nil {
 		return nil, err
 	}
-	// open and close db here, same as other table
+
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
 		return nil, err
@@ -93,7 +82,7 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 			"username_value": username_value,
 		})
 	}
-	return results, nil //no error
+	return results, nil
 }
 
 func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
