@@ -66,4 +66,4 @@ To learn more about using `package-builder` to package and deploy osquery, check
 
 Want to go directly to insights? Not sure how to package Launcher or manage your Fleet?
 
-Try our [osquery SaaS platform](https://kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher) providing insights, alerting, fleet management and user-driven security tools. We also support advanced aggregation of osquery results for power users. Get started immediately, and your first 10 hosts are free. Launcher packages customized for your organization can be downloaded in-app after signup.
+Try our [osquery SaaS platform](https://kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher) providing insights, alerting, fleet management and user-driven security tools. We also support advanced aggregation of osquery results for power users. Get started immediately, with your 30-day free trial [today](https://kolide.com/signup?utm_source=oss&utm_medium=readme&utm_campaign=launcher). Launcher packages customized for your organization can be downloaded in-app after signup.
