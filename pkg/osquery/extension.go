@@ -1,8 +1,11 @@
 package osquery
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -33,12 +36,16 @@ type Extension struct {
 	logger        log.Logger
 
 	osqueryClient Querier
+	initialRunner *initialRunner
 }
 
 // SetQuerier sets an osquery client on the extension, allowing
 // the extension to query the running osqueryd instance.
 func (e *Extension) SetQuerier(client Querier) {
 	e.osqueryClient = client
+	if e.initialRunner != nil {
+		e.initialRunner.client = client
+	}
 }
 
 // Querier allows querying osquery.
@@ -144,12 +151,19 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		return nil, errors.Wrap(err, "creating DB buckets")
 	}
 
+	identifier, err := IdentifierFromDB(db)
+	if err != nil {
+		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
+	}
+	initialRunner := &initialRunner{identifier: identifier}
+
 	return &Extension{
 		logger:        opts.Logger,
 		serviceClient: client,
 		db:            db,
 		Opts:          opts,
 		done:          make(chan struct{}),
+		initialRunner: initialRunner,
 	}, nil
 }
 
@@ -379,6 +393,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		// Don't attempt reenroll after first attempt
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
+
+	hi, _ := e.getHostIdentifier()
+	i := initialRunner{client: e.osqueryClient, identifier: hi}
+	i.Execute(config, e.LogString)
 
 	return config, nil
 }
@@ -768,4 +786,50 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	details.LauncherVersion = version.Version().Version
 
 	return details, nil
+}
+
+type initialRunner struct {
+	identifier   string
+	knownQueries map[string]struct{}
+	client       Querier
+	db           *bolt.DB
+}
+
+func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s string) error) error {
+	// TODO: only unmarshal if checksum changed
+	var config OsqueryConfig
+	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
+		return errors.Wrap(err, "unmarshal osquery config blob")
+	}
+
+	var initialRunResults []OsqueryResultLog
+	for packName, pack := range config.Packs {
+		for query, queryContent := range pack.Queries {
+			//  TODO, checksum every query first, save to bolt. this way we only send data once
+			resp, err := i.client.Query(queryContent.Query)
+			if err != nil {
+				panic(err)
+			}
+			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
+			initialRunResults = append(initialRunResults, OsqueryResultLog{
+				Name:           queryName,
+				HostIdentifier: i.identifier,
+				UnixTime:       int(time.Now().UTC().Unix()),
+				DiffResults:    &DiffResults{Added: resp},
+				Epoch:          0,
+			})
+		}
+	}
+
+	for _, result := range initialRunResults {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(result); err != nil {
+			return errors.Wrap(err, "encoding initial run result")
+		}
+		if err := writeFn(context.Background(), logger.LogTypeString, buf.String()); err != nil {
+			return errors.Wrap(err, "writing encoded initial result log")
+		}
+	}
+
+	return nil
 }
