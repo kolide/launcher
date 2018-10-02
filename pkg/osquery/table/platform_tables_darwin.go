@@ -22,6 +22,5 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		KolideVulnerabilities(client, logger),
 		BestPractices(client),
 		Airdrop(client),
-		OnePasswordAccountConfigInfo(client),
 	}
 }

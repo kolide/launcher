@@ -12,33 +12,22 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
-func OnePasswordAccountConfigInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
-	o := &OnePasswordAccountConfig{
-		client: client,
-	}
-	columns := []table.ColumnDefinition{
-		table.TextColumn("team_name"),
-		table.TextColumn("user_email"),
-		table.TextColumn("user_first_name"),
-		table.TextColumn("user_last_name"),
-	}
-	return table.NewPlugin("kolide_onepassword_account_config", columns, o.generate)
-}
-
-type OnePasswordAccountConfig struct {
+type onePasswordAccountConfig struct {
 	client *osquery.ExtensionManagerClient
 }
 
 // OnePasswordAccountConfigGenerate will be called whenever the table is queried. It should return
 // a full table scan.
-func (o *OnePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext, results []map[string]string) ([]map[string]string, error) {
 	paths, err := queryDbPath(o.client)
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := os.Stat(paths); os.IsNotExist(err) {
+		return results, nil // only populate results if path exists
 	}
 
 	dir, err := ioutil.TempDir("", "kolide_onepassword_account_config")
@@ -60,30 +49,21 @@ func (o *OnePasswordAccountConfig) generate(ctx context.Context, queryContext ta
 
 	db.Exec("PRAGMA journal_mode=WAL;")
 
-	rows, err := db.Query("SELECT team_name, user_email, user_first_name, user_last_name FROM accounts")
+	rows, err := db.Query("SELECT user_email FROM accounts")
 	if err != nil {
 		return nil, errors.Wrap(err, "query rows from onepassword account configuration db")
 	}
 	defer rows.Close()
 
-	var results []map[string]string
-
-	// loop through all the sqlite rows and add them as osquery rows in the results map
-	for rows.Next() { // we initialize these variables for every row, that way we don't have data from the previous iteration
-		var team_name string
-		var user_email string
-		var user_first_name string
-		var user_last_name string
-		if err := rows.Scan(&team_name, &user_email, &user_first_name, &user_last_name); err != nil {
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
 			return nil, errors.Wrap(err, "scanning onepassword account configuration db row")
 		}
-
-		results = append(results, map[string]string{
-			"team_name":       team_name,
-			"user_email":      user_email,
-			"user_first_name": user_first_name,
-			"user_last_name":  user_last_name,
-		})
+		if email == "" {
+			continue
+		}
+		results = addEmailToResults(email, results)
 	}
 	return results, nil
 }
