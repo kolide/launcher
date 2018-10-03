@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/kolide/osquery-go"
@@ -27,11 +28,32 @@ type emailAddressesTable struct {
 }
 
 func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	results := []map[string]string{}
+	var results []map[string]string
 
 	// add results from chrome profiles
+	chromeResults, err := generateEmailAddressesFromChromeState()
+	if err != nil {
+		return nil, errors.Wrap(err, "get email addresses from chrome state")
+	}
+	results = append(results, chromeResults...)
+
+	// add results from 1password
+	onePassResults, err := t.onePasswordAccountConfig.generate(ctx, queryContext)
+	if err != nil {
+		return nil, errors.Wrap(err, "adding email results from 1password config")
+	}
+	results = append(results, onePassResults...)
+
+	return results, nil
+}
+
+func generateEmailAddressesFromChromeState() ([]map[string]string, error) {
+	var results []map[string]string
 	for _, stateFilePath := range findChromeStateFiles() {
 		fileContent, err := ioutil.ReadFile(stateFilePath)
+		if os.IsNotExist(err) {
+			break
+		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not read file %s", stateFilePath)
 		}
@@ -45,13 +67,6 @@ func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryC
 			results = addEmailToResults(profile.Username, results)
 		}
 	}
-
-	// add results from 1password
-	results, err := t.onePasswordAccountConfig.generate(ctx, queryContext, results)
-	if err != nil {
-		return nil, errors.Wrap(err, "adding email results from 1password config")
-	}
-
 	return results, nil
 }
 

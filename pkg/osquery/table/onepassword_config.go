@@ -20,14 +20,14 @@ type onePasswordAccountConfig struct {
 
 // OnePasswordAccountConfigGenerate will be called whenever the table is queried. It should return
 // a full table scan.
-func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext, results []map[string]string) ([]map[string]string, error) {
+func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	paths, err := queryDbPath(o.client)
 	if err != nil {
 		return nil, err
 	}
 
 	if _, err := os.Stat(paths); os.IsNotExist(err) {
-		return results, nil // only populate results if path exists
+		return nil, nil // only populate results if path exists
 	}
 
 	dir, err := ioutil.TempDir("", "kolide_onepassword_account_config")
@@ -55,6 +55,7 @@ func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext ta
 	}
 	defer rows.Close()
 
+	var results []map[string]string
 	for rows.Next() {
 		var email string
 		if err := rows.Scan(&email); err != nil {
@@ -74,10 +75,7 @@ func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "querying for primaryUser version")
 	}
-	var username string
-	if val, ok := row["username"]; ok {
-		username = val
-	}
+	username := row["username"]
 	path := filepath.Join("/Users", username, "/Library/Application Support/1Password 4/Data/B5.sqlite")
 	return path, nil
 }
