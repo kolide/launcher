@@ -201,6 +201,14 @@
   version = "v1.1.2"
 
 [[projects]]
+  digest = "1:3cafc6a5a1b8269605d9df4c6956d43d8011fc57f266ca6b9d04da6c09dee548"
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "25ecb14adfc7543176f7d85291ec7dba82c6f7e4"
+  version = "v1.9.0"
+
+[[projects]]
   branch = "master"
   digest = "1:f6a6660a60d7082ebc819948d910534d501984b04c7df7fb3c1e9a000fcd721a"
   name = "github.com/miekg/pkcs11"
@@ -446,6 +454,7 @@
     "github.com/kolide/osquery-go/plugin/table",
     "github.com/kolide/updater/tuf",
     "github.com/kr/pty",
+    "github.com/mattn/go-sqlite3",
     "github.com/mixer/clock",
     "github.com/oklog/run",
     "github.com/pkg/errors",
