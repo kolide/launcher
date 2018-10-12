@@ -21,10 +21,11 @@ type onePasswordAccountConfig struct {
 // OnePasswordAccountConfigGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	paths, err := queryDbPath(o.client)
+	user, err := getPrimaryUser(o.client)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get primary user for onepassword config")
 	}
+	paths := filepath.Join("/Users", user, "/Library/Application Support/1Password 4/Data/B5.sqlite")
 
 	if _, err := os.Stat(paths); os.IsNotExist(err) {
 		return nil, nil // only populate results if path exists
@@ -67,15 +68,4 @@ func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext ta
 		results = addEmailToResults(email, results)
 	}
 	return results, nil
-}
-
-func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
-	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
-	row, err := client.QueryRow(query)
-	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
-	}
-	username := row["username"]
-	path := filepath.Join("/Users", username, "/Library/Application Support/1Password 4/Data/B5.sqlite")
-	return path, nil
 }
