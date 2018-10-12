@@ -35,10 +35,11 @@ type ChromeLoginKeychain struct {
 // ChromeLoginKeychainGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	paths, err := queryDbPath(c.client)
+	user, err := getPrimaryUser(c.client)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get primary user for chrome login keychain")
 	}
+	paths := filepath.Join("/Users", user, "/Library/Application Support/Google/Chrome/Default/Login Data")
 
 	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
 	if err != nil {
@@ -83,18 +84,4 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 		})
 	}
 	return results, nil
-}
-
-func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
-	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
-	row, err := client.QueryRow(query)
-	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
-	}
-	var username string
-	if val, ok := row["username"]; ok {
-		username = val
-	}
-	path := filepath.Join("/Users", username, "/Library/Application Support/Google/Chrome/Default/Login Data")
-	return path, nil
 }
