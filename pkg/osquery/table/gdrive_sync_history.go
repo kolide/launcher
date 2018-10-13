@@ -36,10 +36,11 @@ type GDriveSyncHistory struct {
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	paths, err := queryDbPath(g.client)
+	user, err := getPrimaryUser(g.client)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get primary user for gdrive sync history")
 	}
+	paths := filepath.Join("/Users", user, "/Library/Application Support/Google/Drive/user_default/snapshot.db")
 
 	dir, err := ioutil.TempDir("", "kolide_gdrive_sync_history")
 	if err != nil {
@@ -86,18 +87,4 @@ func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.Que
 		})
 	}
 	return results, nil
-}
-
-func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
-	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
-	row, err := client.QueryRow(query)
-	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
-	}
-	var username string
-	if val, ok := row["username"]; ok {
-		username = val
-	}
-	path := filepath.Join("/Users", username, "/Library/Application Support/Google/Drive/user_default/snapshot.db")
-	return path, nil
 }
