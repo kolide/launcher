@@ -3,8 +3,11 @@ package table
 import (
 	"context"
 	"database/sql"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -28,16 +31,27 @@ type gdrive struct {
 	client *osquery.ExtensionManagerClient
 }
 
-// GdriveGenerate will be called whenever the table is queried. It should return
-// a full table scan.
+// generate will be called whenever the table is queried. It should return a
+// full table scan.
 func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	paths, err := queryDbPath(g.client)
+	user, err := getPrimaryUser(g.client)
+	if err != nil {
+		return nil, errors.Wrap(err, "get primary user for gdrive sync info")
+	}
+	paths := filepath.Join("/Users", user, "/Library/Application Support/Google/Drive/user_default/sync_config.db")
+
+	dir, err := ioutil.TempDir("", "kolide_gdrive_sync_config")
 	if err != nil {
 		return nil, err
 	}
+	defer os.RemoveAll(dir) // clean up
 
-	// we chose to open the db every time. we don't own this sqlite db
-	db, err := sql.Open("sqlite3", paths)
+	dst := filepath.Join(dir, "tmpfile")
+	if err := fs.CopyFile(paths, dst); err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
 		return nil, err
 	}
@@ -78,18 +92,4 @@ func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) 
 			"local_sync_root_path": localsyncpath,
 		},
 	}, nil
-}
-
-func queryDbPath(client *osquery.ExtensionManagerClient) (string, error) {
-	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
-	row, err := client.QueryRow(query)
-	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
-	}
-	var username string
-	if val, ok := row["username"]; ok {
-		username = val
-	}
-	path := filepath.Join("/Users", username, "/Library/Application Support/Google/Drive/user_default/sync_config.db")
-	return path, nil
 }

@@ -53,7 +53,7 @@ extension: .pre-build
 
 osqueryi: .pre-build
 	go build -i -o build/launcher.ext ./cmd/launcher.ext/
-	osqueryi --extension=./build/launcher.ext --verbose
+	osqueryi --extension=./build/launcher.ext
 
 xp-extension: .pre-build
 	GOOS=darwin go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
