@@ -1,15 +1,28 @@
 package table
 
 import (
-	"github.com/kolide/osquery-go"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/pkg/errors"
 )
 
-func getPrimaryUser(client *osquery.ExtensionManagerClient) (string, error) {
-	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
-	row, err := client.QueryRow(query)
+const userDir = "/Users"
+
+// findFileInUserDirs looks for the existence of a specified path as a
+// subdirectory of users' home directories on macOS
+func findFileInUserDirs(path string) ([]string, error) {
+	userDirs, err := ioutil.ReadDir(userDir)
 	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
+		return nil, errors.Wrap(err, "Reading /Users/")
 	}
-	return row["username"], nil
+	var res []string
+	for _, dir := range userDirs {
+		fullPath := filepath.Join(userDir, dir.Name(), path)
+		if stat, err := os.Stat(fullPath); err == nil && stat.Mode().IsRegular() {
+			res = append(res, fullPath)
+		}
+	}
+	return res, nil
 }

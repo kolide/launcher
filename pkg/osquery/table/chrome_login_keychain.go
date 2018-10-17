@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fs"
@@ -16,9 +18,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
+func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
 		client: client,
+		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
 		table.TextColumn("origin_url"),
@@ -30,17 +33,10 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plug
 
 type ChromeLoginKeychain struct {
 	client *osquery.ExtensionManagerClient
+	logger log.Logger
 }
 
-// ChromeLoginKeychainGenerate will be called whenever the table is queried. It should return
-// a full table scan.
-func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	user, err := getPrimaryUser(c.client)
-	if err != nil {
-		return nil, errors.Wrap(err, "get primary user for chrome login keychain")
-	}
-	paths := filepath.Join("/Users", user, "/Library/Application Support/Google/Chrome/Default/Login Data")
-
+func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
 	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
 	if err != nil {
 		return nil, err
@@ -48,7 +44,7 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(paths, dst); err != nil {
+	if err := fs.CopyFile(path, dst); err != nil {
 		return nil, err
 	}
 
@@ -83,5 +79,24 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 			"username_value": username_value,
 		})
 	}
+	return results, nil
+}
+
+func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	paths, err := findFileInUserDirs("Library/Application Support/Google/Chrome/Default/Login Data")
+	if err != nil {
+		return nil, errors.Wrap(err, "find chrome login data sqlite DBs")
+	}
+
+	var results []map[string]string
+	for _, path := range paths {
+		res, err := c.generateForPath(ctx, path)
+		if err != nil {
+			level.Error(c.logger).Log("Generating result for path %s: %s", path, err.Error())
+			continue
+		}
+		results = append(results, res...)
+	}
+
 	return results, nil
 }
