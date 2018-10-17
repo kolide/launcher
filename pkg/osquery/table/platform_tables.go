@@ -12,6 +12,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 	return []*table.Plugin{
 		LauncherInfo(client),
 		BestPractices(client),
-		EmailAddresses(client),
+		EmailAddresses(client, logger),
 	}
 }

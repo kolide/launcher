@@ -7,18 +7,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
-func EmailAddresses(client *osquery.ExtensionManagerClient) *table.Plugin {
+func EmailAddresses(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("email"),
 		table.TextColumn("domain"),
 	}
 	t := &emailAddressesTable{
-		onePasswordAccountConfig: &onePasswordAccountConfig{client: client},
+		onePasswordAccountConfig: &onePasswordAccountConfig{client: client, logger: logger},
 	}
 	return table.NewPlugin("kolide_email_addresses", columns, t.generateEmailAddresses)
 }
