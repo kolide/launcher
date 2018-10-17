@@ -24,6 +24,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		Airdrop(client),
 		ChromeLoginKeychainInfo(client, logger),
 		GDriveSyncConfig(client, logger),
-		GDriveSyncHistoryInfo(client),
+		GDriveSyncHistoryInfo(client, logger),
 	}
 }
