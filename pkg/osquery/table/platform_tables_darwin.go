@@ -17,11 +17,12 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		MachoInfo(),
 		MacOSUpdate(client),
 		LauncherInfo(client),
-		EmailAddresses(client),
+		EmailAddresses(client, logger),
 		Spotlight(),
 		KolideVulnerabilities(client, logger),
 		BestPractices(client),
 		Airdrop(client),
 		ChromeLoginKeychainInfo(client, logger),
+		GDriveSyncConfig(client, logger),
 	}
 }

@@ -3,11 +3,12 @@ package table
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fs"
@@ -17,6 +18,7 @@ import (
 
 type onePasswordAccountConfig struct {
 	client *osquery.ExtensionManagerClient
+	logger log.Logger
 }
 
 // generate the onepassword account info results given the path to a
@@ -71,7 +73,7 @@ func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext ta
 	for _, path := range paths {
 		res, err := o.generateForPath(ctx, path)
 		if err != nil {
-			fmt.Println("Error generating result for path ", path)
+			level.Error(o.logger).Log("Error generating onepassword result for path %s: %s", path, err.Error())
 			continue
 		}
 		results = append(results, res...)
