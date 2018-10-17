@@ -22,6 +22,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		KolideVulnerabilities(client, logger),
 		BestPractices(client),
 		Airdrop(client),
-		ChromeLoginKeychainInfo(client),
+		ChromeLoginKeychainInfo(client, logger),
 	}
 }

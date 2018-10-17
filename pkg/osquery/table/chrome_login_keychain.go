@@ -3,11 +3,12 @@ package table
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fs"
@@ -17,9 +18,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
+func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
 		client: client,
+		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
 		table.TextColumn("origin_url"),
@@ -31,6 +33,7 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient) *table.Plug
 
 type ChromeLoginKeychain struct {
 	client *osquery.ExtensionManagerClient
+	logger log.Logger
 }
 
 func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
@@ -89,7 +92,7 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 	for _, path := range paths {
 		res, err := c.generateForPath(ctx, path)
 		if err != nil {
-			fmt.Println("Error generating result for path ", path)
+			level.Error(c.logger).Log("Generating result for path %s: %s", path, err.Error())
 			continue
 		}
 		results = append(results, res...)
