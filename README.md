@@ -26,7 +26,7 @@ Because we understand the security implications of an osquery autoupdater, NCC G
 
 ### gRPC Server Specification and Implementation
 
-Osquery has a very extensible plugin architecture that allow it to be heavily customized with plugins. The included TLS plugins are used by many existing osquery management servers, but the design of the TLS API leaves much to be desired. The Launcher includes a set of gRPC plugins for remote communication with a gRPC server. The [server specification](https://github.com/kolide/agent-api) is independently published and versioned.
+Osquery has a very extensible plugin architecture that allow it to be heavily customized with plugins. The included TLS plugins are used by many existing osquery management servers, but the design of the TLS API leaves much to be desired. The Launcher includes a set of gRPC plugins for remote communication with a gRPC server. The [server specification](https://github.com/kolide/launcher/tree/master/pkg/pb/launcher) is independently published and versioned.
 
 An implementation of the gRPC server is included with the [Kolide Fleet](https://github.com/kolide/fleet) osquery fleet manager. Kolide Fleet implements both the gRPC server as well as the legacy TLS server API, so it presents an easy migration path for existing TLS API users.
 
