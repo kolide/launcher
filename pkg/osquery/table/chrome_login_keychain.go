@@ -92,7 +92,7 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 	for _, path := range paths {
 		res, err := c.generateForPath(ctx, path)
 		if err != nil {
-			level.Error(c.logger).Log(
+			level.Info(c.logger).Log(
 				"msg", "Generating chrome keychain result",
 				"path", path,
 				"err", err,
