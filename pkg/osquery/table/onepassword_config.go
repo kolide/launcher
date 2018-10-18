@@ -73,7 +73,11 @@ func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext ta
 	for _, path := range paths {
 		res, err := o.generateForPath(ctx, path)
 		if err != nil {
-			level.Error(o.logger).Log("Error generating onepassword result for path %s: %s", path, err.Error())
+			level.Error(o.logger).Log(
+				"msg", "Generating onepassword result",
+				"path", path,
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, res...)

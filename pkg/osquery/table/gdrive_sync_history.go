@@ -97,7 +97,11 @@ func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.Que
 	for _, path := range paths {
 		res, err := g.generateForPath(ctx, path)
 		if err != nil {
-			level.Error(g.logger).Log("Error generating gdrive history result for path %s: %s", path, err.Error())
+			level.Error(g.logger).Log(
+				"msg", "Generating gdrive history result",
+				"path", path,
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, res...)
