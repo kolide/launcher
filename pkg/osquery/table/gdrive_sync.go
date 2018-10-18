@@ -98,7 +98,11 @@ func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) 
 	for _, path := range paths {
 		res, err := g.generateForPath(ctx, path)
 		if err != nil {
-			level.Error(g.logger).Log("Generating gdrive sync result for path %s: %s", path, err.Error())
+			level.Info(g.logger).Log(
+				"msg", "Generating gdrive sync result",
+				"path", path,
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, res...)
