@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc64"
 	"sync"
 	"time"
 
@@ -155,7 +156,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
-	initialRunner := &initialRunner{identifier: identifier}
+	initialRunner := &initialRunner{identifier: identifier, hashTable: crc64.MakeTable(crc64.ECMA)}
 
 	return &Extension{
 		logger:        opts.Logger,
@@ -394,9 +395,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	hi, _ := e.getHostIdentifier()
-	i := initialRunner{client: e.osqueryClient, identifier: hi}
-	i.Execute(config, e.LogString)
+	e.initialRunner.Execute(config, e.LogString)
 
 	return config, nil
 }
@@ -790,9 +789,11 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 
 type initialRunner struct {
 	identifier   string
-	knownQueries map[string]struct{}
 	client       Querier
 	db           *bolt.DB
+	mu           sync.RWMutex
+	knownQueries map[string]struct{}
+	hashTable    *crc64.Table
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s string) error) error {
