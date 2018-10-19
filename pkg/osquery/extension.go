@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"hash/crc64"
 	"sync"
 	"time"
 
@@ -56,7 +55,8 @@ type Querier interface {
 
 const (
 	// Bucket name to use for launcher configuration.
-	configBucket = "config"
+	configBucket         = "config"
+	initialResultsBucket = "initial_results"
 	// Bucket name to use for buffered status logs.
 	statusLogsBucket = "status_logs"
 	// Bucket name to use for buffered result logs.
@@ -111,7 +111,7 @@ type ExtensionOpts struct {
 func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
 	// bucketNames contains the names of buckets that should be created when the
 	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket}
+	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket}
 
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
@@ -156,7 +156,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
-	initialRunner := &initialRunner{identifier: identifier, hashTable: crc64.MakeTable(crc64.ECMA)}
+	initialRunner := &initialRunner{identifier: identifier, db: db}
 
 	return &Extension{
 		logger:        opts.Logger,
@@ -395,7 +395,9 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	e.initialRunner.Execute(config, e.LogString)
+	if err := e.initialRunner.Execute(config, e.LogString); err != nil {
+		return "", errors.Wrap(err, "initial run results")
+	}
 
 	return config, nil
 }
@@ -788,30 +790,41 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 }
 
 type initialRunner struct {
-	identifier   string
-	client       Querier
-	db           *bolt.DB
-	mu           sync.RWMutex
-	knownQueries map[string]struct{}
-	hashTable    *crc64.Table
+	identifier string
+	client     Querier
+	db         *bolt.DB
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s string) error) error {
-	// TODO: only unmarshal if checksum changed
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
 		return errors.Wrap(err, "unmarshal osquery config blob")
 	}
 
+	var allQueries []string
+	for packName, pack := range config.Packs {
+		for query, _ := range pack.Queries {
+			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
+			allQueries = append(allQueries, queryName)
+		}
+	}
+
+	toRun, err := i.queriesToRun(allQueries)
+	if err != nil {
+		return errors.Wrap(err, "checking if query should run")
+	}
+
 	var initialRunResults []OsqueryResultLog
 	for packName, pack := range config.Packs {
 		for query, queryContent := range pack.Queries {
-			//  TODO, checksum every query first, save to bolt. this way we only send data once
+			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
+			if _, ok := toRun[queryName]; !ok {
+				continue
+			}
 			resp, err := i.client.Query(queryContent.Query)
 			if err != nil {
-				panic(err)
+				return errors.Wrapf(err, "query for initial run results %s", queryName)
 			}
-			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			initialRunResults = append(initialRunResults, OsqueryResultLog{
 				Name:           queryName,
 				HostIdentifier: i.identifier,
@@ -832,5 +845,39 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 	}
 
+	if err := i.cacheRanQueries(toRun); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{}, error) {
+	known := make(map[string]struct{})
+	err := i.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(initialResultsBucket))
+		for _, q := range allFromConfig {
+			knownQuery := b.Get([]byte(q))
+			if knownQuery != nil {
+				continue
+			}
+			known[q] = struct{}{}
+		}
+		return nil
+	})
+
+	return known, errors.Wrap(err, "check bolt for queries to run")
+}
+
+func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
+	err := i.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(initialResultsBucket))
+		for q := range known {
+			if err := b.Put([]byte(q), []byte(q)); err != nil {
+				return errors.Wrapf(err, "cache initial result query %q", q)
+			}
+		}
+		return nil
+	})
+	return errors.Wrap(err, "caching known initial result queries")
 }
