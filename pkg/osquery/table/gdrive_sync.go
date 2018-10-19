@@ -53,7 +53,11 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 
 	db.Exec("PRAGMA journal_mode=WAL;")
 
-	rows, err := db.Query("SELECT entry_key, data_key, data_value FROM data")
+	rows, err := db.Query(
+		`SELECT entry_key, data_value
+		FROM data
+		WHERE entry_key = 'user_email' OR entry_key='local_sync_root_path'
+			AND data_value IS NOT NULL`)
 	if err != nil {
 		return nil, errors.Wrap(err, "query rows from gdrive sync config db")
 	}
@@ -63,19 +67,18 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 	var localsyncpath string
 	for rows.Next() {
 		var (
-			entry_key  string
-			data_key   string
-			data_value string
+			entryKey  string
+			dataValue string
 		)
-		if err := rows.Scan(&entry_key, &data_key, &data_value); err != nil {
+		if err := rows.Scan(&entryKey, &dataValue); err != nil {
 			return nil, errors.Wrap(err, "scanning gdrive sync config db row")
 		}
 
-		switch entry_key {
+		switch entryKey {
 		case "user_email":
-			email = data_value
+			email = dataValue
 		case "local_sync_root_path":
-			localsyncpath = data_value
+			localsyncpath = dataValue
 		default:
 			continue
 		}
