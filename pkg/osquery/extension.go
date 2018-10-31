@@ -143,6 +143,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}
 
 	return &Extension{
+		logger:        opts.Logger,
 		serviceClient: client,
 		db:            db,
 		Opts:          opts,
