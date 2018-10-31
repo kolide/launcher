@@ -109,6 +109,11 @@ func runMake(args []string) error {
 			env.String("ROOT_PEM", ""),
 			"Path to PEM file including root certificates to verify against",
 		)
+		flOutputDir = flagset.String(
+			"output_dir",
+			env.String("OUTPUT_DIR", ""),
+			"Directory to output package files to",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -165,6 +170,7 @@ func runMake(args []string) error {
 		*flSystemd,
 		*flCertPins,
 		*flRootPEM,
+		*flOutputDir,
 	)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")

@@ -48,6 +48,7 @@ func CreatePackages(
 	systemd bool,
 	certPins,
 	rootPEM string,
+	outputPathDir string,
 ) (*PackagePaths, error) {
 	macPkgDestinationPath, err := CreateMacPackage(
 		packageVersion,
@@ -66,6 +67,7 @@ func CreatePackages(
 		omitSecret,
 		certPins,
 		rootPEM,
+		outputPathDir,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
@@ -88,6 +90,7 @@ func CreatePackages(
 		systemd,
 		certPins,
 		rootPEM,
+		outputPathDir,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
@@ -149,6 +152,7 @@ func CreateLinuxPackages(
 	systemd bool,
 	certPins,
 	rootPEM string,
+	outputPathDir string,
 ) (string, string, error) {
 	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
@@ -277,9 +281,15 @@ sudo service launcher restart`
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
-	outputPathDir, err := ioutil.TempDir("/tmp", "packages_")
-	if err != nil {
-		return "", "", errors.Wrap(err, "could not create final output directory for package")
+	if outputPathDir == "" {
+		outputPathDir, err = ioutil.TempDir("/tmp", "packages_")
+		if err != nil {
+			return "", "", errors.Wrap(err, "could not create final output directory for package")
+		}
+	}
+
+	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
+		return "", "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
 	}
 
 	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", packageVersion)
@@ -357,6 +367,7 @@ func CreateMacPackage(
 	omitSecret bool,
 	certPins,
 	rootPEM string,
+	outputPathDir string,
 ) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
@@ -522,7 +533,17 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "rendering newsyslog.d config")
 	}
 
-	outputPathDir, err := ioutil.TempDir("/tmp", "packaging_")
+	if outputPathDir == "" {
+		outputPathDir, err = ioutil.TempDir("/tmp", "packaging_")
+		if err != nil {
+			return "", errors.Wrap(err, "could not create final output directory for package")
+		}
+	}
+
+	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
+		return "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
+	}
+
 	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
