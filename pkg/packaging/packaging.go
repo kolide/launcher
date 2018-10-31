@@ -288,6 +288,10 @@ sudo service launcher restart`
 		}
 	}
 
+	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
+		return "", "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
+	}
+
 	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", packageVersion)
 	debOutputPath := filepath.Join(outputPathDir, debOutputFilename)
 
@@ -534,6 +538,10 @@ func CreateMacPackage(
 		if err != nil {
 			return "", errors.Wrap(err, "could not create final output directory for package")
 		}
+	}
+
+	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
+		return "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
 	}
 
 	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion))
