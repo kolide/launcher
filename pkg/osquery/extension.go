@@ -306,6 +306,10 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
 	config, err := e.generateConfigsWithReenroll(ctx, true)
 	if err != nil {
+		level.Debug(e.logger).Log(
+			"msg", "generating configs with reenroll failed",
+			"err", err,
+		)
 		// Try to use cached config
 		var confBytes []byte
 		e.db.View(func(tx *bolt.Tx) error {
