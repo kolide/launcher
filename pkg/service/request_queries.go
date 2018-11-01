@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -63,10 +63,11 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 			},
 		)
 	}
-	return &pb.QueryCollection{
+	resp := &pb.QueryCollection{
 		Queries:     queries,
 		NodeInvalid: req.NodeInvalid,
-	}, nil
+	}
+	return encodeResponse(req.Err, resp)
 }
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
@@ -100,7 +101,7 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
 	_, rep, err := s.queries.ServeGRPC(ctx, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "request queries")
+		return nil, err
 	}
 	return rep.(*pb.QueryCollection), nil
 }
@@ -109,7 +110,11 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
-		mw.logger.Log(
+		logger := level.Debug(mw.logger)
+		if err != nil {
+			logger = level.Info(mw.logger)
+		}
+		logger.Log(
 			"method", "RequestQueries",
 			"uuid", uuid,
 			"res", string(resJSON),

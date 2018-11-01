@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/logger"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -89,11 +89,12 @@ func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (inte
 
 func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(publishLogsResponse)
-	return &pb.AgentApiResponse{
+	resp := &pb.AgentApiResponse{
 		Message:     req.Message,
 		ErrorCode:   req.ErrorCode,
 		NodeInvalid: req.NodeInvalid,
-	}, nil
+	}
+	return encodeResponse(req.Err, resp)
 }
 
 func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
@@ -125,7 +126,7 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*pb.AgentApiResponse, error) {
 	_, rep, err := s.logs.ServeGRPC(ctx, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "publish logs")
+		return nil, err
 	}
 	return rep.(*pb.AgentApiResponse), nil
 }
@@ -133,7 +134,11 @@ func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*p
 func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		mw.logger.Log(
+		logger := level.Debug(mw.logger)
+		if err != nil {
+			logger = level.Info(mw.logger)
+		}
+		logger.Log(
 			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,
