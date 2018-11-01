@@ -49,11 +49,8 @@ func MakeServerEndpoints(svc KolideService) Endpoints {
 	}
 }
 
-func NewGRPCServer(endpoints Endpoints, logger log.Logger) pb.ApiServer {
-	options := []grpctransport.ServerOption{
-		grpctransport.ServerErrorLogger(logger),
-		parseUUID(),
-	}
+func NewGRPCServer(endpoints Endpoints, logger log.Logger, options ...grpctransport.ServerOption) pb.ApiServer {
+	options = append(options, parseUUID())
 	return &grpcServer{
 		enrollment: grpctransport.NewServer(
 			endpoints.RequestEnrollmentEndpoint,

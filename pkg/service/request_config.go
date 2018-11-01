@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -45,10 +45,11 @@ func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface
 
 func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(configResponse)
-	return &pb.ConfigResponse{
+	resp := &pb.ConfigResponse{
 		ConfigJsonBlob: req.ConfigJSONBlob,
 		NodeInvalid:    req.NodeInvalid,
-	}, nil
+	}
+	return encodeResponse(resp, req.Err)
 }
 
 func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
@@ -79,7 +80,7 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, b
 func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest) (*pb.ConfigResponse, error) {
 	_, rep, err := s.config.ServeGRPC(ctx, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "request config")
+		return nil, err
 	}
 	return rep.(*pb.ConfigResponse), nil
 }
@@ -87,10 +88,14 @@ func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest)
 func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		mw.logger.Log(
+		logger := level.Debug(mw.logger)
+		if err != nil {
+			logger = level.Info(mw.logger)
+		}
+		logger.Log(
 			"method", "RequestConfig",
 			"uuid", uuid,
-			"config", config,
+			"config_size", len(config),
 			"reauth", reauth,
 			"err", err,
 			"took", time.Since(begin),

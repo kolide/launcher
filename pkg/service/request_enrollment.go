@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -95,10 +95,11 @@ func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (inter
 
 func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentResponse)
-	return &pb.EnrollmentResponse{
+	resp := &pb.EnrollmentResponse{
 		NodeKey:     req.NodeKey,
 		NodeInvalid: req.NodeInvalid,
-	}, nil
+	}
+	return encodeResponse(resp, req.Err)
 }
 
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
@@ -133,7 +134,7 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
 	_, rep, err := s.enrollment.ServeGRPC(ctx, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "request enrollment")
+		return nil, err
 	}
 	return rep.(*pb.EnrollmentResponse), nil
 }
@@ -141,16 +142,26 @@ func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRe
 func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		mw.logger.Log(
+
+		keyvals := []interface{}{
 			"method", "RequestEnrollment",
 			"uuid", uuid,
-			"enrollSecret", enrollSecret,
 			"hostIdentifier", hostIdentifier,
-			"nodekey", nodekey,
 			"reauth", reauth,
 			"err", err,
 			"took", time.Since(begin),
-		)
+		}
+
+		logger := level.Debug(mw.logger)
+		if err != nil {
+			logger = level.Info(mw.logger)
+			keyvals = append(keyvals,
+				"enrollSecret", enrollSecret,
+				"nodekey", nodekey,
+			)
+		}
+		logger.Log(keyvals...)
+
 	}(time.Now())
 
 	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
