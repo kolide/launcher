@@ -112,7 +112,12 @@ func runMake(args []string) error {
 		flOutputDir = flagset.String(
 			"output_dir",
 			env.String("OUTPUT_DIR", ""),
-			"Directory to output package files to",
+			"Directory to output package files to (default: random)",
+		)
+		flCacheDir = flagset.String(
+			"cache_dir",
+			env.String("CACHE_DIR", ""),
+			"Directory to cache downloads in (default: random)",
 		)
 	)
 
@@ -171,6 +176,7 @@ func runMake(args []string) error {
 		*flCertPins,
 		*flRootPEM,
 		*flOutputDir,
+		*flCacheDir,
 	)
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")

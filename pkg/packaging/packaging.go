@@ -49,6 +49,7 @@ func CreatePackages(
 	certPins,
 	rootPEM string,
 	outputPathDir string,
+	cacheDir string,
 ) (*PackagePaths, error) {
 	macPkgDestinationPath, err := CreateMacPackage(
 		packageVersion,
@@ -68,6 +69,7 @@ func CreatePackages(
 		certPins,
 		rootPEM,
 		outputPathDir,
+		cacheDir,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
@@ -91,6 +93,7 @@ func CreatePackages(
 		certPins,
 		rootPEM,
 		outputPathDir,
+		cacheDir,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
@@ -153,6 +156,7 @@ func CreateLinuxPackages(
 	certPins,
 	rootPEM string,
 	outputPathDir string,
+	cacheDir string,
 ) (string, string, error) {
 	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
@@ -193,7 +197,7 @@ func CreateLinuxPackages(
 	// installation:
 
 	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(osqueryVersion, "linux")
+	osquerydPath, err := FetchOsquerydBinary(cacheDir, osqueryVersion, "linux")
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
@@ -368,6 +372,7 @@ func CreateMacPackage(
 	certPins,
 	rootPEM string,
 	outputPathDir string,
+	cacheDir string,
 ) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
@@ -413,7 +418,7 @@ func CreateMacPackage(
 	// installation:
 
 	// The initial osqueryd binary
-	localOsquerydPath, err := FetchOsquerydBinary(osqueryVersion, "darwin")
+	localOsquerydPath, err := FetchOsquerydBinary(cacheDir, osqueryVersion, "darwin")
 	if err != nil {
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
