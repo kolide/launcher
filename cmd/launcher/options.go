@@ -18,14 +18,15 @@ import (
 // options is the set of configurable options that may be set when launching this
 // program
 type options struct {
-	kolideServerURL  string
-	enrollSecret     string
-	enrollSecretPath string
-	rootDirectory    string
-	osquerydPath     string
-	certPins         [][]byte
-	rootPEM          string
-	loggingInterval  time.Duration
+	kolideServerURL     string
+	enrollSecret        string
+	enrollSecretPath    string
+	rootDirectory       string
+	osquerydPath        string
+	certPins            [][]byte
+	rootPEM             string
+	loggingInterval     time.Duration
+	enableInitialRunner bool
 
 	control           bool
 	controlServerURL  string
@@ -174,6 +175,13 @@ func parseOptions() (*options, error) {
 			env.Bool("KOLIDE_LAUNCHER_DEV_HELP", false),
 			"Print full Launcher help, including developer options",
 		)
+
+		// Enable Initial Runner: launcher --with_initial_runner
+		flInitialRunner = flag.Bool(
+			"with_initial_runner",
+			env.Bool("KOLIDE_LAUNCHER_INITIAL_RUNNER", false),
+			"Run differential queries from config ahead of scheduled interval.",
+		)
 	)
 
 	flag.Usage = usage
@@ -216,28 +224,29 @@ func parseOptions() (*options, error) {
 	}
 
 	opts := &options{
-		kolideServerURL:    *flKolideServerURL,
-		control:            *flControl,
-		controlServerURL:   *flControlServerURL,
-		getShellsInterval:  *flGetShellsInterval,
-		enrollSecret:       *flEnrollSecret,
-		enrollSecretPath:   *flEnrollSecretPath,
-		rootDirectory:      *flRootDirectory,
-		osquerydPath:       osquerydPath,
-		certPins:           certPins,
-		rootPEM:            *flRootPEM,
-		loggingInterval:    *flLoggingInterval,
-		autoupdate:         *flAutoupdate,
-		printVersion:       *flVersion,
-		developerUsage:     *flDeveloperUsage,
-		debug:              *flDebug,
-		disableControlTLS:  *flDisableControlTLS,
-		insecureTLS:        *flInsecureTLS,
-		insecureGRPC:       *flInsecureGRPC,
-		notaryServerURL:    *flNotaryServerURL,
-		mirrorServerURL:    *flMirrorURL,
-		autoupdateInterval: *flAutoupdateInterval,
-		updateChannel:      updateChannel,
+		kolideServerURL:     *flKolideServerURL,
+		control:             *flControl,
+		controlServerURL:    *flControlServerURL,
+		getShellsInterval:   *flGetShellsInterval,
+		enrollSecret:        *flEnrollSecret,
+		enrollSecretPath:    *flEnrollSecretPath,
+		rootDirectory:       *flRootDirectory,
+		osquerydPath:        osquerydPath,
+		certPins:            certPins,
+		rootPEM:             *flRootPEM,
+		loggingInterval:     *flLoggingInterval,
+		enableInitialRunner: *flInitialRunner,
+		autoupdate:          *flAutoupdate,
+		printVersion:        *flVersion,
+		developerUsage:      *flDeveloperUsage,
+		debug:               *flDebug,
+		disableControlTLS:   *flDisableControlTLS,
+		insecureTLS:         *flInsecureTLS,
+		insecureGRPC:        *flInsecureGRPC,
+		notaryServerURL:     *flNotaryServerURL,
+		mirrorServerURL:     *flMirrorURL,
+		autoupdateInterval:  *flAutoupdateInterval,
+		updateChannel:       updateChannel,
 	}
 	return opts, nil
 }

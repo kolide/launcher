@@ -64,9 +64,10 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 
 	// create the osquery extension
 	extOpts := osquery.ExtensionOpts{
-		EnrollSecret:    enrollSecret,
-		Logger:          logger,
-		LoggingInterval: opts.loggingInterval,
+		EnrollSecret:                      enrollSecret,
+		Logger:                            logger,
+		LoggingInterval:                   opts.loggingInterval,
+		RunDifferentialQueriesImmediately: opts.enableInitialRunner,
 	}
 
 	// create the extension

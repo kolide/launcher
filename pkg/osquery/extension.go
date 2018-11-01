@@ -103,6 +103,9 @@ type ExtensionOpts struct {
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
+	// RunDifferentialQueriesImmediately allows the client to execute a new query the first time it sees it,
+	// bypassing the scheduler.
+	RunDifferentialQueriesImmediately bool
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
@@ -156,7 +159,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
-	initialRunner := &initialRunner{identifier: identifier, db: db}
+	initialRunner := &initialRunner{identifier: identifier, db: db, enabled: opts.RunDifferentialQueriesImmediately}
 
 	return &Extension{
 		logger:        opts.Logger,
@@ -790,6 +793,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 }
 
 type initialRunner struct {
+	enabled    bool
 	identifier string
 	client     Querier
 	db         *bolt.DB
@@ -803,7 +807,11 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 	var allQueries []string
 	for packName, pack := range config.Packs {
-		for query, _ := range pack.Queries {
+		for query, content := range pack.Queries {
+			if content.Snapshot != nil && *content.Snapshot {
+				// only deal with differential pack queries
+				continue
+			}
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			allQueries = append(allQueries, queryName)
 		}
@@ -816,6 +824,9 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 	var initialRunResults []OsqueryResultLog
 	for packName, pack := range config.Packs {
+		if !i.enabled { // only execute them when the plugin is enabled.
+			break
+		}
 		for query, queryContent := range pack.Queries {
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			if _, ok := toRun[queryName]; !ok {
@@ -845,6 +856,8 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 	}
 
+	// note: caching would happen always on first use, even if the runner is not enabled.
+	// This avoids the problem of queries not being known even though they've been in the config for a long time.
 	if err := i.cacheRanQueries(toRun); err != nil {
 		return err
 	}
