@@ -231,7 +231,7 @@ func NodeKeyFromDB(db *bolt.DB) (string, error) {
 	}
 }
 
-func isGRPCInvalid(err error) bool {
+func isNodeInvalidErr(err error) bool {
 	err = errors.Cause(err)
 	if se, ok := err.(interface{ GRPCStatus() *status.Status }); ok {
 		return se.GRPCStatus().Code() == codes.Unauthenticated
@@ -278,7 +278,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// If no cached node key, enroll for new node key
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
-	if isGRPCInvalid(err) {
+	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
@@ -356,7 +356,7 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
-	if isGRPCInvalid(err) {
+	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
 		return "", errors.Wrap(err, "transport error retrieving config")
@@ -526,7 +526,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
-	if isGRPCInvalid(err) {
+	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
 		return errors.Wrap(err, "transport error sending logs")
@@ -641,7 +641,7 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
-	if isGRPCInvalid(err) {
+	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
 		return nil, errors.Wrap(err, "transport error getting queries")
@@ -677,7 +677,7 @@ func (e *Extension) WriteResults(ctx context.Context, results []distributed.Resu
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
-	if isGRPCInvalid(err) {
+	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
 		return errors.Wrap(err, "transport error writing results")

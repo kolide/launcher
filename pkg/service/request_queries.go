@@ -67,7 +67,7 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 		Queries:     queries,
 		NodeInvalid: req.NodeInvalid,
 	}
-	return encodeResponse(req.Err, resp)
+	return encodeResponse(resp, req.Err)
 }
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {

@@ -16,7 +16,7 @@ func isNodeInvalidErr(err error) bool {
 	return ok && oe.NodeInvalid()
 }
 
-func encodeResponse(err error, resp interface{}) (interface{}, error) {
+func encodeResponse(resp interface{}, err error) (interface{}, error) {
 	switch {
 	case err == nil:
 		return resp, nil

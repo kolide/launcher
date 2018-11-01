@@ -49,7 +49,7 @@ func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 		ConfigJsonBlob: req.ConfigJSONBlob,
 		NodeInvalid:    req.NodeInvalid,
 	}
-	return encodeResponse(req.Err, resp)
+	return encodeResponse(resp, req.Err)
 }
 
 func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {

@@ -104,7 +104,7 @@ func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (i
 		ErrorCode:   req.ErrorCode,
 		NodeInvalid: req.NodeInvalid,
 	}
-	return encodeResponse(req.Err, resp)
+	return encodeResponse(resp, req.Err)
 }
 
 func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {

@@ -99,7 +99,7 @@ func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (inter
 		NodeKey:     req.NodeKey,
 		NodeInvalid: req.NodeInvalid,
 	}
-	return encodeResponse(req.Err, resp)
+	return encodeResponse(resp, req.Err)
 }
 
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
