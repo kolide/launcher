@@ -313,7 +313,7 @@ func main() {
 	if opts.control {
 		control, err := createControl(ctx, db, logger, opts)
 		if err != nil {
-			logger.Fatal(errors.Wrap(err, "creating control actor"))
+			logger.Fatal("err", errors.Wrap(err, "creating control actor"))
 		}
 		runGroup.Add(control.Execute, control.Interrupt)
 	}
@@ -333,14 +333,14 @@ func main() {
 		// create an updater for osquery
 		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, runnerRestart, logger, config)
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatal("err", err)
 		}
 		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
 
 		// create an updater for launcher
 		launcherPath, err := os.Executable()
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatal("err", err)
 		}
 		launcherUpdater, err := createUpdater(
 			ctx,
@@ -350,7 +350,7 @@ func main() {
 			config,
 		)
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatal("err", err)
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
@@ -372,7 +372,7 @@ func main() {
 
 	// start the rungroup
 	if err := runGroup.Run(); err != nil {
-		logger.Fatal(err)
+		logger.Fatal("err", err)
 	}
 
 }
