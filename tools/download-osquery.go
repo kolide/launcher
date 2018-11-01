@@ -15,6 +15,7 @@ func main() {
 		flVersion  = flag.String("version", env.String("VERSION", "stable"), "the osqueryd version to download")
 		flPlatform = flag.String("platform", env.String("PLATFORM", ""), "the platform to download osqueryd for (ie: darwin, linux)")
 		flOutput   = flag.String("output", env.String("OUTPUT", ""), "the path where the binary should be output")
+		flCacheDir = flag.String("cache_dir", env.String("CACHE_DIR", ""), "Directory to cache downloads in (default: random)")
 	)
 	flag.Parse()
 
@@ -23,7 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	path, err := packaging.FetchOsquerydBinary(*flVersion, *flPlatform)
+	path, err := packaging.FetchOsquerydBinary(*flCacheDir, *flVersion, *flPlatform)
 	if err != nil {
 		fmt.Println("An error occurred fetching the osqueryd binary: ", err)
 		os.Exit(1)

@@ -37,7 +37,7 @@ func osqueryBinaryPath(osqueryVersion, osqueryPlatform string) string {
 // FetchOsquerydBinary will synchronously download an osquery binary as per the
 // supplied desired osquery version and platform identifiers. The path to the
 // downloaded binary is returned and an error if the operation did not succeed.
-func FetchOsquerydBinary(osqueryVersion, osqueryPlatform string) (string, error) {
+func FetchOsquerydBinary(localCacheDir, osqueryVersion, osqueryPlatform string) (string, error) {
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
 		if err := populateLocalCacheDir(); err != nil {
