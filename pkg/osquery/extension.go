@@ -1,8 +1,11 @@
 package osquery
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -33,12 +36,16 @@ type Extension struct {
 	logger        log.Logger
 
 	osqueryClient Querier
+	initialRunner *initialRunner
 }
 
 // SetQuerier sets an osquery client on the extension, allowing
 // the extension to query the running osqueryd instance.
 func (e *Extension) SetQuerier(client Querier) {
 	e.osqueryClient = client
+	if e.initialRunner != nil {
+		e.initialRunner.client = client
+	}
 }
 
 // Querier allows querying osquery.
@@ -48,7 +55,8 @@ type Querier interface {
 
 const (
 	// Bucket name to use for launcher configuration.
-	configBucket = "config"
+	configBucket         = "config"
+	initialResultsBucket = "initial_results"
 	// Bucket name to use for buffered status logs.
 	statusLogsBucket = "status_logs"
 	// Bucket name to use for buffered result logs.
@@ -95,6 +103,9 @@ type ExtensionOpts struct {
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
+	// RunDifferentialQueriesImmediately allows the client to execute a new query the first time it sees it,
+	// bypassing the scheduler.
+	RunDifferentialQueriesImmediately bool
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
@@ -103,7 +114,7 @@ type ExtensionOpts struct {
 func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
 	// bucketNames contains the names of buckets that should be created when the
 	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket}
+	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket}
 
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
@@ -144,12 +155,19 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		return nil, errors.Wrap(err, "creating DB buckets")
 	}
 
+	identifier, err := IdentifierFromDB(db)
+	if err != nil {
+		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
+	}
+	initialRunner := &initialRunner{identifier: identifier, db: db, enabled: opts.RunDifferentialQueriesImmediately}
+
 	return &Extension{
 		logger:        opts.Logger,
 		serviceClient: client,
 		db:            db,
 		Opts:          opts,
 		done:          make(chan struct{}),
+		initialRunner: initialRunner,
 	}, nil
 }
 
@@ -378,6 +396,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 
 		// Don't attempt reenroll after first attempt
 		return e.generateConfigsWithReenroll(ctx, false)
+	}
+
+	if err := e.initialRunner.Execute(config, e.LogString); err != nil {
+		return "", errors.Wrap(err, "initial run results")
 	}
 
 	return config, nil
@@ -768,4 +790,107 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	details.LauncherVersion = version.Version().Version
 
 	return details, nil
+}
+
+type initialRunner struct {
+	enabled    bool
+	identifier string
+	client     Querier
+	db         *bolt.DB
+}
+
+func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s string) error) error {
+	var config OsqueryConfig
+	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
+		return errors.Wrap(err, "unmarshal osquery config blob")
+	}
+
+	var allQueries []string
+	for packName, pack := range config.Packs {
+		for query, content := range pack.Queries {
+			if content.Snapshot != nil && *content.Snapshot {
+				// only deal with differential pack queries
+				continue
+			}
+			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
+			allQueries = append(allQueries, queryName)
+		}
+	}
+
+	toRun, err := i.queriesToRun(allQueries)
+	if err != nil {
+		return errors.Wrap(err, "checking if query should run")
+	}
+
+	var initialRunResults []OsqueryResultLog
+	for packName, pack := range config.Packs {
+		if !i.enabled { // only execute them when the plugin is enabled.
+			break
+		}
+		for query, queryContent := range pack.Queries {
+			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
+			if _, ok := toRun[queryName]; !ok {
+				continue
+			}
+			resp, err := i.client.Query(queryContent.Query)
+			if err != nil {
+				return errors.Wrapf(err, "query for initial run results %s", queryName)
+			}
+			initialRunResults = append(initialRunResults, OsqueryResultLog{
+				Name:           queryName,
+				HostIdentifier: i.identifier,
+				UnixTime:       int(time.Now().UTC().Unix()),
+				DiffResults:    &DiffResults{Added: resp},
+				Epoch:          0,
+			})
+		}
+	}
+
+	for _, result := range initialRunResults {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(result); err != nil {
+			return errors.Wrap(err, "encoding initial run result")
+		}
+		if err := writeFn(context.Background(), logger.LogTypeString, buf.String()); err != nil {
+			return errors.Wrap(err, "writing encoded initial result log")
+		}
+	}
+
+	// note: caching would happen always on first use, even if the runner is not enabled.
+	// This avoids the problem of queries not being known even though they've been in the config for a long time.
+	if err := i.cacheRanQueries(toRun); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{}, error) {
+	known := make(map[string]struct{})
+	err := i.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(initialResultsBucket))
+		for _, q := range allFromConfig {
+			knownQuery := b.Get([]byte(q))
+			if knownQuery != nil {
+				continue
+			}
+			known[q] = struct{}{}
+		}
+		return nil
+	})
+
+	return known, errors.Wrap(err, "check bolt for queries to run")
+}
+
+func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
+	err := i.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(initialResultsBucket))
+		for q := range known {
+			if err := b.Put([]byte(q), []byte(q)); err != nil {
+				return errors.Wrapf(err, "cache initial result query %q", q)
+			}
+		}
+		return nil
+	})
+	return errors.Wrap(err, "caching known initial result queries")
 }

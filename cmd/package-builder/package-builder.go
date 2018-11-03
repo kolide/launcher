@@ -119,6 +119,11 @@ func runMake(args []string) error {
 			env.String("CACHE_DIR", ""),
 			"Directory to cache downloads in (default: random)",
 		)
+		flInitialRunner = flagset.Bool(
+			"with_initial_runner",
+			env.Bool("ENABLE_INITIAL_RUNNER", false),
+			"Run differential queries from config ahead of scheduled interval.",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -168,6 +173,7 @@ func runMake(args []string) error {
 		*flAutoupdate,
 		*flUpdateChannel,
 		*flControl,
+		*flInitialRunner,
 		*flControlHostname,
 		*flDisableControlTLS,
 		*flIdentifier,
