@@ -82,7 +82,7 @@ xp-launcher: .pre-build .pre-launcher
 .pre-package-builder:
 	$(eval APP_NAME = package-builder)
 
-package-builder: .pre-build xp-launcher xp-extension .pre-package-builder generate
+package-builder: .pre-build xp-codesign .pre-package-builder generate
 	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 .pre-launcher-pummel:
