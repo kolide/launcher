@@ -41,6 +41,7 @@ func CreatePackages(
 	autoupdate bool,
 	updateChannel string,
 	control bool,
+	initialRunner bool,
 	controlHostname string,
 	disableControlTLS bool,
 	identifier string,
@@ -62,6 +63,7 @@ func CreatePackages(
 		autoupdate,
 		updateChannel,
 		control,
+		initialRunner,
 		controlHostname,
 		disableControlTLS,
 		identifier,
@@ -85,6 +87,7 @@ func CreatePackages(
 		autoupdate,
 		updateChannel,
 		control,
+		initialRunner,
 		controlHostname,
 		disableControlTLS,
 		identifier,
@@ -148,6 +151,7 @@ func CreateLinuxPackages(
 	autoupdate bool,
 	updateChannel string,
 	control bool,
+	initialRunner bool,
 	controlHostname string,
 	disableControlTLS bool,
 	identifier string,
@@ -245,6 +249,7 @@ func CreateLinuxPackages(
 		Autoupdate:        autoupdate,
 		UpdateChannel:     updateChannel,
 		Control:           control,
+		InitialRunner:     initialRunner,
 		ControlHostname:   controlHostname,
 		DisableControlTLS: disableControlTLS,
 		CertPins:          certPins,
@@ -365,6 +370,7 @@ func CreateMacPackage(
 	autoupdate bool,
 	updateChannel string,
 	control bool,
+	initialRunner bool,
 	controlHostname string,
 	disableControlTLS bool,
 	identifier string,
@@ -481,6 +487,7 @@ func CreateMacPackage(
 		Autoupdate:        autoupdate,
 		UpdateChannel:     updateChannel,
 		Control:           control,
+		InitialRunner:     initialRunner,
 		ControlHostname:   controlHostname,
 		DisableControlTLS: disableControlTLS,
 		CertPins:          certPins,
@@ -585,6 +592,7 @@ type initTemplateOptions struct {
 	Autoupdate        bool
 	UpdateChannel     string
 	Control           bool
+	InitialRunner     bool
 	ControlHostname   string
 	DisableControlTLS bool
 	CertPins          string
@@ -601,7 +609,8 @@ DAEMON_OPTS="--root_directory={{.RootDirectory}} \
 --hostname={{.ServerHostname}} \
 --enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
 --insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}{{if .Autoupdate}}
+--insecure \{{end}}{{if .InitialRunner}}
+--with_initial_runner \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins}}
 --cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
@@ -666,7 +675,8 @@ ExecStart={{.LauncherPath}} \
 --insecure \{{end}}{{if .Control}}
 --control \
 --control_hostname={{.ControlHostname}} \{{end}}{{if .DisableControlTLS}}
---disable_control_tls \{{end}}{{if .Autoupdate}}
+--disable_control_tls \{{end}}{{if .InitialRunner}}
+--with_initial_runner \{{end}}{{if .Autoupdate}}
 --autoupdate \
 --update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins }}
 --cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
@@ -699,6 +709,7 @@ type launchDaemonTemplateOptions struct {
 	Autoupdate        bool
 	UpdateChannel     string
 	Control           bool
+	InitialRunner     bool
 	ControlHostname   string
 	DisableControlTLS bool
 	CertPins          string
@@ -756,6 +767,9 @@ func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error
 			{{end}}
 			{{if .Control}}
             <string>--control</string>
+			{{end}}
+			{{if .InitialRunner}}
+            <string>--with_initial_runner</string>
 			{{end}}
 			{{if .DisableControlTLS}}
             <string>--disable_control_tls</string>
