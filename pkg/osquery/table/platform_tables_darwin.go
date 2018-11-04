@@ -6,7 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
-	"github.com/kolide/osquery-go"
+	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -29,6 +29,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
 		Spotlight(),
+		UserAvatar(client),
 		legacyexec.TablePlugin(),
 		kextpolicy.TablePlugin(),
 	}
