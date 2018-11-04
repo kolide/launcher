@@ -65,6 +65,9 @@ func (t *userAvatarTable) generateAvatar(ctx context.Context, queryContext table
 	C.Image(&data, C.CString(username))
 	defer C.CFRelease(C.CFTypeRef(data))
 	goBytes := C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(data)), C.int(C.CFDataGetLength(data)))
+	if len(goBytes) == 0 {
+		return nil, errors.Errorf("no avatar result for user %", username)
+	}
 
 	image, err := tiff.Decode(bytes.NewBuffer(goBytes))
 	if err != nil {
