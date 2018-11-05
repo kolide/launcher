@@ -403,7 +403,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	if err := e.initialRunner.Execute(config, e.LogString); err != nil {
+	if err := e.initialRunner.Execute(config, e.writeLogsWithReenroll); err != nil {
 		return "", errors.Wrap(err, "initial run results")
 	}
 
@@ -805,7 +805,7 @@ type initialRunner struct {
 	db         *bolt.DB
 }
 
-func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s string) error) error {
+func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s []string, reeenroll bool) error) error {
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
 		return errors.Wrap(err, "unmarshal osquery config blob")
@@ -862,12 +862,15 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 	}
 
+	cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	for _, result := range initialRunResults {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(result); err != nil {
 			return errors.Wrap(err, "encoding initial run result")
 		}
-		if err := writeFn(context.Background(), logger.LogTypeString, buf.String()); err != nil {
+		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
 			return errors.Wrap(err, "writing encoded initial result log")
 		}
 	}
