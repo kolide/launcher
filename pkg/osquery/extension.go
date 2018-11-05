@@ -159,7 +159,12 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
-	initialRunner := &initialRunner{identifier: identifier, db: db, enabled: opts.RunDifferentialQueriesImmediately}
+	initialRunner := &initialRunner{
+		logger:     opts.Logger,
+		identifier: identifier,
+		db:         db,
+		enabled:    opts.RunDifferentialQueriesImmediately,
+	}
 
 	return &Extension{
 		logger:        opts.Logger,
@@ -793,6 +798,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 }
 
 type initialRunner struct {
+	logger     log.Logger
 	enabled    bool
 	identifier string
 	client     Querier
@@ -833,9 +839,19 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 				continue
 			}
 			resp, err := i.client.Query(queryContent.Query)
+			// returning here causes the rest of the queries not to run
+			// this is a bummer because often configs have queries with bad syntax/tables that do not exist.
+			// log the error and move on.
+			// using debug to not fill disks. the worst that will happen is that the result will come in later.
+			level.Debug(i.logger).Log(
+				"msg", "querying for initial results",
+				"query_name", queryName,
+				"err", err,
+			)
 			if err != nil {
-				return errors.Wrapf(err, "query for initial run results %s", queryName)
+				continue
 			}
+
 			initialRunResults = append(initialRunResults, OsqueryResultLog{
 				Name:           queryName,
 				HostIdentifier: i.identifier,
