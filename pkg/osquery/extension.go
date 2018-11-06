@@ -871,7 +871,12 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			return errors.Wrap(err, "encoding initial run result")
 		}
 		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
-			return errors.Wrap(err, "writing encoded initial result log")
+			level.Debug(i.logger).Log(
+				"msg", "writing initial result log to server",
+				"query_name", result.Name,
+				"err", err,
+			)
+			continue
 		}
 	}
 
