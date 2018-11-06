@@ -805,7 +805,7 @@ type initialRunner struct {
 	db         *bolt.DB
 }
 
-func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, s []string, reeenroll bool) error) error {
+func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
 		return errors.Wrap(err, "unmarshal osquery config blob")
@@ -847,8 +847,9 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 				"msg", "querying for initial results",
 				"query_name", queryName,
 				"err", err,
+				"results", len(resp),
 			)
-			if err != nil {
+			if err != nil || len(resp) == 0 {
 				continue
 			}
 
@@ -857,7 +858,6 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 				HostIdentifier: i.identifier,
 				UnixTime:       int(time.Now().UTC().Unix()),
 				DiffResults:    &DiffResults{Added: resp},
-				Epoch:          0,
 			})
 		}
 	}
