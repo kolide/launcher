@@ -515,7 +515,13 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			} else {
 				logs = append(logs, string(v))
 				totalBytes += len(v)
-				logIDs = append(logIDs, k)
+
+				// create a copy of k. It is retained in logIDs after the transaction is closed,
+				// when the goroutine ticks it zeroes out some of the IDs to delete below, causing logs
+				// to remain in the buffer and be sent again to the server.
+				logID := make([]byte, len(k))
+				copy(logID, k)
+				logIDs = append(logIDs, logID)
 			}
 			k, v = c.Next()
 		}
