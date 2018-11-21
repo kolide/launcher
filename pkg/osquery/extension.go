@@ -812,9 +812,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["hardware_model"]; ok {
 		details.HardwareModel = val
 	}
-	if val, ok := resp[0]["hardware_serial"]; ok {
-		details.HardwareSerial = val
-	}
+	details.HardwareSerial = serialForRow(resp[0])
 	if val, ok := resp[0]["hardware_vendor"]; ok {
 		details.HardwareVendor = val
 	}
