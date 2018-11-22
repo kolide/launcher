@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "control.go",
+        "option.go",
+        "shells.go",
+    ],
+    importpath = "github.com/kolide/launcher/pkg/control",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/osquery:go_default_library",
+        "//pkg/ptycmd:go_default_library",
+        "//pkg/webtty:go_default_library",
+        "//pkg/wsrelay:go_default_library",
+        "@com_github_boltdb_bolt//:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+    ],
+)

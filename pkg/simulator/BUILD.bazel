@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "hosts.go",
+        "simulator.go",
+    ],
+    importpath = "github.com/kolide/launcher/pkg/simulator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/service:go_default_library",
+        "@com_github_ghodss_yaml//:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/distributed:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/logger:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//credentials:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "hosts_test.go",
+        "simulator_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

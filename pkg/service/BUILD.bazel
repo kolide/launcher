@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "check_health.go",
+        "client.go",
+        "error_handling.go",
+        "middleware.go",
+        "publish_logs.go",
+        "publish_results.go",
+        "request_config.go",
+        "request_enrollment.go",
+        "request_queries.go",
+        "server.go",
+        "service.go",
+    ],
+    importpath = "github.com/kolide/launcher/pkg/service",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/pb/launcher:go_default_library",
+        "@com_github_go_kit_kit//endpoint:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_go_kit_kit//transport/grpc:go_default_library",
+        "@com_github_kolide_kit//contexts/uuid:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/distributed:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/logger:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//codes:go_default_library",
+        "@org_golang_google_grpc//credentials:go_default_library",
+        "@org_golang_google_grpc//metadata:go_default_library",
+        "@org_golang_google_grpc//status:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["dial_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//credentials:go_default_library",
+    ],
+)

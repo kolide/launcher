@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["osquery-extension.go"],
+    importpath = "github.com/kolide/launcher/cmd/osquery-extension",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "osquery-extension",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["grpc.go"],
+    importpath = "github.com/kolide/launcher/cmd/grpc.ext",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/log:go_default_library",
+        "//pkg/osquery:go_default_library",
+        "//pkg/service:go_default_library",
+        "@com_github_boltdb_bolt//:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_kolide_kit//env:go_default_library",
+        "@com_github_kolide_osquery_go//:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/config:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/distributed:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/logger:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "grpc.ext",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

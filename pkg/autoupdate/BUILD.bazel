@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "autoupdate.go",
+        "bindata.go",
+    ],
+    importpath = "github.com/kolide/launcher/pkg/autoupdate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/osquery:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_kolide_kit//fs:go_default_library",
+        "@com_github_kolide_updater//tuf:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["autoupdate_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/osquery:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

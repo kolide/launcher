@@ -1,0 +1,46 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "extension.go",
+        "osquery.go",
+        "platform.go",
+    ],
+    importpath = "github.com/kolide/launcher/pkg/osquery",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/service:go_default_library",
+        "@com_github_boltdb_bolt//:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_google_uuid//:go_default_library",
+        "@com_github_kolide_kit//version:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/distributed:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/logger:go_default_library",
+        "@com_github_mixer_clock//:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+        "@org_golang_google_grpc//codes:go_default_library",
+        "@org_golang_google_grpc//status:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "extension_test.go",
+        "platform_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/service:go_default_library",
+        "//pkg/service/mock:go_default_library",
+        "@com_github_boltdb_bolt//:go_default_library",
+        "@com_github_kolide_kit//testutil:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/distributed:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/logger:go_default_library",
+        "@com_github_mixer_clock//:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

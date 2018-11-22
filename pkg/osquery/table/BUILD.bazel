@@ -1,0 +1,77 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "SUSharedPrefs.h",
+        "airdrop_darwin.go",
+        "best_practices.go",
+        "chrome_login_keychain.go",
+        "chrome_state_darwin.go",
+        "chrome_state_linux.go",
+        "chrome_state_windows.go",
+        "corefoundation_helpers_darwin.go",
+        "email_addresses.go",
+        "gdrive_sync.go",
+        "gdrive_sync_history.go",
+        "kolide_vulnerabilities.go",
+        "launcher_identifier.go",
+        "launcher_info.go",
+        "macho.go",
+        "mdfind_darwin.go",
+        "mdm.go",
+        "munki_darwin.go",
+        "onepassword_config.go",
+        "platform_tables.go",
+        "platform_tables_darwin.go",
+        "spotlight.go",
+        "sus_darwin.go",
+        "table.go",
+        "table_util.go",
+    ],
+    cgo = True,
+    clinkopts = select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "-framework Cocoa",
+        ],
+        "//conditions:default": [],
+    }),
+    copts = select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "-DDARWIN -x objective-c",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/kolide/launcher/pkg/osquery/table",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/osquery:go_default_library",
+        "@com_github_boltdb_bolt//:go_default_library",
+        "@com_github_go_kit_kit//log:go_default_library",
+        "@com_github_go_kit_kit//log/level:go_default_library",
+        "@com_github_groob_plist//:go_default_library",
+        "@com_github_kolide_kit//fs:go_default_library",
+        "@com_github_kolide_kit//version:go_default_library",
+        "@com_github_kolide_osquery_go//:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/table:go_default_library",
+        "@com_github_mattn_go_sqlite3//:go_default_library",
+        "@com_github_pkg_errors//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "best_practices_test.go",
+        "mdm_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "@com_github_kolide_osquery_go//:go_default_library",
+        "@com_github_kolide_osquery_go//gen/osquery:go_default_library",
+        "@com_github_kolide_osquery_go//mock:go_default_library",
+        "@com_github_kolide_osquery_go//plugin/table:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

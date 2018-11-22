@@ -1,5 +1,5 @@
 vendor
-build
+/build/
 bin
 .DS_Store
 
@@ -25,3 +25,6 @@ pkg/autoupdate/assets/
 pkg/autoupdate/bindata.go
 tools/notary/config/private
 tools/notary/config/tuf
+
+# Bazel out
+/bazel-*
