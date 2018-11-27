@@ -93,6 +93,19 @@ package-builder: .pre-build xp-codesign .pre-package-builder generate
 launcher-pummel:
 	go build -o build/launcher-pummel -ldflags ${KIT_VERSION} ./cmd/launcher-pummel/
 
+GOTOOLS=$(shell cat pkg/tools/tools.go | awk '/_ /{print $$2}' |  tr -d '"')
+
+install-tools: $(patsubst %, %-go-tool, $(GOTOOLS))
+reinstall-tools: $(patsubst %, %-go-tool-force, $(GOTOOLS))
+
+%-go-tool: GOTOOLBIN = $(lastword $(subst /, , $*))
+%-go-tool: go-mod-download
+	command -v $(GOTOOLBIN) 2> /dev/null || go install $*
+
+%-go-tool-force: GOTOOLBIN = $(lastword $(subst /, , $*))
+%-go-tool-force: go-mod-download
+	rm -f $(GOTOOLBIN)
+	go install $*
 
 go-mod-check:
 	@go help mod > /dev/null || (echo "Your go is too old, no modules. Seek help." && exit 1)
@@ -100,7 +113,7 @@ go-mod-check:
 go-mod-download:
 	go mod download
 
-deps-go: go-mod-check go-mod-download
+deps-go: go-mod-check go-mod-download install-tools
 
 deps: deps-go generate
 
