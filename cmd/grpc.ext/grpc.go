@@ -4,14 +4,13 @@ import (
 	"context"
 	"crypto/x509"
 	"flag"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
-	kolidelog "github.com/kolide/launcher/pkg/log"
+	"github.com/kolide/kit/logutil"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/kolide/osquery-go"
@@ -35,14 +34,11 @@ func main() {
 	// allow for osqueryd to create the socket path
 	time.Sleep(2 * time.Second)
 
-	logger := kolidelog.NewLogger(os.Stderr)
-	if *flVerbose {
-		logger.AllowDebug()
-	}
+	logger := logutil.NewServerLogger(*flVerbose)
 
 	client, err := osquery.NewClient(*flSocketPath, timeout)
 	if err != nil {
-		logger.Fatal("err", err, "creating osquery extension client")
+		logutil.Fatal(logger, "err", err, "creating osquery extension client")
 	}
 
 	var (
@@ -68,7 +64,7 @@ func main() {
 		logger,
 	)
 	if err != nil {
-		logger.Fatal("err", err, "failed to connect to grpc host")
+		logutil.Fatal(logger, "err", err, "failed to connect to grpc host")
 	}
 	remote := service.New(conn, level.Debug(logger))
 
@@ -80,13 +76,13 @@ func main() {
 
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "open local store"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"))
 	}
 	defer db.Close()
 
 	ext, err := grpcext.NewExtension(remote, db, extOpts)
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "starting grpc extension"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "starting grpc extension"))
 	}
 
 	// create an extension server
@@ -96,7 +92,7 @@ func main() {
 		osquery.ServerTimeout(timeout),
 	)
 	if err != nil {
-		logger.Fatal("err", err, "msg", "creating osquery extension server")
+		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
 	}
 
 	configPlugin := config.NewPlugin("kolide_grpc", ext.GenerateConfigs)
@@ -109,10 +105,10 @@ func main() {
 	ctx := context.Background()
 	_, invalid, err := ext.Enroll(ctx)
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "enrolling host"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "enrolling host"))
 	}
 	if invalid {
-		logger.Fatal(errors.Wrap(err, "invalid enroll secret"))
+		logutil.Fatal(logger, errors.Wrap(err, "invalid enroll secret"))
 	}
 	ext.Start()
 	defer ext.Shutdown()
@@ -121,7 +117,7 @@ func main() {
 	defer ext.Shutdown()
 
 	if err := server.Run(); err != nil {
-		logger.Fatal("err", err)
+		logutil.Fatal(logger, "err", err)
 	}
 }
 

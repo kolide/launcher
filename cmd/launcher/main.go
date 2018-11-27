@@ -17,12 +17,13 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/debug"
-	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	osquerygo "github.com/kolide/osquery-go"
@@ -176,7 +177,8 @@ func runSocket(args []string) error {
 }
 
 func main() {
-	logger := kolidelog.NewLogger(os.Stderr)
+	var logger log.Logger
+	logger = log.NewJSONLogger(os.Stderr) // only used until options are parsed.
 
 	// if the launcher is being ran with a positional argument, handle that
 	// argument. If a known positional argument is not supplied, fall-back to
@@ -189,7 +191,7 @@ func main() {
 				args = os.Args[2:]
 			}
 			if err := runSocket(args); err != nil {
-				logger.Fatal("err", errors.Wrap(err, "launching socket command"))
+				logutil.Fatal(logger, "err", errors.Wrap(err, "launching socket command"))
 			}
 			fmt.Println("\nexiting...")
 			os.Exit(0)
@@ -199,7 +201,7 @@ func main() {
 				args = os.Args[2:]
 			}
 			if err := runQuery(args); err != nil {
-				logger.Fatal("err", errors.Wrap(err, "launching query command"))
+				logutil.Fatal(logger, "err", errors.Wrap(err, "launching query command"))
 			}
 			os.Exit(0)
 		case "flare":
@@ -208,7 +210,7 @@ func main() {
 				args = os.Args[2:]
 			}
 			if err := runFlare(args); err != nil {
-				logger.Fatal("err", errors.Wrap(err, "launching flare command"))
+				logutil.Fatal(logger, "err", errors.Wrap(err, "launching flare command"))
 			}
 			os.Exit(0)
 		}
@@ -216,7 +218,7 @@ func main() {
 
 	opts, err := parseOptions()
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "invalid options"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "invalid options"))
 	}
 
 	// handle --version
@@ -232,10 +234,7 @@ func main() {
 	}
 
 	// handle --debug
-	if opts.debug {
-		logger.AllowDebug()
-	}
-	debug.AttachLogToggle(logger, opts.debug)
+	logger = logutil.NewServerLogger(opts.debug)
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.rootDirectory
@@ -243,7 +242,7 @@ func main() {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
 			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
-				logger.Fatal("err", errors.Wrap(err, "creating temporary root directory"))
+				logutil.Fatal(logger, "err", errors.Wrap(err, "creating temporary root directory"))
 			}
 		}
 		level.Info(logger).Log(
@@ -253,11 +252,11 @@ func main() {
 	}
 
 	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
-		logger.Fatal("err", errors.Wrap(err, "creating root directory"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "creating root directory"))
 	}
 
 	if _, err := osquery.DetectPlatform(); err != nil {
-		logger.Fatal("err", errors.Wrap(err, "detecting platform"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "detecting platform"))
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
@@ -280,12 +279,12 @@ func main() {
 	// to multiple actors
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "open local store"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"))
 	}
 	defer db.Close()
 
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
-		logger.Fatal("err", err)
+		logutil.Fatal(logger, "err", err)
 	}
 
 	// create a context for all the asynchronous stuff we are starting
@@ -298,7 +297,7 @@ func main() {
 	// create the osquery extension for launcher
 	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, opts)
 	if err != nil {
-		logger.Fatal("err", errors.Wrap(err, "creating extension and service"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "creating extension and service"))
 	}
 	runGroup.Add(extension.Execute, extension.Interrupt)
 
@@ -313,7 +312,7 @@ func main() {
 	if opts.control {
 		control, err := createControl(ctx, db, logger, opts)
 		if err != nil {
-			logger.Fatal("err", errors.Wrap(err, "creating control actor"))
+			logutil.Fatal(logger, "err", errors.Wrap(err, "creating control actor"))
 		}
 		runGroup.Add(control.Execute, control.Interrupt)
 	}
@@ -333,14 +332,14 @@ func main() {
 		// create an updater for osquery
 		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, runnerRestart, logger, config)
 		if err != nil {
-			logger.Fatal("err", err)
+			logutil.Fatal(logger, "err", err)
 		}
 		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
 
 		// create an updater for launcher
 		launcherPath, err := os.Executable()
 		if err != nil {
-			logger.Fatal("err", err)
+			logutil.Fatal(logger, "err", err)
 		}
 		launcherUpdater, err := createUpdater(
 			ctx,
@@ -350,7 +349,7 @@ func main() {
 			config,
 		)
 		if err != nil {
-			logger.Fatal("err", err)
+			logutil.Fatal(logger, "err", err)
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
@@ -372,7 +371,7 @@ func main() {
 
 	// start the rungroup
 	if err := runGroup.Run(); err != nil {
-		logger.Fatal("err", err)
+		logutil.Fatal(logger, "err", err)
 	}
 
 }
