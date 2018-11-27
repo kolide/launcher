@@ -13,14 +13,16 @@ REVISION = $(shell git rev-parse HEAD)
 REVSHORT = $(shell git rev-parse --short HEAD)
 USER = $(shell whoami)
 
+export GO111MODULE=on
+
 KIT_VERSION = "\
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.appName=${APP_NAME} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.version=${VERSION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.branch=${BRANCH} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.revision=${REVISION} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildDate=${NOW} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.buildUser=${USER} \
-	-X github.com/kolide/launcher/vendor/github.com/kolide/kit/version.goVersion=${GOVERSION}"
+	-X github.com/kolide/kit/version.appName=${APP_NAME} \
+	-X github.com/kolide/kit/version.version=${VERSION} \
+	-X github.com/kolide/kit/version.branch=${BRANCH} \
+	-X github.com/kolide/kit/version.revision=${REVISION} \
+	-X github.com/kolide/kit/version.buildDate=${NOW} \
+	-X github.com/kolide/kit/version.buildUser=${USER} \
+	-X github.com/kolide/kit/version.goVersion=${GOVERSION}"
 
 ifneq ($(OS), Windows_NT)
 	CURRENT_PLATFORM = linux
@@ -49,22 +51,22 @@ build: launcher extension
 	mkdir -p build/linux
 
 extension: .pre-build
-	go build -i -o build/osquery-extension.ext ./cmd/osquery-extension/
+	go build -o build/osquery-extension.ext ./cmd/osquery-extension/
 
 osqueryi: .pre-build
-	go build -i -o build/launcher.ext ./cmd/launcher.ext/
+	go build -o build/launcher.ext ./cmd/launcher.ext/
 	osqueryi --extension=./build/launcher.ext
 
 xp-extension: .pre-build
-	GOOS=darwin go build -i -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
-	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
+	GOOS=darwin go build -o build/darwin/osquery-extension.ext ./cmd/osquery-extension/
+	GOOS=linux CGO_ENABLED=0 go build -o build/linux/osquery-extension.ext ./cmd/osquery-extension/
 	ln -f build/$(CURRENT_PLATFORM)/osquery-extension.ext build/osquery-extension.ext
 
 .pre-launcher:
 	$(eval APP_NAME = launcher)
 
 launcher: .pre-build .pre-launcher
-	go build -i -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	go build -o build/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 
 codesign-darwin:
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
@@ -75,28 +77,32 @@ xp: xp-launcher xp-extension
 xp-codesign: xp codesign-darwin
 
 xp-launcher: .pre-build .pre-launcher
-	GOOS=darwin go build -i -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
-	GOOS=linux CGO_ENABLED=0 go build -i -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	GOOS=darwin go build -o build/darwin/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
+	GOOS=linux CGO_ENABLED=0 go build -o build/linux/launcher -ldflags ${KIT_VERSION} ./cmd/launcher/
 	ln -f build/$(CURRENT_PLATFORM)/launcher build/launcher
 
 .pre-package-builder:
 	$(eval APP_NAME = package-builder)
 
 package-builder: .pre-build xp-codesign .pre-package-builder generate
-	go build -i -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
+	go build -o build/package-builder -ldflags ${KIT_VERSION} ./cmd/package-builder/
 
 .pre-launcher-pummel:
 	$(eval APP_NAME = launcher-pummel)
 
 launcher-pummel:
-	go build -i -o build/launcher-pummel -ldflags ${KIT_VERSION} ./cmd/launcher-pummel/
+	go build -o build/launcher-pummel -ldflags ${KIT_VERSION} ./cmd/launcher-pummel/
 
-.deps:
-	go get -u github.com/golang/dep/cmd/dep
-	go get -u github.com/kolide/go-bindata/...
-	dep ensure -vendor-only
 
-deps: .deps generate
+go-mod-check:
+	@go help mod > /dev/null || (echo "Your go is too old, no modules. Seek help." && exit 1)
+
+go-mod-download:
+	go mod download
+
+deps-go: go-mod-check go-mod-download
+
+deps: deps-go generate
 
 # First, we generate a bindata file from an empty directory so that the symbols
 # are present (Asset, AssetDir, etc). Once the symbols are present, we can run

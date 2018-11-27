@@ -1,30 +1,18 @@
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build-go1.10.1
+
 version: 2
 jobs:
-  build-go1.10.1:
+  build-go1.11:
     docker:
-        - image: gcr.io/kolide-public-containers/launcher-builder:1.10.1
-    working_directory: /go/src/github.com/kolide/launcher
+        - image: golang:1.11
+    working_directory: /go/src/github.com/kolide/kit
     steps: &steps
       - checkout
-      - restore_cache:
-          keys:
-            - vendor-cache-{{ .Branch }}-{{ checksum "Gopkg.lock" }}
-            - vendor-cache-{{ .Branch }}
-            - vendor-cache
       - run: make deps
-      - save_cache:
-          key: vendor-cache-{{ .Branch }}-{{ checksum "Gopkg.lock" }}
-          paths:
-            - vendor
-      - save_cache:
-          key: vendor-cache-{{ .Branch }}
-          paths:
-            - vendor
-      - save_cache:
-          key: vendor-cache
-          paths:
-            - vendor
-
       - run: make test
       - run: make extension
       - run: make launcher
@@ -33,4 +21,4 @@ workflows:
   version: 2
   build:
     jobs:
-      - build-go1.10.1
+      - build-go1.11
