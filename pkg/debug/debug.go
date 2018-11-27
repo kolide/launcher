@@ -17,33 +17,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
-	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/pkg/errors"
 )
 
 const debugSignal = syscall.SIGUSR1
 const debugPrefix = "/debug/"
-
-// AttachLogToggle attaches a signal handler that toggles debug logging when
-// SIGUSR2 is sent to the process.
-func AttachLogToggle(logger *kolidelog.Logger, debug bool) {
-	// Start a loop that will toggle the log level when SIGUSR2 is sent to
-	// the process.
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGUSR2)
-	go func() {
-		for {
-			<-sigChan
-			if debug {
-				logger.AllowInfo()
-			} else {
-				logger.AllowDebug()
-			}
-
-			debug = !debug
-		}
-	}()
-}
 
 // AttachDebugHandler attaches a signal handler that toggles the debug server
 // state when SIGUSR1 is sent to the process.

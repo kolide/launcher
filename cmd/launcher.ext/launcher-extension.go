@@ -2,10 +2,9 @@ package main
 
 import (
 	"flag"
-	"os"
 	"time"
 
-	"github.com/kolide/launcher/pkg/log"
+	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/kolide/osquery-go"
 )
@@ -18,10 +17,7 @@ func main() {
 		_            = flag.Int("interval", 0, "")
 	)
 	flag.Parse()
-	logger := log.NewLogger(os.Stderr)
-	if *flVerbose {
-		logger.AllowDebug()
-	}
+	logger := logutil.NewServerLogger(*flVerbose)
 
 	timeout := time.Duration(*flTimeout) * time.Second
 
@@ -35,12 +31,12 @@ func main() {
 		osquery.ServerTimeout(timeout),
 	)
 	if err != nil {
-		logger.Fatal("err", err, "msg", "creating osquery extension server")
+		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
 	}
 
 	client, err := osquery.NewClient(*flSocketPath, timeout)
 	if err != nil {
-		logger.Fatal("err", err, "creating osquery extension client")
+		logutil.Fatal(logger, "err", err, "creating osquery extension client")
 	}
 
 	var plugins []osquery.OsqueryPlugin
@@ -50,6 +46,6 @@ func main() {
 	server.RegisterPlugin(plugins...)
 
 	if err := server.Run(); err != nil {
-		logger.Fatal("err", err)
+		logutil.Fatal(logger, "err", err)
 	}
 }
