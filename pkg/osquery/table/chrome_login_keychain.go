@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
