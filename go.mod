@@ -21,6 +21,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-kit/kit v0.7.0
 	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/golang/protobuf v1.2.0
