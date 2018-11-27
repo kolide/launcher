@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -474,7 +473,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
-	o.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	o.cmd.SysProcAttr = setpgid()
 
 	// Launch osquery process (async)
 	err = o.cmd.Start()
@@ -654,10 +653,4 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
-}
-
-// kill process group kills a process and all its children.
-func killProcessGroup(cmd *exec.Cmd) error {
-	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	return errors.Wrapf(err, "kill process group %d", cmd.Process.Pid)
 }
