@@ -9,7 +9,7 @@ jobs:
   build-go1.11:
     docker:
         - image: golang:1.11
-    working_directory: /go/src/github.com/kolide/kit
+    working_directory: /go/src/github.com/kolide/launcher
     steps: &steps
       - checkout
       - run: make deps
