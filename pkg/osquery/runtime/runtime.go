@@ -90,7 +90,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	if err != nil {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
-	extensionPath := filepath.Join(filepath.Dir(exPath), "osquery-extension.ext")
+	extensionPath := filepath.Join(filepath.Dir(exPath), extensionName)
 	if _, err := os.Stat(extensionPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
@@ -101,7 +101,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 
 	// Determine the path to the extension socket
 	if extensionSocketPath == "" {
-		extensionSocketPath = filepath.Join(rootDir, "osquery.sock")
+		extensionSocketPath = socketPath(rootDir)
 	}
 
 	// Write the autoload file
@@ -142,6 +142,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--disable_watchdog",
 		"--utc",
 	)
+	cmd.Args = append(cmd.Args, platformArgs()...)
 	if stdout != nil {
 		cmd.Stdout = stdout
 	}
