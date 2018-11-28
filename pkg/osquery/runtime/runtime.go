@@ -482,7 +482,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "starting osqueryd process")
 	}
 	o.errgroup.Go(func() error {
-		err = o.cmd.Wait()
+		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
 			// TODO: should this return nil?
