@@ -482,10 +482,14 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "starting osqueryd process")
 	}
 	o.errgroup.Go(func() error {
-		if err := o.cmd.Wait(); err != nil {
+		err = o.cmd.Wait()
+		switch {
+		case err == nil, isExitOk(err):
+			// TODO: should this return nil?
+			return errors.New("osquery process exited")
+		default:
 			return errors.Wrap(err, "running osqueryd command")
 		}
-		return errors.New("osquery process exited")
 	})
 
 	// Kill osquery process on shutdown

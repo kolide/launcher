@@ -29,3 +29,7 @@ func socketPath(rootDir string) string {
 func platformArgs() []string {
 	return nil
 }
+
+func isExitOk(err error) bool {
+	return false
+}
