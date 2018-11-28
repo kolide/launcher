@@ -13,6 +13,8 @@ import (
 const extensionName = `osquery-extension.exe`
 
 func setpgid() *syscall.SysProcAttr {
+	// TODO: on unix we set the process group id and then
+	// terminate that process group.
 	return &syscall.SysProcAttr{}
 }
 
