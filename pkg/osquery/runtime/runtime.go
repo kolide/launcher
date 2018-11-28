@@ -12,17 +12,17 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
-
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
+
+	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
 type Runner struct {
