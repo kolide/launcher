@@ -3,17 +3,17 @@
 package main
 
 import (
-	"os"
-	"time"
-	"fmt"
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/version"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -25,22 +25,19 @@ import (
 const serviceName = "launcher"
 
 func main() {
-	
 
 	var logger log.Logger
 	logger = logutil.NewCLILogger(true) //interactive
 
-
-
 	isIntSess, err := svc.IsAnInteractiveSession()
 	if err != nil {
 		logutil.Fatal(logger, "err", errors.Wrap(err, "cannot determine if session is interactive"))
-		
+
 	}
 
 	run := debug.Run
 	if !isIntSess {
-		w,  err := eventlog.NewWriter(serviceName)
+		w, err := eventlog.NewWriter(serviceName)
 		if err != nil {
 			logutil.Fatal(logger, "err", errors.Wrap(err, "create eventlog writer"))
 		}
@@ -59,7 +56,7 @@ func main() {
 		case "start":
 			err = startService(serviceName)
 		case "stop":
-			err = controlService(serviceName, svc.Stop, svc.Stopped)	
+			err = controlService(serviceName, svc.Stop, svc.Stopped)
 		}
 		if err != nil {
 			logutil.Fatal(logger, "err", errors.Wrap(err, "run"))
@@ -92,11 +89,9 @@ func main() {
 
 }
 
-
-
-type winSvc struct{
+type winSvc struct {
 	logger log.Logger
-	opts *options
+	opts   *options
 }
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
@@ -105,7 +100,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	level.Debug(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
-	
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

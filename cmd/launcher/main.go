@@ -3,10 +3,13 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
 
@@ -41,17 +44,15 @@ func main() {
 		os.Exit(0)
 	}
 
-	logger = log.NewJSONLogger(opts.debug)
+	logger = logutil.NewServerLogger(opts.debug)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := runLauncher(ctx, cancel, opts, logger)
-	if err != nil {
+	if err := runLauncher(ctx, cancel, opts, logger); err != nil {
 		logutil.Fatal(logger, err, "run launcher")
 	}
 }
-
 
 func isSubCommand() bool {
 	if len(os.Args) > 2 {
