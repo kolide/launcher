@@ -30,74 +30,13 @@ type PackagePaths struct {
 
 // CreatePackages will create a launcher macOS package. The output paths of the
 // packages are returned and an error if the operation was not successful.
-func CreatePackages(
-	packageVersion,
-	osqueryVersion,
-	hostname,
-	secret,
-	macPackageSigningKey string,
-	insecure,
-	insecureGrpc,
-	autoupdate bool,
-	updateChannel string,
-	control bool,
-	initialRunner bool,
-	controlHostname string,
-	disableControlTLS bool,
-	identifier string,
-	omitSecret bool,
-	systemd bool,
-	certPins,
-	rootPEM string,
-	outputPathDir string,
-	cacheDir string,
-) (*PackagePaths, error) {
-	macPkgDestinationPath, err := CreateMacPackage(
-		packageVersion,
-		osqueryVersion,
-		hostname,
-		secret,
-		macPackageSigningKey,
-		insecure,
-		insecureGrpc,
-		autoupdate,
-		updateChannel,
-		control,
-		initialRunner,
-		controlHostname,
-		disableControlTLS,
-		identifier,
-		omitSecret,
-		certPins,
-		rootPEM,
-		outputPathDir,
-		cacheDir,
-	)
+func CreatePackages(po PackageOptions) (*PackagePaths, error) {
+	macPkgDestinationPath, err := CreateMacPackage(po)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate macOS package")
 	}
 
-	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(
-		packageVersion,
-		osqueryVersion,
-		hostname,
-		secret,
-		insecure,
-		insecureGrpc,
-		autoupdate,
-		updateChannel,
-		control,
-		initialRunner,
-		controlHostname,
-		disableControlTLS,
-		identifier,
-		omitSecret,
-		systemd,
-		certPins,
-		rootPEM,
-		outputPathDir,
-		cacheDir,
-	)
+	debDestinationPath, rpmDestinationPath, err := CreateLinuxPackages(po)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not generate linux packages")
 	}
@@ -109,7 +48,7 @@ func CreatePackages(
 	}, nil
 }
 
-func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFileName string, packageRoot string, binaryDirectory string, postInstallScript string, postInstallLauncherContents string, systemd bool) error {
+func createInitFiles(opts *ServiceOptions, serviceDirectory string, initFileName string, packageRoot string, binaryDirectory string, postInstallScript string, postInstallLauncherContents string, systemd bool) error {
 	// Create the init file for the launcher service
 	initPath := filepath.Join(serviceDirectory, initFileName)
 	initFile, err := os.Create(filepath.Join(packageRoot, initPath))
@@ -121,11 +60,11 @@ func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFil
 		return errors.Wrap(err, "could not make postinstall script executable")
 	}
 	if systemd {
-		if err := renderSystemdService(initFile, opts); err != nil {
+		if err := opts.Render(initFile, SystemD); err != nil {
 			return errors.Wrap(err, "could not render init system file")
 		}
 	} else {
-		if err := renderInitService(initFile, opts); err != nil {
+		if err := opts.Render(initFile, Init); err != nil {
 			return errors.Wrap(err, "could not render init system file")
 		}
 	}
@@ -141,27 +80,7 @@ func createInitFiles(opts *initTemplateOptions, serviceDirectory string, initFil
 	return nil
 }
 
-func CreateLinuxPackages(
-	packageVersion,
-	osqueryVersion,
-	hostname,
-	secret string,
-	insecure,
-	insecureGrpc,
-	autoupdate bool,
-	updateChannel string,
-	control bool,
-	initialRunner bool,
-	controlHostname string,
-	disableControlTLS bool,
-	identifier string,
-	omitSecret bool,
-	systemd bool,
-	certPins,
-	rootPEM string,
-	outputPathDir string,
-	cacheDir string,
-) (string, string, error) {
+func CreateLinuxPackages(po PackageOptions) (string, string, error) {
 	postInstallScript := "launcher-installer"
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
@@ -174,12 +93,12 @@ func CreateLinuxPackages(
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
-	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
-	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
-	configurationDirectory := filepath.Join("/etc", identifier)
+	rootDirectory := filepath.Join("/var", po.Identifier, sanitizeHostname(po.Hostname))
+	binaryDirectory := filepath.Join("/usr/local", po.Identifier, "bin")
+	configurationDirectory := filepath.Join("/etc", po.Identifier)
 	serviceDirectory := "/etc/systemd/system"
 
-	if !systemd {
+	if !po.Systemd {
 		serviceDirectory = "/etc/init.d/"
 	}
 
@@ -201,7 +120,7 @@ func CreateLinuxPackages(
 	// installation:
 
 	// The initial osqueryd binary
-	osquerydPath, err := FetchOsquerydBinary(cacheDir, osqueryVersion, "linux")
+	osquerydPath, err := FetchOsquerydBinary(po.CacheDir, po.OsqueryVersion, "linux")
 	if err != nil {
 		return "", "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
@@ -214,18 +133,18 @@ func CreateLinuxPackages(
 	// The secret which the user will use to authenticate to the cloud
 	secretPath := filepath.Join(configurationDirectory, "secret")
 
-	if !omitSecret {
-		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), secretPerms)
+	if !po.OmitSecret {
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(po.Secret), secretPerms)
 		if err != nil {
 			return "", "", errors.Wrap(err, "could not write secret string to file for packaging")
 		}
 	}
 
 	var rootPEMPath string
-	if rootPEM != "" {
+	if po.RootPEM != "" {
 		rootPEMPath = filepath.Join(configurationDirectory, "roots.pem")
 
-		if err := fs.CopyFile(rootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
+		if err := fs.CopyFile(po.RootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
 			return "", "", errors.Wrap(err, "copy root PEM")
 		}
 		if err := os.Chmod(filepath.Join(packageRoot, rootPEMPath), 0600); err != nil {
@@ -233,44 +152,44 @@ func CreateLinuxPackages(
 		}
 	}
 
-	if updateChannel == "" {
-		updateChannel = "stable"
+	if po.UpdateChannel == "" {
+		po.UpdateChannel = "stable"
 	}
 
-	opts := &initTemplateOptions{
+	opts := &ServiceOptions{
 		LaunchDaemonName:  "launcher",
-		ServerHostname:    grpcServerForHostname(hostname),
+		ServerHostname:    grpcServerForHostname(po.Hostname),
 		RootDirectory:     rootDirectory,
 		SecretPath:        secretPath,
 		OsquerydPath:      filepath.Join(binaryDirectory, "osqueryd"),
 		LauncherPath:      filepath.Join(binaryDirectory, "launcher"),
-		Insecure:          insecure,
-		InsecureGrpc:      insecureGrpc,
-		Autoupdate:        autoupdate,
-		UpdateChannel:     updateChannel,
-		Control:           control,
-		InitialRunner:     initialRunner,
-		ControlHostname:   controlHostname,
-		DisableControlTLS: disableControlTLS,
-		CertPins:          certPins,
+		Insecure:          po.Insecure,
+		InsecureGrpc:      po.InsecureGrpc,
+		Autoupdate:        po.Autoupdate,
+		UpdateChannel:     po.UpdateChannel,
+		Control:           po.Control,
+		InitialRunner:     po.InitialRunner,
+		ControlHostname:   po.ControlHostname,
+		DisableControlTLS: po.DisableControlTLS,
+		CertPins:          po.CertPins,
 		RootPEM:           rootPEMPath,
 	}
 
-	if systemd {
+	if po.Systemd {
 		initFileName := "launcher.service"
 		postInstallLauncherContents := `#!/bin/bash
 set -e
 systemctl daemon-reload
 systemctl enable launcher
 systemctl restart launcher`
-		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, po.Systemd)
 
 	} else { //not systemd, so assume init
 		initFileName := "launcher"
 		// The post install step
 		postInstallLauncherContents := `#!/bin/bash
 sudo service launcher restart`
-		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, systemd)
+		createInitFiles(opts, serviceDirectory, initFileName, packageRoot, binaryDirectory, postInstallScript, postInstallLauncherContents, po.Systemd)
 	}
 
 	// The initial launcher (and extension) binary
@@ -290,22 +209,22 @@ sudo service launcher restart`
 		return "", "", errors.Wrap(err, "could not copy the osquery-extension binary to the packaging root")
 	}
 
-	if outputPathDir == "" {
-		outputPathDir, err = ioutil.TempDir("/tmp", "packages_")
+	if po.OutputPathDir == "" {
+		po.OutputPathDir, err = ioutil.TempDir("/tmp", "packages_")
 		if err != nil {
 			return "", "", errors.Wrap(err, "could not create final output directory for package")
 		}
 	}
 
-	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
-		return "", "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
+	if err = os.MkdirAll(po.OutputPathDir, 0755); err != nil {
+		return "", "", errors.Wrapf(err, "could not create directory %s", po.OutputPathDir)
 	}
 
-	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", packageVersion)
-	debOutputPath := filepath.Join(outputPathDir, debOutputFilename)
+	debOutputFilename := fmt.Sprintf("launcher-linux-%s.deb", po.PackageVersion)
+	debOutputPath := filepath.Join(po.OutputPathDir, debOutputFilename)
 
-	rpmOutputFilename := fmt.Sprintf("launcher-linux-%s.rpm", packageVersion)
-	rpmOutputPath := filepath.Join(outputPathDir, rpmOutputFilename)
+	rpmOutputFilename := fmt.Sprintf("launcher-linux-%s.rpm", po.PackageVersion)
+	rpmOutputPath := filepath.Join(po.OutputPathDir, rpmOutputFilename)
 
 	// Create the packages
 	containerPackageRoot := "/pkgroot"
@@ -315,13 +234,13 @@ sudo service launcher restart`
 	debCmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
+		"-v", fmt.Sprintf("%s:/out", po.OutputPathDir),
 		"kolide/fpm",
 		"fpm",
 		"-s", "dir",
 		"-t", "deb",
 		"-n", "launcher",
-		"-v", packageVersion,
+		"-v", po.PackageVersion,
 		"-p", filepath.Join("/out", debOutputFilename),
 		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
@@ -337,13 +256,13 @@ sudo service launcher restart`
 	rpmCmd := exec.Command(
 		"docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:%s", packageRoot, containerPackageRoot),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
+		"-v", fmt.Sprintf("%s:/out", po.OutputPathDir),
 		"kolide/fpm",
 		"fpm",
 		"-s", "dir",
 		"-t", "rpm",
 		"-n", "launcher",
-		"-v", packageVersion,
+		"-v", po.PackageVersion,
 		"-p", filepath.Join("/out", rpmOutputFilename),
 		"--after-install", afterInstall,
 		"-C", containerPackageRoot,
@@ -359,27 +278,30 @@ sudo service launcher restart`
 	return debOutputPath, rpmOutputPath, nil
 }
 
-func CreateMacPackage(
-	packageVersion,
-	osqueryVersion,
-	hostname,
-	secret,
-	macPackageSigningKey string,
-	insecure,
-	insecureGrpc,
-	autoupdate bool,
-	updateChannel string,
-	control bool,
-	initialRunner bool,
-	controlHostname string,
-	disableControlTLS bool,
-	identifier string,
-	omitSecret bool,
-	certPins,
-	rootPEM string,
-	outputPathDir string,
-	cacheDir string,
-) (string, error) {
+type PackageOptions struct {
+	PackageVersion       string
+	OsqueryVersion       string
+	Hostname             string
+	Secret               string
+	MacPackageSigningKey string
+	Insecure             bool
+	InsecureGrpc         bool
+	Autoupdate           bool
+	UpdateChannel        string
+	Control              bool
+	InitialRunner        bool
+	ControlHostname      string
+	DisableControlTLS    bool
+	Identifier           string
+	OmitSecret           bool
+	CertPins             string
+	RootPEM              string
+	OutputPathDir        string
+	CacheDir             string
+	Systemd              bool
+}
+
+func CreateMacPackage(po PackageOptions) (string, error) {
 	// first, we have to create a local temp directory on disk that we will use as
 	// a packaging root, but will delete once the generated package is created and
 	// stored on disk
@@ -395,15 +317,15 @@ func CreateMacPackage(
 
 	// Here, we must create the directory structure of our package.
 	// First, we create all of the directories that we will need:
-	rootDirectory := filepath.Join("/var", identifier, sanitizeHostname(hostname))
-	binaryDirectory := filepath.Join("/usr/local", identifier, "bin")
+	rootDirectory := filepath.Join("/var", po.Identifier, sanitizeHostname(po.Hostname))
+	binaryDirectory := filepath.Join("/usr/local", po.Identifier, "bin")
 	launcherPath := filepath.Join(binaryDirectory, "launcher")
 	osquerydPath := filepath.Join(binaryDirectory, "osqueryd")
-	configurationDirectory := filepath.Join("/etc", identifier)
+	configurationDirectory := filepath.Join("/etc", po.Identifier)
 	secretPath := filepath.Join(configurationDirectory, "secret")
-	logDirectory := filepath.Join("/var/log", identifier)
+	logDirectory := filepath.Join("/var/log", po.Identifier)
 	launchDaemonDirectory := "/Library/LaunchDaemons"
-	launchDaemonName := fmt.Sprintf("com.%s.launcher", identifier)
+	launchDaemonName := fmt.Sprintf("com.%s.launcher", po.Identifier)
 	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
 	pathsToCreate := []string{
 		rootDirectory,
@@ -424,7 +346,7 @@ func CreateMacPackage(
 	// installation:
 
 	// The initial osqueryd binary
-	localOsquerydPath, err := FetchOsquerydBinary(cacheDir, osqueryVersion, "darwin")
+	localOsquerydPath, err := FetchOsquerydBinary(po.CacheDir, po.OsqueryVersion, "darwin")
 	if err != nil {
 		return "", errors.Wrap(err, "could not fetch path to osqueryd binary")
 	}
@@ -452,10 +374,10 @@ func CreateMacPackage(
 	}
 
 	var rootPEMPath string
-	if rootPEM != "" {
+	if po.RootPEM != "" {
 		rootPEMPath = filepath.Join(configurationDirectory, "roots.pem")
 
-		if err := fs.CopyFile(rootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
+		if err := fs.CopyFile(po.RootPEM, filepath.Join(packageRoot, rootPEMPath)); err != nil {
 			return "", errors.Wrap(err, "copy root PEM")
 		}
 
@@ -470,36 +392,36 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "could not open the LaunchDaemon path for writing")
 	}
 
-	if updateChannel == "" {
-		updateChannel = "stable"
+	if po.UpdateChannel == "" {
+		po.UpdateChannel = "stable"
 	}
 
-	opts := &launchDaemonTemplateOptions{
-		ServerHostname:    grpcServerForHostname(hostname),
+	opts := &ServiceOptions{
+		ServerHostname:    grpcServerForHostname(po.Hostname),
 		RootDirectory:     rootDirectory,
 		LauncherPath:      launcherPath,
 		OsquerydPath:      osquerydPath,
 		LogDirectory:      logDirectory,
 		SecretPath:        secretPath,
 		LaunchDaemonName:  launchDaemonName,
-		Insecure:          insecure,
-		InsecureGrpc:      insecureGrpc,
-		Autoupdate:        autoupdate,
-		UpdateChannel:     updateChannel,
-		Control:           control,
-		InitialRunner:     initialRunner,
-		ControlHostname:   controlHostname,
-		DisableControlTLS: disableControlTLS,
-		CertPins:          certPins,
+		Insecure:          po.Insecure,
+		InsecureGrpc:      po.InsecureGrpc,
+		Autoupdate:        po.Autoupdate,
+		UpdateChannel:     po.UpdateChannel,
+		Control:           po.Control,
+		InitialRunner:     po.InitialRunner,
+		ControlHostname:   po.ControlHostname,
+		DisableControlTLS: po.DisableControlTLS,
+		CertPins:          po.CertPins,
 		RootPEM:           rootPEMPath,
 	}
-	if err := renderLaunchDaemon(launchDaemonFile, opts); err != nil {
+	if err := opts.Render(launchDaemonFile, LaunchD); err != nil {
 		return "", errors.Wrap(err, "could not write LaunchDaemon content to file")
 	}
 
 	// The secret which the user will use to authenticate to the server
-	if !omitSecret {
-		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(secret), secretPerms)
+	if !po.OmitSecret {
+		err = ioutil.WriteFile(filepath.Join(packageRoot, secretPath), []byte(po.Secret), secretPerms)
 		if err != nil {
 			return "", errors.Wrap(err, "could not write secret string to file for packaging")
 		}
@@ -531,7 +453,7 @@ func CreateMacPackage(
 	}
 
 	// create newsyslog.d config file
-	newSysLogPath := filepath.Join(packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", identifier))
+	newSysLogPath := filepath.Join(packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", po.Identifier))
 	newSyslogFile, err := os.Create(newSysLogPath)
 	if err != nil {
 		return "", errors.Wrap(err, "creating newsyslog config")
@@ -545,18 +467,18 @@ func CreateMacPackage(
 		return "", errors.Wrap(err, "rendering newsyslog.d config")
 	}
 
-	if outputPathDir == "" {
-		outputPathDir, err = ioutil.TempDir("/tmp", "packaging_")
+	if po.OutputPathDir == "" {
+		po.OutputPathDir, err = ioutil.TempDir("/tmp", "packaging_")
 		if err != nil {
 			return "", errors.Wrap(err, "could not create final output directory for package")
 		}
 	}
 
-	if err = os.MkdirAll(outputPathDir, 0755); err != nil {
-		return "", errors.Wrapf(err, "could not create directory %s", outputPathDir)
+	if err = os.MkdirAll(po.OutputPathDir, 0755); err != nil {
+		return "", errors.Wrapf(err, "could not create directory %s", po.OutputPathDir)
 	}
 
-	outputPath := filepath.Join(outputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", packageVersion))
+	outputPath := filepath.Join(po.OutputPathDir, fmt.Sprintf("launcher-darwin-%s.pkg", po.PackageVersion))
 	if err != nil {
 		return "", errors.Wrap(err, "could not create final output directory for package")
 	}
@@ -566,8 +488,8 @@ func CreateMacPackage(
 		packageRoot,
 		scriptDir,
 		launchDaemonName,
-		packageVersion,
-		macPackageSigningKey,
+		po.PackageVersion,
+		po.MacPackageSigningKey,
 		outputPath,
 	)
 	if err != nil {
@@ -575,217 +497,6 @@ func CreateMacPackage(
 	}
 
 	return outputPath, nil
-}
-
-// systemdTemplateOptions is a struct which contains dynamic systemd
-// parameters that will be rendered into a template in renderInitdService
-type initTemplateOptions struct {
-	ServerHostname    string
-	RootDirectory     string
-	LauncherPath      string
-	OsquerydPath      string
-	LogDirectory      string
-	SecretPath        string
-	LaunchDaemonName  string
-	InsecureGrpc      bool
-	Insecure          bool
-	Autoupdate        bool
-	UpdateChannel     string
-	Control           bool
-	InitialRunner     bool
-	ControlHostname   string
-	DisableControlTLS bool
-	CertPins          string
-	RootPEM           string
-}
-
-//renderInitService renders an init service to start and schedule the launcher
-func renderInitService(w io.Writer, options *initTemplateOptions) error {
-	initdTemplate := `#!/bin/sh
-set -e
-NAME="{{.LaunchDaemonName}}"
-DAEMON="{{.LauncherPath}}"
-DAEMON_OPTS="--root_directory={{.RootDirectory}} \
---hostname={{.ServerHostname}} \
---enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
---insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}{{if .InitialRunner}}
---with_initial_runner \{{end}}{{if .Autoupdate}}
---autoupdate \
---update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins}}
---cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
---root_pem={{.RootPEM}} \{{end}}
---osqueryd_path={{.OsquerydPath}}"
-
-export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
-
-is_running() {
-    start-stop-daemon --status --exec $DAEMON
-}
-case "$1" in
-  start)
-        echo "Starting daemon: "$NAME
-        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
-        ;;
-  stop)
-        echo "Stopping daemon: "$NAME
-        start-stop-daemon --stop --quiet --oknodo --exec $DAEMON
-        ;;
-  restart)
-        echo "Restarting daemon: "$NAME
-        start-stop-daemon --stop --quiet --oknodo --retry 30 --exec $DAEMON
-        start-stop-daemon --start --quiet --background --exec $DAEMON -- $DAEMON_OPTS
-        ;;
-  status)
-    if is_running; then
-        echo "Running"
-    else
-        echo "Stopped"
-        exit 1
-    fi
-    ;;
-  *)
-        echo "Usage: "$1" {start|stop|restart|status}"
-        exit 1
-esac
-
-exit 0
-`
-
-	t, err := template.New("initd").Parse(initdTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse initd template")
-	}
-	return t.ExecuteTemplate(w, "initd", options)
-}
-
-// renderSystemdService renders a systemd service to start and schedule the launcher.
-func renderSystemdService(w io.Writer, options *initTemplateOptions) error {
-	systemdTemplate :=
-		`[Unit]
-Description=The Kolide Launcher
-After=network.service syslog.service
-
-[Service]
-ExecStart={{.LauncherPath}} \
---root_directory={{.RootDirectory}} \
---hostname={{.ServerHostname}} \
---enroll_secret_path={{.SecretPath}} \{{if .InsecureGrpc}}
---insecure_grpc \{{end}}{{if .Insecure}}
---insecure \{{end}}{{if .Control}}
---control \
---control_hostname={{.ControlHostname}} \{{end}}{{if .DisableControlTLS}}
---disable_control_tls \{{end}}{{if .InitialRunner}}
---with_initial_runner \{{end}}{{if .Autoupdate}}
---autoupdate \
---update_channel={{.UpdateChannel}} \{{end}}{{if .CertPins }}
---cert_pins={{.CertPins}} \{{end}}{{if .RootPEM}}
---root_pem={{.RootPEM}} \{{end}}
---osqueryd_path={{.OsquerydPath}}
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target`
-	t, err := template.New("systemd").Parse(systemdTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse systemd template")
-	}
-	return t.ExecuteTemplate(w, "systemd", options)
-}
-
-// launchDaemonTemplateOptions is a struct which contains dynamic LaunchDaemon
-// parameters that will be rendered into a template in renderLaunchDaemon
-type launchDaemonTemplateOptions struct {
-	ServerHostname    string
-	RootDirectory     string
-	LauncherPath      string
-	OsquerydPath      string
-	LogDirectory      string
-	SecretPath        string
-	LaunchDaemonName  string
-	InsecureGrpc      bool
-	Insecure          bool
-	Autoupdate        bool
-	UpdateChannel     string
-	Control           bool
-	InitialRunner     bool
-	ControlHostname   string
-	DisableControlTLS bool
-	CertPins          string
-	RootPEM           string
-}
-
-// renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
-func renderLaunchDaemon(w io.Writer, options *launchDaemonTemplateOptions) error {
-	launchDaemonTemplate :=
-		`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-    <dict>
-        <key>Label</key>
-        <string>{{.LaunchDaemonName}}</string>
-        <key>EnvironmentVariables</key>
-        <dict>
-            <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
-            <string>{{.RootDirectory}}</string>
-            <key>KOLIDE_LAUNCHER_HOSTNAME</key>
-            <string>{{.ServerHostname}}</string>
-            <key>KOLIDE_LAUNCHER_ENROLL_SECRET_PATH</key>
-            <string>{{.SecretPath}}</string>
-            <key>KOLIDE_LAUNCHER_OSQUERYD_PATH</key>
-            <string>{{.OsquerydPath}}</string>{{if .Control}}
-            <key>KOLIDE_CONTROL_HOSTNAME</key>
-            <string>{{.ControlHostname}}</string>{{end}}{{if .Autoupdate}}
-            <key>KOLIDE_LAUNCHER_UPDATE_CHANNEL</key>
-            <string>{{.UpdateChannel}}</string>{{end}}{{if .CertPins }}
-            <key>KOLIDE_LAUNCHER_CERT_PINS</key>
-            <string>{{.CertPins}}</string>{{end}}{{if .RootPEM }}
-            <key>KOLIDE_LAUNCHER_ROOT_PEM</key>
-            <string>{{.RootPEM}}</string>{{end}}
-        </dict>
-        <key>KeepAlive</key>
-        <dict>
-            <key>PathState</key>
-            <dict>
-                <key>{{.SecretPath}}</key>
-                <true/>
-            </dict>
-        </dict>
-        <key>ThrottleInterval</key>
-        <integer>60</integer>
-        <key>ProgramArguments</key>
-        <array>
-            <string>{{.LauncherPath}}</string>
-            {{if .InsecureGrpc}}
-            <string>--insecure_grpc</string>
-			{{end}}
-			{{if .Insecure}}
-            <string>--insecure</string>{{end}}
-			{{if .Autoupdate}}
-            <string>--autoupdate</string>
-			{{end}}
-			{{if .Control}}
-            <string>--control</string>
-			{{end}}
-			{{if .InitialRunner}}
-            <string>--with_initial_runner</string>
-			{{end}}
-			{{if .DisableControlTLS}}
-            <string>--disable_control_tls</string>
-			{{end}}
-        </array>
-        <key>StandardErrorPath</key>
-        <string>{{.LogDirectory}}/launcher-stderr.log</string>
-        <key>StandardOutPath</key>
-        <string>{{.LogDirectory}}/launcher-stdout.log</string>
-    </dict>
-</plist>`
-	t, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse LaunchDaemon template")
-	}
-	return t.ExecuteTemplate(w, "LaunchDaemon", options)
 }
 
 type postinstallTemplateOptions struct {
