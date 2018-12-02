@@ -23,8 +23,52 @@ func main() {
 		}
 	}
 
-	err := runLauncher()
+	opts, err := parseOptions()
+	if err != nil {
+		level.Info(logger).Log("err", err)
+		os.Exit(1)
+	}
+
+	// handle --version
+	if opts.printVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
+	// handle --usage
+	if opts.developerUsage {
+		developerUsage()
+		os.Exit(0)
+	}
+
+	logger = log.NewJSONLogger(opts.debug)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := runLauncher(ctx, cancel, opts, logger)
 	if err != nil {
 		logutil.Fatal(logger, err, "run launcher")
 	}
+}
+
+
+func isSubCommand() bool {
+	if len(os.Args) > 2 {
+		return false
+	}
+
+	subCommands := []string{
+		"socket",
+		"query",
+		"flare",
+	}
+
+	for _, sc := range subCommands {
+		if sc == os.Args[1] {
+			return true
+		}
+	}
+
+	return false
 }

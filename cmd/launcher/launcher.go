@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
@@ -175,25 +176,7 @@ func runSocket(args []string) error {
 	return nil
 }
 
-func isSubCommand() bool {
-	if len(os.Args) > 2 {
-		return false
-	}
 
-	subCommands := []string{
-		"socket",
-		"query",
-		"flare",
-	}
-
-	for _, sc := range subCommands {
-		if sc == os.Args[1] {
-			return true
-		}
-	}
-
-	return false
-}
 
 func runSubcommands() error {
 	var run func([]string) error
@@ -210,27 +193,7 @@ func runSubcommands() error {
 }
 
 // run the launcher daemon
-func runLauncher() error {
-	opts, err := parseOptions()
-	if err != nil {
-		return errors.Wrap(err, "invalid options")
-	}
-
-	// handle --version
-	if opts.printVersion {
-		version.PrintFull()
-		os.Exit(0)
-	}
-
-	// handle --usage
-	if opts.developerUsage {
-		developerUsage()
-		os.Exit(0)
-	}
-
-	// handle --debug
-	logger := logutil.NewServerLogger(opts.debug)
-
+func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.Logger) error {
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.rootDirectory
 	if rootDirectory == "" {
@@ -282,9 +245,7 @@ func runLauncher() error {
 		return errors.Wrap(err, "write launcher pid to file")
 	}
 
-	// create a context for all the asynchronous stuff we are starting
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
