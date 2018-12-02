@@ -15,7 +15,7 @@ type ServiceOptions struct {
 	OsquerydPath      string
 	LogDirectory      string
 	SecretPath        string
-	LaunchDaemonName  string
+	ServiceName       string
 	InsecureGrpc      bool
 	Insecure          bool
 	Autoupdate        bool
@@ -56,7 +56,7 @@ func (o *ServiceOptions) launchd(w io.Writer) error {
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>{{.LaunchDaemonName}}</string>
+        <string>{{.ServiceName}}</string>
         <key>EnvironmentVariables</key>
         <dict>
             <key>KOLIDE_LAUNCHER_ROOT_DIRECTORY</key>
@@ -158,7 +158,7 @@ WantedBy=multi-user.target`
 func (o *ServiceOptions) init(w io.Writer) error {
 	initdTemplate := `#!/bin/sh
 set -e
-NAME="{{.LaunchDaemonName}}"
+NAME="{{.ServiceName}}"
 DAEMON="{{.LauncherPath}}"
 DAEMON_OPTS="--root_directory={{.RootDirectory}} \
 --hostname={{.ServerHostname}} \
