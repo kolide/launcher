@@ -1,6 +1,7 @@
 package launchd
 
 import (
+	"bytes"
 	"io/ioutil"
 	"testing"
 
@@ -24,6 +25,12 @@ func TestRenderComplex(t *testing.T) {
 		"--array", "one",
 		"--array=two",
 	}
-	err := Render(ioutil.Discard, "complex", WithEnv(env), WithFlags(flags))
+
+	var output bytes.Buffer
+
+	err := Render(&output, "complex", WithEnv(env), WithFlags(flags))
 	require.NoError(t, err)
+
+	//require.True(t, strings.Contains(output.String(), expectedFlags))
+
 }
