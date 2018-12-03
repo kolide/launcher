@@ -1,4 +1,4 @@
-package rpm
+package deb
 
 import (
 	"bytes"
@@ -48,9 +48,9 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 		}
 	}
 
-	outputFilename := fmt.Sprintf("%s-%s.rpm", name, options.Version)
+	outputFilename := fmt.Sprintf("%s-%s.deb", name, options.Version)
 
-	outputPathDir, err := ioutil.TempDir("/tmp", "packaging-rpm-output")
+	outputPathDir, err := ioutil.TempDir("/tmp", "packaging-deb-output")
 	if err != nil {
 		return errors.Wrap(err, "making TempDir")
 	}
@@ -59,7 +59,7 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 	fpmCommand := []string{
 		"fpm",
 		"-s", "dir",
-		"-t", "rpm",
+		"-t", "deb",
 		"-n", name,
 		"-v", options.Version,
 		"-p", filepath.Join("/out", outputFilename),
@@ -82,7 +82,7 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "creating rpm package: %s", stderr)
+		return errors.Wrapf(err, "creating deb package: %s", stderr)
 	}
 
 	outputFH, err := os.Open(filepath.Join(outputPathDir, outputFilename))
