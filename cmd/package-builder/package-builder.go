@@ -162,28 +162,28 @@ func runMake(args []string) error {
 	}
 
 	currentVersion := version.Version().Version
-	paths, err := packaging.CreatePackages(
-		currentVersion,
-		osqueryVersion,
-		*flHostname,
-		*flEnrollSecret,
-		macPackageSigningKey,
-		*flInsecure,
-		*flInsecureGrpc,
-		*flAutoupdate,
-		*flUpdateChannel,
-		*flControl,
-		*flInitialRunner,
-		*flControlHostname,
-		*flDisableControlTLS,
-		*flIdentifier,
-		*flOmitSecret,
-		*flSystemd,
-		*flCertPins,
-		*flRootPEM,
-		*flOutputDir,
-		*flCacheDir,
-	)
+	paths, err := packaging.CreatePackages(packaging.PackageOptions{
+		PackageVersion:       currentVersion,
+		OsqueryVersion:       osqueryVersion,
+		Hostname:             *flHostname,
+		Secret:               *flEnrollSecret,
+		MacPackageSigningKey: macPackageSigningKey,
+		Insecure:             *flInsecure,
+		InsecureGrpc:         *flInsecureGrpc,
+		Autoupdate:           *flAutoupdate,
+		UpdateChannel:        *flUpdateChannel,
+		Control:              *flControl,
+		InitialRunner:        *flInitialRunner,
+		ControlHostname:      *flControlHostname,
+		DisableControlTLS:    *flDisableControlTLS,
+		Identifier:           *flIdentifier,
+		OmitSecret:           *flOmitSecret,
+		Systemd:              *flSystemd,
+		CertPins:             *flCertPins,
+		RootPEM:              *flRootPEM,
+		OutputPathDir:        *flOutputDir,
+		CacheDir:             *flCacheDir,
+	})
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}

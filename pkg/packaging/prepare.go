@@ -164,7 +164,7 @@ func prepare(flavor Flavor, platform string, po PackageOptions) (prepareOutput, 
 	case LaunchD:
 		postinstallOpts := &postinstallTemplateOptions{
 			LaunchDaemonDirectory: sp.dir,
-			LaunchDaemonName:      so.ServiceName,
+			LaunchDaemonName:      sp.serviceName,
 		}
 		if err := renderPostinstall(postinstallFile, postinstallOpts); err != nil {
 			return prepOut, err
