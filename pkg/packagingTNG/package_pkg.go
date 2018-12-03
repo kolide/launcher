@@ -1,4 +1,4 @@
-package pkg
+package packageTNG
 
 import (
 	"bytes"
@@ -12,50 +12,30 @@ import (
 	"github.com/pkg/errors"
 )
 
-type PackageOptions struct {
-	Version      string
-	AfterInstall string // postinstall script to run.
-	SigningKey   string
+type PkgOptions struct {
+	SigningKey string
 }
 
-type Option func(*PackageOptions)
+type PkgOption func(*PkgOptions)
 
-func WithVersion(v string) Option {
-	return func(o *PackageOptions) {
-		o.Version = v
-	}
-}
-
-func WithSigningKey(k string) Option {
-	return func(o *PackageOptions) {
+func WithSigningKey(k string) PkgOption {
+	return func(o *PkgOptions) {
 		o.SigningKey = k
 	}
 }
 
-func WithAfterInstall(s string) Option {
-	return func(o *PackageOptions) {
-		o.AfterInstall = s
-	}
-}
-
-func Package(w io.Writer, name string, packageRoot string, opts ...Option) error {
-	options := &PackageOptions{
-		Version: "0.0.0",
-	}
+func PackagePkg(w io.Writer, po *PackageOptions, opts ...PkgOption) error {
+	options := &PkgOptions{}
 
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	if packageRootStat, err := os.Stat(packageRoot); os.IsNotExist(err) {
-		return errors.Wrapf(err, "missing packageRoot %s", packageRoot)
-	} else {
-		if !packageRootStat.IsDir() {
-			return errors.Errorf("packageRoot (%s) isn't a directory", packageRoot)
-		}
+	if err := isDirectory(po.Root); err != nil {
+		return err
 	}
 
-	outputFilename := fmt.Sprintf("%s-%s.pkg", name, options.Version)
+	outputFilename := fmt.Sprintf("%s-%s.pkg", po.Name, po.Version)
 
 	outputPathDir, err := ioutil.TempDir("", "packaging-pkg-output")
 	if err != nil {
@@ -83,10 +63,10 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 	*/
 
 	args := []string{
-		"--root", packageRoot,
+		"--root", po.Root,
 		"--scripts", scriptsDir,
-		"--identifier", name, // FIXME? identifier,
-		"--version", options.Version,
+		"--identifier", po.Name, // FIXME? identifier,
+		"--version", po.Version,
 	}
 
 	if options.SigningKey != "" {

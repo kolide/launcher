@@ -3,20 +3,24 @@ package main
 import (
 	"os"
 
-	"github.com/kolide/launcher/pkg/packagingTNG/deb"
-	"github.com/kolide/launcher/pkg/packagingTNG/pkg"
-	"github.com/kolide/launcher/pkg/packagingTNG/rpm"
+	packageTNG "github.com/kolide/launcher/pkg/packagingTNG"
 )
 
 func main() {
 
-	packageRoot := "/Users/seph/go/src/github.com/kolide/launcher/pkg/packagingTNG"
+	packageRoot := "/Users/seph/go/src/github.com/kolide/launcher/"
+
+	po := &packageTNG.PackageOptions{
+		Name:    "test-empty",
+		Version: "0.0.0",
+		Root:    packageRoot,
+	}
 
 	rpmOut, err := os.Create("/tmp/test.rpm")
 	if err != nil {
 		panic(err)
 	}
-	if err := rpm.Package(rpmOut, "test", packageRoot, rpm.WithVersion("0.0.1")); err != nil {
+	if err := packageTNG.PackageRPM(rpmOut, po); err != nil {
 		panic(err)
 	}
 
@@ -24,7 +28,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := deb.Package(debOut, "test", packageRoot, deb.WithVersion("0.0.1")); err != nil {
+	if err := packageTNG.PackageDeb(debOut, po); err != nil {
 		panic(err)
 	}
 
@@ -32,8 +36,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := pkg.Package(pkgOut, "test", packageRoot, pkg.WithVersion("0.0.1"),
-		pkg.WithSigningKey("Developer ID Installer: Kolide Inc (YZ3EM74M78)")); err != nil {
+	if err := packageTNG.PackagePkg(pkgOut, po, packageTNG.WithSigningKey("Developer ID Installer: Kolide Inc (YZ3EM74M78)")); err != nil {
 		panic(err)
 	}
 
