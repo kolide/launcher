@@ -1,4 +1,4 @@
-package rpm
+package pkg
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 type PackageOptions struct {
 	Version      string
 	AfterInstall string // postinstall script to run.
+	SigningKey   string
 }
 
 type Option func(*PackageOptions)
@@ -22,6 +23,12 @@ type Option func(*PackageOptions)
 func WithVersion(v string) Option {
 	return func(o *PackageOptions) {
 		o.Version = v
+	}
+}
+
+func WithSigningKey(k string) Option {
+	return func(o *PackageOptions) {
+		o.SigningKey = k
 	}
 }
 
@@ -48,41 +55,52 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 		}
 	}
 
-	outputFilename := fmt.Sprintf("%s-%s.rpm", name, options.Version)
+	outputFilename := fmt.Sprintf("%s-%s.pkg", name, options.Version)
 
-	outputPathDir, err := ioutil.TempDir("", "packaging-rpm-output")
+	outputPathDir, err := ioutil.TempDir("", "packaging-pkg-output")
 	if err != nil {
 		return errors.Wrap(err, "making TempDir")
 	}
 	defer os.RemoveAll(outputPathDir)
 
-	fpmCommand := []string{
-		"fpm",
-		"-s", "dir",
-		"-t", "rpm",
-		"-n", name,
-		"-v", options.Version,
-		"-p", filepath.Join("/out", outputFilename),
-		"-C", "/pkgsrc",
+	outputPath := filepath.Join(outputPathDir, outputFilename)
+
+	// Setup the script dir
+	scriptsDir, err := ioutil.TempDir("", "packaging-pkg-script")
+	if err != nil {
+		return errors.Wrap(err, "could not create temp directory for the macOS packaging script directory")
+	}
+	defer os.RemoveAll(scriptsDir)
+
+	/*
+		postinstallFile, err := os.Create(filepath.Join(scriptDir, "postinstall"))
+		if err != nil {
+			return errors.Wrap(err, "opening the postinstall file for writing")
+		}
+		if err := postinstallFile.Chmod(0755); err != nil {
+			return errors.Wrap(err, "could not make postinstall script executable")
+		}
+	*/
+
+	args := []string{
+		"--root", packageRoot,
+		"--scripts", scriptsDir,
+		"--identifier", name, // FIXME? identifier,
+		"--version", options.Version,
 	}
 
-	if options.AfterInstall != "" {
-		fpmCommand = append(fpmCommand, "--after-install", options.AfterInstall)
+	if options.SigningKey != "" {
+		args = append(args, "--sign", options.SigningKey)
 	}
 
-	dockerArgs := []string{
-		"run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgsrc", packageRoot),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"kolide/fpm",
-	}
+	args = append(args, outputPath)
 
-	cmd := exec.Command("docker", append(dockerArgs, fpmCommand...)...)
+	cmd := exec.Command("pkgbuild", args...)
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "creating rpm package: %s", stderr)
+		return errors.Wrapf(err, "creating pkg package: %s", stderr)
 	}
 
 	outputFH, err := os.Open(filepath.Join(outputPathDir, outputFilename))
@@ -95,4 +113,5 @@ func Package(w io.Writer, name string, packageRoot string, opts ...Option) error
 	}
 
 	return nil
+
 }
