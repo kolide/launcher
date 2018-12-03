@@ -1,4 +1,4 @@
-package launchd
+package packagekit
 
 import (
 	"io"
@@ -7,39 +7,23 @@ import (
 	"github.com/pkg/errors"
 )
 
-type LaunchdOptions struct {
-	ThrottleInterval  int
+type launchdOptions struct {
 	StandardErrorPath string
 	StandardOutPath   string
-	Environment       map[string]string
-	Flags             []string
+	ThrottleInterval  int
 }
 
-type Option func(*LaunchdOptions)
+type lOption func(*launchdOptions)
 
-func WithEnv(e map[string]string) Option {
-	return func(o *LaunchdOptions) {
-		o.Environment = e
-	}
-}
-
-func WithFlags(f []string) Option {
-	return func(o *LaunchdOptions) {
-		o.Flags = f
-	}
-}
-
-// renderLaunchDaemon renders a LaunchDaemon to start and schedule the launcher.
-func Render(w io.Writer, name string, opts ...Option) error {
-	// Create options, and define defaults
-	launchdOptions := &LaunchdOptions{
+func RenderLaunchd(w io.Writer, initOptions *InitOptions, opts ...lOption) error {
+	lOpts := &launchdOptions{
 		ThrottleInterval:  60,
 		StandardErrorPath: "/tmp/stderr.log", // TODO
 		StandardOutPath:   "/tmp/stdout.log", // TODO
 	}
 
 	for _, opt := range opts {
-		opt(launchdOptions)
+		opt(lOpts)
 	}
 
 	// This could be replaced with an XML library. Work for another day...
@@ -49,19 +33,19 @@ func Render(w io.Writer, name string, opts ...Option) error {
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>{{.Name}}</string>
+        <string>{{.Common.Name}}</string>
         <key>EnvironmentVariables</key>
         <dict>
-{{- if .Opts.Environment}}{{- range $key, $value := .Opts.Environment }}
+{{- range $key, $value := .Common.Environment }}
             <key>$key</key>
             <string>$value</string>
-{{- end }}{{- end }}
+{{- end }}
         </dict>
         <key>ProgramArguments</key>
         <array>
-{{- if .Opts.Flags }}{{- range $i, $flag := .Opts.Flags }}
+{{- range $i, $flag := .Common.Flags }}
             <string>{{$flag}}</string>
-{{- end }}{{- end }}
+{{- end }}
         </array>
        <key>KeepAlive</key>
         <dict>
@@ -81,11 +65,11 @@ func Render(w io.Writer, name string, opts ...Option) error {
 </plist>`
 
 	var data = struct {
-		Name string
-		Opts LaunchdOptions
+		Common InitOptions
+		Opts   launchdOptions
 	}{
-		Name: name,
-		Opts: *launchdOptions,
+		Common: *initOptions,
+		Opts:   *lOpts,
 	}
 
 	t, err := template.New("LaunchDaemon").Parse(launchDaemonTemplate)
