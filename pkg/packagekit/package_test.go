@@ -1,4 +1,4 @@
-package packageTNG
+package packagekit
 
 import (
 	"io/ioutil"
