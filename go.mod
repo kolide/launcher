@@ -40,7 +40,6 @@ require (
 	github.com/kolide/kit v0.0.0-20181124013649-bd1a9de64d48
 	github.com/kolide/osquery-go v0.0.0-20180816163454-30c843ecb33a
 	github.com/kolide/updater v0.0.0-20181127001321-d5bab28ddf67
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/kr/pty v1.1.2
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b // indirect
@@ -61,9 +60,9 @@ require (
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	google.golang.org/grpc v1.14.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
+	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
