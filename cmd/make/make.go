@@ -27,40 +27,35 @@ import (
 )
 
 func main() {
+	buildAll := strings.Join([]string{
+		"deps-go",
+		"install-tools",
+	}, ",")
+
 	var (
-		flTargets = flag.String("targets", "", "comma separated list of targets")
+		flTargets = flag.String("targets", buildAll, "comma separated list of targets")
 		flDebug   = flag.Bool("debug", false, "use a debug logger")
 	)
 	flag.Parse()
 
 	logger := logutil.NewCLILogger(*flDebug)
 	b := builder{logger: logger}
-
 	targetSet := map[string]func() error{
 		"deps-go":       b.depsGo,
 		"install-tools": b.installTools,
 		"generate-tuf":  b.generateTUF,
 	}
-	targets := targetSet
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {
-		targets = make(map[string]func() error)
 		for _, target := range t {
 			if fn, ok := targetSet[target]; ok {
-				targets[target] = fn
+				level.Debug(logger).Log("msg", "calling target", "target", target)
+				fn()
 			} else {
 				logutil.Fatal(logger, "err", "target does not exist", "target", target)
 			}
 		}
 	}
-
-	for t, fn := range targets {
-		level.Debug(logger).Log("msg", "calling target", "target", t)
-		if err := fn(); err != nil {
-			logutil.Fatal(logger, "err", err)
-		}
-	}
-
 }
 
 type builder struct {

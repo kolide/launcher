@@ -46,9 +46,14 @@ endif
 
 build: launcher extension
 
-.pre-build:
-	mkdir -p build/darwin
-	mkdir -p build/linux
+.pre-build: ${BUILD_DIR}
+
+${BUILD_DIR}:
+ifeq ($(OS), Windows_NT)
+	powershell New-Item -Type Directory -Force -Path ${BUILD_DIR} | powershell Out-Null
+else
+	mkdir -p ${BUILD_DIR}
+endif
 
 extension: .pre-build
 	go build -o build/osquery-extension.ext ./cmd/osquery-extension/
