@@ -93,46 +93,13 @@ package-builder: .pre-build xp-codesign .pre-package-builder generate
 launcher-pummel:
 	go build -o build/launcher-pummel -ldflags ${KIT_VERSION} ./cmd/launcher-pummel/
 
-GOTOOLS=$(shell cat pkg/tools/tools.go | awk '/_ /{print $$2}' |  tr -d '"')
-
-install-tools: $(patsubst %, %-go-tool, $(GOTOOLS))
-reinstall-tools: $(patsubst %, %-go-tool-force, $(GOTOOLS))
-
-%-go-tool: GOTOOLBIN = $(lastword $(subst /, , $*))
-%-go-tool: go-mod-download
-	command -v $(GOTOOLBIN) 2> /dev/null || go install $*
-
-%-go-tool-force: GOTOOLBIN = $(lastword $(subst /, , $*))
-%-go-tool-force: go-mod-download
-	rm -f $(GOTOOLBIN)
-	go install $*
-
-go-mod-check:
-	@go help mod > /dev/null || (echo "Your go is too old, no modules. Seek help." && exit 1)
-
-go-mod-download:
-	go mod download
-
-deps-go: go-mod-check go-mod-download install-tools
+deps-go: 
+	go run cmd/make/make.go -targets=deps-go,install-tools
 
 deps: deps-go generate
 
-# First, we generate a bindata file from an empty directory so that the symbols
-# are present (Asset, AssetDir, etc). Once the symbols are present, we can run
-# the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
-# the bindata file with the real TUF metadata.
 generate:
-	$(eval EMPTY_BINDATA_DIR = $(shell mktemp -d))
-	go-bindata \
-		-o pkg/autoupdate/bindata.go \
-		-pkg autoupdate \
-		$(EMPTY_BINDATA_DIR)
-	go run ./tools/notary/generate_tuf.go -binary osqueryd
-	go run ./tools/notary/generate_tuf.go -binary launcher
-	go-bindata \
-		-o pkg/autoupdate/bindata.go \
-		-pkg autoupdate \
-		pkg/autoupdate/assets/...
+	go run cmd/make/make.go -targets=generate-tuf
 
 proto:
 	@(cd pkg/pb/launcher; go generate)

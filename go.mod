@@ -3,6 +3,7 @@ module github.com/kolide/launcher
 require (
 	cloud.google.com/go v0.33.1 // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/Sirupsen/logrus v1.0.3 // indirect
