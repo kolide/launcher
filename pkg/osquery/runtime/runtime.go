@@ -12,17 +12,17 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
-
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
+
+	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
 type Runner struct {
@@ -90,7 +90,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	if err != nil {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
-	extensionPath := filepath.Join(filepath.Dir(exPath), "osquery-extension.ext")
+	extensionPath := filepath.Join(filepath.Dir(exPath), extensionName)
 	if _, err := os.Stat(extensionPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
@@ -101,7 +101,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 
 	// Determine the path to the extension socket
 	if extensionSocketPath == "" {
-		extensionSocketPath = filepath.Join(rootDir, "osquery.sock")
+		extensionSocketPath = socketPath(rootDir)
 	}
 
 	// Write the autoload file
@@ -142,6 +142,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--disable_watchdog",
 		"--utc",
 	)
+	cmd.Args = append(cmd.Args, platformArgs()...)
 	if stdout != nil {
 		cmd.Stdout = stdout
 	}
@@ -481,10 +482,14 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "starting osqueryd process")
 	}
 	o.errgroup.Go(func() error {
-		if err := o.cmd.Wait(); err != nil {
+		err := o.cmd.Wait()
+		switch {
+		case err == nil, isExitOk(err):
+			// TODO: should this return nil?
+			return errors.New("osquery process exited")
+		default:
 			return errors.Wrap(err, "running osqueryd command")
 		}
-		return errors.New("osquery process exited")
 	})
 
 	// Kill osquery process on shutdown
