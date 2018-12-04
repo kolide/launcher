@@ -25,6 +25,11 @@ func RenderSystemd(w io.Writer, initOptions *InitOptions, opts ...sOption) error
 		opt(sOpts)
 	}
 
+	// Prepend a "" so that the merged output looks a bit cleaner in the systemd file
+	if len(initOptions.Flags) > 0 {
+		initOptions.Flags = append([]string{""}, initOptions.Flags...)
+	}
+
 	systemdTemplate :=
 		`[Unit]
 Description={{.Common.Description}}
@@ -34,7 +39,7 @@ After=network.service syslog.service
 {{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
 Environment=$key=$value
 {{- end }}{{- end }}
-ExecStart={{.Common.Path}} {{ StringsJoin .Common.Flags " \\\n" }}
+ExecStart={{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n" }}
 Restart={{.Opts.Restart}}
 RestartSec={{.Opts.RestartSec}}
 
