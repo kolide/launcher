@@ -94,11 +94,6 @@ func runMake(args []string) error {
 			env.Bool("OMIT_SECRET", false),
 			"omit the enroll secret in the resultant package (default: false)",
 		)
-		flSystemd = flagset.Bool(
-			"systemd",
-			env.Bool("SYSTEMD", true),
-			"weather or not the launcher packages should be built to target systems with systemd (default: true)",
-		)
 		flCertPins = flagset.String(
 			"cert_pins",
 			env.String("CERT_PINS", ""),
@@ -178,20 +173,26 @@ func runMake(args []string) error {
 		DisableControlTLS:    *flDisableControlTLS,
 		Identifier:           *flIdentifier,
 		OmitSecret:           *flOmitSecret,
-		Systemd:              *flSystemd,
 		CertPins:             *flCertPins,
 		RootPEM:              *flRootPEM,
 		OutputPathDir:        *flOutputDir,
 		CacheDir:             *flCacheDir,
 	}
 
-	err := packaging.CreatePackage(packageOptions, packaging.Target{
+	// TODO: Make this nicer
+	outputFile, err := os.Create("/tmp/test.pkg")
+	if err != nil {
+		return errors.Wrap(err, "Failed to make package output file")
+	}
+	defer outputFile.Close()
+
+	packageTarget := packaging.Target{
 		Platform: packaging.Darwin,
 		Init:     packaging.LaunchD,
 		Package:  packaging.Pkg,
-	})
+	}
 
-	if err != nil {
+	if err := packaging.CreatePackage(outputFile, packageOptions, packageTarget); err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
 

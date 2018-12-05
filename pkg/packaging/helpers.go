@@ -1,11 +1,9 @@
 package packaging
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
@@ -95,10 +93,6 @@ func configurationDirectory(packageRoot, identifier string, target Target) (stri
 }
 
 /*
-type postinstallTemplateOptions struct {
-	LaunchDaemonDirectory string
-	LaunchDaemonName      string
-}
 
 func renderPostinstall(w io.Writer, options *postinstallTemplateOptions) error {
 	postinstallTemplate := `#!/bin/bash
@@ -118,47 +112,7 @@ sleep 5
 	return t.ExecuteTemplate(w, "postinstall", options)
 }
 
-type newSyslogTemplateOptions struct {
-	LogPath string
-	PidPath string
-}
 */
-
-func renderNewSyslogConfig(packageRoot string, po PackageOptions, rootDir string) error {
-	// Set logdir, we can assume this is darwin
-	logDir := fmt.Sprintf("/var/log/%s", po.Identifier)
-	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
-
-	if err := os.MkdirAll(filepath.Join(packageRoot, newSysLogDirectory), fs.DirMode); err != nil {
-		return errors.Wrap(err, "making newsyslog dir")
-	}
-
-	newSysLogPath := filepath.Join(packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", po.Identifier))
-	newSyslogFile, err := os.Create(newSysLogPath)
-	if err != nil {
-		return errors.Wrap(err, "creating newsyslog conf file")
-	}
-	defer newSyslogFile.Close()
-
-	logOptions := struct {
-		LogPath string
-		PidPath string
-	}{
-		LogPath: filepath.Join(logDir, "*.log"),
-		PidPath: filepath.Join(rootDir, "launcher.pid"),
-	}
-
-	syslogTemplate := `# logfilename          [owner:group]    mode count size when  flags [/pid_file] [sig_num]
-{{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
-	tmpl, err := template.New("syslog").Parse(syslogTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse postinstall template")
-	}
-	if err := tmpl.ExecuteTemplate(newSyslogFile, "syslog", logOptions); err != nil {
-		return errors.Wrap(err, "execute template")
-	}
-	return nil
-}
 
 // sanitizeHostname will replace any ":" characters in a given hostname with "-"
 // This is useful because ":" is not a valid character for file paths.

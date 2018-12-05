@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packagekit"
@@ -16,6 +17,38 @@ const (
 	// Enroll secret should be readable only by root
 	secretPerms = 0600
 )
+
+// PackageOptions encapsulates the launcher build options. It's
+// populated by callers, such as command line flags. It may change.
+type PackageOptions struct {
+	PackageVersion       string
+	OsqueryVersion       string
+	Hostname             string
+	Secret               string
+	MacPackageSigningKey string
+	Insecure             bool
+	InsecureGrpc         bool
+	Autoupdate           bool
+	UpdateChannel        string
+	Control              bool
+	InitialRunner        bool
+	ControlHostname      string
+	DisableControlTLS    bool
+	Identifier           string
+	OmitSecret           bool
+	CertPins             string
+	RootPEM              string
+	OutputPathDir        string
+	CacheDir             string
+}
+
+// Target is the platform being targetted by the build. As "platform"
+// has several axis, we use a stuct to convey them.
+type Target struct {
+	Init     InitFlavor
+	Package  PackageFlavor
+	Platform PlatformFlavor
+}
 
 type InitFlavor string
 
@@ -43,12 +76,6 @@ const (
 	Msi               = "msi"
 )
 
-type Target struct {
-	Init     InitFlavor
-	Package  PackageFlavor
-	Platform PlatformFlavor
-}
-
 func (f *Target) String() string {
 	return fmt.Sprintf("%s,%s,%s", f.Platform, f.Init, f.Package)
 }
@@ -59,7 +86,7 @@ func (f *Target) String() string {
 // actions.
 //
 // TODO "/tmp" is probably wrong on windows
-func CreatePackage(po PackageOptions, t Target) error {
+func CreatePackage(w io.Writer, po PackageOptions, t Target) error {
 	packageRoot, err := ioutil.TempDir("/tmp", fmt.Sprintf("package.packageRoot"))
 	if err != nil {
 		return errors.Wrap(err, "unable to create temporary packaging root directory")
@@ -169,6 +196,7 @@ func CreatePackage(po PackageOptions, t Target) error {
 		return errors.Wrapf(err, "setup init script for %s", t.String())
 	}
 
+	// Install binaries into packageRoot
 	// TODO seperate launcher versions, parallization, osquery-extension.ext
 	for _, binaryName := range []string{"osqueryd", "launcher"} {
 		if err := getBinary(packageRoot, po, t, binDir, binaryName, po.OsqueryVersion); err != nil {
@@ -180,10 +208,7 @@ func CreatePackage(po PackageOptions, t Target) error {
 		renderNewSyslogConfig(packageRoot, po, rootDir)
 	}
 
-	// TODO: How do we get the extension
-	pkgOut, _ := os.Create("/tmp/test.out")
-
-	return makePackage(pkgOut, packageRoot, po, t)
+	return makePackage(w, packageRoot, po, t)
 }
 
 func getBinary(packageRoot string, po PackageOptions, t Target, binDir, binaryName, binaryVersion string) error {
@@ -227,6 +252,42 @@ func makePackage(w io.Writer, packageRoot string, po PackageOptions, t Target) e
 	return nil
 }
 
+func renderNewSyslogConfig(packageRoot string, po PackageOptions, rootDir string) error {
+	// Set logdir, we can assume this is darwin
+	logDir := fmt.Sprintf("/var/log/%s", po.Identifier)
+	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
+
+	if err := os.MkdirAll(filepath.Join(packageRoot, newSysLogDirectory), fs.DirMode); err != nil {
+		return errors.Wrap(err, "making newsyslog dir")
+	}
+
+	newSysLogPath := filepath.Join(packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", po.Identifier))
+	newSyslogFile, err := os.Create(newSysLogPath)
+	if err != nil {
+		return errors.Wrap(err, "creating newsyslog conf file")
+	}
+	defer newSyslogFile.Close()
+
+	logOptions := struct {
+		LogPath string
+		PidPath string
+	}{
+		LogPath: filepath.Join(logDir, "*.log"),
+		PidPath: filepath.Join(rootDir, "launcher.pid"),
+	}
+
+	syslogTemplate := `# logfilename          [owner:group]    mode count size when  flags [/pid_file] [sig_num]
+{{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
+	tmpl, err := template.New("syslog").Parse(syslogTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse postinstall template")
+	}
+	if err := tmpl.ExecuteTemplate(newSyslogFile, "syslog", logOptions); err != nil {
+		return errors.Wrap(err, "execute template")
+	}
+	return nil
+}
+
 func setupInit(packageRoot string, initOptions *packagekit.InitOptions, f Target) error {
 	var dir string
 	var file string
@@ -260,27 +321,4 @@ func setupInit(packageRoot string, initOptions *packagekit.InitOptions, f Target
 	}
 
 	return nil
-}
-
-type PackageOptions struct {
-	PackageVersion       string
-	OsqueryVersion       string
-	Hostname             string
-	Secret               string
-	MacPackageSigningKey string
-	Insecure             bool
-	InsecureGrpc         bool
-	Autoupdate           bool
-	UpdateChannel        string
-	Control              bool
-	InitialRunner        bool
-	ControlHostname      string
-	DisableControlTLS    bool
-	Identifier           string
-	OmitSecret           bool
-	CertPins             string
-	RootPEM              string
-	OutputPathDir        string
-	CacheDir             string
-	Systemd              bool
 }
