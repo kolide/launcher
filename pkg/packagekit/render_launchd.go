@@ -21,9 +21,9 @@ type launchdOptions struct {
 	KeepAlive         map[string]interface{} `plist:"KeepAlive"`
 }
 
-type lOption func(*launchdOptions)
+// type lOption func(*launchdOptions)
 
-func RenderLaunchd(w io.Writer, initOptions *InitOptions, opts ...lOption) error {
+func RenderLaunchd(w io.Writer, initOptions *InitOptions) error {
 	if initOptions.Identifier == "" {
 		return errors.New("Identifier must not be empty")
 	}
@@ -48,10 +48,6 @@ func RenderLaunchd(w io.Writer, initOptions *InitOptions, opts ...lOption) error
 		StandardErrorPath: fmt.Sprintf("/var/log/%s/launcher-stderr.log", initOptions.Identifier),
 		StandardOutPath:   fmt.Sprintf("/var/log/%s/launcher-stdout.log", initOptions.Identifier),
 		KeepAlive:         keepAlive,
-	}
-
-	for _, opt := range opts {
-		opt(lOpts)
 	}
 
 	enc := plist.NewEncoder(w)

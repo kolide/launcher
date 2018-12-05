@@ -12,23 +12,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-type PkgOptions struct {
+type pkgOptions struct {
 	SigningKey string
 }
 
-type PkgOption func(*PkgOptions)
-
-func WithSigningKey(k string) PkgOption {
-	return func(o *PkgOptions) {
-		o.SigningKey = k
-	}
+type PkgOption interface {
+	SetPkgOption(*pkgOptions)
 }
 
-func PackagePkg(w io.Writer, po *PackageOptions, opts ...PkgOption) error {
-	options := &PkgOptions{}
-
-	for _, opt := range opts {
-		opt(options)
+func PackagePkg(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
+	options := &pkgOptions{}
+	for _, op := range ops {
+		op.SetPkgOption(options)
 	}
 
 	if err := isDirectory(po.Root); err != nil {

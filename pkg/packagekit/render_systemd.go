@@ -13,16 +13,12 @@ type systemdOptions struct {
 	RestartSec int
 }
 
-type sOption func(*systemdOptions)
+//type sOption func(*systemdOptions)
 
-func RenderSystemd(w io.Writer, initOptions *InitOptions, opts ...sOption) error {
+func RenderSystemd(w io.Writer, initOptions *InitOptions) error {
 	sOpts := &systemdOptions{
 		Restart:    "on-failure",
 		RestartSec: 3,
-	}
-
-	for _, opt := range opts {
-		opt(sOpts)
 	}
 
 	// Prepend a "" so that the merged output looks a bit cleaner in the systemd file

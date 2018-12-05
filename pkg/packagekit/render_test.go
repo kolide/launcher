@@ -79,15 +79,7 @@ func TestRenderComplex(t *testing.T) {
 func TestRenderLauncherSystemd(t *testing.T) {
 	t.Parallel()
 
-	launcherFlags := []string{
-		"--root_directory=/var/kolide-app/device.kolide.com-443",
-		"--hostname=device.kolide.com:443",
-		"--enroll_secret_path=/etc/kolide-app/secret",
-		"--with_initial_runner",
-		"--autoupdate",
-		"--update_channel=nightly",
-		"--osqueryd_path=/usr/local/kolide-app/bin/osqueryd",
-	}
+	launcherFlags := []string{}
 
 	initOptions := &InitOptions{
 		Name:        "launcher",
@@ -96,6 +88,16 @@ func TestRenderLauncherSystemd(t *testing.T) {
 		Path:        "/usr/local/kolide-app/bin/launcher",
 		Flags:       launcherFlags,
 	}
+
+	initOptions.Flags = append(initOptions.Flags,
+		"--root_directory=/var/kolide-app/device.kolide.com-443",
+		"--hostname=device.kolide.com:443",
+		"--enroll_secret_path=/etc/kolide-app/secret",
+		"--with_initial_runner",
+		"--autoupdate",
+		"--update_channel=nightly",
+		"--osqueryd_path=/usr/local/kolide-app/bin/osqueryd",
+	)
 
 	var output bytes.Buffer
 	err := RenderSystemd(&output, initOptions)

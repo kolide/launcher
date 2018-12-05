@@ -27,4 +27,7 @@ func TestPackageTrivial(t *testing.T) {
 	err = PackagePkg(ioutil.Discard, po)
 	require.NoError(t, err)
 
+	err = PackagePkg(ioutil.Discard, po, WithSigningKey("Developer ID Installer: Kolide Inc (YZ3EM74M78)"))
+	require.NoError(t, err)
+
 }

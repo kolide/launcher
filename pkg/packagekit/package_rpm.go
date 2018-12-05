@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func PackageRPM(w io.Writer, po *PackageOptions) error {
+func PackageRPM(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
