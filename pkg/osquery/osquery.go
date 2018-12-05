@@ -62,9 +62,9 @@ type OsqueryResultLog struct {
 	Columns map[string]string `json:"columns,omitempty"`
 	// Snapshot stores the rows and columns of snapshot queries
 	Snapshot    []map[string]string `json:"snapshot,omitempty"`
-	DiffResults *DiffResults        `json:"diffResults",omitempty`
-	Action      string              `json:"action",omitempty`
-	Decorations map[string]string   `json:"decorations",omitempty`
+	DiffResults *DiffResults        `json:"diffResults,omitempty"`
+	Action      string              `json:"action,omitempty"`
+	Decorations map[string]string   `json:"decorations,omitempty"`
 }
 
 // DiffResults is the format of osquery log results when --log_result_event is
