@@ -162,7 +162,7 @@ func runMake(args []string) error {
 	}
 
 	currentVersion := version.Version().Version
-	paths, err := packaging.CreatePackages(packaging.PackageOptions{
+	packageOptions := packaging.PackageOptions{
 		PackageVersion:       currentVersion,
 		OsqueryVersion:       osqueryVersion,
 		Hostname:             *flHostname,
@@ -183,16 +183,17 @@ func runMake(args []string) error {
 		RootPEM:              *flRootPEM,
 		OutputPathDir:        *flOutputDir,
 		CacheDir:             *flCacheDir,
+	}
+
+	err := packaging.CreatePackage(packageOptions, packaging.Target{
+		Platform: packaging.Darwin,
+		Init:     packaging.LaunchD,
+		Package:  packaging.Pkg,
 	})
+
 	if err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
-	level.Info(logger).Log(
-		"msg", "created packages",
-		"deb", paths.Deb,
-		"rpm", paths.RPM,
-		"mac", paths.MacOS,
-	)
 
 	return nil
 }

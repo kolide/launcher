@@ -26,18 +26,19 @@ func populateLocalCacheDir() error {
 	return nil
 }
 
-func osqueryTarPath(osqueryVersion, osqueryPlatform string) string {
-	return path.Join("kolide", "osqueryd", osqueryPlatform, fmt.Sprintf("osqueryd-%s.tar.gz", osqueryVersion))
+func dlTarPath(name, version, platform string) string {
+	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
 }
 
-func osqueryBinaryPath(osqueryVersion, osqueryPlatform string) string {
+func binaryPath(osqueryVersion, osqueryPlatform string) string {
 	return filepath.Join("kolide", "osqueryd", osqueryPlatform, osqueryVersion, "osqueryd")
 }
 
-// FetchOsquerydBinary will synchronously download an osquery binary as per the
-// supplied desired osquery version and platform identifiers. The path to the
-// downloaded binary is returned and an error if the operation did not succeed.
-func FetchOsquerydBinary(localCacheDir, osqueryVersion, osqueryPlatform string) (string, error) {
+// FetchOsquerydBinary will synchronously download a binary as per the
+// supplied desired version and platform identifiers. The path to the
+// downloaded binary is returned and an error if the operation did not
+// succeed.
+func FetchBinary(localCacheDir, name, version, platform string) (string, error) {
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
 		if err := populateLocalCacheDir(); err != nil {
@@ -45,29 +46,26 @@ func FetchOsquerydBinary(localCacheDir, osqueryVersion, osqueryPlatform string) 
 		}
 	}
 
+	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, platform, version), name)
+	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, platform, version))
+
 	// See if a local package exists on disk already. If so, return the cached path
-	localBinaryDownloadPath := filepath.Join(localCacheDir, osqueryBinaryPath(osqueryVersion, osqueryPlatform))
-	if _, err := os.Stat(localBinaryDownloadPath); err == nil {
-		return localBinaryDownloadPath, nil
+	if _, err := os.Stat(localBinaryPath); err == nil {
+		return localBinaryPath, nil
 	}
 
 	// If not we have to download the package. First, create download URI
-	url := fmt.Sprintf("https://dl.kolide.co/%s", osqueryTarPath(osqueryVersion, osqueryPlatform))
+	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(name, version, platform))
 
 	// Download the package
-	localPackageDownloadPath := filepath.Join(localCacheDir, osqueryTarPath(osqueryVersion, osqueryPlatform))
-	if err := os.MkdirAll(filepath.Dir(localPackageDownloadPath), fs.DirMode); err != nil {
-		return "", errors.Wrap(err, "couldn't create directory for package")
-	}
-
 	response, err := http.Get(url)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't download osquery binary archive")
+		return "", errors.Wrap(err, "couldn't download binary archive")
 	}
 	defer response.Body.Close()
 
 	// Store it in cache
-	writeHandle, err := os.Create(localPackageDownloadPath)
+	writeHandle, err := os.Create(localPackagePath)
 	if err != nil {
 		return "", errors.Wrap(err, "couldn't create file handle at local package download path")
 	}
@@ -81,17 +79,17 @@ func FetchOsquerydBinary(localCacheDir, osqueryVersion, osqueryPlatform string) 
 	// explicitly close the write handle before untaring the archive
 	writeHandle.Close()
 
-	if err := os.MkdirAll(filepath.Dir(localBinaryDownloadPath), fs.DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localBinaryPath), fs.DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
-	if err := fs.UntarBundle(localBinaryDownloadPath, localPackageDownloadPath); err != nil {
+	if err := fs.UntarBundle(localBinaryPath, localPackagePath); err != nil {
 		return "", errors.Wrap(err, "couldn't untar package")
 	}
 
-	if _, err := os.Stat(localBinaryDownloadPath); err != nil {
+	if _, err := os.Stat(localBinaryPath); err != nil {
 		return "", errors.Wrap(err, "local binary does not exist but it should")
 	}
 
-	return localBinaryDownloadPath, nil
+	return localBinaryPath, nil
 }
