@@ -3,6 +3,7 @@ package packagekit
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/groob/plist"
 	"github.com/pkg/errors"
@@ -45,8 +46,8 @@ func RenderLaunchd(w io.Writer, initOptions *InitOptions) error {
 		Args:              append([]string{initOptions.Path}, initOptions.Flags...),
 		Label:             fmt.Sprintf("com.%s.launcher", initOptions.Identifier),
 		ThrottleInterval:  60,
-		StandardErrorPath: fmt.Sprintf("/var/log/%s/launcher-stderr.log", initOptions.Identifier),
-		StandardOutPath:   fmt.Sprintf("/var/log/%s/launcher-stdout.log", initOptions.Identifier),
+		StandardErrorPath: filepath.Join("", "var", "log", initOptions.Identifier, "launcher-stderr.log"),
+		StandardOutPath:   filepath.Join("", "var", "log", initOptions.Identifier, "launcher-stdout.log"),
 		KeepAlive:         keepAlive,
 	}
 
