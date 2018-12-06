@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func PackageDeb(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
+func PackageDeb(w io.Writer, po *PackageOptions) error {
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -35,10 +35,11 @@ func PackageDeb(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
 		"-C", "/pkgsrc",
 	}
 
-	if po.AfterInstall != "" {
-		fpmCommand = append(fpmCommand, "--after-install", po.AfterInstall)
-	}
-
+	/*
+		if po.AfterInstall != "" {
+			fpmCommand = append(fpmCommand, "--after-install", po.AfterInstall)
+		}
+	*/
 	dockerArgs := []string{
 		"run", "--rm",
 		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),

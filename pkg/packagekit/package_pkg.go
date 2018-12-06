@@ -12,20 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type pkgOptions struct {
-	SigningKey string
-}
-
-type PkgOption interface {
-	SetPkgOption(*pkgOptions)
-}
-
-func PackagePkg(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
-	options := &pkgOptions{}
-	for _, op := range ops {
-		op.SetPkgOption(options)
-	}
-
+func PackagePkg(w io.Writer, po *PackageOptions) error {
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -40,22 +27,26 @@ func PackagePkg(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
 
 	outputPath := filepath.Join(outputPathDir, outputFilename)
 
-	// Setup the script dir
+	// pkg ship a scripts dir _outside_ the package root. this is bundled at packaging time.
 	scriptsDir, err := ioutil.TempDir("", "packaging-pkg-script")
 	if err != nil {
 		return errors.Wrap(err, "could not create temp directory for the macOS packaging script directory")
 	}
 	defer os.RemoveAll(scriptsDir)
 
-	/*
-		postinstallFile, err := os.Create(filepath.Join(scriptDir, "postinstall"))
+	if po.Postinst != nil {
+		postinstallFile, err := os.Create(filepath.Join(scriptsDir, "postinstall"))
 		if err != nil {
 			return errors.Wrap(err, "opening the postinstall file for writing")
 		}
+		defer postinstallFile.Close()
 		if err := postinstallFile.Chmod(0755); err != nil {
 			return errors.Wrap(err, "could not make postinstall script executable")
 		}
-	*/
+		if _, err := io.Copy(postinstallFile, po.Postinst); err != nil {
+			return errors.Wrap(err, "could not write postinstall script")
+		}
+	}
 
 	args := []string{
 		"--root", po.Root,
@@ -64,8 +55,8 @@ func PackagePkg(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
 		"--version", po.Version,
 	}
 
-	if options.SigningKey != "" {
-		args = append(args, "--sign", options.SigningKey)
+	if po.SigningKey != "" {
+		args = append(args, "--sign", po.SigningKey)
 	}
 
 	args = append(args, outputPath)

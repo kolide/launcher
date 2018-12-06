@@ -12,7 +12,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-func PackageRPM(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
+type outputTypes string
+
+const (
+	Deb outputTypes = "deb"
+	RPM             = "rpm"
+	Tar             = "tar"
+)
+
+func PackageRPM(w io.Writer, po *PackageOptions) error {
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -35,9 +43,11 @@ func PackageRPM(w io.Writer, po *PackageOptions, ops ...PkgOption) error {
 		"-C", "/pkgsrc",
 	}
 
-	if po.AfterInstall != "" {
-		fpmCommand = append(fpmCommand, "--after-install", po.AfterInstall)
-	}
+	/*
+		if po.AfterInstall != "" {
+			fpmCommand = append(fpmCommand, "--after-install", po.AfterInstall)
+		}
+	*/
 
 	dockerArgs := []string{
 		"run", "--rm",

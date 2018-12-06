@@ -1,11 +1,13 @@
 package packaging
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/kolide/kit/fs"
@@ -21,25 +23,26 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion       string
-	OsqueryVersion       string
-	Hostname             string
-	Secret               string
-	MacPackageSigningKey string
-	Insecure             bool
-	InsecureGrpc         bool
-	Autoupdate           bool
-	UpdateChannel        string
-	Control              bool
-	InitialRunner        bool
-	ControlHostname      string
-	DisableControlTLS    bool
-	Identifier           string
-	OmitSecret           bool
-	CertPins             string
-	RootPEM              string
-	OutputPathDir        string
-	CacheDir             string
+	PackageVersion    string
+	OsqueryVersion    string
+	LauncherVersion   string
+	Hostname          string
+	Secret            string
+	SigningKey        string
+	Insecure          bool
+	InsecureGrpc      bool
+	Autoupdate        bool
+	UpdateChannel     string
+	Control           bool
+	InitialRunner     bool
+	ControlHostname   string
+	DisableControlTLS bool
+	Identifier        string
+	OmitSecret        bool
+	CertPins          string
+	RootPEM           string
+	OutputPathDir     string
+	CacheDir          string
 }
 
 // Target is the platform being targetted by the build. As "platform"
@@ -192,23 +195,40 @@ func CreatePackage(w io.Writer, po PackageOptions, t Target) error {
 		Environment: launcherEnv,
 	}
 
-	if err := setupInit(packageRoot, initOptions, t); err != nil {
+	initFile, err := setupInit(packageRoot, initOptions, t)
+	if err != nil {
 		return errors.Wrapf(err, "setup init script for %s", t.String())
 	}
 
+	postInst, err := setupPostinst(po, initFile, t)
+	if err != nil {
+		return errors.Wrapf(err, "setup postInst for %s", t.String())
+	}
+
 	// Install binaries into packageRoot
-	// TODO seperate launcher versions, parallization, osquery-extension.ext
-	for _, binaryName := range []string{"osqueryd", "launcher"} {
-		if err := getBinary(packageRoot, po, t, binDir, binaryName, po.OsqueryVersion); err != nil {
-			return errors.Wrapf(err, "fetching binary %s", binaryName)
-		}
+	// TODO parallization, osquery-extension.ext
+	if err := getBinary(packageRoot, po, t, binDir, "osqueryd", po.OsqueryVersion); err != nil {
+		return errors.Wrapf(err, "fetching binary osqueryd")
+	}
+
+	if err := getBinary(packageRoot, po, t, binDir, "launcher", po.LauncherVersion); err != nil {
+		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
 	if t.Platform == Darwin {
 		renderNewSyslogConfig(packageRoot, po, rootDir)
 	}
 
-	return makePackage(w, packageRoot, po, t)
+	packagekitops := &packagekit.PackageOptions{
+		Name:       "launcher",
+		Postinst:   postInst,
+		Prerm:      nil,
+		Root:       packageRoot,
+		SigningKey: po.SigningKey,
+		Version:    po.PackageVersion,
+	}
+
+	return makePackage(w, packageRoot, packagekitops, t)
 }
 
 func getBinary(packageRoot string, po PackageOptions, t Target, binDir, binaryName, binaryVersion string) error {
@@ -225,28 +245,24 @@ func getBinary(packageRoot string, po PackageOptions, t Target, binDir, binaryNa
 	return nil
 }
 
-func makePackage(w io.Writer, packageRoot string, po PackageOptions, t Target) error {
-	packagekitops := &packagekit.PackageOptions{
-		Name:    "launcher",
-		Version: po.PackageVersion,
-		Root:    packageRoot,
-	}
-
-	var packageFunc func(io.Writer, *packagekit.PackageOptions, ...packagekit.PkgOption) error
+func makePackage(w io.Writer, packageRoot string, packagekitops *packagekit.PackageOptions, t Target) error {
 
 	switch {
 	case t.Package == Deb:
-		packageFunc = packagekit.PackageDeb
+		if err := packagekit.PackageDeb(w, packagekitops); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", t.String())
+		}
+
 	case t.Package == Rpm:
-		packageFunc = packagekit.PackageRPM
+		if err := packagekit.PackageRPM(w, packagekitops); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", t.String())
+		}
 	case t.Package == Pkg:
-		packageFunc = packagekit.PackagePkg
+		if err := packagekit.PackagePkg(w, packagekitops); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", t.String())
+		}
 	default:
 		return errors.Errorf("Don't know how to package %s", t.String())
-	}
-
-	if err := packageFunc(w, packagekitops); err != nil {
-		return errors.Wrapf(err, "packaging, target %s", t.String())
 	}
 
 	return nil
@@ -288,7 +304,7 @@ func renderNewSyslogConfig(packageRoot string, po PackageOptions, rootDir string
 	return nil
 }
 
-func setupInit(packageRoot string, initOptions *packagekit.InitOptions, f Target) error {
+func setupInit(packageRoot string, initOptions *packagekit.InitOptions, f Target) (string, error) {
 	var dir string
 	var file string
 	var renderFunc func(io.Writer, *packagekit.InitOptions) error
@@ -303,22 +319,95 @@ func setupInit(packageRoot string, initOptions *packagekit.InitOptions, f Target
 		file = fmt.Sprintf("launcher.%s.service", initOptions.Identifier)
 		renderFunc = packagekit.RenderSystemd
 	default:
-		return errors.Errorf("Unsupported target %s", f.String())
+		return "", errors.Errorf("Unsupported target %s", f.String())
 	}
 
 	if err := os.MkdirAll(filepath.Join(packageRoot, dir), fs.DirMode); err != nil {
-		return errors.Wrapf(err, "mkdir failed, target %s", f.String())
+		return "", errors.Wrapf(err, "mkdir failed, target %s", f.String())
 	}
 
 	fh, err := os.Create(filepath.Join(packageRoot, dir, file))
 	if err != nil {
-		return errors.Wrapf(err, "create filehandle, target %s", f.String())
+		return "", errors.Wrapf(err, "create filehandle, target %s", f.String())
 	}
 	defer fh.Close()
 
 	if err := renderFunc(fh, initOptions); err != nil {
-		return errors.Wrapf(err, "rendering init file, target %s", f.String())
+		return "", errors.Wrapf(err, "rendering init file, target %s", f.String())
 	}
 
-	return nil
+	return filepath.Join(dir, file), nil
+}
+
+func setupPrerm(po PackageOptions, initFile string, t Target) (io.Reader, error) {
+	switch {
+	case t.Platform == Darwin && t.Init == LaunchD:
+	case t.Platform == Linux && t.Init == SystemD:
+	case t.Platform == Linux && t.Init == Init:
+		// TODO double check if this is init, or what
+	}
+
+	// If we don't match in the case statement, log that we're ignoring
+	// the setup, and move on. Don't throw an error. FIXME: Setup
+	// logging
+	return nil, nil
+}
+
+// TODO these names are wrong for linux
+func setupPostinst(po PackageOptions, initFile string, t Target) (io.Reader, error) {
+	switch {
+	case t.Platform == Darwin && t.Init == LaunchD:
+		var output bytes.Buffer
+		if err := renderLaunchdPostinst(&output, po.Identifier, initFile); err != nil {
+			return nil, errors.Wrap(err, "setupPostinst")
+		}
+		return &output, nil
+
+	case t.Platform == Linux && t.Init == SystemD:
+		contents := `#!/bin/bash
+set -e
+systemctl daemon-reload
+systemctl enable launcher
+systemctl restart launcher`
+		return strings.NewReader(contents), nil
+
+	case t.Platform == Linux && t.Init == Init:
+		// TODO double check if this is init, or what
+		contents := `#!/bin/bash
+sudo service launcher restart`
+		return strings.NewReader(contents), nil
+	}
+
+	// If we don't match in the case statement, log that we're ignoring
+	// the setup, and move on. Don't throw an error. FIXME: Setup
+	// logging
+	return nil, nil
+
+}
+
+func renderLaunchdPostinst(w io.Writer, identifier, initFile string) error {
+	var data = struct {
+		Identifier string
+		Path       string
+	}{
+		Identifier: fmt.Sprintf("com.%s.launcher", identifier),
+		Path:       initFile,
+	}
+
+	postinstallTemplate := `#!/bin/bash
+
+[[ $3 != "/" ]] && exit 0
+
+/bin/launchctl stop {{.Identifier}}
+
+sleep 5
+
+/bin/launchctl unload {{.Path}}
+/bin/launchctl load {{.Path}}`
+
+	t, err := template.New("postinstall").Parse(postinstallTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse postinstall template")
+	}
+	return t.ExecuteTemplate(w, "postinstall", data)
 }

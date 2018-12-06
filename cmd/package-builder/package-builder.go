@@ -36,18 +36,23 @@ func runMake(args []string) error {
 		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
-			env.String("OSQUERY_VERSION", ""),
+			env.String("OSQUERY_VERSION", "stable"),
 			"the osquery version to include in the resultant packages",
+		)
+		flLauncherVersion = flagset.String(
+			"launcher_version",
+			env.String("LAUNCHER_VERSION", "stable"),
+			"the launcher version to include in the resultant packages",
 		)
 		flEnrollSecret = flagset.String(
 			"enroll_secret",
 			env.String("ENROLL_SECRET", ""),
 			"the string to be used as the server enrollment secret",
 		)
-		flMacPackageSigningKey = flagset.String(
+		flSigningKey = flagset.String(
 			"mac_package_signing_key",
-			env.String("MAC_PACKAGE_SIGNING_KEY", ""),
-			"the name of the key that should be used to sign mac packages",
+			env.String("SIGNING_KEY", ""),
+			"the name of the key that should be used to packages. Will be platform specific",
 		)
 		flInsecure = flagset.Bool(
 			"insecure",
@@ -140,15 +145,6 @@ func runMake(args []string) error {
 		return errors.New("Hostname undefined")
 	}
 
-	osqueryVersion := *flOsqueryVersion
-	if osqueryVersion == "" {
-		osqueryVersion = "stable"
-	}
-
-	// TODO check that the signing key is installed if defined
-	macPackageSigningKey := *flMacPackageSigningKey
-	_ = macPackageSigningKey
-
 	// Validate that pinned certs are valid hex
 	for _, pin := range strings.Split(*flCertPins, ",") {
 		if _, err := hex.DecodeString(pin); err != nil {
@@ -158,25 +154,26 @@ func runMake(args []string) error {
 
 	currentVersion := version.Version().Version
 	packageOptions := packaging.PackageOptions{
-		PackageVersion:       currentVersion,
-		OsqueryVersion:       osqueryVersion,
-		Hostname:             *flHostname,
-		Secret:               *flEnrollSecret,
-		MacPackageSigningKey: macPackageSigningKey,
-		Insecure:             *flInsecure,
-		InsecureGrpc:         *flInsecureGrpc,
-		Autoupdate:           *flAutoupdate,
-		UpdateChannel:        *flUpdateChannel,
-		Control:              *flControl,
-		InitialRunner:        *flInitialRunner,
-		ControlHostname:      *flControlHostname,
-		DisableControlTLS:    *flDisableControlTLS,
-		Identifier:           *flIdentifier,
-		OmitSecret:           *flOmitSecret,
-		CertPins:             *flCertPins,
-		RootPEM:              *flRootPEM,
-		OutputPathDir:        *flOutputDir,
-		CacheDir:             *flCacheDir,
+		PackageVersion:    currentVersion,
+		OsqueryVersion:    *flOsqueryVersion,
+		LauncherVersion:   *flLauncherVersion,
+		Hostname:          *flHostname,
+		Secret:            *flEnrollSecret,
+		SigningKey:        *flSigningKey,
+		Insecure:          *flInsecure,
+		InsecureGrpc:      *flInsecureGrpc,
+		Autoupdate:        *flAutoupdate,
+		UpdateChannel:     *flUpdateChannel,
+		Control:           *flControl,
+		InitialRunner:     *flInitialRunner,
+		ControlHostname:   *flControlHostname,
+		DisableControlTLS: *flDisableControlTLS,
+		Identifier:        *flIdentifier,
+		OmitSecret:        *flOmitSecret,
+		CertPins:          *flCertPins,
+		RootPEM:           *flRootPEM,
+		OutputPathDir:     *flOutputDir,
+		CacheDir:          *flCacheDir,
 	}
 
 	// TODO: Make this nicer

@@ -92,28 +92,6 @@ func configurationDirectory(packageRoot, identifier string, target Target) (stri
 	return dir, errors.Wrapf(err, "create config dir for %s", target.String())
 }
 
-/*
-
-func renderPostinstall(w io.Writer, options *postinstallTemplateOptions) error {
-	postinstallTemplate := `#!/bin/bash
-
-[[ $3 != "/" ]] && exit 0
-
-/bin/launchctl stop {{.LaunchDaemonName}}
-
-sleep 5
-
-/bin/launchctl unload {{.LaunchDaemonDirectory}}/{{.LaunchDaemonName}}.plist
-/bin/launchctl load {{.LaunchDaemonDirectory}}/{{.LaunchDaemonName}}.plist`
-	t, err := template.New("postinstall").Parse(postinstallTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse postinstall template")
-	}
-	return t.ExecuteTemplate(w, "postinstall", options)
-}
-
-*/
-
 // sanitizeHostname will replace any ":" characters in a given hostname with "-"
 // This is useful because ":" is not a valid character for file paths.
 func sanitizeHostname(hostname string) string {
