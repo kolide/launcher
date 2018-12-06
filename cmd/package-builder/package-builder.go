@@ -189,10 +189,13 @@ func runMake(args []string) error {
 		Package:  packaging.Pkg,
 	}
 
-	if err := packaging.CreatePackage(outputFile, packageOptions, packageTarget); err != nil {
+	packageOptions.Prepare(packageTarget)
+
+	if err := packageOptions.Build(outputFile); err != nil {
 		return errors.Wrap(err, "could not generate packages")
 	}
 
+	fmt.Printf("Build you %s\n", outputFile.Name())
 	return nil
 }
 

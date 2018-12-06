@@ -46,8 +46,8 @@ func RenderLaunchd(w io.Writer, initOptions *InitOptions) error {
 		Args:              append([]string{initOptions.Path}, initOptions.Flags...),
 		Label:             fmt.Sprintf("com.%s.launcher", initOptions.Identifier),
 		ThrottleInterval:  60,
-		StandardErrorPath: filepath.Join("", "var", "log", initOptions.Identifier, "launcher-stderr.log"),
-		StandardOutPath:   filepath.Join("", "var", "log", initOptions.Identifier, "launcher-stdout.log"),
+		StandardErrorPath: filepath.Join("/var/log", initOptions.Identifier, "launcher-stderr.log"),
+		StandardOutPath:   filepath.Join("/var/log", initOptions.Identifier, "launcher-stdout.log"),
 		KeepAlive:         keepAlive,
 	}
 

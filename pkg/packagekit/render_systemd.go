@@ -33,7 +33,7 @@ After=network.service syslog.service
 
 [Service]
 {{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
-Environment=$key=$value
+Environment={{$key}}={{$value}}
 {{- end }}{{- end }}
 ExecStart={{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n" }}
 Restart={{.Opts.Restart}}

@@ -13,9 +13,10 @@ func TestPackageTrivial(t *testing.T) {
 	require.NoError(t, err)
 
 	po := &PackageOptions{
-		Name:    "test-empty",
-		Version: "0.0.0",
-		Root:    inputDir,
+		Name:       "test-empty",
+		Version:    "0.0.0",
+		Root:       inputDir,
+		SigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
 	}
 
 	err = PackageDeb(ioutil.Discard, po)
@@ -27,7 +28,7 @@ func TestPackageTrivial(t *testing.T) {
 	err = PackagePkg(ioutil.Discard, po)
 	require.NoError(t, err)
 
-	err = PackagePkg(ioutil.Discard, po, WithSigningKey("Developer ID Installer: Kolide Inc (YZ3EM74M78)"))
+	err = PackagePkg(ioutil.Discard, po)
 	require.NoError(t, err)
 
 }

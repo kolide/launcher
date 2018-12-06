@@ -2,16 +2,15 @@ package packagekit
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
-	"howett.net/plist"
-	//	"github.com/groob/plist"
 	"github.com/stretchr/testify/require"
+	"howett.net/plist"
 )
 
 func TestRenderEmpty(t *testing.T) {
 	t.Parallel()
-	var err error
 
 	initOptions := &InitOptions{
 		Name:        "empty",
@@ -20,23 +19,34 @@ func TestRenderEmpty(t *testing.T) {
 		Path:        "/dev/null",
 	}
 
-	var output bytes.Buffer
+	var tests = []struct {
+		renderFunc func(io.Writer, *InitOptions) error
+		outSize    int
+	}{
+		{
+			renderFunc: RenderLaunchd,
+			outSize:    100,
+		},
+		{
+			renderFunc: RenderSystemd,
+			outSize:    100,
+		},
+		{
+			renderFunc: RenderInit,
+			outSize:    100,
+		},
+	}
 
-	err = RenderLaunchd(&output, initOptions)
-	require.NoError(t, err)
-	require.True(t, len(output.String()) > 100)
-	output.Reset()
-
-	err = RenderSystemd(&output, initOptions)
-	require.NoError(t, err)
-	require.True(t, len(output.String()) > 100)
-	output.Reset()
-
+	for _, tt := range tests {
+		var output bytes.Buffer
+		err := tt.renderFunc(&output, initOptions)
+		require.NoError(t, err)
+		require.True(t, len(output.String()) > tt.outSize)
+	}
 }
 
 func TestRenderComplex(t *testing.T) {
 	t.Parallel()
-	var err error
 
 	env := map[string]string{
 		"FOO": "bar",
@@ -59,19 +69,31 @@ func TestRenderComplex(t *testing.T) {
 		Path:        "/usr/bin/true",
 	}
 
-	var output bytes.Buffer
+	var tests = []struct {
+		renderFunc func(io.Writer, *InitOptions) error
+		outSize    int
+	}{
+		{
+			renderFunc: RenderLaunchd,
+			outSize:    200,
+		},
+		{
+			renderFunc: RenderSystemd,
+			outSize:    200,
+		},
+		{
+			renderFunc: RenderInit,
+			outSize:    200,
+		},
+	}
 
-	err = RenderLaunchd(&output, initOptions)
-	require.NoError(t, err)
-	require.True(t, len(output.String()) > 200)
-	output.Reset()
-
-	err = RenderSystemd(&output, initOptions)
-	require.NoError(t, err)
-	require.True(t, len(output.String()) > 200)
-	output.Reset()
-
-	//require.True(t, strings.Contains(output.String(), expectedFlags))
+	for _, tt := range tests {
+		var output bytes.Buffer
+		err := tt.renderFunc(&output, initOptions)
+		require.NoError(t, err)
+		require.True(t, len(output.String()) > tt.outSize)
+		// TODO Check some of the rendered content
+	}
 
 }
 
@@ -200,6 +222,8 @@ func TestRenderLauncherLaunchd(t *testing.T) {
   </dict>
 </plist>`
 
+	// TODO this should be unmarshaled into a generic struct, so we can
+	// capture any missing fields.
 	var expectedData launchdOptions
 	_, err = plist.Unmarshal([]byte(expected), &expectedData)
 	require.NoError(t, err)
