@@ -69,7 +69,9 @@ func main() {
 		for _, target := range t {
 			if fn, ok := targetSet[target]; ok {
 				level.Debug(logger).Log("msg", "calling target", "target", target)
-				fn()
+				if err := fn(); err != nil {
+					logutil.Fatal(logger, "msg", "Target Failed", "err", err, "target", target)
+				}
 			} else {
 				logutil.Fatal(logger, "err", "target does not exist", "target", target)
 			}
