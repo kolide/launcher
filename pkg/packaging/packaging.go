@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/kolide/kit/fs"
@@ -41,12 +40,12 @@ type PackageOptions struct {
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
-	OutputPathDir     string
 	CacheDir          string
 
 	target        Target                     // Target build platform
 	initOptions   *packagekit.InitOptions    // options we'll pass to the packagekit renderers
 	packagekitops *packagekit.PackageOptions // options for packagekit packagers
+	packageWriter io.Writer                  // Where to write the file
 
 	// These are build machine local directories. They are absolute path.
 	packageRoot string // temp directory that will become the package
@@ -60,71 +59,27 @@ type PackageOptions struct {
 
 }
 
-// internalOptions is a struct to hold a bunch of internally generated settings. It's here to simplify passing arguments between our packaging routines.
-type internalOptions struct {
-}
-
-// Target is the platform being targetted by the build. As "platform"
-// has several axis, we use a stuct to convey them.
-type Target struct {
-	Init     InitFlavor
-	Package  PackageFlavor
-	Platform PlatformFlavor
-}
-
-type InitFlavor string
-
-const (
-	LaunchD InitFlavor = "launchd"
-	SystemD            = "systemd"
-	Init               = "init"
-)
-
-type PlatformFlavor string
-
-const (
-	Darwin  PlatformFlavor = "darwin"
-	Windows                = "windows"
-	Linux                  = "linux"
-)
-
-type PackageFlavor string
-
-const (
-	Pkg PackageFlavor = "pkg"
-	Tar               = "tar"
-	Deb               = "deb"
-	Rpm               = "rpm"
-	Msi               = "msi"
-)
-
-func (f *Target) String() string {
-	return fmt.Sprintf("%s,%s,%s", f.Platform, f.Init, f.Package)
-}
-
 // NewPackager returns a PackageOptions struct. You can, just create one directly.
 func NewPackager() *PackageOptions {
 	return &PackageOptions{}
 }
 
-func (p *PackageOptions) Prepare(target Target) error {
+func (p *PackageOptions) Build(packageWriter io.Writer, target Target) error {
 
 	p.target = target
+	p.packageWriter = packageWriter
 
 	var err error
 
-	// TODO "/tmp" is probably wrong on windows
-	if p.packageRoot, err = ioutil.TempDir("/tmp", fmt.Sprintf("package.packageRoot")); err != nil {
+	if p.packageRoot, err = ioutil.TempDir("", "package.packageRoot"); err != nil {
 		return errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
-	//TODO defer os.RemoveAll(p.packageRoot)
-	fmt.Printf("hi seph: %s\n", p.packageRoot)
+	defer os.RemoveAll(p.packageRoot)
 
-	// TODO "/tmp" is probably wrong on windows
-	if p.scriptRoot, err = ioutil.TempDir("/tmp", fmt.Sprintf("package.scriptRoot")); err != nil {
+	if p.scriptRoot, err = ioutil.TempDir("", fmt.Sprintf("package.scriptRoot")); err != nil {
 		return errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
-	// TODO defer os.RemoveAll(intOpts.ScriptRoot)
+	defer os.RemoveAll(p.scriptRoot)
 
 	if err := p.setupDirectories(); err != nil {
 		return errors.Wrap(err, "setup directories")
@@ -243,7 +198,10 @@ func (p *PackageOptions) Prepare(target Target) error {
 		}
 	}
 
-	//return makePackage(w, packageRoot, packagekitops, t)
+	if err := p.makePackage(); err != nil {
+		return errors.Wrap(err, "making package")
+	}
+
 	return nil
 }
 
@@ -261,20 +219,20 @@ func (p *PackageOptions) getBinary(binaryName, binaryVersion string) error {
 	return nil
 }
 
-func (p *PackageOptions) Build(w io.Writer) error {
+func (p *PackageOptions) makePackage() error {
 
 	switch {
 	case p.target.Package == Deb:
-		if err := packagekit.PackageDeb(w, p.packagekitops); err != nil {
+		if err := packagekit.PackageDeb(p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 
 	case p.target.Package == Rpm:
-		if err := packagekit.PackageRPM(w, p.packagekitops); err != nil {
+		if err := packagekit.PackageRPM(p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Pkg:
-		if err := packagekit.PackagePkg(w, p.packagekitops); err != nil {
+		if err := packagekit.PackagePkg(p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	default:
@@ -373,46 +331,54 @@ func (p *PackageOptions) setupPrerm() error {
 
 // TODO this is all wrong -- these should be templated based on indentifier
 func (p *PackageOptions) setupPostinst() error {
+	var postinstTemplate string
+	identifier := p.Identifier
+
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
-		var output bytes.Buffer
-		if err := renderLaunchdPostinst(&output, p.Identifier, p.initFile); err != nil {
-			return errors.Wrap(err, "setupPostinst")
-		}
-		p.packagekitops.Postinst = &output
-
+		postinstTemplate = postinstallLauncherTemplate()
+		identifier = fmt.Sprintf("com.%s.launcher", p.Identifier)
 	case p.target.Platform == Linux && p.target.Init == SystemD:
-		contents := `#!/bin/bash
-set -e
-systemctl daemon-reload
-systemctl enable launcher
-systemctl restart launcher`
-		p.packagekitops.Postinst = strings.NewReader(contents)
-
+		postinstTemplate = postinstallSystemdTemplate()
 	case p.target.Platform == Linux && p.target.Init == Init:
-		// TODO double check if this is init, or what
-		contents := `#!/bin/bash
-sudo service launcher restart`
-		p.packagekitops.Postinst = strings.NewReader(contents)
+		postinstTemplate = postinstallInitTemplate()
+	default:
+		// If we don't match in the case statement, log that we're ignoring
+		// the setup, and move on. Don't throw an error.
+		// logging
+		return nil
 	}
 
-	// If we don't match in the case statement, log that we're ignoring
-	// the setup, and move on. Don't throw an error. FIXME: Setup
-	// logging
-	return nil
-
-}
-
-func renderLaunchdPostinst(w io.Writer, identifier, initFile string) error {
 	var data = struct {
 		Identifier string
 		Path       string
 	}{
-		Identifier: fmt.Sprintf("com.%s.launcher", identifier),
-		Path:       initFile,
+		Identifier: identifier,
+		Path:       p.initFile,
 	}
 
-	postinstallTemplate := `#!/bin/bash
+	t, err := template.New("postinstall").Parse(postinstTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse template")
+	}
+
+	var output bytes.Buffer
+
+	if err := t.ExecuteTemplate(&output, "postinstall", data); err != nil {
+		return errors.Wrap(err, "executing template")
+	}
+
+	p.packagekitops.Postinst = &output
+	return nil
+}
+
+func postinstallInitTemplate() string {
+	return `#!/bin/sh
+sudo service launcher restart`
+}
+
+func postinstallLauncherTemplate() string {
+	return `#!/bin/bash
 
 [[ $3 != "/" ]] && exit 0
 
@@ -422,12 +388,14 @@ sleep 5
 
 /bin/launchctl unload {{.Path}}
 /bin/launchctl load {{.Path}}`
+}
 
-	t, err := template.New("postinstall").Parse(postinstallTemplate)
-	if err != nil {
-		return errors.Wrap(err, "not able to parse postinstall template")
-	}
-	return t.ExecuteTemplate(w, "postinstall", data)
+func postinstallSystemdTemplate() string {
+	return `#!/bin/bash
+set -e
+systemctl daemon-reload
+systemctl enable launcher
+systemctl restart launcher`
 }
 
 func (p *PackageOptions) setupDirectories() error {

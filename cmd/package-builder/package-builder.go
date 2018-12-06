@@ -4,7 +4,9 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -152,6 +154,7 @@ func runMake(args []string) error {
 		}
 	}
 
+	// TODO fix this version
 	currentVersion := version.Version().Version
 	packageOptions := packaging.PackageOptions{
 		PackageVersion:    currentVersion,
@@ -172,30 +175,67 @@ func runMake(args []string) error {
 		OmitSecret:        *flOmitSecret,
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
-		OutputPathDir:     *flOutputDir,
 		CacheDir:          *flCacheDir,
 	}
 
-	// TODO: Make this nicer
-	outputFile, err := os.Create("/tmp/test.pkg")
-	if err != nil {
-		return errors.Wrap(err, "Failed to make package output file")
+	outputDir := *flOutputDir
+
+	// NOTE: if you;re using docker-for-mac, you probably need to set the TMPDIR env to /tmp
+	if outputDir == "" {
+		var err error
+		outputDir, err = ioutil.TempDir("", fmt.Sprintf("launcher-package"))
+		if err != nil {
+			return errors.Wrap(err, "making output dir")
+		}
 	}
-	defer outputFile.Close()
-
-	packageTarget := packaging.Target{
-		Platform: packaging.Darwin,
-		Init:     packaging.LaunchD,
-		Package:  packaging.Pkg,
-	}
-
-	packageOptions.Prepare(packageTarget)
-
-	if err := packageOptions.Build(outputFile); err != nil {
-		return errors.Wrap(err, "could not generate packages")
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return errors.Wrap(err, "mkdir")
 	}
 
-	fmt.Printf("Build you %s\n", outputFile.Name())
+	targets := []packaging.Target{
+		{
+			Platform: packaging.Darwin,
+			Init:     packaging.LaunchD,
+			Package:  packaging.Pkg,
+		},
+		{
+			Platform: packaging.Linux,
+			Init:     packaging.SystemD,
+			Package:  packaging.Rpm,
+		},
+		{
+			Platform: packaging.Linux,
+			Init:     packaging.SystemD,
+			Package:  packaging.Deb,
+		},
+		/*
+			{
+				Platform: packaging.Linux,
+				Init:     packaging.Init,
+				Package:  packaging.Rpm,
+			},
+			{
+				Platform: packaging.Linux,
+				Init:     packaging.Init,
+				Package:  packaging.Deb,
+			},
+		*/
+	}
+
+	for _, target := range targets {
+		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.Extension())
+		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
+		if err != nil {
+			return errors.Wrap(err, "Failed to make package output file")
+		}
+		defer outputFile.Close()
+
+		if err := packageOptions.Build(outputFile, target); err != nil {
+			return errors.Wrap(err, "could not generate packages")
+		}
+	}
+
+	fmt.Printf("Built you packages in %s\n", outputDir)
 	return nil
 }
 
