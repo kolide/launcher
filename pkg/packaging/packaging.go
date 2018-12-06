@@ -329,7 +329,6 @@ func (p *PackageOptions) setupPrerm() error {
 	return nil
 }
 
-// TODO this is all wrong -- these should be templated based on indentifier
 func (p *PackageOptions) setupPostinst() error {
 	var postinstTemplate string
 	identifier := p.Identifier
@@ -374,7 +373,7 @@ func (p *PackageOptions) setupPostinst() error {
 
 func postinstallInitTemplate() string {
 	return `#!/bin/sh
-sudo service launcher restart`
+sudo service launcher.{{.Identifier}} restart`
 }
 
 func postinstallLauncherTemplate() string {
@@ -394,8 +393,8 @@ func postinstallSystemdTemplate() string {
 	return `#!/bin/bash
 set -e
 systemctl daemon-reload
-systemctl enable launcher
-systemctl restart launcher`
+systemctl enable launcher.{{.Identifier}}
+systemctl restart launcher.{{.Identifier}}`
 }
 
 func (p *PackageOptions) setupDirectories() error {
