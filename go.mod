@@ -56,6 +56,7 @@ require (
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.2.2
 	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf
+	go.opencensus.io v0.18.0
 	golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
