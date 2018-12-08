@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -64,7 +65,7 @@ func NewPackager() *PackageOptions {
 	return &PackageOptions{}
 }
 
-func (p *PackageOptions) Build(packageWriter io.Writer, target Target) error {
+func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, target Target) error {
 
 	p.target = target
 	p.packageWriter = packageWriter
@@ -170,43 +171,43 @@ func (p *PackageOptions) Build(packageWriter io.Writer, target Target) error {
 		Version:    p.PackageVersion,
 	}
 
-	if err := p.setupInit(); err != nil {
+	if err := p.setupInit(ctx); err != nil {
 		return errors.Wrapf(err, "setup init script for %s", p.target.String())
 	}
 
-	if err := p.setupPostinst(); err != nil {
+	if err := p.setupPostinst(ctx); err != nil {
 		return errors.Wrapf(err, "setup postInst for %s", p.target.String())
 	}
 
-	if err := p.setupPrerm(); err != nil {
+	if err := p.setupPrerm(ctx); err != nil {
 		return errors.Wrapf(err, "setup setupPrerm for %s", p.target.String())
 	}
 
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
-	if err := p.getBinary("osqueryd", p.OsqueryVersion); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.OsqueryVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary("launcher", p.LauncherVersion); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.LauncherVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
 	if p.target.Platform == Darwin {
-		if err := p.renderNewSyslogConfig(); err != nil {
+		if err := p.renderNewSyslogConfig(ctx); err != nil {
 			return errors.Wrap(err, "render")
 		}
 	}
 
-	if err := p.makePackage(); err != nil {
+	if err := p.makePackage(ctx); err != nil {
 		return errors.Wrap(err, "making package")
 	}
 
 	return nil
 }
 
-func (p *PackageOptions) getBinary(binaryName, binaryVersion string) error {
-	localPath, err := FetchBinary(p.CacheDir, binaryName, binaryVersion, string(p.target.Platform))
+func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersion string) error {
+	localPath, err := FetchBinary(ctx, p.CacheDir, binaryName, binaryVersion, string(p.target.Platform))
 	if err != nil {
 		return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
 	}
@@ -219,20 +220,20 @@ func (p *PackageOptions) getBinary(binaryName, binaryVersion string) error {
 	return nil
 }
 
-func (p *PackageOptions) makePackage() error {
+func (p *PackageOptions) makePackage(ctx context.Context) error {
 
 	switch {
 	case p.target.Package == Deb:
-		if err := packagekit.PackageDeb(p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackageDeb(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 
 	case p.target.Package == Rpm:
-		if err := packagekit.PackageRPM(p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackageRPM(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Pkg:
-		if err := packagekit.PackagePkg(p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	default:
@@ -242,7 +243,7 @@ func (p *PackageOptions) makePackage() error {
 	return nil
 }
 
-func (p *PackageOptions) renderNewSyslogConfig() error {
+func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	// Set logdir, we can assume this is darwin
 	logDir := fmt.Sprintf("/var/log/%s", p.Identifier)
 	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
@@ -278,10 +279,10 @@ func (p *PackageOptions) renderNewSyslogConfig() error {
 	return nil
 }
 
-func (p *PackageOptions) setupInit() error {
+func (p *PackageOptions) setupInit(ctx context.Context) error {
 	var dir string
 	var file string
-	var renderFunc func(io.Writer, *packagekit.InitOptions) error
+	var renderFunc func(context.Context, io.Writer, *packagekit.InitOptions) error
 
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
@@ -308,14 +309,14 @@ func (p *PackageOptions) setupInit() error {
 	}
 	defer fh.Close()
 
-	if err := renderFunc(fh, p.initOptions); err != nil {
+	if err := renderFunc(ctx, fh, p.initOptions); err != nil {
 		return errors.Wrapf(err, "rendering init file (%s), target %s", p.target.String())
 	}
 
 	return nil
 }
 
-func (p *PackageOptions) setupPrerm() error {
+func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
 	case p.target.Platform == Linux && p.target.Init == SystemD:
@@ -329,7 +330,7 @@ func (p *PackageOptions) setupPrerm() error {
 	return nil
 }
 
-func (p *PackageOptions) setupPostinst() error {
+func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	var postinstTemplate string
 	identifier := p.Identifier
 

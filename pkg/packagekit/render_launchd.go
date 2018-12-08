@@ -1,12 +1,14 @@
 package packagekit
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
 
 	"github.com/groob/plist"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
 // Note: I wanted to just include the InitOptions struct here, but it
@@ -24,7 +26,10 @@ type launchdOptions struct {
 
 // type lOption func(*launchdOptions)
 
-func RenderLaunchd(w io.Writer, initOptions *InitOptions) error {
+func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
+	ctx, span := trace.StartSpan(ctx, "packagekit.RenderLaunchd")
+	defer span.End()
+
 	if initOptions.Identifier == "" {
 		return errors.New("Identifier must not be empty")
 	}

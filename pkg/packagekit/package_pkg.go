@@ -2,6 +2,7 @@ package packagekit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,9 +11,13 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
-func PackagePkg(w io.Writer, po *PackageOptions) error {
+func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
+	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
+	defer span.End()
+
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -61,7 +66,7 @@ func PackagePkg(w io.Writer, po *PackageOptions) error {
 
 	args = append(args, outputPath)
 
-	cmd := exec.Command("pkgbuild", args...)
+	cmd := exec.CommandContext(ctx, "pkgbuild", args...)
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr

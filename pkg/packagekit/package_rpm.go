@@ -2,6 +2,7 @@ package packagekit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
 type outputTypes string
@@ -20,7 +22,10 @@ const (
 	Tar             = "tar"
 )
 
-func PackageRPM(w io.Writer, po *PackageOptions) error {
+func PackageRPM(ctx context.Context, w io.Writer, po *PackageOptions) error {
+	ctx, span := trace.StartSpan(ctx, "packagekit.PackageRPM")
+	defer span.End()
+
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -56,7 +61,7 @@ func PackageRPM(w io.Writer, po *PackageOptions) error {
 		"kolide/fpm",
 	}
 
-	cmd := exec.Command("docker", append(dockerArgs, fpmCommand...)...)
+	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...)
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -230,7 +231,7 @@ func runMake(args []string) error {
 		}
 		defer outputFile.Close()
 
-		if err := packageOptions.Build(outputFile, target); err != nil {
+		if err := packageOptions.Build(context.Background(), outputFile, target); err != nil {
 			return errors.Wrap(err, "could not generate packages")
 		}
 	}

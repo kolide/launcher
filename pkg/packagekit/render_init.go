@@ -1,14 +1,18 @@
 package packagekit
 
 import (
+	"context"
 	"io"
 	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
-func RenderInit(w io.Writer, initOptions *InitOptions) error {
+func RenderInit(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
+	ctx, span := trace.StartSpan(ctx, "packagekit.RenderInit")
+	defer span.End()
 
 	initdTemplate := `#!/bin/sh
 set -e

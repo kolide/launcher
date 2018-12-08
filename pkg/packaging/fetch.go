@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,7 +39,7 @@ func binaryPath(osqueryVersion, osqueryPlatform string) string {
 // supplied desired version and platform identifiers. The path to the
 // downloaded binary is returned and an error if the operation did not
 // succeed.
-func FetchBinary(localCacheDir, name, version, platform string) (string, error) {
+func FetchBinary(ctx context.Context, localCacheDir, name, version, platform string) (string, error) {
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
 		if err := populateLocalCacheDir(); err != nil {
@@ -58,7 +59,14 @@ func FetchBinary(localCacheDir, name, version, platform string) (string, error) 
 	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(name, version, platform))
 
 	// Download the package
-	response, err := http.Get(url)
+	downloadReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", errors.Wrap(err, "new request")
+	}
+	downloadReq = downloadReq.WithContext(ctx)
+
+	httpClient := http.DefaultClient
+	response, err := httpClient.Do(downloadReq)
 	if err != nil {
 		return "", errors.Wrap(err, "couldn't download binary archive")
 	}
