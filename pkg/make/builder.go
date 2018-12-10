@@ -81,7 +81,6 @@ func WithStampVersion() Option {
 }
 
 func New(opts ...Option) (*Builder, error) {
-
 	verString := strings.TrimPrefix(runtime.Version(), "go")
 	goVer, err := semver.NewVersion(verString)
 	if err != nil {
@@ -150,6 +149,13 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.DepsGo")
 	defer span.End()
 
+	logger := ctxlog.FromContext(ctx)
+
+	level.Debug(logger).Log(
+		"cmd", "go mod download",
+		"msg", "Starting",
+	)
+
 	if err := b.goVersionCompatible(); err != nil {
 		return err
 	}
@@ -160,7 +166,13 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "run go mod download, output=%s", out)
 	}
-	level.Debug(ctxlog.FromContext(ctx)).Log("cmd", "go mod download", "output", string(out))
+
+	level.Debug(logger).Log(
+		"cmd", "go mod download",
+		"msg", "Finished",
+		"output", string(out),
+	)
+
 	return nil
 }
 
@@ -168,12 +180,19 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.InstallTools")
 	defer span.End()
 
+	logger := ctxlog.FromContext(ctx)
+
+	level.Debug(logger).Log(
+		"cmd", "Install Tools",
+		"msg", "Starting",
+	)
+
 	cmd := b.execCC(
 		ctx,
 		"go", "list",
 		"-tags", "tools",
 		"-json",
-		"github.com/kolide/launcher/pkg/tools",
+		"./pkg/tools",
 	)
 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	stdout, err := cmd.StdoutPipe()
@@ -213,6 +232,12 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 		})
 	}
 	err = g.Wait()
+
+	level.Debug(logger).Log(
+		"cmd", "Install Tools",
+		"msg", "Finished",
+	)
+
 	return errors.Wrap(err, "install tools")
 }
 
@@ -346,6 +371,14 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 
 		ctx, span := trace.StartSpan(ctx, fmt.Sprintf("make.BuildCmd.%s", appName))
 		defer span.End()
+
+		logger := ctxlog.FromContext(ctx)
+
+		level.Debug(logger).Log(
+			"cmd", "Build",
+			"app", appName,
+			"msg", "Starting",
+		)
 
 		baseArgs := []string{"build", "-o", output}
 		if b.race {
