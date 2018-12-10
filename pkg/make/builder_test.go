@@ -92,13 +92,12 @@ func TestDepsGo(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	execCommandContext = helperCommandContext
-	defer func() { execCommand = exec.Command }()
 
 	semVer, err := semver.NewVersion("1.11")
 	require.NoError(t, err)
 
 	b := Builder{goVer: semVer}
+	b.execCC = helperCommandContext
 
 	err = b.DepsGo(ctx)
 	require.NoError(t, err)
@@ -108,15 +107,16 @@ func TestExecOut(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	execCommandContext = helperCommandContext
-	defer func() { execCommand = exec.Command }()
 
-	response, err := execOut(ctx, "echo", "one", "and", "two")
+	b := &Builder{}
+	b.execCC = helperCommandContext
+
+	response, err := b.execOut(ctx, "echo", "one", "and", "two")
 	require.NoError(t, err)
 	require.Equal(t, "one and two", response)
 
 	// This fails because we didn't mock the "not mocked" command
-	failResponse, err := execOut(ctx, "not mocked", "echo", "one", "and", "two")
+	failResponse, err := b.execOut(ctx, "not mocked", "echo", "one", "and", "two")
 	require.Error(t, err)
 	require.Equal(t, "", failResponse)
 
@@ -127,7 +127,6 @@ func TestExecOut(t *testing.T) {
 // https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
 // and https://npf.io/2015/06/testing-exec-command/
 func TestHelperProcess(t *testing.T) {
-
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}

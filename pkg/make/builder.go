@@ -45,6 +45,7 @@ type Builder struct {
 
 	goVer  *semver.Version
 	cmdEnv []string
+	execCC func(context.Context, string, ...string) *exec.Cmd
 }
 
 type Option func(*Builder)
@@ -79,12 +80,6 @@ func WithStampVersion() Option {
 	}
 }
 
-// execCommand is a var to allow mocking in tesst
-var execCommand = exec.Command
-
-// execCommandContext is a var to allow mocking in tests
-var execCommandContext = exec.CommandContext
-
 func New(opts ...Option) (*Builder, error) {
 
 	verString := strings.TrimPrefix(runtime.Version(), "go")
@@ -97,6 +92,8 @@ func New(opts ...Option) (*Builder, error) {
 		os:    runtime.GOOS,
 		arch:  runtime.GOARCH,
 		goVer: goVer,
+
+		execCC: exec.CommandContext,
 	}
 
 	for _, opt := range opts {
@@ -156,7 +153,7 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 	if err := b.goVersionCompatible(); err != nil {
 		return err
 	}
-	cmd := execCommandContext(ctx, "go", "mod", "download")
+	cmd := b.execCC(ctx, "go", "mod", "download")
 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 
 	out, err := cmd.CombinedOutput()
@@ -171,7 +168,7 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.InstallTools")
 	defer span.End()
 
-	cmd := execCommandContext(
+	cmd := b.execCC(
 		ctx,
 		"go", "list",
 		"-tags", "tools",
@@ -223,7 +220,7 @@ func (b *Builder) installTool(ctx context.Context, importPath string) error {
 	ctx, span := trace.StartSpan(ctx, "make.installTool")
 	defer span.End()
 
-	cmd := execCommandContext(ctx, "go", "install", importPath)
+	cmd := b.execCC(ctx, "go", "install", importPath)
 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -248,7 +245,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	}
 	defer os.RemoveAll(dir)
 
-	if err := execBindata(ctx, dir); err != nil {
+	if err := b.execBindata(ctx, dir); err != nil {
 		return errors.Wrap(err, "exec bindata for empty dir")
 	}
 
@@ -285,18 +282,18 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		}
 	}
 
-	if err := execBindata(ctx, "pkg/autoupdate/assets/..."); err != nil {
+	if err := b.execBindata(ctx, "pkg/autoupdate/assets/..."); err != nil {
 		return errors.Wrap(err, "exec bindata for autoupdate assets")
 	}
 
 	return nil
 }
 
-func execBindata(ctx context.Context, dir string) error {
+func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	ctx, span := trace.StartSpan(ctx, "make.execBindata")
 	defer span.End()
 
-	cmd := execCommandContext(
+	cmd := b.execCC(
 		ctx,
 		"go-bindata",
 		"-o", "pkg/autoupdate/bindata.go",
@@ -359,17 +356,17 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-w -d -linkmode internal")
 		}
 		if b.stampVersion {
-			v, err := execOut(ctx, "git", "describe", "--tags", "--always", "--dirty")
+			v, err := b.execOut(ctx, "git", "describe", "--tags", "--always", "--dirty")
 			if err != nil {
 				return err
 			}
 
-			branch, err := execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+			branch, err := b.execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				return err
 			}
 
-			revision, err := execOut(ctx, "git", "rev-parse", "HEAD")
+			revision, err := b.execOut(ctx, "git", "rev-parse", "HEAD")
 			if err != nil {
 				return err
 			}
@@ -394,7 +391,7 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 
 		level.Debug(ctxlog.FromContext(ctx)).Log("mgs", "building binary", "app_name", appName, "output", output, "go_args", strings.Join(args, "  "))
 
-		cmd := execCommandContext(ctx, "go", args...)
+		cmd := b.execCC(ctx, "go", args...)
 		cmd.Env = append(cmd.Env, b.cmdEnv...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -418,8 +415,8 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 	}
 }
 
-func execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
-	cmd := execCommandContext(ctx, argv0, args...)
+func (b *Builder) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
+	cmd := b.execCC(ctx, argv0, args...)
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil {
