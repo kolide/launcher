@@ -34,7 +34,7 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	opts := []make.Option{
-		make.WithOs(*flBuildOS),
+		make.WithOS(*flBuildOS),
 		make.WithArch(*flBuildARCH),
 	}
 	if *flRace {

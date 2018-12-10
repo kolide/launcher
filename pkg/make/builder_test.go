@@ -15,17 +15,9 @@ import (
 func helperCommandContext(ctx context.Context, command string, args ...string) (cmd *exec.Cmd) {
 	cs := []string{"-test.run=TestHelperProcess", "--", command}
 	cs = append(cs, args...)
-	if ctx != nil {
-		cmd = exec.CommandContext(ctx, os.Args[0], cs...)
-	} else {
-		cmd = exec.Command(os.Args[0], cs...)
-	}
+	cmd = exec.CommandContext(ctx, os.Args[0], cs...)
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 	return cmd
-}
-
-func helperCommand(command string, args ...string) *exec.Cmd {
-	return helperCommandContext(nil, command, args...)
 }
 
 func TestNamingHelpers(t *testing.T) {

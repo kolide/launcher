@@ -1,5 +1,5 @@
 /* Package make provides some simple functions to handle build and go
-dependancies.
+dependencies.
 
 We used to do this with gnumake rules, but as we added windows
 compatibility, we found make too limiting. Moving this into go allows
@@ -49,7 +49,7 @@ type Builder struct {
 
 type Option func(*Builder)
 
-func WithOs(o string) Option {
+func WithOS(o string) Option {
 	return func(b *Builder) {
 		b.os = o
 	}
@@ -210,7 +210,7 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 			)
 			continue
 		}
-		// TODO for go 1.12, this can be parallized.
+
 		g.Go(func() error {
 			return b.installTool(ctx, toolPath)
 		})
