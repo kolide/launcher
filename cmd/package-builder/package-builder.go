@@ -47,6 +47,11 @@ func runMake(args []string) error {
 			env.String("LAUNCHER_VERSION", "stable"),
 			"the launcher version to include in the resultant packages",
 		)
+		flExtensionVersion = flagset.String(
+			"extension_version",
+			env.String("EXTENSION_VERSION", "stable"),
+			"the extension version to include in the resultant packages",
+		)
 		flEnrollSecret = flagset.String(
 			"enroll_secret",
 			env.String("ENROLL_SECRET", ""),
@@ -161,6 +166,7 @@ func runMake(args []string) error {
 		PackageVersion:    currentVersion,
 		OsqueryVersion:    *flOsqueryVersion,
 		LauncherVersion:   *flLauncherVersion,
+		ExtensionVersion:  *flExtensionVersion,
 		Hostname:          *flHostname,
 		Secret:            *flEnrollSecret,
 		SigningKey:        *flSigningKey,

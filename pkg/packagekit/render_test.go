@@ -2,6 +2,7 @@ package packagekit
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestRenderEmpty(t *testing.T) {
 	}
 
 	var tests = []struct {
-		renderFunc func(io.Writer, *InitOptions) error
+		renderFunc func(context.Context, io.Writer, *InitOptions) error
 		outSize    int
 	}{
 		{
@@ -39,7 +40,7 @@ func TestRenderEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		var output bytes.Buffer
-		err := tt.renderFunc(&output, initOptions)
+		err := tt.renderFunc(context.TODO(), &output, initOptions)
 		require.NoError(t, err)
 		require.True(t, len(output.String()) > tt.outSize)
 	}
@@ -70,7 +71,7 @@ func TestRenderComplex(t *testing.T) {
 	}
 
 	var tests = []struct {
-		renderFunc func(io.Writer, *InitOptions) error
+		renderFunc func(context.Context, io.Writer, *InitOptions) error
 		outSize    int
 	}{
 		{
@@ -89,7 +90,7 @@ func TestRenderComplex(t *testing.T) {
 
 	for _, tt := range tests {
 		var output bytes.Buffer
-		err := tt.renderFunc(&output, initOptions)
+		err := tt.renderFunc(context.TODO(), &output, initOptions)
 		require.NoError(t, err)
 		require.True(t, len(output.String()) > tt.outSize)
 		// TODO Check some of the rendered content
@@ -122,7 +123,7 @@ func TestRenderLauncherSystemd(t *testing.T) {
 	)
 
 	var output bytes.Buffer
-	err := RenderSystemd(&output, initOptions)
+	err := RenderSystemd(context.TODO(), &output, initOptions)
 	require.NoError(t, err)
 
 	expected := `[Unit]
@@ -174,7 +175,7 @@ func TestRenderLauncherLaunchd(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	err := RenderLaunchd(&output, initOptions)
+	err := RenderLaunchd(context.TODO(), &output, initOptions)
 	require.NoError(t, err)
 
 	// Now, let's check that the content matches. We're doing this with

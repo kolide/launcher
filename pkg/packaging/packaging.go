@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packagekit"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
 const (
@@ -26,6 +28,7 @@ type PackageOptions struct {
 	PackageVersion    string
 	OsqueryVersion    string
 	LauncherVersion   string
+	ExtensionVersion  string
 	Hostname          string
 	Secret            string
 	SigningKey        string
@@ -185,12 +188,17 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
+	// TODO windows file extensions
 	if err := p.getBinary(ctx, "osqueryd", p.OsqueryVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
 	if err := p.getBinary(ctx, "launcher", p.LauncherVersion); err != nil {
-		return errors.Wrapf(err, "fetching binary osqueryd")
+		return errors.Wrapf(err, "fetching binary launcher")
+	}
+
+	if err := p.getBinary(ctx, "osquery-extension.ext", p.ExtensionVersion); err != nil {
+		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
 	if p.target.Platform == Darwin {
@@ -206,11 +214,30 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	return nil
 }
 
+// getBinary will fetch binaries from places and copy them into our
+// package root. The default case is to assume binaryVersion is a
+// string, and to download from TUF. But it it starts with a character
+// that looks like a file path, treat is as something on the
+// filesystem.
+//
+// TODO: add in file:// URLs
 func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersion string) error {
-	localPath, err := FetchBinary(ctx, p.CacheDir, binaryName, binaryVersion, string(p.target.Platform))
-	if err != nil {
-		return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
+	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", binaryName))
+	defer span.End()
+
+	var err error
+	var localPath string
+
+	switch {
+	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
+		localPath = binaryVersion
+	default:
+		localPath, err = FetchBinary(ctx, p.CacheDir, binaryName, binaryVersion, string(p.target.Platform))
+		if err != nil {
+			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
+		}
 	}
+
 	if err := fs.CopyFile(
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),
@@ -221,6 +248,8 @@ func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersio
 }
 
 func (p *PackageOptions) makePackage(ctx context.Context) error {
+	ctx, span := trace.StartSpan(ctx, "packaging.makePackage")
+	defer span.End()
 
 	switch {
 	case p.target.Package == Deb:
