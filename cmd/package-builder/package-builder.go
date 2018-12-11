@@ -133,6 +133,11 @@ func runMake(args []string) error {
 			env.Bool("ENABLE_INITIAL_RUNNER", false),
 			"Run differential queries from config ahead of scheduled interval.",
 		)
+		flTargets = flagset.String(
+			"targets",
+			env.String("TARGETS", ""),
+			"Target platforms to build",
+		)
 	)
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
@@ -203,34 +208,50 @@ func runMake(args []string) error {
 		return errors.Wrap(err, "mkdir")
 	}
 
-	targets := []packaging.Target{
-		{
-			Platform: packaging.Darwin,
-			Init:     packaging.LaunchD,
-			Package:  packaging.Pkg,
-		},
-		{
-			Platform: packaging.Linux,
-			Init:     packaging.SystemD,
-			Package:  packaging.Rpm,
-		},
-		{
-			Platform: packaging.Linux,
-			Init:     packaging.SystemD,
-			Package:  packaging.Deb,
-		},
-		/*
+	targets := []packaging.Target{}
+	if *flTargets == "" {
+		targets = []packaging.Target{
+			{
+				Platform: packaging.Darwin,
+				Init:     packaging.LaunchD,
+				Package:  packaging.Pkg,
+			},
 			{
 				Platform: packaging.Linux,
-				Init:     packaging.Init,
+				Init:     packaging.SystemD,
 				Package:  packaging.Rpm,
 			},
 			{
 				Platform: packaging.Linux,
-				Init:     packaging.Init,
+				Init:     packaging.SystemD,
 				Package:  packaging.Deb,
 			},
-		*/
+		}
+	}
+
+	for _, target := range strings.Split(*flTargets, ",") {
+		switch target {
+		case "rpm":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Linux,
+				Init:     packaging.SystemD,
+				Package:  packaging.Rpm,
+			})
+		case "deb":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Linux,
+				Init:     packaging.SystemD,
+				Package:  packaging.Deb,
+			})
+		case "darwin":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Darwin,
+				Init:     packaging.LaunchD,
+				Package:  packaging.Pkg,
+			})
+		default:
+			return errors.Errorf("Unknown target: %s", target)
+		}
 	}
 
 	for _, target := range targets {
