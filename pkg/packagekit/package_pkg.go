@@ -56,7 +56,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	args := []string{
 		"--root", po.Root,
 		"--scripts", scriptsDir,
-		"--identifier", po.Name, // FIXME? identifier,
+		"--identifier", fmt.Sprintf("com.%s.launcher", po.Identifier),
 		"--version", po.Version,
 	}
 

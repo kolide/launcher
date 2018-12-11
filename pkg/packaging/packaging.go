@@ -167,6 +167,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:       "launcher",
+		Identifier: p.Identifier,
 		Postinst:   nil,
 		Prerm:      nil,
 		Root:       p.packageRoot,
