@@ -234,7 +234,7 @@ func runMake(args []string) error {
 	}
 
 	for _, target := range targets {
-		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.Extension())
+		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
 		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
 		if err != nil {
 			return errors.Wrap(err, "Failed to make package output file")

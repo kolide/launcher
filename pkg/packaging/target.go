@@ -1,6 +1,9 @@
 package packaging
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Target is the platform being targetted by the build. As "platform"
 // has several axis, we use a stuct to convey them.
@@ -40,23 +43,14 @@ func (t *Target) String() string {
 	return fmt.Sprintf("%s-%s-%s", t.Platform, t.Init, t.Package)
 }
 
-func (t *Target) Extension() string {
-	switch t.Package {
-	case Pkg:
-		return "pkg"
-	case Tar:
-		return "tar"
-	case Deb:
-		return "deb"
-	case Rpm:
-		return "rpm"
-	case Msi:
-		return "msi"
-	}
-	return ""
+// Extension returns the extension that the resulting filesystem
+// package should have. This may need to gain a PlatformFlavor in the
+// future, and not just a straight string(PackageFlavor)
+func (t *Target) PkgExtension() string {
+	return strings.ToLower(string(t.Package))
 }
 
-// extBinary is a helper to return the platform specific extension name.
+// ExtBinary is a helper to return the platform specific extension name.
 func (t *Target) ExtBinary(input string) string {
 	if t.Platform == "Windows" {
 		return input + ".exe"
@@ -65,8 +59,8 @@ func (t *Target) ExtBinary(input string) string {
 	}
 }
 
-// platformBinary is a helper to return the platform specific binary suffix.
-func (t *Target) PlatformBinary(input string) string {
+// BinExtension is a helper to return the platform specific binary suffix.
+func (t *Target) BinExtension(input string) string {
 	if t.Platform == "Windows" {
 		return input + ".exe"
 	}

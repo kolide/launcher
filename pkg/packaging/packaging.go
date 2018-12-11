@@ -189,11 +189,11 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
-	if err := p.getBinary(ctx, p.target.PlatformBinary("osqueryd"), p.OsqueryVersion); err != nil {
+	if err := p.getBinary(ctx, p.target.BinExtension("osqueryd"), p.OsqueryVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary(ctx, p.target.PlatformBinary("launcher"), p.LauncherVersion); err != nil {
+	if err := p.getBinary(ctx, p.target.BinExtension("launcher"), p.LauncherVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 

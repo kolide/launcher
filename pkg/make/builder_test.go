@@ -45,7 +45,7 @@ func TestNamingHelpers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		require.Equal(t, tt.binaryOut, tt.b.PlatformBinary("test"))
+		require.Equal(t, tt.binaryOut, tt.b.BinExtension("test"))
 		require.Equal(t, tt.extensionOut, tt.b.ExtBinary("test"))
 	}
 }
