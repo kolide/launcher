@@ -169,7 +169,8 @@ func runMake(args []string) error {
 		}
 	}
 
-	// TODO fix this version
+	// TODO fix this version -- If we're not building launcher, how do
+	// we tell what to version it with?
 	currentVersion := version.Version().Version
 	packageOptions := packaging.PackageOptions{
 		PackageVersion:    currentVersion,

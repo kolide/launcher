@@ -50,8 +50,8 @@ func (t *Target) PkgExtension() string {
 	return strings.ToLower(string(t.Package))
 }
 
-// ExtBinary is a helper to return the platform specific extension name.
-func (t *Target) ExtBinary(input string) string {
+// PlatformExtensionName is a helper to return the platform specific extension name.
+func (t *Target) PlatformExtensionName(input string) string {
 	if t.Platform == "Windows" {
 		return input + ".exe"
 	} else {
@@ -59,8 +59,8 @@ func (t *Target) ExtBinary(input string) string {
 	}
 }
 
-// BinExtension is a helper to return the platform specific binary suffix.
-func (t *Target) BinExtension(input string) string {
+// PlatformBinaryName is a helper to return the platform specific binary suffix.
+func (t *Target) PlatformBinaryName(input string) string {
 	if t.Platform == "Windows" {
 		return input + ".exe"
 	}
