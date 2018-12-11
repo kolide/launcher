@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -24,7 +25,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	path, err := packaging.FetchOsquerydBinary(*flCacheDir, *flVersion, *flPlatform)
+	ctx := context.Background()
+
+	path, err := packaging.FetchBinary(ctx, *flCacheDir, "osqueryd", *flVersion, *flPlatform)
 	if err != nil {
 		fmt.Println("An error occurred fetching the osqueryd binary: ", err)
 		os.Exit(1)

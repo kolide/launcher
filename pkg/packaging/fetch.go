@@ -9,8 +9,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 )
 
@@ -31,15 +34,13 @@ func dlTarPath(name, version, platform string) string {
 	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
 }
 
-func binaryPath(osqueryVersion, osqueryPlatform string) string {
-	return filepath.Join("kolide", "osqueryd", osqueryPlatform, osqueryVersion, "osqueryd")
-}
-
 // FetchOsquerydBinary will synchronously download a binary as per the
 // supplied desired version and platform identifiers. The path to the
 // downloaded binary is returned and an error if the operation did not
 // succeed.
 func FetchBinary(ctx context.Context, localCacheDir, name, version, platform string) (string, error) {
+	logger := ctxlog.FromContext(ctx)
+
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
 		if err := populateLocalCacheDir(); err != nil {
@@ -55,8 +56,16 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 		return localBinaryPath, nil
 	}
 
-	// If not we have to download the package. First, create download URI
-	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(name, version, platform))
+	// If not we have to download the package. First, create download
+	// URI. Notary stores things by name, sans extension. So just strip
+	// it off.
+	baseName := strings.TrimSuffix(name, filepath.Ext(name))
+	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(baseName, version, platform))
+
+	level.Debug(logger).Log(
+		"msg", "starting download",
+		"url", url,
+	)
 
 	// Download the package
 	downloadReq, err := http.NewRequest("GET", url, nil)
@@ -71,6 +80,10 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 		return "", errors.Wrap(err, "couldn't download binary archive")
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return "", errors.Errorf("Failed download. Got http status %s", response.Status)
+	}
 
 	// Store it in cache
 	writeHandle, err := os.Create(localPackagePath)
@@ -91,10 +104,13 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
+	// UntarBundle is a bit misnamed. this untars unto the directory
+	// containing that file. It has a call to filepath.Dir(destination) there.
 	if err := fs.UntarBundle(localBinaryPath, localPackagePath); err != nil {
-		return "", errors.Wrap(err, "couldn't untar package")
+		return "", errors.Wrap(err, "couldn't untar download")
 	}
 
+	// TODO / FIXME this fails for osquery-extension, since the binary name is inconsistent.
 	if _, err := os.Stat(localBinaryPath); err != nil {
 		return "", errors.Wrap(err, "local binary does not exist but it should")
 	}

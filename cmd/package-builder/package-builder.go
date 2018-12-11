@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/pkg/errors"
 )
@@ -149,6 +150,9 @@ func runMake(args []string) error {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
+	ctx := context.Background()
+	ctx = ctxlog.NewContext(ctx, logger)
+
 	if *flHostname == "" {
 		return errors.New("Hostname undefined")
 	}
@@ -237,7 +241,7 @@ func runMake(args []string) error {
 		}
 		defer outputFile.Close()
 
-		if err := packageOptions.Build(context.Background(), outputFile, target); err != nil {
+		if err := packageOptions.Build(ctx, outputFile, target); err != nil {
 			return errors.Wrap(err, "could not generate packages")
 		}
 	}

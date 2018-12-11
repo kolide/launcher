@@ -55,3 +55,20 @@ func (t *Target) Extension() string {
 	}
 	return ""
 }
+
+// extBinary is a helper to return the platform specific extension name.
+func (t *Target) ExtBinary(input string) string {
+	if t.Platform == "Windows" {
+		return input + ".exe"
+	} else {
+		return input + ".ext"
+	}
+}
+
+// platformBinary is a helper to return the platform specific binary suffix.
+func (t *Target) PlatformBinary(input string) string {
+	if t.Platform == "Windows" {
+		return input + ".exe"
+	}
+	return input
+}
