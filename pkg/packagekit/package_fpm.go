@@ -71,13 +71,6 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	}
 	defer os.RemoveAll(outputPathDir)
 
-	// pkg ship a scripts dir _outside_ the package root. this is bundled at packaging time.
-	scriptsDir, err := ioutil.TempDir("", "packaging-pkg-script")
-	if err != nil {
-		return errors.Wrap(err, "could not create temp directory for scripts")
-	}
-	defer os.RemoveAll(scriptsDir)
-
 	fpmCommand := []string{
 		"fpm",
 		"-s", "dir",
@@ -88,40 +81,20 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"-C", "/pkgsrc",
 	}
 
-	if po.Postinst != nil {
-		postinstallFile, err := os.Create(filepath.Join(scriptsDir, "postinstall"))
-		if err != nil {
-			return errors.Wrap(err, "opening the postinstall file for writing")
-		}
-		defer postinstallFile.Close()
-		if err := postinstallFile.Chmod(0755); err != nil {
-			return errors.Wrap(err, "could not make postinstall script executable")
-		}
-		if _, err := io.Copy(postinstallFile, po.Postinst); err != nil {
-			return errors.Wrap(err, "could not write postinstall script")
-		}
+	// If postinstall exists, pass it to fpm
+	if _, err := os.Stat(filepath.Join(po.Scripts, "postinstall")); !os.IsNotExist(err) {
 		fpmCommand = append(fpmCommand, "--after-install", filepath.Join("/pkgscripts", "postinstall"))
 	}
 
-	if po.Prerm != nil {
-		prermFile, err := os.Create(filepath.Join(scriptsDir, "prerm"))
-		if err != nil {
-			return errors.Wrap(err, "opening the prerm file for writing")
-		}
-		defer prermFile.Close()
-		if err := prermFile.Chmod(0755); err != nil {
-			return errors.Wrap(err, "could not make prerm script executable")
-		}
-		if _, err := io.Copy(prermFile, po.Prerm); err != nil {
-			return errors.Wrap(err, "could not write prerm script")
-		}
+	// If prerm exists, pass it to fpm
+	if _, err := os.Stat(filepath.Join(po.Scripts, "prerm")); !os.IsNotExist(err) {
 		fpmCommand = append(fpmCommand, "--before-remove", filepath.Join("/pkgscripts", "prerm"))
 	}
 
 	dockerArgs := []string{
 		"run", "--rm",
 		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),
-		"-v", fmt.Sprintf("%s:/pkgscripts", scriptsDir),
+		"-v", fmt.Sprintf("%s:/pkgscripts", po.Scripts),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
 		"kolide/fpm",
 	}

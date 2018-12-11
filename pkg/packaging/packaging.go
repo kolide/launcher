@@ -1,7 +1,6 @@
 package packaging
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -51,7 +50,7 @@ type PackageOptions struct {
 	packagekitops *packagekit.PackageOptions // options for packagekit packagers
 	packageWriter io.Writer                  // Where to write the file
 
-	// These are build machine local directories. They are absolute path.
+	// These are build machine local directories. They are absolute paths.
 	packageRoot string // temp directory that will become the package
 	scriptRoot  string // temp directory to hold scripts. Many packaging systems treat these as metadata.
 
@@ -168,9 +167,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:       "launcher",
 		Identifier: p.Identifier,
-		Postinst:   nil,
-		Prerm:      nil,
 		Root:       p.packageRoot,
+		Scripts:    p.scriptRoot,
 		SigningKey: p.SigningKey,
 		Version:    p.PackageVersion,
 	}
@@ -301,7 +299,7 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 {{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
 	tmpl, err := template.New("syslog").Parse(syslogTemplate)
 	if err != nil {
-		return errors.Wrap(err, "not able to parse postinstall template")
+		return errors.Wrap(err, "not able to parse newsyslog template")
 	}
 	if err := tmpl.ExecuteTemplate(newSyslogFile, "syslog", logOptions); err != nil {
 		return errors.Wrap(err, "execute template")
@@ -392,13 +390,16 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return errors.Wrap(err, "not able to parse template")
 	}
 
-	var output bytes.Buffer
+	fh, err := os.Create(filepath.Join(p.scriptRoot, "postinstall"))
+	if err != nil {
+		return errors.Wrapf(err, "create postinstall filehandle")
+	}
+	defer fh.Close()
 
-	if err := t.ExecuteTemplate(&output, "postinstall", data); err != nil {
+	if err := t.ExecuteTemplate(fh, "postinstall", data); err != nil {
 		return errors.Wrap(err, "executing template")
 	}
 
-	p.packagekitops.Postinst = &output
 	return nil
 }
 

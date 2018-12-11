@@ -32,30 +32,9 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 
 	outputPath := filepath.Join(outputPathDir, outputFilename)
 
-	// pkg ship a scripts dir _outside_ the package root. this is bundled at packaging time.
-	scriptsDir, err := ioutil.TempDir("", "packaging-pkg-script")
-	if err != nil {
-		return errors.Wrap(err, "could not create temp directory for scripts")
-	}
-	defer os.RemoveAll(scriptsDir)
-
-	if po.Postinst != nil {
-		postinstallFile, err := os.Create(filepath.Join(scriptsDir, "postinstall"))
-		if err != nil {
-			return errors.Wrap(err, "opening the postinstall file for writing")
-		}
-		defer postinstallFile.Close()
-		if err := postinstallFile.Chmod(0755); err != nil {
-			return errors.Wrap(err, "could not make postinstall script executable")
-		}
-		if _, err := io.Copy(postinstallFile, po.Postinst); err != nil {
-			return errors.Wrap(err, "could not write postinstall script")
-		}
-	}
-
 	args := []string{
 		"--root", po.Root,
-		"--scripts", scriptsDir,
+		"--scripts", po.Scripts,
 		"--identifier", fmt.Sprintf("com.%s.launcher", po.Identifier),
 		"--version", po.Version,
 	}
