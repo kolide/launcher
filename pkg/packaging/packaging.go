@@ -1,11 +1,13 @@
 package packaging
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -24,7 +26,7 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion    string
+	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
 	OsqueryVersion    string
 	LauncherVersion   string
 	ExtensionVersion  string
@@ -60,9 +62,11 @@ type PackageOptions struct {
 	confDir  string // where to place configs (eg: /etc/<name>)
 	initFile string // init file, the path is used in the various scripts.
 
+	execCC func(context.Context, string, ...string) *exec.Cmd
 }
 
-// NewPackager returns a PackageOptions struct. You can, just create one directly.
+// NewPackager returns a PackageOptions struct. You can, however, just
+// create one directly.
 func NewPackager() *PackageOptions {
 	return &PackageOptions{}
 }
@@ -117,17 +121,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.DisableControlTLS {
 		launcherFlags = append(launcherFlags, "--disable_control_tls")
-
 	}
 
 	if p.InsecureGrpc {
 		launcherFlags = append(launcherFlags, "--insecure_grpc")
-
 	}
 
 	if p.Insecure {
 		launcherFlags = append(launcherFlags, "--insecure")
-
 	}
 
 	// Unless we're omitting the secret, write it into the package.
@@ -155,36 +156,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		}
 	}
 
-	p.initOptions = &packagekit.InitOptions{
-		Name:        "launcher",
-		Description: "The Kolide Launcher",
-		Path:        filepath.Join(p.binDir, "launcher"),
-		Identifier:  p.Identifier,
-		Flags:       launcherFlags,
-		Environment: launcherEnv,
-	}
-
-	p.packagekitops = &packagekit.PackageOptions{
-		Name:       "launcher",
-		Identifier: p.Identifier,
-		Root:       p.packageRoot,
-		Scripts:    p.scriptRoot,
-		SigningKey: p.SigningKey,
-		Version:    p.PackageVersion,
-	}
-
-	if err := p.setupInit(ctx); err != nil {
-		return errors.Wrapf(err, "setup init script for %s", p.target.String())
-	}
-
-	if err := p.setupPostinst(ctx); err != nil {
-		return errors.Wrapf(err, "setup postInst for %s", p.target.String())
-	}
-
-	if err := p.setupPrerm(ctx); err != nil {
-		return errors.Wrapf(err, "setup setupPrerm for %s", p.target.String())
-	}
-
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
@@ -204,6 +175,43 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		if err := p.renderNewSyslogConfig(ctx); err != nil {
 			return errors.Wrap(err, "render")
 		}
+	}
+
+	// The version string is the version of _launcher_ which we don't know until we've downloaded it.
+	if p.PackageVersion == "" {
+		if err := p.detectLauncherVersion(ctx); err != nil {
+			return errors.Wrap(err, "version detection")
+		}
+	}
+
+	p.initOptions = &packagekit.InitOptions{
+		Name:        "launcher",
+		Description: "The Kolide Launcher",
+		Path:        filepath.Join(p.binDir, "launcher"),
+		Identifier:  p.Identifier,
+		Flags:       launcherFlags,
+		Environment: launcherEnv,
+	}
+
+	if err := p.setupInit(ctx); err != nil {
+		return errors.Wrapf(err, "setup init script for %s", p.target.String())
+	}
+
+	if err := p.setupPostinst(ctx); err != nil {
+		return errors.Wrapf(err, "setup postInst for %s", p.target.String())
+	}
+
+	if err := p.setupPrerm(ctx); err != nil {
+		return errors.Wrapf(err, "setup setupPrerm for %s", p.target.String())
+	}
+
+	p.packagekitops = &packagekit.PackageOptions{
+		Name:       "launcher",
+		Identifier: p.Identifier,
+		Root:       p.packageRoot,
+		Scripts:    p.scriptRoot,
+		SigningKey: p.SigningKey,
+		Version:    p.PackageVersion,
 	}
 
 	if err := p.makePackage(ctx); err != nil {
@@ -446,4 +454,39 @@ func (p *PackageOptions) setupDirectories() error {
 		}
 	}
 	return nil
+}
+
+func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
+	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
+	stdout, err := p.execOut(ctx, launcherPath, "-version")
+	if err != nil {
+		return errors.Wrapf(err, "getting version")
+	}
+
+	stdoutSplit := strings.Split(stdout, "\n")
+	versionLine := strings.Split(stdoutSplit[0], " ")
+	version := versionLine[len(versionLine)-1]
+
+	if version == "" {
+		return errors.New("Unable to autodetect launcher version.")
+	}
+
+	p.PackageVersion = version
+	return nil
+}
+
+func (p *PackageOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
+	// Since PackageOptions is sometimes instantiated directly, set execCC if it's nil.
+	if p.execCC == nil {
+		p.execCC = exec.CommandContext
+	}
+
+	cmd := p.execCC(ctx, argv0, args...)
+	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if err := cmd.Run(); err != nil {
+		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
+	}
+	return strings.TrimSpace(stdout.String()), nil
+
 }

@@ -38,20 +38,25 @@ func runMake(args []string) error {
 			env.String("HOSTNAME", ""),
 			"the hostname of the gRPC server",
 		)
+		flPackageVersion = flagset.String(
+			"package_version",
+			env.String("PACKAGE_VERSION", ""),
+			"the resultant package version. If left blank, auto detection will be attempted",
+		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
 			env.String("OSQUERY_VERSION", "stable"),
-			"the osquery version to include in the resultant packages",
+			"What TUF channel to download osquery from. Supports filesystem paths",
 		)
 		flLauncherVersion = flagset.String(
 			"launcher_version",
 			env.String("LAUNCHER_VERSION", "stable"),
-			"the launcher version to include in the resultant packages",
+			"What TUF channel to download launcher from. Supports filesystem paths",
 		)
 		flExtensionVersion = flagset.String(
 			"extension_version",
 			env.String("EXTENSION_VERSION", "stable"),
-			"the extension version to include in the resultant packages",
+			"What TUF channel to download the osquery extension from. Supports filesystem paths",
 		)
 		flEnrollSecret = flagset.String(
 			"enroll_secret",
@@ -180,11 +185,8 @@ func runMake(args []string) error {
 		defer os.RemoveAll(cacheDir)
 	}
 
-	// TODO fix this version -- If we're not building launcher, how do
-	// we tell what to version it with?
-	currentVersion := version.Version().Version
 	packageOptions := packaging.PackageOptions{
-		PackageVersion:    currentVersion,
+		PackageVersion:    *flPackageVersion,
 		OsqueryVersion:    *flOsqueryVersion,
 		LauncherVersion:   *flLauncherVersion,
 		ExtensionVersion:  *flExtensionVersion,
