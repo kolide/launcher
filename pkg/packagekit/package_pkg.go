@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -17,6 +19,8 @@ import (
 func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
 	defer span.End()
+
+	logger := ctxlog.FromContext(ctx)
 
 	if err := isDirectory(po.Root); err != nil {
 		return err
@@ -34,9 +38,12 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 
 	args := []string{
 		"--root", po.Root,
-		"--scripts", po.Scripts,
 		"--identifier", fmt.Sprintf("com.%s.launcher", po.Identifier),
 		"--version", po.Version,
+	}
+
+	if po.Scripts != "" {
+		args = append(args, "--scripts", po.Scripts)
 	}
 
 	if po.SigningKey != "" {
@@ -44,6 +51,11 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	}
 
 	args = append(args, outputPath)
+
+	level.Debug(logger).Log(
+		"msg", "Running pkbuild",
+		"args", args,
+	)
 
 	cmd := exec.CommandContext(ctx, "pkgbuild", args...)
 
