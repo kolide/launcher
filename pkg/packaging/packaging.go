@@ -253,12 +253,12 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 
 	switch {
 	case p.target.Package == Deb:
-		if err := packagekit.PackageDeb(ctx, p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb()); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 
 	case p.target.Package == Rpm:
-		if err := packagekit.PackageRPM(ctx, p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM()); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Pkg:
@@ -339,7 +339,7 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 	defer fh.Close()
 
 	if err := renderFunc(ctx, fh, p.initOptions); err != nil {
-		return errors.Wrapf(err, "rendering init file (%s), target %s", p.target.String())
+		return errors.Wrapf(err, "rendering init file (%s), target %s", p.initFile, p.target.String())
 	}
 
 	return nil

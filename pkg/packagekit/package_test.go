@@ -27,10 +27,10 @@ func TestPackageTrivial(t *testing.T) {
 		SigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
 	}
 
-	err = PackageDeb(context.TODO(), ioutil.Discard, po)
+	err = PackageFPM(context.TODO(), ioutil.Discard, po, AsDeb())
 	require.NoError(t, err)
 
-	err = PackageRPM(context.TODO(), ioutil.Discard, po)
+	err = PackageFPM(context.TODO(), ioutil.Discard, po, AsRPM())
 	require.NoError(t, err)
 
 	err = PackagePkg(context.TODO(), ioutil.Discard, po)

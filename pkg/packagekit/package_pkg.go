@@ -35,7 +35,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	// pkg ship a scripts dir _outside_ the package root. this is bundled at packaging time.
 	scriptsDir, err := ioutil.TempDir("", "packaging-pkg-script")
 	if err != nil {
-		return errors.Wrap(err, "could not create temp directory for the macOS packaging script directory")
+		return errors.Wrap(err, "could not create temp directory for scripts")
 	}
 	defer os.RemoveAll(scriptsDir)
 
