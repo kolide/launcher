@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -17,35 +16,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	localCacheDir string
-)
-
-func populateLocalCacheDir() error {
-	tempDir, err := ioutil.TempDir("/tmp", "package-builder_cache")
-	if err != nil {
-		return errors.Wrap(err, "could not create temp dir for caching files")
-	}
-	localCacheDir = tempDir
-	return nil
-}
-
-func dlTarPath(name, version, platform string) string {
-	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
-}
-
 // FetchOsquerydBinary will synchronously download a binary as per the
 // supplied desired version and platform identifiers. The path to the
-// downloaded binary is returned and an error if the operation did not
+// downloaded binary is returned or an error if the operation did not
 // succeed.
+//
+// You must specify a localCacheDir, to reuse downloads
 func FetchBinary(ctx context.Context, localCacheDir, name, version, platform string) (string, error) {
 	logger := ctxlog.FromContext(ctx)
 
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
-		if err := populateLocalCacheDir(); err != nil {
-			return "", errors.Wrap(err, "could not create local cache directory")
-		}
+		return "", errors.New("Empty cache dir argument")
 	}
 
 	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, platform, version), name)
@@ -116,4 +98,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 	}
 
 	return localBinaryPath, nil
+}
+
+func dlTarPath(name, version, platform string) string {
+	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
 }

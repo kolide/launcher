@@ -169,6 +169,17 @@ func runMake(args []string) error {
 		}
 	}
 
+	// If we have a cacheDir, use it. Otherwise. set something random.
+	cacheDir := *flCacheDir
+	var err error
+	if cacheDir == "" {
+		cacheDir, err = ioutil.TempDir("", "download_cache")
+		if err != nil {
+			return errors.Wrap(err, "could not create temp dir for caching files")
+		}
+		defer os.RemoveAll(cacheDir)
+	}
+
 	// TODO fix this version -- If we're not building launcher, how do
 	// we tell what to version it with?
 	currentVersion := version.Version().Version
@@ -192,7 +203,7 @@ func runMake(args []string) error {
 		OmitSecret:        *flOmitSecret,
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
-		CacheDir:          *flCacheDir,
+		CacheDir:          cacheDir,
 	}
 
 	outputDir := *flOutputDir
