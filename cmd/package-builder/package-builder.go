@@ -61,7 +61,7 @@ func runMake(args []string) error {
 		flSigningKey = flagset.String(
 			"mac_package_signing_key",
 			env.String("SIGNING_KEY", ""),
-			"the name of the key that should be used to packages. Will be platform specific",
+			"The name of the key that should be used to packages. Behavior is platform and packaging specific",
 		)
 		flInsecure = flagset.Bool(
 			"insecure",
@@ -220,50 +220,9 @@ func runMake(args []string) error {
 		return errors.Wrap(err, "mkdir")
 	}
 
-	targets := []packaging.Target{}
-	if *flTargets == "" {
-		targets = []packaging.Target{
-			{
-				Platform: packaging.Darwin,
-				Init:     packaging.LaunchD,
-				Package:  packaging.Pkg,
-			},
-			{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Rpm,
-			},
-			{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Deb,
-			},
-		}
-	}
-
-	for _, target := range strings.Split(*flTargets, ",") {
-		switch target {
-		case "rpm":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Rpm,
-			})
-		case "deb":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Deb,
-			})
-		case "darwin":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Darwin,
-				Init:     packaging.LaunchD,
-				Package:  packaging.Pkg,
-			})
-		default:
-			return errors.Errorf("Unknown target: %s", target)
-		}
+	targets, err := getTargets(*flTargets)
+	if err != nil {
+		return err
 	}
 
 	for _, target := range targets {
@@ -332,4 +291,61 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+}
+
+// getTargets takes a string, and parses targets out of it. This
+// encodes what the default mapping between human names and build
+// targets is.
+func getTargets(input string) ([]packaging.Target, error) {
+
+	defaultTargets := []packaging.Target{
+		{
+			Platform: packaging.Darwin,
+			Init:     packaging.LaunchD,
+			Package:  packaging.Pkg,
+		},
+		{
+			Platform: packaging.Linux,
+			Init:     packaging.SystemD,
+			Package:  packaging.Rpm,
+		},
+		{
+			Platform: packaging.Linux,
+			Init:     packaging.SystemD,
+			Package:  packaging.Deb,
+		},
+	}
+
+	// Nothing specified, return a default set
+	if input == "" {
+		return defaultTargets, nil
+	}
+
+	// split the input, and iterate
+	targets := []packaging.Target{}
+	for _, target := range strings.Split(input, ",") {
+		switch target {
+		case "rpm":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Linux,
+				Init:     packaging.SystemD,
+				Package:  packaging.Rpm,
+			})
+		case "deb":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Linux,
+				Init:     packaging.SystemD,
+				Package:  packaging.Deb,
+			})
+		case "darwin":
+			targets = append(targets, packaging.Target{
+				Platform: packaging.Darwin,
+				Init:     packaging.LaunchD,
+				Package:  packaging.Pkg,
+			})
+		default:
+			return nil, errors.Errorf("Unknown target: %s", target)
+		}
+	}
+	return targets, nil
 }
