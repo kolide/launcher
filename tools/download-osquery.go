@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packaging"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -33,7 +32,8 @@ func main() {
 	if *flCacheDir == "" {
 		cacheDir, err = ioutil.TempDir("", "download_cache")
 		if err != nil {
-			return errors.Wrap(err, "could not create temp dir for caching files")
+			fmt.Printf("Could not create temp dir for caching files %v", err)
+			os.Exit(1)
 		}
 		defer os.RemoveAll(cacheDir)
 	}
