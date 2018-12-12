@@ -177,7 +177,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		}
 	}
 
-	// The version string is the version of _launcher_ which we don't know until we've downloaded it.
+	// The version string is the version of _launcher_ which we don't
+	// know until we've downloaded it.
 	if p.PackageVersion == "" {
 		if err := p.detectLauncherVersion(ctx); err != nil {
 			return errors.Wrap(err, "version detection")
@@ -460,7 +461,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
-		return errors.Wrapf(err, "getting version")
+		return errors.Wrap(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling")
 	}
 
 	stdoutSplit := strings.Split(stdout, "\n")
@@ -468,7 +469,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	version := versionLine[len(versionLine)-1]
 
 	if version == "" {
-		return errors.New("Unable to autodetect launcher version.")
+		return errors.New("Unable to parse launcher version.")
 	}
 
 	p.PackageVersion = version
