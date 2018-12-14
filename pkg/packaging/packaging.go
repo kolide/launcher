@@ -415,6 +415,10 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	}
 	defer fh.Close()
 
+	if err := os.Chmod(filepath.Join(p.scriptRoot, "postinstall"), 0755); err != nil {
+		return errors.Wrap(err, "chmod postinst")
+	}
+
 	if err := t.ExecuteTemplate(fh, "postinstall", data); err != nil {
 		return errors.Wrap(err, "executing template")
 	}
