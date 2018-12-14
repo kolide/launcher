@@ -171,9 +171,19 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
+	// Some darwin specific bits
 	if p.target.Platform == Darwin {
 		if err := p.renderNewSyslogConfig(ctx); err != nil {
 			return errors.Wrap(err, "render")
+		}
+
+		// launchd seems to need the log directory to be pre-created. So,
+		// we'll do this here. This is a bit ugly, since we're duplicate
+		// the directory expansion we do in packagekit.RenderLaunchd. TODO
+		// merge logic, and pass the logs paths as an option.
+		logDir := filepath.Join(p.packageRoot, "var", "log", p.Identifier)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return errors.Wrapf(err, "mkdir logdir %s", logDir)
 		}
 	}
 
