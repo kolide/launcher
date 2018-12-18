@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package kolide.launcher;
+
+option go_package = "kt";
+
+service KTarget {
+  rpc GetTargets(GetTargetsRequest) returns (GetTargetsResponse) {}
+}
+
+message GetTargetsRequest {
+  string node_key = 1;
+}
+
+message GetTargetsResponse {
+  repeated Target targets = 1;
+}
+
+message Target {
+  string id = 1;
+}

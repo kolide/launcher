@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/pkg/pb/kt"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
@@ -79,6 +80,9 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 	// create the logging adapter for osquery
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
 
+	ktargetClient := kt.NewKTargetClient(grpcConn)
+	tm := table.NewTargetMembership(logger, db, ktargetClient)
+
 	runner := runtime.LaunchUnstartedInstance(
 		runtime.WithOsquerydBinary(opts.osquerydPath),
 		runtime.WithRootDirectory(rootDirectory),
@@ -89,6 +93,7 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 		runtime.WithOsqueryExtensionPlugin(osquerylogger.NewPlugin("kolide_grpc", ext.LogString)),
 		runtime.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
 		runtime.WithOsqueryExtensionPlugin(table.LauncherIdentifierTable(db)),
+		runtime.WithOsqueryExtensionPlugin(tm.Plugin()),
 		runtime.WithStdout(osqueryLogger),
 		runtime.WithStderr(osqueryLogger),
 		runtime.WithLogger(logger),
@@ -123,6 +128,9 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 
 				// TODO: remove when underlying libs are refactored
 				// everything exits right now, so block this actor on the context finishing
+
+				go tm.Run(ctx)
+
 				<-ctx.Done()
 				return nil
 			},
