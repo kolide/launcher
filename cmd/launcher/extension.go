@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"io/ioutil"
 
 	"github.com/boltdb/bolt"
@@ -13,17 +12,17 @@ import (
 	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
-	"github.com/kolide/launcher/pkg/osquery/table"
-	"github.com/kolide/launcher/pkg/pb/kt"
+	ktable "github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/osquery-go/plugin/config"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquerylogger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, opts *options) (
+func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, grpcConn *grpc.ClientConn, opts *options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
@@ -39,25 +38,6 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 			return nil, nil, nil, errors.Wrapf(err, "could not read enroll_secret_path: %s", opts.enrollSecretPath)
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
-	}
-
-	// create the certificate pool
-	var rootPool *x509.CertPool
-	if opts.rootPEM != "" {
-		rootPool = x509.NewCertPool()
-		pemContents, err := ioutil.ReadFile(opts.rootPEM)
-		if err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "reading root certs PEM at path: %s", opts.rootPEM)
-		}
-		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return nil, nil, nil, errors.Errorf("found no valid certs in PEM at path: %s", opts.rootPEM)
-		}
-	}
-
-	// connect to the grpc server
-	grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "dialing grpc server")
 	}
 
 	// create the client of the grpc service
@@ -80,20 +60,18 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 	// create the logging adapter for osquery
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
 
-	ktargetClient := kt.NewKTargetClient(grpcConn)
-	tm := table.NewTargetMembership(logger, db, ktargetClient)
-
 	runner := runtime.LaunchUnstartedInstance(
 		runtime.WithOsquerydBinary(opts.osquerydPath),
 		runtime.WithRootDirectory(rootDirectory),
 		runtime.WithConfigPluginFlag("kolide_grpc"),
 		runtime.WithLoggerPluginFlag("kolide_grpc"),
 		runtime.WithDistributedPluginFlag("kolide_grpc"),
-		runtime.WithOsqueryExtensionPlugin(config.NewPlugin("kolide_grpc", ext.GenerateConfigs)),
-		runtime.WithOsqueryExtensionPlugin(osquerylogger.NewPlugin("kolide_grpc", ext.LogString)),
-		runtime.WithOsqueryExtensionPlugin(distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults)),
-		runtime.WithOsqueryExtensionPlugin(table.LauncherIdentifierTable(db)),
-		runtime.WithOsqueryExtensionPlugin(tm.Plugin()),
+		runtime.WithOsqueryExtensionPlugins(
+			config.NewPlugin("kolide_grpc", ext.GenerateConfigs),
+			distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
+			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
+		),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db)...),
 		runtime.WithStdout(osqueryLogger),
 		runtime.WithStderr(osqueryLogger),
 		runtime.WithLogger(logger),
@@ -128,9 +106,6 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 
 				// TODO: remove when underlying libs are refactored
 				// everything exits right now, so block this actor on the context finishing
-
-				go tm.Run(ctx)
-
 				<-ctx.Done()
 				return nil
 			},

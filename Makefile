@@ -68,7 +68,7 @@ generate:
 
 proto:
 	@(cd pkg/pb/launcher; go generate)
-	@(cd pkg/pb/kt; go generate)
+	@(cd pkg/pb/querytarget; go generate)
 	@echo "Generated code from proto definitions."
 
 test: generate

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package kolide.launcher;
 
-option go_package = "kt";
+option go_package = "querytarget";
 
-service KTarget {
+service QueryTarget {
   rpc GetTargets(GetTargetsRequest) returns (GetTargetsResponse) {}
 }
 

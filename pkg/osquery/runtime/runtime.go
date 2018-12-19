@@ -170,13 +170,13 @@ func osqueryTempDir() (string, func(), error) {
 // https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
 type OsqueryInstanceOption func(*OsqueryInstance)
 
-// WithOsqueryExtensionPlugin is a functional option which allows the user to
+// WithOsqueryExtensionPlugins is a functional option which allows the user to
 // declare a number of osquery plugins (ie: config plugin, logger plugin, tables,
 // etc) which can be loaded when calling LaunchOsqueryInstance. You can load as
 // many plugins as you'd like.
-func WithOsqueryExtensionPlugin(plugin osquery.OsqueryPlugin) OsqueryInstanceOption {
+func WithOsqueryExtensionPlugins(plugins ...osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugin)
+		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugins...)
 	}
 }
 
@@ -305,10 +305,12 @@ const socketOpenInterval = 200 * time.Millisecond
 //   instance, err := LaunchInstance(
 //     WithOsquerydBinary("/usr/local/bin/osqueryd"),
 //     WithRootDirectory("/var/foobar"),
-//     WithOsqueryExtensionPlugin(config.NewPlugin("custom", custom.GenerateConfigs)),
 //     WithConfigPluginFlag("custom"),
-//     WithOsqueryExtensionPlugin(logger.NewPlugin("custom", custom.LogString)),
-//     WithOsqueryExtensionPlugin(tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate)),
+// 		 WithOsqueryExtensionPlugins(
+//		 	 config.NewPlugin("custom", custom.GenerateConfigs),
+//		   logger.NewPlugin("custom", custom.LogString),
+//		 	 tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate),
+//     ),
 //   )
 func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
 	runner := newRunner(opts...)
