@@ -11,20 +11,20 @@ import (
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	munki := new(MunkiInfo)
+
 	return []*table.Plugin{
-		munki.MunkiReport(client, logger),
-		munki.ManagedInstalls(client, logger),
-		MDMInfo(logger),
-		MachoInfo(),
-		MacOSUpdate(client),
-		LauncherInfo(client),
-		EmailAddresses(client, logger),
-		Spotlight(),
-		KolideVulnerabilities(client, logger),
-		BestPractices(client),
 		Airdrop(client),
+		BestPractices(client),
 		ChromeLoginKeychainInfo(client, logger),
+		EmailAddresses(client, logger),
 		GDriveSyncConfig(client, logger),
 		GDriveSyncHistoryInfo(client, logger),
+		KolideVulnerabilities(client, logger),
+		MachoInfo(),
+		MacOSUpdate(client),
+		MDMInfo(logger),
+		munki.ManagedInstalls(client, logger),
+		munki.MunkiReport(client, logger),
+		Spotlight(),
 	}
 }

@@ -10,7 +10,6 @@ import (
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	return []*table.Plugin{
-		LauncherInfo(client),
 		BestPractices(client),
 		EmailAddresses(client, logger),
 	}

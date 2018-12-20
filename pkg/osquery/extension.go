@@ -62,6 +62,9 @@ const (
 	// Bucket name to use for buffered result logs.
 	resultLogsBucket = "result_logs"
 
+	// the bucket which we push values into from server-backed tables, like kolide_target_membership
+	ServerProvidedDataBucket = "server_provided_data"
+
 	// DB key for UUID
 	uuidKey = "uuid"
 	// DB key for node key
@@ -114,7 +117,7 @@ type ExtensionOpts struct {
 func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
 	// bucketNames contains the names of buckets that should be created when the
 	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket}
+	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
 
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")

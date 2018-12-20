@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
+	"github.com/kolide/launcher/pkg/service"
 	osquerygo "github.com/kolide/osquery-go"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
@@ -84,7 +86,7 @@ func runQuery(args []string) error {
 			return errors.Wrap(err, "reading supplied queries file")
 		}
 		if err := json.Unmarshal(data, &queries); err != nil {
-			return errors.Wrap(err, "unmarshaling queries file json")
+			return errors.Wrap(err, "unmarshalling queries file json")
 		}
 	}
 
@@ -94,7 +96,7 @@ func runQuery(args []string) error {
 			return errors.Wrap(err, "reading stdin")
 		}
 		if err := json.Unmarshal(stdinQueries, &queries); err != nil {
-			return errors.Wrap(err, "unmarshaling stdin queries json")
+			return errors.Wrap(err, "unmarshalling stdin queries json")
 		}
 	}
 
@@ -176,8 +178,6 @@ func runSocket(args []string) error {
 	return nil
 }
 
-
-
 func runSubcommands() error {
 	var run func([]string) error
 	switch os.Args[1] {
@@ -245,13 +245,30 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		return errors.Wrap(err, "write launcher pid to file")
 	}
 
+	// create the certificate pool
+	var rootPool *x509.CertPool
+	if opts.rootPEM != "" {
+		rootPool = x509.NewCertPool()
+		pemContents, err := ioutil.ReadFile(opts.rootPEM)
+		if err != nil {
+			return errors.Wrapf(err, "reading root certs PEM at path: %s", opts.rootPEM)
+		}
+		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
+			return errors.Errorf("found no valid certs in PEM at path: %s", opts.rootPEM)
+		}
+	}
 
+	// connect to the grpc server
+	grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
+	if err != nil {
+		return errors.Wrap(err, "dialing grpc server")
+	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
 
 	// create the osquery extension for launcher
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, grpcConn, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}
@@ -263,6 +280,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
+
+	queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
+	runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 
 	// If the control server has been opted-in to, run it
 	if opts.control {

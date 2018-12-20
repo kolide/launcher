@@ -4,11 +4,10 @@ import (
 	"context"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-func LauncherInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
+func LauncherInfoTable() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("version"),
 		table.TextColumn("go_version"),
@@ -17,10 +16,10 @@ func LauncherInfo(client *osquery.ExtensionManagerClient) *table.Plugin {
 		table.TextColumn("build_date"),
 		table.TextColumn("build_user"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfo(client))
+	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable())
 }
 
-func generateLauncherInfo(client *osquery.ExtensionManagerClient) table.GenerateFunc {
+func generateLauncherInfoTable() table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		results := []map[string]string{
 			map[string]string{

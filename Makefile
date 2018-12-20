@@ -58,7 +58,7 @@ package-builder: .pre-build xp-codesign generate
 launcher-pummel:
 	go run cmd/make/make.go -targets=launcher-pummel
 
-deps-go: 
+deps-go:
 	go run cmd/make/make.go -targets=deps-go,install-tools
 
 deps: deps-go generate
@@ -68,6 +68,7 @@ generate:
 
 proto:
 	@(cd pkg/pb/launcher; go generate)
+	@(cd pkg/pb/querytarget; go generate)
 	@echo "Generated code from proto definitions."
 
 test: generate
