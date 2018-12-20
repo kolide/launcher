@@ -13,7 +13,6 @@ import (
 
 func createQueryTargetUpdater(logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) *actor.Actor {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	updater := querytarget.NewQueryTargeter(logger, db, grpcConn)
 
