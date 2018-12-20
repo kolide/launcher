@@ -86,7 +86,7 @@ func runQuery(args []string) error {
 			return errors.Wrap(err, "reading supplied queries file")
 		}
 		if err := json.Unmarshal(data, &queries); err != nil {
-			return errors.Wrap(err, "unmarshaling queries file json")
+			return errors.Wrap(err, "unmarshalling queries file json")
 		}
 	}
 
@@ -96,7 +96,7 @@ func runQuery(args []string) error {
 			return errors.Wrap(err, "reading stdin")
 		}
 		if err := json.Unmarshal(stdinQueries, &queries); err != nil {
-			return errors.Wrap(err, "unmarshaling stdin queries json")
+			return errors.Wrap(err, "unmarshalling stdin queries json")
 		}
 	}
 

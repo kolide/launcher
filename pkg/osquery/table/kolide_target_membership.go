@@ -37,7 +37,7 @@ func generateTargetMembershipTable(db *bolt.DB) table.GenerateFunc {
 
 		var cachedResp qt.GetTargetsResponse
 		if err := proto.Unmarshal(targetRespBytes, &cachedResp); err != nil {
-			return nil, errors.Wrap(err, "unmarshaling target resp")
+			return nil, errors.Wrap(err, "unmarshalling target resp")
 		}
 
 		targets := cachedResp.GetTargets()

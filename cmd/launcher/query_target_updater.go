@@ -17,12 +17,9 @@ func createQueryTargetUpdater(ctx context.Context, logger log.Logger, db *bolt.D
 	return &actor.Actor{
 		Execute: func() error {
 			level.Info(logger).Log("msg", "query target updater started")
-			updater.Start(ctx)
+			updater.Run(ctx)
 			return nil
 		},
-		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "query target updater interrupted", "err", err)
-			updater.Stop()
-		},
+		Interrupt: func(err error) {},
 	}
 }
