@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -11,15 +9,18 @@ import (
 	"google.golang.org/grpc"
 )
 
-func createQueryTargetUpdater(ctx context.Context, logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) *actor.Actor {
+func createQueryTargetUpdater(logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) *actor.Actor {
 	updater := querytarget.NewQueryTargeter(logger, db, grpcConn)
 
 	return &actor.Actor{
 		Execute: func() error {
 			level.Info(logger).Log("msg", "query target updater started")
-			updater.Run(ctx)
+			updater.Run()
 			return nil
 		},
-		Interrupt: func(err error) {},
+		Interrupt: func(err error) {
+			level.Info(logger).Log("msg", "query target updater interrupted")
+			updater.Interrupt()
+		},
 	}
 }

@@ -281,7 +281,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		"build", versionInfo.Revision,
 	)
 
-	queryTargeter := createQueryTargetUpdater(ctx, logger, db, grpcConn)
+	queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 	runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 
 	// If the control server has been opted-in to, run it

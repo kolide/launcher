@@ -16,13 +16,18 @@ import (
 )
 
 type QueryTargetUpdater struct {
+	runnerCtx    context.Context
+	cancelFunc   func()
 	logger       log.Logger
 	db           *bolt.DB
 	targetClient qt.QueryTargetClient
 }
 
 func NewQueryTargeter(logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) QueryTargetUpdater {
+	runnerCtx, cancelFunc := context.WithCancel(context.Background())
 	return QueryTargetUpdater{
+		runnerCtx:    runnerCtx,
+		cancelFunc:   cancelFunc,
 		logger:       logger,
 		db:           db,
 		targetClient: qt.NewQueryTargetClient(grpcConn),
@@ -57,23 +62,27 @@ func (qtu *QueryTargetUpdater) updateTargetMemberships(ctx context.Context) erro
 	return nil
 }
 
-func (qtu *QueryTargetUpdater) Run(ctx context.Context) error {
+func (qtu *QueryTargetUpdater) Run() error {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if err := qtu.updateTargetMemberships(ctx); err != nil {
+			if err := qtu.updateTargetMemberships(qtu.runnerCtx); err != nil {
 				level.Error(qtu.logger).Log(
 					"msg", "updating kolide_target_membership data",
 					"err", err,
 				)
 			}
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-qtu.runnerCtx.Done():
+			return qtu.runnerCtx.Err()
 		}
 	}
 
 	return nil
+}
+
+func (qtu *QueryTargetUpdater) Interrupt() {
+	qtu.cancelFunc()
 }
