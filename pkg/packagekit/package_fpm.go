@@ -26,27 +26,27 @@ type fpmOptions struct {
 	outputType outputType
 }
 
-type fpmOpt func(*fpmOptions)
+type FpmOpt func(*fpmOptions)
 
-func AsRPM() fpmOpt {
+func AsRPM() FpmOpt {
 	return func(f *fpmOptions) {
 		f.outputType = RPM
 	}
 }
 
-func AsDeb() fpmOpt {
+func AsDeb() FpmOpt {
 	return func(f *fpmOptions) {
 		f.outputType = Deb
 	}
 }
 
-func AsTar() fpmOpt {
+func AsTar() FpmOpt {
 	return func(f *fpmOptions) {
 		f.outputType = Tar
 	}
 }
 
-func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ...fpmOpt) error {
+func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ...FpmOpt) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageRPM")
 	defer span.End()
 
