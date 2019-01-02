@@ -24,8 +24,6 @@ type launchdOptions struct {
 	KeepAlive         map[string]interface{} `plist:"KeepAlive"`
 }
 
-// type lOption func(*launchdOptions)
-
 func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.RenderLaunchd")
 	defer span.End()
@@ -57,6 +55,7 @@ func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) e
 	}
 
 	enc := plist.NewEncoder(w)
+	enc.Indent("   ")
 	if err := enc.Encode(lOpts); err != nil {
 		return errors.Wrap(err, "plist encode")
 	}
