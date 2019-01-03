@@ -52,7 +52,7 @@ codesign-darwin:
 
 xp-codesign: xp codesign-darwin
 
-package-builder: .pre-build xp-codesign generate
+package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
 
 launcher-pummel:
