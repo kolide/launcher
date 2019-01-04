@@ -46,13 +46,37 @@ make package-builder
 
 ## General Usage
 
-### Obtaining Binaries
-
 `package-builder` will package binaries from either local disk, or
 Kolide's Notary server. These are specified with version command line
 options. Arguments that look like a path (denoted by starting with `/`
 or `./`) will be pulled from local disk, otherwise the argument is
 parsed as a notary channel.
+
+The only required parameter is `--hostname`. 
+
+If you don't define an enrollment secret via `--enroll_secret`, then a
+blank enrollment secret will be used when connecting to the gRPC
+server defined by the supplied hostname. If you would like the
+resultant packages to not contain the enroll secret (so that you can
+distribute it via another mechanism), you can use the `--omit_secret`
+flag.
+
+
+### Simplest Package Creation
+
+The simplest usage, is to use the binaries on the Kolide Notary
+server:
+
+``` shell
+./build/package-builder make \
+   --hostname=grpc.launcher.acme.biz:443 \
+   --enroll_secret=foobar123 \
+   --extension_version nightly
+```
+
+
+### Building a package with your own binaries
+
 
 To build binaries you'll want something like:
 
@@ -69,15 +93,7 @@ export CODESIGN_IDENTITY='Developer ID Application: Acme Inc (ABCDEF123456)'
 make xp-codesign
 ```
 
-### Creating a set of packages
-
-Assuming you have built the `package-builder` tool and the `launcher`
-and `osquery-extension.ext` binaries via `make package-builder`, you
-can create a set of launcher packages by using the `package-builder
-make` command. The only required parameter is `--hostname`. If you
-don't define an enrollment secret via `--enroll_secret`, then a blank
-enrollment secret will be used when connecting to the gRPC server
-defined by the supplied hostname.
+You can now use `package-builder` to make packages with those:
 
 ```
 ./build/package-builder make \
@@ -105,16 +121,16 @@ of the following flags, include them with the invocation of
 - `--cert_pins`
 
 
+
+### Caveats
+
+#### Identifiers
+
 By default, binaries will be installed to `/usr/local/launcher/bin`,
 configuration will be installed to `/etc/launcher`, logs will be
 outputted to `/var/log/launcher`, etc. If you'd like the `launcher`
 string to be something else (for example, your company name), you can
-use the `--identifier` flag to specify this value. If you would like
-the resultant packages to not contain the enroll secret (so that you
-can distribute it via another mechanism), you can use the
-`--omit_secret` flag.
-
-### Caveats
+use the `--identifier` flag to specify this value. 
 
 #### Cross Platform Binaries
 
