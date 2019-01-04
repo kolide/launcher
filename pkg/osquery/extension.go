@@ -257,6 +257,28 @@ func NodeKeyFromDB(db *bolt.DB) (string, error) {
 	}
 }
 
+// ConfigFromDB returns the device config from a local bolt DB
+func ConfigFromDB(db *bolt.DB) (string, error) {
+	if db == nil {
+		return "", errors.New("received a nil db")
+	}
+
+	var key []byte
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		key = b.Get([]byte(configKey))
+		return nil
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "error reading config from db")
+	}
+	if key != nil {
+		return string(key), nil
+	} else {
+		return "", nil
+	}
+}
+
 func isNodeInvalidErr(err error) bool {
 	err = errors.Cause(err)
 	if se, ok := err.(interface{ GRPCStatus() *status.Status }); ok {
