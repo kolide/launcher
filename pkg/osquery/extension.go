@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -844,9 +845,14 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 	var allQueries []string
 	for packName, pack := range config.Packs {
+		// only run queries from kolide packs
+		if !strings.Contains(packName, "_kolide_") {
+			continue
+		}
+
 		for query, content := range pack.Queries {
+			// only run differential queries
 			if content.Snapshot != nil && *content.Snapshot {
-				// only deal with differential pack queries
 				continue
 			}
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
