@@ -270,7 +270,7 @@ func ConfigFromDB(db *bolt.DB) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "error reading node key from db")
+		return "", errors.Wrap(err, "error reading config from db")
 	}
 	if key != nil {
 		return string(key), nil
