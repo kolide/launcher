@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/kolide/kit/env"
@@ -24,7 +26,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	path, err := packaging.FetchOsquerydBinary(*flCacheDir, *flVersion, *flPlatform)
+	// If we have a cacheDir, use it. Otherwise. set something random.
+	cacheDir := *flCacheDir
+	var err error
+	if *flCacheDir == "" {
+		cacheDir, err = ioutil.TempDir("", "download_cache")
+		if err != nil {
+			fmt.Printf("Could not create temp dir for caching files %v", err)
+			os.Exit(1)
+		}
+		defer os.RemoveAll(cacheDir)
+	}
+
+	ctx := context.Background()
+
+	path, err := packaging.FetchBinary(ctx, cacheDir, "osqueryd", *flVersion, *flPlatform)
 	if err != nil {
 		fmt.Println("An error occurred fetching the osqueryd binary: ", err)
 		os.Exit(1)

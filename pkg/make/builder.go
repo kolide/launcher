@@ -114,8 +114,8 @@ func New(opts ...Option) (*Builder, error) {
 
 }
 
-// ExtBinary is a helper to return the platform specific extension name.
-func (b *Builder) ExtBinary(input string) string {
+// PlatformExtensionName is a helper to return the platform specific extension name.
+func (b *Builder) PlatformExtensionName(input string) string {
 	input = filepath.Join("build", b.os, input)
 	if b.os == "windows" {
 		return input + ".exe"
@@ -124,8 +124,8 @@ func (b *Builder) ExtBinary(input string) string {
 	}
 }
 
-// PlatformBinary is a helper to return the platform specific binary suffix.
-func (b *Builder) PlatformBinary(input string) string {
+// PlatformBinaryName is a helper to return the platform specific binary suffix.
+func (b *Builder) PlatformBinaryName(input string) string {
 	input = filepath.Join("build", b.os, input)
 	if b.os == "windows" {
 		return input + ".exe"
