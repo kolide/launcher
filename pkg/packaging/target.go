@@ -19,6 +19,7 @@ const (
 	LaunchD InitFlavor = "launchd"
 	SystemD            = "systemd"
 	Init               = "init"
+	NoInit             = "none"
 )
 
 type PlatformFlavor string

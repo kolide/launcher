@@ -327,6 +327,14 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 }
 
 func (p *PackageOptions) setupInit(ctx context.Context) error {
+	if p.target.Init == NoInit {
+		return nil
+	}
+
+	if p.initOptions == nil {
+		return errors.New("Missing initOptions")
+	}
+
 	var dir string
 	var file string
 	var renderFunc func(context.Context, io.Writer, *packagekit.InitOptions) error
@@ -334,11 +342,11 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
 		dir = "/Library/LaunchDaemons"
-		file = fmt.Sprintf("com.%s.launcher.plist", p.initOptions.Identifier)
+		file = fmt.Sprintf("com.%s.launcher.plist", p.Identifier)
 		renderFunc = packagekit.RenderLaunchd
 	case p.target.Platform == Linux && p.target.Init == SystemD:
 		dir = "/etc/systemd/system"
-		file = fmt.Sprintf("launcher.%s.service", p.initOptions.Identifier)
+		file = fmt.Sprintf("launcher.%s.service", p.Identifier)
 		renderFunc = packagekit.RenderSystemd
 	default:
 		return errors.Errorf("Unsupported target %s", p.target.String())
@@ -364,6 +372,10 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 }
 
 func (p *PackageOptions) setupPrerm(ctx context.Context) error {
+	if p.target.Init == NoInit {
+		return nil
+	}
+
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
 	case p.target.Platform == Linux && p.target.Init == SystemD:
@@ -378,6 +390,10 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 }
 
 func (p *PackageOptions) setupPostinst(ctx context.Context) error {
+	if p.target.Init == NoInit {
+		return nil
+	}
+
 	var postinstTemplate string
 	identifier := p.Identifier
 
