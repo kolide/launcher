@@ -3,12 +3,14 @@ package packaging
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/packagekit"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,6 +55,44 @@ func TestExecOut(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "", failResponse)
 
+}
+
+func TestInitStuff(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	initOptions := &packagekit.InitOptions{
+		Name:        "test",
+		Description: "A test init",
+		Path:        "/a/path",
+		Identifier:  "test",
+		Flags:       []string{},
+		Environment: map[string]string{},
+	}
+
+	for _, target := range testedTargets() {
+		testPackageRoot, err := ioutil.TempDir("", fmt.Sprintf("test-packaging-root-%s", target.String()))
+		require.NoError(t, err)
+
+		testScriptDir, err := ioutil.TempDir("", fmt.Sprintf("test-packaging-script-%s", target.String()))
+		require.NoError(t, err)
+
+		p := &PackageOptions{
+			target:      target,
+			Identifier:  "test",
+			initFile:    "/usr/bin/true",
+			scriptRoot:  testScriptDir,
+			packageRoot: testPackageRoot,
+			initOptions: initOptions,
+		}
+
+		// TODO we're creating here, but we should check the output
+		require.NoError(t, p.setupInit(ctx))
+		require.NoError(t, p.setupPostinst(ctx))
+		require.NoError(t, p.setupPrerm(ctx))
+	}
 }
 
 // TestHelperProcess isn't a real test. It's used as a helper process
@@ -106,4 +146,34 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 
+}
+
+func testedTargets() []Target {
+	return []Target{
+		{
+			Platform: Darwin,
+			Init:     LaunchD,
+			Package:  Pkg,
+		},
+		{
+			Platform: Darwin,
+			Init:     NoInit,
+			Package:  Pkg,
+		},
+		{
+			Platform: Linux,
+			Init:     SystemD,
+			Package:  Rpm,
+		},
+		{
+			Platform: Linux,
+			Init:     SystemD,
+			Package:  Deb,
+		},
+		{
+			Platform: Linux,
+			Init:     NoInit,
+			Package:  Deb,
+		},
+	}
 }
