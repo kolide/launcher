@@ -24,6 +24,7 @@ const (
 
 type fpmOptions struct {
 	outputType outputType
+	replaces   []string
 }
 
 type FpmOpt func(*fpmOptions)
@@ -43,6 +44,15 @@ func AsDeb() FpmOpt {
 func AsTar() FpmOpt {
 	return func(f *fpmOptions) {
 		f.outputType = Tar
+	}
+}
+
+// WithReplaces passes a list of package names tpo fpm's replace and
+// conflict options. This allows creation of packages that supercede
+// previous versions.
+func WithReplaces(r []string) FpmOpt {
+	return func(f *fpmOptions) {
+		f.replaces = r
 	}
 }
 
@@ -75,10 +85,15 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"fpm",
 		"-s", "dir",
 		"-t", string(f.outputType),
-		"-n", po.Name,
+		"-n", fmt.Sprintf("%s-%s", po.Name, po.Identifier),
 		"-v", po.Version,
 		"-p", filepath.Join("/out", outputFilename),
 		"-C", "/pkgsrc",
+	}
+
+	// Pass each replaces in. Set it as a conflict and a replace.
+	for _, r := range f.replaces {
+		fpmCommand = append(fpmCommand, "--replaces", r, "--conflicts", r)
 	}
 
 	// If postinstall exists, pass it to fpm
