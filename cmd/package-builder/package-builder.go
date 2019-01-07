@@ -316,6 +316,11 @@ func getTargets(input string) ([]packaging.Target, error) {
 			Init:     packaging.SystemD,
 			Package:  packaging.Deb,
 		},
+		{
+			Platform: packaging.Linux,
+			Init:     packaging.Upstart,
+			Package:  packaging.Deb,
+		},
 	}
 
 	// Nothing specified, return a default set

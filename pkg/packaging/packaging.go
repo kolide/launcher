@@ -353,6 +353,12 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		dir = "/etc/systemd/system"
 		file = fmt.Sprintf("launcher.%s.service", p.Identifier)
 		renderFunc = packagekit.RenderSystemd
+	case p.target.Platform == Linux && p.target.Init == Upstart:
+		dir = "/etc/init"
+		file = fmt.Sprintf("launcher-%s.conf", p.Identifier)
+		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
+			return packagekit.RenderUpstart(ctx, w, io)
+		}
 	default:
 		return errors.Errorf("Unsupported target %s", p.target.String())
 	}
@@ -408,6 +414,8 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		identifier = fmt.Sprintf("com.%s.launcher", p.Identifier)
 	case p.target.Platform == Linux && p.target.Init == SystemD:
 		postinstTemplate = postinstallSystemdTemplate()
+	case p.target.Platform == Linux && p.target.Init == Upstart:
+		postinstTemplate = postinstallUpstartTemplate()
 	case p.target.Platform == Linux && p.target.Init == Init:
 		postinstTemplate = postinstallInitTemplate()
 	default:
@@ -465,8 +473,19 @@ sleep 5
 /bin/launchctl load {{.Path}}`
 }
 
+// postinstallUpstartTemplate is a post install restart script.
+// upstart's stop and restart commands error out if the daemon isn't
+// running. So stop and start are seperate, and `set -e` is after the
+// stop.
+func postinstallUpstartTemplate() string {
+	return `#!/bin/sh
+stop launcher-{{.Identifier}}
+set -e
+start launcher-{{.Identifier}}`
+}
+
 func postinstallSystemdTemplate() string {
-	return `#!/bin/bash
+	return `#!/bin/sh
 set -e
 systemctl daemon-reload
 systemctl enable launcher.{{.Identifier}}
