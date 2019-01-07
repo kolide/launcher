@@ -269,14 +269,19 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "packaging.makePackage")
 	defer span.End()
 
+	// Linux packages used to be distributed named "launcher". We've
+	// moved to naming them "launcher-<identifier>". To provide a
+	// cleaner package replacement, we can flag this to the underlying
+	// packaging systems.
+	oldPackageNames := []string{"launcher"}
+
 	switch {
 	case p.target.Package == Deb:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb()); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb(), packagekit.WithReplaces(oldPackageNames)); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
-
 	case p.target.Package == Rpm:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM()); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames)); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Pkg:
