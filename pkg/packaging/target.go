@@ -19,7 +19,7 @@ const (
 	LaunchD InitFlavor = "launchd"
 	SystemD            = "systemd"
 	Init               = "init"
-    Upstart            = "upstart"
+	Upstart            = "upstart"
 	NoInit             = "none"
 )
 

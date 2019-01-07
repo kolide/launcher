@@ -47,6 +47,9 @@ func AsTar() FpmOpt {
 	}
 }
 
+// WithReplaces passes a list of package names tpo fpm's replace and
+// conflict options. This allows creation of packages that supercede
+// previous versions.
 func WithReplaces(r []string) FpmOpt {
 	return func(f *fpmOptions) {
 		f.replaces = r
