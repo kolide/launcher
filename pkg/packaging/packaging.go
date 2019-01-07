@@ -78,12 +78,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	var err error
 
-	if p.packageRoot, err = ioutil.TempDir("", "package.packageRoot"); err != nil {
+	if p.packageRoot, err = ioutil.TempDir("/tmp", "package.packageRoot"); err != nil {
 		return errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
 	defer os.RemoveAll(p.packageRoot)
 
-	if p.scriptRoot, err = ioutil.TempDir("", fmt.Sprintf("package.scriptRoot")); err != nil {
+	if p.scriptRoot, err = ioutil.TempDir("/tmp", fmt.Sprintf("package.scriptRoot")); err != nil {
 		return errors.Wrap(err, "unable to create temporary packaging root directory")
 	}
 	defer os.RemoveAll(p.scriptRoot)
