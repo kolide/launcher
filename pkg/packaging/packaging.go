@@ -94,7 +94,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	launcherEnv := map[string]string{
 		"KOLIDE_LAUNCHER_HOSTNAME":           p.Hostname,
-		"KOLIDE_LAUNCHER_UPDATE_CHANNEL":     p.UpdateChannel,
 		"KOLIDE_LAUNCHER_ROOT_DIRECTORY":     p.rootDir,
 		"KOLIDE_LAUNCHER_OSQUERYD_PATH":      filepath.Join(p.binDir, "osqueryd"),
 		"KOLIDE_LAUNCHER_ENROLL_SECRET_PATH": filepath.Join(p.confDir, "secret"),

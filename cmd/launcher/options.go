@@ -208,7 +208,7 @@ func parseOptions() (*options, error) {
 
 	updateChannel := autoupdate.Stable
 	switch *flUpdateChannel {
-	case "stable":
+	case "", "stable":
 		updateChannel = autoupdate.Stable
 	case "beta":
 		updateChannel = autoupdate.Beta
