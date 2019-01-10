@@ -3,7 +3,9 @@ package wix
 import (
 	"bytes"
 	"context"
+	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -99,9 +101,31 @@ func (wix *Wix) Candle(ctx context.Context) error {
 
 // Light invokes wix's light command. This links and binds one or more
 // .wixobj files and creates a Windows Installer database (.msi or
-// .msm)
-func (wix *Wix) Light() {
+// .msm). See http://wixtoolset.org/documentation/manual/v3/overview/light.html for options
+func (wix *Wix) Light(ctx context.Context, w io.Writer) error {
+	_, err := wix.execOut(ctx,
+		filepath.Join(wix.wixPath, "light.exe"),
+		"-nologo",
+		"-dcl:high", // compression level
+		"AppFiles.wixobj",
+		"Installer.wixobj",
+		"-out", "out.msi",
+	)
+	if err != nil {
+		return err
+	}
 
+	msiFH, err := os.Open(filepath.Join(wix.buildDir, "out.msi"))
+	if err != nil {
+		return errors.Wrap(err, "opening msi output file")
+	}
+	defer msiFH.Close()
+
+	if _, err := io.Copy(w, msiFH); err != nil {
+		return errors.Wrap(err, "copying output")
+	}
+
+	return nil
 }
 
 func (wix *Wix) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {

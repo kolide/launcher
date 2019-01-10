@@ -288,6 +288,10 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
+	case p.target.Package == Msi:
+		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+		}
 	default:
 		return errors.Errorf("Don't know how to package %s", p.target.String())
 	}
@@ -498,7 +502,16 @@ func (p *PackageOptions) setupDirectories() error {
 		p.binDir = filepath.Join("/usr/local", p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
 		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
-
+	case Windows:
+		// On Windows, these paths end up rooted not at `c:`, but instead
+		// where the WiX template says. In our case, that's `c:\Program
+		// Files\Kolide` These do need the identigier, since we need WiX
+		// to take that into account for the guid generation.
+		//
+		//FIXME what should these be?
+		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
+		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
+		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data", sanitizeHostname(p.Hostname))
 	default:
 		return errors.Errorf("Unknown platform %s", string(p.target.Platform))
 	}

@@ -55,6 +55,8 @@ xp-codesign: xp codesign-darwin
 package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
 
+package-builder-windows: .pre-build deps
+	go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
 launcher-pummel:
 	go run cmd/make/make.go -targets=launcher-pummel
 
@@ -64,6 +66,7 @@ deps-go:
 deps: deps-go generate
 
 generate:
+	cd pkg/packagekit/internal && go generate
 	go run cmd/make/make.go -targets=generate-tuf
 
 proto:
