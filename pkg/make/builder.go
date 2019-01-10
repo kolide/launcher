@@ -378,6 +378,8 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			"cmd", "Build",
 			"app", appName,
 			"msg", "Starting",
+			"os", b.os,
+			"arch", b.arch,
 		)
 
 		baseArgs := []string{"build", "-o", output}
