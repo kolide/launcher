@@ -66,7 +66,7 @@ deps-go:
 deps: deps-go generate
 
 generate:
-	cd pkg/packagekit/internal && go generate
+	go generate ./pkg/packagekit
 	go run cmd/make/make.go -targets=generate-tuf
 
 proto:

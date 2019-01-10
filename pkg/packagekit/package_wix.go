@@ -18,9 +18,7 @@ import (
 	"go.opencensus.io/trace"
 )
 
-func GimmieWXS() ([]byte, error) {
-	return internal.InstallWXS()
-}
+//go:generate go-bindata -pkg internal -o internal/assets.go internal/assets/
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
@@ -51,7 +49,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	//
 	// This might all be cleaner moved to a marshalled struct. For now,
 	// just sent the template the PackageOptions struct
-	wixTemplateBytes, err := internal.Asset("assets/installer.wxs")
+	wixTemplateBytes, err := internal.Asset("internal/assets/installer.wxs")
 	if err != nil {
 		return errors.Wrap(err, "getting go-bindata install.wxs")
 	}
