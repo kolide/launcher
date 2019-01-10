@@ -3,14 +3,14 @@ package packagekit
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"runtime"
+	"strings"
 	"text/template"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
@@ -55,8 +55,8 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	}
 
 	extraGuidIdentifiers := []string{
-		runtime.GOARCH,
 		po.Version,
+		runtime.GOARCH,
 	}
 
 	var templateData = struct {
@@ -102,19 +102,23 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	return nil
 }
 
-// generateMicrosoftProductCode is a stable guid that is used to
-// identify the product / sub product / package / version, and
-// whatnot. We need to either store them, or generate them in a
-// predictable fasion based on a set of inputs. See doc.go, or
+// generateMicrosoftProductCode create a stable guid from a set of
+// inputs. This is used to identify the product / sub product /
+// package / version, and whatnot. We need to either store them, or
+// generate them in a predictable fasion based on a set of inputs. See
+// doc.go, or
 // https://docs.microsoft.com/en-us/windows/desktop/Msi/productcode
+//
+// It is equivlent to uuid.NewSHA1(kolideUuidSpace,
+// []byte(launcherkolide-app0.7.0amd64)) but provided here so we have
+// a clear point to test stability against.
 func generateMicrosoftProductCode(ident1 string, identN ...string) string {
-	h := md5.New()
-	io.WriteString(h, ident1)
-	for _, s := range identN {
-		io.WriteString(h, s)
-	}
+	// Define a Kolide uuid space. This could also have used uuid.NameSpaceDNS
+	uuidSpace := uuid.NewSHA1(uuid.Nil, []byte("Kolide"))
 
-	hash := h.Sum(nil)
+	data := strings.Join(append([]string{ident1}, identN...), "")
 
-	return fmt.Sprintf("%X-%X-%X-%X-%X", hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
+	guid := uuid.NewSHA1(uuidSpace, []byte(data))
+
+	return strings.ToUpper(guid.String())
 }

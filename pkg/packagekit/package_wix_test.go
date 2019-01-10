@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestGenerateMicrosoftProductCode tests that our guid generation is
+// stable. These are various guids that we used in production.
 func TestGenerateMicrosoftProductCode(t *testing.T) {
 	t.Parallel()
 
@@ -15,19 +17,27 @@ func TestGenerateMicrosoftProductCode(t *testing.T) {
 		out    string
 	}{
 		{
-			ident1: "launcher",
+			ident1: "launcherkolide",
+			out:    "0D597685-1969-5D11-B2D6-600939967590",
+		},
+		{
+			ident1: "launcherkolide",
 			identN: []string{},
-			out:    "F3E08B51-1935-8A8F-58F1-7A678759F60C",
+			out:    "0D597685-1969-5D11-B2D6-600939967590",
 		},
 		{
-			ident1: "launcher",
-			identN: []string{"kolide-app"},
-			out:    "3367A041-D1DA-D2D4-5A6C-E7A286F024C5",
+			ident1: "launcherkolide-app",
+			out:    "0FF3EBE1-C157-5C0D-9B74-C15097E024B5",
 		},
 		{
-			ident1: "launcher",
-			identN: []string{"kolide-app", "0.7.0"},
-			out:    "05CFB3A6-0882-AF2A-B11B-E0E07589C1D1",
+			ident1: "launcherkolide-app",
+			identN: []string{"0.7.0", "386"},
+			out:    "F569EA5A-C60A-5952-AE82-14FCF2BF15EC",
+		},
+		{
+			ident1: "launcherkolide-app",
+			identN: []string{"0.7.0", "amd64"},
+			out:    "8DDC9786-A19D-5BA2-BEB2-0999F959EEC7",
 		},
 	}
 
