@@ -54,7 +54,7 @@ func (t *Target) PkgExtension() string {
 
 // PlatformExtensionName is a helper to return the platform specific extension name.
 func (t *Target) PlatformExtensionName(input string) string {
-	if t.Platform == "Windows" {
+	if t.Platform == Windows {
 		return input + ".exe"
 	} else {
 		return input + ".ext"
@@ -63,7 +63,7 @@ func (t *Target) PlatformExtensionName(input string) string {
 
 // PlatformBinaryName is a helper to return the platform specific binary suffix.
 func (t *Target) PlatformBinaryName(input string) string {
-	if t.Platform == "Windows" {
+	if t.Platform == Windows {
 		return input + ".exe"
 	}
 	return input
