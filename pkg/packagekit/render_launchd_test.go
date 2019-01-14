@@ -83,6 +83,8 @@ func expectedComplex() (launchdOptions, error) {
       <string>--autoupdate</string>
       <string>--with_initial_runner</string>
     </array>
+    <key>RunAtLoad</key>
+    <true/>
     <key>StandardErrorPath</key>
     <string>/var/log/kolide-app/launcher-stderr.log</string>
     <key>StandardOutPath</key>
