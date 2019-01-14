@@ -84,6 +84,8 @@ github.com/gorilla/websocket v1.2.0 h1:VJtLvh6VQym50czpZzx07z/kw9EgAxI3x1ZB8taTM
 github.com/gorilla/websocket v1.2.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/groob/plist v0.0.0-20171204151034-2805b357fb23 h1:nmNKT1NDQ0XE2uQAopKtKDNRzWL0Earp5zeiTnLgkY0=
 github.com/groob/plist v0.0.0-20171204151034-2805b357fb23/go.mod h1:qg2Nek0ND/hIr+nY8H1oVqEW2cLzVVNaAQ0QexOyjyc=
+github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03 h1:z4Na/Ihs7LelUWfkSkr3sixCMwF3Ln1a/3K4eXynhBg=
+github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03/go.mod h1:qg2Nek0ND/hIr+nY8H1oVqEW2cLzVVNaAQ0QexOyjyc=
 github.com/grpc-ecosystem/grpc-gateway v1.5.0/go.mod h1:RSKVYQBd5MCa4OVpNdGskqpgL2+G+NZTnrVHpWWfpdw=
 github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed h1:5upAirOpQc1Q53c0bnx2ufif5kANL7bfZWcc6VJWJd8=
 github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed/go.mod h1:tMWxXQ9wFIaZeTI9F+hmhFiGpFmhOHzyShyFUhRm0H4=
