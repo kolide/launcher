@@ -101,8 +101,7 @@ You can now use `package-builder` to make packages with those:
    --enroll_secret=foobar123 \
    --osquery_version stable \
    --launcher_version ./build/darwin/launcher \
-   --extension_version ./build/darwin/osquery-extension.ext \
-   --targets darwin
+   --extension_version ./build/darwin/osquery-extension.ext
 ```
 
 If you'd like to customize the keys that are used to sign the
@@ -132,13 +131,15 @@ outputted to `/var/log/launcher`, etc. If you'd like the `launcher`
 string to be something else (for example, your company name), you can
 use the `--identifier` flag to specify this value. 
 
-#### Cross Platform Binaries
+#### Cross Platform Binaries and Targets
 
 `package-builder` can package cross platform. If you're obtaining
-binaries from notary, this should be straigh forward, and you can
+binaries from notary, this should be straight forward, and you can
 specify multiple targets in a single invocation.  However, if you're
 using locally build binaries you will need to run `package-builder`
 for each target platform.
+
+Targets can be specificity as a _platform-init-packaging_ triple. 
 
 #### Docker Temp Directories
 

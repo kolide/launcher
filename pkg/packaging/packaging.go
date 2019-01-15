@@ -159,15 +159,15 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
-	if err := p.getBinary(ctx, "osqueryd", p.OsqueryVersion); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.LauncherVersion); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
-	if err := p.getBinary(ctx, "osquery-extension", p.ExtensionVersion); err != nil {
+	if err := p.getBinary(ctx, "osquery-extension", p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
@@ -239,8 +239,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 // filesystem.
 //
 // TODO: add in file:// URLs
-func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersion string) error {
-	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", binaryName))
+func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion string) error {
+	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", symbolicName))
 	defer span.End()
 
 	var err error
@@ -250,7 +250,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersio
 	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
 		localPath = binaryVersion
 	default:
-		localPath, err = FetchBinary(ctx, p.CacheDir, binaryName, binaryVersion, p.target)
+		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
 		if err != nil {
 			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
 		}
@@ -258,9 +258,9 @@ func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersio
 
 	if err := fs.CopyFile(
 		localPath,
-		filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName(binaryName)),
+		filepath.Join(p.packageRoot, p.binDir, binaryName),
 	); err != nil {
-		return errors.Wrapf(err, "could not copy binary %s", p.target.PlatformBinaryName(binaryName))
+		return errors.Wrapf(err, "could not copy binary %s", binaryName)
 	}
 	return nil
 }

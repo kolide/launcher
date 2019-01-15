@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 
@@ -140,8 +141,8 @@ func runMake(args []string) error {
 		)
 		flTargets = flagset.String(
 			"targets",
-			env.String("TARGETS", ""),
-			"Target platforms to build",
+			env.String("TARGETS", defaultTargets()),
+			"Target platforms to build. Specified in the form platform-init-package",
 		)
 	)
 
@@ -295,64 +296,35 @@ func main() {
 	}
 }
 
+// defaultTargets sets the default target based on platform
+func defaultTargets() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "windows-none-msi"
+	case "linux":
+		return "linux-upstart-rpm,linux-upstart-deb"
+	case "darwin":
+		return "darwin-launchd-pkg"
+	default:
+		return ""
+	}
+}
+
 // getTargets takes a string, and parses targets out of it. This
 // encodes what the default mapping between human names and build
 // targets is.
 func getTargets(input string) ([]packaging.Target, error) {
-
-	defaultTargets := []packaging.Target{
-		{
-			Platform: packaging.Darwin,
-			Init:     packaging.LaunchD,
-			Package:  packaging.Pkg,
-		},
-		{
-			Platform: packaging.Linux,
-			Init:     packaging.SystemD,
-			Package:  packaging.Rpm,
-		},
-		{
-			Platform: packaging.Linux,
-			Init:     packaging.SystemD,
-			Package:  packaging.Deb,
-		},
-		{
-			Platform: packaging.Linux,
-			Init:     packaging.Upstart,
-			Package:  packaging.Deb,
-		},
-	}
-
-	// Nothing specified, return a default set
 	if input == "" {
-		return defaultTargets, nil
+		input = defaultTargets()
 	}
 
-	// split the input, and iterate
 	targets := []packaging.Target{}
-	for _, target := range strings.Split(input, ",") {
-		switch target {
-		case "rpm":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Rpm,
-			})
-		case "deb":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Linux,
-				Init:     packaging.SystemD,
-				Package:  packaging.Deb,
-			})
-		case "darwin":
-			targets = append(targets, packaging.Target{
-				Platform: packaging.Darwin,
-				Init:     packaging.LaunchD,
-				Package:  packaging.Pkg,
-			})
-		default:
-			return nil, errors.Errorf("Unknown target: %s", target)
+	for _, targetString := range strings.Split(input, ",") {
+		t := packaging.Target{}
+		if err := t.Parse(targetString); err != nil {
+			return nil, err
 		}
+		targets = append(targets, t)
 	}
 	return targets, nil
 }
