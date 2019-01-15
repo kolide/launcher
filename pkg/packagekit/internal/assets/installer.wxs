@@ -30,10 +30,17 @@
     <MajorUpgrade AllowDowngrades="yes" />
 
     <!-- Set INSTALLDIR to "c:\Program Files\Kolide". With appropriate
-	 WiX replacements along the way -->
+	 WiX replacements along the way
+	 Set DATADIR to "c:\ProgramData\Kolide"
+
+	 It's up to the caller to decide which directories to use
+    -->
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="$(var.ProgFolder)">
-	<Directory Id="INSTALLDIR" Name="Kolide"/>
+	<Directory Id="PROGDIR" Name="Kolide"/>
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+	<Directory Id="DATADIR" Name="Kolide"/>
       </Directory>
     </Directory>
 

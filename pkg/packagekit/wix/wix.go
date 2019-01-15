@@ -61,6 +61,8 @@ func (wix *Wix) InstallWXS(installWXS []byte) error {
 // Heat invokes wix's heat command. This examines a directory and
 // "harvests" the files into an xml structure. See
 // http://wixtoolset.org/documentation/manual/v3/overview/heat.html
+//
+// TODO split this into PROGDIR and DATADIR
 func (wix *Wix) Heat(ctx context.Context) error {
 	_, err := wix.execOut(ctx,
 
@@ -73,7 +75,7 @@ func (wix *Wix) Heat(ctx context.Context) error {
 		"-ke",
 		"-cg", "AppFiles",
 		"-template", "fragment",
-		"-dr", "INSTALLDIR",
+		"-dr", "DATADIR",
 		"-var", "var.SourceDir",
 		"-out", "AppFiles.wxs",
 	)
@@ -88,9 +90,6 @@ func (wix *Wix) Candle(ctx context.Context) error {
 		filepath.Join(wix.wixPath, "candle.exe"),
 		"-nologo",
 		"-arch", wix.msArch,
-		//"-dGoVersion="+version,
-		//fmt.Sprintf("-dWixGoVersion=%v.%v.%v", verMajor, verMinor, verPatch),
-		//fmt.Sprintf("-dIsWinXPSupported=%v", wixIsWinXPSupported(version)),
 		"-dArch="+runtime.GOARCH,
 		"-dSourceDir="+wix.packageRoot,
 		"Installer.wxs",
