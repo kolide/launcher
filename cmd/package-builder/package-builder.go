@@ -302,7 +302,7 @@ func defaultTargets() string {
 	case "windows":
 		return "windows-none-msi"
 	case "linux":
-		return "linux-upstart-rpm,linux-upstart-deb"
+		return "linux-systemd-rpm,linux-systemd-deb"
 	case "darwin":
 		return "darwin-launchd-pkg"
 	default:
