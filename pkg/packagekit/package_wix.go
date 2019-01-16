@@ -5,13 +5,12 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 	"text/template"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/pkg/errors"
@@ -24,22 +23,19 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
 	defer span.End()
 
-	logger := ctxlog.FromContext(ctx)
-
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
 
 	buildDir, err := ioutil.TempDir("", "wix-build")
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "making wix build dir")
 	}
-	level.Debug(logger).Log("builddir", buildDir)
-	// TODO remove this on cleanup
+	defer os.RemoveAll(buildDir)
 
 	wixTool, err := wix.New(po.Root, buildDir)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "making wixTool")
 	}
 
 	// We need to use variables to stub various parts of the wix

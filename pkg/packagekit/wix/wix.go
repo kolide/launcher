@@ -65,7 +65,6 @@ func (wix *Wix) InstallWXS(installWXS []byte) error {
 // TODO split this into PROGDIR and DATADIR
 func (wix *Wix) Heat(ctx context.Context) error {
 	_, err := wix.execOut(ctx,
-
 		filepath.Join(wix.wixPath, "heat.exe"),
 		"dir", wix.packageRoot,
 		"-nologo",
