@@ -62,6 +62,7 @@ func main() {
 		"table-extension": b.BuildCmd("./cmd/launcher.ext", b.PlatformExtensionName("tables")),
 		"grpc-extension":  b.BuildCmd("./cmd/grpc.ext", b.PlatformExtensionName("grpc")),
 		"package-builder": b.BuildCmd("./cmd/package-builder", b.PlatformBinaryName("package-builder")),
+		"make":            b.BuildCmd("./cmd/make", b.PlatformBinaryName("make")),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {

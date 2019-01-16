@@ -14,15 +14,19 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
-// FetchOsquerydBinary will synchronously download a binary as per the
+// FetchBinary will synchronously download a binary as per the
 // supplied desired version and platform identifiers. The path to the
 // downloaded binary is returned or an error if the operation did not
 // succeed.
 //
 // You must specify a localCacheDir, to reuse downloads
-func FetchBinary(ctx context.Context, localCacheDir, name, version, platform string) (string, error) {
+func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version string, target Target) (string, error) {
+	ctx, span := trace.StartSpan(ctx, "packaging.fetchbinary")
+	defer span.End()
+
 	logger := ctxlog.FromContext(ctx)
 
 	// Create the cache directory if it doesn't already exist
@@ -30,8 +34,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 		return "", errors.New("Empty cache dir argument")
 	}
 
-	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, platform, version), name)
-	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, platform, version))
+	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, version), binaryName)
+	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, target.Platform, version))
 
 	// See if a local package exists on disk already. If so, return the cached path
 	if _, err := os.Stat(localBinaryPath); err == nil {
@@ -42,7 +46,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 	// URI. Notary stores things by name, sans extension. So just strip
 	// it off.
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(baseName, version, platform))
+	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(baseName, version, string(target.Platform)))
 
 	level.Debug(logger).Log(
 		"msg", "starting download",
@@ -94,6 +98,10 @@ func FetchBinary(ctx context.Context, localCacheDir, name, version, platform str
 
 	// TODO / FIXME this fails for osquery-extension, since the binary name is inconsistent.
 	if _, err := os.Stat(localBinaryPath); err != nil {
+		level.Debug(logger).Log(
+			"msg", "Missing local binary",
+			"localBinaryPath", localBinaryPath,
+		)
 		return "", errors.Wrap(err, "local binary does not exist but it should")
 	}
 

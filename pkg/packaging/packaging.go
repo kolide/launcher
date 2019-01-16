@@ -158,15 +158,15 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
-	if err := p.getBinary(ctx, p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary(ctx, p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
-	if err := p.getBinary(ctx, p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion); err != nil {
+	if err := p.getBinary(ctx, "osquery-extension", p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
@@ -238,8 +238,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 // filesystem.
 //
 // TODO: add in file:// URLs
-func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersion string) error {
-	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", binaryName))
+func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion string) error {
+	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", symbolicName))
 	defer span.End()
 
 	var err error
@@ -249,7 +249,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, binaryName, binaryVersio
 	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
 		localPath = binaryVersion
 	default:
-		localPath, err = FetchBinary(ctx, p.CacheDir, binaryName, binaryVersion, string(p.target.Platform))
+		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
 		if err != nil {
 			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
 		}
@@ -285,6 +285,10 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 		}
 	case p.target.Package == Pkg:
 		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+		}
+	case p.target.Package == Msi:
+		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	default:
@@ -497,7 +501,16 @@ func (p *PackageOptions) setupDirectories() error {
 		p.binDir = filepath.Join("/usr/local", p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
 		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
-
+	case Windows:
+		// On Windows, these paths end up rooted not at `c:`, but instead
+		// where the WiX template says. In our case, that's `c:\Program
+		// Files\Kolide` These do need the identigier, since we need WiX
+		// to take that into account for the guid generation.
+		//
+		//FIXME what should these be?
+		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
+		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
+		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data", sanitizeHostname(p.Hostname))
 	default:
 		return errors.Errorf("Unknown platform %s", string(p.target.Platform))
 	}
@@ -510,11 +523,12 @@ func (p *PackageOptions) setupDirectories() error {
 	return nil
 }
 
+// BUG This doesn't work on windows
 func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
-		return errors.Wrap(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling")
+		return errors.Wrapf(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s)", stdout)
 	}
 
 	stdoutSplit := strings.Split(stdout, "\n")

@@ -26,6 +26,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	target := packaging.Target{}
+	if err := target.PlatformFromString(*flPlatform); err != nil {
+		fmt.Printf("Error parsing platform: %v\n", err)
+		os.Exit(1)
+	}
+
 	// If we have a cacheDir, use it. Otherwise. set something random.
 	cacheDir := *flCacheDir
 	var err error
@@ -40,7 +46,7 @@ func main() {
 
 	ctx := context.Background()
 
-	path, err := packaging.FetchBinary(ctx, cacheDir, "osqueryd", *flVersion, *flPlatform)
+	path, err := packaging.FetchBinary(ctx, cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), *flVersion, target)
 	if err != nil {
 		fmt.Println("An error occurred fetching the osqueryd binary: ", err)
 		os.Exit(1)
