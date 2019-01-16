@@ -11,12 +11,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/packagekit/wix/internal"
+	"github.com/kolide/launcher/pkg/packagekit/wix/testdata"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate go-bindata -pkg internal -o internal/assets.go internal/assets/
+//go:generate go-bindata -pkg testdata -o testdata/assets.go testdata/assets/
 
 func TestWixPackage(t *testing.T) {
 	t.Parallel()
@@ -43,7 +43,7 @@ func TestWixPackage(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(outMsi.Name())
 
-	mainWxsContent, err := internal.Asset("internal/assets/product.wxs")
+	mainWxsContent, err := testdata.Asset("testdata/assets/product.wxs")
 	require.NoError(t, err)
 
 	wixTool, err := New(packageRoot,
@@ -70,8 +70,8 @@ func verifyMsi(ctx context.Context, t *testing.T, outMsi *os.File) {
 
 	fileContents, err := execWix.execOut(ctx, "7z", "x", "-so", outMsi.Name())
 	require.NoError(t, err)
-	// TODO Is this fragile? I don't know if file order is guaranteed.
-	require.Equal(t, "HelloVroom Vroom", fileContents)
+	require.Contains(t, fileContents, "Hello")
+	require.Contains(t, fileContents, "Vroom Vroom")
 
 	listOutput, err := execWix.execOut(ctx, "7z", "l", outMsi.Name())
 	require.NoError(t, err)
