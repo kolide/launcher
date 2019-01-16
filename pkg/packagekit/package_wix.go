@@ -17,7 +17,7 @@ import (
 	"go.opencensus.io/trace"
 )
 
-//go:generate go-bindata -pkg internal -o internal/assets.go internal/assets/
+//go:generate go-bindata   -nocompress -pkg internal -o internal/assets.go internal/assets/
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
