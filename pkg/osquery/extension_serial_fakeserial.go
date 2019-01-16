@@ -1,4 +1,4 @@
-// +build dockertest
+// +build fakeserial
 
 package osquery
 
