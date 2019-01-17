@@ -353,7 +353,12 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		file = fmt.Sprintf("com.%s.launcher.plist", p.Identifier)
 		renderFunc = packagekit.RenderLaunchd
 	case p.target.Platform == Linux && p.target.Init == SystemD:
-		dir = "/etc/systemd/system"
+		// Default to dropping into /lib, it seems more common. But for
+		// rpm use /usr/lib.
+		dir = "/lib/systemd/system"
+		if p.target.Package == Rpm {
+			dir = "/usr/lib/systemd/system"
+		}
 		file = fmt.Sprintf("launcher.%s.service", p.Identifier)
 		renderFunc = packagekit.RenderSystemd
 	case p.target.Platform == Linux && p.target.Init == Upstart:
@@ -390,16 +395,46 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 		return nil
 	}
 
+	var prermTemplate string
+	identifier := p.Identifier
+
 	switch {
-	case p.target.Platform == Darwin && p.target.Init == LaunchD:
 	case p.target.Platform == Linux && p.target.Init == SystemD:
-	case p.target.Platform == Linux && p.target.Init == Init:
-		// TODO double check if this is init, or what
+		prermTemplate = prermSystemdTemplate()
+	default:
+		// If we don't match in the case statement, log that we're ignoring
+		// the setup, and move on. Don't throw an error.
+		// logging
+		return nil
 	}
 
-	// If we don't match in the case statement, log that we're ignoring
-	// the setup, and move on. Don't throw an error. FIXME: Setup
-	// logging
+	var data = struct {
+		Identifier string
+		Path       string
+	}{
+		Identifier: identifier,
+		Path:       p.initFile,
+	}
+
+	t, err := template.New("prerm").Parse(prermTemplate)
+	if err != nil {
+		return errors.Wrap(err, "not able to parse template")
+	}
+
+	fh, err := os.Create(filepath.Join(p.scriptRoot, "prerm"))
+	if err != nil {
+		return errors.Wrapf(err, "create prerm filehandle")
+	}
+	defer fh.Close()
+
+	if err := os.Chmod(filepath.Join(p.scriptRoot, "prerm"), 0755); err != nil {
+		return errors.Wrap(err, "chmod prerm")
+	}
+
+	if err := t.ExecuteTemplate(fh, "prerm", data); err != nil {
+		return errors.Wrap(err, "executing template")
+	}
+
 	return nil
 }
 
@@ -491,8 +526,24 @@ func postinstallSystemdTemplate() string {
 	return `#!/bin/sh
 set -e
 systemctl daemon-reload
+
 systemctl enable launcher.{{.Identifier}}
 systemctl restart launcher.{{.Identifier}}`
+}
+
+// prermSystemdTemplate returns a template suitable for stopping and
+// uninstalling launcher. It's trying to be compatible with both dpkg
+// and rpm, so there are slightly more convoluted args.
+//
+// rpm upgrade: prerm 1
+// rpm uninstall: prerm 0
+func prermSystemdTemplate() string {
+	return `#!/bin/sh
+set -e
+if [ "$1" = remove -o "$1" == "0" ] ; then
+  systemctl stop launcher.{{.Identifier}} || true
+  systemctl disable launcher.{{.Identifier}} || true
+fi`
 }
 
 func (p *PackageOptions) setupDirectories() error {
