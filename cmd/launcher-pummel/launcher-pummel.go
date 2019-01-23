@@ -32,7 +32,7 @@ func main() {
 			env.Bool("DEBUG", false),
 			"Print debug logs",
 		)
-		flJson = flag.Bool(
+		flJSON = flag.Bool(
 			"json",
 			env.Bool("JSON", false),
 			"Print logs in JSON format",
@@ -72,12 +72,17 @@ func main() {
 			env.Bool("INSECURE_GRPC", false),
 			"Dial GRPC without a TLS config (default: false)",
 		)
+		flOffset = flag.Int(
+			"offset",
+			env.Int("OFFSET", 0),
+			"Offset to use for host UUID generation",
+		)
 	)
 	flag.Parse()
 
 	var logger log.Logger
 
-	if *flJson {
+	if *flJSON {
 		logger = log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
 	} else {
 		logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
@@ -172,7 +177,7 @@ func main() {
 		}
 
 		// Start hosts
-		for i := 0; i < count; i++ {
+		for i := *flOffset; i < *flOffset+count; i++ {
 			simulator.LaunchSimulation(
 				logger,
 				host,
