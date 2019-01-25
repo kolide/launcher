@@ -2,6 +2,7 @@ module github.com/kolide/launcher
 
 require (
 	cloud.google.com/go v0.33.1 // indirect
+	git.apache.org/thrift.git v0.12.0 // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
@@ -37,8 +38,9 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
+	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
 	github.com/kolide/kit v0.0.0-20181124013649-bd1a9de64d48
-	github.com/kolide/osquery-go v0.0.0-20180816163454-30c843ecb33a
+	github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
 	github.com/kolide/updater v0.0.0-20181127001321-d5bab28ddf67
 	github.com/kr/pty v1.1.2
 	github.com/mattn/go-sqlite3 v1.10.0
@@ -47,16 +49,16 @@ require (
 	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf
 	go.opencensus.io v0.18.0
 	golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
+	golang.org/x/sys v0.0.0-20190124100055-b90733256f2e
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	google.golang.org/grpc v1.14.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect

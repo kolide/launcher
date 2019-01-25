@@ -31,6 +31,12 @@ endif
 launcher: .pre-build
 	go run cmd/make/make.go -targets=launcher -linkstamp
 
+table.ext: .pre-build
+	go run cmd/make/make.go -targets=table-extension -linkstamp
+
+osqueryi-tables: table.ext
+	osqueryd -S --extension ./build/darwin/tables.ext
+
 extension: .pre-build
 	go run cmd/make/make.go -targets=extension
 
