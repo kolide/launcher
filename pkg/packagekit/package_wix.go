@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
-	"os"
 	"runtime"
 	"strings"
 	"text/template"
@@ -27,17 +25,6 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return err
 	}
 
-	buildDir, err := ioutil.TempDir("", "wix-build")
-	if err != nil {
-		return errors.Wrap(err, "making wix build dir")
-	}
-	defer os.RemoveAll(buildDir)
-
-	wixTool, err := wix.New(po.Root, buildDir)
-	if err != nil {
-		return errors.Wrap(err, "making wixTool")
-	}
-
 	// We need to use variables to stub various parts of the wix
 	// xml. While we could use wix's internal variable system, it's a
 	// little more debugable to do it with go's. This way, we can
@@ -45,9 +32,9 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	//
 	// This might all be cleaner moved to a marshalled struct. For now,
 	// just sent the template the PackageOptions struct
-	wixTemplateBytes, err := internal.Asset("internal/assets/installer.wxs")
+	wixTemplateBytes, err := internal.Asset("internal/assets/main.wxs")
 	if err != nil {
-		return errors.Wrap(err, "getting go-bindata install.wxs")
+		return errors.Wrap(err, "getting go-bindata main.wxs")
 	}
 
 	extraGuidIdentifiers := []string{
@@ -69,29 +56,23 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse Install.wxs template")
+		return errors.Wrap(err, "not able to parse main.wxs template")
 	}
 
-	installWXS := new(bytes.Buffer)
-	if err := wixTemplate.ExecuteTemplate(installWXS, "WixTemplate", templateData); err != nil {
+	mainWxsContent := new(bytes.Buffer)
+	if err := wixTemplate.ExecuteTemplate(mainWxsContent, "WixTemplate", templateData); err != nil {
 		return errors.Wrap(err, "executing WixTemplate")
 	}
 
-	if err := wixTool.InstallWXS(installWXS.Bytes()); err != nil {
-		return errors.Wrap(err, "installing WixTemplate")
+	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes())
+	if err != nil {
+		return errors.Wrap(err, "making wixTool")
 	}
-
-	if err := wixTool.Heat(ctx); err != nil {
-		return errors.Wrap(err, "running heat")
-	}
-
-	if err := wixTool.Candle(ctx); err != nil {
-		return errors.Wrap(err, "running candle")
-	}
+	defer wixTool.Cleanup()
 
 	// Run light to compile the msi (and copy the output into our file
 	// handle)
-	if err := wixTool.Light(ctx, w); err != nil {
+	if err := wixTool.Package(ctx, w); err != nil {
 		return errors.Wrap(err, "running light")
 	}
 

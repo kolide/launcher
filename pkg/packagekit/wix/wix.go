@@ -78,8 +78,8 @@ func WithDocker(image string) WixOpt {
 }
 
 // New takes a packageRoot of files, and a wxsContent of xml wix
-// configs, and will return a struct suitable for builing packages
-// with.
+// configuration, and will return a struct with methods for building
+// packages with.
 func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixOptions, error) {
 	wo := &wixOptions{
 		wixPath:     `C:\wix311`,
