@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type wixOptions struct {
+type wixTool struct {
 	wixPath        string   // Where is wix installed
 	packageRoot    string   // What's the root of the packaging files?
 	buildDir       string   // The wix tools want to work in a build dir.
@@ -30,16 +30,16 @@ type wixOptions struct {
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
 
-type WixOpt func(*wixOptions)
+type WixOpt func(*wixTool)
 
 func As64bit() WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.msArch = "x64"
 	}
 }
 
 func As32bit() WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.msArch = "x86"
 	}
 }
@@ -47,31 +47,31 @@ func As32bit() WixOpt {
 // If you're running this in a virtual win environment, you probably
 // need to skip validation. LGHT0216 is a common error.
 func SkipValidation() WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.skipValidation = true
 	}
 }
 
 func WithWix(path string) WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.wixPath = path
 	}
 }
 
 func WithServices(service string) WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.services = append(wo.services, service)
 	}
 }
 
 func WithBuildDir(path string) WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.buildDir = path
 	}
 }
 
 func WithDocker(image string) WixOpt {
-	return func(wo *wixOptions) {
+	return func(wo *wixTool) {
 		wo.dockerImage = image
 
 	}
@@ -80,8 +80,8 @@ func WithDocker(image string) WixOpt {
 // New takes a packageRoot of files, and a wxsContent of xml wix
 // configuration, and will return a struct with methods for building
 // packages with.
-func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixOptions, error) {
-	wo := &wixOptions{
+func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
+	wo := &wixTool{
 		wixPath:     `C:\wix311`,
 		packageRoot: packageRoot,
 
@@ -125,7 +125,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixOpti
 }
 
 // Cleanup removes temp directories. Meant to be called in a defer.
-func (wo *wixOptions) Cleanup() {
+func (wo *wixTool) Cleanup() {
 	for _, d := range wo.cleanDirs {
 		os.RemoveAll(d)
 	}
@@ -134,7 +134,7 @@ func (wo *wixOptions) Cleanup() {
 // Package will run through the wix steps to produce a resulting
 // package. This package will be written into the provided io.Writer,
 // facilitating export to a file, buffer, or other storage backends.
-func (wo *wixOptions) Package(ctx context.Context, pkgOutput io.Writer) error {
+func (wo *wixTool) Package(ctx context.Context, pkgOutput io.Writer) error {
 	if err := wo.heat(ctx); err != nil {
 		return errors.Wrap(err, "running heat")
 	}
@@ -167,7 +167,7 @@ func (wo *wixOptions) Package(ctx context.Context, pkgOutput io.Writer) error {
 // TODO split this into PROGDIR and DATADIR. Perhaps using options? Or
 // figuring out a way to invoke this multiple times with different dir
 // and -cg settings.
-func (wo *wixOptions) heat(ctx context.Context) error {
+func (wo *wixTool) heat(ctx context.Context) error {
 	_, err := wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "heat.exe"),
 		"dir", wo.packageRoot,
@@ -188,7 +188,7 @@ func (wo *wixOptions) heat(ctx context.Context) error {
 // candle invokes wix's candle command. This is the wix compiler, It
 // preprocesses and compiles WiX source files into object files
 // (.wixobj).
-func (wo *wixOptions) candle(ctx context.Context) error {
+func (wo *wixTool) candle(ctx context.Context) error {
 	_, err := wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "candle.exe"),
 		"-nologo",
@@ -203,7 +203,7 @@ func (wo *wixOptions) candle(ctx context.Context) error {
 // light invokes wix's light command. This links and binds one or more
 // .wixobj files and creates a Windows Installer database (.msi or
 // .msm). See http://wixtoolset.org/documentation/manual/v3/overview/light.html for options
-func (wo *wixOptions) light(ctx context.Context) error {
+func (wo *wixTool) light(ctx context.Context) error {
 	args := []string{
 		"-nologo",
 		"-dcl:high", // compression level
@@ -225,7 +225,7 @@ func (wo *wixOptions) light(ctx context.Context) error {
 
 }
 
-func (wo *wixOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
+func (wo *wixTool) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
 	logger := ctxlog.FromContext(ctx)
 
 	dockerArgs := []string{

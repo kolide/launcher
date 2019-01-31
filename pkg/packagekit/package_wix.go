@@ -30,8 +30,8 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	// little more debugable to do it with go's. This way, we can
 	// inspect the intermediate xml file.
 	//
-	// This might all be cleaner moved to a marshalled struct. For now,
-	// just sent the template the PackageOptions struct
+	// This might all be cleaner moved from a template to a marshalled
+	// struct. But enumerating the wix options looks very ugly
 	wixTemplateBytes, err := internal.Asset("internal/assets/main.wxs")
 	if err != nil {
 		return errors.Wrap(err, "getting go-bindata main.wxs")
@@ -70,8 +70,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	}
 	defer wixTool.Cleanup()
 
-	// Run light to compile the msi (and copy the output into our file
-	// handle)
+	// Use wix to compile into an MSI
 	if err := wixTool.Package(ctx, w); err != nil {
 		return errors.Wrap(err, "running light")
 	}
