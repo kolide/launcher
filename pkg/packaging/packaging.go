@@ -334,6 +334,11 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	return nil
 }
 
+// setupInit setups the init scripts.
+//
+// Note that windows is a special
+// case here -- they're not files on disk, instead it's an argument
+// passed in to wix. So this is a confusing split.
 func (p *PackageOptions) setupInit(ctx context.Context) error {
 	if p.target.Init == NoInit {
 		return nil
@@ -555,13 +560,11 @@ func (p *PackageOptions) setupDirectories() error {
 	case Windows:
 		// On Windows, these paths end up rooted not at `c:`, but instead
 		// where the WiX template says. In our case, that's `c:\Program
-		// Files\Kolide` These do need the identigier, since we need WiX
+		// Files\Kolide` These do need the identifier, since we need WiX
 		// to take that into account for the guid generation.
-		//
-		//FIXME what should these be?
 		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
 		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
-		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data", sanitizeHostname(p.Hostname))
+		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data")
 	default:
 		return errors.Errorf("Unknown platform %s", string(p.target.Platform))
 	}

@@ -46,15 +46,19 @@ func (fi bindataFileInfo) Sys() interface{} {
 
 var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <?if $(var.Arch) = 386 ?>
-  <?define ProgFolder=ProgramFilesFolder ?>
-  <?else?>
-  <?define ProgFolder=ProgramFiles64Folder ?>
-  <?endif?>
+<?if $(sys.BUILDARCH)="x86"?>
+    <?define Minimum_Version="100"?>
+    <?define Program_Files="ProgramFilesFolder"?>
+<?elseif $(sys.BUILDARCH)="x64"?>
+    <?define Minimum_Version="200"?>
+    <?define Program_Files="ProgramFiles64Folder"?>
+<?else?>
+    <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
+<?endif?>
 
   <Product
       Id="*"
-      Name="Kolide {{.Opts.Name}} {{.Opts.Identifier}} $(var.Arch) {{.Opts.Version}}"
+      Name="Kolide {{.Opts.Name}} {{.Opts.Identifier}} $(sys.BUILDARCH) {{.Opts.Version}}"
       Language="1033"
       Version="{{.Opts.Version}}"
       Manufacturer="https://kolide.com"
@@ -82,7 +86,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	 It's up to the caller to decide which directories to use
     -->
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="$(var.ProgFolder)">
+      <Directory Id="$(var.Program_Files)">
 	<Directory Id="PROGDIR" Name="Kolide"/>
       </Directory>
       <Directory Id="CommonAppDataFolder">
@@ -112,7 +116,7 @@ func internalAssetsMainWxs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "internal/assets/main.wxs", size: 1558, mode: os.FileMode(420), modTime: time.Unix(1547607846, 0)}
+	info := bindataFileInfo{name: "internal/assets/main.wxs", size: 1750, mode: os.FileMode(420), modTime: time.Unix(1549050131, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

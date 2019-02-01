@@ -18,11 +18,12 @@ type Target struct {
 type InitFlavor string
 
 const (
-	LaunchD InitFlavor = "launchd"
-	SystemD            = "systemd"
-	Init               = "init"
-	Upstart            = "upstart"
-	NoInit             = "none"
+	LaunchD    InitFlavor = "launchd"
+	SystemD               = "systemd"
+	Init                  = "init"
+	Upstart               = "upstart"
+	WiXService            = "service"
+	NoInit                = "none"
 )
 
 type PlatformFlavor string
