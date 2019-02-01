@@ -39,9 +39,9 @@ func TestWixPackage(t *testing.T) {
 	err = setupPackageRoot(packageRoot)
 	require.NoError(t, err)
 
-	outMsi, err := ioutil.TempFile("", "wix-test-*.msi")
+	outMsi, err := os.Create("/tmp/out.msi") //ioutil.TempFile("", "wix-test-*.msi")
 	require.NoError(t, err)
-	defer os.Remove(outMsi.Name())
+	//defer os.Remove(outMsi.Name())
 
 	mainWxsContent, err := testdata.Asset("testdata/assets/product.wxs")
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestWixPackage(t *testing.T) {
 		SkipValidation(),          // wine can't validate
 		WithDocker("felfert/wix"), // TODO Use a Kolide distributed Dockerfile
 		WithWix("/opt/wix/bin"),
-		WithService(Service{Binary: `hello.txt`}),
+		WithService(NewService("hello.txt")),
 	)
 	require.NoError(t, err)
 	defer wixTool.Cleanup()

@@ -18,14 +18,14 @@ import (
 )
 
 type wixTool struct {
-	wixPath        string    // Where is wix installed
-	packageRoot    string    // What's the root of the packaging files?
-	buildDir       string    // The wix tools want to work in a build dir.
-	msArch         string    // What's the microsoft archtecture name?
-	services       []Service // array of services. TBD
-	dockerImage    string    // If in docker, what image?
-	skipValidation bool      // Skip light validation. Seems to be needed for running in 32bit wine environments.
-	cleanDirs      []string  // directories to rm on cleanup
+	wixPath        string     // Where is wix installed
+	packageRoot    string     // What's the root of the packaging files?
+	buildDir       string     // The wix tools want to work in a build dir.
+	msArch         string     // What's the microsoft archtecture name?
+	services       []*Service // array of services.
+	dockerImage    string     // If in docker, what image?
+	skipValidation bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
+	cleanDirs      []string   // directories to rm on cleanup
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
@@ -58,7 +58,7 @@ func WithWix(path string) WixOpt {
 	}
 }
 
-func WithService(service Service) WixOpt {
+func WithService(service *Service) WixOpt {
 	return func(wo *wixTool) {
 		wo.services = append(wo.services, service)
 	}
@@ -197,8 +197,11 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 		heatWrite.WriteString(line)
 		heatWrite.WriteString("\n")
 		for _, service := range wo.services {
-			// This is a sketchtastic way of finding matches
-			if strings.Contains(line, service.Binary) {
+			isMatch, err := service.Match(line)
+			if err != nil {
+				return err
+			}
+			if isMatch {
 				if err := service.Xml(heatWrite); err != nil {
 					return errors.Wrap(err, "adding service")
 				}

@@ -3,6 +3,9 @@ package wix
 import (
 	"encoding/xml"
 	"io"
+	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
@@ -69,30 +72,82 @@ type ServiceControl struct {
 	Wait   YesNoType            `xml:",attr,omitempty"`
 }
 
-// Service is a rollup of ServiceInstall and ServiceControl
+// Service represents a wix service. It provides an interface to both
+// ServiceInstall and ServiceControl.
 type Service struct {
-	Binary string
+	matchString   string
+	count         int // number of times we've seen this. Used for error handling
+	expectedCount int
+
+	serviceInstall *ServiceInstall
+	serviceControl *ServiceControl
 }
 
-func (s *Service) Xml(w io.Writer) error {
-	si := ServiceInstall{
-		Name:         "x",
+type ServiceOpt func(*Service)
+
+func ServiceName(name string) ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.Name = name
+		s.serviceControl.Name = name
+	}
+}
+
+// New returns a service
+func NewService(matchString string, opts ...ServiceOpt) *Service {
+	defaultName := strings.TrimSuffix(matchString, ".exe") + "Svc"
+
+	si := &ServiceInstall{
+		Name:         defaultName,
 		Id:           "ServiceInstall",
 		Start:        StartAuto,
 		Type:         "ownProcess",
 		ErrorControl: ErrorControlNormal,
 	}
-	sc := ServiceControl{
-		Name: "x",
+
+	sc := &ServiceControl{
+		Name: defaultName,
 		Id:   "ServiceControl",
 	}
 
+	s := &Service{
+		matchString:    matchString,
+		expectedCount:  1,
+		count:          0,
+		serviceInstall: si,
+		serviceControl: sc,
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
+}
+
+// Match returns a bool if there's a match
+func (s *Service) Match(line string) (bool, error) {
+	isMatch := strings.Contains(line, s.matchString)
+
+	if isMatch {
+		s.count += 1
+	}
+
+	if s.count > s.expectedCount {
+		return isMatch, errors.Errorf("Too many matches. Have %d, expected %d", s.count, s.expectedCount)
+	}
+
+	return isMatch, nil
+}
+
+// Xml converts a Service resource to Xml suitable for embedding
+func (s *Service) Xml(w io.Writer) error {
+
 	enc := xml.NewEncoder(w)
 	enc.Indent("                    ", "    ")
-	if err := enc.Encode(si); err != nil {
+	if err := enc.Encode(s.serviceInstall); err != nil {
 		return err
 	}
-	if err := enc.Encode(sc); err != nil {
+	if err := enc.Encode(s.serviceControl); err != nil {
 		return err
 	}
 
