@@ -3,6 +3,7 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"runtime"
 	"strings"
@@ -66,7 +67,10 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	wixArgs := []wix.WixOpt{}
 
 	if includeService {
-		launcherService := wix.NewService("launcher.exe", wix.ServiceName("KolideLauncherSvc"))
+		launcherService := wix.NewService("launcher.exe",
+			wix.ServiceName(fmt.Sprintf("KolideLauncher%sSvc", strings.Title(po.Identifier))),
+			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),
+		)
 		wixArgs = append(wixArgs, wix.WithService(launcherService))
 	}
 

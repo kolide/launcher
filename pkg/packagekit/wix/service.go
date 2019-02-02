@@ -39,9 +39,9 @@ const (
 type InstallUninstallType string
 
 const (
-	InstallUninstallInstall InstallUninstallType = "install"
-	InstallUninstallUnstall                      = "uninstall"
-	InstallUninstallBoth                         = "both"
+	InstallUninstallInstall   InstallUninstallType = "install"
+	InstallUninstallUninstall                      = "uninstall"
+	InstallUninstallBoth                           = "both"
 )
 
 // ServiceInstall implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
@@ -87,8 +87,16 @@ type ServiceOpt func(*Service)
 
 func ServiceName(name string) ServiceOpt {
 	return func(s *Service) {
-		s.serviceInstall.Name = name
+		s.serviceControl.Id = name
 		s.serviceControl.Name = name
+		s.serviceInstall.Id = name
+		s.serviceInstall.Name = name
+	}
+}
+
+func ServiceDescription(desc string) ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.Description = desc
 	}
 }
 
@@ -98,15 +106,21 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 
 	si := &ServiceInstall{
 		Name:         defaultName,
-		Id:           "ServiceInstall",
+		Id:           defaultName,
+		Account:      `NT AUTHORITY\SYSTEM`,
 		Start:        StartAuto,
 		Type:         "ownProcess",
 		ErrorControl: ErrorControlNormal,
+		Vital:        Yes,
 	}
 
 	sc := &ServiceControl{
-		Name: defaultName,
-		Id:   "ServiceControl",
+		Name:   defaultName,
+		Id:     defaultName,
+		Stop:   InstallUninstallBoth,
+		Start:  InstallUninstallInstall,
+		Remove: InstallUninstallUninstall,
+		Wait:   No,
 	}
 
 	s := &Service{
