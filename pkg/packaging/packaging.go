@@ -288,7 +288,8 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Msi:
-		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops); err != nil {
+		includeService := p.target.Init == WindowsService
+		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops, includeService); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	default:
@@ -372,6 +373,9 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
 		}
+	case p.target.Platform == Windows && p.target.Init == WindowsService:
+		// Do nothing, this is handled in the packaging step.
+		return nil
 	default:
 		return errors.Errorf("Unsupported target %s", p.target.String())
 	}

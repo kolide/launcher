@@ -218,7 +218,8 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 //
 // TODO split this into PROGDIR and DATADIR. Perhaps using options? Or
 // figuring out a way to invoke this multiple times with different dir
-// and -cg settings.
+// and -cg settings. Historically this used PROGDIR, and I haven't dug
+// into the auto-update code, so it's staying there for now.
 func (wo *wixTool) heat(ctx context.Context) error {
 	_, err := wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "heat.exe"),
@@ -230,7 +231,7 @@ func (wo *wixTool) heat(ctx context.Context) error {
 		"-ke",
 		"-cg", "AppFiles",
 		"-template", "fragment",
-		"-dr", "DATADIR",
+		"-dr", "PROGDIR",
 		"-var", "var.SourceDir",
 		"-out", "AppFiles.wxs",
 	)

@@ -17,7 +17,7 @@ import (
 
 //go:generate go-bindata   -nocompress -pkg internal -o internal/assets.go internal/assets/
 
-func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
+func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
 	defer span.End()
 
@@ -51,7 +51,6 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		Opts:        po,
 		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
 		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
-		PackageCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
 	}
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
@@ -64,7 +63,14 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return errors.Wrap(err, "executing WixTemplate")
 	}
 
-	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes())
+	wixArgs := []wix.WixOpt{}
+
+	if includeService {
+		launcherService := wix.NewService("launcher.exe", wix.ServiceName("KolideLauncherSvc"))
+		wixArgs = append(wixArgs, wix.WithService(launcherService))
+	}
+
+	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes(), wixArgs...)
 	if err != nil {
 		return errors.Wrap(err, "making wixTool")
 	}
