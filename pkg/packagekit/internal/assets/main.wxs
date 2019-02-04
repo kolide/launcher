@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
 <?if $(sys.BUILDARCH)="x86"?>
-    <?define Minimum_Version="100"?>
     <?define Program_Files="ProgramFilesFolder"?>
 <?elseif $(sys.BUILDARCH)="x64"?>
-    <?define Minimum_Version="200"?>
     <?define Program_Files="ProgramFiles64Folder"?>
 <?else?>
     <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
