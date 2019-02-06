@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/go-kit/kit/log"
@@ -50,7 +51,7 @@ func main() {
 	defer cancel()
 
 	if err := runLauncher(ctx, cancel, opts, logger); err != nil {
-		logutil.Fatal(logger, err, "run launcher")
+		logutil.Fatal(logger, err, "run launcher", "stack", fmt.Sprintf("%+v", err))
 	}
 }
 
