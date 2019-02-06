@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"syscall"
@@ -71,7 +72,7 @@ func createUpdater(
 			return nil
 		},
 		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "updater interrupted", "err", err)
+			level.Info(logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 			if stop != nil {
 				stop()
 			}
@@ -85,6 +86,7 @@ func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() e
 			level.Info(logger).Log(
 				"method", "launcherFinalizer",
 				"err", err,
+				"stack", fmt.Sprintf("%+v", err),
 			)
 		}
 		// replace launcher

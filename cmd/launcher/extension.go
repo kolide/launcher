@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/boltdb/bolt"
@@ -110,12 +111,12 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 				return nil
 			},
 			Interrupt: func(err error) {
-				level.Info(logger).Log("msg", "extension interrupted", "err", err)
+				level.Info(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 				grpcConn.Close()
 				ext.Shutdown()
 				if runner != nil {
 					if err := runner.Shutdown(); err != nil {
-						level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
+						level.Info(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
 					}
 				}
 			},
