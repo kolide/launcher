@@ -130,6 +130,7 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		fmt.Sprintf("--database_path=%s", paths.databasePath),
 		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
+		"--extensions_timeout=10",
 		fmt.Sprintf("--config_plugin=%s", configPlugin),
 		fmt.Sprintf("--logger_plugin=%s", loggerPlugin),
 		fmt.Sprintf("--distributed_plugin=%s", distributedPlugin),
