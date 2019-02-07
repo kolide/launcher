@@ -26,6 +26,4 @@ type KolideService interface {
 	PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 	// CheckHealth returns the status of the remote API, with 1 indicating OK status.
 	CheckHealth(ctx context.Context) (int32, error)
-	//TODO: add shutdown
-	//Shutdown(ctx context.Context)
 }

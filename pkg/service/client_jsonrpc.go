@@ -1,7 +1,6 @@
 package service
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"net/http"
 	"net/url"
@@ -12,7 +11,7 @@ import (
 
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using the provided gRPC client connection.
-func NewJSONRPC(
+func NewJSONRPCClient(
 	serverURL string,
 	insecureTLS bool,
 	certPins [][]byte,
@@ -24,15 +23,12 @@ func NewJSONRPC(
 		Host:   serverURL,
 	}
 
+	tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)
 	httpClient := http.DefaultClient
-	if insecureTLS {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
+	httpClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
 	}
 
 	requestEnrollmentEndpoint := jsonrpc.NewClient(

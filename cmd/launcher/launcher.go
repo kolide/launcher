@@ -259,7 +259,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
-			client = service.NewJSONRPC(opts.kolideServerURL, opts.insecureTLS, opts.certPins, rootPool, logger)
+			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.certPins, rootPool, logger)
 			if err != nil {
 				errors.Wrap(err, "create JSON RPC Client")
 			}
