@@ -6,6 +6,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+type Opt func(*Backoff)
+
+func MaxAttempts(i int) Opt {
+	return func(b *Backoff) {
+		b.maxAttempt = i
+	}
+}
+
 // Backoff is a quick retry function
 type Backoff struct {
 	count      int
@@ -15,11 +23,15 @@ type Backoff struct {
 }
 
 // New returns a Backoff timer
-func New() *Backoff {
+func New(opts ...Opt) *Backoff {
 	b := &Backoff{
 		count:      0,
 		delay:      1,
 		maxAttempt: 20,
+	}
+
+	for _, opt := range opts {
+		opt(b)
 	}
 
 	return b
@@ -35,7 +47,7 @@ func (b *Backoff) try() error {
 	b.count += 1
 	err := b.runFunc()
 	if err != nil {
-		if b.count > b.maxAttempt {
+		if b.count >= b.maxAttempt {
 			return errors.Wrap(err, "done trying")
 		}
 

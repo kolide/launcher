@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/osquery-go/plugin/distributed"
 	"github.com/kolide/osquery-go/plugin/logger"
@@ -320,24 +321,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "generating UUID")
 	}
 
-	// We've seen this fail, so add some retry logic. Keep trying to
-	// get enroll details, until either we succeed, or we;ve tried 5
-	// times.
+	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-EnrollDetailsLoop:
-	for i := 0; ; i++ {
+	backoff := backoff.New(backoff.MaxAttempts(5))
+	backoff.Run(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
-		switch {
-		case err == nil:
-			break EnrollDetailsLoop
-		case i < 5:
-			timer := time.NewTimer(time.Second * 1)
-			<-timer.C
-		default:
-			// Trigger when:  err != nil && i > 5
-			return "", true, errors.Wrap(err, "query enrollment details")
-		}
-	}
+		return err
+	})
 
 	// If no cached node key, enroll for new node key
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)

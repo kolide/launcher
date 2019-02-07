@@ -41,7 +41,17 @@ func TestSlowFail(t *testing.T) {
 
 	err := bkoff.Run(willFail)
 	require.Error(t, err)
-	require.Equal(t, 21, bkoff.count)
+	require.Equal(t, 20, bkoff.count)
+}
+
+func TestMaxAttempts(t *testing.T) {
+	t.Parallel()
+	bkoff := New(MaxAttempts(5))
+	bkoff.delay = 0.0
+
+	err := bkoff.Run(willFail)
+	require.Error(t, err)
+	require.Equal(t, 5, bkoff.count)
 }
 
 func willSucceed() error {
