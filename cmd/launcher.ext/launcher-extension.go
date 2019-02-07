@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/kolide/kit/logutil"
@@ -31,12 +32,12 @@ func main() {
 		osquery.ServerTimeout(timeout),
 	)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
+		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
 	}
 
 	client, err := osquery.NewClient(*flSocketPath, timeout)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "creating osquery extension client")
+		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
 	}
 
 	var plugins []osquery.OsqueryPlugin
@@ -46,6 +47,6 @@ func main() {
 	server.RegisterPlugin(plugins...)
 
 	if err := server.Run(); err != nil {
-		logutil.Fatal(logger, "err", err)
+		logutil.Fatal(logger, "err", err, "stack", fmt.Sprintf("%+v", err))
 	}
 }

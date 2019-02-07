@@ -27,6 +27,6 @@ func DetectPlatform() (OsqueryPlatform, error) {
 	case "linux":
 		return Linux, nil
 	default:
-		return Unknown, errors.New("unrecognized runtime.GOOS: " + runtime.GOOS)
+		return Unknown, errors.Errorf("unrecognized runtime.GOOS: %s", runtime.GOOS)
 	}
 }

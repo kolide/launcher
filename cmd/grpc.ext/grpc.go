@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -38,7 +39,7 @@ func main() {
 
 	client, err := osquery.NewClient(*flSocketPath, timeout)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "creating osquery extension client")
+		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
 	}
 
 	var (
