@@ -320,9 +320,22 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "generating UUID")
 	}
 
-	enrollDetails, err := getEnrollDetails(e.osqueryClient)
-	if err != nil {
-		return "", true, errors.Wrap(err, "query enrollment details")
+	// We've seen this fail, so add some retry logic. Keep trying to
+	// get enroll details, until either we succeed, or we;ve tried 5
+	// times.
+	var enrollDetails service.EnrollmentDetails
+EnrollDetailsLoop:
+	for i := 0; ; i++ {
+		enrollDetails, err = getEnrollDetails(e.osqueryClient)
+		switch {
+		case err == nil:
+			break EnrollDetailsLoop
+		case i < 5:
+			timer := time.NewTimer(time.Second * 1)
+			<-timer.C
+		default:
+			return "", true, errors.Wrap(err, "query enrollment details")
+		}
 	}
 
 	// If no cached node key, enroll for new node key
