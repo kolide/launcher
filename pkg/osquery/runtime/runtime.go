@@ -22,6 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
@@ -554,8 +555,9 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch the extension manager server asynchronously.
 	o.errgroup.Go(func() error {
-		time.Sleep(1 * time.Second)
-		if err := o.extensionManagerServer.Start(); err != nil {
+		// We see the extention manager being slow to start. Implement a simple re-try routine
+		backoff := backoff.New()
+		if err := backoff.Run(o.extensionManagerServer.Start); err != nil {
 			return errors.Wrap(err, "running extension server")
 		}
 		return errors.New("extension manager server exited")
