@@ -31,7 +31,6 @@ import (
 	osquerygo "github.com/kolide/osquery-go"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -244,18 +243,21 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			return errors.Errorf("found no valid certs in PEM at path: %s", opts.rootPEM)
 		}
 	}
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	var runGroup run.Group
 
 	var client service.KolideService
-	var grpcConn *grpc.ClientConn
 	{
 		switch opts.transport {
 		case "grpc":
-			grpcConn, err = service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
 			if err != nil {
 				errors.Wrap(err, "dialing grpc server")
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, level.Debug(logger))
+			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
+			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
 			client = service.NewJSONRPC(opts.kolideServerURL, opts.insecureTLS, opts.certPins, rootPool, logger)
 			if err != nil {
@@ -265,9 +267,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			errors.New("invalid transport option selected")
 		}
 	}
-
-	// create a rungroup for all the actors we create to allow for easy start/stop
-	var runGroup run.Group
 
 	// create the osquery extension for launcher
 	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, client, opts)
@@ -282,9 +281,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
-
-	queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
-	runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 
 	// If the control server has been opted-in to, run it
 	if opts.control {
