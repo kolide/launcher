@@ -16,7 +16,6 @@ func TestImmediate(t *testing.T) {
 	err := bkoff.Run(willSucceed)
 	require.NoError(t, err)
 	require.Equal(t, 1, bkoff.count)
-
 }
 
 func TestEventual(t *testing.T) {
