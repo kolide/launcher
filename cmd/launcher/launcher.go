@@ -249,12 +249,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	if err != nil {
 		return errors.Wrap(err, "dialing grpc server")
 	}
+	launcherClient := service.New(grpcConn, level.Debug(logger))
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
 
 	// create the osquery extension for launcher
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, grpcConn, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, launcherClient, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}

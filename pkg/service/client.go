@@ -7,81 +7,51 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	grpctransport "github.com/go-kit/kit/transport/grpc"
-	"github.com/kolide/kit/contexts/uuid"
+	httptransport "github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using the provided gRPC client connection.
 func New(conn *grpc.ClientConn, logger log.Logger) KolideService {
-	requestEnrollmentEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	serviceUrl, _ := url.Parse("http://localhost:8080")
+
+	requestEnrollmentEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"RequestEnrollment",
-		encodeGRPCEnrollmentRequest,
-		decodeGRPCEnrollmentResponse,
-		pb.EnrollmentResponse{},
-		uuid.Attach(),
 	).Endpoint()
 
-	requestConfigEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	requestConfigEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"RequestConfig",
-		encodeGRPCConfigRequest,
-		decodeGRPCConfigResponse,
-		pb.ConfigResponse{},
-		uuid.Attach(),
 	).Endpoint()
 
-	publishLogsEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	publishLogsEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"PublishLogs",
-		encodeGRPCLogCollection,
-		decodeGRPCPublishLogsResponse,
-		pb.AgentApiResponse{},
-		uuid.Attach(),
 	).Endpoint()
 
-	requestQueriesEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	requestQueriesEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"RequestQueries",
-		encodeGRPCQueriesRequest,
-		decodeGRPCQueryCollection,
-		pb.QueryCollection{},
-		uuid.Attach(),
 	).Endpoint()
 
-	publishResultsEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	publishResultsEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"PublishResults",
-		encodeGRPCResultCollection,
-		decodeGRPCPublishResultsResponse,
-		pb.AgentApiResponse{},
-		uuid.Attach(),
 	).Endpoint()
 
-	checkHealthEndpoint := grpctransport.NewClient(
-		conn,
-		"kolide.agent.Api",
+	checkHealthEndpoint := httptransport.NewClient(
+		serviceUrl,
 		"CheckHealth",
-		encodeGRPCHealcheckRequest,
-		decodeGRPCHealthCheckResponse,
-		pb.HealthCheckResponse{},
-		uuid.Attach(),
 	).Endpoint()
 
 	var client KolideService = Endpoints{
