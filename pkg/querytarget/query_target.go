@@ -13,6 +13,8 @@ import (
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type QueryTargetUpdater struct {
@@ -65,10 +67,16 @@ func (qtu *QueryTargetUpdater) Run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			if err := qtu.updateTargetMemberships(ctx); err != nil {
-				level.Error(qtu.logger).Log(
-					"msg", "updating kolide_target_membership data",
-					"err", err,
-				)
+				if status.Code(errors.Cause(err)) == codes.Unimplemented {
+					level.Debug(qtu.logger).Log(
+						"msg", "server does not implement GetTargets",
+					)
+				} else {
+					level.Error(qtu.logger).Log(
+						"msg", "updating kolide_target_membership data",
+						"err", err,
+					)
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
