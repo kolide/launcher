@@ -76,7 +76,7 @@ func main() {
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "failed to connect to grpc host", "stack", fmt.Sprintf("%+v", err))
 	}
-	remote := service.New(conn, level.Debug(logger))
+	remote := service.NewGRPCClient(conn, level.Debug(logger))
 
 	extOpts := grpcext.ExtensionOpts{
 		EnrollSecret:    enrollSecret,

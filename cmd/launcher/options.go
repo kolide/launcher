@@ -27,6 +27,7 @@ type options struct {
 	rootPEM             string
 	loggingInterval     time.Duration
 	enableInitialRunner bool
+	transport           string
 
 	control           bool
 	controlServerURL  string
@@ -51,7 +52,6 @@ const (
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
 func parseOptions(args []string) (*options, error) {
-
 	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
 
@@ -65,6 +65,7 @@ func parseOptions(args []string) (*options, error) {
 		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 3*time.Second, "The interval at which the 'get shells' request will be made")
 		flInitialRunner     = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL   = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flTransport         = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
 		flLoggingInterval   = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath      = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
@@ -142,6 +143,7 @@ func parseOptions(args []string) (*options, error) {
 
 	opts := &options{
 		kolideServerURL:     *flKolideServerURL,
+		transport:           *flTransport,
 		control:             *flControl,
 		controlServerURL:    *flControlServerURL,
 		getShellsInterval:   *flGetShellsInterval,
@@ -188,6 +190,8 @@ func shortUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("hostname")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("transport")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("enroll_secret")
 	printOpt("enroll_secret_path")

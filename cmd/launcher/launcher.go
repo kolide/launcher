@@ -31,6 +31,7 @@ import (
 	osquerygo "github.com/kolide/osquery-go"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -244,18 +245,32 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		}
 	}
 
-	// connect to the grpc server
-	grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
-	if err != nil {
-		return errors.Wrap(err, "dialing grpc server")
+	var client service.KolideService
+	var grpcConn *grpc.ClientConn
+	{
+		switch opts.transport {
+		case "grpc":
+			grpcConn, err = service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
+			if err != nil {
+				errors.Wrap(err, "dialing grpc server")
+			}
+			defer grpcConn.Close()
+			client = service.NewGRPCClient(grpcConn, level.Debug(logger))
+		case "jsonrpc":
+			client = service.NewJSONRPC(opts.kolideServerURL, opts.insecureTLS, opts.certPins, rootPool, logger)
+			if err != nil {
+				errors.Wrap(err, "create JSON RPC Client")
+			}
+		default:
+			errors.New("invalid transport option selected")
+		}
 	}
-	launcherClient := service.New(grpcConn, level.Debug(logger))
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
 
 	// create the osquery extension for launcher
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, launcherClient, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, client, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}
