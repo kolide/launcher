@@ -334,6 +334,7 @@ EnrollDetailsLoop:
 			timer := time.NewTimer(time.Second * 1)
 			<-timer.C
 		default:
+			// Trigger when:  err != nil && i > 5
 			return "", true, errors.Wrap(err, "query enrollment details")
 		}
 	}
