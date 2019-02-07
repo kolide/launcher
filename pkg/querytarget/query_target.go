@@ -3,6 +3,7 @@ package querytarget
 import (
 	"context"
 	"time"
+	"strings"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -65,10 +66,18 @@ func (qtu *QueryTargetUpdater) Run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			if err := qtu.updateTargetMemberships(ctx); err != nil {
-				level.Error(qtu.logger).Log(
-					"msg", "updating kolide_target_membership data",
-					"err", err,
-				)
+				if strings.Contains(err.Error(), "code = Unimplemented") {
+					level.Debug(qtu.logger).Log(
+						"msg", "server does not implement GetTargets",
+						"err", err,
+					)
+				} else {
+					level.Error(qtu.logger).Log(
+						"msg", "updating kolide_target_membership data",
+						"err", err,
+					)
+
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
