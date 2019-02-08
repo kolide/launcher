@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"crypto/x509"
+	"encoding/json"
 	"net/http"
 	"net/url"
 
@@ -35,6 +37,7 @@ func NewJSONRPCClient(
 		serviceURL,
 		"RequestEnrollment",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(requestEnrollmentResponseDecoder),
 	).Endpoint()
 
 	requestConfigEndpoint := jsonrpc.NewClient(
@@ -82,4 +85,17 @@ func NewJSONRPCClient(
 	client = uuidMiddleware(client)
 
 	return client
+}
+
+func requestEnrollmentResponseDecoder(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result enrollmentResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
