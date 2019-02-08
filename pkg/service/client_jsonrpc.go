@@ -1,13 +1,24 @@
 package service
 
 import (
+	"context"
 	"crypto/x509"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 )
+
+// forceNoChunkedEncoding forces the connection not to use chunked
+// encoding. This is because we're talking to rails wehich doeasn't
+// support it. TOD: followup info
+func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
+	r.TransferEncoding = []string{"identity"}
+	return ctx
+}
 
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using the provided gRPC client connection.
@@ -31,51 +42,56 @@ func NewJSONRPCClient(
 	tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)
 	httpClient := http.DefaultClient
 	httpClient = &http.Client{
+		Timeout: time.Second * 30,
 		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
+			TLSClientConfig:   tlsConfig,
+			DisableKeepAlives: true,
 		},
+	}
+
+	commonOpts := []jsonrpc.ClientOption{
+		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientBefore(
+			forceNoChunkedEncoding,
+			//kithttp.SetRequestHeader("Transfer-Encoding", "identity"),
+			kithttp.SetRequestHeader("x-seph", "test"),
+		),
 	}
 
 	requestEnrollmentEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"RequestEnrollment",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCEnrollmentResponse),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCEnrollmentResponse))...,
 	).Endpoint()
 
 	requestConfigEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"RequestConfig",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCConfigResponse),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCConfigResponse))...,
 	).Endpoint()
 
 	publishLogsEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"PublishLogs",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishLogsResponse),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishLogsResponse))...,
 	).Endpoint()
 
 	requestQueriesEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"RequestQueries",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCQueryCollection),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCQueryCollection))...,
 	).Endpoint()
 
 	publishResultsEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"PublishResults",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishResultsResponse),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishResultsResponse))...,
 	).Endpoint()
 
 	checkHealthEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"CheckHealth",
-		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse),
+		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse))...,
 	).Endpoint()
 
 	var client KolideService = Endpoints{
