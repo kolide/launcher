@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -21,6 +22,7 @@ import (
 const (
 	// Enroll secret should be readable only by root
 	secretPerms = 0600
+	hostLauncher = "launcher-host"
 )
 
 // PackageOptions encapsulates the launcher build options. It's
@@ -48,6 +50,8 @@ type PackageOptions struct {
 	CacheDir          string
 
 	target        Target                     // Target build platform
+	hostTarget    Target					 // Host target
+	crossCompiling	bool					 // Whether the target platform and host differ
 	initOptions   *packagekit.InitOptions    // options we'll pass to the packagekit renderers
 	packagekitops *packagekit.PackageOptions // options for packagekit packagers
 	packageWriter io.Writer                  // Where to write the file
@@ -75,6 +79,11 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	p.target = target
 	p.packageWriter = packageWriter
+	p.crossCompiling = runtime.GOOS != p.target.Platform.String()
+	p.hostTarget = Target{}
+	if err := p.hostTarget.Parse(fmt.Sprintf("%s-%s-%s", runtime.GOOS, p.target.Init, p.target.Package)); err != nil {
+		return errors.Wrapf(err, "unable to parse host platform")
+	}
 
 	var err error
 
