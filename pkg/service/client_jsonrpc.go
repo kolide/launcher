@@ -1,14 +1,12 @@
 package service
 
 import (
-	"context"
 	"crypto/x509"
-	"encoding/json"
 	"net/http"
 	"net/url"
 
 	"github.com/go-kit/kit/log"
-	jsonrpc "github.com/go-kit/kit/transport/http/jsonrpc"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 )
 
 // New creates a new Kolide Client (implementation of the KolideService
@@ -37,37 +35,42 @@ func NewJSONRPCClient(
 		serviceURL,
 		"RequestEnrollment",
 		jsonrpc.SetClient(httpClient),
-		jsonrpc.ClientResponseDecoder(requestEnrollmentResponseDecoder),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCEnrollmentResponse),
 	).Endpoint()
 
 	requestConfigEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"RequestConfig",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCConfigResponse),
 	).Endpoint()
 
 	publishLogsEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"PublishLogs",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishLogsResponse),
 	).Endpoint()
 
 	requestQueriesEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"RequestQueries",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCQueryCollection),
 	).Endpoint()
 
 	publishResultsEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"PublishResults",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishResultsResponse),
 	).Endpoint()
 
 	checkHealthEndpoint := jsonrpc.NewClient(
 		serviceURL,
 		"CheckHealth",
 		jsonrpc.SetClient(httpClient),
+		jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse),
 	).Endpoint()
 
 	var client KolideService = Endpoints{
@@ -85,17 +88,4 @@ func NewJSONRPCClient(
 	client = uuidMiddleware(client)
 
 	return client
-}
-
-func requestEnrollmentResponseDecoder(_ context.Context, res jsonrpc.Response) (interface{}, error) {
-	if res.Error != nil {
-		return nil, *res.Error
-	}
-	var result enrollmentResponse
-	err := json.Unmarshal(res.Result, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
 }

@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -95,6 +98,19 @@ func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (inte
 		NodeInvalid: req.NodeInvalid,
 	}
 	return encodeResponse(resp, req.Err)
+}
+
+func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result publishLogsResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling PublishLogs response")
+	}
+
+	return result, nil
 }
 
 func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {

@@ -7,8 +7,10 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -21,6 +23,18 @@ type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool
 	Err         error
+}
+
+func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result queryCollectionResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling RequestQueries response")
+	}
+	return result, nil
 }
 
 func decodeGRPCQueriesRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

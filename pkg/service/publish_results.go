@@ -7,8 +7,10 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -53,6 +55,19 @@ func decodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 		Results: results,
 		NodeKey: req.NodeKey,
 	}, nil
+}
+
+func decodeJSONRPCPublishResultsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result resultCollection
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling PublishResults response")
+	}
+
+	return result, nil
 }
 
 func encodeGRPCResultCollection(_ context.Context, request interface{}) (interface{}, error) {

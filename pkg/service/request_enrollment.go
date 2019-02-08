@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -61,6 +64,19 @@ func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interf
 		HostIdentifier:    req.HostIdentifier,
 		EnrollmentDetails: enrollDetails,
 	}, nil
+}
+
+func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result enrollmentResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling RequestEnrollment response")
+	}
+
+	return result, nil
 }
 
 func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
