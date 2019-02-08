@@ -38,6 +38,26 @@ func TestLauncherVersionDetection(t *testing.T) {
 	require.Equal(t, "0.5.6-19-g17c8589", p.PackageVersion)
 }
 
+func TestCrossCompileLauncherVersionDetection(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var err error
+
+	p := &PackageOptions{
+		crossCompiling:true,
+		hostTarget:Target{Platform: Darwin, Package: Pkg, Init: LaunchD},
+	}
+
+	p.execCC = helperCommandContext
+
+	err = p.detectLauncherVersion(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, "0.5.6-19-g17c8589", p.PackageVersion)
+}
+
 func TestExecOut(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -134,7 +154,7 @@ func TestHelperProcess(t *testing.T) {
 	case cmd == "exit":
 		n, _ := strconv.Atoi(args[0])
 		os.Exit(n)
-	case strings.HasSuffix(cmd, "launcher") && args[0] == "-version":
+	case (strings.HasSuffix(cmd, "launcher") || strings.HasSuffix(cmd, "launcher-host")) && args[0] == "-version":
 		fmt.Println(`launcher - version 0.5.6-19-g17c8589
   branch: 	master
   revision: 	17c8589f47858877bb8de3d8ab1bd095cf631a11
