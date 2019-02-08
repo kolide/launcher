@@ -599,7 +599,14 @@ func (p *PackageOptions) setupDirectories() error {
 
 // BUG This doesn't work on windows
 func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
-	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
+	var launcherPath string
+
+	if p.crossCompiling {
+		launcherPath = filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName(hostLauncher))
+	} else {
+		launcherPath = filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
+	}
+
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
 		return errors.Wrapf(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s)", stdout)
