@@ -255,11 +255,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 				errors.Wrap(err, "dialing grpc server")
 			}
 			defer grpcConn.Close()
-			client = service.NewGRPCClient(grpcConn, level.Debug(logger))
+			client = service.NewGRPCClient(grpcConn, logger)
 			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.certPins, rootPool, logger)
+			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureJSONRPC, opts.certPins, rootPool, logger)
 			if err != nil {
 				errors.Wrap(err, "create JSON RPC Client")
 			}

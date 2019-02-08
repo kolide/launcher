@@ -14,6 +14,7 @@ import (
 func NewJSONRPCClient(
 	serverURL string,
 	insecureTLS bool,
+	insecureJSONRPC bool,
 	certPins [][]byte,
 	rootPool *x509.CertPool,
 	logger log.Logger,
@@ -21,6 +22,10 @@ func NewJSONRPCClient(
 	serviceURL := &url.URL{
 		Scheme: "https",
 		Host:   serverURL,
+	}
+
+	if insecureJSONRPC {
+		serviceURL.Scheme = "http"
 	}
 
 	tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)

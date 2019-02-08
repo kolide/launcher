@@ -38,6 +38,7 @@ type options struct {
 	disableControlTLS  bool
 	insecureTLS        bool
 	insecureGRPC       bool
+	insecureJSONRPC    bool
 	notaryServerURL    string
 	mirrorServerURL    string
 	autoupdateInterval time.Duration
@@ -85,9 +86,9 @@ func parseOptions(args []string) (*options, error) {
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
 		flInsecureGRPC      = flagset.Bool("insecure_grpc", false, "Dial GRPC without a TLS config (default: false)")
+		flInsecureJSONRPC   = flagset.Bool("insecure_jsonrpc", false, "Use JSONPRC without a tls config (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
-
 	ff.Parse(flagset, args,
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
@@ -160,6 +161,7 @@ func parseOptions(args []string) (*options, error) {
 		disableControlTLS:   *flDisableControlTLS,
 		insecureTLS:         *flInsecureTLS,
 		insecureGRPC:        *flInsecureGRPC,
+		insecureJSONRPC:     *flInsecureJSONRPC,
 		notaryServerURL:     *flNotaryServerURL,
 		mirrorServerURL:     *flMirrorURL,
 		autoupdateInterval:  *flAutoupdateInterval,

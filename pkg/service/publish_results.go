@@ -61,7 +61,7 @@ func decodeJSONRPCPublishResultsResponse(_ context.Context, res jsonrpc.Response
 	if res.Error != nil {
 		return nil, *res.Error
 	}
-	var result resultCollection
+	var result publishResultsResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshalling PublishResults response")
