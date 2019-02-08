@@ -167,15 +167,15 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
-	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion, "", p.target); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion, "", p.target); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
-	if err := p.getBinary(ctx, "osquery-extension", p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion); err != nil {
+	if err := p.getBinary(ctx, "osquery-extension", p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion, "", p.target); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
@@ -247,28 +247,35 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 // filesystem.
 //
 // TODO: add in file:// URLs
-func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion string) error {
+func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion, destinationName string, target Target) error {
 	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", symbolicName))
 	defer span.End()
 
 	var err error
 	var localPath string
+	var localFileName string
 
 	switch {
 	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
 		localPath = binaryVersion
 	default:
-		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
+		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, target)
 		if err != nil {
 			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
 		}
 	}
 
+	if destinationName != "" {
+		localFileName = destinationName
+	} else {
+		localFileName = binaryName
+	}
+
 	if err := fs.CopyFile(
 		localPath,
-		filepath.Join(p.packageRoot, p.binDir, binaryName),
+		filepath.Join(p.packageRoot, p.binDir, localFileName),
 	); err != nil {
-		return errors.Wrapf(err, "could not copy binary %s", binaryName)
+		return errors.Wrapf(err, "could not copy binary %s", localFileName)
 	}
 	return nil
 }
