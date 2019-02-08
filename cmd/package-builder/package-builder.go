@@ -228,6 +228,8 @@ func runMake(args []string) error {
 		return err
 	}
 
+	var builtTargets []packaging.Target
+
 	for _, target := range targets {
 		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
 		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
@@ -239,9 +241,13 @@ func runMake(args []string) error {
 		if err := packageOptions.Build(ctx, outputFile, target); err != nil {
 			return errors.Wrap(err, "could not generate packages")
 		}
+		builtTargets = append(builtTargets, target)
 	}
 
-	fmt.Printf("Built you packages in %s\n", outputDir)
+	fmt.Printf("\nBuilt the following packages in %s:\n", outputDir)
+	for _, target := range builtTargets {
+		fmt.Println(target.String())
+	}
 	return nil
 }
 
