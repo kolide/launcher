@@ -198,6 +198,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// The version string is the version of _launcher_ which we don't
 	// know until we've downloaded it.
 	if p.PackageVersion == "" {
+		// We need to handle the case where we have a target version that's different from the host version and we're using autodetect
+		if p.crossCompiling {
+			if err := p.getBinary(ctx, "launcher", p.hostTarget.PlatformBinaryName("launcher"), p.LauncherVersion, p.hostTarget.PlatformBinaryName(hostLauncher), p.hostTarget); err != nil {
+				return errors.Wrapf(err, "fetching binary launcher for platform %s", p.hostTarget.Platform)
+			}
+		}
+
 		if err := p.detectLauncherVersion(ctx); err != nil {
 			return errors.Wrap(err, "version detection")
 		}
