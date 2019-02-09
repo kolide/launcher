@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -17,6 +20,13 @@ import (
 // support it. TOD: followup info
 func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
 	r.TransferEncoding = []string{"identity"}
+
+	// read the body, set the content legth, and leave a new ReadCloser in Body
+	bodyBuf := &bytes.Buffer{}
+	bodyReadBytes, _ := io.Copy(bodyBuf, r.Body)
+	r.ContentLength = bodyReadBytes
+	r.Body = ioutil.NopCloser(bodyBuf)
+
 	return ctx
 }
 
