@@ -602,7 +602,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	var launcherPath string
 
 	if p.crossCompiling {
-		launcherPath = filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName(hostLauncher))
+		launcherPath = filepath.Join(p.packageRoot, p.binDir, p.hostTarget.PlatformBinaryName(hostLauncher))
 	} else {
 		launcherPath = filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
 	}
