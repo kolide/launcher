@@ -49,14 +49,18 @@ func NewJSONRPCClient(
 		serviceURL.Scheme = "http"
 	}
 
-	tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)
-	httpClient := http.DefaultClient
-	httpClient = &http.Client{
+	httpClient := &http.Client{
 		Timeout: time.Second * 30,
 		Transport: &http.Transport{
-			TLSClientConfig:   tlsConfig,
 			DisableKeepAlives: true,
 		},
+	}
+	if !insecureJSONRPC {
+		tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig:   tlsConfig,
+			DisableKeepAlives: true,
+		}
 	}
 
 	commonOpts := []jsonrpc.ClientOption{
