@@ -15,13 +15,13 @@ import (
 )
 
 type configRequest struct {
-	NodeKey string
+	NodeKey string `json: "node_key"`
 }
 
 type configResponse struct {
-	ConfigJSONBlob string `json:"config"`
-	NodeInvalid    bool
-	Err            error
+	ConfigJSONBlob string `json: "config"`
+	NodeInvalid    bool   `json: "node_invalid"`
+	Err            error  `json: "error_code"`
 }
 
 func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

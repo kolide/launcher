@@ -15,7 +15,7 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
-	Status int32
+	Status int32 `json: "status"`
 	Err    error
 }
 

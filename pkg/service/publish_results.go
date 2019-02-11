@@ -16,14 +16,14 @@ import (
 )
 
 type resultCollection struct {
-	NodeKey string
+	NodeKey string `json: "node_key"`
 	Results []distributed.Result
 }
 
 type publishResultsResponse struct {
-	Message     string
-	ErrorCode   string
-	NodeInvalid bool
+	Message     string `json: "message"`
+	ErrorCode   string `json: "error_code"`
+	NodeInvalid bool   `json: "node_invalid"`
 	Err         error
 }
 

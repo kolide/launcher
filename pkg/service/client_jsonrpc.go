@@ -11,13 +11,12 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 )
 
 // forceNoChunkedEncoding forces the connection not to use chunked
-// encoding. This is because we're talking to rails wehich doeasn't
-// support it. TOD: followup info
+// encoding. This is because we're talking to rails which doeasn't
+// support it. TODO: followup info
 func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
 	r.TransferEncoding = []string{"identity"}
 
@@ -31,7 +30,7 @@ func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Contex
 }
 
 // New creates a new Kolide Client (implementation of the KolideService
-// interface) using the provided gRPC client connection.
+// interface) using a JSONRPC client connection.
 func NewJSONRPCClient(
 	serverURL string,
 	insecureTLS bool,
@@ -67,8 +66,6 @@ func NewJSONRPCClient(
 		jsonrpc.SetClient(httpClient),
 		jsonrpc.ClientBefore(
 			forceNoChunkedEncoding,
-			//kithttp.SetRequestHeader("Transfer-Encoding", "identity"),
-			kithttp.SetRequestHeader("x-seph", "test"),
 		),
 	}
 

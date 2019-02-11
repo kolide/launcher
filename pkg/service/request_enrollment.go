@@ -15,29 +15,29 @@ import (
 )
 
 type enrollmentRequest struct {
-	EnrollSecret      string
-	HostIdentifier    string
+	EnrollSecret      string `json: enroll_secret`
+	HostIdentifier    string `json: host_identifier`
 	EnrollmentDetails EnrollmentDetails
 }
 
 type EnrollmentDetails struct {
-	OSVersion       string
-	OSBuildID       string
-	OSPlatform      string
-	Hostname        string
-	HardwareVendor  string
-	HardwareModel   string
-	HardwareSerial  string
-	OsqueryVersion  string
-	LauncherVersion string
-	OSName          string
-	OSPlatformLike  string
+	OSVersion       string `json: os_version`
+	OSBuildID       string `json: os_build_id`
+	OSPlatform      string `json: os_platform`
+	Hostname        string `json: hostname`
+	HardwareVendor  string `json: hardware_vendor`
+	HardwareModel   string `json: hardware_model`
+	HardwareSerial  string `json: hardware_serial`
+	OsqueryVersion  string `json: osquery_version`
+	LauncherVersion string `json: launcher_version`
+	OSName          string `json: os_name`
+	OSPlatformLike  string `json: os_platform_like`
 }
 
 type enrollmentResponse struct {
-	NodeKey     string
-	NodeInvalid bool
-	Err         error
+	NodeKey     string `json: "node_key"`
+	NodeInvalid bool   `json: "node_invalid"`
+	Err         error  `json: "error_code"`
 }
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

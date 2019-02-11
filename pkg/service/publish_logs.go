@@ -17,15 +17,15 @@ import (
 )
 
 type logCollection struct {
-	NodeKey string
+	NodeKey string `json: "node_key"`
 	LogType logger.LogType
 	Logs    []string
 }
 
 type publishLogsResponse struct {
-	Message     string
-	ErrorCode   string
-	NodeInvalid bool
+	Message     string `json: "message"`
+	ErrorCode   string `json: "error_code"`
+	NodeInvalid bool   `json: "node_invalid"`
 	Err         error
 }
 
