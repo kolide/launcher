@@ -8,14 +8,14 @@ os:
   - osx
 
 stages:
-  - compile
+  - Compile
 #  - test
 #  - deploy
 
 
 jobs:
   include:
-    - stage: "compile"
+    - stage: "Compile"
       name: "Deps"
       script: make deps
     - name: "build"
