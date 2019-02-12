@@ -9,14 +9,17 @@ os:
 
 stages:
   - Compile
-#  - test
+  - Test
 #  - deploy
 
 
 jobs:
   include:
     - stage: "Compile"
-      name: "Deps"
+      name: "deps"
       script: make deps
     - name: "build"
-      script: make -j 
+      script: make
+    - stage: "Test"
+      name: "test"
+      script: make test
