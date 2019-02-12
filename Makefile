@@ -10,8 +10,8 @@ PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on
 
+# If on macOS, set the shell to bash explicitly
 ifneq ($(OS), Windows_NT)
-	# If on macOS, set the shell to bash explicitly
 	ifeq ($(shell uname), Darwin)
 		SHELL := /bin/bash
 	endif
@@ -102,15 +102,15 @@ push-containers: $(CONTAINERS)
 builder:
 	cd tools/builders/launcher-builder/1.11/ && gcloud builds submit --project=kolide-public-containers --config=cloudbuild.yml
 
-binary-bundle: xp-codesign
+binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
+binary-bundle: #xp-codesign
 	rm -rf build/binary-bundle
-	mkdir -p build/binary-bundle/linux
-	mkdir -p build/binary-bundle/darwin
-	cp build/linux/launcher build/binary-bundle/linux/launcher
-	cp build/linux/osquery-extension.ext build/binary-bundle/linux/osquery-extension.ext
-	go run ./tools/download-osquery.go --platform=linux --output=build/binary-bundle/linux/osqueryd
-	cp build/darwin/launcher build/binary-bundle/darwin/launcher
-	cp build/darwin/osquery-extension.ext build/binary-bundle/darwin/osquery-extension.ext
-	go run ./tools/download-osquery.go --platform=darwin --output=build/binary-bundle/darwin/osqueryd
-	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" linux/ darwin/
+	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
+	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
 	cp build/binary-bundle/launcher_${VERSION}.zip build/binary-bundle/launcher_latest.zip
+
+build/binary-bundle/%:
+	mkdir -p $@
+	cp build/$*/launcher* $@/
+	cp build/$*/osquery-extension* $@/
+	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
