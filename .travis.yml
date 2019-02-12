@@ -7,12 +7,16 @@ os:
   - linux
   - osx
 
+stages:
+  - compile
+#  - test
+#  - deploy
+
 
 jobs:
   include:
-    - stage: "Deps"
-      name: "Go"
+    - stage: "Compile"
+      name: "Deps"
       script: make deps
-    - stage: "Build"
-      name: "build"
+    - name: "build"
       script: make -j 
