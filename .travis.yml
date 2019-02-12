@@ -8,3 +8,11 @@ os:
   - osx
 
 
+jobs:
+  include:
+    - stage: "Deps"
+      name: "Go"
+      script: make deps
+    - stage: "Build"
+      name: "build"
+      script: make -j 
