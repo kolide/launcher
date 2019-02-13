@@ -16,10 +16,8 @@ stages:
 jobs:
   include:
     - stage: "Compile"
-      name: "deps"
-      script: make deps
-    - name: "build"
-      script: make
+      name: "deps & build"
+      script: make deps build
     - stage: "Test"
       name: "test"
-      script: make test
+      script: make deps test
