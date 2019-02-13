@@ -15,7 +15,6 @@ env:
 os:
   - linux
   - osx
-  - windows
 
 install:
   - make deps
