@@ -9,6 +9,9 @@ language: go
 go:
   - 1.11.x
 
+env:
+  - SKIP_TEST_MDM=true
+  
 os:
   - linux
   - osx
