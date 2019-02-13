@@ -1,7 +1,6 @@
 # Use containers, not VMs
 sudo: false
 
-# Don't email me the results of the test runs.
 notifications:
   email: false
 
@@ -13,6 +12,7 @@ go:
 os:
   - linux
   - osx
+  - windows
 
 install:
   - make deps

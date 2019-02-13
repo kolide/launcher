@@ -4,23 +4,48 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/kolide/osquery-go"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var testOsqueryBinaryDirectory string
+
+// TestMain overrides the default test main function. This allows us to share setup/teardown.
+func TestMain(m *testing.M) {
+	binDirectory, rmBinDirectory, err := osqueryTempDir()
+	if err != nil {
+		fmt.Println("Failed to make temp dir for test binaries")
+		os.Exit(1)
+	}
+	defer rmBinDirectory()
+	testOsqueryBinaryDirectory = filepath.Join(binDirectory, "osqueryd")
+
+	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
+		fmt.Printf("Failed to download osquery: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Run the tests!
+	retCode := m.Run()
+	os.Exit(retCode)
+}
 
 // getBinDir finds the directory of the currently running binary (where we will
 // look for the osquery extension)
@@ -58,13 +83,35 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		extensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	osquerydPath, err := exec.LookPath("osqueryd")
-	require.NoError(t, err)
+	osquerydPath := testOsqueryBinaryDirectory
 
 	cmd, err := createOsquerydCommand(osquerydPath, paths, "config_plugin", "logger_plugin", "distributed_plugin", os.Stdout, os.Stderr)
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
+}
+
+// downloadOsqueryInBinDir downloads osqueryd. This allows the test
+// suite to run on hosts lacking osqueryd. We could consider moving this into a deps step.
+func downloadOsqueryInBinDir(binDirectory string) error {
+	target := packaging.Target{}
+	if err := target.PlatformFromString(runtime.GOOS); err != nil {
+		return errors.Wrapf(err, "Error parsing platform: %s", runtime.GOOS)
+	}
+
+	outputFile := filepath.Join(binDirectory, "osqueryd") //, target.PlatformBinaryName("osqueryd"))
+	cacheDir := "/tmp"
+
+	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
+	if err != nil {
+		return errors.Wrap(err, "An error occurred fetching the osqueryd binary")
+	}
+
+	if err := fs.CopyFile(path, outputFile); err != nil {
+		return errors.Wrapf(err, "Couldn't copy file to %s", outputFile)
+	}
+
+	return nil
 }
 
 // buildOsqueryExtensionInBinDir compiles the osquery extension and places it
@@ -131,7 +178,10 @@ func TestSimplePath(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+	)
 	require.NoError(t, err)
 
 	waitHealthy(t, runner)
@@ -158,7 +208,10 @@ func TestOsqueryDies(t *testing.T) {
 	defer rmRootDirectory()
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory))
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+	)
 	require.NoError(t, err)
 
 	waitHealthy(t, runner)
@@ -221,7 +274,11 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	runner, err := LaunchInstance(WithRootDirectory(rootDirectory), WithExtensionSocketPath(extensionSocketPath))
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithExtensionSocketPath(extensionSocketPath),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+	)
 	require.NoError(t, err)
 
 	waitHealthy(t, runner)
@@ -245,7 +302,10 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	require.NoError(t, err)
 
 	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
-	runner, err = LaunchInstance(WithRootDirectory(rootDirectory))
+	runner, err = LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+	)
 	require.NoError(t, err)
 	waitHealthy(t, runner)
 
