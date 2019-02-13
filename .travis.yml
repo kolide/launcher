@@ -1,3 +1,10 @@
+# Use containers, not VMs
+sudo: false
+
+# Don't email me the results of the test runs.
+notifications:
+  email: false
+
 language: go
 
 go:
@@ -7,17 +14,10 @@ os:
   - linux
   - osx
 
-stages:
-  - Compile
-  - Test
-#  - deploy
+install:
+  - make deps
 
+script:
+   - make build
+   - make test
 
-jobs:
-  include:
-    - stage: "Compile"
-      name: "deps & build"
-      script: make deps build
-    - stage: "Test"
-      name: "test"
-      script: make deps test
