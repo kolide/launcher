@@ -103,7 +103,7 @@ builder:
 	cd tools/builders/launcher-builder/1.11/ && gcloud builds submit --project=kolide-public-containers --config=cloudbuild.yml
 
 binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
-binary-bundle: #xp-codesign
+binary-bundle: xp-codesign
 	rm -rf build/binary-bundle
 	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
 	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
