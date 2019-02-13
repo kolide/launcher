@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,6 +41,18 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// Build the osquerty extension once
+	binDir, err := getBinDir()
+	if err != nil {
+		fmt.Printf("Failed to get binDir: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := buildOsqueryExtensionInBinDir(binDir); err != nil {
+		fmt.Printf("Failed to build osquery extension: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Run the tests!
 	retCode := m.Run()
 	os.Exit(retCode)
@@ -49,18 +60,19 @@ func TestMain(m *testing.M) {
 
 // getBinDir finds the directory of the currently running binary (where we will
 // look for the osquery extension)
-func getBinDir(t *testing.T) string {
+func getBinDir() (string, error) {
 	binPath, err := os.Executable()
-	require.NoError(t, err)
+	if err != nil {
+		return "", err
+	}
 	binDir := filepath.Dir(binPath)
-	return binDir
+	return binDir, nil
 }
 
 func TestCalculateOsqueryPaths(t *testing.T) {
 	t.Parallel()
-	binDir := getBinDir(t)
-	fakeExtensionPath := filepath.Join(binDir, "osquery-extension.ext")
-	require.NoError(t, ioutil.WriteFile(fakeExtensionPath, []byte("#!/bin/bash\nsleep infinity"), 0755))
+	binDir, err := getBinDir()
+	require.NoError(t, err)
 
 	paths, err := calculateOsqueryPaths(binDir, "")
 	require.NoError(t, err)
@@ -152,7 +164,6 @@ func TestBadBinaryPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
@@ -177,7 +188,6 @@ func TestSimplePath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -207,7 +217,6 @@ func TestOsqueryDies(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -233,7 +242,6 @@ func TestNotStarted(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	runner := newRunner(WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
@@ -272,7 +280,6 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
@@ -301,7 +308,6 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 
-	require.NoError(t, buildOsqueryExtensionInBinDir(getBinDir(t)))
 	runner, err = LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
