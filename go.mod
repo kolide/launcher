@@ -18,6 +18,7 @@ require (
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
 	github.com/docker/distribution v2.6.2+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -49,6 +50,7 @@ require (
 	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
+	github.com/peterbourgon/ff v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect

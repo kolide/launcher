@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )
 
@@ -53,140 +53,146 @@ const (
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
 func parseOptions() (*options, error) {
+
+	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
+	flagset.Usage = usage
+
 	var (
 		// Primary options
-		flRootDirectory = flag.String(
+		flRootDirectory = flagset.String(
 			"root_directory",
-			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", ""),
+			"",
 			"The location of the local database, pidfiles, etc.",
 		)
-		flKolideServerURL = flag.String(
+		flKolideServerURL = flagset.String(
 			"hostname",
-			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
+			"",
 			"The hostname of the gRPC server",
 		)
 
-		flControl = flag.Bool(
+		flControl = flagset.Bool(
 			"control",
-			env.Bool("KOLIDE_LAUNCHER_CONTROL", false),
+			false,
 			"Whether or not the control server is enabled (default: false)",
 		)
-		flControlServerURL = flag.String(
+		flControlServerURL = flagset.String(
 			"control_hostname",
-			env.String("KOLIDE_LAUNCHER_CONTROL_HOSTNAME", ""),
+			"",
 			"The hostname of the control server",
 		)
-		flGetShellsInterval = flag.Duration(
+		flGetShellsInterval = flagset.Duration(
 			"control_get_shells_interval",
-			env.Duration("KOLIDE_LAUNCHER_CONTROL_GET_SHELLS_INTERVAL", 3*time.Second),
+			3*time.Second,
 			"The interval at which the get shells request will be made",
 		)
 
-		flEnrollSecret = flag.String(
+		flEnrollSecret = flagset.String(
 			"enroll_secret",
-			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
+			"",
 			"The enroll secret that is used in your environment",
 		)
-		flEnrollSecretPath = flag.String(
+		flEnrollSecretPath = flagset.String(
 			"enroll_secret_path",
-			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
+			"",
 			"Optionally, the path to your enrollment secret",
 		)
-		flOsquerydPath = flag.String(
+		flOsquerydPath = flagset.String(
 			"osqueryd_path",
-			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
+			"",
 			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
 		)
-		flCertPins = flag.String(
+		flCertPins = flagset.String(
 			"cert_pins",
-			env.String("KOLIDE_LAUNCHER_CERT_PINS", ""),
+			"",
 			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
 		)
-		flRootPEM = flag.String(
+		flRootPEM = flagset.String(
 			"root_pem",
-			env.String("KOLIDE_LAUNCHER_ROOT_PEM", ""),
+			"",
 			"Path to PEM file including root certificates to verify against",
 		)
-		flLoggingInterval = flag.Duration(
+		flLoggingInterval = flagset.Duration(
 			"logging_interval",
-			env.Duration("KOLIDE_LAUNCHER_LOGGING_INTERVAL", 60*time.Second),
+			60*time.Second,
 			"The interval at which logs should be flushed to the server",
 		)
 
 		// Autoupdate options
-		flAutoupdate = flag.Bool(
+		flAutoupdate = flagset.Bool(
 			"autoupdate",
-			env.Bool("KOLIDE_LAUNCHER_AUTOUPDATE", false),
+			false,
 			"Whether or not the osquery autoupdater is enabled (default: false)",
 		)
-		flNotaryServerURL = flag.String(
+		flNotaryServerURL = flagset.String(
 			"notary_url",
-			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", autoupdate.DefaultNotary),
+			autoupdate.DefaultNotary,
 			"The Notary update server (default: https://notary.kolide.co)",
 		)
-		flMirrorURL = flag.String(
+		flMirrorURL = flagset.String(
 			"mirror_url",
-			env.String("KOLIDE_LAUNCHER_MIRROR_SERVER_URL", autoupdate.DefaultMirror),
+			autoupdate.DefaultMirror,
 			"The mirror server for autoupdates (default: https://dl.kolide.co)",
 		)
-		flAutoupdateInterval = flag.Duration(
+		flAutoupdateInterval = flagset.Duration(
 			"autoupdate_interval",
-			duration("KOLIDE_LAUNCHER_AUTOUPDATE_INTERVAL", 1*time.Hour),
+			1*time.Hour,
 			"The interval to check for updates (default: once every hour)",
 		)
-		flUpdateChannel = flag.String(
+		flUpdateChannel = flagset.String(
 			"update_channel",
-			env.String("KOLIDE_LAUNCHER_UPDATE_CHANNEL", "stable"),
+			"stable",
 			"The channel to pull updates from (options: stable, beta, nightly)",
 		)
 
 		// Development options
-		flDebug = flag.Bool(
+		flDebug = flagset.Bool(
 			"debug",
-			env.Bool("KOLIDE_LAUNCHER_DEBUG", false),
+			false,
 			"Whether or not debug logging is enabled (default: false)",
 		)
-		flDisableControlTLS = flag.Bool(
+		flDisableControlTLS = flagset.Bool(
 			"disable_control_tls",
-			env.Bool("KOLIDE_LAUNCHER_DISABLE_CONTROL_TLS", false),
+			false,
 			"Disable TLS encryption for the control features",
 		)
-		flInsecureTLS = flag.Bool(
+		flInsecureTLS = flagset.Bool(
 			"insecure",
-			env.Bool("KOLIDE_LAUNCHER_INSECURE", false),
+			false,
 			"Do not verify TLS certs for outgoing connections (default: false)",
 		)
-		flInsecureGRPC = flag.Bool(
+		flInsecureGRPC = flagset.Bool(
 			"insecure_grpc",
-			env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false),
+			false,
 			"Dial GRPC without a TLS config (default: false)",
 		)
 
 		// Version command: launcher --version
-		flVersion = flag.Bool(
+		flVersion = flagset.Bool(
 			"version",
-			env.Bool("KOLIDE_LAUNCHER_VERSION", false),
+			false,
 			"Print Launcher version and exit",
 		)
 
 		// Developer usage
-		flDeveloperUsage = flag.Bool(
+		flDeveloperUsage = flagset.Bool(
 			"dev_help",
-			env.Bool("KOLIDE_LAUNCHER_DEV_HELP", false),
+			false,
 			"Print full Launcher help, including developer options",
 		)
 
 		// Enable Initial Runner: launcher --with_initial_runner
-		flInitialRunner = flag.Bool(
+		flInitialRunner = flagset.Bool(
 			"with_initial_runner",
-			env.Bool("KOLIDE_LAUNCHER_INITIAL_RUNNER", false),
+			false,
 			"Run differential queries from config ahead of scheduled interval.",
 		)
 	)
 
-	flag.Usage = usage
-
-	flag.Parse()
+	ff.Parse(flagset, os.Args[1:],
+		ff.WithConfigFileFlag("config"),
+		ff.WithConfigFileParser(ff.PlainParser),
+		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),
+	)
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
