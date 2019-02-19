@@ -106,7 +106,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	if p.Control && p.ControlHostname != "" {
-		launcherEnv["KOLIDE_CONTROL_HOSTNAME"] = p.ControlHostname
+		launcherEnv["KOLIDE_LAUNCHER_CONTROL_HOSTNAME"] = p.ControlHostname
 	}
 
 	if p.Autoupdate && p.UpdateChannel != "" {

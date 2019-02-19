@@ -68,17 +68,17 @@ func parseOptions() (*options, error) {
 
 		flControl = flag.Bool(
 			"control",
-			env.Bool("KOLIDE_CONTROL", false),
+			env.Bool("KOLIDE_LAUNCHER_CONTROL", false),
 			"Whether or not the control server is enabled (default: false)",
 		)
 		flControlServerURL = flag.String(
 			"control_hostname",
-			env.String("KOLIDE_CONTROL_HOSTNAME", ""),
+			env.String("KOLIDE_LAUNCHER_CONTROL_HOSTNAME", ""),
 			"The hostname of the control server",
 		)
 		flGetShellsInterval = flag.Duration(
 			"control_get_shells_interval",
-			env.Duration("KOLIDE_CONTROL_GET_SHELLS_INTERVAL", 3*time.Second),
+			env.Duration("KOLIDE_LAUNCHER_CONTROL_GET_SHELLS_INTERVAL", 3*time.Second),
 			"The interval at which the get shells request will be made",
 		)
 
