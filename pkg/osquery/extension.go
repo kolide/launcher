@@ -330,6 +330,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	})
 
 	// If no cached node key, enroll for new node key
+	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
 	if isNodeInvalidErr(err) {
 		invalid = true
@@ -337,7 +338,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
 	if invalid {
-		return "", true, errors.Wrap(err, "enrollment invalid")
+		return "", true, errors.Errorf("enrollment invalid (orig_err: %v)", err)
 	}
 
 	// Save newly acquired node key if successful
@@ -703,6 +704,7 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
+	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 	if isNodeInvalidErr(err) {
 		invalid = true
@@ -712,7 +714,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 
 	if invalid {
 		if !reenroll {
-			return nil, errors.Wrap(err, "enrollment invalid, reenroll disabled")
+			return nil, errors.Errorf("enrollment invalid, reenroll disabled (orig_err: %v)", err)
 		}
 
 		e.RequireReenroll(ctx)
