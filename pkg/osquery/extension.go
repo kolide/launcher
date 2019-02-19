@@ -338,7 +338,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
 	if invalid {
-		return "", true, errors.Errorf("enrollment invalid (orig_err: %v)", err)
+		if err == nil {
+			err = errors.New("no further error")
+		}
+		return "", true, errors.Wrap(err, "enrollment invalid")
 	}
 
 	// Save newly acquired node key if successful
@@ -417,6 +420,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
 			return "", errors.New("enrollment invalid, reenroll disabled")
 		}
@@ -597,6 +604,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
@@ -713,8 +723,12 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
-			return nil, errors.Errorf("enrollment invalid, reenroll disabled (orig_err: %v)", err)
+			return nil, errors.Wrap(err, "enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
@@ -749,6 +763,10 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
