@@ -33,8 +33,6 @@ type options struct {
 	getShellsInterval time.Duration
 
 	autoupdate         bool
-	printVersion       bool
-	developerUsage     bool
 	debug              bool
 	disableControlTLS  bool
 	insecureTLS        bool
@@ -55,7 +53,7 @@ const (
 func parseOptions() (*options, error) {
 
 	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
-	flagset.Usage = usage
+	flagset.Usage = func() { usage(flagset) }
 
 	var (
 		// Primary options
@@ -81,18 +79,11 @@ func parseOptions() (*options, error) {
 		flUpdateChannel      = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 
 		// Development options
-		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
-		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 		flInsecureGRPC      = flagset.Bool("insecure_grpc", false, "Dial GRPC without a TLS config (default: false)")
-
-		// Version command: launcher --version
-
-		// Developer usage
-
-		// Enable Initial Runner: launcher --with_initial_runner
-
+		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
 
 	ff.Parse(flagset, os.Args[1:],
@@ -100,6 +91,18 @@ func parseOptions() (*options, error) {
 		ff.WithConfigFileParser(ff.PlainParser),
 		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),
 	)
+
+	// handle --version
+	if *flVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
+	// handle --usage
+	if *flDeveloperUsage {
+		developerUsage(flagset)
+		os.Exit(0)
+	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
@@ -150,8 +153,6 @@ func parseOptions() (*options, error) {
 		loggingInterval:     *flLoggingInterval,
 		enableInitialRunner: *flInitialRunner,
 		autoupdate:          *flAutoupdate,
-		printVersion:        *flVersion,
-		developerUsage:      *flDeveloperUsage,
 		debug:               *flDebug,
 		disableControlTLS:   *flDisableControlTLS,
 		insecureTLS:         *flInsecureTLS,
@@ -164,12 +165,12 @@ func parseOptions() (*options, error) {
 	return opts, nil
 }
 
-func shortUsage() {
+func shortUsage(flagset *flag.FlagSet) {
 	launcherFlags := map[string]string{}
 	flagAggregator := func(f *flag.Flag) {
 		launcherFlags[f.Name] = f.Usage
 	}
-	flag.VisitAll(flagAggregator)
+	flagset.VisitAll(flagAggregator)
 
 	printOpt := func(opt string) {
 		fmt.Fprintf(os.Stderr, "  --%s", opt)
@@ -207,17 +208,17 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 }
 
-func usage() {
-	shortUsage()
+func usage(flagset *flag.FlagSet) {
+	shortUsage(flagset)
 	usageFooter()
 }
 
-func developerUsage() {
+func developerUsage(flagset *flag.FlagSet) {
 	launcherFlags := map[string]string{}
 	flagAggregator := func(f *flag.Flag) {
 		launcherFlags[f.Name] = f.Usage
 	}
-	flag.VisitAll(flagAggregator)
+	flagset.VisitAll(flagAggregator)
 
 	printOpt := func(opt string) {
 		fmt.Fprintf(os.Stderr, "  --%s", opt)
@@ -227,7 +228,8 @@ func developerUsage() {
 		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
 	}
 
-	shortUsage()
+	shortUsage(flagset)
+
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "Development Options:\n")
 	fmt.Fprintf(os.Stderr, "\n")
@@ -252,19 +254,6 @@ func developerUsage() {
 func usageFooter() {
 	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.co/osquery\n")
 	fmt.Fprintf(os.Stderr, "\n")
-}
-
-// TODO: move to kolide/kit and figure out error handling there.
-func duration(key string, def time.Duration) time.Duration {
-	if env, ok := os.LookupEnv(key); ok {
-		t, err := time.ParseDuration(env)
-		if err != nil {
-			fmt.Println("env: parse duration flag: ", err)
-			os.Exit(1)
-		}
-		return t
-	}
-	return def
 }
 
 func parseCertPins(pins string) ([][]byte, error) {

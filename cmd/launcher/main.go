@@ -8,7 +8,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
 
@@ -29,18 +28,6 @@ func main() {
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
-	}
-
-	// handle --version
-	if opts.printVersion {
-		version.PrintFull()
-		os.Exit(0)
-	}
-
-	// handle --usage
-	if opts.developerUsage {
-		developerUsage()
-		os.Exit(0)
 	}
 
 	logger = logutil.NewServerLogger(opts.debug)
