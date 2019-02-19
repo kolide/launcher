@@ -40,17 +40,13 @@ osqueryi-tables: table.ext
 extension: .pre-build
 	go run cmd/make/make.go -targets=extension
 
-xp: xp-launcher xp-extension
+xp: xp-launcher xp-extension xp-grpc-extension
 
-xp-launcher: .pre-build
-	go run cmd/make/make.go -targets=launcher -linkstamp -os=darwin
-	go run cmd/make/make.go -targets=launcher -linkstamp -os=linux
-	go run cmd/make/make.go -targets=launcher -linkstamp -os=windows
+xp-%: .pre-build
+	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
+	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
+	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
-xp-extension: .pre-build
-	go run cmd/make/make.go -targets=extension -os=darwin
-	go run cmd/make/make.go -targets=extension -os=linux
-	go run cmd/make/make.go -targets=extension -os=windows
 
 codesign-darwin:
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
