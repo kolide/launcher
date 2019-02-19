@@ -74,3 +74,21 @@ func isSubCommand() bool {
 
 	return false
 }
+
+func runSubcommands() error {
+	var run func([]string) error
+	switch os.Args[1] {
+	case "socket":
+		run = runSocket
+	case "query":
+		run = runQuery
+	case "flare":
+		run = runFlare
+	case "svc":
+		run = runWindowsSvc
+	case "svc-debug":
+		run = runWindowsSvcDebug
+	}
+	err := run(os.Args[2:])
+	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
+}

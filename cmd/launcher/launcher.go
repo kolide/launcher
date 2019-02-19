@@ -178,20 +178,6 @@ func runSocket(args []string) error {
 	return nil
 }
 
-func runSubcommands() error {
-	var run func([]string) error
-	switch os.Args[1] {
-	case "socket":
-		run = runSocket
-	case "query":
-		run = runQuery
-	case "flare":
-		run = runFlare
-	}
-	err := run(os.Args[2:])
-	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
-}
-
 // run the launcher daemon
 func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.Logger) error {
 	// determine the root directory, create one if it's not provided
