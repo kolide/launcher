@@ -65,7 +65,7 @@ func main() {
 		logger,
 	)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "failed to connect to grpc host")
+		logutil.Fatal(logger, "err", err, "failed to connect to grpc host", "stack", fmt.Sprintf("%+v", err))
 	}
 	remote := service.New(conn, level.Debug(logger))
 
@@ -77,13 +77,13 @@ func main() {
 
 	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"), "stack", fmt.Sprintf("%+v", err))
 	}
 	defer db.Close()
 
 	ext, err := grpcext.NewExtension(remote, db, extOpts)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "starting grpc extension"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "starting grpc extension"), "stack", fmt.Sprintf("%+v", err))
 	}
 
 	// create an extension server
@@ -93,7 +93,7 @@ func main() {
 		osquery.ServerTimeout(timeout),
 	)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
+		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
 	}
 
 	configPlugin := config.NewPlugin("kolide_grpc", ext.GenerateConfigs)
@@ -106,10 +106,10 @@ func main() {
 	ctx := context.Background()
 	_, invalid, err := ext.Enroll(ctx)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "enrolling host"))
+		logutil.Fatal(logger, "err", errors.Wrap(err, "enrolling host"), "stack", fmt.Sprintf("%+v", err))
 	}
 	if invalid {
-		logutil.Fatal(logger, errors.Wrap(err, "invalid enroll secret"))
+		logutil.Fatal(logger, errors.Wrap(err, "invalid enroll secret"), "stack", fmt.Sprintf("%+v", err))
 	}
 	ext.Start()
 	defer ext.Shutdown()
@@ -118,7 +118,7 @@ func main() {
 	defer ext.Shutdown()
 
 	if err := server.Run(); err != nil {
-		logutil.Fatal(logger, "err", err)
+		logutil.Fatal(logger, "err", err, "stack", fmt.Sprintf("%+v", err))
 	}
 }
 

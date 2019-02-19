@@ -337,7 +337,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
 	if invalid {
-		return "", true, errors.New("enrollment invalid")
+		return "", true, errors.Wrap(err, "enrollment invalid")
 	}
 
 	// Save newly acquired node key if successful
@@ -712,7 +712,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 
 	if invalid {
 		if !reenroll {
-			return nil, errors.New("enrollment invalid, reenroll disabled")
+			return nil, errors.Wrap(err, "enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
