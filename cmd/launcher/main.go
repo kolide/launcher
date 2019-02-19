@@ -1,5 +1,3 @@
-// +build !windows
-
 package main
 
 import (
@@ -64,6 +62,8 @@ func isSubCommand() bool {
 		"socket",
 		"query",
 		"flare",
+		"svc",
+		"svc-debug",
 	}
 
 	for _, sc := range subCommands {
