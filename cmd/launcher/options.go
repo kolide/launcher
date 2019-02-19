@@ -70,6 +70,7 @@ func parseOptions() (*options, error) {
 		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
 		flRootPEM           = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion           = flagset.Bool("version", false, "Print Launcher version and exit")
+		_                   = flagset.String("config", "", "config file ro parse options from (optional)")
 
 		// Autoupdate options
 		flAutoupdate         = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
