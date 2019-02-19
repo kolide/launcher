@@ -59,133 +59,40 @@ func parseOptions() (*options, error) {
 
 	var (
 		// Primary options
-		flRootDirectory = flagset.String(
-			"root_directory",
-			"",
-			"The location of the local database, pidfiles, etc.",
-		)
-		flKolideServerURL = flagset.String(
-			"hostname",
-			"",
-			"The hostname of the gRPC server",
-		)
-
-		flControl = flagset.Bool(
-			"control",
-			false,
-			"Whether or not the control server is enabled (default: false)",
-		)
-		flControlServerURL = flagset.String(
-			"control_hostname",
-			"",
-			"The hostname of the control server",
-		)
-		flGetShellsInterval = flagset.Duration(
-			"control_get_shells_interval",
-			3*time.Second,
-			"The interval at which the get shells request will be made",
-		)
-
-		flEnrollSecret = flagset.String(
-			"enroll_secret",
-			"",
-			"The enroll secret that is used in your environment",
-		)
-		flEnrollSecretPath = flagset.String(
-			"enroll_secret_path",
-			"",
-			"Optionally, the path to your enrollment secret",
-		)
-		flOsquerydPath = flagset.String(
-			"osqueryd_path",
-			"",
-			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
-		)
-		flCertPins = flagset.String(
-			"cert_pins",
-			"",
-			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
-		)
-		flRootPEM = flagset.String(
-			"root_pem",
-			"",
-			"Path to PEM file including root certificates to verify against",
-		)
-		flLoggingInterval = flagset.Duration(
-			"logging_interval",
-			60*time.Second,
-			"The interval at which logs should be flushed to the server",
-		)
+		flCertPins          = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControl           = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
+		flControlServerURL  = flagset.String("control_hostname", "", "The hostname of the control server")
+		flEnrollSecret      = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath  = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 3*time.Second, "The interval at which the get shells request will be made")
+		flInitialRunner     = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL   = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flLoggingInterval   = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath      = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootPEM           = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion           = flagset.Bool("version", false, "Print Launcher version and exit")
 
 		// Autoupdate options
-		flAutoupdate = flagset.Bool(
-			"autoupdate",
-			false,
-			"Whether or not the osquery autoupdater is enabled (default: false)",
-		)
-		flNotaryServerURL = flagset.String(
-			"notary_url",
-			autoupdate.DefaultNotary,
-			"The Notary update server (default: https://notary.kolide.co)",
-		)
-		flMirrorURL = flagset.String(
-			"mirror_url",
-			autoupdate.DefaultMirror,
-			"The mirror server for autoupdates (default: https://dl.kolide.co)",
-		)
-		flAutoupdateInterval = flagset.Duration(
-			"autoupdate_interval",
-			1*time.Hour,
-			"The interval to check for updates (default: once every hour)",
-		)
-		flUpdateChannel = flagset.String(
-			"update_channel",
-			"stable",
-			"The channel to pull updates from (options: stable, beta, nightly)",
-		)
+		flAutoupdate         = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flNotaryServerURL    = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
+		flMirrorURL          = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flAutoupdateInterval = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flUpdateChannel      = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 
 		// Development options
-		flDebug = flagset.Bool(
-			"debug",
-			false,
-			"Whether or not debug logging is enabled (default: false)",
-		)
-		flDisableControlTLS = flagset.Bool(
-			"disable_control_tls",
-			false,
-			"Disable TLS encryption for the control features",
-		)
-		flInsecureTLS = flagset.Bool(
-			"insecure",
-			false,
-			"Do not verify TLS certs for outgoing connections (default: false)",
-		)
-		flInsecureGRPC = flagset.Bool(
-			"insecure_grpc",
-			false,
-			"Dial GRPC without a TLS config (default: false)",
-		)
+		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
+		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
+		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+		flInsecureGRPC      = flagset.Bool("insecure_grpc", false, "Dial GRPC without a TLS config (default: false)")
 
 		// Version command: launcher --version
-		flVersion = flagset.Bool(
-			"version",
-			false,
-			"Print Launcher version and exit",
-		)
 
 		// Developer usage
-		flDeveloperUsage = flagset.Bool(
-			"dev_help",
-			false,
-			"Print full Launcher help, including developer options",
-		)
 
 		// Enable Initial Runner: launcher --with_initial_runner
-		flInitialRunner = flagset.Bool(
-			"with_initial_runner",
-			false,
-			"Run differential queries from config ahead of scheduled interval.",
-		)
+
 	)
 
 	ff.Parse(flagset, os.Args[1:],
