@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/kolide/osquery-go"
@@ -26,9 +28,16 @@ func main() {
 		flSocketPath = flag.String("socket", "", "")
 		flTimeout    = flag.Int("timeout", 0, "")
 		flVerbose    = flag.Bool("verbose", false, "")
-		_            = flag.Int("interval", 0, "")
+		flVersion    = flag.Bool("version", false, "Print Launcher version and exit")
+
+		_ = flag.Int("interval", 0, "")
 	)
 	flag.Parse()
+
+	if *flVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
 
 	timeout := time.Duration(*flTimeout) * time.Second
 
