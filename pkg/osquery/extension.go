@@ -330,6 +330,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	})
 
 	// If no cached node key, enroll for new node key
+	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
 	if isNodeInvalidErr(err) {
 		invalid = true
@@ -337,7 +338,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, errors.Wrap(err, "transport error in enrollment")
 	}
 	if invalid {
-		return "", true, errors.New("enrollment invalid")
+		if err == nil {
+			err = errors.New("no further error")
+		}
+		return "", true, errors.Wrap(err, "enrollment invalid")
 	}
 
 	// Save newly acquired node key if successful
@@ -416,6 +420,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
 			return "", errors.New("enrollment invalid, reenroll disabled")
 		}
@@ -596,6 +604,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
@@ -703,6 +714,7 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
+	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 	if isNodeInvalidErr(err) {
 		invalid = true
@@ -711,8 +723,12 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
-			return nil, errors.New("enrollment invalid, reenroll disabled")
+			return nil, errors.Wrap(err, "enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
@@ -747,6 +763,10 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	if invalid {
+		if err == nil {
+			err = errors.New("no further error")
+		}
+
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
