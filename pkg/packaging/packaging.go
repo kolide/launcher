@@ -92,42 +92,74 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return errors.Wrap(err, "setup directories")
 	}
 
-	launcherEnv := map[string]string{
-		"KOLIDE_LAUNCHER_HOSTNAME":           p.Hostname,
-		"KOLIDE_LAUNCHER_ROOT_DIRECTORY":     p.rootDir,
-		"KOLIDE_LAUNCHER_OSQUERYD_PATH":      filepath.Join(p.binDir, "osqueryd"),
-		"KOLIDE_LAUNCHER_ENROLL_SECRET_PATH": filepath.Join(p.confDir, "secret"),
+	flagFilePath := filepath.Join(p.confDir, "launcher.flags")
+	flagFile, err := os.Create(filepath.Join(p.packageRoot, flagFilePath))
+	if err != nil {
+		return errors.Wrap(err, "creating flag file")
+	}
+	defer flagFile.Close()
+
+	launcherMapFlags := map[string]string{
+		"hostname":           p.Hostname,
+		"root_directory":     p.rootDir,
+		"osqueryd_path":      filepath.Join(p.binDir, "osqueryd"),
+		"enroll_secret_path": filepath.Join(p.confDir, "secret"),
 	}
 
-	launcherFlags := []string{}
+	launcherBoolFlags := []string{}
 
 	if p.InitialRunner {
-		launcherFlags = append(launcherFlags, "--with_initial_runner")
+		launcherBoolFlags = append(launcherBoolFlags, "with_initial_runner")
 	}
 
 	if p.Control && p.ControlHostname != "" {
-		launcherEnv["KOLIDE_LAUNCHER_CONTROL_HOSTNAME"] = p.ControlHostname
+		launcherMapFlags["control_hostname"] = p.ControlHostname
 	}
 
 	if p.Autoupdate && p.UpdateChannel != "" {
-		launcherFlags = append(launcherFlags, "--autoupdate")
-		launcherEnv["KOLIDE_LAUNCHER_UPDATE_CHANNEL"] = p.UpdateChannel
+		launcherBoolFlags = append(launcherBoolFlags, "autoupdate")
+		launcherMapFlags["update_channel"] = p.UpdateChannel
 	}
 
 	if p.CertPins != "" {
-		launcherEnv["KOLIDE_LAUNCHER_CERT_PINS"] = p.CertPins
+		launcherMapFlags["cert_pins"] = p.CertPins
 	}
 
 	if p.DisableControlTLS {
-		launcherFlags = append(launcherFlags, "--disable_control_tls")
+		launcherBoolFlags = append(launcherBoolFlags, "disable_control_tls")
 	}
 
 	if p.InsecureGrpc {
-		launcherFlags = append(launcherFlags, "--insecure_grpc")
+		launcherBoolFlags = append(launcherBoolFlags, "insecure_grpc")
 	}
 
 	if p.Insecure {
-		launcherFlags = append(launcherFlags, "--insecure")
+		launcherBoolFlags = append(launcherBoolFlags, "insecure")
+	}
+
+	if p.RootPEM != "" {
+		rootPemPath := filepath.Join(p.confDir, "roots.pem")
+		launcherMapFlags["root_pem"] = rootPemPath
+
+		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
+			return errors.Wrap(err, "copy root PEM")
+		}
+
+		if err := os.Chmod(filepath.Join(p.packageRoot, rootPemPath), 0600); err != nil {
+			return errors.Wrap(err, "chmod root PEM")
+		}
+	}
+
+	// Write the flags to the flagFile
+	for _, k := range launcherBoolFlags {
+		if _, err := flagFile.WriteString(fmt.Sprintf("%s\n", k)); err != nil {
+			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+		}
+	}
+	for k, v := range launcherMapFlags {
+		if _, err := flagFile.WriteString(fmt.Sprintf("%s %s\n", k, v)); err != nil {
+			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+		}
 	}
 
 	// Unless we're omitting the secret, write it into the package.
@@ -139,19 +171,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			secretPerms,
 		); err != nil {
 			return errors.Wrap(err, "could not write secret string to file for packaging")
-		}
-	}
-
-	if p.RootPEM != "" {
-		rootPemPath := filepath.Join(p.confDir, "roots.pem")
-		launcherEnv["KOLIDE_LAUNCHER_ROOT_PEM"] = rootPemPath
-
-		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
-			return errors.Wrap(err, "copy root PEM")
-		}
-
-		if err := os.Chmod(filepath.Join(p.packageRoot, rootPemPath), 0600); err != nil {
-			return errors.Wrap(err, "chmod root PEM")
 		}
 	}
 
@@ -199,8 +218,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Description: "The Kolide Launcher",
 		Path:        filepath.Join(p.binDir, "launcher"),
 		Identifier:  p.Identifier,
-		Flags:       launcherFlags,
-		Environment: launcherEnv,
+		Flags:       []string{"-config", flagFilePath},
+		Environment: map[string]string{},
 	}
 
 	if err := p.setupInit(ctx); err != nil {
