@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ func TestStartDebugServer(t *testing.T) {
 	t.Parallel()
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
+	defer os.Remove(tokenFile.Name())
 
 	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
 	require.Nil(t, err)
@@ -41,6 +43,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 	t.Parallel()
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
+	defer os.Remove(tokenFile.Name())
 
 	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
 	require.Nil(t, err)
@@ -59,6 +62,7 @@ func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
+	defer os.Remove(tokenFile.Name())
 
 	AttachDebugHandler(tokenFile.Name(), log.NewNopLogger())
 

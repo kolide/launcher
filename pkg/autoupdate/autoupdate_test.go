@@ -17,6 +17,7 @@ import (
 func TestCreateTUFRepoDirectory(t *testing.T) {
 	localTUFRepoPath, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
+	defer os.RemoveAll(localTUFRepoPath)
 
 	require.Nil(t, createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
 

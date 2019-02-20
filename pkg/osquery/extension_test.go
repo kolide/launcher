@@ -28,6 +28,7 @@ func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
+	defer os.Remove(file.Name())
 
 	db, err = bolt.Open(file.Name(), 0600, nil)
 	if err != nil {
@@ -51,6 +52,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
+	defer os.Remove(file.Name())
 
 	db, _ := makeTempDB(t)
 	path := db.Path()
