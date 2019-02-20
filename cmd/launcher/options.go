@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )
 
@@ -33,8 +33,6 @@ type options struct {
 	getShellsInterval time.Duration
 
 	autoupdate         bool
-	printVersion       bool
-	developerUsage     bool
 	debug              bool
 	disableControlTLS  bool
 	insecureTLS        bool
@@ -52,141 +50,60 @@ const (
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
-func parseOptions() (*options, error) {
+func parseOptions(args []string) (*options, error) {
+
+	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
+	flagset.Usage = func() { usage(flagset) }
+
 	var (
 		// Primary options
-		flRootDirectory = flag.String(
-			"root_directory",
-			env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", ""),
-			"The location of the local database, pidfiles, etc.",
-		)
-		flKolideServerURL = flag.String(
-			"hostname",
-			env.String("KOLIDE_LAUNCHER_HOSTNAME", ""),
-			"The hostname of the gRPC server",
-		)
-
-		flControl = flag.Bool(
-			"control",
-			env.Bool("KOLIDE_CONTROL", false),
-			"Whether or not the control server is enabled (default: false)",
-		)
-		flControlServerURL = flag.String(
-			"control_hostname",
-			env.String("KOLIDE_CONTROL_HOSTNAME", ""),
-			"The hostname of the control server",
-		)
-		flGetShellsInterval = flag.Duration(
-			"control_get_shells_interval",
-			env.Duration("KOLIDE_CONTROL_GET_SHELLS_INTERVAL", 3*time.Second),
-			"The interval at which the get shells request will be made",
-		)
-
-		flEnrollSecret = flag.String(
-			"enroll_secret",
-			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", ""),
-			"The enroll secret that is used in your environment",
-		)
-		flEnrollSecretPath = flag.String(
-			"enroll_secret_path",
-			env.String("KOLIDE_LAUNCHER_ENROLL_SECRET_PATH", ""),
-			"Optionally, the path to your enrollment secret",
-		)
-		flOsquerydPath = flag.String(
-			"osqueryd_path",
-			env.String("KOLIDE_LAUNCHER_OSQUERYD_PATH", ""),
-			"Path to the osqueryd binary to use (Default: find osqueryd in $PATH)",
-		)
-		flCertPins = flag.String(
-			"cert_pins",
-			env.String("KOLIDE_LAUNCHER_CERT_PINS", ""),
-			"Comma separated, hex encoded SHA256 hashes of pinned subject public key info",
-		)
-		flRootPEM = flag.String(
-			"root_pem",
-			env.String("KOLIDE_LAUNCHER_ROOT_PEM", ""),
-			"Path to PEM file including root certificates to verify against",
-		)
-		flLoggingInterval = flag.Duration(
-			"logging_interval",
-			env.Duration("KOLIDE_LAUNCHER_LOGGING_INTERVAL", 60*time.Second),
-			"The interval at which logs should be flushed to the server",
-		)
+		flCertPins          = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControl           = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
+		flControlServerURL  = flagset.String("control_hostname", "", "The hostname of the control server")
+		flEnrollSecret      = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath  = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 3*time.Second, "The interval at which the 'get shells' request will be made")
+		flInitialRunner     = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL   = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flLoggingInterval   = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath      = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootPEM           = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion           = flagset.Bool("version", false, "Print Launcher version and exit")
+		_                   = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
-		flAutoupdate = flag.Bool(
-			"autoupdate",
-			env.Bool("KOLIDE_LAUNCHER_AUTOUPDATE", false),
-			"Whether or not the osquery autoupdater is enabled (default: false)",
-		)
-		flNotaryServerURL = flag.String(
-			"notary_url",
-			env.String("KOLIDE_LAUNCHER_NOTARY_SERVER_URL", autoupdate.DefaultNotary),
-			"The Notary update server (default: https://notary.kolide.co)",
-		)
-		flMirrorURL = flag.String(
-			"mirror_url",
-			env.String("KOLIDE_LAUNCHER_MIRROR_SERVER_URL", autoupdate.DefaultMirror),
-			"The mirror server for autoupdates (default: https://dl.kolide.co)",
-		)
-		flAutoupdateInterval = flag.Duration(
-			"autoupdate_interval",
-			duration("KOLIDE_LAUNCHER_AUTOUPDATE_INTERVAL", 1*time.Hour),
-			"The interval to check for updates (default: once every hour)",
-		)
-		flUpdateChannel = flag.String(
-			"update_channel",
-			env.String("KOLIDE_LAUNCHER_UPDATE_CHANNEL", "stable"),
-			"The channel to pull updates from (options: stable, beta, nightly)",
-		)
+		flAutoupdate         = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flNotaryServerURL    = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
+		flMirrorURL          = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flAutoupdateInterval = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flUpdateChannel      = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 
 		// Development options
-		flDebug = flag.Bool(
-			"debug",
-			env.Bool("KOLIDE_LAUNCHER_DEBUG", false),
-			"Whether or not debug logging is enabled (default: false)",
-		)
-		flDisableControlTLS = flag.Bool(
-			"disable_control_tls",
-			env.Bool("KOLIDE_LAUNCHER_DISABLE_CONTROL_TLS", false),
-			"Disable TLS encryption for the control features",
-		)
-		flInsecureTLS = flag.Bool(
-			"insecure",
-			env.Bool("KOLIDE_LAUNCHER_INSECURE", false),
-			"Do not verify TLS certs for outgoing connections (default: false)",
-		)
-		flInsecureGRPC = flag.Bool(
-			"insecure_grpc",
-			env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false),
-			"Dial GRPC without a TLS config (default: false)",
-		)
-
-		// Version command: launcher --version
-		flVersion = flag.Bool(
-			"version",
-			env.Bool("KOLIDE_LAUNCHER_VERSION", false),
-			"Print Launcher version and exit",
-		)
-
-		// Developer usage
-		flDeveloperUsage = flag.Bool(
-			"dev_help",
-			env.Bool("KOLIDE_LAUNCHER_DEV_HELP", false),
-			"Print full Launcher help, including developer options",
-		)
-
-		// Enable Initial Runner: launcher --with_initial_runner
-		flInitialRunner = flag.Bool(
-			"with_initial_runner",
-			env.Bool("KOLIDE_LAUNCHER_INITIAL_RUNNER", false),
-			"Run differential queries from config ahead of scheduled interval.",
-		)
+		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
+		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
+		flInsecureGRPC      = flagset.Bool("insecure_grpc", false, "Dial GRPC without a TLS config (default: false)")
+		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
 
-	flag.Usage = usage
+	ff.Parse(flagset, args,
+		ff.WithConfigFileFlag("config"),
+		ff.WithConfigFileParser(ff.PlainParser),
+		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),
+	)
 
-	flag.Parse()
+	// handle --version
+	if *flVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
+	// handle --usage
+	if *flDeveloperUsage {
+		developerUsage(flagset)
+		os.Exit(0)
+	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
@@ -237,8 +154,6 @@ func parseOptions() (*options, error) {
 		loggingInterval:     *flLoggingInterval,
 		enableInitialRunner: *flInitialRunner,
 		autoupdate:          *flAutoupdate,
-		printVersion:        *flVersion,
-		developerUsage:      *flDeveloperUsage,
 		debug:               *flDebug,
 		disableControlTLS:   *flDisableControlTLS,
 		insecureTLS:         *flInsecureTLS,
@@ -251,12 +166,12 @@ func parseOptions() (*options, error) {
 	return opts, nil
 }
 
-func shortUsage() {
+func shortUsage(flagset *flag.FlagSet) {
 	launcherFlags := map[string]string{}
 	flagAggregator := func(f *flag.Flag) {
 		launcherFlags[f.Name] = f.Usage
 	}
-	flag.VisitAll(flagAggregator)
+	flagset.VisitAll(flagAggregator)
 
 	printOpt := func(opt string) {
 		fmt.Fprintf(os.Stderr, "  --%s", opt)
@@ -294,17 +209,17 @@ func shortUsage() {
 	fmt.Fprintf(os.Stderr, "\n")
 }
 
-func usage() {
-	shortUsage()
+func usage(flagset *flag.FlagSet) {
+	shortUsage(flagset)
 	usageFooter()
 }
 
-func developerUsage() {
+func developerUsage(flagset *flag.FlagSet) {
 	launcherFlags := map[string]string{}
 	flagAggregator := func(f *flag.Flag) {
 		launcherFlags[f.Name] = f.Usage
 	}
-	flag.VisitAll(flagAggregator)
+	flagset.VisitAll(flagAggregator)
 
 	printOpt := func(opt string) {
 		fmt.Fprintf(os.Stderr, "  --%s", opt)
@@ -314,7 +229,8 @@ func developerUsage() {
 		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
 	}
 
-	shortUsage()
+	shortUsage(flagset)
+
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "Development Options:\n")
 	fmt.Fprintf(os.Stderr, "\n")
@@ -339,19 +255,6 @@ func developerUsage() {
 func usageFooter() {
 	fmt.Fprintf(os.Stderr, "For more information, check out https://kolide.co/osquery\n")
 	fmt.Fprintf(os.Stderr, "\n")
-}
-
-// TODO: move to kolide/kit and figure out error handling there.
-func duration(key string, def time.Duration) time.Duration {
-	if env, ok := os.LookupEnv(key); ok {
-		t, err := time.ParseDuration(env)
-		if err != nil {
-			fmt.Println("env: parse duration flag: ", err)
-			os.Exit(1)
-		}
-		return t
-	}
-	return def
 }
 
 func parseCertPins(pins string) ([][]byte, error) {

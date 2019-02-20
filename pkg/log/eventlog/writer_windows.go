@@ -53,5 +53,8 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 }
 
 func isAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), "registry key already exists")
 }

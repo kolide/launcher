@@ -1,5 +1,3 @@
-// +build !windows
-
 package main
 
 import (
@@ -10,7 +8,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/kit/version"
 	"github.com/pkg/errors"
 )
 
@@ -27,22 +24,10 @@ func main() {
 		}
 	}
 
-	opts, err := parseOptions()
+	opts, err := parseOptions(os.Args[1:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
-	}
-
-	// handle --version
-	if opts.printVersion {
-		version.PrintFull()
-		os.Exit(0)
-	}
-
-	// handle --usage
-	if opts.developerUsage {
-		developerUsage()
-		os.Exit(0)
 	}
 
 	logger = logutil.NewServerLogger(opts.debug)
@@ -56,7 +41,7 @@ func main() {
 }
 
 func isSubCommand() bool {
-	if len(os.Args) != 2 {
+	if len(os.Args) < 2 {
 		return false
 	}
 
@@ -64,6 +49,8 @@ func isSubCommand() bool {
 		"socket",
 		"query",
 		"flare",
+		"svc",
+		"svc-fg",
 	}
 
 	for _, sc := range subCommands {
@@ -73,4 +60,22 @@ func isSubCommand() bool {
 	}
 
 	return false
+}
+
+func runSubcommands() error {
+	var run func([]string) error
+	switch os.Args[1] {
+	case "socket":
+		run = runSocket
+	case "query":
+		run = runQuery
+	case "flare":
+		run = runFlare
+	case "svc":
+		run = runWindowsSvc
+	case "svc-fg":
+		run = runWindowsSvcForeground
+	}
+	err := run(os.Args[2:])
+	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
 }
