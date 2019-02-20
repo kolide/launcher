@@ -24,7 +24,7 @@ func main() {
 		}
 	}
 
-	opts, err := parseOptions()
+	opts, err := parseOptions(os.Args[1:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)

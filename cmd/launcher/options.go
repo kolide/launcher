@@ -50,7 +50,7 @@ const (
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
-func parseOptions() (*options, error) {
+func parseOptions(args []string) (*options, error) {
 
 	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
@@ -87,7 +87,7 @@ func parseOptions() (*options, error) {
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
 
-	ff.Parse(flagset, os.Args[1:],
+	ff.Parse(flagset, args,
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
 		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),

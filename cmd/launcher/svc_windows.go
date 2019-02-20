@@ -31,7 +31,7 @@ func runWindowsSvc(args []string) error {
 	logger := eventlog.New(eventLogWriter)
 	level.Debug(logger).Log("msg", "service start requested")
 
-	opts, err := parseOptions()
+	opts, err := parseOptions(os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
@@ -46,7 +46,7 @@ func runWindowsSvcDebug(args []string) error {
 	logger := logutil.NewCLILogger(true) //interactive
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
-	opts, err := parseOptions()
+	opts, err := parseOptions(os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
