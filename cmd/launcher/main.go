@@ -50,7 +50,7 @@ func isSubCommand() bool {
 		"query",
 		"flare",
 		"svc",
-		"svc-debug",
+		"svc-fg",
 	}
 
 	for _, sc := range subCommands {
@@ -73,8 +73,8 @@ func runSubcommands() error {
 		run = runFlare
 	case "svc":
 		run = runWindowsSvc
-	case "svc-debug":
-		run = runWindowsSvcDebug
+	case "svc-fg":
+		run = runWindowsSvcForeground
 	}
 	err := run(os.Args[2:])
 	return errors.Wrapf(err, "running subcommand %s", os.Args[1])

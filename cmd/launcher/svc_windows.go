@@ -42,7 +42,7 @@ func runWindowsSvc(args []string) error {
 	return run(serviceName, &winSvc{logger: logger, opts: opts})
 }
 
-func runWindowsSvcDebug(args []string) error {
+func runWindowsSvcForeground(args []string) error {
 	logger := logutil.NewCLILogger(true) //interactive
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 

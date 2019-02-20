@@ -13,7 +13,7 @@ func runWindowsSvc(args []string) error {
 	return nil
 }
 
-func runWindowsSvcDebug(args []string) error {
+func runWindowsSvcForeground(args []string) error {
 	fmt.Println("This isn't windows")
 	os.Exit(1)
 	return nil
