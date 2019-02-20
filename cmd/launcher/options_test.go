@@ -84,6 +84,7 @@ func getArgsAndResponse() (map[string]string, *options) {
 	randomHostname := fmt.Sprintf("%s.example.com", stringutil.RandomString(8))
 	randomInt := rand.Intn(1024)
 
+	// includes both `-` and `--` for variety.
 	args := map[string]string{
 		"-control":             "", // This is a bool, it's special cased in the test routines
 		"--hostname":           randomHostname,
