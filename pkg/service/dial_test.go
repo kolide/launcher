@@ -88,17 +88,20 @@ func TestSwappingCert(t *testing.T) {
 	client := New(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	stop()
 
 	cert, err = tls.LoadX509KeyPair(goodCert, goodKey)
 	require.Nil(t, err)
 	stop = startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
-	time.Sleep(1 * time.Second)
+
+	// Wait for amount of time
+	timer := time.NewTimer(time.Second * 2)
+	<-timer.C
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	stop()
 }
@@ -107,7 +110,10 @@ func TestCertRemainsBad(t *testing.T) {
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
-	time.Sleep(1 * time.Second)
+
+	// Wait for amount of time
+	timer := time.NewTimer(time.Second * 2)
+	<-timer.C
 
 	pem1, err := ioutil.ReadFile(badCert)
 	require.Nil(t, err)
