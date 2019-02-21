@@ -91,6 +91,7 @@ func getArgsAndResponse() (map[string]string, *options) {
 		"-autoupdate_interval": "48h",
 		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
 		"-osqueryd_path":       "/dev/null",
+		"-transport":           "grpc",
 	}
 
 	opts := &options{
@@ -103,6 +104,7 @@ func getArgsAndResponse() (map[string]string, *options) {
 		notaryServerURL:    "https://notary.kolide.co",
 		mirrorServerURL:    "https://dl.kolide.co",
 		updateChannel:      "stable",
+		transport:          "grpc",
 	}
 
 	return args, opts
