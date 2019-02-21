@@ -47,7 +47,7 @@ const (
 // ServiceInstall implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
 type ServiceInstall struct {
 	Account          string           `xml:",attr,omitempty"`
-	Arguments        []string         `xml:",attr,omitempty"`
+	Arguments        string           `xml:",attr,omitempty"`
 	Description      string           `xml:",attr,omitempty"`
 	DisplayName      string           `xml:",attr,omitempty"`
 	EraseDescription bool             `xml:",attr,omitempty"`
@@ -97,6 +97,20 @@ func ServiceName(name string) ServiceOpt {
 func ServiceDescription(desc string) ServiceOpt {
 	return func(s *Service) {
 		s.serviceInstall.Description = desc
+	}
+}
+
+// ServiceArgs takes an arry of args, escapes the whitespace, and
+// munges them into a string for wix.
+func ServiceArgs(args []string) ServiceOpt {
+	return func(s *Service) {
+		quotedArgs := make([]string, len(args))
+
+		for i, arg := range args {
+			quotedArgs[i] = strings.Replace(arg, " ", "\\ ", -1)
+		}
+
+		s.serviceInstall.Arguments = strings.Join(quotedArgs, " ")
 	}
 }
 

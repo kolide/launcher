@@ -26,8 +26,8 @@ func TestService(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, expectTrue2)
 
-	expectedXml := `<ServiceInstall ErrorControl="normal" Id="ServiceInstall" Name="daemonSvc" Start="auto" Type="ownProcess"></ServiceInstall>
-                    <ServiceControl Name="daemonSvc" Id="ServiceControl"></ServiceControl>`
+	expectedXml := `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="daemonSvc" Name="daemonSvc" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="daemonSvc" Id="daemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
 
 	var xmlString bytes.Buffer
 
@@ -46,8 +46,30 @@ func TestServiceOptions(t *testing.T) {
 	}{
 		{
 			in: NewService("daemon.exe", ServiceName("myDaemon")),
-			out: `<ServiceInstall ErrorControl="normal" Id="ServiceInstall" Name="myDaemon" Start="auto" Type="ownProcess"></ServiceInstall>
-                    <ServiceControl Name="myDaemon" Id="ServiceControl"></ServiceControl>`,
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
+		},
+		{
+			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first"})),
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
+		},
+		{
+			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first with spaces"})),
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first\ with\ spaces" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
+		},
+
+		{
+			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first", "second"})),
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first second" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
+		},
+
+		{
+			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first", "second", "third has spaces"})),
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first second third\ has\ spaces" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
 		},
 	}
 
