@@ -56,7 +56,7 @@ func TestServiceOptions(t *testing.T) {
 		},
 		{
 			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first with spaces"})),
-			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first\ with\ spaces" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="&#34;first with spaces&#34;" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
                     <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
 		},
 
@@ -68,7 +68,7 @@ func TestServiceOptions(t *testing.T) {
 
 		{
 			in: NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first", "second", "third has spaces"})),
-			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first second third\ has\ spaces" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" Arguments="first second &#34;third has spaces&#34;" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
                     <ServiceControl Name="myDaemon" Id="myDaemon" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
 		},
 	}

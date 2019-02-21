@@ -2,9 +2,11 @@ package wix
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -100,17 +102,25 @@ func ServiceDescription(desc string) ServiceOpt {
 	}
 }
 
-// ServiceArgs takes an arry of args, escapes the whitespace, and
-// munges them into a string for wix.
+// ServiceArgs takes an array of args, wraps them in spaces, then
+// joins them into a string. In xml, quotes are _always_ transmitted
+// as html entities. (&#34; or &quot;) empiracally wix handles that
+// okay.
 func ServiceArgs(args []string) ServiceOpt {
 	return func(s *Service) {
 		quotedArgs := make([]string, len(args))
 
 		for i, arg := range args {
-			quotedArgs[i] = strings.Replace(arg, " ", "\\ ", -1)
+			if strings.ContainsAny(arg, " ") {
+				quotedArgs[i] = fmt.Sprintf(`"%s"`, arg)
+			} else {
+				quotedArgs[i] = arg
+			}
 		}
 
 		s.serviceInstall.Arguments = strings.Join(quotedArgs, " ")
+		spew.Dump("seph")
+		spew.Dump(s.serviceInstall.Arguments)
 	}
 }
 
