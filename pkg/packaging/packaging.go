@@ -101,9 +101,9 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	launcherMapFlags := map[string]string{
 		"hostname":           p.Hostname,
-		"root_directory":     p.rootDir,
-		"osqueryd_path":      filepath.Join(p.binDir, "osqueryd"),
-		"enroll_secret_path": filepath.Join(p.confDir, "secret"),
+		"root_directory":     p.canonicalizePath(p.rootDir),
+		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
+		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
 	}
 
 	launcherBoolFlags := []string{}
@@ -139,7 +139,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.RootPEM != "" {
 		rootPemPath := filepath.Join(p.confDir, "roots.pem")
-		launcherMapFlags["root_pem"] = rootPemPath
+		launcherMapFlags["root_pem"] = p.canonicalizePath(rootPemPath)
 
 		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
 			return errors.Wrap(err, "copy root PEM")
@@ -161,6 +161,10 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
 		}
 	}
+
+	// Wixtoolset seems to get unhappy if the flagFile is open, and since
+	// we're done writing it, may as well close it.
+	flagFile.Close()
 
 	// Unless we're omitting the secret, write it into the package.
 	// Note that we _always_ set KOLIDE_LAUNCHER_ENROLL_SECRET_PATH
@@ -633,5 +637,26 @@ func (p *PackageOptions) execOut(ctx context.Context, argv0 string, args ...stri
 		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
 
+// canonicalizePath takes a path, and makes it into a full, absolute,
+// path. It is a hack around how the windows install process works,
+// and will likely need to be revisited.
+//
+// The windows process installs using _relative_ paths, which are
+// expanded to full paths inside the wix template. However, the flag
+// file needs full paths, and is generated here. Thus,
+// canonicalizePath encodes some things that should be left as
+// install-time variables controlled by wix and windows.
+//
+// Likely a longer term approach will involve one of:
+//  1. pull all the paths into the golang portion.
+//  2. Move flag file generation to wix
+//  3. utilize some environmental variable
+func (p *PackageOptions) canonicalizePath(path string) string {
+	if p.target.Package != Msi {
+		return path
+	}
+
+	return filepath.Join(`C:\Program Files\Kolide`, path)
 }
