@@ -245,6 +245,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Scripts:    p.scriptRoot,
 		SigningKey: p.SigningKey,
 		Version:    p.PackageVersion,
+		FlagFile:   p.canonicalizePath(flagFilePath),
 	}
 
 	if err := p.makePackage(ctx); err != nil {
@@ -311,6 +312,7 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Msi:
+		// pass whether to include a service as a bool argument to PackageWixMSI
 		includeService := p.target.Init == WindowsService
 		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops, includeService); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())

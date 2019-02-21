@@ -9,4 +9,5 @@ type PackageOptions struct {
 	Scripts    string // directory of packaging scripts (postinst, prerm, etc)
 	SigningKey string // key to sign packages with (platform specific behaviors)
 	Version    string // package version
+	FlagFile   string // Path to the flagfile for configuration
 }
