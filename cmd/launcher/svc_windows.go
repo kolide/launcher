@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -37,13 +38,22 @@ func runWindowsSvc(args []string) error {
 		os.Exit(1)
 	}
 
+	// Now that we've parsed the options, let's set a filter on our logger
+	if opts.debug {
+		logger = level.NewFilter(logger, level.AllowDebug())
+	} else {
+		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
 	run := svc.Run
 
 	return run(serviceName, &winSvc{logger: logger, opts: opts})
 }
 
 func runWindowsSvcForeground(args []string) error {
-	logger := logutil.NewCLILogger(true) //interactive
+	// Foreground mode is inherently a debug mode. So we start the
+	// logger in debugging mode, instead of looking at opts.debug
+	logger := logutil.NewCLILogger(true)
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
 	opts, err := parseOptions(os.Args[2:])
@@ -74,7 +84,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	go func() {
 		err := runLauncher(ctx, cancel, w.opts, w.logger)
 		if err != nil {
-			level.Info(w.logger).Log("err", err)
+			level.Info(w.logger).Log("err", err, "stack", fmt.Sprintf("%+v", err))
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
