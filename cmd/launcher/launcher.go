@@ -252,7 +252,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		case "grpc":
 			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
 			if err != nil {
-				errors.Wrap(err, "dialing grpc server")
+				return errors.Wrap(err, "dialing grpc server")
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
@@ -260,11 +260,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
 			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureJSONRPC, opts.certPins, rootPool, logger)
-			if err != nil {
-				errors.Wrap(err, "create JSON RPC Client")
-			}
 		default:
-			errors.New("invalid transport option selected")
+			return errors.New("invalid transport option selected")
 		}
 	}
 
