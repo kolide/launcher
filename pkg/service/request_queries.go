@@ -16,13 +16,13 @@ import (
 )
 
 type queriesRequest struct {
-	NodeKey string `json: "node_key"`
+	NodeKey string `json:"node_key"`
 }
 
 type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
-	NodeInvalid bool  `json: "node_invalid"`
-	Err         error `json: "error_code"`
+	NodeInvalid bool  `json:"node_invalid"`
+	Err         error `json:"error_code"`
 }
 
 func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
