@@ -41,7 +41,7 @@ func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x
 			// feedback to the user about what is going wrong.
 			level.Info(logger).Log(
 				"msg", "no match found with pinned certificates",
-				"err", "certificate pin validationf failed",
+				"err", "certificate pin validation failed",
 			)
 			return errors.New("no match found with pinned cert")
 		}
