@@ -13,6 +13,7 @@ env:
   global:
     - SKIP_TEST_MDM=true
   matrix:
+    - TRAVISTARGET=lint
     - TRAVISTARGET=build
     - TRAVISTARGET=test
     - TRAVISTARGET=package-builder
@@ -25,5 +26,5 @@ install:
   - make deps
 
 script:
-   - make $TRAVISTARGET
+   - make -j $TRAVISTARGET
 

@@ -125,7 +125,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	}(time.Now())
 
 	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)
-	return
+	return res, reauth, err
 }
 
 func (mw uuidmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {

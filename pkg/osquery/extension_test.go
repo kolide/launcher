@@ -465,7 +465,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 			case logger.LogTypeString:
 				gotResultLogs = logs
 			default:
-				t.Error("Unkown log type")
+				t.Error("Unknown log type")
 			}
 			return "", "", false, nil
 		},
@@ -556,7 +556,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 			case logger.LogTypeString:
 				gotResultLogs = logs
 			default:
-				t.Error("Unkown log type")
+				t.Error("Unknown log type")
 			}
 			return "", "", false, nil
 		},
@@ -619,7 +619,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 			case logger.LogTypeString:
 				gotResultLogs = logs
 			default:
-				t.Error("Unkown log type")
+				t.Error("Unknown log type")
 			}
 			return "", "", false, nil
 		},
@@ -680,7 +680,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 				funcInvokedResult = true
 				gotResultLogs = logs
 			default:
-				t.Error("Unkown log type")
+				t.Error("Unknown log type")
 			}
 			return "", "", false, nil
 		},
@@ -771,7 +771,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 			case logger.LogTypeString:
 				gotResultLogs = logs
 			default:
-				t.Error("Unkown log type")
+				t.Error("Unknown log type")
 			}
 			// Mock as if sending logs errored
 			return "", "", false, errors.New("server rejected logs")

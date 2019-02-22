@@ -11,7 +11,7 @@ import (
 
 func TestPackageTrivial(t *testing.T) {
 	t.Parallel()
-	// This test won't work in CI. It's got dependancies on docker, as
+	// This test won't work in CI. It's got dependencies on docker, as
 	// well as the osx packaging tools. So, skip it unless we've
 	// explicitly asked to run it.
 	if !env.Bool("CI_TEST_PACKAGING", false) {

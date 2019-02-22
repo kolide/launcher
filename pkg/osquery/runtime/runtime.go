@@ -555,7 +555,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch the extension manager server asynchronously.
 	o.errgroup.Go(func() error {
-		// We see the extention manager being slow to start. Implement a simple re-try routine
+		// We see the extension manager being slow to start. Implement a simple re-try routine
 		backoff := backoff.New()
 		if err := backoff.Run(o.extensionManagerServer.Start); err != nil {
 			return errors.Wrap(err, "running extension server")

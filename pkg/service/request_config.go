@@ -103,7 +103,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 	}(time.Now())
 
 	config, reauth, err = mw.next.RequestConfig(ctx, nodeKey)
-	return
+	return config, reauth, err
 }
 
 func (mw uuidmw) RequestConfig(ctx context.Context, nodeKey string) (errcode string, reauth bool, err error) {

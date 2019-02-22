@@ -35,7 +35,7 @@ type queryRunner struct {
 // return if the query matches.
 type matcher struct {
 	// Pattern is a regexp for the query patterns this should match.
-	Pattern regexp.Regexp `json:"pattern"`
+	Pattern *regexp.Regexp `json:"pattern"`
 	// Results is the results to return for matched queries
 	Results []map[string]string `json:"results"`
 }
@@ -48,7 +48,7 @@ type querySpec struct {
 	ParentName string `json:"parent"`
 	Queries    []struct {
 		Pattern string              `json:"pattern"`
-		Results []map[string]string `json"results"`
+		Results []map[string]string `json:"results"`
 	} `json:"queries"`
 }
 
@@ -90,7 +90,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 				if err != nil {
 					return nil, errors.Wrapf(err, "compile regexp for %s", path)
 				}
-				runner.Queries = append(runner.Queries, matcher{*re, q.Results})
+				runner.Queries = append(runner.Queries, matcher{re, q.Results})
 			}
 
 			// Check for duplicate host type name. It is user error
