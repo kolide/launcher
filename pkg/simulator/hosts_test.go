@@ -64,11 +64,11 @@ func TestLoadHosts(t *testing.T) {
 	assert.Equal(t,
 		[]matcher{
 			matcher{
-				*regexp.MustCompile("select hour, minutes from time"),
+				regexp.MustCompile("select hour, minutes from time"),
 				[]map[string]string{{"hour": "19", "minutes": "34"}},
 			},
 			matcher{
-				*regexp.MustCompile("select platform from osquery_info"),
+				regexp.MustCompile("select platform from osquery_info"),
 				[]map[string]string{{"platform": "darwin"}},
 			},
 		},
@@ -80,7 +80,7 @@ func TestLoadHosts(t *testing.T) {
 	assert.Equal(t,
 		[]matcher{
 			{
-				*regexp.MustCompile("select version from osquery_info"),
+				regexp.MustCompile("select version from osquery_info"),
 				[]map[string]string{{"version": "2.10.2"}},
 			},
 		},
@@ -92,14 +92,14 @@ func TestLoadHosts(t *testing.T) {
 func TestRunQuery(t *testing.T) {
 	h1 := queryRunner{
 		Queries: []matcher{
-			{*regexp.MustCompile(".*time.*"), []map[string]string{{"foo": "bar"}}},
+			{regexp.MustCompile(".*time.*"), []map[string]string{{"foo": "bar"}}},
 		},
 		unmatchedQueries: make(map[string]bool),
 		logger:           log.NewNopLogger(),
 	}
 	h2 := queryRunner{
 		Queries: []matcher{
-			{*regexp.MustCompile("select \\* from osquery_info"), []map[string]string{{"osquery": "info"}}},
+			{regexp.MustCompile("select \\* from osquery_info"), []map[string]string{{"osquery": "info"}}},
 		},
 		parent:           &h1,
 		unmatchedQueries: make(map[string]bool),
@@ -107,8 +107,8 @@ func TestRunQuery(t *testing.T) {
 	}
 	h3 := queryRunner{
 		Queries: []matcher{
-			{*regexp.MustCompile("select hour from time"), []map[string]string{{"hour": "12"}}},
-			{*regexp.MustCompile("select .* from time"), []map[string]string{{"minute": "36"}}},
+			{regexp.MustCompile("select hour from time"), []map[string]string{{"hour": "12"}}},
+			{regexp.MustCompile("select .* from time"), []map[string]string{{"minute": "36"}}},
 		},
 		parent:           &h1,
 		unmatchedQueries: make(map[string]bool),
