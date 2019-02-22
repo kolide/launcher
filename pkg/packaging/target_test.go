@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -82,7 +83,7 @@ func TestPlatformFromString(t *testing.T) {
 	}
 }
 
-func TestPackageFromString(t *testing.T) {
+func TestPackageStrings(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
@@ -120,7 +121,10 @@ func TestPackageFromString(t *testing.T) {
 		target := &Target{}
 		err := target.PackageFromString(tt.in)
 		require.NoError(t, err)
-		require.Equal(t, string(tt.out), string(target.Package))
+		require.Equal(t, tt.out, target.Package)
+
+		// Check the reversal as well.
+		require.Equal(t, tt.in, target.PkgExtension())
 	}
 }
 
@@ -164,4 +168,72 @@ func TestTargetParse(t *testing.T) {
 			require.Equal(t, tt.out.String(), target.String())
 		}
 	}
+}
+
+func TestTargetPlatformBinaryName(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		in     string
+		out    string
+		outwin string
+	}{
+		{
+			in:     "foo",
+			out:    "foo",
+			outwin: "foo.exe",
+		},
+		{
+			in:     "foo.app",
+			out:    "foo.app",
+			outwin: "foo.app.exe",
+		},
+		{
+			in:     "foo.exe",
+			out:    "foo",
+			outwin: "foo.exe",
+		},
+	}
+
+	target := &Target{Platform: Darwin, Init: LaunchD, Package: Pkg}
+	targetWin := &Target{Platform: Windows, Init: NoInit, Package: Msi}
+
+	for _, tt := range tests {
+		require.Equal(t, tt.out, target.PlatformBinaryName(tt.in), fmt.Sprintf("Test: %s", tt.in))
+		require.Equal(t, tt.outwin, targetWin.PlatformBinaryName(tt.in), fmt.Sprintf("Test: %s", tt.in))
+	}
+}
+func TestTargetPlatformExtensionName(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		in     string
+		out    string
+		outwin string
+	}{
+		{
+			in:     "foo",
+			out:    "foo.ext",
+			outwin: "foo.exe",
+		},
+		{
+			in:     "foo.ext",
+			out:    "foo.ext",
+			outwin: "foo.exe",
+		},
+		{
+			in:     "foo.exe",
+			out:    "foo.ext",
+			outwin: "foo.exe",
+		},
+	}
+
+	target := &Target{Platform: Darwin, Init: LaunchD, Package: Pkg}
+	targetWin := &Target{Platform: Windows, Init: NoInit, Package: Msi}
+
+	for _, tt := range tests {
+		require.Equal(t, tt.out, target.PlatformExtensionName(tt.in), fmt.Sprintf("Test: %s", tt.in))
+		require.Equal(t, tt.outwin, targetWin.PlatformExtensionName(tt.in), tt.in, fmt.Sprintf("Test: %s", tt.in))
+	}
+
 }
