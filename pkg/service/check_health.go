@@ -82,7 +82,7 @@ func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
 		)
 	}(time.Now())
 	status, err = mw.next.CheckHealth(ctx)
-	return
+	return status, err
 }
 
 func (mw uuidmw) CheckHealth(ctx context.Context) (status int32, err error) {

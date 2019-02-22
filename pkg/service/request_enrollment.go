@@ -165,7 +165,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 	}(time.Now())
 
 	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
-	return
+	return nodekey, reauth, err
 }
 
 func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, err error) {

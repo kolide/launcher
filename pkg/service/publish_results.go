@@ -163,7 +163,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 	}(time.Now())
 
 	message, errcode, reauth, err = mw.next.PublishResults(ctx, nodeKey, results)
-	return
+	return message, errcode, reauth, err
 }
 
 func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {

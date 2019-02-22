@@ -152,7 +152,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 	}(time.Now())
 
 	message, errcode, reauth, err = mw.next.PublishLogs(ctx, nodeKey, logType, logs)
-	return
+	return message, errcode, reauth, err
 }
 
 func (mw uuidmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
