@@ -15,14 +15,23 @@ import (
 )
 
 // forceNoChunkedEncoding forces the connection not to use chunked
-// encoding. This is because we're talking to rails which doeasn't
-// support it. TODO: followup info
+// encoding. It is designed as a go-kit httptransport.RequestFunc,
+// suitable for being passed in with ClientBefore.  This is required
+// when using rails as an endpoint, as rails does not support chunked
+// encoding.
+//
+// It does this by calculating the body size, and applying a
+// ContentLength header. This triggers http.client to not chunk it.
 func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
 	r.TransferEncoding = []string{"identity"}
 
 	// read the body, set the content legth, and leave a new ReadCloser in Body
 	bodyBuf := &bytes.Buffer{}
-	bodyReadBytes, _ := io.Copy(bodyBuf, r.Body)
+	bodyReadBytes, err := io.Copy(bodyBuf, r.Body)
+	if err != nil {
+		panic(err)
+	}
+	r.Body.Close()
 	r.ContentLength = bodyReadBytes
 	r.Body = ioutil.NopCloser(bodyBuf)
 
