@@ -7,6 +7,7 @@ jobs:
     steps: &steps
       - checkout
       - run: make deps
+      - run: make -j lint
       - run: make test
       - run: make extension
       - run: make launcher
