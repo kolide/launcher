@@ -39,9 +39,9 @@ func TestWixPackage(t *testing.T) {
 	err = setupPackageRoot(packageRoot)
 	require.NoError(t, err)
 
-	outMsi, err := os.Create("/tmp/out.msi") //ioutil.TempFile("", "wix-test-*.msi")
+	outMsi, err := ioutil.TempFile("", "wix-test-*.msi")
 	require.NoError(t, err)
-	//defer os.Remove(outMsi.Name())
+	defer os.Remove(outMsi.Name())
 
 	mainWxsContent, err := testdata.Asset("testdata/assets/product.wxs")
 	require.NoError(t, err)
