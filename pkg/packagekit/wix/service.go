@@ -32,7 +32,7 @@ type StartType string
 const (
 	StartAuto     StartType = "auto"
 	StartDemand             = "demand"
-	StartDisabled           = "disabled:"
+	StartDisabled           = "disabled"
 	StartBoot               = "boot"
 	StartSystem             = "system"
 )
