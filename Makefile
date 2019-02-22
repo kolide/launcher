@@ -110,3 +110,25 @@ build/binary-bundle/%:
 	cp build/$*/launcher* $@/
 	cp build/$*/osquery-extension* $@/
 	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
+
+# These are escape newlines, looks super weird. Allows these to run in
+# parallel with `make -j`
+lint: \
+	lint-go-deadcode \
+	lint-misspell \
+	lint-go-vet \
+	lint-go-nakedret
+
+lint-go-deadcode:
+	deadcode cmd/ pkg/
+
+lint-misspell:
+	git ls-files \
+	  | grep -v pkg/simulator/testdata/bad_symlink \
+	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
+
+lint-go-vet:
+	go vet ./...
+
+lint-go-nakedret:
+	nakedret ./...
