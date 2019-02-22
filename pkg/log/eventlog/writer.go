@@ -2,8 +2,9 @@
 
 package eventlog
 
-// NewWriter creates and installs a windows.Handle that writes to the Windows Event log.
-// Use the Close method to close the handle.
+type Writer struct {
+}
+
 func NewWriter(name string) (*Writer, error) {
 	panic("windows only")
 }

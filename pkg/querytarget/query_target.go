@@ -82,6 +82,4 @@ func (qtu *QueryTargetUpdater) Run(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-
-	return nil
 }

@@ -48,7 +48,7 @@ type querySpec struct {
 	ParentName string `json:"parent"`
 	Queries    []struct {
 		Pattern string              `json:"pattern"`
-		Results []map[string]string `json"results"`
+		Results []map[string]string `json:"results"`
 	} `json:"queries"`
 }
 
