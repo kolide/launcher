@@ -513,7 +513,7 @@ sleep 5
 
 // postinstallUpstartTemplate is a post install restart script.
 // upstart's stop and restart commands error out if the daemon isn't
-// running. So stop and start are seperate, and `set -e` is after the
+// running. So stop and start are separate, and `set -e` is after the
 // stop.
 func postinstallUpstartTemplate() string {
 	return `#!/bin/sh

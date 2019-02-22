@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Target is the platform being targetted by the build. As "platform"
+// Target is the platform being targeted by the build. As "platform"
 // has several axis, we use a stuct to convey them.
 type Target struct {
 	Init     InitFlavor

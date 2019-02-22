@@ -396,7 +396,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 			}
 			if err != nil {
 				level.Debug(h.logger).Log(
-					"msg", "an error occured in simulation",
+					"msg", "an error occurred in simulation",
 					"err", err.Error(),
 					"uuid", h.uuid,
 				)

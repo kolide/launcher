@@ -60,7 +60,7 @@ func main() {
 		flHosts = flag.String(
 			"hosts",
 			env.String("HOSTS", ""),
-			"Comma-seperated list of host type and quantity i.e.: linux:1000,macos:200",
+			"Comma-separated list of host type and quantity i.e.: linux:1000,macos:200",
 		)
 		flInsecureTLS = flag.Bool(
 			"insecure",
