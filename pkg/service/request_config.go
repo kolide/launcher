@@ -15,13 +15,13 @@ import (
 )
 
 type configRequest struct {
-	NodeKey string `json: "node_key"`
+	NodeKey string `json:"node_key"`
 }
 
 type configResponse struct {
-	ConfigJSONBlob string `json: "config"`
-	NodeInvalid    bool   `json: "node_invalid"`
-	Err            error  `json: "error_code"`
+	ConfigJSONBlob string `json:"config"`
+	NodeInvalid    bool   `json:"node_invalid"`
+	Err            error  `json:"error_code,omitempty"`
 }
 
 func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -59,6 +59,7 @@ func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (inter
 	if res.Error != nil {
 		return nil, *res.Error // I'm undecided if we should errors.Wrap this or not.
 	}
+
 	var result configResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
