@@ -243,18 +243,30 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			return errors.Errorf("found no valid certs in PEM at path: %s", opts.rootPEM)
 		}
 	}
-
-	// connect to the grpc server
-	grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
-	if err != nil {
-		return errors.Wrap(err, "dialing grpc server")
-	}
-
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
 
+	var client service.KolideService
+	{
+		switch opts.transport {
+		case "grpc":
+			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
+			if err != nil {
+				return errors.Wrap(err, "dialing grpc server")
+			}
+			defer grpcConn.Close()
+			client = service.NewGRPCClient(grpcConn, logger)
+			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
+			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
+		case "jsonrpc":
+			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureJSONRPC, opts.certPins, rootPool, logger)
+		default:
+			return errors.New("invalid transport option selected")
+		}
+	}
+
 	// create the osquery extension for launcher
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, grpcConn, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, client, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}
@@ -266,9 +278,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
-
-	queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
-	runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 
 	// If the control server has been opted-in to, run it
 	if opts.control {

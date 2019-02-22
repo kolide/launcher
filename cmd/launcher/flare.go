@@ -279,7 +279,7 @@ func reportGRPCNetwork(
 	if err != nil {
 		return errors.Wrap(err, "establishing grpc connection to server")
 	}
-	remote := service.New(conn, logger)
+	remote := service.NewGRPCClient(conn, logger)
 
 	logger.Log(
 		"flare", "reportGRPCNetwork",

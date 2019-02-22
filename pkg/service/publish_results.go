@@ -7,21 +7,23 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type resultCollection struct {
-	NodeKey string
+	NodeKey string `json:"node_key"`
 	Results []distributed.Result
 }
 
 type publishResultsResponse struct {
-	Message     string
-	ErrorCode   string
-	NodeInvalid bool
+	Message     string `json:"message"`
+	ErrorCode   string `json:"error_code"`
+	NodeInvalid bool   `json:"node_invalid"`
 	Err         error
 }
 
@@ -53,6 +55,19 @@ func decodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 		Results: results,
 		NodeKey: req.NodeKey,
 	}, nil
+}
+
+func decodeJSONRPCPublishResultsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result publishResultsResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling PublishResults response")
+	}
+
+	return result, nil
 }
 
 func encodeGRPCResultCollection(_ context.Context, request interface{}) (interface{}, error) {

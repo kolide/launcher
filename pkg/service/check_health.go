@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-
 	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
@@ -14,7 +15,7 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
-	Status int32
+	Status int32 `json:"status"`
 	Err    error
 }
 
@@ -38,6 +39,19 @@ func encodeGRPCHealthcheckResponse(_ context.Context, request interface{}) (inte
 	return &pb.HealthCheckResponse{
 		Status: pb.HealthCheckResponse_ServingStatus(req.Status),
 	}, nil
+}
+
+func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error
+	}
+	var result healthcheckResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling CheckHealth response")
+	}
+
+	return result, nil
 }
 
 func MakeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {

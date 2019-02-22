@@ -85,7 +85,7 @@ func TestSwappingCert(t *testing.T) {
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := New(conn, log.NewNopLogger())
+	client := NewGRPCClient(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.Error(t, err)
@@ -129,7 +129,7 @@ func TestCertRemainsBad(t *testing.T) {
 	require.Nil(t, err)
 	defer conn.Close()
 
-	client := New(conn, log.NewNopLogger())
+	client := NewGRPCClient(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.NotNil(t, err)
@@ -197,7 +197,7 @@ func TestCertPinning(t *testing.T) {
 			require.Nil(t, err)
 			defer conn.Close()
 
-			client := New(conn, log.NewNopLogger())
+			client := NewGRPCClient(conn, log.NewNopLogger())
 
 			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {
@@ -256,7 +256,7 @@ func TestRootCAs(t *testing.T) {
 			require.Nil(t, err)
 			defer conn.Close()
 
-			client := New(conn, log.NewNopLogger())
+			client := NewGRPCClient(conn, log.NewNopLogger())
 
 			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {

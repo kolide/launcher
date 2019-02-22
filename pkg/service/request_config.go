@@ -2,23 +2,26 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
+	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type configRequest struct {
-	NodeKey string
+	NodeKey string `json:"node_key"`
 }
 
 type configResponse struct {
-	ConfigJSONBlob string
-	NodeInvalid    bool
-	Err            error
+	ConfigJSONBlob string `json:"config"`
+	NodeInvalid    bool   `json:"node_invalid"`
+	Err            error  `json:"error_code,omitempty"`
 }
 
 func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -50,6 +53,19 @@ func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 		NodeInvalid:    req.NodeInvalid,
 	}
 	return encodeResponse(resp, req.Err)
+}
+
+func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+	if res.Error != nil {
+		return nil, *res.Error // I'm undecided if we should errors.Wrap this or not.
+	}
+
+	var result configResponse
+	err := json.Unmarshal(res.Result, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshalling RequestConfig response")
+	}
+	return result, nil
 }
 
 func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {

@@ -19,11 +19,10 @@ import (
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquerylogger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, grpcConn *grpc.ClientConn, opts *options) (
+func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, launcherClient service.KolideService, opts *options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
@@ -40,9 +39,6 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	}
-
-	// create the client of the grpc service
-	launcherClient := service.New(grpcConn, level.Debug(logger))
 
 	// create the osquery extension
 	extOpts := osquery.ExtensionOpts{
@@ -112,7 +108,6 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 			},
 			Interrupt: func(err error) {
 				level.Info(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
-				grpcConn.Close()
 				ext.Shutdown()
 				if runner != nil {
 					if err := runner.Shutdown(); err != nil {
