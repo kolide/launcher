@@ -199,7 +199,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 		for _, service := range wo.services {
 			isMatch, err := service.Match(line)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "match error")
 			}
 			if isMatch {
 				if err := service.Xml(heatWrite); err != nil {

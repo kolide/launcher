@@ -163,7 +163,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	return s
 }
 
-// Match returns a bool if there's a match
+// Match returns a bool if there's a match, and throws an error if we
+// have too many matches. This is to ensure the configured regex isn't
+// broader than expected.
 func (s *Service) Match(line string) (bool, error) {
 	isMatch := strings.Contains(line, s.matchString)
 
@@ -172,7 +174,7 @@ func (s *Service) Match(line string) (bool, error) {
 	}
 
 	if s.count > s.expectedCount {
-		return isMatch, errors.Errorf("Too many matches. Have %d, expected %d", s.count, s.expectedCount)
+		return isMatch, errors.Errorf("Too many matches. Have %d, expected %d. (on %s)", s.count, s.expectedCount, s.matchString)
 	}
 
 	return isMatch, nil
