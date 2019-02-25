@@ -9,33 +9,23 @@ language: go
 go:
   - 1.11.x
 
+env:
+  global:
+    - SKIP_TEST_MDM=true
+  matrix:
+    - TRAVISTARGET=lint
+    - TRAVISTARGET=build
+    - TRAVISTARGET=test
+    - TRAVISTARGET=package-builder
+  
 os:
   - linux
   - osx
+  - windows
 
 install:
   - make deps
 
+script:
+   - make -j $TRAVISTARGET
 
-env:
-  global:
-    - SKIP_TEST_MDM=true
-
-
-stages:
-  - lint
-  - compile
-  - test
-  - package-builder
-
-
-jobs:
-  include:
-    - stage: lint
-      script: make -j lint
-    - stage: compile
-      script: make build
-    - stage: test
-      script: make test
-    - stage: package-builder
-      script: make package-builder
