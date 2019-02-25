@@ -18,11 +18,12 @@ type Target struct {
 type InitFlavor string
 
 const (
-	LaunchD InitFlavor = "launchd"
-	SystemD            = "systemd"
-	Init               = "init"
-	Upstart            = "upstart"
-	NoInit             = "none"
+	LaunchD        InitFlavor = "launchd"
+	SystemD                   = "systemd"
+	Init                      = "init"
+	Upstart                   = "upstart"
+	WindowsService            = "service"
+	NoInit                    = "none"
 )
 
 type PlatformFlavor string
@@ -79,6 +80,9 @@ func (t *Target) PkgExtension() string {
 
 // PlatformExtensionName is a helper to return the platform specific extension name.
 func (t *Target) PlatformExtensionName(input string) string {
+	// Remove suffixes. This is order dependand, so slightly fragile.
+	input = strings.TrimSuffix(input, ".ext")
+	input = strings.TrimSuffix(input, ".exe")
 	if t.Platform == Windows {
 		return input + ".exe"
 	} else {
@@ -88,6 +92,9 @@ func (t *Target) PlatformExtensionName(input string) string {
 
 // PlatformBinaryName is a helper to return the platform specific binary suffix.
 func (t *Target) PlatformBinaryName(input string) string {
+	// remove trailing .exe
+	input = strings.TrimSuffix(input, ".exe")
+
 	if t.Platform == Windows {
 		return input + ".exe"
 	}
@@ -96,7 +103,7 @@ func (t *Target) PlatformBinaryName(input string) string {
 
 // InitFromString sets a target's init flavor from string representation
 func (t *Target) InitFromString(s string) error {
-	for _, testInit := range []InitFlavor{LaunchD, SystemD, Init, Upstart, NoInit} {
+	for _, testInit := range []InitFlavor{LaunchD, SystemD, Init, Upstart, NoInit, WindowsService} {
 		if testInit.String() == s {
 			t.Init = testInit
 			return nil

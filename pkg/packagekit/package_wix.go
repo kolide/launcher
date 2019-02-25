@@ -3,6 +3,7 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"runtime"
 	"strings"
@@ -17,7 +18,7 @@ import (
 
 //go:generate go-bindata   -nocompress -pkg internal -o internal/assets.go internal/assets/
 
-func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
+func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
 	defer span.End()
 
@@ -30,8 +31,8 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	// little more debugable to do it with go's. This way, we can
 	// inspect the intermediate xml file.
 	//
-	// This might all be cleaner moved to a marshalled struct. For now,
-	// just sent the template the PackageOptions struct
+	// This might all be cleaner moved from a template to a marshalled
+	// struct. But enumerating the wix options looks very ugly
 	wixTemplateBytes, err := internal.Asset("internal/assets/main.wxs")
 	if err != nil {
 		return errors.Wrap(err, "getting go-bindata main.wxs")
@@ -51,7 +52,6 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		Opts:        po,
 		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
 		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
-		PackageCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
 	}
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
@@ -64,14 +64,24 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return errors.Wrap(err, "executing WixTemplate")
 	}
 
-	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes())
+	wixArgs := []wix.WixOpt{}
+
+	if includeService {
+		launcherService := wix.NewService("launcher.exe",
+			wix.ServiceName(fmt.Sprintf("KolideLauncher%sSvc", strings.Title(po.Identifier))),
+			wix.ServiceArgs([]string{"svc", "-config", po.FlagFile}),
+			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),
+		)
+		wixArgs = append(wixArgs, wix.WithService(launcherService))
+	}
+
+	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes(), wixArgs...)
 	if err != nil {
 		return errors.Wrap(err, "making wixTool")
 	}
 	defer wixTool.Cleanup()
 
-	// Run light to compile the msi (and copy the output into our file
-	// handle)
+	// Use wix to compile into an MSI
 	if err := wixTool.Package(ctx, w); err != nil {
 		return errors.Wrap(err, "running light")
 	}

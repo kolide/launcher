@@ -300,7 +300,7 @@ func main() {
 func defaultTargets() string {
 	switch runtime.GOOS {
 	case "windows":
-		return "windows-none-msi"
+		return "windows-service-msi"
 	case "linux":
 		return "linux-systemd-rpm,linux-systemd-deb"
 	case "darwin":

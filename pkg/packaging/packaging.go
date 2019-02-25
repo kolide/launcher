@@ -92,43 +92,79 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return errors.Wrap(err, "setup directories")
 	}
 
-	launcherEnv := map[string]string{
-		"KOLIDE_LAUNCHER_HOSTNAME":           p.Hostname,
-		"KOLIDE_LAUNCHER_ROOT_DIRECTORY":     p.rootDir,
-		"KOLIDE_LAUNCHER_OSQUERYD_PATH":      filepath.Join(p.binDir, "osqueryd"),
-		"KOLIDE_LAUNCHER_ENROLL_SECRET_PATH": filepath.Join(p.confDir, "secret"),
+	flagFilePath := filepath.Join(p.confDir, "launcher.flags")
+	flagFile, err := os.Create(filepath.Join(p.packageRoot, flagFilePath))
+	if err != nil {
+		return errors.Wrap(err, "creating flag file")
+	}
+	defer flagFile.Close()
+
+	launcherMapFlags := map[string]string{
+		"hostname":           p.Hostname,
+		"root_directory":     p.canonicalizePath(p.rootDir),
+		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
+		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
 	}
 
-	launcherFlags := []string{}
+	launcherBoolFlags := []string{}
 
 	if p.InitialRunner {
-		launcherFlags = append(launcherFlags, "--with_initial_runner")
+		launcherBoolFlags = append(launcherBoolFlags, "with_initial_runner")
 	}
 
 	if p.Control && p.ControlHostname != "" {
-		launcherEnv["KOLIDE_LAUNCHER_CONTROL_HOSTNAME"] = p.ControlHostname
+		launcherMapFlags["control_hostname"] = p.ControlHostname
 	}
 
 	if p.Autoupdate && p.UpdateChannel != "" {
-		launcherFlags = append(launcherFlags, "--autoupdate")
-		launcherEnv["KOLIDE_LAUNCHER_UPDATE_CHANNEL"] = p.UpdateChannel
+		launcherBoolFlags = append(launcherBoolFlags, "autoupdate")
+		launcherMapFlags["update_channel"] = p.UpdateChannel
 	}
 
 	if p.CertPins != "" {
-		launcherEnv["KOLIDE_LAUNCHER_CERT_PINS"] = p.CertPins
+		launcherMapFlags["cert_pins"] = p.CertPins
 	}
 
 	if p.DisableControlTLS {
-		launcherFlags = append(launcherFlags, "--disable_control_tls")
+		launcherBoolFlags = append(launcherBoolFlags, "disable_control_tls")
 	}
 
 	if p.InsecureGrpc {
-		launcherFlags = append(launcherFlags, "--insecure_grpc")
+		launcherBoolFlags = append(launcherBoolFlags, "insecure_grpc")
 	}
 
 	if p.Insecure {
-		launcherFlags = append(launcherFlags, "--insecure")
+		launcherBoolFlags = append(launcherBoolFlags, "insecure")
 	}
+
+	if p.RootPEM != "" {
+		rootPemPath := filepath.Join(p.confDir, "roots.pem")
+		launcherMapFlags["root_pem"] = p.canonicalizePath(rootPemPath)
+
+		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
+			return errors.Wrap(err, "copy root PEM")
+		}
+
+		if err := os.Chmod(filepath.Join(p.packageRoot, rootPemPath), 0600); err != nil {
+			return errors.Wrap(err, "chmod root PEM")
+		}
+	}
+
+	// Write the flags to the flagFile
+	for _, k := range launcherBoolFlags {
+		if _, err := flagFile.WriteString(fmt.Sprintf("%s\n", k)); err != nil {
+			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+		}
+	}
+	for k, v := range launcherMapFlags {
+		if _, err := flagFile.WriteString(fmt.Sprintf("%s %s\n", k, v)); err != nil {
+			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+		}
+	}
+
+	// Wixtoolset seems to get unhappy if the flagFile is open, and since
+	// we're done writing it, may as well close it.
+	flagFile.Close()
 
 	// Unless we're omitting the secret, write it into the package.
 	// Note that we _always_ set KOLIDE_LAUNCHER_ENROLL_SECRET_PATH
@@ -139,19 +175,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			secretPerms,
 		); err != nil {
 			return errors.Wrap(err, "could not write secret string to file for packaging")
-		}
-	}
-
-	if p.RootPEM != "" {
-		rootPemPath := filepath.Join(p.confDir, "roots.pem")
-		launcherEnv["KOLIDE_LAUNCHER_ROOT_PEM"] = rootPemPath
-
-		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
-			return errors.Wrap(err, "copy root PEM")
-		}
-
-		if err := os.Chmod(filepath.Join(p.packageRoot, rootPemPath), 0600); err != nil {
-			return errors.Wrap(err, "chmod root PEM")
 		}
 	}
 
@@ -199,8 +222,8 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Description: "The Kolide Launcher",
 		Path:        filepath.Join(p.binDir, "launcher"),
 		Identifier:  p.Identifier,
-		Flags:       launcherFlags,
-		Environment: launcherEnv,
+		Flags:       []string{"-config", flagFilePath},
+		Environment: map[string]string{},
 	}
 
 	if err := p.setupInit(ctx); err != nil {
@@ -222,6 +245,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Scripts:    p.scriptRoot,
 		SigningKey: p.SigningKey,
 		Version:    p.PackageVersion,
+		FlagFile:   p.canonicalizePath(flagFilePath),
 	}
 
 	if err := p.makePackage(ctx); err != nil {
@@ -288,7 +312,9 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	case p.target.Package == Msi:
-		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops); err != nil {
+		// pass whether to include a service as a bool argument to PackageWixMSI
+		includeService := p.target.Init == WindowsService
+		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops, includeService); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
 	default:
@@ -334,6 +360,11 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	return nil
 }
 
+// setupInit setups the init scripts.
+//
+// Note that windows is a special
+// case here -- they're not files on disk, instead it's an argument
+// passed in to wix. So this is a confusing split.
 func (p *PackageOptions) setupInit(ctx context.Context) error {
 	if p.target.Init == NoInit {
 		return nil
@@ -367,6 +398,9 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
 		}
+	case p.target.Platform == Windows && p.target.Init == WindowsService:
+		// Do nothing, this is handled in the packaging step.
+		return nil
 	default:
 		return errors.Errorf("Unsupported target %s", p.target.String())
 	}
@@ -555,13 +589,11 @@ func (p *PackageOptions) setupDirectories() error {
 	case Windows:
 		// On Windows, these paths end up rooted not at `c:`, but instead
 		// where the WiX template says. In our case, that's `c:\Program
-		// Files\Kolide` These do need the identigier, since we need WiX
+		// Files\Kolide` These do need the identifier, since we need WiX
 		// to take that into account for the guid generation.
-		//
-		//FIXME what should these be?
 		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
 		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
-		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data", sanitizeHostname(p.Hostname))
+		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data")
 	default:
 		return errors.Errorf("Unknown platform %s", string(p.target.Platform))
 	}
@@ -607,5 +639,26 @@ func (p *PackageOptions) execOut(ctx context.Context, argv0 string, args ...stri
 		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
 
+// canonicalizePath takes a path, and makes it into a full, absolute,
+// path. It is a hack around how the windows install process works,
+// and will likely need to be revisited.
+//
+// The windows process installs using _relative_ paths, which are
+// expanded to full paths inside the wix template. However, the flag
+// file needs full paths, and is generated here. Thus,
+// canonicalizePath encodes some things that should be left as
+// install-time variables controlled by wix and windows.
+//
+// Likely a longer term approach will involve one of:
+//  1. pull all the paths into the golang portion.
+//  2. Move flag file generation to wix
+//  3. utilize some environmental variable
+func (p *PackageOptions) canonicalizePath(path string) string {
+	if p.target.Package != Msi {
+		return path
+	}
+
+	return filepath.Join(`C:\Program Files\Kolide`, path)
 }

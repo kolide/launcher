@@ -2,6 +2,7 @@ vendor
 build
 bin
 .DS_Store
+test-cmds
 
 ## Below from https://github.com/github/gitignore/blob/master/Go.gitignore ##
 

@@ -163,3 +163,13 @@ As `ioutil.TempFile` respects the `TMPDIR` environmental variable, there is a si
 ``` shell
 export TMPDIR=/tmp
 ```
+
+#### Windows
+
+Windows can be built without a service `windows-none-msi` or with a
+service `windows-service-msi`.
+
+Note that the windows package will only install as `ALLUSERS`. You may
+need to use elevated privileges to install it. This will likely be
+confusing. `msiexec.exe` will either silently fail, or be
+inscrutable. But `start` will work.

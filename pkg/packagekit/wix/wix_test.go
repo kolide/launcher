@@ -52,6 +52,7 @@ func TestWixPackage(t *testing.T) {
 		SkipValidation(),          // wine can't validate
 		WithDocker("felfert/wix"), // TODO Use a Kolide distributed Dockerfile
 		WithWix("/opt/wix/bin"),
+		WithService(NewService("hello.txt")),
 	)
 	require.NoError(t, err)
 	defer wixTool.Cleanup()
@@ -66,7 +67,7 @@ func TestWixPackage(t *testing.T) {
 // which can mostly read MSI files.
 func verifyMsi(ctx context.Context, t *testing.T, outMsi *os.File) {
 	// Use the wix struct for its execOut
-	execWix := &wixOptions{execCC: exec.CommandContext}
+	execWix := &wixTool{execCC: exec.CommandContext}
 
 	fileContents, err := execWix.execOut(ctx, "7z", "x", "-so", outMsi.Name())
 	require.NoError(t, err)
