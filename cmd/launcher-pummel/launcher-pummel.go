@@ -181,7 +181,8 @@ func main() {
 				enrollSecret,
 				opts...,
 			)
-			time.Sleep(10 * time.Millisecond)
+			timer := time.NewTimer(10 * time.Millisecond)
+			<-timer.C
 		}
 	}
 

@@ -23,7 +23,8 @@ func main() {
 	timeout := time.Duration(*flTimeout) * time.Second
 
 	// allow for osqueryd to create the socket path
-	time.Sleep(2 * time.Second)
+	timer := time.NewTimer(time.Second * 2)
+	<-timer.C
 
 	// create an extension server
 	server, err := osquery.NewExtensionManagerServer(

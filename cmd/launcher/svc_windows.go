@@ -97,12 +97,18 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			case svc.Interrogate:
 				changes <- c.CurrentStatus
 				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-				time.Sleep(100 * time.Millisecond)
+				timer := time.NewTimer(100 * time.Millisecond)
+				<-timer.C
+
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
-				time.Sleep(100 * time.Millisecond)
+
+				// Sleep and let things exit
+				timer := time.NewTimer(100 * time.Millisecond)
+				<-timer.C
+
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return
 			default:
