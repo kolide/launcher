@@ -240,7 +240,7 @@ func developerUsage(flagset *flag.FlagSet) {
 	printOpt("debug")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("insecure")
-	printOpt("insecure_grpc")
+	printOpt("insecure_transport")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("logging_interval")
 	fmt.Fprintf(os.Stderr, "\n")

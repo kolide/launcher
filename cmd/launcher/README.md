@@ -35,9 +35,13 @@ To use The Launcher to easily connect osquery to a server that is compliant with
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5
 ```
 
-You can also define the enroll secret via a file path (`--enroll_secret_path`) or an environment variable (`KOLIDE_LAUNCHER_ENROLL_SECRET`). See `launcher --help` for more information.
+You can also define the enroll secret via a file path
+(`--enroll_secret_path`) or an environment variable
+(`KOLIDE_LAUNCHER_ENROLL_SECRET`). See `launcher --help` for more
+information.
 
-You may need to define the `--insecure` and/or `--insecure_grpc` flag depending on your server configurations.
+Depending on your transport configuration, you may need any of the
+`--transport`, `--insecure` or `--insecure_transport` flags.
 
 ### Running an extension socket
 
