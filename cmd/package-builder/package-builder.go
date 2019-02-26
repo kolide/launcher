@@ -74,10 +74,10 @@ func runMake(args []string) error {
 			env.Bool("INSECURE", false),
 			"whether or not the launcher packages should invoke the launcher's --insecure flag",
 		)
-		flInsecureGrpc = flagset.Bool(
-			"insecure_grpc",
-			env.Bool("INSECURE_GRPC", false),
-			"whether or not the launcher packages should invoke the launcher's --insecure_grpc flag",
+		flInsecureTransport = flagset.Bool(
+			"insecure_transport",
+			env.Bool("INSECURE_TRANSPORT", false),
+			"whether or not the launcher packages should invoke the launcher's --insecure_transport flag",
 		)
 		flAutoupdate = flagset.Bool(
 			"autoupdate",
@@ -195,7 +195,7 @@ func runMake(args []string) error {
 		Secret:            *flEnrollSecret,
 		SigningKey:        *flSigningKey,
 		Insecure:          *flInsecure,
-		InsecureGrpc:      *flInsecureGrpc,
+		InsecureTransport: *flInsecureTransport,
 		Autoupdate:        *flAutoupdate,
 		UpdateChannel:     *flUpdateChannel,
 		Control:           *flControl,
