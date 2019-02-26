@@ -36,7 +36,7 @@ Osquery allows you to ask a lot of great questions, but sometimes it's hard to k
 
 -	`select gatekeeper_enabled from kolide_best_practices`
 - `select remote_login_disabled from kolide_best_practices`
-- `select screensaver_password_enabled from kolide_best_practices`
+- ~`select screensaver_password_enabled from kolide_best_practices`~ see https://blog.kolide.com/screensaver-security-on-macos-10-13-is-broken-a385726e2ae2
 
 The following best practices, and many more, are included:
 
