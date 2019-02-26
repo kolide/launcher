@@ -33,6 +33,7 @@ type PackageOptions struct {
 	Hostname          string
 	Secret            string
 	SigningKey        string
+	Transport         string
 	Insecure          bool
 	InsecureTransport bool
 	Autoupdate        bool
@@ -127,6 +128,10 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.DisableControlTLS {
 		launcherBoolFlags = append(launcherBoolFlags, "disable_control_tls")
+	}
+
+	if p.Transport != "" {
+		launcherMapFlags["transport"] = p.Transport
 	}
 
 	if p.InsecureTransport {
