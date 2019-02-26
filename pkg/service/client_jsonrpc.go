@@ -43,7 +43,7 @@ func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Contex
 func NewJSONRPCClient(
 	serverURL string,
 	insecureTLS bool,
-	insecureJSONRPC bool,
+	insecureTransport bool,
 	certPins [][]byte,
 	rootPool *x509.CertPool,
 	logger log.Logger,
@@ -53,7 +53,7 @@ func NewJSONRPCClient(
 		Host:   serverURL,
 	}
 
-	if insecureJSONRPC {
+	if insecureTransport {
 		serviceURL.Scheme = "http"
 	}
 
@@ -63,7 +63,7 @@ func NewJSONRPCClient(
 			DisableKeepAlives: true,
 		},
 	}
-	if !insecureJSONRPC {
+	if !insecureTransport {
 		tlsConfig := makeTLSConfig(serverURL, insecureTLS, certPins, rootPool, logger)
 		httpClient.Transport = &http.Transport{
 			TLSClientConfig:   tlsConfig,

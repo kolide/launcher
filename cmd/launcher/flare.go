@@ -34,11 +34,11 @@ func runFlare(args []string) error {
 		flHostname = flag.String("hostname", "dababe.launcher.kolide.com:443", "")
 
 		// not documented via flags on purpose
-		enrollSecret    = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
-		serverURL       = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
-		insecureTLS     = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
-		insecureGRPC    = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
-		flareSocketPath = env.String("FLARE_SOCKET_PATH", filepath.Join(os.TempDir(), "flare.sock"))
+		enrollSecret      = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
+		serverURL         = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
+		insecureTLS       = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
+		insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
+		flareSocketPath   = env.String("FLARE_SOCKET_PATH", filepath.Join(os.TempDir(), "flare.sock"))
 
 		certPins [][]byte
 		rootPool *x509.CertPool
@@ -115,7 +115,7 @@ func runFlare(args []string) error {
 		logger,
 		serverURL,
 		insecureTLS,
-		insecureGRPC,
+		insecureTransport,
 		enrollSecret,
 		certPins,
 		rootPool,
@@ -259,7 +259,7 @@ func reportGRPCNetwork(
 	logger log.Logger,
 	serverURL string,
 	insecureTLS bool,
-	insecureGRPC bool,
+	insecureTransport bool,
 	enrollSecret string,
 	certPins [][]byte,
 	rootPool *x509.CertPool,
@@ -270,7 +270,7 @@ func reportGRPCNetwork(
 	conn, err := service.DialGRPC(
 		serverURL,
 		insecureTLS,
-		insecureGRPC,
+		insecureTransport,
 		certPins,
 		rootPool,
 		logger,

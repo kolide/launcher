@@ -102,7 +102,7 @@ func NewGRPCClient(conn *grpc.ClientConn, logger log.Logger) KolideService {
 func DialGRPC(
 	serverURL string,
 	insecureTLS bool,
-	insecureGRPC bool,
+	insecureTransport bool,
 	certPins [][]byte,
 	rootPool *x509.CertPool,
 	logger log.Logger,
@@ -112,13 +112,13 @@ func DialGRPC(
 		"msg", "dialing grpc server",
 		"server", serverURL,
 		"tls_secure", insecureTLS == false,
-		"grpc_secure", insecureGRPC == false,
+		"transport_secure", insecureTransport == false,
 		"cert_pinning", len(certPins) > 0,
 	)
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTimeout(time.Second),
 	}
-	if insecureGRPC {
+	if insecureTransport {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	} else {
 		host, _, err := net.SplitHostPort(serverURL)

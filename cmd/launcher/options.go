@@ -37,8 +37,7 @@ type options struct {
 	debug              bool
 	disableControlTLS  bool
 	insecureTLS        bool
-	insecureGRPC       bool
-	insecureJSONRPC    bool
+	insecureTransport  bool
 	notaryServerURL    string
 	mirrorServerURL    string
 	autoupdateInterval time.Duration
@@ -85,8 +84,7 @@ func parseOptions(args []string) (*options, error) {
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
-		flInsecureGRPC      = flagset.Bool("insecure_grpc", false, "Dial GRPC without a TLS config (default: false)")
-		flInsecureJSONRPC   = flagset.Bool("insecure_jsonrpc", false, "Use JSONPRC without a tls config (default: false)")
+		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
 	ff.Parse(flagset, args,
@@ -160,8 +158,7 @@ func parseOptions(args []string) (*options, error) {
 		debug:               *flDebug,
 		disableControlTLS:   *flDisableControlTLS,
 		insecureTLS:         *flInsecureTLS,
-		insecureGRPC:        *flInsecureGRPC,
-		insecureJSONRPC:     *flInsecureJSONRPC,
+		insecureTransport:   *flInsecureTransport,
 		notaryServerURL:     *flNotaryServerURL,
 		mirrorServerURL:     *flMirrorURL,
 		autoupdateInterval:  *flAutoupdateInterval,
