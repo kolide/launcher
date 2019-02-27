@@ -69,15 +69,20 @@ func runMake(args []string) error {
 			env.String("SIGNING_KEY", ""),
 			"The name of the key that should be used to packages. Behavior is platform and packaging specific",
 		)
+		flTransport = flagset.String(
+			"transport",
+			env.String("TRANSPORT", ""),
+			"Transport for launcher. Expected as grpc, jsonrpc. Default is up to launcher",
+		)
 		flInsecure = flagset.Bool(
 			"insecure",
 			env.Bool("INSECURE", false),
 			"whether or not the launcher packages should invoke the launcher's --insecure flag",
 		)
-		flInsecureGrpc = flagset.Bool(
-			"insecure_grpc",
-			env.Bool("INSECURE_GRPC", false),
-			"whether or not the launcher packages should invoke the launcher's --insecure_grpc flag",
+		flInsecureTransport = flagset.Bool(
+			"insecure_transport",
+			env.Bool("INSECURE_TRANSPORT", false),
+			"whether or not the launcher packages should invoke the launcher's --insecure_transport flag",
 		)
 		flAutoupdate = flagset.Bool(
 			"autoupdate",
@@ -194,8 +199,9 @@ func runMake(args []string) error {
 		Hostname:          *flHostname,
 		Secret:            *flEnrollSecret,
 		SigningKey:        *flSigningKey,
+		Transport:         *flTransport,
 		Insecure:          *flInsecure,
-		InsecureGrpc:      *flInsecureGrpc,
+		InsecureTransport: *flInsecureTransport,
 		Autoupdate:        *flAutoupdate,
 		UpdateChannel:     *flUpdateChannel,
 		Control:           *flControl,

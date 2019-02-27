@@ -55,10 +55,10 @@ func main() {
 		enrollSecret  = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "")
 		rootDirectory = env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", "")
 
-		serverURL       = env.String("KOLIDE_LAUNCHER_HOSTNAME", "")
-		insecureTLS     = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
-		insecureGRPC    = env.Bool("KOLIDE_LAUNCHER_INSECURE_GRPC", false)
-		loggingInterval = env.Duration("KOLIDE_LAUNCHER_LOGGING_INTERVAL", 60*time.Second)
+		serverURL         = env.String("KOLIDE_LAUNCHER_HOSTNAME", "")
+		insecureTLS       = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
+		insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
+		loggingInterval   = env.Duration("KOLIDE_LAUNCHER_LOGGING_INTERVAL", 60*time.Second)
 
 		// TODO(future pr): these values are unset
 		// they'll have to be parsed from a string
@@ -68,7 +68,7 @@ func main() {
 	conn, err := service.DialGRPC(
 		serverURL,
 		insecureTLS,
-		insecureGRPC,
+		insecureTransport,
 		certPins,
 		rootPool,
 		logger,

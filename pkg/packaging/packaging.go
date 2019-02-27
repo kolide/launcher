@@ -33,8 +33,9 @@ type PackageOptions struct {
 	Hostname          string
 	Secret            string
 	SigningKey        string
+	Transport         string
 	Insecure          bool
-	InsecureGrpc      bool
+	InsecureTransport bool
 	Autoupdate        bool
 	UpdateChannel     string
 	Control           bool
@@ -129,8 +130,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherBoolFlags = append(launcherBoolFlags, "disable_control_tls")
 	}
 
-	if p.InsecureGrpc {
-		launcherBoolFlags = append(launcherBoolFlags, "insecure_grpc")
+	if p.Transport != "" {
+		launcherMapFlags["transport"] = p.Transport
+	}
+
+	if p.InsecureTransport {
+		launcherBoolFlags = append(launcherBoolFlags, "insecure_transport")
 	}
 
 	if p.Insecure {

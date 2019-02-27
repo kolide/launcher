@@ -250,7 +250,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	{
 		switch opts.transport {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureGRPC, opts.certPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureTransport, opts.certPins, rootPool, logger)
 			if err != nil {
 				return errors.Wrap(err, "dialing grpc server")
 			}
@@ -259,7 +259,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureJSONRPC, opts.certPins, rootPool, logger)
+			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureTransport, opts.certPins, rootPool, logger)
 		default:
 			return errors.New("invalid transport option selected")
 		}
