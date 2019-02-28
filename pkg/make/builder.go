@@ -396,6 +396,8 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 				return err
 			}
 
+			taggedVersion := strings.Join([]string{v, buildTagFS()}, "")
+
 			branch, err := b.execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
 				return err
@@ -412,7 +414,7 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			}
 
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.appName=%s"`, appName))
-			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, v))
+			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, taggedVersion))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.branch=%s"`, branch))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.revision=%s"`, revision))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Now().UTC().Format("2006-01-02")))
