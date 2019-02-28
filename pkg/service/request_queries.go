@@ -21,32 +21,19 @@ type queriesRequest struct {
 
 type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
-	NodeInvalid bool  `json:"node_invalid"`
-	Err         error `json:"error_code"`
+	NodeInvalid bool   `json:"node_invalid"`
+	ErrorCode   string `json:"error_code"`
+	Err         error
 }
 
 func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
 	if res.Error != nil {
 		return nil, *res.Error
 	}
-
-	// Can't unmarshal errors, as they're interfaces. So we unmarshal to
-	// an intermediary first.
-	var tmpResult = struct {
-		Queries     distributed.GetQueriesResult
-		NodeInvalid bool   `json:"node_invalid"`
-		Err         string `json:"error_code"`
-	}{}
-
-	err := json.Unmarshal(res.Result, &tmpResult)
+	var result queryCollectionResponse
+	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshalling RequestQueries response")
-	}
-
-	result := queryCollectionResponse{
-		Queries:     tmpResult.Queries,
-		NodeInvalid: tmpResult.NodeInvalid,
-		Err:         errors.New(tmpResult.Err),
 	}
 
 	return result, nil

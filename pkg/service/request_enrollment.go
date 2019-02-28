@@ -37,7 +37,8 @@ type EnrollmentDetails struct {
 type enrollmentResponse struct {
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
-	Err         error  `json:"error_code"`
+	ErrorCode   string `json:"error_code"`
+	Err         error
 }
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -70,25 +71,12 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 	if res.Error != nil {
 		return nil, *res.Error
 	}
-
-	// Can't unmarshal errors, as they're interfaces. So we unmarshal to
-	// an intermediary first.
-	var tmpResult = struct {
-		NodeKey     string `json:"node_key"`
-		NodeInvalid bool   `json:"node_invalid"`
-		Err         string `json:"error_code"`
-	}{}
-
-	err := json.Unmarshal(res.Result, &tmpResult)
+	var result enrollmentResponse
+	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshalling RequestEnrollment response")
 	}
 
-	result := enrollmentResponse{
-		NodeKey:     tmpResult.NodeKey,
-		NodeInvalid: tmpResult.NodeInvalid,
-		Err:         errors.New(tmpResult.Err),
-	}
 	return result, nil
 }
 
