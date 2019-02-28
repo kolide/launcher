@@ -29,11 +29,26 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	if res.Error != nil {
 		return nil, *res.Error
 	}
-	var result queryCollectionResponse
-	err := json.Unmarshal(res.Result, &result)
+
+	// Can't unmarshal errors, as they're interfaces. So we unmarshal to
+	// an intermediary first.
+	var tmpResult = struct {
+		Queries     distributed.GetQueriesResult
+		NodeInvalid bool   `json:"node_invalid"`
+		Err         string `json:"error_code"`
+	}{}
+
+	err := json.Unmarshal(res.Result, &tmpResult)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshalling RequestQueries response")
 	}
+
+	result := queryCollectionResponse{
+		Queries:     tmpResult.Queries,
+		NodeInvalid: tmpResult.NodeInvalid,
+		Err:         errors.New(tmpResult.Err),
+	}
+
 	return result, nil
 }
 
