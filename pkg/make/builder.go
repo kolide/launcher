@@ -20,6 +20,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -403,9 +404,9 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-w -d -linkmode internal")
 		}
 		if b.stampVersion {
-			v, err := b.execOut(ctx, "git", "describe", "--tags", "--always", "--dirty")
+			v, err := b.getVersion(ctx)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "getVersion")
 			}
 
 			if b.fakedata {
@@ -414,12 +415,12 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 
 			branch, err := b.execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
-				return err
+				return errors.Wrap(err, "git for branch")
 			}
 
 			revision, err := b.execOut(ctx, "git", "rev-parse", "HEAD")
 			if err != nil {
-				return err
+				return errors.Wrap(err, "git for revision")
 			}
 
 			usr, err := user.Current()
@@ -465,6 +466,48 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 		}
 		return nil
 	}
+}
+
+// getVersion uses `git describe` to determine the version of the
+// running code. The underlying functionality is as simple as
+// strings.TrimPrefix, but there is some additional sanity checking
+// with a regex.
+func (b *Builder) getVersion(ctx context.Context) (string, error) {
+	gitVersion, err := b.execOut(ctx, "git", "describe", "--tags", "--always", "--dirty")
+	if err != nil {
+		return "", errors.Wrap(err, "git describe")
+	}
+
+	// The `-` is included in the "additional" part of the regex, to
+	// make the later concatination correct.
+	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:(-.+))?`)
+	if err != nil {
+		return "", errors.Wrap(err, "bad regex")
+	}
+
+	// regex match and check the results
+	matches := versionRegex.FindAllStringSubmatch(gitVersion, -1)
+
+	if len(matches) == 0 {
+		return "", errors.Errorf(`Version "%s" did not match expected format`, gitVersion)
+	}
+
+	if len(matches[0]) != 5 {
+		return "", errors.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), gitVersion)
+	}
+
+	major := matches[0][1]
+	minor := matches[0][2]
+	patch := matches[0][3]
+	additional := matches[0][4]
+
+	if patch == "" {
+		patch = "0"
+	}
+
+	version := fmt.Sprintf("%s.%s.%s%s", major, minor, patch, additional)
+
+	return version, nil
 }
 
 func (b *Builder) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
