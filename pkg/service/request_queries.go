@@ -21,8 +21,9 @@ type queriesRequest struct {
 
 type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
-	NodeInvalid bool  `json:"node_invalid"`
-	Err         error `json:"error_code"`
+	NodeInvalid bool   `json:"node_invalid"`
+	ErrorCode   string `json:"error_code"`
+	Err         error
 }
 
 func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
@@ -34,6 +35,7 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshalling RequestQueries response")
 	}
+
 	return result, nil
 }
 

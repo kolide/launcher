@@ -37,7 +37,8 @@ type EnrollmentDetails struct {
 type enrollmentResponse struct {
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
-	Err         error  `json:"error_code"`
+	ErrorCode   string `json:"error_code"`
+	Err         error
 }
 
 func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
