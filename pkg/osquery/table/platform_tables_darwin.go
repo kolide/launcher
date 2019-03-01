@@ -22,6 +22,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		GDriveSyncConfig(client, logger),
 		GDriveSyncHistoryInfo(client, logger),
 		KolideVulnerabilities(client, logger),
+		LauncherInfoTable(),
 		MachoInfo(),
 		MacOSUpdate(client),
 		MDMInfo(logger),
