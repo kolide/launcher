@@ -804,9 +804,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		system_info.hardware_model,
 		system_info.hardware_serial,
 		system_info.hardware_vendor,
-		system_info.hostname,
-		kolide_launcher_info.goos,
-		kolide_launcher_info.goarch
+		system_info.hostname
 	FROM
 		os_version,
 		system_info,
@@ -850,13 +848,6 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["hostname"]; ok {
 		details.Hostname = val
 	}
-	if val, ok := resp[0]["goos"]; ok {
-		details.GOOS = val
-	}
-	if val, ok := resp[0]["goarch"]; ok {
-		details.GOARCH = val
-	}
-
 	spew.Dump("seph")
 	spew.Dump(details)
 
