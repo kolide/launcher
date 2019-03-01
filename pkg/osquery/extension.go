@@ -6,11 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
@@ -852,9 +854,16 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		details.GOARCH = val
 	}
 
-	// Using the version field from the binary.
-	// The extension uses the same value to build the table, but the query runs before the extension tables are registered.
+	spew.Dump("seph")
+	spew.Dump(details)
+
+	// This runs before the extensions are registered. These mirror the
+	// underlying tables.
 	details.LauncherVersion = version.Version().Version
+	details.GOOS = runtime.GOOS
+	details.GOARCH = runtime.GOARCH
+
+	spew.Dump(details)
 
 	return details, nil
 }
