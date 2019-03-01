@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/kolide/osquery-go"
 )
@@ -15,9 +17,16 @@ func main() {
 		flSocketPath = flag.String("socket", "", "")
 		flTimeout    = flag.Int("timeout", 0, "")
 		flVerbose    = flag.Bool("verbose", false, "")
+		flVersion    = flag.Bool("version", false, "Print  version and exit")
 		_            = flag.Int("interval", 0, "")
 	)
 	flag.Parse()
+
+	if *flVersion {
+		version.PrintFull()
+		os.Exit(0)
+	}
+
 	logger := logutil.NewServerLogger(*flVerbose)
 
 	timeout := time.Duration(*flTimeout) * time.Second
