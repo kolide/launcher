@@ -325,11 +325,14 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-	backoff := backoff.New(backoff.MaxAttempts(5))
-	backoff.Run(func() error {
+	backoff := backoff.New(backoff.MaxAttempts(10))
+	if err := backoff.Run(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	})
+	}); err != nil {
+		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+	}
+
 
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
