@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
@@ -332,7 +331,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}); err != nil {
 		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
 	}
-
 
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
@@ -793,6 +791,7 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	fmt.Println("seph 1")
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,
@@ -813,8 +812,11 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
+		fmt.Println("seph fail 1")
 		return details, errors.Wrap(err, "query enrollment details")
 	}
+
+	fmt.Println("seph 2")
 
 	if len(resp) < 1 {
 		return details, errors.New("expected at least one row from the enrollment details query")
@@ -848,16 +850,12 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["hostname"]; ok {
 		details.Hostname = val
 	}
-	spew.Dump("seph")
-	spew.Dump(details)
 
 	// This runs before the extensions are registered. These mirror the
 	// underlying tables.
 	details.LauncherVersion = version.Version().Version
 	details.GOOS = runtime.GOOS
 	details.GOARCH = runtime.GOARCH
-
-	spew.Dump(details)
 
 	return details, nil
 }
