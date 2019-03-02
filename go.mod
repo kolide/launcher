@@ -10,6 +10,7 @@ require (
 	github.com/Sirupsen/logrus v1.0.3 // indirect
 	github.com/WatchBeam/clock v0.0.0-20170901150240-b08e6b4da7ea // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
+	github.com/alexkohler/nakedret v0.0.0-20171106223215-c0e305a4f690
 	github.com/bitly/go-hostpool v0.0.0-20171023180738-a3a6125de932 // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
@@ -17,6 +18,7 @@ require (
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
+	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
@@ -57,6 +59,7 @@ require (
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf
+	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
 	go.opencensus.io v0.18.0
 	golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
