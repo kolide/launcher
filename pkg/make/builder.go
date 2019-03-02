@@ -42,6 +42,7 @@ type Builder struct {
 	static       bool
 	race         bool
 	stampVersion bool
+	fakedata     bool
 
 	goVer  *semver.Version
 	cmdEnv []string
@@ -77,6 +78,12 @@ func WithRace() Option {
 func WithStampVersion() Option {
 	return func(b *Builder) {
 		b.stampVersion = true
+	}
+}
+
+func WithFakeData() Option {
+	return func(b *Builder) {
+		b.fakedata = true
 	}
 }
 
@@ -386,6 +393,11 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 		if b.race {
 			baseArgs = append(baseArgs, "-race")
 		}
+
+		if b.fakedata {
+			baseArgs = append(baseArgs, "-tags", "fakeserial")
+		}
+
 		var ldFlags []string
 		if b.static {
 			ldFlags = append(ldFlags, "-w -d -linkmode internal")
@@ -396,7 +408,9 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 				return err
 			}
 
-			taggedVersion := strings.Join([]string{v, buildTagFS()}, "")
+			if b.fakedata {
+				v = fmt.Sprintf("%s-fakedata", v)
+			}
 
 			branch, err := b.execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
@@ -414,13 +428,14 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			}
 
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.appName=%s"`, appName))
-			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, taggedVersion))
+			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, v))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.branch=%s"`, branch))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.revision=%s"`, revision))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Now().UTC().Format("2006-01-02")))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildUser=%s (%s)"`, usr.Name, usr.Username))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
 		}
+
 		if len(ldFlags) != 0 {
 			baseArgs = append(baseArgs, fmt.Sprintf("--ldflags=%s", strings.Join(ldFlags, " ")))
 		}

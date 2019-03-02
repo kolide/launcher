@@ -26,6 +26,7 @@ func main() {
 		flRace         = flag.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic       = flag.Bool("static", false, "Build a static binary.")
 		flStampVersion = flag.Bool("linkstamp", false, "Add version info with ldflags.")
+		flFakeData     = flag.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
 	)
 	flag.Parse()
 
@@ -45,6 +46,9 @@ func main() {
 	}
 	if *flStampVersion {
 		opts = append(opts, make.WithStampVersion())
+	}
+	if *flFakeData {
+		opts = append(opts, make.WithFakeData())
 	}
 
 	b, err := make.New(opts...)
