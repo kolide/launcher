@@ -428,7 +428,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		}
 
 		if !reenroll {
-			return "", errors.New("enrollment invalid, reenroll disabled")
+			return "", errors.Wrap(err, "enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
@@ -791,7 +791,6 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
-	fmt.Println("seph 1")
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,
@@ -812,11 +811,8 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
-		fmt.Println("seph fail 1")
 		return details, errors.Wrap(err, "query enrollment details")
 	}
-
-	fmt.Println("seph 2")
 
 	if len(resp) < 1 {
 		return details, errors.New("expected at least one row from the enrollment details query")
