@@ -265,9 +265,21 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	err = syscall.Kill(osqueryPID, syscall.SIGKILL)
 	require.NoError(t, err)
 
+	// We need to (a) let the runner restart osquery, and (b) wait for
+	// the extension to die. Both of these may take up to 30s. We'll
+	// start a clock, wait for the respawn, and after 32s, test that the
+	// extension process is no longer running. See
+	// https://github.com/kolide/launcher/pull/342 and associated for
+	// background.
+	timer1 := time.NewTimer(32 * time.Second)
+
+	// Wait for osquery to respawn
 	waitHealthy(t, runner)
 
-	// check that the extension process is no longer running
+	// Ensure we've waited at least 32s
+	<-timer1.C
+
+	// check that the extension process is no longer running Under some
 	extpgid, err := syscall.Getpgid(extensionPid)
 	require.EqualError(t, err, "no such process")
 	require.Equal(t, extpgid, -1)
