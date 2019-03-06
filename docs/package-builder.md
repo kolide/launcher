@@ -97,7 +97,7 @@ Or to build signed:
 
 ```
 # Replace this with your codesign information
-export CODESIGN_IDENTITY='Developer ID Application: Acme Inc (ABCDEF123456)'
+export CODESIGN_IDENTITY='Developer ID Application: Example Inc (ABCDEF123456)'
 make xp-codesign
 ```
 

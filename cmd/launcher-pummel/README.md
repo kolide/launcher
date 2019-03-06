@@ -15,7 +15,7 @@ make launcher-pummel
 ```
 ./build/launcher-pummel \
   --host_path=./path/to/my/host/templates \
-  --server_url=fleet.acme.co \
+  --server_url=fleet.example.co \
   --enroll_secret=mB3XE5kwLt3YryD9FAanjwhm02HoOqll \
   --hosts=mac:100,windows:20,linux:5000
 ```

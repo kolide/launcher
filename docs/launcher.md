@@ -12,13 +12,23 @@ make launcher
 ./build/launcher --help
 ```
 
-Note that this style of build is generally only for development instances of Launcher. You should have `osqueryd` already installed on your system, as `launcher` will fall-back to looking for it in your `$PATH` in this case. For additional, more distributable, build options and commands, see the [Additional Build Options](#additional-build-options) section.
+Note that this style of build is generally only for development
+instances of Launcher. You should have `osqueryd` already installed on
+your system, as `launcher` will fall-back to looking for it in your
+`$PATH` in this case. For additional, more distributable, build
+options and commands, see the [Additional Build
+Options](#additional-build-options) section.
 
-For more distributable packages of Launcher and Osquery, consider using the [`package-builder`](./package-builder.md) tool that is provided with this repository.
+For more distributable packages of Launcher and Osquery, consider
+using the [`package-builder`](./package-builder.md) tool that is
+provided with this repository.
 
 ## General Usage
 
-To use The Launcher to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto), invoke the binary with just a few flags:
+To use The Launcher to easily connect osquery to a server that is
+compliant with the [gRPC
+specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto),
+invoke the binary with just a few flags:
 
 - `--hostname`: the hostname of the gRPC server for your environment
 - `--root_directory`: the location of the local database, pidfiles, etc.
@@ -27,14 +37,29 @@ To use The Launcher to easily connect osquery to a server that is compliant with
 
 ```
 ./build/launcher \
-  --hostname=fleet.acme.net:443 \
+  --hostname=fleet.example.net:443 \
   --root_directory=/var/kolide-fleet \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5
 ```
 
-You can also define the enroll secret via a file path (`--enroll_secret_path`) or an environment variable (`KOLIDE_LAUNCHER_ENROLL_SECRET`). See `launcher --help` for more information.
+You may need to define the `--insecure` and/or `--insecure_grpc` flag
+depending on your server configurations.
 
-You may need to define the `--insecure` and/or `--insecure_grpc` flag depending on your server configurations.
+## Configuring Launcher
+
+Launcher supports runtime configuration via three mechanisms. It reads
+environmental variables, then a config file, and lastly command line
+flags. As an example, to set the hostname, you would do one of:
+
+1. set the environmental variable `KOLIDE_LAUNCHER_HOSTNAME=fleet.example.net:443`
+1. Include `hostname fleet.example.net:443` in a config.flags file
+1. invoke with `--hostname=fleet.example.net:443` on the command line
+
+While any of these can be used in conjunction with your init system,
+we generally recommend using config files for simplicity. As a side
+note, environmental variables on windows are global, and thus
+contraindicated for configuration data.
+
 
 ## Override Osquery Flags
 
@@ -64,13 +89,13 @@ Because of likely breakage, the following flags cannot be overridden:
 
 ### Connecting to Fleet
 
-Let's say that you have [Kolide Fleet](https://github.com/kolide/fleet) running at https://fleet.acme.org, you could simply run the following to connect The Launcher to Fleet (assuming you replace the enroll secret with the correct string):
+Let's say that you have [Kolide Fleet](https://github.com/kolide/fleet) running at https://fleet.example.org, you could simply run the following to connect The Launcher to Fleet (assuming you replace the enroll secret with the correct string):
 
 ```
 launcher \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5 \
-  --hostname=fleet.acme.org:443 \
-  --root_directory=/var/acme/fleet
+  --hostname=fleet.example.org:443 \
+  --root_directory=/var/launcher/fleet
 ```
 
 If you're running Fleet on the default development location (https://localhost:8080), you can connect a launcher via:
@@ -79,7 +104,7 @@ If you're running Fleet on the default development location (https://localhost:8
 mkdir /tmp/fleet-launcher
 launcher \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5 \
-  --hostname=fleet.acme.org:443 \
+  --hostname=fleet.example.org:443 \
   --root_directory=/tmp/fleet-launcher \
   --insecure
 ```
