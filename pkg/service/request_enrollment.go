@@ -32,6 +32,8 @@ type EnrollmentDetails struct {
 	LauncherVersion string `json:"launcher_version"`
 	OSName          string `json:"os_name"`
 	OSPlatformLike  string `json:"os_platform_like"`
+	GOOS            string `json:"goos"`
+	GOARCH          string `json:"goarch"`
 }
 
 type enrollmentResponse struct {

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -323,11 +324,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-	backoff := backoff.New(backoff.MaxAttempts(5))
-	backoff.Run(func() error {
+	backoff := backoff.New(backoff.MaxAttempts(10))
+	if err := backoff.Run(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	})
+	}); err != nil {
+		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+	}
 
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
@@ -425,7 +428,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		}
 
 		if !reenroll {
-			return "", errors.New("enrollment invalid, reenroll disabled")
+			return "", errors.Wrap(err, "enrollment invalid, reenroll disabled")
 		}
 
 		e.RequireReenroll(ctx)
@@ -844,9 +847,11 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		details.Hostname = val
 	}
 
-	// Using the version field from the binary.
-	// The extension uses the same value to build the table, but the query runs before the extension tables are registered.
+	// This runs before the extensions are registered. These mirror the
+	// underlying tables.
 	details.LauncherVersion = version.Version().Version
+	details.GOOS = runtime.GOOS
+	details.GOARCH = runtime.GOARCH
 
 	return details, nil
 }

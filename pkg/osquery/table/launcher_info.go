@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -15,6 +16,8 @@ func LauncherInfoTable() *table.Plugin {
 		table.TextColumn("revision"),
 		table.TextColumn("build_date"),
 		table.TextColumn("build_user"),
+		table.TextColumn("goos"),
+		table.TextColumn("goarch"),
 	}
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable())
 }
@@ -29,6 +32,8 @@ func generateLauncherInfoTable() table.GenerateFunc {
 				"revision":   version.Version().Revision,
 				"build_date": version.Version().BuildDate,
 				"build_user": version.Version().BuildUser,
+				"goos":       runtime.GOOS,
+				"goarch":     runtime.GOARCH,
 			},
 		}
 
