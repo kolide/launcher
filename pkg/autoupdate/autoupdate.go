@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/updater/tuf"
@@ -39,15 +40,16 @@ const (
 
 // Updater is a TUF autoupdater.
 type Updater struct {
-	settings      *tuf.Settings
-	client        *http.Client
-	finalizer     func() error
-	stagingPath   string
-	destination   string
-	target        string
-	updateChannel UpdateChannel
-	logger        log.Logger
-	bootstrapFn   func() error
+	settings           *tuf.Settings
+	client             *http.Client
+	finalizer          func() error
+	stagingPath        string
+	destination        string
+	target             string
+	updateChannel      UpdateChannel
+	logger             log.Logger
+	bootstrapFn        func() error
+	strippedBinaryName string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
@@ -59,9 +61,10 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	// extension. The suffix is inconistent. package-builder has a lot
 	// of gnarly code around that. We may need to import it.
 	binaryName := filepath.Base(binaryPath)
-	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strings.TrimSuffix(binaryName, ".exe")))
+	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
+	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := fmt.Sprintf("kolide/%s", binaryName)
+	gun := fmt.Sprintf("kolide/%s", strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
@@ -71,13 +74,14 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	}
 
 	updater := Updater{
-		settings:      &settings,
-		destination:   binaryPath,
-		stagingPath:   stagingPath,
-		updateChannel: Stable,
-		client:        http.DefaultClient,
-		logger:        logger,
-		finalizer:     func() error { return nil },
+		settings:           &settings,
+		destination:        binaryPath,
+		stagingPath:        stagingPath,
+		updateChannel:      Stable,
+		client:             http.DefaultClient,
+		logger:             logger,
+		finalizer:          func() error { return nil },
+		strippedBinaryName: strippedBinaryName,
 	}
 
 	// create TUF from local assets, but allow overriding with a no-op in tests.
@@ -228,6 +232,16 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 	for _, opt := range opts {
 		updaterOpts = append(updaterOpts, opt)
 	}
+
+	level.Debug(u.logger).Log(
+		"msg", "Running Updater",
+		"targetName", u.target,
+		"strippedBinaryName", u.strippedBinaryName,
+		"LocalRepoPath", u.settings.LocalRepoPath,
+		"GUN", u.settings.GUN,
+		"stagingPath", u.stagingPath,
+	)
+
 	client, err := tuf.NewClient(
 		u.settings,
 		updaterOpts...,
@@ -286,8 +300,8 @@ func (u *Updater) setTargetPath() (string, error) {
 		return "", err
 	}
 
-	// filename = <binary>-<update-channel>.tar.gz
-	filename := fmt.Sprintf("%s-%s", filepath.Base(u.destination), u.updateChannel)
+	// filename = <strippedBinaryName>-<update-channel>.tar.gz
+	filename := fmt.Sprintf("%s-%s", u.strippedBinaryName, u.updateChannel)
 	base := path.Join(string(platform), filename)
 	return fmt.Sprintf("%s.tar.gz", base), nil
 }
