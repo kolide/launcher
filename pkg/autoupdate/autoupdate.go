@@ -12,9 +12,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/updater/tuf"
@@ -53,8 +53,13 @@ type Updater struct {
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
 func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
+	// There's some chaos between windows and non-windows. In windows,
+	// the binaryName ends in .exe, in posix it does not. So, a simple
+	// TrimSuffix will handle. *However* this will break if we add the
+	// extension. The suffix is inconistent. package-builder has a lot
+	// of gnarly code around that. We may need to import it.
 	binaryName := filepath.Base(binaryPath)
-	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", binaryName))
+	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strings.TrimSuffix(binaryName, ".exe")))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
 	gun := fmt.Sprintf("kolide/%s", binaryName)
 
@@ -96,12 +101,6 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 
 // bootstraps local TUF metadata from bindata assets.
 func (u *Updater) createLocalTufRepo() error {
-	// We don't want to overwrite an existing repo as it stores state between installations
-	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
-		level.Debug(u.logger).Log("msg", "not creating new TUF repositories because they already exist")
-		return nil
-	}
-
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
 		return err
 	}
@@ -129,6 +128,16 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 
 		// if fullAssetPath is a json file, we should copy it to localPath
 		if filepath.Ext(fullAssetPath) == ".json" {
+			// We need to ensure the file exists, but if it exists it has
+			// additional state. So, create when not present. This helps
+			// with an issue where the directory would be created, but the
+			// files not yet yet there -- Generating an invalid state. Note:
+			// this does not check the validity of the files, they might be
+			// corrupt.
+			if _, err := os.Stat(fullAssetPath); !os.IsNotExist(err) {
+				continue
+			}
+
 			asset, err := Asset(fullAssetPath)
 			if err != nil {
 				return errors.Wrap(err, "could not get asset")
