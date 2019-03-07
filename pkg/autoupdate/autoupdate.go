@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -39,24 +40,31 @@ const (
 
 // Updater is a TUF autoupdater.
 type Updater struct {
-	settings      *tuf.Settings
-	client        *http.Client
-	finalizer     func() error
-	stagingPath   string
-	destination   string
-	target        string
-	updateChannel UpdateChannel
-	logger        log.Logger
-	bootstrapFn   func() error
+	settings           *tuf.Settings
+	client             *http.Client
+	finalizer          func() error
+	stagingPath        string
+	destination        string
+	target             string
+	updateChannel      UpdateChannel
+	logger             log.Logger
+	bootstrapFn        func() error
+	strippedBinaryName string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
 func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
+	// There's some chaos between windows and non-windows. In windows,
+	// the binaryName ends in .exe, in posix it does not. So, a simple
+	// TrimSuffix will handle. *However* this will break if we add the
+	// extension. The suffix is inconistent. package-builder has a lot
+	// of gnarly code around that. We may need to import it.
 	binaryName := filepath.Base(binaryPath)
-	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", binaryName))
+	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
+	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := fmt.Sprintf("kolide/%s", binaryName)
+	gun := fmt.Sprintf("kolide/%s", strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
@@ -66,13 +74,14 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	}
 
 	updater := Updater{
-		settings:      &settings,
-		destination:   binaryPath,
-		stagingPath:   stagingPath,
-		updateChannel: Stable,
-		client:        http.DefaultClient,
-		logger:        logger,
-		finalizer:     func() error { return nil },
+		settings:           &settings,
+		destination:        binaryPath,
+		stagingPath:        stagingPath,
+		updateChannel:      Stable,
+		client:             http.DefaultClient,
+		logger:             logger,
+		finalizer:          func() error { return nil },
+		strippedBinaryName: strippedBinaryName,
 	}
 
 	// create TUF from local assets, but allow overriding with a no-op in tests.
@@ -96,12 +105,6 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 
 // bootstraps local TUF metadata from bindata assets.
 func (u *Updater) createLocalTufRepo() error {
-	// We don't want to overwrite an existing repo as it stores state between installations
-	if _, err := os.Stat(u.settings.LocalRepoPath); !os.IsNotExist(err) {
-		level.Debug(u.logger).Log("msg", "not creating new TUF repositories because they already exist")
-		return nil
-	}
-
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
 		return err
 	}
@@ -129,6 +132,16 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 
 		// if fullAssetPath is a json file, we should copy it to localPath
 		if filepath.Ext(fullAssetPath) == ".json" {
+			// We need to ensure the file exists, but if it exists it has
+			// additional state. So, create when not present. This helps
+			// with an issue where the directory would be created, but the
+			// files not yet yet there -- Generating an invalid state. Note:
+			// this does not check the validity of the files, they might be
+			// corrupt.
+			if _, err := os.Stat(fullAssetPath); !os.IsNotExist(err) {
+				continue
+			}
+
 			asset, err := Asset(fullAssetPath)
 			if err != nil {
 				return errors.Wrap(err, "could not get asset")
@@ -219,6 +232,16 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 	for _, opt := range opts {
 		updaterOpts = append(updaterOpts, opt)
 	}
+
+	level.Debug(u.logger).Log(
+		"msg", "Running Updater",
+		"targetName", u.target,
+		"strippedBinaryName", u.strippedBinaryName,
+		"LocalRepoPath", u.settings.LocalRepoPath,
+		"GUN", u.settings.GUN,
+		"stagingPath", u.stagingPath,
+	)
+
 	client, err := tuf.NewClient(
 		u.settings,
 		updaterOpts...,
@@ -277,8 +300,8 @@ func (u *Updater) setTargetPath() (string, error) {
 		return "", err
 	}
 
-	// filename = <binary>-<update-channel>.tar.gz
-	filename := fmt.Sprintf("%s-%s", filepath.Base(u.destination), u.updateChannel)
+	// filename = <strippedBinaryName>-<update-channel>.tar.gz
+	filename := fmt.Sprintf("%s-%s", u.strippedBinaryName, u.updateChannel)
 	base := path.Join(string(platform), filename)
 	return fmt.Sprintf("%s.tar.gz", base), nil
 }
