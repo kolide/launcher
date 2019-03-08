@@ -79,25 +79,6 @@ proto:
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
 
-CONTAINERS = ubuntu14 ubuntu16 centos6 centos7
-
-.PHONY: push-containers containers $(CONTAINERS)
-
-containers: $(CONTAINERS)
-
-$(CONTAINERS): xp-launcher xp-extension
-	docker build -t gcr.io/kolide-ose-testing/${@}-launcher:latest -f docker/${@}/Dockerfile .
-	VERSION=$$(docker run --rm gcr.io/kolide-ose-testing/${@}-launcher:latest launcher -version | head -1 | sed 's/launcher - version //g')
-	docker tag gcr.io/kolide-ose-testing/${@}-launcher:latest gcr.io/kolide-ose-testing/${@}-launcher:${VERSION}
-
-push-containers: $(CONTAINERS)
-	for container in $(CONTAINERS); do \
-		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
-	done
-
-builder:
-	cd tools/builders/launcher-builder/1.11/ && gcloud builds submit --project=kolide-public-containers --config=cloudbuild.yml
-
 binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
 binary-bundle: codesign
 	rm -rf build/binary-bundle
@@ -132,3 +113,42 @@ lint-go-vet:
 
 lint-go-nakedret:
 	nakedret ./...
+
+
+docker-build:
+	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
+	docker build -t launcher-build .
+
+dockerfake-%:
+	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
+	docker push gcr.io/kolide-public-containers/launcher-fakedata-$*
+
+docker-%:
+	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
+	docker push gcr.io/kolide-public-containers/launcher-$*
+
+containersseph: dockerfake-ubuntu18 docker-ubuntu18 dockerfake-ubuntu16 docker-ubuntu16
+
+
+
+
+# Old docker stuff down here
+
+CONTAINERS = ubuntu14 ubuntu16 centos6 centos7
+
+.PHONY: push-containers containers $(CONTAINERS)
+
+containers: $(CONTAINERS)
+
+$(CONTAINERS): xp-launcher xp-extension
+	docker build -t gcr.io/kolide-ose-testing/${@}-launcher:latest -f docker/${@}/Dockerfile .
+	VERSION=$$(docker run --rm gcr.io/kolide-ose-testing/${@}-launcher:latest launcher -version | head -1 | sed 's/launcher - version //g')
+	docker tag gcr.io/kolide-ose-testing/${@}-launcher:latest gcr.io/kolide-ose-testing/${@}-launcher:${VERSION}
+
+push-containers: $(CONTAINERS)
+	for container in $(CONTAINERS); do \
+		gcloud docker -- push gcr.io/kolide-ose-testing/$${container}-launcher; \
+	done
+
+builder:
+	cd tools/builders/launcher-builder/1.11/ && gcloud builds submit --project=kolide-public-containers --config=cloudbuild.yml
