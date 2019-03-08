@@ -100,10 +100,10 @@ lint: \
 	lint-go-vet \
 	lint-go-nakedret
 
-lint-go-deadcode:
+lint-go-deadcode: deps-go
 	deadcode cmd/ pkg/
 
-lint-misspell:
+lint-misspell: deps-go
 	git ls-files \
 	  | grep -v pkg/simulator/testdata/bad_symlink \
 	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
@@ -111,7 +111,7 @@ lint-misspell:
 lint-go-vet:
 	go vet ./cmd/... ./pkg/...
 
-lint-go-nakedret:
+lint-go-nakedret: deps-go
 	nakedret ./...
 
 
