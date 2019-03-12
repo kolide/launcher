@@ -76,23 +76,23 @@ type ServiceControl struct {
 	Wait   YesNoType            `xml:",attr,omitempty"`
 }
 
-// ServiceConfigUtil implements
+// ServiceConfig implements
 // http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
-// Given some comments online
-//   - http://lists.wixtoolset.org/pipermail/wix-users-wixtoolset.org/2017-August/005405.html
-//   - and other threads about CNDL1150
-//   - https://docs.microsoft.com/en-us/windows/desktop/Msi/msiconfigureservices-action
+// this is a path to setting FailureActions. There are some
+// limitations. Notably, reset period is in days here, though the
+// underlying `sc.exe` command supports seconds. (See
+// https://github.com/wixtoolset/issues/issues/5963)
 //
-// It's possible we'll need to replace this *entire* service config,
-// with a golang post-install section.
+// Docs are a bit confusing. This schema is supported. It is _not_ the
+// unsupported CNDL1150. (That's the ServiceConfig part of the main
+// schema, the util schema is fine)
 type ServiceConfig struct {
-	XMLName xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
-	//Xmlns                        string   `xml:"xmlns,attr"`
-	FirstFailureActionType       string `xml:",attr,omitempty"`
-	SecondFailureActionType      string `xml:",attr,omitempty"`
-	ThirdFailureActionType       string `xml:",attr,omitempty"`
-	RestartServiceDelayInSeconds int    `xml:",attr,omitempty"`
-	ResetPeriodInDays            int    `xml:",attr,omitempty"`
+	XMLName                      xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
+	FirstFailureActionType       string   `xml:",attr,omitempty"`
+	SecondFailureActionType      string   `xml:",attr,omitempty"`
+	ThirdFailureActionType       string   `xml:",attr,omitempty"`
+	RestartServiceDelayInSeconds int      `xml:",attr,omitempty"`
+	ResetPeriodInDays            int      `xml:",attr,omitempty"`
 }
 
 // Service represents a wix service. It provides an interface to both
@@ -163,7 +163,6 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// Set some defaults. It's not clear we can reset in under a
 	// day. See https://github.com/wixtoolset/issues/issues/5963
 	sconfig := &ServiceConfig{
-		//Xmlns: "http://schemas.microsoft.com/wix/UtilExtension",
 		FirstFailureActionType:       "restart",
 		SecondFailureActionType:      "restart",
 		ThirdFailureActionType:       "restart",
