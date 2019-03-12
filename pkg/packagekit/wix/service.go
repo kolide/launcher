@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/serenize/snaker"
 )
 
 // http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
@@ -127,7 +128,16 @@ func ServiceArgs(args []string) ServiceOpt {
 
 // New returns a service
 func NewService(matchString string, opts ...ServiceOpt) *Service {
-	defaultName := strings.TrimSuffix(matchString, ".exe") + "Svc"
+	// Windows seems a bit fussy about allowable characters. So, we'll
+	// replace some obvious ones, and snake case the whole thing.
+	r := strings.NewReplacer(
+		"-", "_",
+		" ", "_",
+		".", "_",
+	)
+
+	snakeName := r.Replace(strings.TrimSuffix(matchString, ".exe") + "_svc")
+	defaultName := snaker.SnakeToCamel(snakeName)
 
 	si := &ServiceInstall{
 		Name:         defaultName,

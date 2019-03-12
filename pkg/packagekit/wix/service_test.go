@@ -26,8 +26,8 @@ func TestService(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, expectTrue2)
 
-	expectedXml := `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="daemonSvc" Name="daemonSvc" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
-                    <ServiceControl Name="daemonSvc" Id="daemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
+	expectedXml := `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
 
 	var xmlString bytes.Buffer
 
@@ -44,6 +44,11 @@ func TestServiceOptions(t *testing.T) {
 		in  *Service
 		out string
 	}{
+		{
+			in: NewService("my.daemon-is_Great snakeCase.exe"),
+			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="MyDaemonIsGreatSnakeCaseSvc" Name="MyDaemonIsGreatSnakeCaseSvc" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
+                    <ServiceControl Name="MyDaemonIsGreatSnakeCaseSvc" Id="MyDaemonIsGreatSnakeCaseSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`,
+		},
 		{
 			in: NewService("daemon.exe", ServiceName("myDaemon")),
 			out: `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="myDaemon" Name="myDaemon" Start="auto" Type="ownProcess" Vital="yes"></ServiceInstall>
