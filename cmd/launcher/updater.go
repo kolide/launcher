@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -59,7 +57,7 @@ func createUpdater(
 		Execute: func() error {
 			level.Info(logger).Log("msg", "updater started")
 
-			// run the updater and set the stop function so that the interrupt has aaccess to it
+			// run the updater and set the stop function so that the interrupt has access to it
 			stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval))
 			if err != nil {
 				return errors.Wrap(err, "running updater")
@@ -78,25 +76,4 @@ func createUpdater(
 			}
 		},
 	}, nil
-}
-
-func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
-	return func() error {
-		if err := shutdownOsquery(); err != nil {
-			level.Info(logger).Log(
-				"method", "launcherFinalizer",
-				"err", err,
-				"stack", fmt.Sprintf("%+v", err),
-			)
-		}
-		// replace launcher
-		// FIXME: Not supported on windows
-		// https://golang.org/src/syscall/exec_windows.go#338
-		// https://github.com/golang/go/issues/30662
-		// We probably need to use StartProcess which is a fork/exec?
-		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-			return errors.Wrap(err, "restarting launcher")
-		}
-		return nil
-	}
 }
