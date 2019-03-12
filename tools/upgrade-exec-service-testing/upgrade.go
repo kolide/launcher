@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"syscall"
 
 	"github.com/go-kit/kit/log"
@@ -43,11 +44,20 @@ func triggerUpgrade(ctx context.Context, cancel func(), logger log.Logger) error
 		return errors.Wrap(err, "os.Chmod")
 	}
 
-	// This will be the crux on windows
+	// Our normal process here is to exec the new binary. However, this
+	// doesn't work on windows -- windows has no exec. So instead, we
+	// exit, and let the service manager restart us.
+	if runtime.GOOS == "windows" {
+		level.Info(logger).Log("msg", "Exiting, so service manager can restart new version")
+		return nil
+	}
+
+	// For non-windows machine, exec the new version
 	level.Debug(logger).Log("msg", "syscall.Exec")
 	if err := syscall.Exec(ProcessNotes.Path, os.Args, os.Environ()); err != nil {
 		return errors.Wrap(err, "syscall.Exec")
 	}
 
+	// Getting here, means the exec call returned
 	return nil
 }

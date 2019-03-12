@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 func runWindowsSvc(args []string) error {
@@ -55,6 +56,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// TODO: needs a gofunc probably
+	if err := fixRecoveryActions(serviceName); err != nil {
+		level.Info(w.logger).Log("msg", "Failed to fixRecoveryActions", "err", err)
+		// TODO: Do we actually want to exit here? Not sure.
+		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+		os.Exit(1)
+	}
+
 	go func() {
 		err := runLauncher(ctx, cancel, w.args, w.logger)
 		if err != nil {
@@ -94,11 +103,13 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		case c := <-r:
 			switch c.Cmd {
 			case svc.Interrogate:
+				level.Info(w.logger).Log("case", "Interrogate")
 				changes <- c.CurrentStatus
 				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
+				level.Info(w.logger).Log("case", "stop/shutdown")
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(100 * time.Millisecond)
@@ -109,4 +120,37 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			}
 		}
 	}
+}
+
+// Fix the Recovery Actions.
+//
+// This is all a hack around MSI's inability to set the recovery actions.
+//
+// Doing this requires the service name. We ought be able to get it
+// inside the service, but I can't see how. So, we'll make some
+// assumptions about how the service has been installed. Bummer.
+func fixRecoveryActions(name string) error {
+	m, err := mgr.Connect()
+	if err != nil {
+		return errors.Wrap(err, "mgr.Connect")
+	}
+	defer m.Disconnect()
+
+	s, err := m.OpenService(name)
+	if err != nil {
+		return errors.Errorf("service %s is not installed", name)
+	}
+	defer s.Close()
+
+	// Action, and time to wait before performing action
+	ra := mgr.RecoveryAction{Type: mgr.ServiceRestart, Delay: 1 * time.Second}
+
+	// How many seconds of stable daemon activity resets the RecoveryAction cycle
+	resetPeriod := uint32(3)
+
+	if err := s.SetRecoveryActions([]mgr.RecoveryAction{ra}, resetPeriod); err != nil {
+		return errors.Wrap(err, "SetRecoveryActions")
+	}
+
+	return nil
 }

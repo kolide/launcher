@@ -272,6 +272,8 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
+		// FIXME: seph this fails on windows
+		// caller=level.go:63 msg="update binary from staging dir" binary="C:\\Program Files\\Kolide\\Launcher-kolideapp\\bin\\launcher.exe" err="rename C:\\Program Files\\Kolide\\Launcher-kolideapp\\bin\\launcher.exe-staging\\windows\\launcher.exe C:\\Program Files\\Kolide\\Launcher-kolideapp\\bin\\launcher.exe: Access is denied."
 		binary := filepath.Join(filepath.Dir(stagingPath), filepath.Base(u.destination))
 		if err := os.Rename(binary, u.destination); err != nil {
 			u.logger.Log("msg", "update binary from staging dir", "binary", u.destination, "err", err)

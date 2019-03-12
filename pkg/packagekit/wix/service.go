@@ -62,9 +62,11 @@ type ServiceInstall struct {
 	Start            StartType        `xml:",attr,omitempty"`
 	Type             string           `xml:",attr,omitempty"`
 	Vital            YesNoType        `xml:",attr,omitempty"`
+	ServiceConfig    *ServiceConfig   `xml:",omitempty"`
 }
 
-// ServiceControl implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/servicecontrol.html
+// ServiceControl implements
+// http://wixtoolset.org/documentation/manual/v3/xsd/wix/servicecontrol.html
 type ServiceControl struct {
 	Name   string               `xml:",attr,omitempty"`
 	Id     string               `xml:",attr,omitempty"`
@@ -72,6 +74,25 @@ type ServiceControl struct {
 	Start  InstallUninstallType `xml:",attr,omitempty"`
 	Stop   InstallUninstallType `xml:",attr,omitempty"`
 	Wait   YesNoType            `xml:",attr,omitempty"`
+}
+
+// ServiceConfigUtil implements
+// http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
+// Given some comments online
+//   - http://lists.wixtoolset.org/pipermail/wix-users-wixtoolset.org/2017-August/005405.html
+//   - and other threads about CNDL1150
+//   - https://docs.microsoft.com/en-us/windows/desktop/Msi/msiconfigureservices-action
+//
+// It's possible we'll need to replace this *entire* service config,
+// with a golang post-install section.
+type ServiceConfig struct {
+	XMLName xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
+	//Xmlns                        string   `xml:"xmlns,attr"`
+	FirstFailureActionType       string `xml:",attr,omitempty"`
+	SecondFailureActionType      string `xml:",attr,omitempty"`
+	ThirdFailureActionType       string `xml:",attr,omitempty"`
+	RestartServiceDelayInSeconds int    `xml:",attr,omitempty"`
+	ResetPeriodInDays            int    `xml:",attr,omitempty"`
 }
 
 // Service represents a wix service. It provides an interface to both
@@ -139,14 +160,26 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	snakeName := r.Replace(strings.TrimSuffix(matchString, ".exe") + "_svc")
 	defaultName := snaker.SnakeToCamel(snakeName)
 
+	// Set some defaults. It's not clear we can reset in under a
+	// day. See https://github.com/wixtoolset/issues/issues/5963
+	sconfig := &ServiceConfig{
+		//Xmlns: "http://schemas.microsoft.com/wix/UtilExtension",
+		FirstFailureActionType:       "restart",
+		SecondFailureActionType:      "restart",
+		ThirdFailureActionType:       "restart",
+		ResetPeriodInDays:            1,
+		RestartServiceDelayInSeconds: 5,
+	}
+
 	si := &ServiceInstall{
-		Name:         defaultName,
-		Id:           defaultName,
-		Account:      `NT AUTHORITY\SYSTEM`,
-		Start:        StartAuto,
-		Type:         "ownProcess",
-		ErrorControl: ErrorControlNormal,
-		Vital:        Yes,
+		Name:          defaultName,
+		Id:            defaultName,
+		Account:       `NT AUTHORITY\SYSTEM`,
+		Start:         StartAuto,
+		Type:          "ownProcess",
+		ErrorControl:  ErrorControlNormal,
+		Vital:         Yes,
+		ServiceConfig: sconfig,
 	}
 
 	sc := &ServiceControl{

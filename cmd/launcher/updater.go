@@ -90,6 +90,10 @@ func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() e
 			)
 		}
 		// replace launcher
+		// FIXME: Not supported on windows
+		// https://golang.org/src/syscall/exec_windows.go#338
+		// https://github.com/golang/go/issues/30662
+		// We probably need to use StartProcess which is a fork/exec?
 		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 			return errors.Wrap(err, "restarting launcher")
 		}

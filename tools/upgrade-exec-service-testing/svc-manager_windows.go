@@ -3,8 +3,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/kardianos/osext"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -30,7 +28,7 @@ func runInstallService(args []string) error {
 
 	cfg := mgr.Config{DisplayName: serviceDesc, StartType: mgr.StartAutomatic}
 
-	ra := mgr.RecoveryAction{Type: mgr.ServiceRestart, Delay: 5 * time.Second}
+	//ra := mgr.RecoveryAction{Type: mgr.ServiceRestart, Delay: 5 * time.Second}
 
 	s, err = m.CreateService(serviceName, exepath, cfg, "svc")
 	if err != nil {
@@ -38,9 +36,9 @@ func runInstallService(args []string) error {
 	}
 	defer s.Close()
 
-	if err := s.SetRecoveryActions([]mgr.RecoveryAction{ra}, 3); err != nil {
-		return errors.Wrap(err, "SetRecoveryActions")
-	}
+	//if err := s.SetRecoveryActions([]mgr.RecoveryAction{ra}, 3); err != nil {
+	//return errors.Wrap(err, "SetRecoveryActions")
+	//}
 
 	return nil
 }

@@ -247,6 +247,8 @@ func (wo *wixTool) candle(ctx context.Context) error {
 		"-nologo",
 		"-arch", wo.msArch,
 		"-dSourceDir="+wo.packageRoot,
+		//"-ext", filepath.Join(wo.wixPath, "WixUtilExtension.dll"),
+		"-ext", "WixUtilExtension",
 		"Installer.wxs",
 		"AppFiles.wxs",
 	)
@@ -261,6 +263,7 @@ func (wo *wixTool) light(ctx context.Context) error {
 		"-nologo",
 		"-dcl:high", // compression level
 		"-dSourceDir=" + wo.packageRoot,
+		"-ext", "WixUtilExtension",
 		"AppFiles.wixobj",
 		"Installer.wixobj",
 		"-out", "out.msi",

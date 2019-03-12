@@ -45,7 +45,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 }
 
 var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
 <?if $(sys.BUILDARCH)="x86"?>
     <?define Program_Files="ProgramFilesFolder"?>
 <?elseif $(sys.BUILDARCH)="x64"?>
@@ -115,7 +115,7 @@ func internalAssetsMainWxs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "internal/assets/main.wxs", size: 1721, mode: os.FileMode(420), modTime: time.Unix(1550456584, 0)}
+	info := bindataFileInfo{name: "internal/assets/main.wxs", size: 1781, mode: os.FileMode(420), modTime: time.Unix(1552328656, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

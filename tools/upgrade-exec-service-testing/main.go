@@ -16,8 +16,8 @@ type thingy struct {
 	stagedFile string
 }
 
-const serviceName = "sephexec"
-const serviceDesc = "seph Update Testing"
+const serviceName = "upgradetest"
+const serviceDesc = "Launcher Auto Upgrade Testing"
 
 type processNotes struct {
 	Pid     int
