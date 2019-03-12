@@ -40,7 +40,7 @@ require (
 	github.com/jinzhu/gorm v1.9.1 // indirect
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
-	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
+	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
 	github.com/kolide/kit v0.0.0-20181124013649-bd1a9de64d48
 	github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
