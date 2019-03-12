@@ -88,6 +88,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
+
+		// If we get here, it means runLauncher returned nil. If we do
+		// nothing, the service is left running, but with no
+		// functionality. Instead, signal that as a stop to the service
+		// manager, and exit. We rely on the service manager to restart.
+		level.Info(w.logger).Log("msg", "Launcher exiting cleanly")
+		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+		os.Exit(0)
 	}()
 
 	for {
