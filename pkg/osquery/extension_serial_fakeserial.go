@@ -2,9 +2,13 @@
 
 package osquery
 
-import "github.com/kolide/kit/ulid"
+import (
+	"fmt"
 
-var fakeSerialNumber = ulid.New()
+	"github.com/kolide/kit/ulid"
+)
+
+var fakeSerialNumber = fmt.Sprintf("fake%s", ulid.New())
 
 func serialForRow(row map[string]string) string {
 	return fakeSerialNumber
