@@ -1,6 +1,11 @@
-FROM kolide/centos6-osquery
-MAINTAINER engineering@kolide.co
+ARG FAKE
+FROM launcher${FAKE}-build as stage1
 
-COPY build/linux/ /usr/local/bin/
+FROM centos:centos6
+LABEL maintainer="engineering@kolide.co"
 
-CMD ["launcher"]
+COPY --from=stage1 /usr/local/kolide/bin/* /usr/local/kolide/bin/
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/kolide/bin/launcher"]
+CMD []

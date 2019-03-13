@@ -1,6 +1,14 @@
-FROM kolide/ubuntu16-osquery
-MAINTAINER engineering@kolide.co
+ARG FAKE
+FROM launcher${FAKE}-build as stage1
 
-COPY build/linux/ /usr/local/bin/
+FROM ubuntu:16.04
+LABEL maintainer="engineering@kolide.co"
 
-CMD ["launcher"]
+COPY --from=stage1 /usr/local/kolide/bin/* /usr/local/kolide/bin/
+
+# Launcher does cert verification. Ensure certs.
+RUN apt-get update && apt-get install ca-certificates -y
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/kolide/bin/launcher"]
+CMD []
