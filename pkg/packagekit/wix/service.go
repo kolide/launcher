@@ -61,7 +61,7 @@ type ServiceInstall struct {
 	Password         string           `xml:",attr,omitempty"`
 	Start            StartType        `xml:",attr,omitempty"`
 	Type             string           `xml:",attr,omitempty"`
-	Vital            YesNoType        `xml:",attr,omitempty"`
+	Vital            YesNoType        `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
 	ServiceConfig    *ServiceConfig   `xml:",omitempty"`
 }
 
@@ -78,14 +78,14 @@ type ServiceControl struct {
 
 // ServiceConfig implements
 // http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
-// this is a path to setting FailureActions. There are some
+// This is used to set FailureActions. There are some
 // limitations. Notably, reset period is in days here, though the
 // underlying `sc.exe` command supports seconds. (See
 // https://github.com/wixtoolset/issues/issues/5963)
 //
-// Docs are a bit confusing. This schema is supported. It is _not_ the
-// unsupported CNDL1150. (That's the ServiceConfig part of the main
-// schema, the util schema is fine)
+// Docs are a bit confusing. This schema is supported, and should
+// work. The non-util ServiceConfig generates unsupported CNDL1150
+// errors.
 type ServiceConfig struct {
 	XMLName                      xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
 	FirstFailureActionType       string   `xml:",attr,omitempty"`

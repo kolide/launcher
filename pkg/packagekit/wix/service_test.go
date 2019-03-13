@@ -10,7 +10,6 @@ import (
 
 func TestService(t *testing.T) {
 	t.Parallel()
-	t.Skip()
 
 	service := NewService("daemon.exe")
 
@@ -28,8 +27,7 @@ func TestService(t *testing.T) {
 	require.True(t, expectTrue2)
 
 	expectedXml := `<ServiceInstall Account="NT AUTHORITY\SYSTEM" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes">
-                        <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></util:ServiceConfig>
-                        <ServiceConfig OnInstall="yes" OnReinstall="yes" FailureActionsWhen="failedToStopOrReturnedError"></ServiceConfig>
+                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
                     </ServiceInstall>
                     <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
 

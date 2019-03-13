@@ -10,11 +10,12 @@ Accepted (March 11, 2019)
 
 ## Context
 
-One of the features of Launcher, is it's ability to securely update
+One of the features of Launcher is it's ability to securely update
 osquery and itself. The unix implementation is a straightforward
 `exec` implementation. However, Windows does not have an `exec`.
 
-This ADR documents the current implementation, and a solution for windows.
+This ADR documents the current implementation, and a solution for
+windows.
 
 ## Decision
 
@@ -28,8 +29,8 @@ running binary is replaced. This code can be found in
 [autoupdate.go](/pkg/autoupdate/autoupdate.go)
 
 On Unix, launcher calls `syscall.Exec` to replace the current
-executable with a new process, using the new binary. This code can be
-found in [updater.go](/cmd/launcher/updater.go)
+executable without a new process, using the new binary. This code can
+be found in [updater.go](/cmd/launcher/updater.go)
 
 ### Windows Variation
 
@@ -42,8 +43,7 @@ in the correct location. This has the drawback of losing atomicity.
 
 Second, Windows does not support `exec`. Instead, we will exit
 launcher, and assume the service manager will restart. Empirically, it
-will start the binary on the configured path.
-
+will start the new binary on the configured path.
 
 ### Example Code
 
@@ -59,11 +59,11 @@ may look like corruption in some packaging systems.
 
 The update process on Windows is based on the service manager
 restarting the service. We don't believe there's a downside here, but
-it does increase restart counts. We set the recovery period
-sufficiently low to handle this.
+it does increase restart counts. Due to implementation limitations of
+WiX, the shortest recovery period is 1 day.
 
 Due to the nature of this update process, updates that depend on
 command line flag changes, require a re-installation of Launcher. They
 are handled outside this update process.
 
-This process can result in running binaries that are no longer on disk. 
+This process can result in running binaries that are no longer on disk.

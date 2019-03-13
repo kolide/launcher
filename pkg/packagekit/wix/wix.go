@@ -247,7 +247,6 @@ func (wo *wixTool) candle(ctx context.Context) error {
 		"-nologo",
 		"-arch", wo.msArch,
 		"-dSourceDir="+wo.packageRoot,
-		//"-ext", filepath.Join(wo.wixPath, "WixUtilExtension.dll"),
 		"-ext", "WixUtilExtension",
 		"Installer.wxs",
 		"AppFiles.wxs",
