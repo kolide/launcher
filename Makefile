@@ -48,11 +48,11 @@ xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
-codesign-darwin:
+codesign-darwin: xp
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
 
-codesign: xp codesign-darwin
+codesign: codesign-darwin
 
 package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
