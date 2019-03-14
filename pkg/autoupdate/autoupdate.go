@@ -139,7 +139,7 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 			// files not yet yet there -- Generating an invalid state. Note:
 			// this does not check the validity of the files, they might be
 			// corrupt.
-			if _, err := os.Stat(fullAssetPath); !os.IsNotExist(err) {
+			if _, err := os.Stat(fullLocalPath); !os.IsNotExist(err) {
 				continue
 			}
 
