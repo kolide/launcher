@@ -102,14 +102,16 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	return &updater, nil
 }
 
-// bootstraps local TUF metadata from bindata assets.
+// createLocalTufRepo bootstraps local TUF metadata from bindata
+// assets. (TUF requires an initial starting repo)
 func (u *Updater) createLocalTufRepo() error {
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
 		return err
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("pkg", "autoupdate", "assets", localRepo)
-	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
+
+	if err := u.createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
 		return err
 	}
 	return nil
@@ -119,7 +121,7 @@ type assetDirFunc func(string) ([]string, error)
 
 // Creates TUF repo including delegate tree structure on local file system.
 // assetDir is the bindata AssetDir function.
-func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
+func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
 		return err
@@ -156,7 +158,7 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
 			return err
 		}
-		if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
+		if err := u.createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
 			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
 		}
 	}

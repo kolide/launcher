@@ -58,7 +58,7 @@ func createUpdater(
 			level.Info(logger).Log("msg", "updater started")
 
 			// run the updater and set the stop function so that the interrupt has access to it
-			stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval))
+			stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval), tuf.WithLogger(logger))
 			if err != nil {
 				return errors.Wrap(err, "running updater")
 			}
