@@ -58,14 +58,13 @@ func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]m
 	var results []map[string]string
 	buf := new(bytes.Buffer)
 	img = resize.Resize(128, 128, img, resize.Bilinear)
-	err = png.Encode(buf, img)
-	if err != nil {
+	if err := png.Encode(buf, img); err != nil {
 		return nil, err
 	}
 	results = append(results, map[string]string{
 		"path": path,
 		"icon": base64.StdEncoding.EncodeToString(buf.Bytes()),
-		"hash": fmt.Sprintf("d_%x", hash),
+		"hash": fmt.Sprintf("%x", hash),
 	})
 
 	return results, nil
