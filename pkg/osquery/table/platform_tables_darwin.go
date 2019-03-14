@@ -16,6 +16,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 
 	return []*table.Plugin{
 		Airdrop(client),
+		AppIcons(),
 		BestPractices(client),
 		ChromeLoginKeychainInfo(client, logger),
 		EmailAddresses(client, logger),
