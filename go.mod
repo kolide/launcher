@@ -27,7 +27,7 @@ require (
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
-	github.com/go-kit/kit v0.7.0
+	github.com/go-kit/kit v0.8.0
 	github.com/gogo/protobuf v1.2.0
 	github.com/golang/protobuf v1.2.0
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
 	github.com/kolide/kit v0.0.0-20181124013649-bd1a9de64d48
 	github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
-	github.com/kolide/updater v0.0.0-20181127001321-d5bab28ddf67
+	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b // indirect
