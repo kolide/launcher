@@ -38,6 +38,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
+	"hash/crc64"
 	"image"
 	"image/png"
 	"strings"
@@ -55,6 +57,7 @@ func UserAvatar(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("thumbnail"),
+		table.TextColumn("hash"),
 	}
 	t := &userAvatarTable{logger: logger}
 	return table.NewPlugin("kolide_user_avatars", columns, t.generateAvatars)
@@ -73,16 +76,15 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 			usernames = append(usernames, constraint.Expression)
 		}
 	} else {
-		cString := C.LocalUsers()
-		usernamesString := C.GoString(cString)
-		for _, posixName := range strings.Split(usernamesString, " ") {
+		usernamesString := C.LocalUsers()
+		for _, posixName := range strings.Split(C.GoString(usernamesString), " ") {
 			usernames = append(usernames, string(posixName))
 		}
 	}
 
 	var results []map[string]string
 	for _, username := range usernames {
-		image, err := getUserAvatar(username)
+		image, hash, err := getUserAvatar(username)
 		if err != nil {
 			level.Debug(t.logger).Log(
 				"msg", "error getting user avatar",
@@ -110,6 +112,7 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 			map[string]string{
 				"username":  username,
 				"thumbnail": base64Buf.String(),
+				"hash":      fmt.Sprintf("%x", hash),
 			},
 		)
 	}
@@ -117,22 +120,23 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 	return results, nil
 }
 
-func getUserAvatar(username string) (image.Image, error) {
+func getUserAvatar(username string) (image.Image, uint64, error) {
 	var data C.CFDataRef = 0
 	C.Image(&data, C.CString(username))
 	if data == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 	defer C.CFRelease(C.CFTypeRef(data))
 
 	goBytes := C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(data)), C.int(C.CFDataGetLength(data)))
 	if len(goBytes) == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	image, err := tiff.Decode(bytes.NewBuffer(goBytes))
 	if err != nil {
-		return nil, errors.Wrap(err, "decoding tiff data from C")
+		return nil, 0, errors.Wrap(err, "decoding tiff data from C")
 	}
-	return image, nil
+	hash := crc64.Checksum(goBytes, crcTable)
+	return image, hash, nil
 }
