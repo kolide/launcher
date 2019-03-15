@@ -40,11 +40,19 @@ osqueryi-tables: table.ext
 extension: .pre-build
 	go run cmd/make/make.go -targets=extension
 
+
 xp: xp-launcher xp-extension xp-grpc-extension
 
-xp-%: .pre-build
+xp-%:
+	$(MAKE) -j darwin-xp-$* windows-xp-$* linux-xp-$*
+
+darwin-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
+
+linux-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
+
+windows-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
