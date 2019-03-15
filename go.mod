@@ -49,6 +49,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b // indirect
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
@@ -62,6 +63,7 @@ require (
 	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
 	go.opencensus.io v0.18.0
+	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
 	golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys v0.0.0-20190124100055-b90733256f2e
