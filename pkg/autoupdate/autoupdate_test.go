@@ -19,7 +19,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	u := &Updater{}
-	require.Nil(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
+	require.NoError(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
 
 	knownFilePaths := []string{
 		"launcher-tuf/root.json",
@@ -82,7 +82,7 @@ func TestNewUpdater(t *testing.T) {
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
 			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewNopLogger(), tt.opts...)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tt.target, u.target)
 
@@ -94,7 +94,9 @@ func TestNewUpdater(t *testing.T) {
 
 			// must have a non-nil finalizer
 			require.NotNil(t, u.finalizer)
-			assert.Nil(t, u.finalizer())
+
+			// Running finalizer shouldn't error
+			require.NoError(t, u.finalizer())
 		})
 	}
 }
