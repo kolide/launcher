@@ -29,6 +29,7 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
+		table.TextColumn("username"),
 		table.TextColumn("origin_url"),
 		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
@@ -41,7 +42,7 @@ type ChromeLoginKeychain struct {
 	logger log.Logger
 }
 
-func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
+func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string, username string) ([]map[string]string, error) {
 	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
 	if err != nil {
 		return nil, err
@@ -82,14 +83,24 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 			"origin_url":     origin_url,
 			"action_url":     action_url,
 			"username_value": username_value,
+			"username":       username,
 		})
 	}
 	return results, nil
 }
 
 func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	var results []map[string]string
+	var usernames []string
+	q, ok := queryContext.Constraints["username"]
+	if ok && len(q.Constraints) != 0 {
+		for _, constraint := range q.Constraints {
+			usernames = append(usernames, constraint.Expression)
+		}
+	} else {
+		return nil, errors.New("The kolide_chrome_login_keychain table requires that you specify a constraint WHERE username =")
+	}
 
+	var results []map[string]string
 	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {
 		osProfileDirs, ok = profileDirs["default"]
@@ -98,32 +109,31 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 		}
 	}
 
-	var paths []string
-	for _, profileDir := range osProfileDirs {
-		userPaths, err := findFileInUserDirs(filepath.Join(profileDir, "Default/Login Data"))
-		if err != nil {
-			level.Info(c.logger).Log(
-				"msg", "Find chrome login data sqlite DBs",
-				"path", profileDir,
-				"err", err,
-			)
-			continue
-		}
-		paths = append(paths, userPaths...)
-	}
+	for _, username := range usernames {
+		for _, profileDir := range osProfileDirs {
+			userPaths, err := findFileInUserDirs(filepath.Join(profileDir, "Default/Login Data"), WithUsername(username))
+			if err != nil {
+				level.Info(c.logger).Log(
+					"msg", "Find chrome login data sqlite DBs",
+					"path", profileDir,
+					"err", err,
+				)
+				continue
+			}
 
-	for _, path := range paths {
-		res, err := c.generateForPath(ctx, path)
-		if err != nil {
-			level.Info(c.logger).Log(
-				"msg", "Generating chrome keychain result",
-				"path", path,
-				"err", err,
-			)
-			continue
+			for _, path := range userPaths {
+				res, err := c.generateForPath(ctx, path, username)
+				if err != nil {
+					level.Info(c.logger).Log(
+						"msg", "Generating chrome keychain result",
+						"path", path,
+						"err", err,
+					)
+					continue
+				}
+				results = append(results, res...)
+			}
 		}
-		results = append(results, res...)
 	}
-
 	return results, nil
 }
