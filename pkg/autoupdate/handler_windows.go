@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/updater/tuf"
 )
@@ -21,15 +22,20 @@ import (
 // support copying over a running binary.
 func (u *Updater) handler() tuf.NotificationHandler {
 	return func(stagingPath string, err error) {
-		u.logger.Log("msg", "new staged tuf file", "file", stagingPath, "target", u.target, "binary", u.destination)
+		level.Debug(u.logger).Log(
+			"msg", "new staged tuf file",
+			"file", stagingPath,
+			"target", u.target,
+			"binary", u.destination,
+		)
 
 		if err != nil {
-			u.logger.Log("msg", "download failed", "target", u.target, "err", err)
+			level.Info(u.logger).Log("msg", "download failed", "target", u.target, "err", err)
 			return
 		}
 
 		if err := fs.UntarBundle(stagingPath, stagingPath); err != nil {
-			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
+			level.Info(u.logger).Log("msg", "untar downloaded target", "binary", u.target, "err", err)
 			return
 		}
 
@@ -41,26 +47,28 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			fmt.Sprintf("old-%s", filepath.Base(u.destination)),
 		)
 		if err := os.Rename(u.destination, oldFilePath); err != nil {
-			u.logger.Log("msg", "Moving binary to oldFilePath", "binary", u.destination, "err", err)
+			level.Info(u.logger).Log("msg", "Moving binary to oldFilePath", "binary", u.destination, "err", err)
 			return
 		}
 
 		binary := filepath.Join(filepath.Dir(stagingPath), filepath.Base(u.destination))
 		if err := os.Rename(binary, u.destination); err != nil {
-			u.logger.Log("msg", "update binary from staging dir", "binary", u.destination, "err", err)
+			level.Info(u.logger).Log("msg", "update binary from staging dir", "binary", u.destination, "err", err)
 			return
 		}
 
 		if err := os.Chmod(u.destination, 0755); err != nil {
-			u.logger.Log("msg", "setting +x permissions on binary", "binary", u.destination, "err", err)
+			level.Info(u.logger).Log("msg", "setting +x permissions on binary", "binary", u.destination, "err", err)
 			return
 		}
 
+		// On windows, this is expected to return an error to signal the
+		// restart. This is a bit confusing, but hard to untangle.
 		if err := u.finalizer(); err != nil {
-			u.logger.Log("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
+			level.Info(u.logger).Log("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
 			return
 		}
 
-		u.logger.Log("msg", "completed update for binary", "binary", u.destination)
+		level.Debug(u.logger).Log("msg", "completed update for binary", "binary", u.destination)
 	}
 }
