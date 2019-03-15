@@ -17,10 +17,10 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-var profileDirs = map[string]string{
-	"windows": "Appdata/Local/Google/Chrome/User Data",
-	"darwin":  "Library/Application Support/Google/Chrome",
-	"linux":   ".config/google-chrome",
+var profileDirs = map[string][]string{
+	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
+	"darwin":  []string{"Library/Application Support/Google/Chrome"},
+	"linux":   []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"},
 }
 
 func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -90,14 +90,23 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	profileDir, ok := profileDirs[runtime.GOOS]
+	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {
 		return results, errors.New("No profileDir for this platform")
 	}
 
-	paths, err := findFileInUserDirs(filepath.Join(profileDir, "Default/Login Data"))
-	if err != nil {
-		return nil, errors.Wrap(err, "find chrome login data sqlite DBs")
+	var paths []string
+	for _, profileDir := range osProfileDirs {
+		userPaths, err := findFileInUserDirs(filepath.Join(profileDir, "Default/Login Data"))
+		if err != nil {
+			level.Info(c.logger).Log(
+				"msg", "Find chrome login data sqlite DBs",
+				"path", profileDir,
+				"err", err,
+			)
+			continue
+		}
+		paths = append(paths, userPaths...)
 	}
 
 	for _, path := range paths {
