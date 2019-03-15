@@ -12,25 +12,28 @@ import (
 var homedirLocations = map[string][]string{
 	"windows": {"/Users"}, // windows10 uses /Users
 	"darwin":  {"/Users"},
-	"linux":   {"/home"},
+	"default": {"/home"},
 }
 
 // findFileInUserDirs looks for the existence of a specified path as a
 // subdirectory of users' home directories. It does this by searching
 // likely paths
-func findFileInUserDirs(path string) ([]string, error) {
+func findFileInUserDirs(path string, user string) ([]string, error) {
 	var foundDirs []string
 
 	homedirRoots, ok := homedirLocations[runtime.GOOS]
 	if !ok {
-		return foundDirs, errors.New("No homedir locations for this platform")
+		homedirRoots, ok = homedirLocations["default"]
+		if !ok {
+			return foundDirs, errors.New("No homedir locations for this platform")
+		}
 	}
 
 	for _, userDir := range homedirRoots {
 
 		userDirs, err := ioutil.ReadDir(userDir)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Reading %s", userDir)
+			continue
 		}
 
 		for _, dir := range userDirs {

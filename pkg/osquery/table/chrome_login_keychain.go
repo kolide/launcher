@@ -20,7 +20,7 @@ import (
 var profileDirs = map[string][]string{
 	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
 	"darwin":  []string{"Library/Application Support/Google/Chrome"},
-	"linux":   []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"},
+	"default": []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"},
 }
 
 func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -92,7 +92,10 @@ func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.Q
 
 	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {
-		return results, errors.New("No profileDir for this platform")
+		osProfileDirs, ok = profileDirs["default"]
+		if !ok {
+			return results, errors.New("No profileDir for this platform")
+		}
 	}
 
 	var paths []string
