@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
@@ -50,6 +49,7 @@ type Updater struct {
 	logger             log.Logger
 	bootstrapFn        func() error
 	strippedBinaryName string
+	sigChannel         chan os.Signal
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
@@ -103,15 +103,17 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	return &updater, nil
 }
 
-// bootstraps local TUF metadata from bindata assets.
+// createLocalTufRepo bootstraps local TUF metadata from bindata
+// assets. (TUF requires an initial starting repo)
 func (u *Updater) createLocalTufRepo() error {
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
-		return err
+		return errors.Wrapf(err, "mkdir LocalRepoPath (%s)", u.settings.LocalRepoPath)
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("pkg", "autoupdate", "assets", localRepo)
-	if err := createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
-		return err
+
+	if err := u.createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
+		return errors.Wrapf(err, "createTUFRepoDirectory %s", u.settings.LocalRepoPath)
 	}
 	return nil
 }
@@ -120,10 +122,10 @@ type assetDirFunc func(string) ([]string, error)
 
 // Creates TUF repo including delegate tree structure on local file system.
 // assetDir is the bindata AssetDir function.
-func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
+func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "assetDir")
 	}
 
 	for _, assetPath := range paths {
@@ -138,7 +140,7 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 			// files not yet yet there -- Generating an invalid state. Note:
 			// this does not check the validity of the files, they might be
 			// corrupt.
-			if _, err := os.Stat(fullAssetPath); !os.IsNotExist(err) {
+			if _, err := os.Stat(fullLocalPath); !os.IsNotExist(err) {
 				continue
 			}
 
@@ -155,9 +157,9 @@ func createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir 
 		// if fullAssetPath is not a JSON file, it's a directory. Create the
 		// directory in localPath and recurse into it
 		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
-			return err
+			return errors.Wrapf(err, "mkdir fullLocalPath (%s)", fullLocalPath)
 		}
-		if err := createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
+		if err := u.createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
 			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
 		}
 	}
@@ -172,6 +174,13 @@ type UpdaterOption func(*Updater)
 func WithHTTPClient(client *http.Client) UpdaterOption {
 	return func(u *Updater) {
 		u.client = client
+	}
+}
+
+// WithSigChannel configures the channel uses for shutdown signaling
+func WithSigChannel(sc chan os.Signal) UpdaterOption {
+	return func(u *Updater) {
+		u.sigChannel = sc
 	}
 }
 
@@ -250,46 +259,6 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 		return nil, errors.Wrapf(err, "launching %s updater service", filepath.Base(u.destination))
 	}
 	return client.Stop, nil
-}
-
-// The handler is called by the tuf package when tuf detects a change with
-// the remote metadata.
-// The handler method will do the following:
-// 1) untar the staged staged file,
-// 2) replace the existing binary,
-// 3) call the Updater's finalizer method, usually a restart function for the running binary.
-func (u *Updater) handler() tuf.NotificationHandler {
-	return func(stagingPath string, err error) {
-		u.logger.Log("msg", "new staged tuf file", "file", stagingPath, "target", u.target, "binary", u.destination)
-
-		if err != nil {
-			u.logger.Log("msg", "download failed", "target", u.target, "err", err)
-			return
-		}
-
-		if err := fs.UntarBundle(stagingPath, stagingPath); err != nil {
-			u.logger.Log("msg", "untar downloaded target", "binary", u.target, "err", err)
-			return
-		}
-
-		binary := filepath.Join(filepath.Dir(stagingPath), filepath.Base(u.destination))
-		if err := os.Rename(binary, u.destination); err != nil {
-			u.logger.Log("msg", "update binary from staging dir", "binary", u.destination, "err", err)
-			return
-		}
-
-		if err := os.Chmod(u.destination, 0755); err != nil {
-			u.logger.Log("msg", "setting +x permissions on binary", "binary", u.destination, "err", err)
-			return
-		}
-
-		if err := u.finalizer(); err != nil {
-			u.logger.Log("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
-			return
-		}
-
-		u.logger.Log("msg", "completed update for binary", "binary", u.destination)
-	}
 }
 
 // target creates a TUF target for a binary using the Destination.

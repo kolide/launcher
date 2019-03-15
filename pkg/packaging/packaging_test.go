@@ -22,22 +22,6 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 	return cmd
 }
 
-func TestLauncherVersionDetection(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var err error
-
-	p := &PackageOptions{}
-	p.execCC = helperCommandContext
-
-	err = p.detectLauncherVersion(ctx)
-	require.NoError(t, err)
-
-	require.Equal(t, "0.5.6-19-g17c8589", p.PackageVersion)
-}
-
 func TestExecOut(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())

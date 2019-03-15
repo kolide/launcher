@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -26,6 +25,8 @@ type updaterConfig struct {
 	MirrorURL string
 
 	HTTPClient *http.Client
+
+	SigChannel chan os.Signal
 }
 
 func createUpdater(
@@ -46,6 +47,7 @@ func createUpdater(
 		autoupdate.WithMirrorURL(config.MirrorURL),
 		autoupdate.WithFinalizer(finalizer),
 		autoupdate.WithUpdateChannel(config.UpdateChannel),
+		autoupdate.WithSigChannel(config.SigChannel),
 	)
 	if err != nil {
 		return nil, err
@@ -59,8 +61,8 @@ func createUpdater(
 		Execute: func() error {
 			level.Info(logger).Log("msg", "updater started")
 
-			// run the updater and set the stop function so that the interrupt has aaccess to it
-			stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval))
+			// run the updater and set the stop function so that the interrupt has access to it
+			stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval), tuf.WithLogger(logger))
 			if err != nil {
 				return errors.Wrap(err, "running updater")
 			}
@@ -78,21 +80,4 @@ func createUpdater(
 			}
 		},
 	}, nil
-}
-
-func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
-	return func() error {
-		if err := shutdownOsquery(); err != nil {
-			level.Info(logger).Log(
-				"method", "launcherFinalizer",
-				"err", err,
-				"stack", fmt.Sprintf("%+v", err),
-			)
-		}
-		// replace launcher
-		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-			return errors.Wrap(err, "restarting launcher")
-		}
-		return nil
-	}
 }

@@ -40,19 +40,27 @@ osqueryi-tables: table.ext
 extension: .pre-build
 	go run cmd/make/make.go -targets=extension
 
+
 xp: xp-launcher xp-extension xp-grpc-extension
 
-xp-%: .pre-build
+xp-%:
+	$(MAKE) -j darwin-xp-$* windows-xp-$* linux-xp-$*
+
+darwin-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
+
+linux-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
+
+windows-xp-%: .pre-build
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
-codesign-darwin:
+codesign-darwin: xp
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
 
-codesign: xp codesign-darwin
+codesign: codesign-darwin
 
 package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
@@ -100,10 +108,10 @@ lint: \
 	lint-go-vet \
 	lint-go-nakedret
 
-lint-go-deadcode:
+lint-go-deadcode: deps-go
 	deadcode cmd/ pkg/
 
-lint-misspell:
+lint-misspell: deps-go
 	git ls-files \
 	  | grep -v pkg/simulator/testdata/bad_symlink \
 	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
@@ -111,7 +119,7 @@ lint-misspell:
 lint-go-vet:
 	go vet ./cmd/... ./pkg/...
 
-lint-go-nakedret:
+lint-go-nakedret: deps-go
 	nakedret ./...
 
 

@@ -61,10 +61,12 @@ type ServiceInstall struct {
 	Password         string           `xml:",attr,omitempty"`
 	Start            StartType        `xml:",attr,omitempty"`
 	Type             string           `xml:",attr,omitempty"`
-	Vital            YesNoType        `xml:",attr,omitempty"`
+	Vital            YesNoType        `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
+	ServiceConfig    *ServiceConfig   `xml:",omitempty"`
 }
 
-// ServiceControl implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/servicecontrol.html
+// ServiceControl implements
+// http://wixtoolset.org/documentation/manual/v3/xsd/wix/servicecontrol.html
 type ServiceControl struct {
 	Name   string               `xml:",attr,omitempty"`
 	Id     string               `xml:",attr,omitempty"`
@@ -72,6 +74,25 @@ type ServiceControl struct {
 	Start  InstallUninstallType `xml:",attr,omitempty"`
 	Stop   InstallUninstallType `xml:",attr,omitempty"`
 	Wait   YesNoType            `xml:",attr,omitempty"`
+}
+
+// ServiceConfig implements
+// http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
+// This is used to set FailureActions. There are some
+// limitations. Notably, reset period is in days here, though the
+// underlying `sc.exe` command supports seconds. (See
+// https://github.com/wixtoolset/issues/issues/5963)
+//
+// Docs are a bit confusing. This schema is supported, and should
+// work. The non-util ServiceConfig generates unsupported CNDL1150
+// errors.
+type ServiceConfig struct {
+	XMLName                      xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
+	FirstFailureActionType       string   `xml:",attr,omitempty"`
+	SecondFailureActionType      string   `xml:",attr,omitempty"`
+	ThirdFailureActionType       string   `xml:",attr,omitempty"`
+	RestartServiceDelayInSeconds int      `xml:",attr,omitempty"`
+	ResetPeriodInDays            int      `xml:",attr,omitempty"`
 }
 
 // Service represents a wix service. It provides an interface to both
@@ -139,14 +160,25 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	snakeName := r.Replace(strings.TrimSuffix(matchString, ".exe") + "_svc")
 	defaultName := snaker.SnakeToCamel(snakeName)
 
+	// Set some defaults. It's not clear we can reset in under a
+	// day. See https://github.com/wixtoolset/issues/issues/5963
+	sconfig := &ServiceConfig{
+		FirstFailureActionType:       "restart",
+		SecondFailureActionType:      "restart",
+		ThirdFailureActionType:       "restart",
+		ResetPeriodInDays:            1,
+		RestartServiceDelayInSeconds: 5,
+	}
+
 	si := &ServiceInstall{
-		Name:         defaultName,
-		Id:           defaultName,
-		Account:      `NT AUTHORITY\SYSTEM`,
-		Start:        StartAuto,
-		Type:         "ownProcess",
-		ErrorControl: ErrorControlNormal,
-		Vital:        Yes,
+		Name:          defaultName,
+		Id:            defaultName,
+		Account:       `NT AUTHORITY\SYSTEM`,
+		Start:         StartAuto,
+		Type:          "ownProcess",
+		ErrorControl:  ErrorControlNormal,
+		Vital:         Yes,
+		ServiceConfig: sconfig,
 	}
 
 	sc := &ServiceControl{

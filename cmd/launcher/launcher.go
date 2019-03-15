@@ -246,6 +246,24 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
 
+	// Create a channel for signals
+	sigChannel := make(chan os.Signal, 1)
+
+	// Add a rungroup to catch things on the sigChannel
+	// Attach a notifier for os.Interrupt
+	runGroup.Add(func() error {
+		signal.Notify(sigChannel, os.Interrupt)
+		select {
+		case <-sigChannel:
+			level.Info(logger).Log("msg", "beginnning shutdown via signal")
+			return nil
+		}
+	}, func(err error) {
+		level.Info(logger).Log("msg", "interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+		cancel()
+		close(sigChannel)
+	})
+
 	var client service.KolideService
 	{
 		switch opts.transport {
@@ -298,6 +316,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			NotaryURL:          opts.notaryServerURL,
 			MirrorURL:          opts.mirrorServerURL,
 			HTTPClient:         httpClient,
+			SigChannel:         sigChannel,
 		}
 
 		// create an updater for osquery
@@ -315,7 +334,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		launcherUpdater, err := createUpdater(
 			ctx,
 			launcherPath,
-			launcherFinalizer(logger, runnerShutdown),
+			updateFinalizer(logger, runnerShutdown),
 			logger,
 			config,
 		)
@@ -324,21 +343,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
-
-	// Create the signal notifier and add it to the rungroup
-	sig := make(chan os.Signal, 1)
-	runGroup.Add(func() error {
-		signal.Notify(sig, os.Interrupt)
-		select {
-		case <-sig:
-			level.Info(logger).Log("msg", "beginnning shutdown")
-			return nil
-		}
-	}, func(err error) {
-		level.Info(logger).Log("msg", "interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
-		cancel()
-		close(sig)
-	})
 
 	err = runGroup.Run()
 	return errors.Wrap(err, "run service")
