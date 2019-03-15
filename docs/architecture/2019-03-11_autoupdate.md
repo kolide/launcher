@@ -73,4 +73,6 @@ Due to the nature of this update process, updates that depend on
 command line flag changes, require a re-installation of Launcher. They
 are handled outside this update process.
 
-This process can result in running binaries that are no longer on disk.
+The act of moving a new binary over a running old one (as we do on
+unix) results in the running binary no longer being disk. This can
+trigger notices in some monitoring software, for example, osquery.
