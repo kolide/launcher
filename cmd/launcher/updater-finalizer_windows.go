@@ -24,6 +24,7 @@ func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() e
 				"stack", fmt.Sprintf("%+v", err),
 			)
 		}
+		level.Info(logger).Log("msg", "Exit for updated launcher")
 		return errors.New("Exiting launcher to allow a service manager restart")
 	}
 }

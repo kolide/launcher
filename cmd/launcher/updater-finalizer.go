@@ -25,6 +25,7 @@ func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() e
 			)
 		}
 		// replace launcher
+		level.Info(logger).Log("msg", "Exec for updated launcher")
 		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 			return errors.Wrap(err, "restarting launcher")
 		}
