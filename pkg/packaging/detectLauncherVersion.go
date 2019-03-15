@@ -40,7 +40,6 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 			return errors.Wrap(err, "formatting version")
 		}
 		level.Debug(logger).Log("msg", "reformating for windows", "newVersion", version)
-
 	}
 
 	p.PackageVersion = version
@@ -53,7 +52,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 // Windows packages must confirm to W.X.Y.Z, so we convert our git
 // format to that.
 func formatVersion(rawVersion string) (string, error) {
-	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:-(.+))?`)
+	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:-(\d+).*)?`)
 	if err != nil {
 		return "", errors.Wrap(err, "version regex")
 	}
@@ -89,6 +88,5 @@ func formatVersion(rawVersion string) (string, error) {
 	}
 
 	version := fmt.Sprintf("%s.%s.%s.%s", major, minor, patch, commits)
-
 	return version, nil
 }
