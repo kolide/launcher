@@ -12,14 +12,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// launcherFinalizer finalizes a launcher update. It assume the new
+// updateFinalizer finalizes a launcher update. It assume the new
 // binary has been copied into place, and calls exec, so we start a
 // new running launcher in our place.
-func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
+func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
 	return func() error {
 		if err := shutdownOsquery(); err != nil {
 			level.Info(logger).Log(
-				"method", "launcherFinalizer",
+				"method", "updateFinalizer",
 				"err", err,
 				"stack", fmt.Sprintf("%+v", err),
 			)

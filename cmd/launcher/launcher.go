@@ -334,7 +334,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 		launcherUpdater, err := createUpdater(
 			ctx,
 			launcherPath,
-			launcherFinalizer(logger, runnerShutdown),
+			updateFinalizer(logger, runnerShutdown),
 			logger,
 			config,
 		)
