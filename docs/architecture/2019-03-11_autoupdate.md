@@ -45,6 +45,13 @@ Second, Windows does not support `exec`. Instead, we will exit
 launcher, and assume the service manager will restart. Empirically, it
 will start the new binary on the configured path.
 
+Exiting launcher is hard to navigate. Things inside TUF are buried
+deep in routines. Simple returning an error isn't enough. While we
+could call `os.Exit` that seems abrupt. So instead, we plumb the
+signal channel through, and signal a `os.Interrupt` on it. (Note that
+it's not a _signal_ in the posix sense. It's a constant sent to a
+channel)
+
 ### Example Code
 
 There an [example service](/tools/upgrade-exec-service-testing/)
