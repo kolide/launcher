@@ -30,7 +30,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
 		Spotlight(),
-		UserAvatar(client),
+		UserAvatar(logger),
 		legacyexec.TablePlugin(),
 		kextpolicy.TablePlugin(),
 	}
