@@ -18,7 +18,8 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	localTUFRepoPath, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 
-	require.Nil(t, createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
+	u := &Updater{}
+	require.Nil(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
 
 	knownFilePaths := []string{
 		"launcher-tuf/root.json",
