@@ -107,13 +107,13 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 // assets. (TUF requires an initial starting repo)
 func (u *Updater) createLocalTufRepo() error {
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
-		return err
+		return errors.Wrapf(err, "mkdir LocalRepoPath (%s)", u.settings.LocalRepoPath)
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("pkg", "autoupdate", "assets", localRepo)
 
 	if err := u.createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
-		return err
+		return errors.Wrapf(err, "createTUFRepoDirectory %s", u.settings.LocalRepoPath)
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ type assetDirFunc func(string) ([]string, error)
 func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "assetDir")
 	}
 
 	for _, assetPath := range paths {
@@ -157,7 +157,7 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 		// if fullAssetPath is not a JSON file, it's a directory. Create the
 		// directory in localPath and recurse into it
 		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
-			return err
+			return errors.Wrapf(err, "mkdir fullLocalPath (%s)", fullLocalPath)
 		}
 		if err := u.createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
 			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
