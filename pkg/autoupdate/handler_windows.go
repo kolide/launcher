@@ -65,7 +65,8 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		// On windows, this is expected to return an error to signal the
 		// restart. This is a bit confusing, but hard to untangle.
 		if err := u.finalizer(); err != nil {
-			level.Info(u.logger).Log("msg", "calling restart function for updated binary", "binary", u.destination, "err", err)
+			level.Info(u.logger).Log("msg", "signaling restart function for updated binary", "binary", u.destination, "err", err)
+			u.sigChannel <- os.Interrupt
 			return
 		}
 

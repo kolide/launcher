@@ -84,7 +84,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	go func() {
 		err := runLauncher(ctx, cancel, w.opts, w.logger)
 		if err != nil {
-			level.Info(w.logger).Log("err", err, "stack", fmt.Sprintf("%+v", err))
+			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
@@ -93,7 +93,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// nothing, the service is left running, but with no
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
-		level.Info(w.logger).Log("msg", "Launcher exiting cleanly")
+		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		os.Exit(0)
 	}()

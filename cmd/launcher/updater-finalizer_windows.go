@@ -19,6 +19,7 @@ func launcherFinalizer(logger log.Logger, shutdownOsquery func() error) func() e
 	return func() error {
 		if err := shutdownOsquery(); err != nil {
 			level.Info(logger).Log(
+				"msg", "calling shutdownOsquery",
 				"method", "launcherFinalizer",
 				"err", err,
 				"stack", fmt.Sprintf("%+v", err),

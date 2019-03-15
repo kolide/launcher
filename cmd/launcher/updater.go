@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -24,6 +25,8 @@ type updaterConfig struct {
 	MirrorURL string
 
 	HTTPClient *http.Client
+
+	SigChannel chan os.Signal
 }
 
 func createUpdater(
@@ -44,6 +47,7 @@ func createUpdater(
 		autoupdate.WithMirrorURL(config.MirrorURL),
 		autoupdate.WithFinalizer(finalizer),
 		autoupdate.WithUpdateChannel(config.UpdateChannel),
+		autoupdate.WithSigChannel(config.SigChannel),
 	)
 	if err != nil {
 		return nil, err

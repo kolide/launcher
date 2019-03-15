@@ -49,6 +49,7 @@ type Updater struct {
 	logger             log.Logger
 	bootstrapFn        func() error
 	strippedBinaryName string
+	sigChannel         chan os.Signal
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
@@ -173,6 +174,13 @@ type UpdaterOption func(*Updater)
 func WithHTTPClient(client *http.Client) UpdaterOption {
 	return func(u *Updater) {
 		u.client = client
+	}
+}
+
+// WithSigChannel configures the channel uses for shutdown signaling
+func WithSigChannel(sc chan os.Signal) UpdaterOption {
+	return func(u *Updater) {
+		u.sigChannel = sc
 	}
 }
 
