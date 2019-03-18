@@ -54,7 +54,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 
 	level.Debug(logger).Log(
 		"msg", "Running pkbuild",
-		"args", args,
+		"args", fmt.Sprintf("%v", args),
 	)
 
 	cmd := exec.CommandContext(ctx, "pkgbuild", args...)
