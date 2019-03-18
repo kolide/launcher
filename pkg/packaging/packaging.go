@@ -38,7 +38,6 @@ type PackageOptions struct {
 	InsecureTransport bool
 	Autoupdate        bool
 	UpdateChannel     string
-	Control           bool
 	InitialRunner     bool
 	ControlHostname   string
 	DisableControlTLS bool
@@ -113,8 +112,9 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherBoolFlags = append(launcherBoolFlags, "with_initial_runner")
 	}
 
-	if p.Control && p.ControlHostname != "" {
+	if p.ControlHostname != "" {
 		launcherMapFlags["control_hostname"] = p.ControlHostname
+		launcherBoolFlags = append(launcherBoolFlags, "control")
 	}
 
 	if p.Autoupdate && p.UpdateChannel != "" {
