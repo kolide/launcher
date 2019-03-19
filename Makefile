@@ -92,7 +92,6 @@ binary-bundle: codesign
 	rm -rf build/binary-bundle
 	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
 	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
-	cp build/binary-bundle/launcher_${VERSION}.zip build/binary-bundle/launcher_latest.zip
 
 build/binary-bundle/%:
 	mkdir -p $@
