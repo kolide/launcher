@@ -30,9 +30,8 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.
 	}
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
-		table.TextColumn("origin_url"),
-		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
+		table.BigIntColumn("frequency"),
 	}
 	return table.NewPlugin("kolide_chrome_login_keychain", columns, c.generate)
 }
@@ -62,7 +61,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string, 
 
 	db.Exec("PRAGMA journal_mode=WAL;")
 
-	rows, err := db.Query("SELECT origin_url, action_url, username_value FROM logins")
+	rows, err := db.Query("SELECT username_value, count(*) AS frequency FROM logins GROUP BY lower(username_value)")
 	if err != nil {
 		return nil, errors.Wrap(err, "query rows from chrome login keychain db")
 	}
@@ -72,18 +71,15 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string, 
 
 	// loop through all the sqlite rows and add them as osquery rows in the results map
 	for rows.Next() { // we initialize these variables for every row, that way we don't have data from the previous iteration
-		var origin_url string
-		var action_url string
 		var username_value string
-		if err := rows.Scan(&origin_url, &action_url, &username_value); err != nil {
+		var username_freq string
+		if err := rows.Scan(&username_value, &username_freq); err != nil {
 			return nil, errors.Wrap(err, "scanning chrome login keychain db row")
 		}
-
 		results = append(results, map[string]string{
-			"origin_url":     origin_url,
-			"action_url":     action_url,
-			"username_value": username_value,
 			"username":       username,
+			"username_value": username_value,
+			"frequency":      username_freq,
 		})
 	}
 	return results, nil
