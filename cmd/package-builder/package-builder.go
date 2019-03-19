@@ -94,11 +94,6 @@ func runMake(args []string) error {
 			env.String("UPDATE_CHANNEL", ""),
 			"the value that should be used when invoking the launcher's --update_channel flag",
 		)
-		flControl = flagset.Bool(
-			"control",
-			env.Bool("CONTROL", false),
-			"whether or not the launcher packages should invoke the launcher's --control flag",
-		)
 		flControlHostname = flagset.String(
 			"control_hostname",
 			env.String("CONTROL_HOSTNAME", ""),
@@ -204,7 +199,6 @@ func runMake(args []string) error {
 		InsecureTransport: *flInsecureTransport,
 		Autoupdate:        *flAutoupdate,
 		UpdateChannel:     *flUpdateChannel,
-		Control:           *flControl,
 		InitialRunner:     *flInitialRunner,
 		ControlHostname:   *flControlHostname,
 		DisableControlTLS: *flDisableControlTLS,
