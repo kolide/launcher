@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -16,22 +17,49 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-type onePasswordAccountConfig struct {
+var onepasswordDataFiles = map[string][]string{
+	"windows": []string{"AppData/Local/1password/data/1Password10.sqlite"},
+	"darwin": []string{
+		"Library/Application Support/1Password 4/Data/B5.sqlite",
+		"Library/Group Containers/2BUA8C4S2C.com.agilebits/Library/Application Support/1Password/Data/B5.sqlite",
+		"Library/Containers/2BUA8C4S2C.com.agilebits.onepassword-osx-helper/Data/Library/Data/B5.sqlite",
+	},
+}
+
+func OnePasswordAccounts(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.TextColumn("username"),
+		table.TextColumn("user_email"),
+		table.TextColumn("team_name"),
+		table.TextColumn("user_first_name"),
+		table.TextColumn("user_last_name"),
+		table.TextColumn("account_type"),
+	}
+
+	o := &onePasswordAccountsTable{
+		client: client,
+		logger: logger,
+	}
+
+	return table.NewPlugin("kolide_onepassword_accounts", columns, o.generate)
+}
+
+type onePasswordAccountsTable struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
 // generate the onepassword account info results given the path to a
 // onepassword sqlite DB
-func (o *onePasswordAccountConfig) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_onepassword_account_config")
+func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
+	dir, err := ioutil.TempDir("", "kolide_onepassword_accounts")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_onepassword_account_config tmp dir")
+		return nil, errors.Wrap(err, "creating kolide_onepassword_accounts tmp dir")
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(path, dst); err != nil {
+	if err := fs.CopyFile(fileInfo.path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
 	}
 
@@ -43,7 +71,7 @@ func (o *onePasswordAccountConfig) generateForPath(ctx context.Context, path str
 
 	db.Exec("PRAGMA journal_mode=WAL;")
 
-	rows, err := db.Query("SELECT user_email FROM accounts")
+	rows, err := db.Query("SELECT user_email, team_name, user_first_name, user_last_name, account_type FROM accounts")
 	if err != nil {
 		return nil, errors.Wrap(err, "query rows from onepassword account configuration db")
 	}
@@ -51,37 +79,52 @@ func (o *onePasswordAccountConfig) generateForPath(ctx context.Context, path str
 
 	var results []map[string]string
 	for rows.Next() {
-		var email string
-		if err := rows.Scan(&email); err != nil {
+		var email, team, firstName, lastName, accountType string
+		if err := rows.Scan(&email, &team, &firstName, &lastName, &accountType); err != nil {
 			return nil, errors.Wrap(err, "scanning onepassword account configuration db row")
 		}
-		if email == "" {
-			continue
-		}
-		results = addEmailToResults(email, results)
+		results = append(results, map[string]string{
+			"user_email":      email,
+			"username":        fileInfo.user,
+			"team_name":       team,
+			"user_first_name": firstName,
+			"user_last_name":  lastName,
+			"account_type":    accountType,
+		})
 	}
 	return results, nil
 }
 
-func (o *onePasswordAccountConfig) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	files, err := findFileInUserDirs("Library/Application Support/1Password 4/Data/B5.sqlite", o.logger)
-	if err != nil {
-		return nil, errors.Wrap(err, "find onepassword sqlite DBs")
+func (o *onePasswordAccountsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+	osDataFiles, ok := onepasswordDataFiles[runtime.GOOS]
+	if !ok {
+		return results, errors.New("No onepasswordDataFiles for this platform")
 	}
 
-	var results []map[string]string
-	for _, file := range files {
-		res, err := o.generateForPath(ctx, file.path)
+	for _, dataFilePath := range osDataFiles {
+		files, err := findFileInUserDirs(dataFilePath, o.logger)
 		if err != nil {
 			level.Info(o.logger).Log(
-				"msg", "Generating onepassword result",
-				"path", file.path,
+				"msg", "Find 1password sqlite DBs",
+				"path", dataFilePath,
 				"err", err,
 			)
 			continue
 		}
-		results = append(results, res...)
-	}
 
+		for _, file := range files {
+			res, err := o.generateForPath(ctx, file)
+			if err != nil {
+				level.Info(o.logger).Log(
+					"msg", "Generating onepassword result",
+					"path", file.path,
+					"err", err,
+				)
+				continue
+			}
+			results = append(results, res...)
+		}
+	}
 	return results, nil
 }
