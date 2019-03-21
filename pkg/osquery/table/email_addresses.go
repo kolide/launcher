@@ -2,9 +2,6 @@ package table
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -20,23 +17,32 @@ func EmailAddresses(client *osquery.ExtensionManagerClient, logger log.Logger) *
 	}
 	t := &emailAddressesTable{
 		onePasswordAccountConfig: &onePasswordAccountConfig{client: client, logger: logger},
+		chromeUserProfilesTable:  &chromeUserProfilesTable{client: client, logger: logger},
 	}
 	return table.NewPlugin("kolide_email_addresses", columns, t.generateEmailAddresses)
 }
 
 type emailAddressesTable struct {
 	onePasswordAccountConfig *onePasswordAccountConfig
+	chromeUserProfilesTable  *chromeUserProfilesTable
 }
 
 func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
 	// add results from chrome profiles
-	chromeResults, err := generateEmailAddressesFromChromeState()
+	chromeResults, err := t.chromeUserProfilesTable.generate(ctx, queryContext)
 	if err != nil {
 		return nil, errors.Wrap(err, "get email addresses from chrome state")
 	}
-	results = append(results, chromeResults...)
+	for _, result := range chromeResults {
+		email := result["email"]
+		// chrome profiles don't require an email skip ones without emails
+		if email == "" {
+			continue
+		}
+		results = addEmailToResults(email, results)
+	}
 
 	// add results from 1password
 	onePassResults, err := t.onePasswordAccountConfig.generate(ctx, queryContext)
@@ -46,37 +52,6 @@ func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryC
 	results = append(results, onePassResults...)
 
 	return results, nil
-}
-
-func generateEmailAddressesFromChromeState() ([]map[string]string, error) {
-	var results []map[string]string
-	for _, stateFilePath := range findChromeStateFiles() {
-		fileContent, err := ioutil.ReadFile(stateFilePath)
-		if os.IsNotExist(err) {
-			break
-		}
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not read file %s", stateFilePath)
-		}
-
-		var parsedStateFileContent chromeLocalStateFile
-		if err := json.Unmarshal(fileContent, &parsedStateFileContent); err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal json file")
-		}
-
-		for _, profile := range parsedStateFileContent.Profile.InfoCache {
-			results = addEmailToResults(profile.Username, results)
-		}
-	}
-	return results, nil
-}
-
-type chromeLocalStateFile struct {
-	Profile struct {
-		InfoCache map[string]struct {
-			Username string `json:"user_name"`
-		} `json:"info_cache"`
-	} `json:"profile"`
 }
 
 func emailDomain(email string) string {
