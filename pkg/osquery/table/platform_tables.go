@@ -11,6 +11,7 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	return []*table.Plugin{
 		BestPractices(client),
+		ChromeLoginDataEmails(client, logger),
 		EmailAddresses(client, logger),
 		LauncherInfoTable(),
 	}

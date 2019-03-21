@@ -14,9 +14,9 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
-
 )
 
+// DEPRECATED use kolide_chrome_login_data_emails
 func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
 		client: client,
@@ -38,18 +38,18 @@ type ChromeLoginKeychain struct {
 func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
 	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "creating kolide_chrome_login_keychain tmp dir")
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fs.CopyFile(path, dst); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "copying db to tmp dir")
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "connecting to sqlite db")
 	}
 	defer db.Close()
 
@@ -82,18 +82,18 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 }
 
 func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	paths, err := findFileInUserDirs("Library/Application Support/Google/Chrome/Default/Login Data")
+	files, err := findFileInUserDirs("Library/Application Support/Google/Chrome/*/Login Data", c.logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "find chrome login data sqlite DBs")
 	}
 
 	var results []map[string]string
-	for _, path := range paths {
-		res, err := c.generateForPath(ctx, path)
+	for _, file := range files {
+		res, err := c.generateForPath(ctx, file.path)
 		if err != nil {
 			level.Info(c.logger).Log(
 				"msg", "Generating chrome keychain result",
-				"path", path,
+				"path", file.path,
 				"err", err,
 			)
 			continue
