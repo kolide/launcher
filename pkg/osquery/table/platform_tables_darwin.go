@@ -30,6 +30,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		MDMInfo(logger),
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
+		SlackConfig(client, logger),
 		Spotlight(),
 		UserAvatar(logger),
 		legacyexec.TablePlugin(),

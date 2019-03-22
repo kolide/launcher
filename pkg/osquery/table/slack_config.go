@@ -1,0 +1,114 @@
+package table
+
+import (
+	"context"
+	"encoding/json"
+	"io/ioutil"
+	"path/filepath"
+	"runtime"
+	"strconv"
+
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	osquery "github.com/kolide/osquery-go"
+	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/pkg/errors"
+)
+
+var slackConfigDirs = map[string][]string{
+	"windows": []string{"AppData/Roaming/Slack/storage"},
+	"darwin":  []string{"/Library/Application Support/Slack/storage"},
+}
+var slackConfigDirDefault = []string{".config/Slack/storage/"}
+
+func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.TextColumn("team_id"),
+		table.TextColumn("team_name"),
+		table.TextColumn("team_url"),
+		table.TextColumn("logged_in"),
+		table.TextColumn("user_handle"),
+		table.TextColumn("user_id"),
+	}
+
+	t := &SlackConfigTable{
+		client: client,
+		logger: logger,
+	}
+
+	return table.NewPlugin("kolide_slack_config", columns, t.generate)
+}
+
+type SlackConfigTable struct {
+	client *osquery.ExtensionManagerClient
+	logger log.Logger
+}
+
+type slackTeamsFile map[string]struct {
+	LoggedIn   bool   `json:"hasValidSession"`
+	TeamID     string `json:"team_id"`
+	TeamName   string `json:"team_name"`
+	TeamUrl    string `json:"team_url"`
+	UserHandle string `json:"name"`
+	UserID     string `json:"user_id"`
+}
+
+func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
+	var results []map[string]string
+	data, err := ioutil.ReadFile(file.path)
+	if err != nil {
+		return results, errors.Wrap(err, "Reading slack teams file")
+	}
+	var slackTeamConfigs slackTeamsFile
+	if err := json.Unmarshal(data, &slackTeamConfigs); err != nil {
+		return results, errors.Wrap(err, "unmarshalling slack teams")
+	}
+	for _, teamConfig := range slackTeamConfigs {
+		results = append(results, map[string]string{
+			"team_id":     teamConfig.TeamID,
+			"team_name":   teamConfig.TeamName,
+			"team_url":    teamConfig.TeamUrl,
+			"logged_in":   strconv.Itoa(btoi(teamConfig.LoggedIn)),
+			"user_handle": teamConfig.UserHandle,
+			"user_id":     teamConfig.UserID,
+		})
+	}
+
+	return results, nil
+}
+
+func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+	// Prevent this table from being used to easily enumerate a user's slack teams
+	q, ok := queryContext.Constraints["team_id"]
+	if ok && len(q.Constraints) == 0 {
+		return results, errors.New("The kolide_slack_config table requires that you specify a constraint WHERE team_id =")
+	}
+	osProfileDirs, ok := slackConfigDirs[runtime.GOOS]
+	if !ok {
+		osProfileDirs = slackConfigDirDefault
+	}
+	for _, profileDir := range osProfileDirs {
+		files, err := findFileInUserDirs(filepath.Join(profileDir, "slack-teams"), t.logger)
+		if err != nil {
+			level.Info(t.logger).Log(
+				"msg", "Finding slack teams json",
+				"path", profileDir,
+				"err", err,
+			)
+			continue
+		}
+		for _, file := range files {
+			res, err := t.generateForPath(ctx, file)
+			if err != nil {
+				level.Info(t.logger).Log(
+					"msg", "Generating slack team result",
+					"path", file.path,
+					"err", err,
+				)
+			}
+			results = append(results, res...)
+		}
+	}
+	return results, nil
+}
