@@ -106,6 +106,7 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 					"path", file.path,
 					"err", err,
 				)
+				continue
 			}
 			results = append(results, res...)
 		}
