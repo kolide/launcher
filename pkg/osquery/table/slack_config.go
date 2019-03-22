@@ -19,6 +19,7 @@ var slackConfigDirs = map[string][]string{
 	"windows": []string{"AppData/Roaming/Slack/storage"},
 	"darwin":  []string{"Library/Application Support/Slack/storage"},
 }
+// try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var slackConfigDirDefault = []string{".config/Slack/storage/"}
 
 func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
