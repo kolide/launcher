@@ -17,7 +17,7 @@ import (
 
 var slackConfigDirs = map[string][]string{
 	"windows": []string{"AppData/Roaming/Slack/storage"},
-	"darwin":  []string{"/Library/Application Support/Slack/storage"},
+	"darwin":  []string{"Library/Application Support/Slack/storage"},
 }
 var slackConfigDirDefault = []string{".config/Slack/storage/"}
 
