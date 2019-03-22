@@ -113,3 +113,10 @@ func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) 
 	}
 	return foundPaths, nil
 }
+
+func btoi(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
