@@ -26,7 +26,7 @@ func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("team_id"),
 		table.TextColumn("team_name"),
 		table.TextColumn("team_url"),
-		table.TextColumn("logged_in"),
+		table.IntegerColumn("logged_in"),
 		table.TextColumn("user_handle"),
 		table.TextColumn("user_id"),
 	}
@@ -82,7 +82,14 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 	// Prevent this table from being used to easily enumerate a user's slack teams
 	q, ok := queryContext.Constraints["team_id"]
 	if ok && len(q.Constraints) == 0 {
-		return results, errors.New("The kolide_slack_config table requires that you specify a constraint WHERE team_id =")
+	return results, errors.New("The kolide_slack_config table requires that you specify a constraint WHERE team_id =")
+	}
+	if ok { // If we have a constraint on team_id limit it to the = operator
+			for _, constraint := range q.Constraints {
+				if constraint.Operator != table.OperatorEquals {
+					return results, errors.New("The kolide_slack_config table only accepts = constraints on the team_id column")
+				}
+			}
 	}
 	osProfileDirs, ok := slackConfigDirs[runtime.GOOS]
 	if !ok {
