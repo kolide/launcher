@@ -19,6 +19,7 @@ var chromeLocalStateDirs = map[string][]string{
 	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
 	"darwin":  []string{"Library/Application Support/Google/Chrome"},
 }
+// try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var chromeLocalStateDirDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
 func ChromeUserProfiles(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -31,7 +32,7 @@ func ChromeUserProfiles(client *osquery.ExtensionManagerClient, logger log.Logge
 		table.TextColumn("username"),
 		table.TextColumn("email"),
 		table.TextColumn("name"),
-		table.TextColumn("ephemeral"),
+		table.IntegerColumn("ephemeral"),
 	}
 
 	return table.NewPlugin("kolide_chrome_user_profiles", columns, c.generate)
