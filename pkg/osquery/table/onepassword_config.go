@@ -31,6 +31,7 @@ func OnePasswordAccounts(client *osquery.ExtensionManagerClient, logger log.Logg
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
 		table.TextColumn("team_name"),
+		table.TextColumn("server"),
 		table.TextColumn("user_first_name"),
 		table.TextColumn("user_last_name"),
 		table.TextColumn("account_type"),
@@ -69,9 +70,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	}
 	defer db.Close()
 
-	db.Exec("PRAGMA journal_mode=WAL;")
-
-	rows, err := db.Query("SELECT user_email, team_name, user_first_name, user_last_name, account_type FROM accounts")
+	rows, err := db.Query("SELECT user_email, team_name, server, user_first_name, user_last_name, account_type FROM accounts")
 	if err != nil {
 		return nil, errors.Wrap(err, "query rows from onepassword account configuration db")
 	}
@@ -79,14 +78,15 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 
 	var results []map[string]string
 	for rows.Next() {
-		var email, team, firstName, lastName, accountType string
-		if err := rows.Scan(&email, &team, &firstName, &lastName, &accountType); err != nil {
+		var email, team, server, firstName, lastName, accountType string
+		if err := rows.Scan(&email, &team, &server, &firstName, &lastName, &accountType); err != nil {
 			return nil, errors.Wrap(err, "scanning onepassword account configuration db row")
 		}
 		results = append(results, map[string]string{
 			"user_email":      email,
 			"username":        fileInfo.user,
 			"team_name":       team,
+			"server":          server,
 			"user_first_name": firstName,
 			"user_last_name":  lastName,
 			"account_type":    accountType,
