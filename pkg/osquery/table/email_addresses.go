@@ -16,14 +16,14 @@ func EmailAddresses(client *osquery.ExtensionManagerClient, logger log.Logger) *
 		table.TextColumn("domain"),
 	}
 	t := &emailAddressesTable{
-		onePasswordAccountConfig: &onePasswordAccountConfig{client: client, logger: logger},
+		onePasswordAccountsTable: &onePasswordAccountsTable{client: client, logger: logger},
 		chromeUserProfilesTable:  &chromeUserProfilesTable{client: client, logger: logger},
 	}
 	return table.NewPlugin("kolide_email_addresses", columns, t.generateEmailAddresses)
 }
 
 type emailAddressesTable struct {
-	onePasswordAccountConfig *onePasswordAccountConfig
+	onePasswordAccountsTable *onePasswordAccountsTable
 	chromeUserProfilesTable  *chromeUserProfilesTable
 }
 
@@ -45,11 +45,13 @@ func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryC
 	}
 
 	// add results from 1password
-	onePassResults, err := t.onePasswordAccountConfig.generate(ctx, queryContext)
+	onePassResults, err := t.onePasswordAccountsTable.generate(ctx, queryContext)
 	if err != nil {
 		return nil, errors.Wrap(err, "adding email results from 1password config")
 	}
-	results = append(results, onePassResults...)
+	for _, onePassResult := range onePassResults {
+		results = addEmailToResults(onePassResult["user_email"], results)
+	}
 
 	return results, nil
 }

@@ -15,6 +15,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		ChromeUserProfiles(client, logger),
 		EmailAddresses(client, logger),
 		LauncherInfoTable(),
+		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
 	}
 }
