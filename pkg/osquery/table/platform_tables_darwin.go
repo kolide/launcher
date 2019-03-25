@@ -20,6 +20,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		BestPractices(client),
 		ChromeLoginDataEmails(client, logger),
 		ChromeLoginKeychainInfo(client, logger),
+		ChromeUserProfiles(client, logger),
 		EmailAddresses(client, logger),
 		GDriveSyncConfig(client, logger),
 		GDriveSyncHistoryInfo(client, logger),
