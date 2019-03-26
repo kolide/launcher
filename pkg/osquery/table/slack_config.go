@@ -19,6 +19,7 @@ var slackConfigDirs = map[string][]string{
 	"windows": []string{"AppData/Roaming/Slack/storage"},
 	"darwin":  []string{"Library/Application Support/Slack/storage"},
 }
+
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var slackConfigDirDefault = []string{".config/Slack/storage/"}
 
@@ -83,14 +84,14 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 	// Prevent this table from being used to easily enumerate a user's slack teams
 	q, ok := queryContext.Constraints["team_id"]
 	if ok && len(q.Constraints) == 0 {
-	return results, errors.New("The kolide_slack_config table requires that you specify a constraint WHERE team_id =")
+		return results, errors.New("The kolide_slack_config table requires that you specify a constraint WHERE team_id =")
 	}
 	if ok { // If we have a constraint on team_id limit it to the = operator
-			for _, constraint := range q.Constraints {
-				if constraint.Operator != table.OperatorEquals {
-					return results, errors.New("The kolide_slack_config table only accepts = constraints on the team_id column")
-				}
+		for _, constraint := range q.Constraints {
+			if constraint.Operator != table.OperatorEquals {
+				return results, errors.New("The kolide_slack_config table only accepts = constraints on the team_id column")
 			}
+		}
 	}
 	osProfileDirs, ok := slackConfigDirs[runtime.GOOS]
 	if !ok {
