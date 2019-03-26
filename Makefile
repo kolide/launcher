@@ -105,7 +105,8 @@ lint: \
 	lint-go-deadcode \
 	lint-misspell \
 	lint-go-vet \
-	lint-go-nakedret
+	lint-go-nakedret \
+	lint-go-fmt
 
 lint-go-deadcode: deps-go
 	deadcode cmd/ pkg/
@@ -120,6 +121,13 @@ lint-go-vet:
 
 lint-go-nakedret: deps-go
 	nakedret ./...
+
+# This is a big ugly, since go-fmt doesn't have a simple exit code. Thus the doubled echo and test.
+lint-go-fmt: export FMTFAILS = $(shell gofmt -l ./pkg/ ./cmd/ | grep -vE 'assets.go|bindata.go')
+lint-go-fmt: deps-go
+	@test -z "$(FMTFAILS)" || echo gofmt failures in: "$(FMTFAILS)"
+	@test -z "$(FMTFAILS)"
+
 
 
 builder:
