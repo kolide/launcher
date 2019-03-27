@@ -68,7 +68,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	if includeService {
 		launcherService := wix.NewService("launcher.exe",
-			wix.ServiceName(fmt.Sprintf("KolideLauncher%sSvc", strings.Title(po.Identifier))),
+			wix.ServiceName(fmt.Sprintf("Launcher%sSvc", strings.Title(po.Identifier))),
 			wix.ServiceArgs([]string{"svc", "-config", po.FlagFile}),
 			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),
 		)
