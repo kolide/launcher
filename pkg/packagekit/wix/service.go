@@ -110,10 +110,10 @@ type ServiceOpt func(*Service)
 
 func ServiceName(name string) ServiceOpt {
 	return func(s *Service) {
-		s.serviceControl.Id = name
-		s.serviceControl.Name = name
-		s.serviceInstall.Id = name
-		s.serviceInstall.Name = name
+		s.serviceControl.Id = cleanServiceName(name)
+		s.serviceControl.Name = cleanServiceName(name)
+		s.serviceInstall.Id = cleanServiceName(name)
+		s.serviceInstall.Name = cleanServiceName(name)
 	}
 }
 
@@ -149,17 +149,6 @@ func ServiceArgs(args []string) ServiceOpt {
 
 // New returns a service
 func NewService(matchString string, opts ...ServiceOpt) *Service {
-	// Windows seems a bit fussy about allowable characters. So, we'll
-	// replace some obvious ones, and snake case the whole thing.
-	r := strings.NewReplacer(
-		"-", "_",
-		" ", "_",
-		".", "_",
-	)
-
-	snakeName := r.Replace(strings.TrimSuffix(matchString, ".exe") + "_svc")
-	defaultName := snaker.SnakeToCamel(snakeName)
-
 	// Set some defaults. It's not clear we can reset in under a
 	// day. See https://github.com/wixtoolset/issues/issues/5963
 	sconfig := &ServiceConfig{
@@ -171,8 +160,8 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	si := &ServiceInstall{
-		Name:          defaultName,
-		Id:            defaultName,
+		Name:          cleanServiceName(matchString),
+		Id:            cleanServiceName(matchString),
 		Account:       `NT AUTHORITY\SYSTEM`,
 		Start:         StartAuto,
 		Type:          "ownProcess",
@@ -182,8 +171,8 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	sc := &ServiceControl{
-		Name:   defaultName,
-		Id:     defaultName,
+		Name:   cleanServiceName(matchString),
+		Id:     cleanServiceName(matchString),
 		Stop:   InstallUninstallBoth,
 		Start:  InstallUninstallInstall,
 		Remove: InstallUninstallUninstall,
@@ -240,4 +229,17 @@ func (s *Service) Xml(w io.Writer) error {
 
 	return nil
 
+}
+
+// cleanServiceName removes characters windows doesn't like in
+// services names, and converts everything to camel case.
+func cleanServiceName(in string) string {
+	r := strings.NewReplacer(
+		"-", "_",
+		" ", "_",
+		".", "_",
+	)
+
+	snakeName := r.Replace(strings.TrimSuffix(in, ".exe") + "_svc")
+	return snaker.SnakeToCamel(snakeName)
 }
