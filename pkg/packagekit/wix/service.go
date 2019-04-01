@@ -232,7 +232,7 @@ func (s *Service) Xml(w io.Writer) error {
 }
 
 // cleanServiceName removes characters windows doesn't like in
-// services names, and converts everything to snake case.
+// services names, and converts everything to camel case.
 func cleanServiceName(in string) string {
 	r := strings.NewReplacer(
 		"-", "_",
@@ -241,7 +241,5 @@ func cleanServiceName(in string) string {
 	)
 
 	snakeName := r.Replace(strings.TrimSuffix(in, ".exe") + "_svc")
-	defaultName := snaker.SnakeToCamel(snakeName)
-
-	return defaultName
+	return snaker.SnakeToCamel(snakeName)
 }
