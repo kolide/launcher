@@ -301,9 +301,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	if opts.control {
 		control, err := createControl(ctx, db, logger, opts)
 		if err != nil {
-			return errors.Wrap(err, "create conrol actor")
+			return errors.Wrap(err, "create control actor")
 		}
-		runGroup.Add(control.Execute, control.Interrupt)
+		if control != nil {
+			runGroup.Add(control.Execute, control.Interrupt)
+		} else {
+			level.Debug(logger).Log("msg", "got nil control actor. Ignoring")
+		}
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher

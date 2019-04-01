@@ -7,10 +7,14 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
-	"github.com/pkg/errors"
 )
 
+// createControl creates a no-op actor, as the control server isn't
+// yet supported on windows.
 func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *options) (*actor.Actor, error) {
-	return nil, errors.New("control is not supported for windows")
+	level.Info(logger).Log("msg", "Cannot create control channel for windows, ignoring")
+
+	return nil, nil
 }
