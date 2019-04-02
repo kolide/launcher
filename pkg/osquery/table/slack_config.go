@@ -16,7 +16,10 @@ import (
 )
 
 var slackConfigDirs = map[string][]string{
-	"windows": []string{"AppData/Roaming/Slack"},
+	"windows": []string{
+		"AppData/Roaming/Slack",
+		"AppData/Local/Packages/*.Slack*/LocalCache/Roaming/Slack",
+	},
 	"darwin": []string{
 		"Library/Application Support/Slack",
 		"Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack",
