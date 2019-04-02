@@ -69,10 +69,12 @@ require (
 	go.opencensus.io v0.18.0
 	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c // indirect
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
-	golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
+	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3 // indirect
+	golang.org/x/net v0.0.0-20190328230028-74de082e2cca
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys v0.0.0-20190402142545-baf5eb976a8c
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
+	golang.org/x/tools v0.0.0-20190402160749-c5ac96b4c419 // indirect
 	google.golang.org/grpc v1.14.0
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
