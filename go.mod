@@ -16,7 +16,9 @@ require (
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/boltdb/bolt v1.3.1
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
+	github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
+	github.com/cenk/backoff v1.0.0
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
@@ -24,6 +26,8 @@ require (
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
 	github.com/docker/distribution v2.6.2+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7
+	github.com/dvsekhvalnov/jose2go v0.0.0-20170216131308-f21a8cedbbae
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
@@ -37,6 +41,7 @@ require (
 	github.com/gorilla/websocket v1.2.0
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
+	github.com/inconshreveable/mousetrap v1.0.0
 	github.com/jinzhu/gorm v1.9.1 // indirect
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
@@ -47,17 +52,19 @@ require (
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mattn/go-sqlite3 v1.10.0
-	github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b // indirect
+	github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f // indirect
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
+	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/peterbourgon/ff v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.2.0 // indirect
+	github.com/spf13/cobra v0.0.1
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf

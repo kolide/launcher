@@ -142,8 +142,8 @@ github.com/mattn/go-sqlite3 v1.10.0 h1:jbhqpg7tQe4SupckyijYiy0mJJ/pRyHvXf7JdWK86
 github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b h1:uumfVsC21COkmPFmtJvv+HHeZPZgkO/lKynUEQu52yg=
-github.com/miekg/pkcs11 v0.0.0-20171207072458-57296583125b/go.mod h1:WCBAbTOdfhHhz7YXujeZMF7owC4tPb1naKFsgfUISjo=
+github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f h1:8MAK/u+dE11/n8VIHQRfXX6VElJl6gD60VzbE8Qxggg=
+github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f/go.mod h1:WCBAbTOdfhHhz7YXujeZMF7owC4tPb1naKFsgfUISjo=
 github.com/mitchellh/mapstructure v1.0.0 h1:vVpGvMXJPqSDh2VYHF7gsfQj8Ncx+Xw5Y1KHeTRY+7I=
 github.com/mitchellh/mapstructure v1.0.0/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea h1:eWwD4TJbXXLj8Ay2KQ1F3lh1YtgpcWZL3ZZN2sKvSDg=
