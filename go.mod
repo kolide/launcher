@@ -67,7 +67,7 @@ require (
 	github.com/spf13/cobra v0.0.1
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/theupdateframework/notary v0.0.0-20180129185925-f234167994cf
+	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
 	go.opencensus.io v0.18.0
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
