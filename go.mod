@@ -7,7 +7,6 @@ require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
-	github.com/Sirupsen/logrus v1.0.3 // indirect
 	github.com/WatchBeam/clock v0.0.0-20170901150240-b08e6b4da7ea // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
 	github.com/alexkohler/nakedret v0.0.0-20171106223215-c0e305a4f690
@@ -22,8 +21,9 @@ require (
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
-	github.com/docker/distribution v2.6.2+incompatible // indirect
+	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ghodss/yaml v1.0.0
@@ -55,13 +55,14 @@ require (
 	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
+	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
+	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/peterbourgon/ff v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stevvooe/resumable v0.0.0-20180830230917-22b14a53ba50 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
@@ -73,10 +74,8 @@ require (
 	golang.org/x/sys v0.0.0-20190402142545-baf5eb976a8c
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	google.golang.org/grpc v1.14.0
-	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
-	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
