@@ -237,12 +237,16 @@ func (s *Service) Xml(w io.Writer) error {
 }
 
 // cleanServiceName removes characters windows doesn't like in
-// services names, and converts everything to camel case.
+// services names, and converts everything to camel case. Right now,
+// it only removes likely bad characters. It is not as complete as a
+// whitelist.
 func cleanServiceName(in string) string {
 	r := strings.NewReplacer(
 		"-", "_",
 		" ", "_",
 		".", "_",
+		"/", "_",
+		"\\", "_",
 	)
 
 	return snaker.SnakeToCamel(r.Replace(in))
