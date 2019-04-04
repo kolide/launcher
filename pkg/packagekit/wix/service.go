@@ -159,9 +159,14 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 		RestartServiceDelayInSeconds: 5,
 	}
 
+	// If a service name is not specified, replace the .exe with a svc,
+	// and CamelCase it. (eg: daemon.exe becomes DaemonSvc). It is
+	// probably better to specific a ServiceName, but this might be an
+	// okay default.
+	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
 	si := &ServiceInstall{
-		Name:          cleanServiceName(matchString),
-		Id:            cleanServiceName(matchString),
+		Name:          defaultName,
+		Id:            defaultName,
 		Account:       `NT AUTHORITY\SYSTEM`,
 		Start:         StartAuto,
 		Type:          "ownProcess",
@@ -171,8 +176,8 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	sc := &ServiceControl{
-		Name:   cleanServiceName(matchString),
-		Id:     cleanServiceName(matchString),
+		Name:   defaultName,
+		Id:     defaultName,
 		Stop:   InstallUninstallBoth,
 		Start:  InstallUninstallInstall,
 		Remove: InstallUninstallUninstall,
@@ -240,6 +245,5 @@ func cleanServiceName(in string) string {
 		".", "_",
 	)
 
-	snakeName := r.Replace(strings.TrimSuffix(in, ".exe") + "_svc")
-	return snaker.SnakeToCamel(snakeName)
+	return snaker.SnakeToCamel(r.Replace(in))
 }
