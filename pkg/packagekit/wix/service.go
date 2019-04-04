@@ -159,9 +159,14 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 		RestartServiceDelayInSeconds: 5,
 	}
 
+	// If a service name is not specified, replace the .exe with a svc,
+	// and CamelCase it. (eg: daemon.exe becomes DaemonSvc). It is
+	// probably better to specific a ServiceName, but this might be an
+	// okay default.
+	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
 	si := &ServiceInstall{
-		Name:          cleanServiceName(matchString),
-		Id:            cleanServiceName(matchString),
+		Name:          defaultName,
+		Id:            defaultName,
 		Account:       `NT AUTHORITY\SYSTEM`,
 		Start:         StartAuto,
 		Type:          "ownProcess",
@@ -171,8 +176,8 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	sc := &ServiceControl{
-		Name:   cleanServiceName(matchString),
-		Id:     cleanServiceName(matchString),
+		Name:   defaultName,
+		Id:     defaultName,
 		Stop:   InstallUninstallBoth,
 		Start:  InstallUninstallInstall,
 		Remove: InstallUninstallUninstall,
@@ -232,14 +237,17 @@ func (s *Service) Xml(w io.Writer) error {
 }
 
 // cleanServiceName removes characters windows doesn't like in
-// services names, and converts everything to camel case.
+// services names, and converts everything to camel case. Right now,
+// it only removes likely bad characters. It is not as complete as a
+// whitelist.
 func cleanServiceName(in string) string {
 	r := strings.NewReplacer(
 		"-", "_",
 		" ", "_",
 		".", "_",
+		"/", "_",
+		"\\", "_",
 	)
 
-	snakeName := r.Replace(strings.TrimSuffix(in, ".exe") + "_svc")
-	return snaker.SnakeToCamel(snakeName)
+	return snaker.SnakeToCamel(r.Replace(in))
 }

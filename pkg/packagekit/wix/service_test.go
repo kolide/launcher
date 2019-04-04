@@ -51,7 +51,7 @@ func TestServiceOptions(t *testing.T) {
 		},
 		{
 			in:  NewService("snake-case.exe", ServiceName("Another-Case-Of-snakes")),
-			out: []string{`Id="AnotherCaseOfSnakesSvc"`, `Name="AnotherCaseOfSnakesSvc"`},
+			out: []string{`Id="AnotherCaseOfSnakes"`, `Name="AnotherCaseOfSnakes"`},
 		},
 		{
 			in:  NewService("daemon.exe"),
@@ -59,23 +59,23 @@ func TestServiceOptions(t *testing.T) {
 		},
 		{
 			in:  NewService("daemon.exe", ServiceName("myDaemon")),
-			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`},
+			out: []string{`Id="MyDaemon"`, `Name="MyDaemon"`},
 		},
 		{
 			in:  NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first"})),
-			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`, `Arguments="first"`},
+			out: []string{`Id="MyDaemon"`, `Name="MyDaemon"`, `Arguments="first"`},
 		},
 		{
-			in:  NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first with spaces"})),
+			in:  NewService("daemon.exe", ServiceName("myDaemon.svc"), ServiceArgs([]string{"first with spaces"})),
 			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`, `Arguments="&#34;first with spaces&#34;"`},
 		},
 
 		{
-			in:  NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first", "second"})),
+			in:  NewService("daemon.exe", ServiceName("myDaemon svc"), ServiceArgs([]string{"first", "second"})),
 			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`, `Arguments="first second"`},
 		},
 		{
-			in:  NewService("daemon.exe", ServiceName("myDaemon"), ServiceArgs([]string{"first", "second", "third has spaces"})),
+			in:  NewService("daemon.exe", ServiceName("myDaemon_svc"), ServiceArgs([]string{"first", "second", "third has spaces"})),
 			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`, `Arguments="first second &#34;third has spaces&#34;"`},
 		},
 	}
