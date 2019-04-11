@@ -1,5 +1,7 @@
 #!/bin/bash
 
+IDENTIFIER=launcher
+
 function usage() {
     echo "Clean launcher instances from your host"
     echo ""
@@ -8,6 +10,7 @@ function usage() {
     echo "  Arguments:"
     echo "    -h --help     Print help text"
     echo "    --remove-db   Remove database files"
+    echo "    --identifier  Identifier used in packaging"
     echo ""
 }
 
@@ -31,7 +34,7 @@ function main() {
   ensureMacos
   ensureRoot
 
-  countLaunchersQuery="select count(name) as launchers from launchd where name = 'com.kolide.launcher.plist';"
+  countLaunchersQuery="select count(name) as launchers from launchd where name = 'com.${IDENTIFIER}.launcher.plist';"
   launchersInstalled=`osqueryi "${countLaunchersQuery}" --line | awk '{print $3}'`
 
   if [[ $launchersInstalled -ne 1 ]]; then
@@ -40,36 +43,47 @@ function main() {
     exit 1
   fi
 
-  /bin/launchctl stop /Library/LaunchDaemons/com.kolide.launcher.plist
-  /bin/launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
+  /bin/launchctl stop /Library/LaunchDaemons/com.${IDENTIFIER}.launcher.plist
+  /bin/launchctl unload /Library/LaunchDaemons/com.${IDENTIFIER}.launcher.plist
   sleep 3
 
-  rm -rf /etc/kolide
-  rm -f /Library/LaunchDaemons/com.kolide.launcher.plist
-  rm -rf /usr/local/kolide
-  rm -rf /var/log/kolide
+  rm -rf /etc/${IDENTIFIER}
+  rm -f /Library/LaunchDaemons/com.${IDENTIFIER}.launcher.plist
+  rm -rf /usr/local/${IDENTIFIER}
+  rm -rf /var/log/${IDENTIFIER}
 
   if [[ $REMOVE_DATABASE ]]; then
-    rm -rf /var/kolide
+    rm -rf /var/${IDENTIFIER}
   fi
 
   echo "One launcher instance cleaned"
 }
 
-for i in "$@"
+while (( "$#" ));
 do
-case $i in
+case $1 in
     -h | --help)
-    usage
-    exit 0
-    ;;
+        usage
+        exit 0
+        ;;
+
     --remove-db)
-    REMOVE_DATABASE=1
-    shift
-    ;;
+        REMOVE_DATABASE=1
+        ;;
+
+    --identifier)
+        shift
+        IDENTIFIER=$1
+        ;;
+
     *)
+        usage
+        exit 0
     ;;
 esac
+
+shift
+
 done
 
 main
