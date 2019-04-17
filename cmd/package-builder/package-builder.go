@@ -211,7 +211,7 @@ func runMake(args []string) error {
 
 	outputDir := *flOutputDir
 
-	// NOTE: if you;re using docker-for-mac, you probably need to set the TMPDIR env to /tmp
+	// NOTE: if you are using docker-for-mac, you probably need to set the TMPDIR env to /tmp
 	if outputDir == "" {
 		var err error
 		outputDir, err = ioutil.TempDir("", fmt.Sprintf("launcher-package"))
@@ -241,7 +241,7 @@ func runMake(args []string) error {
 		}
 	}
 
-	fmt.Printf("Built you packages in %s\n", outputDir)
+	fmt.Printf("Built packages in %s\n", outputDir)
 	return nil
 }
 
