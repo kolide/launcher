@@ -1,5 +1,3 @@
-// +build !darwin
-
 package table
 
 import (
@@ -8,7 +6,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+func platformTablesCommon(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	return []*table.Plugin{
 		BestPractices(client),
 		ChromeLoginDataEmails(client, logger),
