@@ -84,15 +84,10 @@ func runMake(args []string) error {
 			env.Bool("INSECURE_TRANSPORT", false),
 			"whether or not the launcher packages should invoke the launcher's --insecure_transport flag",
 		)
-		flAutoupdate = flagset.Bool(
-			"autoupdate",
-			env.Bool("AUTOUPDATE", false),
-			"whether or not the launcher packages should invoke the launcher's --autoupdate flag",
-		)
 		flUpdateChannel = flagset.String(
 			"update_channel",
 			env.String("UPDATE_CHANNEL", ""),
-			"the value that should be used when invoking the launcher's --update_channel flag",
+			"the value that should be used when invoking the launcher's --update_channel flag. Autoupdates will be disabled unless this is specified",
 		)
 		flControlHostname = flagset.String(
 			"control_hostname",
@@ -168,10 +163,6 @@ func runMake(args []string) error {
 		return errors.New("Hostname undefined")
 	}
 
-	if *flAutoupdate && *flUpdateChannel == "" {
-		return errors.New("-update_channel must be specified with -autoupdate")
-	}
-
 	// Validate that pinned certs are valid hex
 	for _, pin := range strings.Split(*flCertPins, ",") {
 		if _, err := hex.DecodeString(pin); err != nil {
@@ -201,7 +192,6 @@ func runMake(args []string) error {
 		Transport:         *flTransport,
 		Insecure:          *flInsecure,
 		InsecureTransport: *flInsecureTransport,
-		Autoupdate:        *flAutoupdate,
 		UpdateChannel:     *flUpdateChannel,
 		InitialRunner:     *flInitialRunner,
 		ControlHostname:   *flControlHostname,
