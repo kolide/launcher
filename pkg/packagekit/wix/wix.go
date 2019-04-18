@@ -21,7 +21,7 @@ type wixTool struct {
 	wixPath        string     // Where is wix installed
 	packageRoot    string     // What's the root of the packaging files?
 	buildDir       string     // The wix tools want to work in a build dir.
-	msArch         string     // What's the microsoft archtecture name?
+	msArch         string     // What's the Microsoft architecture name?
 	services       []*Service // array of services.
 	dockerImage    string     // If in docker, what image?
 	skipValidation bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
