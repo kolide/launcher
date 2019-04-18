@@ -168,6 +168,10 @@ func runMake(args []string) error {
 		return errors.New("Hostname undefined")
 	}
 
+	if *flAutoupdate && *flUpdateChannel == "" {
+		return errors.New("-update_channel must be specified with -autoupdate")
+	}
+
 	// Validate that pinned certs are valid hex
 	for _, pin := range strings.Split(*flCertPins, ",") {
 		if _, err := hex.DecodeString(pin); err != nil {
