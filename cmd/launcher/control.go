@@ -10,23 +10,24 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/control"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/pkg/errors"
 )
 
-func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *options) (*actor.Actor, error) {
+func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
 	level.Debug(logger).Log("msg", "creating control client")
 
 	controlOpts := []control.Option{
 		control.WithLogger(logger),
-		control.WithGetShellsInterval(opts.getShellsInterval),
+		control.WithGetShellsInterval(opts.GetShellsInterval),
 	}
-	if opts.insecureTLS {
+	if opts.InsecureTLS {
 		controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
 	}
-	if opts.disableControlTLS {
+	if opts.DisableControlTLS {
 		controlOpts = append(controlOpts, control.WithDisableTLS())
 	}
-	controlClient, err := control.NewControlClient(db, opts.controlServerURL, controlOpts...)
+	controlClient, err := control.NewControlClient(db, opts.ControlServerURL, controlOpts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating control client")
 	}

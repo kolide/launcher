@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/debug"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
@@ -179,9 +180,9 @@ func runSocket(args []string) error {
 }
 
 // run the launcher daemon
-func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.Logger) error {
+func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options, logger log.Logger) error {
 	// determine the root directory, create one if it's not provided
-	rootDirectory := opts.rootDirectory
+	rootDirectory := opts.RootDirectory
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
@@ -209,7 +210,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
-	if opts.insecureTLS {
+	if opts.InsecureTLS {
 		httpClient = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -233,14 +234,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
-	if opts.rootPEM != "" {
+	if opts.RootPEM != "" {
 		rootPool = x509.NewCertPool()
-		pemContents, err := ioutil.ReadFile(opts.rootPEM)
+		pemContents, err := ioutil.ReadFile(opts.RootPEM)
 		if err != nil {
-			return errors.Wrapf(err, "reading root certs PEM at path: %s", opts.rootPEM)
+			return errors.Wrapf(err, "reading root certs PEM at path: %s", opts.RootPEM)
 		}
 		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return errors.Errorf("found no valid certs in PEM at path: %s", opts.rootPEM)
+			return errors.Errorf("found no valid certs in PEM at path: %s", opts.RootPEM)
 		}
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -266,9 +267,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 
 	var client service.KolideService
 	{
-		switch opts.transport {
+		switch opts.Transport {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(opts.kolideServerURL, opts.insecureTLS, opts.insecureTransport, opts.certPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
 			if err != nil {
 				return errors.Wrap(err, "dialing grpc server")
 			}
@@ -277,14 +278,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(opts.kolideServerURL, opts.insecureTLS, opts.insecureTransport, opts.certPins, rootPool, logger)
+			client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
 		default:
 			return errors.New("invalid transport option selected")
 		}
 	}
 
 	// create the osquery extension for launcher
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, rootDirectory, db, logger, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, logger, client, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}
@@ -298,7 +299,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	)
 
 	// If the control server has been opted-in to, run it
-	if opts.control {
+	if opts.Control {
 		control, err := createControl(ctx, db, logger, opts)
 		if err != nil {
 			return errors.Wrap(err, "create control actor")
@@ -311,20 +312,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *options, logger log.L
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
-	if opts.autoupdate {
+	if opts.Autoupdate {
 		config := &updaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
-			AutoupdateInterval: opts.autoupdateInterval,
-			UpdateChannel:      opts.updateChannel,
-			NotaryURL:          opts.notaryServerURL,
-			MirrorURL:          opts.mirrorServerURL,
+			AutoupdateInterval: opts.AutoupdateInterval,
+			UpdateChannel:      opts.UpdateChannel,
+			NotaryURL:          opts.NotaryServerURL,
+			MirrorURL:          opts.MirrorServerURL,
 			HTTPClient:         httpClient,
 			SigChannel:         sigChannel,
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := createUpdater(ctx, opts.osquerydPath, runnerRestart, logger, config)
+		osqueryUpdater, err := createUpdater(ctx, opts.OsquerydPath, runnerRestart, logger, config)
 		if err != nil {
 			return errors.Wrap(err, "create osquery updater")
 		}

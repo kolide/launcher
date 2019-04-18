@@ -30,7 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger = logutil.NewServerLogger(opts.debug)
+	logger = logutil.NewServerLogger(opts.Debug)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

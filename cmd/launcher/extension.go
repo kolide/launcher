@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
+	"github.com/kolide/launcher/pkg/launcher"
 	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
@@ -22,7 +23,7 @@ import (
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.DB, logger log.Logger, launcherClient service.KolideService, opts *options) (
+func createExtensionRuntime(ctx context.Context, db *bolt.DB, logger log.Logger, launcherClient service.KolideService, opts *launcher.Options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
@@ -30,12 +31,12 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 ) {
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
-	if opts.enrollSecret != "" {
-		enrollSecret = opts.enrollSecret
-	} else if opts.enrollSecretPath != "" {
-		content, err := ioutil.ReadFile(opts.enrollSecretPath)
+	if opts.EnrollSecret != "" {
+		enrollSecret = opts.EnrollSecret
+	} else if opts.EnrollSecretPath != "" {
+		content, err := ioutil.ReadFile(opts.EnrollSecretPath)
 		if err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "could not read enroll_secret_path: %s", opts.enrollSecretPath)
+			return nil, nil, nil, errors.Wrapf(err, "could not read enroll_secret_path: %s", opts.EnrollSecretPath)
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	}
@@ -44,8 +45,8 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 	extOpts := osquery.ExtensionOpts{
 		EnrollSecret:                      enrollSecret,
 		Logger:                            logger,
-		LoggingInterval:                   opts.loggingInterval,
-		RunDifferentialQueriesImmediately: opts.enableInitialRunner,
+		LoggingInterval:                   opts.LoggingInterval,
+		RunDifferentialQueriesImmediately: opts.EnableInitialRunner,
 	}
 
 	// create the extension
@@ -58,8 +59,8 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
 
 	runner := runtime.LaunchUnstartedInstance(
-		runtime.WithOsquerydBinary(opts.osquerydPath),
-		runtime.WithRootDirectory(rootDirectory),
+		runtime.WithOsquerydBinary(opts.OsquerydPath),
+		runtime.WithRootDirectory(opts.RootDirectory),
 		runtime.WithConfigPluginFlag("kolide_grpc"),
 		runtime.WithLoggerPluginFlag("kolide_grpc"),
 		runtime.WithDistributedPluginFlag("kolide_grpc"),
@@ -68,7 +69,7 @@ func createExtensionRuntime(ctx context.Context, rootDirectory string, db *bolt.
 			distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
 			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
 		),
-		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db)...),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
 		runtime.WithStdout(osqueryLogger),
 		runtime.WithStderr(osqueryLogger),
 		runtime.WithLogger(logger),
