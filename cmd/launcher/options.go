@@ -11,38 +11,10 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )
-
-// options is the set of configurable options that may be set when launching this
-// program
-type options struct {
-	kolideServerURL     string
-	enrollSecret        string
-	enrollSecretPath    string
-	rootDirectory       string
-	osquerydPath        string
-	certPins            [][]byte
-	rootPEM             string
-	loggingInterval     time.Duration
-	enableInitialRunner bool
-	transport           string
-
-	control           bool
-	controlServerURL  string
-	getShellsInterval time.Duration
-
-	autoupdate         bool
-	debug              bool
-	disableControlTLS  bool
-	insecureTLS        bool
-	insecureTransport  bool
-	notaryServerURL    string
-	mirrorServerURL    string
-	autoupdateInterval time.Duration
-	updateChannel      autoupdate.UpdateChannel
-}
 
 const (
 	defaultRootDirectory = "launcher-root"
@@ -51,7 +23,7 @@ const (
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
-func parseOptions(args []string) (*options, error) {
+func parseOptions(args []string) (*launcher.Options, error) {
 	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
 
@@ -140,29 +112,29 @@ func parseOptions(args []string) (*options, error) {
 		return nil, err
 	}
 
-	opts := &options{
-		kolideServerURL:     *flKolideServerURL,
-		transport:           *flTransport,
-		control:             *flControl,
-		controlServerURL:    *flControlServerURL,
-		getShellsInterval:   *flGetShellsInterval,
-		enrollSecret:        *flEnrollSecret,
-		enrollSecretPath:    *flEnrollSecretPath,
-		rootDirectory:       *flRootDirectory,
-		osquerydPath:        osquerydPath,
-		certPins:            certPins,
-		rootPEM:             *flRootPEM,
-		loggingInterval:     *flLoggingInterval,
-		enableInitialRunner: *flInitialRunner,
-		autoupdate:          *flAutoupdate,
-		debug:               *flDebug,
-		disableControlTLS:   *flDisableControlTLS,
-		insecureTLS:         *flInsecureTLS,
-		insecureTransport:   *flInsecureTransport,
-		notaryServerURL:     *flNotaryServerURL,
-		mirrorServerURL:     *flMirrorURL,
-		autoupdateInterval:  *flAutoupdateInterval,
-		updateChannel:       updateChannel,
+	opts := &launcher.Options{
+		KolideServerURL:     *flKolideServerURL,
+		Transport:           *flTransport,
+		Control:             *flControl,
+		ControlServerURL:    *flControlServerURL,
+		GetShellsInterval:   *flGetShellsInterval,
+		EnrollSecret:        *flEnrollSecret,
+		EnrollSecretPath:    *flEnrollSecretPath,
+		RootDirectory:       *flRootDirectory,
+		OsquerydPath:        osquerydPath,
+		CertPins:            certPins,
+		RootPEM:             *flRootPEM,
+		LoggingInterval:     *flLoggingInterval,
+		EnableInitialRunner: *flInitialRunner,
+		Autoupdate:          *flAutoupdate,
+		Debug:               *flDebug,
+		DisableControlTLS:   *flDisableControlTLS,
+		InsecureTLS:         *flInsecureTLS,
+		InsecureTransport:   *flInsecureTransport,
+		NotaryServerURL:     *flNotaryServerURL,
+		MirrorServerURL:     *flMirrorURL,
+		AutoupdateInterval:  *flAutoupdateInterval,
+		UpdateChannel:       updateChannel,
 	}
 	return opts, nil
 }

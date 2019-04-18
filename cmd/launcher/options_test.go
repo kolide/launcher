@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/stringutil"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,7 +81,7 @@ func TestOptionsFromFile(t *testing.T) {
 	require.Equal(t, expectedOpts, opts)
 }
 
-func getArgsAndResponse() (map[string]string, *options) {
+func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	randomHostname := fmt.Sprintf("%s.example.com", stringutil.RandomString(8))
 	randomInt := rand.Intn(1024)
 
@@ -94,17 +95,17 @@ func getArgsAndResponse() (map[string]string, *options) {
 		"-transport":           "grpc",
 	}
 
-	opts := &options{
-		control:            true,
-		osquerydPath:       "/dev/null",
-		kolideServerURL:    randomHostname,
-		getShellsInterval:  3 * time.Second,
-		loggingInterval:    time.Duration(randomInt) * time.Second,
-		autoupdateInterval: 48 * time.Hour,
-		notaryServerURL:    "https://notary.kolide.co",
-		mirrorServerURL:    "https://dl.kolide.co",
-		updateChannel:      "stable",
-		transport:          "grpc",
+	opts := &launcher.Options{
+		Control:            true,
+		OsquerydPath:       "/dev/null",
+		KolideServerURL:    randomHostname,
+		GetShellsInterval:  3 * time.Second,
+		LoggingInterval:    time.Duration(randomInt) * time.Second,
+		AutoupdateInterval: 48 * time.Hour,
+		NotaryServerURL:    "https://notary.kolide.co",
+		MirrorServerURL:    "https://dl.kolide.co",
+		UpdateChannel:      "stable",
+		Transport:          "grpc",
 	}
 
 	return args, opts
