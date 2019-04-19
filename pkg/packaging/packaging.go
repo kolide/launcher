@@ -36,7 +36,6 @@ type PackageOptions struct {
 	Transport         string
 	Insecure          bool
 	InsecureTransport bool
-	Autoupdate        bool
 	UpdateChannel     string
 	InitialRunner     bool
 	ControlHostname   string
@@ -117,7 +116,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherBoolFlags = append(launcherBoolFlags, "control")
 	}
 
-	if p.Autoupdate && p.UpdateChannel != "" {
+	if p.UpdateChannel != "" {
 		launcherBoolFlags = append(launcherBoolFlags, "autoupdate")
 		launcherMapFlags["update_channel"] = p.UpdateChannel
 	}
