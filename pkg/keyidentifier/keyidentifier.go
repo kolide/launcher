@@ -150,6 +150,7 @@ func attemptPem(keyBytes []byte) (*KeyInfo, error) {
 
 	case "PRIVATE KEY":
 		// RFC5208 - https://tools.ietf.org/html/rfc5208
+		ki.Encrypted = x509.IsEncryptedPEMBlock(block)
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 			spew.Dump(key)
 			switch assertedKey := key.(type) {
