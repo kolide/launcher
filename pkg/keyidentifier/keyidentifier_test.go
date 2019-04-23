@@ -8,15 +8,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/kit/logutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIdentifyFiles(t *testing.T) {
+	kIdentifer, err := New(WithLogger(logutil.NewCLILogger(true)))
+	require.NoError(t, err)
 
 	testFiles := []string{}
 
-	err := filepath.Walk("testdata/plaintext", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk("testdata/plaintext", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return errors.Wrap(err, "failure to access path in filepath.Walk")
 		}
@@ -36,11 +39,11 @@ func TestIdentifyFiles(t *testing.T) {
 
 	// Now that we have paths, let's test them...
 	for _, path := range testFiles {
-		testIdentifyFile(t, path)
+		testIdentifyFile(t, kIdentifer, path)
 	}
 }
 
-func testIdentifyFile(t *testing.T, path string) {
+func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	var err error
 	pathComponents := strings.Split(path, "/")
 	expected := &KeyInfo{
@@ -75,7 +78,7 @@ func testIdentifyFile(t *testing.T, path string) {
 		require.NoError(t, errors.New("can't determine whether this should be encrypted"), path)
 	}
 
-	keyInfo, err := IdentifyFile(path)
+	keyInfo, err := kIdentifer.IdentifyFile(path)
 	parsedBy := keyInfo.Parser
 	keyInfo.Parser = ""
 	require.NoError(t, err, path)
