@@ -5,12 +5,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/binary"
 	"encoding/pem"
 	"io/ioutil"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
@@ -89,7 +87,7 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	case bytes.HasPrefix(keyBytes, []byte("---- BEGIN SSH2")):
 		return kIdentifer.attemptSshcom(keyBytes)
 	case bytes.HasPrefix(keyBytes, []byte("SSH PRIVATE KEY FILE FORMAT 1.1\n")):
-		return kIdentifer.attemptSsh1(keyBytes)
+		return ParseSsh1PrivateKey(keyBytes)
 	}
 
 	// Try various parsers. Note that we consider `err == nil`
@@ -126,54 +124,6 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 		_ = key
 	*/
 
-}
-
-func (kIdentifer *KeyIdentifier) attemptSsh1(keyBytes []byte) (*KeyInfo, error) {
-	const legacyBegin = "SSH PRIVATE KEY FILE FORMAT 1.1\n"
-
-	ki := &KeyInfo{
-		Format: "ssh1",
-		Parser: "attemptSsh1",
-		Type:   "rsa1",
-	}
-
-	if !bytes.HasPrefix(keyBytes, []byte(legacyBegin)) {
-		return nil, errors.New("key not in ssh1 format: missing header")
-	}
-
-	// FIXME:
-	// Putty seems to treat these as RSA keys. Maybe I can too.
-	// https://github.com/KasperDeng/putty/blob/037a4ccb6e731fafc4cc77c0d16f80552fd69dce/putty-src/sshpubk.c#L176-L180
-	// https://github.com/chrber/pcells-maven/blob/bb7a1ef3aa5e9313c532c043a624bfb929962b48/modules/pcells-gui-core/src/main/java/dmg/security/cipher/SshPrivateKeyInputStream.java#L23
-
-	keyReader := bytes.NewReader(keyBytes)
-
-	// seph testiong
-	var sshData struct {
-		Header     [len(legacyBegin)]byte
-		Zero       uint8  // null after header
-		CipherType uint8  // Enc type (0 is none, 3 is encrypted)
-		Reserved   uint32 // 4 bytes reserved
-		Bits       uint32 // 4 bytes for the bit size
-	}
-	// Is this ever Little Endian!?
-	if err := binary.Read(keyReader, binary.BigEndian, &sshData); err != nil {
-		spew.Dump(err)
-		return nil, errors.Wrap(err, "key not in ssh1 format: failed binary read")
-	}
-
-	ki.Bits = int(sshData.Bits)
-
-	switch sshData.CipherType {
-	case 0:
-		ki.Encrypted = falsePtr()
-	case 3:
-		ki.Encrypted = truePtr()
-	default:
-		return nil, errors.Errorf("ssh1 bad cipher type: %d", sshData.CipherType)
-	}
-
-	return ki, nil
 }
 
 func (kIdentifer *KeyIdentifier) attemptSshcom(keyBytes []byte) (*KeyInfo, error) {
