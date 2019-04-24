@@ -105,15 +105,15 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 		expected.Bits = 0
 	}
 
-	// FIXME don't test sshcom for now
+	// Can't get bit size from sshcom key
 	if expected.Format == "sshcom" {
-		return
+		expected.Bits = 0
 	}
 
-	// FIXME skip sshv1
-	//if expected.Format == "ssh1" {
-	//	return
-	//	}
+	// Since Encrypted is a pointer, compare it manually, and then zero it.
+	require.Equal(t, expected.Encrypted, keyInfo.Encrypted, "Encypted pointer references")
+	expected.Encrypted = nil
+	keyInfo.Encrypted = nil
 
 	require.Equal(t, expected, keyInfo, fmt.Sprintf("%s (parsed by %s)", path, parsedBy))
 

@@ -15,6 +15,7 @@ import (
 
 const ssh1LegacyBegin = "SSH PRIVATE KEY FILE FORMAT 1.1\n"
 
+// ParseSsh1PrivateKey returns key infornation from an ssh1 key.
 func ParseSsh1PrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	if !bytes.HasPrefix(keyBytes, []byte(ssh1LegacyBegin)) {

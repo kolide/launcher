@@ -85,7 +85,7 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	case bytes.HasPrefix(keyBytes, []byte("PuTTY-User-Key-File-2")):
 		return kIdentifer.decodePuttyPPK(keyBytes)
 	case bytes.HasPrefix(keyBytes, []byte("---- BEGIN SSH2")):
-		return kIdentifer.attemptSshcom(keyBytes)
+		return ParseSshComPrivateKey(keyBytes)
 	case bytes.HasPrefix(keyBytes, []byte("SSH PRIVATE KEY FILE FORMAT 1.1\n")):
 		return ParseSsh1PrivateKey(keyBytes)
 	}
@@ -124,19 +124,6 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 		_ = key
 	*/
 
-}
-
-func (kIdentifer *KeyIdentifier) attemptSshcom(keyBytes []byte) (*KeyInfo, error) {
-	if !bytes.HasPrefix(keyBytes, []byte("---- BEGIN SSH2")) {
-		return nil, errors.New("key not in sshcom format")
-	}
-
-	ki := &KeyInfo{
-		Format: "",
-		Parser: "attemptSshcom",
-	}
-
-	return ki, nil
 }
 
 // attemptPem trie to decode the pem, and then work with the key. It's
