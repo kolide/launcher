@@ -50,7 +50,7 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 		Format: pathComponents[4],
 	}
 
-	// set  type. Naming is the worst
+	// set type. Naming is the worst
 	switch pathComponents[2] {
 	case "rsa":
 		expected.Type = "ssh-rsa"
@@ -71,9 +71,9 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 
 	switch pathComponents[1] {
 	case "encrypted":
-		expected.Encrypted = true
+		expected.Encrypted = truePtr()
 	case "plaintext":
-		expected.Encrypted = false
+		expected.Encrypted = falsePtr()
 	default:
 		require.NoError(t, errors.New("can't determine whether this should be encrypted"), path)
 	}
@@ -90,7 +90,7 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	}
 
 	// The elliptic types carry more detail than we need. So whomp down
-	// how we test. eg `ecdsa-sha2-nistp256` beco es `ecdsa` for testing
+	// how we test. eg `ecdsa-sha2-nistp256` becomes `ecdsa` for testing
 	if strings.HasPrefix(keyInfo.Type, "ecdsa-") {
 		keyInfo.Type = "ecdsa"
 	}
@@ -111,9 +111,9 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	}
 
 	// FIXME skip sshv1
-	if expected.Format == "ssh1" {
-		return
-	}
+	//if expected.Format == "ssh1" {
+	//	return
+	//	}
 
 	require.Equal(t, expected, keyInfo, fmt.Sprintf("%s (parsed by %s)", path, parsedBy))
 

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/pem"
 	"io/ioutil"
 	"strings"
@@ -25,7 +26,7 @@ type KeyInfo struct {
 	Format     string // file format
 	Bits       int    // number of bits in the key
 	Encryption string // key encryption algorythem
-	Encrypted  bool   // is the key encrypted
+	Encrypted  *bool  // is the key encrypted
 	Comment    string // comments attached to the key
 	Parser     string // what parser we used to determine information
 }
@@ -55,6 +56,11 @@ func New(opts ...Option) (*KeyIdentifier, error) {
 }
 
 func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
+	level.Debug(kIdentifer.logger).Log(
+		"msg", "starting a key identification",
+		"file", path,
+	)
+
 	keyBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "read key")
@@ -71,6 +77,11 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 // Identify uses a manually curated set of heuristics to determine
 // what kind of key something is.
 func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
+	level.Debug(kIdentifer.logger).Log(
+		"msg", "starting a key identification",
+		"file", "<bytestream>",
+	)
+
 	// Some magic strings for dispatching
 	switch {
 	case bytes.HasPrefix(keyBytes, []byte("PuTTY-User-Key-File-2")):
@@ -118,13 +129,48 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 }
 
 func (kIdentifer *KeyIdentifier) attemptSsh1(keyBytes []byte) (*KeyInfo, error) {
-	if !bytes.HasPrefix(keyBytes, []byte("SSH PRIVATE KEY FILE FORMAT 1.1\n")) {
-		return nil, errors.New("key not in ssh1 format")
-	}
+	const legacyBegin = "SSH PRIVATE KEY FILE FORMAT 1.1\n"
 
 	ki := &KeyInfo{
-		Format: "",
+		Format: "ssh1",
 		Parser: "attemptSsh1",
+		Type:   "rsa1",
+	}
+
+	if !bytes.HasPrefix(keyBytes, []byte(legacyBegin)) {
+		return nil, errors.New("key not in ssh1 format: missing header")
+	}
+
+	// FIXME:
+	// Putty seems to treat these as RSA keys. Maybe I can too.
+	// https://github.com/KasperDeng/putty/blob/037a4ccb6e731fafc4cc77c0d16f80552fd69dce/putty-src/sshpubk.c#L176-L180
+	// https://github.com/chrber/pcells-maven/blob/bb7a1ef3aa5e9313c532c043a624bfb929962b48/modules/pcells-gui-core/src/main/java/dmg/security/cipher/SshPrivateKeyInputStream.java#L23
+
+	keyReader := bytes.NewReader(keyBytes)
+
+	// seph testiong
+	var sshData struct {
+		Header     [len(legacyBegin)]byte
+		Zero       uint8  // null after header
+		CipherType uint8  // Enc type (0 is none, 3 is encrypted)
+		Reserved   uint32 // 4 bytes reserved
+		Bits       uint32 // 4 bytes for the bit size
+	}
+	// Is this ever Little Endian!?
+	if err := binary.Read(keyReader, binary.BigEndian, &sshData); err != nil {
+		spew.Dump(err)
+		return nil, errors.Wrap(err, "key not in ssh1 format: failed binary read")
+	}
+
+	ki.Bits = int(sshData.Bits)
+
+	switch sshData.CipherType {
+	case 0:
+		ki.Encrypted = falsePtr()
+	case 3:
+		ki.Encrypted = truePtr()
+	default:
+		return nil, errors.Errorf("ssh1 bad cipher type: %d", sshData.CipherType)
 	}
 
 	return ki, nil
@@ -157,7 +203,7 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 		return nil, errors.New("pem could not parse")
 	}
 
-	ki.Encrypted = encryptedBlock(block)
+	ki.Encrypted = boolPtr(encryptedBlock(block))
 
 	level.Debug(kIdentifer.logger).Log(
 		"msg", "pem says",
@@ -177,9 +223,9 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 
 	case "PRIVATE KEY":
 		// RFC5208 - https://tools.ietf.org/html/rfc5208
-		ki.Encrypted = x509.IsEncryptedPEMBlock(block)
+		ki.Encrypted = boolPtr(x509.IsEncryptedPEMBlock(block))
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
-			spew.Dump(key)
+			//spew.Dump(key)
 			switch assertedKey := key.(type) {
 			case *rsa.PrivateKey:
 				ki.Bits = assertedKey.PublicKey.Size() * 8
@@ -211,12 +257,9 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 		// ignore the error.
 		parseOpenSSHPrivateKey(ki, block.Bytes)
 		return ki, nil
-
-	default:
-		// return nil, fmt.Errorf("ssh: unsupported key type %q", block.Type)
-		return ki, nil
 	}
 
+	// Unmatched. return what we have
 	return ki, nil
 }
 
@@ -268,9 +311,9 @@ func (kIdentifer *KeyIdentifier) decodePuttyPPK(keyBytes []byte) (*KeyInfo, erro
 			ki.Type = components[1]
 		case "Encryption":
 			if components[1] == "none" {
-				ki.Encrypted = false
+				ki.Encrypted = falsePtr()
 			} else {
-				ki.Encrypted = true
+				ki.Encrypted = truePtr()
 				ki.Encryption = components[1]
 			}
 		case "Comment":
