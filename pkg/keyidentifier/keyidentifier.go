@@ -151,10 +151,19 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 		return ki, nil
 
 	case "EC PRIVATE KEY":
+		// set the Type here, since parsing fails on encrypted keys
+		ki.Type = "ecdsa"
+
 		if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
 			ki.Type = "ecdsa"
 			ki.Bits = key.PublicKey.Curve.Params().BitSize
+		} else {
+			level.Debug(kIdentifer.logger).Log(
+				"msg", "x509.ParseECPrivateKey failed to parse",
+				"err", err,
+			)
 		}
+
 		return ki, nil
 
 	case "DSA PRIVATE KEY":
@@ -173,6 +182,10 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	// Unmatched. return what we have
+	level.Debug(kIdentifer.logger).Log(
+		"msg", "pem failed to match block type",
+		"type", block.Type,
+	)
 	return ki, nil
 }
 

@@ -19,12 +19,14 @@ func TestIdentifyFiles(t *testing.T) {
 
 	testFiles := []string{}
 
-	err = filepath.Walk("testdata/plaintext", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk("testdata/encrypted", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return errors.Wrap(err, "failure to access path in filepath.Walk")
 		}
 
-		if path == "testdata/make.sh" {
+		// This automatic tester can only parse things if they're stored
+		// in the folder heirarchy.
+		if !strings.HasPrefix(path, "testdata/plaintext") && !strings.HasPrefix(path, "testdata/encrypted") {
 			return nil
 		}
 
@@ -83,6 +85,9 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	keyInfo.Parser = ""
 	require.NoError(t, err, path)
 
+	// We're never testing the encryption name
+	keyInfo.Encryption = ""
+
 	// The elliptic keys don't always have a clear file format, so don't
 	// compare that in this test.
 	if expected.Type == "ecdsa" && keyInfo.Format == "" {
@@ -93,6 +98,13 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	// how we test. eg `ecdsa-sha2-nistp256` becomes `ecdsa` for testing
 	if strings.HasPrefix(keyInfo.Type, "ecdsa-") {
 		keyInfo.Type = "ecdsa"
+	}
+
+	if keyInfo.Format == "openssh" && *keyInfo.Encrypted {
+		expected.Bits = 0
+	}
+	if expected.Type == "ecdsa" && *keyInfo.Encrypted {
+		expected.Bits = 0
 	}
 
 	// Can't get bit sizes from openssh-new keys. At least not yet.
