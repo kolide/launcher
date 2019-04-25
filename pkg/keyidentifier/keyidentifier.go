@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
-	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -83,7 +82,7 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	// Some magic strings for dispatching
 	switch {
 	case bytes.HasPrefix(keyBytes, []byte("PuTTY-User-Key-File-2")):
-		return kIdentifer.decodePuttyPPK(keyBytes)
+		return ParsePuttyPrivateKey(keyBytes)
 	case bytes.HasPrefix(keyBytes, []byte("---- BEGIN SSH2")):
 		return ParseSshComPrivateKey(keyBytes)
 	case bytes.HasPrefix(keyBytes, []byte("SSH PRIVATE KEY FILE FORMAT 1.1\n")):
@@ -93,17 +92,6 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	// Try various parsers. Note that we consider `err == nil`
 	// success. Errors are discarded as an unparsable key
 
-	/*
-		// Try the simplest ssh key parsers. These are limited, and don't
-		// handle encrypted keys. We may remove them.
-		if ki, err := attemptSshParseDSAPrivateKey(keyBytes); err == nil {
-			return ki, nil
-		}
-		if ki, err := attemptSshParseRawPrivateKey(keyBytes); err == nil {
-			return ki, nil
-		}
-	*/
-
 	// Manually parse it from the pem data
 	if ki, err := kIdentifer.attemptPem(keyBytes); err == nil {
 		return ki, nil
@@ -112,21 +100,9 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	// Out of options
 	return nil, errors.New("Unable to parse key")
 
-	/*
-		key, err := ssh.ParseRawPrivateKey(keyBytes)
-		if err != nil {
-			return nil, errors.Wrap(err, "ssh.ParseRawPrivateKey")
-		}
-
-		// BitLen won't work -- the length of 0 is 0.
-		rsaKey := key.(*rsa.PrivateKey)
-		spew.Dump(rsaKey.D.BitLen())
-		_ = key
-	*/
-
 }
 
-// attemptPem trie to decode the pem, and then work with the key. It's
+// attemptPem tries to decode the pem, and then work with the key. It's
 // based on code from x/crypto's ssh.ParseRawPrivateKey, but more
 // flexible in handling encryption and formats.
 func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
@@ -227,36 +203,4 @@ func (kIdentifer *KeyIdentifier) attemptSshParseRawPrivateKey(keyBytes []byte) (
 
 	return ki, nil
 
-}
-
-func (kIdentifer *KeyIdentifier) decodePuttyPPK(keyBytes []byte) (*KeyInfo, error) {
-	ki := &KeyInfo{
-		Format: "putty",
-		Parser: "decodePuttyPPK",
-	}
-
-	keyString := string(keyBytes)
-	keyString = strings.Replace(keyString, "\r\n", "\n", -1)
-
-	for _, line := range strings.Split(keyString, "\n") {
-		components := strings.SplitN(line, ": ", 2)
-		if len(components) != 2 {
-			continue
-		}
-		switch components[0] {
-		case "PuTTY-User-Key-File-2":
-			ki.Type = components[1]
-		case "Encryption":
-			if components[1] == "none" {
-				ki.Encrypted = falsePtr()
-			} else {
-				ki.Encrypted = truePtr()
-				ki.Encryption = components[1]
-			}
-		case "Comment":
-			ki.Comment = components[1]
-		}
-	}
-
-	return ki, nil
 }
