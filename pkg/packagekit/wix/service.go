@@ -167,7 +167,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	si := &ServiceInstall{
 		Name:          defaultName,
 		Id:            defaultName,
-		Account:       `NT AUTHORITY\SYSTEM`,
+		Account:       `[SERVICEACCOUNT]`, // Or should this be `LocalSystem`
 		Start:         StartAuto,
 		Type:          "ownProcess",
 		ErrorControl:  ErrorControlNormal,
