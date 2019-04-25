@@ -3,14 +3,14 @@
 # This script uses several tools to create ssh keys. We attempt to be
 # as exhaustive as possible to create a wide range of things to test.
 #
-# This puts them into a somewhat ugly filesystem heirachy. The intent
+# This puts them into a somewhat ugly filesystem hierarchy. The intent
 # is to group things to make it simpler for tools to test
 # groups. The layout should straightforward.
 
 
 
 set -e
-set -x
+#set -x
 
 function rand {
     dd if=/dev/random bs=1 count=16 2> /dev/null  | base64
@@ -23,8 +23,8 @@ function makeOpensshKey {
     os="openssh7"
     dir_fragment="$type/$bits/openssh-new"
     mkdir -p {encrypted,plaintext}"/$dir_fragment"
-    #ssh-keygen -t $type -b $bits  -C "" -f "plaintext/$dir_fragment/seph-$os" -P ""
-    #ssh-keygen -t $type -b $bits  -C "" -f "encrypted/$dir_fragment/seph-$os" -P "$(rand)"
+    echo ssh-keygen -t $type -b $bits  -C "" -f "plaintext/$dir_fragment/seph-$os" -P ""
+    echo ssh-keygen -t $type -b $bits  -C "" -f "encrypted/$dir_fragment/seph-$os" -P "$(rand)"
 }
 
 makeOpensshKey rsa 1024
@@ -42,7 +42,7 @@ makeOpensshKey ed25519 2048
 # ssh.com style
 #
 # Note that openssh's ssh-keygen proportes to convert (using `-e`) but
-# empiracally this does not work. So we use puttygen (`brew install
+# empirically this does not work. So we use puttygen (`brew install
 # putty` to generate these)
 
 function makePuttyKeyPuttyFormat {
@@ -57,8 +57,8 @@ function makePuttyKeyPuttyFormat {
     dir_fragment="$type/$bits/$format"
     mkdir -p {encrypted,plaintext}"/$dir_fragment"
 
-    puttygen -t $type -b $bits -C "" -o "plaintext/$dir_fragment/seph-putty" -O private --new-passphrase /dev/null
-    puttygen -t $type -b $bits -C "" -o "encrypted/$dir_fragment/seph-putty" -O private --new-passphrase <(rand)
+    echo puttygen -t $type -b $bits -C "" -o "plaintext/$dir_fragment/seph-putty" -O private --new-passphrase /dev/null
+    echo puttygen -t $type -b $bits -C "" -o "encrypted/$dir_fragment/seph-putty" -O private --new-passphrase <(rand)
 }
 
 
@@ -73,8 +73,8 @@ function makePuttyKey {
         dir_fragment="$type/$bits/$format"
         mkdir -p {encrypted,plaintext}"/$dir_fragment"
 
-        puttygen -t $type -b $bits -C "" -o "plaintext/$dir_fragment/seph-putty" -O private-$format --new-passphrase /dev/null
-        puttygen -t $type -b $bits -C "" -o "encrypted/$dir_fragment/seph-putty" -O private-$format --new-passphrase <(rand)
+        echo puttygen -t $type -b $bits -C "" -o "plaintext/$dir_fragment/seph-putty" -O private-$format --new-passphrase /dev/null
+        echo puttygen -t $type -b $bits -C "" -o "encrypted/$dir_fragment/seph-putty" -O private-$format --new-passphrase <(rand)
     done
 }
 
