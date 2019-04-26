@@ -8,9 +8,8 @@ jobs:
       - checkout
       - run: make deps
       - run: make -j lint
+      - run: make -j xp
       - run: make test
-      - run: make extension
-      - run: make launcher
 
 workflows:
   version: 2

@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
@@ -39,7 +40,7 @@ func runWindowsSvc(args []string) error {
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger
-	if opts.debug {
+	if opts.Debug {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
@@ -69,7 +70,7 @@ func runWindowsSvcForeground(args []string) error {
 
 type winSvc struct {
 	logger log.Logger
-	opts   *options
+	opts   *launcher.Options
 }
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
