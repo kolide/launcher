@@ -47,9 +47,9 @@ func ParseSsh1PrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	switch sshData.CipherType {
 	case 0:
-		ki.Encrypted = falsePtr()
+		ki.Encrypted = boolPtr(false)
 	case 3:
-		ki.Encrypted = truePtr()
+		ki.Encrypted = boolPtr(true)
 	default:
 		return nil, errors.Errorf("ssh1 bad cipher type: %d. Should be 0 or 3", sshData.CipherType)
 	}

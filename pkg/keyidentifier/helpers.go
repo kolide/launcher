@@ -10,14 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func truePtr() *bool {
-	return boolPtr(true)
-}
-
-func falsePtr() *bool {
-	return boolPtr(false)
-}
-
+// boolPtr makes a pointer from a boolean. We use it to fake a ternary unknown/true/false
 func boolPtr(b bool) *bool {
 	return &b
 }

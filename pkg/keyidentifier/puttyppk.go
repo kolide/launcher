@@ -34,9 +34,9 @@ func ParsePuttyPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 			ki.Type = components[1]
 		case "Encryption":
 			if components[1] == "none" {
-				ki.Encrypted = falsePtr()
+				ki.Encrypted = boolPtr(false)
 			} else {
-				ki.Encrypted = truePtr()
+				ki.Encrypted = boolPtr(true)
 				ki.Encryption = components[1]
 			}
 		case "Comment":

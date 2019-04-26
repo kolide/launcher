@@ -71,9 +71,9 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	switch cipherName {
 	case "none":
-		ki.Encrypted = falsePtr()
+		ki.Encrypted = boolPtr(false)
 	case "3des-cbc":
-		ki.Encrypted = truePtr()
+		ki.Encrypted = boolPtr(true)
 		ki.Encryption = cipherName
 	default:
 		return nil, errors.Errorf("sshcom bad cipher name: %s. Should be none or 3des-cbc", cipherName)

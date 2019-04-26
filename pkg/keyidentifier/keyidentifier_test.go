@@ -75,9 +75,9 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 
 	switch pathComponents[1] {
 	case "encrypted":
-		expected.Encrypted = truePtr()
+		expected.Encrypted = boolPtr(true)
 	case "plaintext":
-		expected.Encrypted = falsePtr()
+		expected.Encrypted = boolPtr(false)
 	default:
 		require.NoError(t, errors.New("can't determine whether this should be encrypted"), path)
 	}

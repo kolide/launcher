@@ -39,10 +39,10 @@ func ParseOpenSSHPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	if w.KdfName != "none" || w.CipherName != "none" {
-		ki.Encrypted = truePtr()
+		ki.Encrypted = boolPtr(true)
 		ki.Encryption = fmt.Sprintf("%s-%s", w.CipherName, w.KdfName)
 	} else {
-		ki.Encrypted = falsePtr()
+		ki.Encrypted = boolPtr(false)
 	}
 
 	// If we can parse the public key. extract info
