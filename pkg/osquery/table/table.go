@@ -21,5 +21,19 @@ func LauncherTables(db *bolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin
 
 // PlatformTables returns all tables for the launcher build platform.
 func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
-	return platformTables(client, logger)
+	// Common tables to all platforms
+	tables := []*table.Plugin{
+		BestPractices(client),
+		ChromeLoginDataEmails(client, logger),
+		ChromeUserProfiles(client, logger),
+		EmailAddresses(client, logger),
+		LauncherInfoTable(),
+		OnePasswordAccounts(client, logger),
+		SlackConfig(client, logger),
+	}
+
+	// add in the platform specific ones (as denboted by build tags)
+	tables = append(tables, platformTables(client, logger)...)
+
+	return tables
 }
