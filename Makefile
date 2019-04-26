@@ -130,10 +130,6 @@ lint-go-fmt: deps-go
 
 
 
-builder:
-	cd tools/builders/launcher-builder/1.11/ && gcloud builds submit --project=kolide-public-containers --config=cloudbuild.yml
-
-
 ##
 ## Docker Tooling
 ##
@@ -146,7 +142,6 @@ containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerpush-fakeda
 
 docker-build:
 	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
-	docker build -t launcher-build .
 
 dockerfake-%:
 	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
