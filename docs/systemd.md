@@ -6,18 +6,19 @@ Below is a sample unit file.
 
 ```
 [Unit]
- Description=The Kolide Launcher
- After=network.service syslog.service
+Description=The Kolide Launcher
+After=network.service syslog.service
 
- [Service]
- ExecStart= $LauncherPath \
- --hostname=$FleetServer:FleetPort \
- --enroll_secret=$FleetSecret \
- --autoupdate \
---osqueryd_path=$OsquerydPath
+[Service]
+ExecStart= $LauncherPath \
+  --hostname=$FleetServer:FleetPort \
+  --enroll_secret=$FleetSecret \
+  --autoupdate=true \
+  --osqueryd_path=$OsquerydPath
 Restart=on-failure
 RestartSec=3
- [Install]
+
+[Install]
 WantedBy=multi-user.target
 ```
 
