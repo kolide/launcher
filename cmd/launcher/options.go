@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultRootDirectory = "launcher-root"
-	skipEnvParse         = runtime.GOOS == "windows" // skip enviromental variable parsing on windows
+	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 )
 
 // parseOptions parses the options that may be configured via command-line flags
