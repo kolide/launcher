@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )
@@ -59,11 +60,23 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
-	ff.Parse(flagset, args,
+
+	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
-		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),
-	)
+	}
+
+	// Windows doesn't really support environmental variables in quite
+	// the same way unix does. This led to Kolide's early Cloud packages
+	// installing with some global environmental variables. Those would
+	// cause an incompatibility with all subsequent launchers. As
+	// they're not part of the normal windows use case, we can skip
+	// using them here.
+	if runtime.GOOS != "windows" {
+		ffOpts = append(ffOpts, ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"))
+	}
+
+	ff.Parse(flagset, args, ffOpts...)
 
 	// handle --version
 	if *flVersion {
