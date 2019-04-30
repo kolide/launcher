@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )
 
 const (
 	defaultRootDirectory = "launcher-root"
+	skipEnvParse         = runtime.GOOS == "windows" // skip enviromental variable parsing on windows
 )
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -72,7 +73,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	// cause an incompatibility with all subsequent launchers. As
 	// they're not part of the normal windows use case, we can skip
 	// using them here.
-	if runtime.GOOS != "windows" {
+	if !skipEnvParse {
 		ffOpts = append(ffOpts, ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"))
 	}
 
@@ -190,9 +191,11 @@ func shortUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
-	fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
-	fmt.Fprintf(os.Stderr, "\n")
+	if !skipEnvParse {
+		fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
+		fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
+		fmt.Fprintf(os.Stderr, "\n")
+	}
 	printOpt("dev_help")
 	fmt.Fprintf(os.Stderr, "\n")
 }
