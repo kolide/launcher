@@ -9,6 +9,8 @@ endif
 PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on
+export GOPROXY=https://proxy.golang.org
+export GOSUMDB=sum.golang.org
 
 # If on macOS, set the shell to bash explicitly
 ifneq ($(OS), Windows_NT)
