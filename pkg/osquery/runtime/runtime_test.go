@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/kolide/osquery-go"
+	ps "github.com/mitchellh/go-ps"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -264,6 +266,11 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pgid, osqueryPID, "pgid must be set")
 
+	extensionProcess, err := ps.FindProcess(extensionPid)
+	require.NoError(t, err)
+	// process name seems truncated
+	require.True(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"))
+
 	// kill the current osquery process but not the extension
 	err = syscall.Kill(osqueryPID, syscall.SIGKILL)
 	require.NoError(t, err)
@@ -282,10 +289,23 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	// Ensure we've waited at least 32s
 	<-timer1.C
 
-	// check that the extension process is no longer running Under some
+	// check that the extension process is no longer running. Because
+	// this may be subject to PID reuse as a false positive, we have two
+	// test patterns.  If we got an err, then the process is probably
+	// gone, and we test one way. If err==nil, check for PID
+	// reuse. go-ps will panic if you look for a missing process, so
+	// there is still some window for errors.
 	extpgid, err := syscall.Getpgid(extensionPid)
-	require.EqualError(t, err, "no such process", "Expected the extension to be gone")
-	require.Equal(t, extpgid, -1)
+	if err != nil {
+		require.EqualError(t, err, "no such process")
+		require.Equal(t, extpgid, -1)
+	} else {
+		extensionProcess, err := ps.FindProcess(extensionPid)
+		require.NoError(t, err)
+		require.False(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"))
+		require.NotEqual(t, osqueryPID, extpgid)
+	}
+
 }
 
 func TestExtensionSocketPath(t *testing.T) {
