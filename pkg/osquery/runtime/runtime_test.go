@@ -271,7 +271,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	// extension process is no longer running. See
 	// https://github.com/kolide/launcher/pull/342 and associated for
 	// background.
-	timer1 := time.NewTimer(32 * time.Second)
+	timer1 := time.NewTimer(35 * time.Second)
 
 	// Wait for osquery to respawn
 	waitHealthy(t, runner)
@@ -281,7 +281,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 	// check that the extension process is no longer running Under some
 	extpgid, err := syscall.Getpgid(extensionPid)
-	require.EqualError(t, err, "no such process")
+	require.EqualError(t, err, "no such process", "Expected the extension to be gone")
 	require.Equal(t, extpgid, -1)
 }
 
