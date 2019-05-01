@@ -249,6 +249,9 @@ func TestNotStarted(t *testing.T) {
 	assert.NoError(t, runner.Shutdown())
 }
 
+// TestExtensionIsCleanedUp tests that the osquery extension cleans
+// itself up. Unfortunately, this test has proved very flakey on
+// circle-ci, but just fine on laptops.
 func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Parallel()
 
