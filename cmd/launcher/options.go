@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 
 const (
 	defaultRootDirectory = "launcher-root"
+	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 )
 
 // parseOptions parses the options that may be configured via command-line flags
@@ -59,11 +61,23 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
-	ff.Parse(flagset, args,
+
+	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
-		ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"),
-	)
+	}
+
+	// Windows doesn't really support environmental variables in quite
+	// the same way unix does. This led to Kolide's early Cloud packages
+	// installing with some global environmental variables. Those would
+	// cause an incompatibility with all subsequent launchers. As
+	// they're not part of the normal windows use case, we can skip
+	// using them here.
+	if !skipEnvParse {
+		ffOpts = append(ffOpts, ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"))
+	}
+
+	ff.Parse(flagset, args, ffOpts...)
 
 	// handle --version
 	if *flVersion {
@@ -177,9 +191,11 @@ func shortUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
-	fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
-	fmt.Fprintf(os.Stderr, "\n")
+	if !skipEnvParse {
+		fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
+		fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
+		fmt.Fprintf(os.Stderr, "\n")
+	}
 	printOpt("dev_help")
 	fmt.Fprintf(os.Stderr, "\n")
 }

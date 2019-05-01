@@ -19,6 +19,7 @@ require (
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -49,6 +50,7 @@ require (
 	github.com/kr/pty v1.1.2
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f // indirect
+	github.com/mitchellh/go-ps v0.0.0-20170309133038-4fdf99ab2936
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/oklog/run v1.0.0
