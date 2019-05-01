@@ -255,6 +255,7 @@ func TestNotStarted(t *testing.T) {
 // itself up. Unfortunately, this test has proved very flakey on
 // circle-ci, but just fine on laptops.
 func TestExtensionIsCleanedUp(t *testing.T) {
+	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
 
 	runner, extensionPid, teardown := setupOsqueryInstanceForTests(t)
@@ -302,7 +303,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	} else {
 		extensionProcess, err := ps.FindProcess(extensionPid)
 		require.NoError(t, err)
-		require.False(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"))
+		require.False(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"), "old extension pid, still running. And named like osquery-extension")
 		require.NotEqual(t, osqueryPID, extpgid)
 	}
 
