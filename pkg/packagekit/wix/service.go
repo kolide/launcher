@@ -167,7 +167,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	si := &ServiceInstall{
 		Name:          defaultName,
 		Id:            defaultName,
-		Account:       `[SERVICEACCOUNT]`, // Or should this be `LocalSystem`
+		Account:       `[SERVICEACCOUNT]`, // Wix resolves this to `LocalSystem`
 		Start:         StartAuto,
 		Type:          "ownProcess",
 		ErrorControl:  ErrorControlNormal,
