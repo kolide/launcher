@@ -47,7 +47,6 @@ func TestIdentifyFiles(t *testing.T) {
 }
 
 func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
-	var err error
 	pathComponents := strings.Split(path, "/")
 	expected := &KeyInfo{
 		Format: pathComponents[4],
@@ -69,6 +68,7 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 		expected.Type = pathComponents[2]
 	}
 
+	var err error
 	if expected.Bits, err = strconv.Atoi(pathComponents[3]); err != nil {
 		require.NoError(t, errors.New("can't determine key size"), path)
 	}

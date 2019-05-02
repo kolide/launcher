@@ -10,7 +10,7 @@ import (
 
 const opensshMagic = "openssh-key-v1\x00"
 
-// ParseOpenSSHPrivateKey returtns key informatin from an openssh
+// ParseOpenSSHPrivateKey returns key information from an openssh
 // private key. It is adapted from
 // https://github.com/golang/crypto/blob/master/ssh/keys.go
 func ParseOpenSSHPrivateKey(keyBytes []byte) (*KeyInfo, error) {

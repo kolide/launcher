@@ -9,14 +9,13 @@ import (
 
 const ssh1LegacyBegin = "SSH PRIVATE KEY FILE FORMAT 1.1\n"
 
-// ParseSsh1PrivateKey returns key infornation from an ssh1 private key.
+// ParseSsh1PrivateKey returns key information from an ssh1 private key.
 //
 // The underlying format was gleaned from various other code. Notably:
 //
 // https://github.com/openssh/openssh-portable/blob/c7670b091a7174760d619ef6738b4f26b2093301/sshkey.c
 // https://github.com/KasperDeng/putty/blob/037a4ccb6e731fafc4cc77c0d16f80552fd69dce/putty-src/sshpubk.c#L176-L180
 // https://github.com/chrber/pcells-maven/blob/bb7a1ef3aa5e9313c532c043a624bfb929962b48/modules/pcells-gui-core/src/main/java/dmg/security/cipher/SshPrivateKeyInputStream.java#L23
-
 func ParseSsh1PrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	if !bytes.HasPrefix(keyBytes, []byte(ssh1LegacyBegin)) {

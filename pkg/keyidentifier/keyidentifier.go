@@ -59,12 +59,12 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 
 	keyBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "read key")
+		return nil, errors.Wrapf(err, "reading file %s", path)
 	}
 
 	ki, err := kIdentifer.Identify(keyBytes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading file %s", path)
+		return nil, errors.Wrap(err, "identifying key")
 	}
 
 	return ki, nil
@@ -151,7 +151,6 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 		ki.Type = "ecdsa"
 
 		if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
-			ki.Type = "ecdsa"
 			ki.Bits = key.PublicKey.Curve.Params().BitSize
 		} else {
 			level.Debug(kIdentifer.logger).Log(
