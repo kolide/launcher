@@ -27,9 +27,11 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		ChromeLoginDataEmails(client, logger),
 		ChromeUserProfiles(client, logger),
 		EmailAddresses(client, logger),
+		KeyInfo(client, logger),
 		LauncherInfoTable(),
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
+		SshKeys(client, logger),
 	}
 
 	// add in the platform specific ones (as denboted by build tags)
