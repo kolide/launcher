@@ -13,7 +13,7 @@ After=network.service syslog.service
 ExecStart= $LauncherPath \
   --hostname=$FleetServer:FleetPort \
   --enroll_secret=$FleetSecret \
-  --autoupdate=true \
+  --autoupdate \
   --osqueryd_path=$OsquerydPath
 Restart=on-failure
 RestartSec=3
