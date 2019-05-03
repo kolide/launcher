@@ -126,6 +126,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	if err != nil {
 		return errors.Wrap(err, "opening resultant output file")
 	}
+	defer outputFH.Close()
 
 	if _, err := io.Copy(w, outputFH); err != nil {
 		return errors.Wrap(err, "copying output")

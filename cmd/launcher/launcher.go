@@ -307,7 +307,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options, log
 		if control != nil {
 			runGroup.Add(control.Execute, control.Interrupt)
 		} else {
-			level.Debug(logger).Log("msg", "got nil control actor. Ignoring")
+			level.Info(logger).Log("msg", "got nil control actor. Ignoring")
 		}
 	}
 
