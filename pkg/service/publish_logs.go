@@ -152,7 +152,8 @@ func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
 func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}
+
+	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: patchOsqueryEmojiHandlingArray(logs)}
 	response, err := e.PublishLogsEndpoint(newCtx, request)
 	if err != nil {
 		return "", "", false, err
