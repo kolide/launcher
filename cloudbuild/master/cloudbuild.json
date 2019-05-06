@@ -5,7 +5,7 @@
       "timeout": "300s",
       "args": [
 	"fetch",
-	"--depth=200'"
+	"--depth=200"
       ],
       "name": "gcr.io/cloud-builders/git"
     },
