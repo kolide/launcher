@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "id": "checkout_repo",
+      "timeout": "300s",
+      "args": [
+	"fetch",
+	"--depth=200'"
+      ],
+      "name": "gcr.io/cloud-builders/git"
+    },
+    {
+      "args": [
+	"-j",
+	"deps"
+      ],
+      "entrypoint": "make",
+      "timeout": "300s",
+      "name": "gcr.io/cloud-builders/go",
+      "id": "deps"
+    },
+    {
+      "args": [
+	"-j",
+	"linux-xp-launcher",
+	"linux-xp-extension",
+	"linux-xp-grpc-extension"
+      ],
+      "entrypoint": "make",
+      "timeout": "300s",
+      "name": "gcr.io/cloud-builders/go",
+      "waitFor": [
+	"checkout_repo",
+	"deps"
+      ],
+      "id": "build"
+    },
+    {
+      "args": [
+	"-j",
+	"lint"
+      ],
+      "entrypoint": "make",
+      "timeout": "300s",
+      "name": "gcr.io/cloud-builders/go",
+      "waitFor": [
+	"checkout_repo",
+	"deps"
+      ],
+      "id": "lint"
+    }
+  ]
+}
