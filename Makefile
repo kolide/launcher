@@ -87,17 +87,9 @@ proto:
 test: generate
 	go test -cover -race -v $(shell go list ./... | grep -v /vendor/)
 
-binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
-binary-bundle: codesign
-	rm -rf build/binary-bundle
-	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
-	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
-
-build/binary-bundle/%:
-	mkdir -p $@
-	cp build/$*/launcher* $@/
-	cp build/$*/osquery-extension* $@/
-	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
+##
+## Lint
+##
 
 # These are escape newlines, looks super weird. Allows these to run in
 # parallel with `make -j`
@@ -128,7 +120,23 @@ lint-go-fmt: deps-go
 	@test -z "$(FMTFAILS)" || echo gofmt failures in: "$(FMTFAILS)"
 	@test -z "$(FMTFAILS)"
 
+##
+## Release Process Stuff
+##
 
+release: binary-bundle containers-push
+
+binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
+binary-bundle: codesign
+	rm -rf build/binary-bundle
+	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
+	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
+
+build/binary-bundle/%:
+	mkdir -p $@
+	cp build/$*/launcher* $@/
+	cp build/$*/osquery-extension* $@/
+	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
 
 ##
 ## Docker Tooling
@@ -140,14 +148,26 @@ CONTAINER_OSES = ubuntu16 ubuntu18 centos6 centos7 distroless
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
 containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerpush-fakedata-$(c))
 
-docker-build:
+build-docker:
+	docker build -t launcher-build  .
+
+build-dockerfake:
 	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
 
-dockerfake-%:
+dockerfake-%:  build-dockerfake
 	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
 
-docker-%:
+docker-%: build-docker
 	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
 
-dockerpush-%:
+dockerpush-%: docker-%
 	docker push gcr.io/kolide-public-containers/launcher-$*
+
+
+
+# Porter is a kolide tool to update notary, part of the update framework
+porter-%: codesign
+	for p in darwin linux windows; do \
+	  echo porter mirror -debug -channel $* -platform $$p -launcher-all; \
+	  echo porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
+	done
