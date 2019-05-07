@@ -14,6 +14,9 @@
 	"-j",
 	"deps"
       ],
+      "env": [
+	"GOPATH=/go"
+      ],
       "entrypoint": "make",
       "timeout": "300s",
       "name": "gcr.io/cloud-builders/go",
