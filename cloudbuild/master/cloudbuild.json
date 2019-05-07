@@ -1,80 +1,82 @@
 {
   "steps": [
     {
-      "id": "checkout_repo",
-      "timeout": "300s",
+      "name": "gcr.io/cloud-builders/git",
       "args": [
 	"fetch",
-	"--depth=200"
+	"--depth=200'"
       ],
-      "name": "gcr.io/cloud-builders/git"
+      "timeout": "300s",
+      "id": "checkout_repo"
     },
     {
-      "args": [
-	"-j",
-	"deps"
-      ],
+      "id": "deps",
+      "name": "gcr.io/cloud-builders/go",
+      "timeout": "300s",
+      "entrypoint": "make",
       "env": [
 	"GOPATH=/go"
       ],
-      "entrypoint": "make",
-      "timeout": "300s",
-      "name": "gcr.io/cloud-builders/go",
-      "id": "deps"
+      "args": [
+	"-j",
+	"deps"
+      ]
     },
     {
+      "id": "build",
+      "waitFor": [
+	"checkout_repo",
+	"deps"
+      ],
+      "name": "gcr.io/cloud-builders/go",
+      "timeout": "600s",
+      "entrypoint": "make",
       "args": [
 	"-j",
 	"linux-xp-launcher",
 	"linux-xp-extension",
 	"linux-xp-grpc-extension"
-      ],
-      "entrypoint": "make",
-      "timeout": "600s",
-      "name": "gcr.io/cloud-builders/go",
+      ]
+    },
+    {
+      "id": "lint",
       "waitFor": [
 	"checkout_repo",
 	"deps"
       ],
-      "id": "build"
-    },
-    {
+      "name": "gcr.io/cloud-builders/go",
+      "timeout": "600s",
+      "entrypoint": "make",
       "args": [
 	"-j",
 	"lint"
-      ],
-      "entrypoint": "make",
-      "timeout": "600s",
-      "name": "gcr.io/cloud-builders/go",
-      "waitFor": [
-	"checkout_repo",
-	"deps"
-      ],
-      "id": "lint"
+      ]
     },
     {
+      "waitFor": [
+	"lint",
+	"build"
+      ],
+      "id": "build-docker",
+      "entrypoint": "make",
       "args": [
 	"-j",
 	"build-docker"
       ],
-      "entrypoint": "make",
-      "id": "build-docker",
+      "name": "gcr.io/cloud-builders/docker"
+    },
+    {
       "waitFor": [
 	"lint",
 	"build"
-      ]
-    },
-    {
-      "id": "build-dockerfake",
-      "entrypoint": "make",
+      ],
       "args": [
 	"-j",
 	"build-dockerfake"
       ],
-      "waitFor": [
-	"lint",
-	"build"
-      ]
+      "entrypoint": "make",
+      "id": "build-dockerfake",
+      "name": "gcr.io/cloud-builders/docker"
     }
   ]
 }
