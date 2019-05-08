@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strings"
 	"text/template"
@@ -82,8 +83,27 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	defer wixTool.Cleanup()
 
 	// Use wix to compile into an MSI
-	if err := wixTool.Package(ctx, w); err != nil {
-		return errors.Wrap(err, "running light")
+	msiFile, err := wixTool.Package(ctx)
+	if err != nil {
+		return errors.Wrap(err, "wix packaging")
+	}
+
+	// Sign?
+	if po.SigningKey != "" {
+		if err := authenticode.Sign(ctx, msiFile, authenticode.WithSubjectName(po.SigningKey)); err != nil {
+			return errors.Wrap(err, "authencode signing")
+		}
+	}
+
+	// Copy MSI into our filehandle
+	msiFH, err := os.Open(msiFile)
+	if err != nil {
+		return errors.Wrap(err, "opening msi output file")
+	}
+	defer msiFH.Close()
+
+	if _, err := io.Copy(w, msiFH); err != nil {
+		return errors.Wrap(err, "copying output")
 	}
 
 	return nil

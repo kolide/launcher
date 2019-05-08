@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -132,9 +131,8 @@ func (wo *wixTool) Cleanup() {
 }
 
 // Package will run through the wix steps to produce a resulting
-// package. This package will be written into the provided io.Writer,
-// facilitating export to a file, buffer, or other storage backends.
-func (wo *wixTool) Package(ctx context.Context, pkgOutput io.Writer) error {
+// package. The path for the resultant package will be returned.
+func (wo *wixTool) Package(ctx context.Context) (string, error) {
 	if err := wo.heat(ctx); err != nil {
 		return errors.Wrap(err, "running heat")
 	}
@@ -151,17 +149,7 @@ func (wo *wixTool) Package(ctx context.Context, pkgOutput io.Writer) error {
 		return errors.Wrap(err, "running light")
 	}
 
-	msiFH, err := os.Open(filepath.Join(wo.buildDir, "out.msi"))
-	if err != nil {
-		return errors.Wrap(err, "opening msi output file")
-	}
-	defer msiFH.Close()
-
-	if _, err := io.Copy(pkgOutput, msiFH); err != nil {
-		return errors.Wrap(err, "copying output")
-	}
-
-	return nil
+	return filepath.Join(wo.buildDir, "out.msi"), nil
 }
 
 // addServices adds service definitions into the wix configs.
