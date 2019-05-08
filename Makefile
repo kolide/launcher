@@ -74,11 +74,13 @@ launcher-pummel:
 
 deps-go:
 	go run cmd/make/make.go -targets=deps-go,install-tools
+	go install github.com/go-bindata/go-bindata/go-bindata
+	-find /go/bin -type d
 
 deps: deps-go generate
 
 generate: deps-go
-	-find /go -type d
+	-find /go/bin -type d
 	-find /root/go -type d
 	go generate ./pkg/packagekit
 	go run cmd/make/make.go -targets=generate-tuf
