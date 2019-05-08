@@ -78,7 +78,8 @@ deps-go:
 deps: deps-go generate
 
 generate: deps-go
-	ls -d {/go,/root/go}/{bin,src}/*
+	-find /go -type d
+	-find /root/go -type d
 	go generate ./pkg/packagekit
 	go run cmd/make/make.go -targets=generate-tuf
 
