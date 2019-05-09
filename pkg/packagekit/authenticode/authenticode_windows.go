@@ -11,7 +11,6 @@ package authenticode
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -74,11 +73,10 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		return nil
 	}
 
-	verifyOut, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
+	_, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
 	if err != nil {
 		return errors.Wrap(err, "verify")
 	}
-	fmt.Printf(verifyOut)
 
 	return nil
 }
@@ -87,8 +85,6 @@ func (so *signtoolOptions) execOut(ctx context.Context, argv0 string, args ...st
 	logger := ctxlog.FromContext(ctx)
 
 	cmd := so.execCC(ctx, argv0, args...)
-
-	fmt.Println(strings.Join(cmd.Args, " "))
 
 	level.Debug(logger).Log(
 		"msg", "execing",
