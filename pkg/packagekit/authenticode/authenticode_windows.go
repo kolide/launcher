@@ -50,8 +50,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 	}
 	{
-
-		args = []string{
+		args := []string{
 			"sign",
 			"/as",
 			"/fd", "sha256",
@@ -75,7 +74,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	return nil
 }
 
-func (so *signtoolOptions) execOut(ctx context.Context, argv0, args ...string) (string, error) {
+func (so *signtoolOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
 	logger := ctxlog.FromContext(ctx)
 
 	cmd := so.execCC(ctx, argv0, args...)
