@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -27,9 +28,11 @@ func TestSign(t *testing.T) {
 
 	// create a signtoolOptions object so we can call the exec method
 	so := &signtoolOptions{
-
 		execCC: exec.CommandContext,
 	}
+
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	tmpDir, err := ioutil.TempDir("", "packagekit-authenticode-signing")
 	defer os.RemoveAll(tmpDir)
@@ -48,7 +51,7 @@ func TestSign(t *testing.T) {
 	require.NoError(t, err)
 
 	// Sign it!
-	err = Sign(context.TODO(), testExe, WithSigntoolPath(signtoolPath))
+	err = Sign(ctx, testExe, WithSigntoolPath(signtoolPath))
 	require.NoError(t, err)
 
 	// verify, as an explicit test. Gotta check both indexes manually.
