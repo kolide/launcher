@@ -9,13 +9,9 @@
 package authenticode
 
 import (
-	"bytes"
 	"context"
 	"os/exec"
-	"strings"
 
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 )
 
@@ -45,7 +41,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 
 		args = append(args, file)
-		if _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
+		if _, _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
 			return errors.Wrap(err, "calling signtool")
 		}
 	}
@@ -64,7 +60,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 
 		args = append(args, file)
-		if _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
+		if _, _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
 			return errors.Wrap(err, "calling signtool")
 		}
 	}
@@ -73,28 +69,10 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		return nil
 	}
 
-	_, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
+	_, _, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
 	if err != nil {
 		return errors.Wrap(err, "verify")
 	}
 
 	return nil
-}
-
-func (so *signtoolOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
-	logger := ctxlog.FromContext(ctx)
-
-	cmd := so.execCC(ctx, argv0, args...)
-
-	level.Debug(logger).Log(
-		"msg", "execing",
-		"cmd", strings.Join(cmd.Args, " "),
-	)
-
-	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	if err := cmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
-	}
-	return strings.TrimSpace(stdout.String()), nil
 }

@@ -41,7 +41,7 @@ func TestSign(t *testing.T) {
 	testExe := filepath.Join(tmpDir, "test.exe")
 
 	// confirm that we _don't_ have a sig on this file
-	verifyInitial, err := so.execOut(ctx, signtoolPath, "verify", "/pa", testExe)
+	_, verifyInitial, err := so.execOut(ctx, signtoolPath, "verify", "/pa", testExe)
 	require.Error(t, err, "no initial signature")
 	require.Contains(t, verifyInitial, "No signature found", "no initial signature")
 
@@ -56,12 +56,12 @@ func TestSign(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify, as an explicit test. Gotta check both indexes manually.
-	verifyOut0, err := so.execOut(ctx, signtoolPath, "verify", "/pa", "/ds", "0", testExe)
+	verifyOut0, _, err := so.execOut(ctx, signtoolPath, "verify", "/pa", "/ds", "0", testExe)
 	require.NoError(t, err, "verify signature position 0")
 	require.Contains(t, verifyOut0, "sha1", "contains algorithm verify output")
 	require.Contains(t, verifyOut0, "Authenticode", "contains timestamp verify output")
 
-	verifyOut1, err := so.execOut(ctx, signtoolPath, "verify", "/pa", "/ds", "1", testExe)
+	verifyOut1, _, err := so.execOut(ctx, signtoolPath, "verify", "/pa", "/ds", "1", testExe)
 	require.NoError(t, err, "verify signature position 1")
 	require.Contains(t, verifyOut1, "sha1", "contains algorithm verify output")
 	require.Contains(t, verifyOut1, "Authenticode", "contains timestamp verify output")
