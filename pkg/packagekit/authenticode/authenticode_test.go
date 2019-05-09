@@ -43,6 +43,7 @@ func TestSign(t *testing.T) {
 	// confirm that we _don't_ have a sig on this file
 	verifyInitial, err := so.execOut(ctx, signtoolPath, "verify", "/pa", testExe)
 	require.Error(t, err, "no initial signature")
+	require.Contains(t, verifyInitial, "No signature found", "no initial signature")
 
 	// copy our test file
 	data, err := ioutil.ReadFile(srcExe)
