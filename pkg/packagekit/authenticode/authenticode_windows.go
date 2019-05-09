@@ -74,7 +74,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		return nil
 	}
 
-	verifyOut, err := so.execOut(ctx, so.signtoolPath, "verify", "/v", file)
+	verifyOut, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
 	if err != nil {
 		return errors.Wrap(err, "verify")
 	}
