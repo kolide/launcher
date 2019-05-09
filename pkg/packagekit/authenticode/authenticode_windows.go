@@ -45,6 +45,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 			args = append(args, "/n", so.subjectName)
 		}
 
+		args = append(args, file)
 		if _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
 			return errors.Wrap(err, "calling signtool")
 		}
@@ -62,12 +63,12 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		if so.subjectName != "" {
 			args = append(args, "/n", so.subjectName)
 		}
+
+		args = append(args, file)
 		if _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
 			return errors.Wrap(err, "calling signtool")
 		}
 	}
-
-	fmt.Println("seph")
 
 	// Verify!
 	// FIXME

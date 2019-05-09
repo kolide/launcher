@@ -39,7 +39,7 @@ func TestSign(t *testing.T) {
 
 	// Sign it!
 	fmt.Println("seph in ")
-	err = Sign(context.TODO(), testExe, WithSigntoolPath("echo"))
+	err = Sign(context.TODO(), testExe, WithSigntoolPath(signtoolPath))
 	require.NoError(t, err)
 
 }
