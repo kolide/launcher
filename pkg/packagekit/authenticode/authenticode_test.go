@@ -64,6 +64,6 @@ func TestSign(t *testing.T) {
 	verifyOut1, _, err := so.execOut(ctx, signtoolPath, "verify", "/pa", "/ds", "1", testExe)
 	require.NoError(t, err, "verify signature position 1")
 	require.Contains(t, verifyOut1, "sha256", "contains algorithm verify output")
-	require.Contains(t, verifyOut1, "Authenticode", "contains timestamp verify output")
+	require.Contains(t, verifyOut1, "RFC3161", "contains timestamp verify output")
 
 }
