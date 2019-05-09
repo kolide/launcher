@@ -70,8 +70,16 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 	}
 
-	// Verify!
-	// FIXME
+	if so.skipValidation {
+		return nil
+	}
+
+	verifyOut, err := so.execOut(ctx, so.signtoolPath, "verify", "/v", file)
+	if err != nil {
+		return errors.Wrap(err, "verify")
+	}
+	fmt.Printf(verifyOut)
+
 	return nil
 }
 
