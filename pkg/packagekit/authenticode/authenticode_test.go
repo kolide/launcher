@@ -40,16 +40,16 @@ func TestSign(t *testing.T) {
 
 	testExe := filepath.Join(tmpDir, "test.exe")
 
-	// confirm that we _don't_ have a sig on this file
-	_, verifyInitial, err := so.execOut(ctx, signtoolPath, "verify", "/pa", testExe)
-	require.Error(t, err, "no initial signature")
-	require.Contains(t, verifyInitial, "No signature found", "no initial signature")
-
 	// copy our test file
 	data, err := ioutil.ReadFile(srcExe)
 	require.NoError(t, err)
 	err = ioutil.WriteFile(testExe, data, 0755)
 	require.NoError(t, err)
+
+	// confirm that we _don't_ have a sig on this file
+	_, verifyInitial, err := so.execOut(ctx, signtoolPath, "verify", "/pa", testExe)
+	require.Error(t, err, "no initial signature")
+	require.Contains(t, verifyInitial, "No signature found", "no initial signature")
 
 	// Sign it!
 	err = Sign(ctx, testExe, WithSigntoolPath(signtoolPath))
