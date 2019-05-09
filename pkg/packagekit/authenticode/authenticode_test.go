@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -22,6 +23,12 @@ func TestSign(t *testing.T) {
 
 	if runtime.GOOS != "windows" {
 		t.Skip("not windows")
+	}
+
+	// create a signtoolOptions object so we can call the exec method
+	so := &signtoolOptions{
+
+		execCC: exec.CommandContext,
 	}
 
 	tmpDir, err := ioutil.TempDir("", "packagekit-authenticode-signing")
