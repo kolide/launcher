@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/pkg/errors"

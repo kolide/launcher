@@ -39,10 +39,6 @@ func TestWixPackage(t *testing.T) {
 	err = setupPackageRoot(packageRoot)
 	require.NoError(t, err)
 
-	outMsi, err := ioutil.TempFile("", "wix-test-*.msi")
-	require.NoError(t, err)
-	defer os.Remove(outMsi.Name())
-
 	mainWxsContent, err := testdata.Asset("testdata/assets/product.wxs")
 	require.NoError(t, err)
 
@@ -57,7 +53,7 @@ func TestWixPackage(t *testing.T) {
 	require.NoError(t, err)
 	defer wixTool.Cleanup()
 
-	err = wixTool.Package(ctx, outMsi)
+	outMsi, err := wixTool.Package(ctx)
 	require.NoError(t, err)
 
 	verifyMsi(ctx, t, outMsi)
@@ -65,16 +61,16 @@ func TestWixPackage(t *testing.T) {
 
 // verifyMSI attempts to very MSI correctness. It leverages 7zip,
 // which can mostly read MSI files.
-func verifyMsi(ctx context.Context, t *testing.T, outMsi *os.File) {
+func verifyMsi(ctx context.Context, t *testing.T, outMsi string) {
 	// Use the wix struct for its execOut
 	execWix := &wixTool{execCC: exec.CommandContext}
 
-	fileContents, err := execWix.execOut(ctx, "7z", "x", "-so", outMsi.Name())
+	fileContents, err := execWix.execOut(ctx, "7z", "x", "-so", outMsi)
 	require.NoError(t, err)
 	require.Contains(t, fileContents, "Hello")
 	require.Contains(t, fileContents, "Vroom Vroom")
 
-	listOutput, err := execWix.execOut(ctx, "7z", "l", outMsi.Name())
+	listOutput, err := execWix.execOut(ctx, "7z", "l", outMsi)
 	require.NoError(t, err)
 	require.Contains(t, listOutput, "Path = go.cab")
 	require.Contains(t, listOutput, "2 files")

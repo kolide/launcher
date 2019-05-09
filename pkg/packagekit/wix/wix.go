@@ -134,19 +134,19 @@ func (wo *wixTool) Cleanup() {
 // package. The path for the resultant package will be returned.
 func (wo *wixTool) Package(ctx context.Context) (string, error) {
 	if err := wo.heat(ctx); err != nil {
-		return errors.Wrap(err, "running heat")
+		return "", errors.Wrap(err, "running heat")
 	}
 
 	if err := wo.addServices(ctx); err != nil {
-		return errors.Wrap(err, "adding services")
+		return "", errors.Wrap(err, "adding services")
 	}
 
 	if err := wo.candle(ctx); err != nil {
-		return errors.Wrap(err, "running candle")
+		return "", errors.Wrap(err, "running candle")
 	}
 
 	if err := wo.light(ctx); err != nil {
-		return errors.Wrap(err, "running light")
+		return "", errors.Wrap(err, "running light")
 	}
 
 	return filepath.Join(wo.buildDir, "out.msi"), nil
