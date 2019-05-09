@@ -32,7 +32,7 @@ func TestSign(t *testing.T) {
 	}
 
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
+	defer ctxCancel()
 
 	tmpDir, err := ioutil.TempDir("", "packagekit-authenticode-signing")
 	defer os.RemoveAll(tmpDir)
