@@ -46,8 +46,8 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		args = append(args, "--scripts", po.Scripts)
 	}
 
-	if po.SigningKey != "" {
-		args = append(args, "--sign", po.SigningKey)
+	if po.AppleSigningKey != "" {
+		args = append(args, "--sign", po.AppleSigningKey)
 	}
 
 	args = append(args, outputPath)

@@ -15,9 +15,12 @@ import (
 // are *not* the tool options, but instead our own representation of
 // the arguments.w
 type signtoolOptions struct {
-	subjectName    string // If present, use this as the `/n` argument
-	skipValidation bool
-	signtoolPath   string
+	extraArgs       []string
+	subjectName     string // If present, use this as the `/n` argument
+	skipValidation  bool
+	signtoolPath    string
+	timestampServer string
+	rfc3161Server   string
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 
@@ -31,9 +34,10 @@ func SkipValidation() SigntoolOpt {
 	}
 }
 
-func WithSubjectName(sn string) SigntoolOpt {
+// WithExtraArgs set additional arguments for signtool. Common ones may be {`\n`, "subject name"}
+func WithExtraArgs(args []string) SigntoolOpt {
 	return func(so *signtoolOptions) {
-		so.subjectName = sn
+		so.extraArgs = args
 	}
 }
 

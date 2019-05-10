@@ -67,7 +67,7 @@ func runMake(args []string) error {
 		flSigningKey = flagset.String(
 			"mac_package_signing_key",
 			env.String("SIGNING_KEY", ""),
-			"The name of the key that should be used to packages. Behavior is platform and packaging specific",
+			"The name of the key that should be used for signing on apple platforms",
 		)
 		flTransport = flagset.String(
 			"transport",
@@ -188,7 +188,7 @@ func runMake(args []string) error {
 		ExtensionVersion:  *flExtensionVersion,
 		Hostname:          *flHostname,
 		Secret:            *flEnrollSecret,
-		SigningKey:        *flSigningKey,
+		AppleSigningKey:   *flSigningKey,
 		Transport:         *flTransport,
 		Insecure:          *flInsecure,
 		InsecureTransport: *flInsecureTransport,

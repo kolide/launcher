@@ -7,7 +7,10 @@ type PackageOptions struct {
 	Name       string // What's the name for this package (eg: launcher)
 	Root       string // source directory to package
 	Scripts    string // directory of packaging scripts (postinst, prerm, etc)
-	SigningKey string // key to sign packages with (platform specific behaviors)
 	Version    string // package version
 	FlagFile   string // Path to the flagfile for configuration
+
+	AppleSigningKey     string   // apple signing key
+	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
+	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key
 }

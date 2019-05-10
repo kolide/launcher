@@ -22,10 +22,10 @@ func TestPackageTrivial(t *testing.T) {
 	require.NoError(t, err)
 
 	po := &PackageOptions{
-		Name:       "test-empty",
-		Version:    "0.0.0",
-		Root:       inputDir,
-		SigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
+		Name:            "test-empty",
+		Version:         "0.0.0",
+		Root:            inputDir,
+		AppleSigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
 	}
 
 	err = PackageFPM(context.TODO(), ioutil.Discard, po, AsTar())

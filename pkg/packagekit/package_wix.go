@@ -20,6 +20,10 @@ import (
 
 //go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
 
+const (
+	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
+)
+
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
 	defer span.End()
@@ -90,8 +94,12 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	}
 
 	// Sign?
-	if po.SigningKey != "" {
-		if err := authenticode.Sign(ctx, msiFile, authenticode.WithSubjectName(po.SigningKey)); err != nil {
+	if po.WindowsUseSigntool {
+		if err := authenticode.Sign(
+			ctx, msiFile,
+			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
+			authenticode.WithSigntoolPath(signtoolPath),
+		); err != nil {
 			return errors.Wrap(err, "authencode signing")
 		}
 	}
