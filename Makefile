@@ -60,6 +60,13 @@ codesign-darwin: xp
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
 
+
+# Using the `osslsigncode` we can sign windows binaries from
+# non-windows platforms. This is part of our notary upload pipeline.
+codesign-windows-%:
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -askpass
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -askpass
+
 codesign: codesign-darwin
 
 package-builder: .pre-build deps
