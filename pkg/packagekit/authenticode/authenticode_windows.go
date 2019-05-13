@@ -10,7 +10,6 @@ package authenticode
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -21,13 +20,8 @@ import (
 	"go.opencensus.io/trace"
 )
 
-type digestAlgo string
-
-const (
-	SHA1   digestAlgo = "sha1"
-	SHA256            = "sha256"
-)
-
+// Sign uses signtool to add authenticode signatures. It supports
+// optional arguments to allow cert specification
 func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	ctx, span := trace.StartSpan(ctx, "authenticode.Sign")
 	defer span.End()
@@ -54,20 +48,22 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	// signatures. _But_ it uses different arguments for the subsequent
 	// signatures. So, multiple calls.
 	//
-	// _However_ it's not clear this is supported for MSIs, which maybe only have a single
+	// _However_ it's not clear this is supported for MSIs, which maybe
+	// only have a single slot for signing.
 	//
 	// References:
 	// https://knowledge.digicert.com/generalinformation/INFO2274.html
 	if strings.HasSuffix(file, ".msi") {
-		if err := so.signtoolSign(ctx, file, true, SHA1); err != nil {
-			return errors.Wrap(err, "signing exe with sha1")
+		if err := so.signtoolSign(ctx, file, "/fd", "sha1", "/t", so.timestampServer); err != nil {
+			return errors.Wrap(err, "signing msi with sha1")
 		}
 	} else {
-		if err := so.signtoolSign(ctx, file, true, SHA1); err != nil {
-			return errors.Wrap(err, "signing file with 0:sha1")
+		if err := so.signtoolSign(ctx, file, "/fd", "sha1", "/t", so.timestampServer); err != nil {
+			return errors.Wrap(err, "signing msi with sha1")
 		}
-		if err := so.signtoolSign(ctx, file, false, SHA256); err != nil {
-			return errors.Wrap(err, "signing file with 1:sha256")
+
+		if err := so.signtoolSign(ctx, file, "/as", "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
+			return errors.Wrap(err, "signing msi with sha1")
 		}
 	}
 
@@ -83,30 +79,10 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	return nil
 }
 
-// constructSigntoolArgs returns an array of signtool.exe args based
-// on whether this is the first or subsequent signature, and what the
-// algorithm is.
-//
-// This is _very_ fragile. Not everthing you think will work does
-func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, firstSig bool, algo digestAlgo) error {
-	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("algo %s", algo))
+// signtoolSign appends some arguments and execs
+func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args ...string) error {
+	ctx, span := trace.StartSpan(ctx, "signtoolSign")
 	defer span.End()
-
-	args := []string{
-		"sign",
-		"/fd", string(algo),
-	}
-
-	if !firstSig {
-		args = append(args, "/as")
-	}
-
-	switch algo {
-	case SHA1:
-		args = append(args, "/t", so.timestampServer)
-	case SHA256:
-		args = append(args, "/td", "sha256", "/tr", so.rfc3161Server)
-	}
 
 	if so.extraArgs != nil {
 		args = append(args, so.extraArgs...)
