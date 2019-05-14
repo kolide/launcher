@@ -34,7 +34,8 @@ func SkipValidation() SigntoolOpt {
 	}
 }
 
-// WithExtraArgs set additional arguments for signtool. Common ones may be {`\n`, "subject name"}
+// WithExtraArgs set additional arguments for signtool. Common ones
+// may be {`\n`, "subject name"}
 func WithExtraArgs(args []string) SigntoolOpt {
 	return func(so *signtoolOptions) {
 		so.extraArgs = args
