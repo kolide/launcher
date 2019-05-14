@@ -175,6 +175,7 @@ dockerpush-%: docker-%
 
 # Porter is a kolide tool to update notary, part of the update framework
 porter-%: codesign
+	@if [ -z "${NOTARY_DELEGATION_PASSPHRASE}" ]; then echo "Missing NOTARY_DELEGATION_PASSPHRASE"; exit 1; fi
 	for p in darwin linux windows; do \
 	  echo porter mirror -debug -channel $* -platform $$p -launcher-all; \
 	  echo porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
