@@ -177,6 +177,6 @@ dockerpush-%: docker-%
 porter-%: codesign
 	@if [ -z "${NOTARY_DELEGATION_PASSPHRASE}" ]; then echo "Missing NOTARY_DELEGATION_PASSPHRASE"; exit 1; fi
 	for p in darwin linux windows; do \
-	  echo porter mirror -debug -channel $* -platform $$p -launcher-all; \
-	  echo porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
+	  porter mirror -debug -channel $* -platform $$p -launcher-all; \
+	  porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
 	done
