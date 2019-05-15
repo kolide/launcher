@@ -59,11 +59,11 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 	} else {
 		if err := so.signtoolSign(ctx, file, "/fd", "sha1", "/t", so.timestampServer); err != nil {
-			return errors.Wrap(err, "signing msi with sha1")
+			return errors.Wrap(err, "signing file with sha1")
 		}
 
 		if err := so.signtoolSign(ctx, file, "/as", "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
-			return errors.Wrap(err, "signing msi with sha256")
+			return errors.Wrap(err, "signing file with sha256")
 		}
 	}
 
