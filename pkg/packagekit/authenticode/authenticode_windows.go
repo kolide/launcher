@@ -63,7 +63,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		}
 
 		if err := so.signtoolSign(ctx, file, "/as", "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
-			return errors.Wrap(err, "signing msi with sha1")
+			return errors.Wrap(err, "signing msi with sha256")
 		}
 	}
 
