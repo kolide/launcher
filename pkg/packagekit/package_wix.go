@@ -100,7 +100,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
 			authenticode.WithSigntoolPath(signtoolPath),
 		); err != nil {
-			return errors.Wrap(err, "authencode signing")
+			return errors.Wrap(err, "authenticode signing")
 		}
 	}
 
