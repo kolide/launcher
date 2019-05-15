@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//const notepadeExe = `C:\Windows\System32\Notepad.exe`
 const (
 	srcExe       = `C:\Windows\System32\netmsg.dll`
 	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
