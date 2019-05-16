@@ -32,7 +32,6 @@ type PackageOptions struct {
 	ExtensionVersion  string
 	Hostname          string
 	Secret            string
-	SigningKey        string
 	Transport         string
 	Insecure          bool
 	InsecureTransport bool
@@ -45,6 +44,10 @@ type PackageOptions struct {
 	CertPins          string
 	RootPEM           string
 	CacheDir          string
+
+	AppleSigningKey     string   // apple signing key
+	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
+	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key
 
 	target        Target                     // Target build platform
 	initOptions   *packagekit.InitOptions    // options we'll pass to the packagekit renderers
@@ -243,13 +246,15 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	p.packagekitops = &packagekit.PackageOptions{
-		Name:       "launcher",
-		Identifier: p.Identifier,
-		Root:       p.packageRoot,
-		Scripts:    p.scriptRoot,
-		SigningKey: p.SigningKey,
-		Version:    p.PackageVersion,
-		FlagFile:   p.canonicalizePath(flagFilePath),
+		Name:                "launcher",
+		Identifier:          p.Identifier,
+		Root:                p.packageRoot,
+		Scripts:             p.scriptRoot,
+		AppleSigningKey:     p.AppleSigningKey,
+		WindowsUseSigntool:  p.WindowsUseSigntool,
+		WindowsSigntoolArgs: p.WindowsSigntoolArgs,
+		Version:             p.PackageVersion,
+		FlagFile:            p.canonicalizePath(flagFilePath),
 	}
 
 	if err := p.makePackage(ctx); err != nil {

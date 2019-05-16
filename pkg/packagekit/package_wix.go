@@ -5,11 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strings"
 	"text/template"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/pkg/errors"
@@ -17,6 +19,10 @@ import (
 )
 
 //go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
+
+const (
+	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
+)
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
@@ -82,8 +88,31 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	defer wixTool.Cleanup()
 
 	// Use wix to compile into an MSI
-	if err := wixTool.Package(ctx, w); err != nil {
-		return errors.Wrap(err, "running light")
+	msiFile, err := wixTool.Package(ctx)
+	if err != nil {
+		return errors.Wrap(err, "wix packaging")
+	}
+
+	// Sign?
+	if po.WindowsUseSigntool {
+		if err := authenticode.Sign(
+			ctx, msiFile,
+			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
+			authenticode.WithSigntoolPath(signtoolPath),
+		); err != nil {
+			return errors.Wrap(err, "authenticode signing")
+		}
+	}
+
+	// Copy MSI into our filehandle
+	msiFH, err := os.Open(msiFile)
+	if err != nil {
+		return errors.Wrap(err, "opening msi output file")
+	}
+	defer msiFH.Close()
+
+	if _, err := io.Copy(w, msiFH); err != nil {
+		return errors.Wrap(err, "copying output")
 	}
 
 	return nil

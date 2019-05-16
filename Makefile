@@ -60,7 +60,15 @@ codesign-darwin: xp
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
 	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
 
-codesign: codesign-darwin
+# Using the `osslsigncode` we can sign windows binaries from
+# non-windows platforms.
+codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
+codesign-windows-%: xp
+	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+
+codesign: codesign-darwin codesign-windows
 
 package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
@@ -167,7 +175,8 @@ dockerpush-%: docker-%
 
 # Porter is a kolide tool to update notary, part of the update framework
 porter-%: codesign
+	@if [ -z "${NOTARY_DELEGATION_PASSPHRASE}" ]; then echo "Missing NOTARY_DELEGATION_PASSPHRASE"; exit 1; fi
 	for p in darwin linux windows; do \
-	  echo porter mirror -debug -channel $* -platform $$p -launcher-all; \
-	  echo porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
+	  porter mirror -debug -channel $* -platform $$p -launcher-all; \
+	  porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
 	done
