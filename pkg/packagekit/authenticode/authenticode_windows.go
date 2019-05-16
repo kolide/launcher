@@ -54,7 +54,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	// References:
 	// https://knowledge.digicert.com/generalinformation/INFO2274.html
 	if strings.HasSuffix(file, ".msi") {
-		if err := so.signtoolSign(ctx, file, "/fd", "sha1", "/t", so.timestampServer); err != nil {
+		if err := so.signtoolSign(ctx, file, "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
 			return errors.Wrap(err, "signing msi with sha1")
 		}
 	} else {
