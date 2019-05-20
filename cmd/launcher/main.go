@@ -22,6 +22,7 @@ func main() {
 		if err := runSubcommands(); err != nil {
 			logutil.Fatal(logger, "err", errors.Wrap(err, "run with positional args"))
 		}
+		return
 	}
 
 	opts, err := parseOptions(os.Args[1:])
@@ -46,11 +47,12 @@ func isSubCommand() bool {
 	}
 
 	subCommands := []string{
-		"socket",
-		"query",
 		"flare",
+		"query",
+		"socket",
 		"svc",
 		"svc-fg",
+		"uninstall",
 	}
 
 	for _, sc := range subCommands {
@@ -75,6 +77,8 @@ func runSubcommands() error {
 		run = runWindowsSvc
 	case "svc-fg":
 		run = runWindowsSvcForeground
+	case "uninstall":
+		run = runUninstall
 	}
 	err := run(os.Args[2:])
 	return errors.Wrapf(err, "running subcommand %s", os.Args[1])

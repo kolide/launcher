@@ -1,9 +1,8 @@
 module github.com/kolide/launcher
 
 require (
-	cloud.google.com/go v0.33.1 // indirect
+	cloud.google.com/go v0.38.0
 	git.apache.org/thrift.git v0.12.0 // indirect
-	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
@@ -30,7 +29,7 @@ require (
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-kit/kit v0.8.0
 	github.com/gogo/protobuf v1.2.0
-	github.com/golang/protobuf v1.2.0
+	github.com/golang/protobuf v1.3.1
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/uuid v1.1.0
 	github.com/gorilla/context v1.1.1 // indirect
@@ -67,14 +66,17 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
-	go.opencensus.io v0.18.0
+	go.opencensus.io v0.21.0
 	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
-	golang.org/x/net v0.0.0-20190328230028-74de082e2cca
-	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
+	golang.org/x/oauth2 v0.0.0-20190517181255-950ef44c6e07 // indirect
+	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6
 	golang.org/x/sys v0.0.0-20190402142545-baf5eb976a8c
-	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
-	google.golang.org/grpc v1.14.0
+	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c
+	google.golang.org/api v0.5.0 // indirect
+	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb // indirect
+	google.golang.org/grpc v1.20.1
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
