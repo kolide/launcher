@@ -47,7 +47,7 @@ message AgentApiRequest {
 }
 
 message AgentApiResponse {
-     string message=1;
+     string message = 1;
      string error_code = 2;
      bool node_invalid = 3;
 }
