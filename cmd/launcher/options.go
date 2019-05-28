@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/kit/version"
 	"github.com/peterbourgon/ff"
 	"github.com/pkg/errors"
 )

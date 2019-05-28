@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/kit/actor"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 )
