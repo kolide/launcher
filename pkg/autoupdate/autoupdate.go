@@ -51,7 +51,6 @@ type Updater struct {
 	bootstrapFn        func() error
 	strippedBinaryName string
 	sigChannel         chan os.Signal
-	GUNPrefix          string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
