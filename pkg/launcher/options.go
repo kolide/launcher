@@ -55,7 +55,7 @@ type Options struct {
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 	UpdateChannel autoupdate.UpdateChannel
-	// The GUN prefix for where the launcher and osqueryd collections are
+	// GUNPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
 	GUNPrefix string
 
 	// Debug enables debug logging.
