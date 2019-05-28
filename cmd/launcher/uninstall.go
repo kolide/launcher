@@ -17,6 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	cloudIdentifier = "kolide"
+)
+
 type UninstallOptions struct {
 	dryRun              bool
 	userConfirmed       bool
@@ -42,7 +46,7 @@ func runUninstall(args []string) error {
 	)
 
 	uo := &UninstallOptions{
-		identifier:          "kolide",
+		identifier:          cloudIdentifier,
 		identifierHumanName: "Cloud",
 		execCC:              exec.CommandContext,
 	}
