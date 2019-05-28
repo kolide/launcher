@@ -33,8 +33,9 @@ const (
 )
 
 const (
-	DefaultMirror = "https://dl.kolide.co"
-	DefaultNotary = "https://notary.kolide.co"
+	DefaultMirror    = "https://dl.kolide.co"
+	DefaultNotary    = "https://notary.kolide.co"
+	DefaultGUNPrefix = "kolide/"
 )
 
 // Updater is a TUF autoupdater.
@@ -50,11 +51,12 @@ type Updater struct {
 	bootstrapFn        func() error
 	strippedBinaryName string
 	sigChannel         chan os.Signal
+	GUNPrefix          string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
-func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
+func NewUpdater(binaryPath, rootDirectory string, gunPrefix string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
 	// There's some chaos between windows and non-windows. In windows,
 	// the binaryName ends in .exe, in posix it does not. So, a simple
 	// TrimSuffix will handle. *However* this will break if we add the
@@ -64,7 +66,7 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := fmt.Sprintf("kolide/%s", strippedBinaryName)
+	gun := fmt.Sprintf("%s%s", gunPrefix, strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,

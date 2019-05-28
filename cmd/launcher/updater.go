@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/kit/actor"
 	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 )
@@ -23,6 +23,7 @@ type updaterConfig struct {
 
 	NotaryURL string
 	MirrorURL string
+	GUNPrefix string
 
 	HTTPClient *http.Client
 
@@ -40,6 +41,7 @@ func createUpdater(
 	updater, err := autoupdate.NewUpdater(
 		binaryPath,
 		config.RootDirectory,
+		config.GUNPrefix,
 		config.Logger,
 		autoupdate.WithLogger(config.Logger),
 		autoupdate.WithHTTPClient(config.HTTPClient),

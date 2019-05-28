@@ -81,7 +81,7 @@ func TestNewUpdater(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
-			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewNopLogger(), tt.opts...)
+			u, err := NewUpdater("/tmp/app", "/tmp/tuf", "kolide/", log.NewNopLogger(), tt.opts...)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.target, u.target)
