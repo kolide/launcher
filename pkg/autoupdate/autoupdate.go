@@ -65,12 +65,11 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := path.Join(DefaultNotaryPrefix, strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
 		NotaryURL:     DefaultNotary,
-		GUN:           gun,
+		GUN:           path.Join(DefaultNotaryPrefix, strippedBinaryName),
 		MirrorURL:     DefaultMirror,
 	}
 
