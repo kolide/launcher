@@ -33,9 +33,9 @@ const (
 )
 
 const (
-	DefaultMirror    = "https://dl.kolide.co"
-	DefaultNotary    = "https://notary.kolide.co"
-	DefaultGUNPrefix = "kolide/"
+	DefaultMirror       = "https://dl.kolide.co"
+	DefaultNotary       = "https://notary.kolide.co"
+	DefaultNotaryPrefix = "kolide/"
 )
 
 // Updater is a TUF autoupdater.
@@ -65,7 +65,7 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := path.Join(DefaultGUNPrefix, strippedBinaryName)
+	gun := path.Join(DefaultNotaryPrefix, strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
@@ -221,8 +221,8 @@ func WithNotaryURL(url string) UpdaterOption {
 	}
 }
 
-// WithGUNPrefix configures a prefix for the binaryTargets
-func WithGUNPrefix(prefix string) UpdaterOption {
+// WithNotaryPrefix configures a prefix for the binaryTargets
+func WithNotaryPrefix(prefix string) UpdaterOption {
 	return func(u *Updater) {
 		u.settings.GUN = path.Join(prefix, u.strippedBinaryName)
 	}

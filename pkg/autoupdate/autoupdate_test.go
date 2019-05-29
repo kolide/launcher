@@ -68,7 +68,7 @@ func TestNewUpdater(t *testing.T) {
 				WithUpdateChannel(Beta),
 				WithNotaryURL("https://notary"),
 				WithMirrorURL("https://mirror"),
-				WithGUNPrefix("kolide/"),
+				WithNotaryPrefix("kolide/"),
 			},
 			httpClient:    nil,
 			target:        withPlatform(t, "%s/app-beta.tar.gz"),

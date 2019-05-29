@@ -21,9 +21,9 @@ type updaterConfig struct {
 	AutoupdateInterval time.Duration
 	UpdateChannel      autoupdate.UpdateChannel
 
-	NotaryURL string
-	MirrorURL string
-	GUNPrefix string
+	NotaryURL    string
+	MirrorURL    string
+	NotaryPrefix string
 
 	HTTPClient *http.Client
 
@@ -46,7 +46,7 @@ func createUpdater(
 		autoupdate.WithHTTPClient(config.HTTPClient),
 		autoupdate.WithNotaryURL(config.NotaryURL),
 		autoupdate.WithMirrorURL(config.MirrorURL),
-		autoupdate.WithGUNPrefix(config.GUNPrefix),
+		autoupdate.WithNotaryPrefix(config.NotaryPrefix),
 		autoupdate.WithFinalizer(finalizer),
 		autoupdate.WithUpdateChannel(config.UpdateChannel),
 		autoupdate.WithSigChannel(config.SigChannel),
