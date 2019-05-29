@@ -104,7 +104,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		AutoupdateInterval: 48 * time.Hour,
 		NotaryServerURL:    "https://notary.kolide.co",
 		MirrorServerURL:    "https://dl.kolide.co",
-		NotaryPrefix:       "kolide/",
+		NotaryPrefix:       "kolide",
 		UpdateChannel:      "stable",
 		Transport:          "grpc",
 	}
