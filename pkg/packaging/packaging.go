@@ -44,6 +44,9 @@ type PackageOptions struct {
 	CertPins          string
 	RootPEM           string
 	CacheDir          string
+	NotaryURL         string
+	MirrorURL         string
+	NotaryPrefix      string
 
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
@@ -142,6 +145,18 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.Insecure {
 		launcherBoolFlags = append(launcherBoolFlags, "insecure")
+	}
+
+	if p.NotaryURL != "" {
+		launcherMapFlags["notary_url"] = p.NotaryURL
+	}
+
+	if p.MirrorURL != "" {
+		launcherMapFlags["mirror_url"] = p.MirrorURL
+	}
+
+	if p.NotaryPrefix != "" {
+		launcherMapFlags["notary_prefix"] = p.NotaryPrefix
 	}
 
 	if p.RootPEM != "" {
