@@ -53,6 +53,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flMirrorURL          = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
 		flAutoupdateInterval = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
 		flUpdateChannel      = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
+		flNotaryPrefix       = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
 
 		// Development options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
@@ -147,6 +148,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		InsecureTransport:   *flInsecureTransport,
 		NotaryServerURL:     *flNotaryServerURL,
 		MirrorServerURL:     *flMirrorURL,
+		NotaryPrefix:        *flNotaryPrefix,
 		AutoupdateInterval:  *flAutoupdateInterval,
 		UpdateChannel:       updateChannel,
 	}
@@ -236,6 +238,7 @@ func developerUsage(flagset *flag.FlagSet) {
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
 	printOpt("update_channel")
+	printOpt("notary_prefix")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
 	printOpt("disable_control_tls")

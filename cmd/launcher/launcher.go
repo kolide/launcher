@@ -320,6 +320,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options, log
 			UpdateChannel:      opts.UpdateChannel,
 			NotaryURL:          opts.NotaryServerURL,
 			MirrorURL:          opts.MirrorServerURL,
+			NotaryPrefix:       opts.NotaryPrefix,
 			HTTPClient:         httpClient,
 			SigChannel:         sigChannel,
 		}
