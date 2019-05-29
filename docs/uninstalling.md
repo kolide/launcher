@@ -36,3 +36,52 @@ dpkg: warning: while removing launcher, directory '/var/kolide/launcher.example.
 ```
 
 Based on the configurations used when the Launcher package was created, the specific paths printed may look slightly different. In any case, these left over directories mentioned in the `dpkg` warning can be removed with `sudo rm -rf`.
+
+## macOS
+
+### Launcher (`kolide-osquery-launcher.pkg`)
+
+Directories:
+
+- `/usr/local/kolide`
+- `/var/kolide`
+- `/etc/kolide`
+
+Files:
+- `/Library/LaunchDaemons/com.kolide.launcher.plist`
+
+To remove the binaries and other supporting files, run the following:
+
+```
+sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
+sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
+sudo rm -r /usr/local/kolide
+sudo rm -r /var/kolide
+sudo rm -r /etc/kolide
+```
+
+### App (`kolide-desktop-app.pkg`)
+
+Directories:
+- `$HOME/Applications/Kolide.app`
+- `"$HOME/Library/Application Support/Kolide"`
+- `/usr/local/kolide`
+
+
+Files:
+- `/Library/LaunchDaemons/com.kolide.launcher.plist`
+
+To remove the `.app` bundle, run the following:
+
+```
+sudo rm -r /Applications/Kolide.app
+```
+
+To remove the preferences, cache and other supporting files, run the following:
+
+```
+sudo rm -r "$HOME/Library/Application Support/Kolide"
+sudo rm -r /usr/local/kolide
+sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
+sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
+```
