@@ -67,6 +67,7 @@ func main() {
 		"grpc-extension":  b.BuildCmd("./cmd/grpc.ext", b.PlatformExtensionName("grpc")),
 		"package-builder": b.BuildCmd("./cmd/package-builder", b.PlatformBinaryName("package-builder")),
 		"make":            b.BuildCmd("./cmd/make", b.PlatformBinaryName("make")),
+		"launcher-pummel": b.BuildCmd("./cmd/launcher-pummel", b.PlatformBinaryName("launcher-pummel")),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {
