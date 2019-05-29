@@ -51,7 +51,6 @@ type Updater struct {
 	bootstrapFn        func() error
 	strippedBinaryName string
 	sigChannel         chan os.Signal
-	gunPrefix          string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
@@ -83,7 +82,6 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 		logger:             logger,
 		finalizer:          func() error { return nil },
 		strippedBinaryName: strippedBinaryName,
-		gunPrefix:          DefaultGUNPrefix,
 	}
 
 	// create TUF from local assets, but allow overriding with a no-op in tests.
@@ -92,9 +90,6 @@ func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...Upd
 	for _, opt := range opts {
 		opt(&updater)
 	}
-
-	gun := path.Join(updater.gunPrefix, strippedBinaryName)
-	updater.settings.GUN = gun
 
 	var err error
 	updater.target, err = updater.setTargetPath()
@@ -228,7 +223,7 @@ func WithNotaryURL(url string) UpdaterOption {
 // WithGUNPrefix configures a prefix for the binaryTargets
 func WithGUNPrefix(prefix string) UpdaterOption {
 	return func(u *Updater) {
-		u.gunPrefix = prefix
+		u.settings.GUN = path.Join(prefix, u.strippedBinaryName)
 	}
 }
 
