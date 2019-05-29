@@ -53,11 +53,11 @@ Files:
 To remove the binaries and other supporting files, run the following:
 
 ```
+sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
+sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 sudo rm -r /usr/local/kolide
 sudo rm -r /var/kolide
 sudo rm -r /etc/kolide
-sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
-sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 ```
 
 ### App (`kolide-desktop-app.pkg`)
