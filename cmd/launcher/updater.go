@@ -41,12 +41,12 @@ func createUpdater(
 	updater, err := autoupdate.NewUpdater(
 		binaryPath,
 		config.RootDirectory,
-		config.GUNPrefix,
 		config.Logger,
 		autoupdate.WithLogger(config.Logger),
 		autoupdate.WithHTTPClient(config.HTTPClient),
 		autoupdate.WithNotaryURL(config.NotaryURL),
 		autoupdate.WithMirrorURL(config.MirrorURL),
+		autoupdate.WithGUNPrefix(config.GUNPrefix),
 		autoupdate.WithFinalizer(finalizer),
 		autoupdate.WithUpdateChannel(config.UpdateChannel),
 		autoupdate.WithSigChannel(config.SigChannel),

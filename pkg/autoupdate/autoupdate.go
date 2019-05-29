@@ -51,11 +51,12 @@ type Updater struct {
 	bootstrapFn        func() error
 	strippedBinaryName string
 	sigChannel         chan os.Signal
+	gunPrefix          string
 }
 
 // NewUpdater creates a unstarted updater for a specific binary
 // updated from a TUF mirror.
-func NewUpdater(binaryPath, rootDirectory string, gunPrefix string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
+func NewUpdater(binaryPath, rootDirectory string, logger log.Logger, opts ...UpdaterOption) (*Updater, error) {
 	// There's some chaos between windows and non-windows. In windows,
 	// the binaryName ends in .exe, in posix it does not. So, a simple
 	// TrimSuffix will handle. *However* this will break if we add the
@@ -65,12 +66,11 @@ func NewUpdater(binaryPath, rootDirectory string, gunPrefix string, logger log.L
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 	stagingPath := filepath.Join(filepath.Dir(binaryPath), fmt.Sprintf("%s-staging", binaryName))
-	gun := path.Join(gunPrefix, strippedBinaryName)
 
 	settings := tuf.Settings{
 		LocalRepoPath: tufRepoPath,
 		NotaryURL:     DefaultNotary,
-		GUN:           gun,
+		GUN:           "",
 		MirrorURL:     DefaultMirror,
 	}
 
@@ -83,6 +83,7 @@ func NewUpdater(binaryPath, rootDirectory string, gunPrefix string, logger log.L
 		logger:             logger,
 		finalizer:          func() error { return nil },
 		strippedBinaryName: strippedBinaryName,
+		gunPrefix:          DefaultGUNPrefix,
 	}
 
 	// create TUF from local assets, but allow overriding with a no-op in tests.
@@ -91,6 +92,9 @@ func NewUpdater(binaryPath, rootDirectory string, gunPrefix string, logger log.L
 	for _, opt := range opts {
 		opt(&updater)
 	}
+
+	gun := path.Join(updater.gunPrefix, strippedBinaryName)
+	updater.settings.GUN = gun
 
 	var err error
 	updater.target, err = updater.setTargetPath()
@@ -218,6 +222,13 @@ func WithLogger(logger log.Logger) UpdaterOption {
 func WithNotaryURL(url string) UpdaterOption {
 	return func(u *Updater) {
 		u.settings.NotaryURL = url
+	}
+}
+
+// WithGUNPrefix configures a prefix for the binaryTargets
+func WithGUNPrefix(prefix string) UpdaterOption {
+	return func(u *Updater) {
+		u.gunPrefix = prefix
 	}
 }
 
