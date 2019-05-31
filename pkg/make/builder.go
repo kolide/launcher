@@ -27,6 +27,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/theupdateframework/notary/client"
@@ -287,29 +288,38 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	}
 
 	notaryConfigDir := filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/tools/notary/config")
-	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
-	if err != nil {
-		return errors.Wrap(err, "opening notary config file")
+	notaryURL := os.Getenv("NOTARY_URL")
+	if notaryURL == "" {
+		notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
+		if err != nil {
+			return errors.Wrap(err, "opening notary config file")
+		}
+		defer notaryConfigFile.Close()
+		var conf struct {
+			RemoteServer struct {
+				URL string `json:"url"`
+			} `json:"remote_server"`
+		}
+		if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
+			return errors.Wrap(err, "decoding notary config file")
+		}
+		notaryURL = conf.RemoteServer.URL
 	}
-	defer notaryConfigFile.Close()
-	var conf struct {
-		RemoteServer struct {
-			URL string `json:"url"`
-		} `json:"remote_server"`
-	}
-	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
-		return errors.Wrap(err, "decoding notary config file")
+
+	notaryPrefix := os.Getenv("NOTARY_PREFIX")
+	if notaryPrefix == "" {
+		notaryPrefix = autoupdate.DefaultNotaryPrefix
 	}
 
 	for _, t := range binaryTargets {
-		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", conf.RemoteServer.URL)
-		gun := path.Join("kolide", t)
+		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", notaryURL)
+		gun := path.Join(notaryPrefix, t)
 		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
 		if err := os.MkdirAll(localRepo, 0755); err != nil {
 			return errors.Wrapf(err, "make autoupdate dir %s", localRepo)
 		}
 
-		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun); err != nil {
+		if err := bootstrapFromNotary(notaryConfigDir, notaryURL, localRepo, gun); err != nil {
 			return errors.Wrapf(err, "bootstrap notary GUN %s", gun)
 		}
 	}
