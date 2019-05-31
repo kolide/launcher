@@ -27,7 +27,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/theupdateframework/notary/client"
@@ -308,7 +307,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 
 	notaryPrefix := os.Getenv("NOTARY_PREFIX")
 	if notaryPrefix == "" {
-		notaryPrefix = autoupdate.DefaultNotaryPrefix
+		notaryPrefix = "kolide"
 	}
 
 	for _, t := range binaryTargets {
