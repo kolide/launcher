@@ -13,8 +13,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -26,12 +24,8 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
-	"github.com/theupdateframework/notary/client"
-	"github.com/theupdateframework/notary/trustpinning"
-	"github.com/theupdateframework/notary/tuf/data"
 	"go.opencensus.io/trace"
 	"golang.org/x/sync/errgroup"
 )
@@ -259,116 +253,6 @@ func (b *Builder) installTool(ctx context.Context, importPath string) error {
 		return errors.Wrapf(err, "run go install %s, output=%s", importPath, out)
 	}
 	level.Debug(ctxlog.FromContext(ctx)).Log("target", "install tool", "import_path", importPath, "output", string(out))
-	return nil
-}
-
-func (b *Builder) GenerateTUF(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
-	defer span.End()
-
-	/* First, we generate a bindata file from an empty directory so that the symbols
-	   are present (Asset, AssetDir, etc). Once the symbols are present, we can run
-	   the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
-	   the bindata file with the real TUF metadata.
-	*/
-	dir, err := ioutil.TempDir("", "bootstrap-launcher-bindata")
-	if err != nil {
-		return errors.Wrapf(err, "create empty dir for bindata")
-	}
-	defer os.RemoveAll(dir)
-
-	if err := b.execBindata(ctx, dir); err != nil {
-		return errors.Wrap(err, "exec bindata for empty dir")
-	}
-
-	binaryTargets := []string{ // binaries that are autoupdated.
-		"osqueryd",
-		"launcher",
-	}
-
-	notaryConfigDir := filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/tools/notary/config")
-	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
-	if err != nil {
-		return errors.Wrap(err, "opening notary config file")
-	}
-	defer notaryConfigFile.Close()
-	var conf struct {
-		RemoteServer struct {
-			URL string `json:"url"`
-		} `json:"remote_server"`
-	}
-	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
-		return errors.Wrap(err, "decoding notary config file")
-	}
-
-	for _, t := range binaryTargets {
-		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", conf.RemoteServer.URL)
-		gun := path.Join("kolide", t)
-		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
-		if err := os.MkdirAll(localRepo, 0755); err != nil {
-			return errors.Wrapf(err, "make autoupdate dir %s", localRepo)
-		}
-
-		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun); err != nil {
-			return errors.Wrapf(err, "bootstrap notary GUN %s", gun)
-		}
-	}
-
-	if err := b.execBindata(ctx, "pkg/autoupdate/assets/..."); err != nil {
-		return errors.Wrap(err, "exec bindata for autoupdate assets")
-	}
-
-	return nil
-}
-
-func (b *Builder) execBindata(ctx context.Context, dir string) error {
-	ctx, span := trace.StartSpan(ctx, "make.execBindata")
-	defer span.End()
-
-	cmd := b.execCC(
-		ctx,
-		"go-bindata",
-		"-o", "pkg/autoupdate/bindata.go",
-		"-pkg", "autoupdate",
-		dir,
-	)
-	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
-	out, err := cmd.CombinedOutput()
-	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
-}
-
-func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string) error {
-	passwordRetrieverFn := func(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
-		pass = os.Getenv(key)
-		if pass == "" {
-			err = fmt.Errorf("Missing pass phrase env var %q", key)
-		}
-		return pass, giveUp, err
-	}
-
-	// Safely fetch and validate all TUF metadata from remote Notary server.
-	repo, err := client.NewFileCachedRepository(
-		notaryConfigDir,
-		data.GUN(gun),
-		remoteServerURL,
-		&http.Transport{Proxy: http.ProxyFromEnvironment},
-		passwordRetrieverFn,
-		trustpinning.TrustPinConfig{},
-	)
-	if err != nil {
-		return errors.Wrap(err, "create an instance of the TUF repository")
-	}
-
-	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-		return errors.Wrap(err, "getting all target metadata")
-	}
-
-	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
-	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := fs.CopyDir(source, localRepo); err != nil {
-		return errors.Wrap(err, "copying TUF repo metadata")
-	}
-
 	return nil
 }
 
