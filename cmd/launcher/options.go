@@ -36,7 +36,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flControlServerURL  = flagset.String("control_hostname", "", "The hostname of the control server")
 		flEnrollSecret      = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
 		flEnrollSecretPath  = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
-		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 3*time.Second, "The interval at which the 'get shells' request will be made")
+		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 60*time.Second, "The interval at which the 'get shells' request will be made")
 		flInitialRunner     = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL   = flagset.String("hostname", "", "The hostname of the gRPC server")
 		flTransport         = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
