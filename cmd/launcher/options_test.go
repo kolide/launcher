@@ -99,7 +99,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		Control:            true,
 		OsquerydPath:       "/dev/null",
 		KolideServerURL:    randomHostname,
-		GetShellsInterval:  3 * time.Second,
+		GetShellsInterval:  60 * time.Second,
 		LoggingInterval:    time.Duration(randomInt) * time.Second,
 		AutoupdateInterval: 48 * time.Hour,
 		NotaryServerURL:    "https://notary.kolide.co",
