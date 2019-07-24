@@ -144,11 +144,11 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--utc",
 	)
 
-	// Refresh configs every couple minutes. if there's a failure, try
-	// again more prompty. Values in seconds. These settings are CLI
-	// flags only.
+	// Configs aren't expected to change often, so refresh configs
+	// every couple minutes. if there's a failure, try again more
+	// promptly. Values in seconds. These settings are CLI flags only.
 	cmd.Args = append(cmd.Args,
-		"--config_refresh=120",
+		"--config_refresh=300",
 		"--config_accelerated_refresh=30",
 	)
 
