@@ -138,12 +138,20 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--disable_distributed=false",
 		"--distributed_interval=5",
 		"--pack_delimiter=:",
-		"--config_refresh=10",
 		"--host_identifier=uuid",
 		"--force=true",
 		"--disable_watchdog",
 		"--utc",
 	)
+
+	// Refresh configs every couple minutes. if there's a failure, try
+	// again more prompty. Values in seconds. These settings are CLI
+	// flags only.
+	cmd.Args = append(cmd.Args,
+		"--config_refresh=120",
+		"--config_accelerated_refresh=30",
+	)
+
 	cmd.Args = append(cmd.Args, platformArgs()...)
 	if stdout != nil {
 		cmd.Stdout = stdout
