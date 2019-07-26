@@ -3,9 +3,8 @@ package table
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os/exec"
-	"path/filepath"
+	"os/user"
 	"strconv"
 	"strings"
 	"syscall"
@@ -50,56 +49,32 @@ type touchIDUserConfig struct {
 	effectiveApplePay      int
 }
 
-func enumerateUIDs() ([]int, error) {
-	// Enumerate all of the files in /Users
-	files, err := ioutil.ReadDir("/Users")
-	if err != nil {
-		return nil, errors.Wrap(err, "enumerating files and folders in /Users")
-	}
-
-	// If it's a directory, add it to the array
-	user_folders := make([]string, 0)
-	for _, file := range files {
-		if file.IsDir() {
-			user_folders = append(user_folders, filepath.Join("/Users", file.Name()))
-		}
-	}
-
-	// Run dscl on each directory to get its owner's UID and add it to the slice
-	uids := make([]int, 0)
-	for _, folder := range user_folders {
-		var stdout bytes.Buffer
-		cmd := exec.Command("/usr/bin/dscl", ".", "-read", folder, "UniqueID")
-		cmd.Stdout = &stdout
-		cmd.Run()
-		outStr := string(stdout.Bytes())
-		uid := strings.Split(outStr, ": ")[1]
-		uid = uid[:len(uid)-1] // trim newline
-		uidInt, _ := strconv.Atoi(uid)
-		uids = append(uids, uidInt)
-	}
-
-	// If the length of the UIDs slice is zero, something went wrong
-	if len(uids) == 0 {
-		return nil, errors.Wrap(errors.New("result_length"), "UIDs slice length is zero")
-	}
-
-	return uids, nil
-}
-
-// TouchIDUserConfigGenerate will be called whenever the table is queried.
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	var results []map[string]string
-
-	// Enumerate the uids on the system
-	uids, err := enumerateUIDs()
-	if err != nil {
-		return nil, errors.Wrap(err, "error calling enumerateUIDs")
+	q, _ := queryContext.Constraints["uid"]
+	if len(q.Constraints) == 0 {
+		level.Debug(t.logger).Log(
+			"msg", "The touchid_user_config table requires that you specify a constraint WHERE uid =",
+			"err", "no constraints",
+		)
+		return nil, errors.New("The touchid_user_config table requires that you specify a constraint WHERE uid =")
 	}
 
-	for _, uid := range uids {
+	var results []map[string]string
+	for _, constraint := range q.Constraints {
 		var touchIDUnlock, touchIDApplePay, effectiveUnlock, effectiveApplePay string
 		var stdout bytes.Buffer
+
+		// Verify the user exists on the system before proceeding
+		_, err := user.LookupId(constraint.Expression)
+		if err != nil {
+			level.Debug(t.logger).Log(
+				"msg", "nonexistant user",
+				"uid", constraint.Expression,
+				"err", err,
+			)
+			continue
+		}
+		uid, _ := strconv.Atoi(constraint.Expression)
 
 		// Grab the user's TouchID configuration
 		cmd := exec.Command("/usr/bin/bioutil", "-r")
@@ -130,7 +105,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 			level.Debug(t.logger).Log(
 				"msg", "bioutil -r returned unexpected output",
 				"uid", uid,
-				"err", "bad_output",
+				"err", "bad output",
 			)
 			continue
 		}
