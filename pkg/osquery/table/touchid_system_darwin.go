@@ -26,7 +26,7 @@ func TouchIDSystemConfig(client *osquery.ExtensionManagerClient, logger log.Logg
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return table.NewPlugin("touchid_system_config", columns, t.generate)
+	return table.NewPlugin("kolide_touchid_system_config", columns, t.generate)
 }
 
 type touchIDSystemConfigTable struct {

@@ -31,7 +31,7 @@ func TouchIDUserConfig(client *osquery.ExtensionManagerClient, logger log.Logger
 		table.IntegerColumn("effective_applepay"),
 	}
 
-	return table.NewPlugin("touchid_user_config", columns, t.generate)
+	return table.NewPlugin("kolide_touchid_user_config", columns, t.generate)
 }
 
 type touchIDUserConfigTable struct {
