@@ -25,6 +25,8 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		MacOSUpdate(client),
 		MachoInfo(),
 		Spotlight(),
+		TouchIDUserConfig(client, logger),
+		TouchIDSystemConfig(client, logger),
 		UserAvatar(logger),
 		kextpolicy.TablePlugin(),
 		legacyexec.TablePlugin(),
