@@ -77,7 +77,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		uid, _ := strconv.Atoi(constraint.Expression)
 
 		// Grab the user's TouchID configuration
-		cmd := exec.Command("/usr/bin/bioutil", "-r")
+		cmd := exec.CommandContext(ctx, "/usr/bin/bioutil", "-r")
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: 20}
 		cmd.Stdout = &stdout
@@ -112,7 +112,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 
 		// Grab the fingerprint count
 		stdout.Reset()
-		cmd = exec.Command("/usr/bin/bioutil", "-c")
+		cmd = exec.CommandContext(ctx, "/usr/bin/bioutil", "-c")
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: 20}
 		cmd.Stdout = &stdout
