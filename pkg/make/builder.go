@@ -285,7 +285,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "create empty dir for bindata")
 	}
-	// defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir)
 	fmt.Printf("using %s as a dir\n", dir)
 
 	// asset bundle on an empty directory. Not sure if this is still
@@ -340,6 +340,23 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	return nil
 }
 
+// execBindata runs go-bindat as asset packaging.
+func (b *Builder) execBindata(ctx context.Context, dir string) error {
+	ctx, span := trace.StartSpan(ctx, "make.execBindata")
+	defer span.End()
+
+	cmd := b.execCC(
+		ctx,
+		"go-bindata",
+		"-o", "pkg/autoupdate/bindata.go",
+		"-pkg", "autoupdate",
+		dir,
+	)
+	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
+	out, err := cmd.CombinedOutput()
+	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
+}
+
 func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string) error {
 	passwordRetrieverFn := func(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
 		pass = os.Getenv(key)
@@ -373,23 +390,6 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 	}
 
 	return nil
-}
-
-// execBindata runs go-bindat as asset packaging.
-func (b *Builder) execBindata(ctx context.Context, dir string) error {
-	ctx, span := trace.StartSpan(ctx, "make.execBindata")
-	defer span.End()
-
-	cmd := b.execCC(
-		ctx,
-		"go-bindata",
-		"-o", "pkg/autoupdate/bindata.go",
-		"-pkg", "autoupdate",
-		dir,
-	)
-	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
-	out, err := cmd.CombinedOutput()
-	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
 }
 
 func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
