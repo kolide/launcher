@@ -274,9 +274,8 @@ type notaryConf struct {
 // GenerateTUF setups up a bunch of TUF metadata for the auto
 // updater. There are several steps:
 //
-// 1. Generate a bindata file from an empty directory so that the symbol are present (Asset, AssetDir, etc)
-// 2. Run generate_tuf.go tool to generate actual TUF metadata
-// 3. Recreate the bindata file with the real TUF metadata
+// 1. Run generate_tuf.go tool to generate actual TUF metadata
+// 2. Recreate the bindata file with the real TUF metadata
 func (b *Builder) GenerateTUF(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
 	defer span.End()
@@ -286,13 +285,6 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		return errors.Wrapf(err, "create empty dir for bindata")
 	}
 	defer os.RemoveAll(dir)
-	fmt.Printf("using %s as a dir\n", dir)
-
-	// asset bundle on an empty directory. Not sure if this is still
-	// needed, but it's always been this way.
-	if err := b.execBindata(ctx, dir); err != nil {
-		return errors.Wrap(err, "exec bindata for empty dir")
-	}
 
 	//
 	// Populate the asset dir, and package it.
@@ -318,10 +310,16 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	binaryTargets := []string{
 		"osqueryd",
 		"launcher",
+		"osquery-extension",
 	}
 
 	for _, t := range binaryTargets {
-		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", notaryConfig.RemoteServer.URL)
+		level.Debug(ctxlog.FromContext(ctx)).Log(
+			"target", "generate-tuf",
+			"msg", "bootstrap notary",
+			"binary", t,
+			"remote_server_url", notaryConfig.RemoteServer.URL,
+		)
 		gun := path.Join(autoupdate.DefaultNotaryPrefix, t)
 		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
 		if err := os.MkdirAll(localRepo, 0755); err != nil {
@@ -345,6 +343,7 @@ func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	ctx, span := trace.StartSpan(ctx, "make.execBindata")
 	defer span.End()
 
+	// FIXME: this is a relative path
 	cmd := b.execCC(
 		ctx,
 		"go-bindata",
