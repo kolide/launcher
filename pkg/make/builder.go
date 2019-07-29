@@ -27,7 +27,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/theupdateframework/notary/client"
@@ -109,17 +108,23 @@ func New(opts ...Option) (*Builder, error) {
 	}
 
 	b := Builder{
-		os:           runtime.GOOS,
-		arch:         runtime.GOARCH,
-		goVer:        goVer,
-		notaryServer: autoupdate.DefaultNotary,
-		notaryPrefix: autoupdate.DefaultNotaryPrefix,
+		os:    runtime.GOOS,
+		arch:  runtime.GOARCH,
+		goVer: goVer,
 
 		execCC: exec.CommandContext,
 	}
 
 	for _, opt := range opts {
 		opt(&b)
+	}
+
+	if b.notaryServer == "" {
+		return nil, errors.New("notaryServer unset")
+	}
+
+	if b.notaryPrefix == "" {
+		return nil, errors.New("notaryPrefix unset")
 	}
 
 	// Some default environment things
