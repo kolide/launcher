@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/make"
 )
@@ -22,6 +23,8 @@ func main() {
 		flTargets      = flag.String("targets", buildAll, "comma separated list of targets")
 		flDebug        = flag.Bool("debug", false, "use a debug logger")
 		flBuildARCH    = flag.String("arch", runtime.GOARCH, "Architecture to build for.")
+		flNotaryServer = flag.String("notaryserver", autoupdate.DefaultNotary, "Notary server")
+		flNotaryPrefix = flag.String("notaryprefix", autoupdate.DefaultNotaryPrefix, "Notary prefix (aka GUN)")
 		flBuildOS      = flag.String("os", runtime.GOOS, "Operating system to build for.")
 		flRace         = flag.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic       = flag.Bool("static", false, "Build a static binary.")
@@ -37,6 +40,12 @@ func main() {
 	opts := []make.Option{
 		make.WithOS(*flBuildOS),
 		make.WithArch(*flBuildARCH),
+	}
+	if *flNotaryServer != "" {
+		opts = append(opts, make.WithNotaryServer(*flNotaryServer))
+	}
+	if *flNotaryPrefix != "" {
+		opts = append(opts, make.WithNotaryPrefix(*flNotaryPrefix))
 	}
 	if *flRace {
 		opts = append(opts, make.WithRace())

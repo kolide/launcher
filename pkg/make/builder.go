@@ -44,6 +44,8 @@ type Builder struct {
 	race         bool
 	stampVersion bool
 	fakedata     bool
+	notaryServer string
+	notaryPrefix string
 
 	goVer  *semver.Version
 	cmdEnv []string
@@ -61,6 +63,17 @@ func WithOS(o string) Option {
 func WithArch(a string) Option {
 	return func(b *Builder) {
 		b.arch = a
+	}
+}
+
+func WithNotaryServer(s string) Option {
+	return func(b *Builder) {
+		b.notaryServer = s
+	}
+}
+func WithNotaryPrefix(p string) Option {
+	return func(b *Builder) {
+		b.notaryPrefix = p
 	}
 }
 
@@ -96,9 +109,11 @@ func New(opts ...Option) (*Builder, error) {
 	}
 
 	b := Builder{
-		os:    runtime.GOOS,
-		arch:  runtime.GOARCH,
-		goVer: goVer,
+		os:           runtime.GOOS,
+		arch:         runtime.GOARCH,
+		goVer:        goVer,
+		notaryServer: autoupdate.DefaultNotary,
+		notaryPrefix: autoupdate.DefaultNotaryPrefix,
 
 		execCC: exec.CommandContext,
 	}
@@ -292,7 +307,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 
 	// config file pulls in values from the autoupdate package
 	notaryConfig := notaryConf{
-		RemoteServer: notaryRemoteServer{URL: autoupdate.DefaultNotary},
+		RemoteServer: notaryRemoteServer{URL: b.notaryServer},
 	}
 
 	configFileOut, err := os.Create(filepath.Join(dir, "config.json"))
@@ -320,7 +335,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 			"binary", t,
 			"remote_server_url", notaryConfig.RemoteServer.URL,
 		)
-		gun := path.Join(autoupdate.DefaultNotaryPrefix, t)
+		gun := path.Join(b.notaryPrefix, t)
 		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
 		if err := os.MkdirAll(localRepo, 0755); err != nil {
 			return errors.Wrapf(err, "make autoupdate dir %s", localRepo)
