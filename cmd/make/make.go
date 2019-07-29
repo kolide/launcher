@@ -8,9 +8,16 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/make"
+)
+
+// These need to be hardcoded here, and not in autoupdate, as
+// autoupdate can't build before a stub bindata is present.
+const (
+	DefaultMirror       = "https://dl.kolide.co"
+	DefaultNotary       = "https://notary.kolide.co"
+	DefaultNotaryPrefix = "kolide"
 )
 
 func main() {
@@ -23,8 +30,8 @@ func main() {
 		flTargets      = flag.String("targets", buildAll, "comma separated list of targets")
 		flDebug        = flag.Bool("debug", false, "use a debug logger")
 		flBuildARCH    = flag.String("arch", runtime.GOARCH, "Architecture to build for.")
-		flNotaryServer = flag.String("notaryserver", autoupdate.DefaultNotary, "Notary server")
-		flNotaryPrefix = flag.String("notaryprefix", autoupdate.DefaultNotaryPrefix, "Notary prefix (aka GUN)")
+		flNotaryServer = flag.String("notaryserver", DefaultNotary, "Notary server")
+		flNotaryPrefix = flag.String("notaryprefix", DefaultNotaryPrefix, "Notary prefix (aka GUN)")
 		flBuildOS      = flag.String("os", runtime.GOOS, "Operating system to build for.")
 		flRace         = flag.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic       = flag.Bool("static", false, "Build a static binary.")

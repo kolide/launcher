@@ -294,7 +294,7 @@ type notaryConf struct {
 // GenerateTUF setups up a bunch of TUF metadata for the auto
 // updater. There are several steps:
 //
-// 1. Run generate_tuf.go tool to generate actual TUF metadata
+// 1. Run generate_tuf.go tool to generate TUF metadata
 // 2. Recreate the bindata file with the real TUF metadata
 func (b *Builder) GenerateTUF(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
@@ -363,14 +363,25 @@ func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	ctx, span := trace.StartSpan(ctx, "make.execBindata")
 	defer span.End()
 
+	logger := ctxlog.FromContext(ctx)
+
 	// FIXME: this is a relative path
-	cmd := b.execCC(
-		ctx,
-		"go-bindata",
+	args := []string{
 		"-o", "pkg/autoupdate/bindata.go",
 		"-pkg", "autoupdate",
 		dir,
+	}
+	cmd := b.execCC(
+		ctx,
+		"go-bindata",
+		args...,
 	)
+
+	level.Debug(logger).Log(
+		"msg", "Running go-bindata",
+		"args", args,
+	)
+
 	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
 	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
