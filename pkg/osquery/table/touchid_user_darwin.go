@@ -62,7 +62,6 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 	var results []map[string]string
 	for _, constraint := range q.Constraints {
 		var touchIDUnlock, touchIDApplePay, effectiveUnlock, effectiveApplePay string
-		var stdout bytes.Buffer
 
 		// Verify the user exists on the system before proceeding
 		_, err := user.LookupId(constraint.Expression)
@@ -76,21 +75,17 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		}
 		uid, _ := strconv.Atoi(constraint.Expression)
 
-		// Grab the user's TouchID configuration
-		cmd := exec.CommandContext(ctx, "/usr/bin/bioutil", "-r")
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: 20}
-		cmd.Stdout = &stdout
-		if err := cmd.Run(); err != nil {
+		// Get the user's TouchID config
+		configOutput, err := runCommandContext(ctx, uid, "/usr/bin/bioutil", "-r")
+		if err != nil {
 			level.Debug(t.logger).Log(
-				"msg", "Failed to run bioutil for configuration",
+				"msg", "could not run bioutil -r",
 				"uid", uid,
 				"err", err,
 			)
 			continue
 		}
-		configOutStr := string(stdout.Bytes())
-		configSplit := strings.Split(configOutStr, ":")
+		configSplit := strings.Split(configOutput, ":")
 
 		// If the length of the split is 2, TouchID is not configured for this user
 		// Otherwise, extract the values from the split.
@@ -103,28 +98,23 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 			effectiveApplePay = configSplit[5][1:2]
 		} else {
 			level.Debug(t.logger).Log(
-				"msg", "bioutil -r returned unexpected output",
+				"msg", configOutput,
 				"uid", uid,
-				"err", "bad output",
+				"err", "bioutil -r returned unexpected output",
 			)
 			continue
 		}
 
 		// Grab the fingerprint count
-		stdout.Reset()
-		cmd = exec.CommandContext(ctx, "/usr/bin/bioutil", "-c")
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: 20}
-		cmd.Stdout = &stdout
-		if err := cmd.Run(); err != nil {
+		countOutStr, err := runCommandContext(ctx, uid, "/usr/bin/bioutil", "-c")
+		if err != nil {
 			level.Debug(t.logger).Log(
-				"msg", "Failed to run bioutil for fingerprint count",
+				"msg", "could not run bioutil -c",
 				"uid", uid,
 				"err", err,
 			)
 			continue
 		}
-		countOutStr := string(stdout.Bytes())
 		countSplit := strings.Split(countOutStr, ":")
 		fingerprintCount := strings.ReplaceAll(countSplit[1], "\t", "")[:1]
 
@@ -140,4 +130,29 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 	}
 
 	return results, nil
+}
+
+// runCommand runs a given command and arguments as the supplied user
+func runCommandContext(ctx context.Context, uid int, cmd string, args ...string) (string, error) {
+	// Set up the command
+	var stdout bytes.Buffer
+	c := exec.CommandContext(ctx, cmd, args...)
+	c.Stdout = &stdout
+
+	// Check if the supplied UID is that of the current user
+	currentUser, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	if strconv.Itoa(uid) != currentUser.Uid {
+		c.SysProcAttr = &syscall.SysProcAttr{}
+		c.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: 20}
+	}
+
+	// Run the command
+	if err := c.Run(); err != nil {
+		return "", err
+	}
+
+	return string(stdout.Bytes()), nil
 }
