@@ -557,7 +557,7 @@ sudo service launcher.{{.Identifier}} restart`
 }
 
 func postinstallLauncherTemplate() string {
-	return `#!/bin/bash
+	return `#!/bin/sh
 
 [[ $3 != "/" ]] && exit 0
 
