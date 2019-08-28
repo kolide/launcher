@@ -57,8 +57,8 @@ windows-xp-%: .pre-build
 
 
 codesign-darwin: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/launcher
-	codesign --force -s "${CODESIGN_IDENTITY}" -v ./build/darwin/osquery-extension.ext
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/launcher
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/osquery-extension.ext
 
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
