@@ -1,4 +1,4 @@
-// +build !darwin, !windows
+// +build windows
 
 package table
 
@@ -8,8 +8,8 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-// platformTables returns an empty set. It's here as a catchall for
-// unimplemented platforms.
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
-	return []*table.Plugin{}
+	return []*table.Plugin{
+		ProgramIcons(),
+	}
 }

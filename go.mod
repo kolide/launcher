@@ -53,6 +53,7 @@ require (
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
+	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f // indirect
 	github.com/mitchellh/go-ps v0.0.0-20170309133038-4fdf99ab2936
