@@ -1,9 +1,13 @@
 module github.com/kolide/launcher
 
+// Force references to thrift to use the new place.
+// https://github.com/knightsc/system_policy/pull/6 is the remaining one
+replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
+
+replace github.com/kolide/osquery-go => github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
+
 require (
-	cloud.google.com/go v0.33.1 // indirect
-	git.apache.org/thrift.git v0.12.0 // indirect
-	github.com/BurntSushi/toml v0.3.1 // indirect
+	cloud.google.com/go v0.43.0
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
@@ -14,6 +18,7 @@ require (
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/boltdb/bolt v1.3.1
+	github.com/boltdb/boltd v0.0.0-20150220181201-1f04e2021e45
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
@@ -30,7 +35,7 @@ require (
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-kit/kit v0.8.0
 	github.com/gogo/protobuf v1.2.0
-	github.com/golang/protobuf v1.2.0
+	github.com/golang/protobuf v1.3.2
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/uuid v1.1.0
 	github.com/gorilla/context v1.1.1 // indirect
@@ -43,8 +48,8 @@ require (
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
-	github.com/kolide/kit v0.0.0-20181124013649-bd1a9de64d48
-	github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
+	github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541
+	github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
@@ -67,14 +72,14 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
-	go.opencensus.io v0.18.0
-	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c
+	go.opencensus.io v0.22.1
+	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
-	golang.org/x/net v0.0.0-20190328230028-74de082e2cca
-	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys v0.0.0-20190402142545-baf5eb976a8c
-	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
-	google.golang.org/grpc v1.14.0
+	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+	google.golang.org/grpc v1.23.0
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
