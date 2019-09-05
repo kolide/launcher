@@ -8,6 +8,8 @@
 
 Accepted (March 11, 2019)
 
+Superseded by [Version 2](2019-09-05_autoupdate_v2.md)
+
 ## Context
 
 One of the features of Launcher is it's ability to securely update
@@ -54,7 +56,7 @@ channel)
 
 ### Example Code
 
-There an [example service](/tools/upgrade-exec-service-testing/)
+There an [example service](/tools/autoupdate-v1-tests)
 exploring these mechanisms. See code for further comments and
 discussion.
 

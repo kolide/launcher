@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +23,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
@@ -91,7 +94,8 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	if err != nil {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
-	extensionPath := filepath.Join(filepath.Dir(exPath), extensionName)
+
+	extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extensionName)
 	if _, err := os.Stat(extensionPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
@@ -292,6 +296,19 @@ func (r *Runner) Shutdown() error {
 	return nil
 }
 
+// Restart allows you to cleanly shutdown the current instance and launch a new
+// instance with the same configurations.
+func (r *Runner) Restart() error {
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
+	// Cancelling will cause all of the cleanup routines to execute, and a
+	// new instance will start.
+	r.instance.cancel()
+	r.instance.errgroup.Wait()
+
+	return nil
+}
+
 // Healthy checks the health of the instance and returns an error describing
 // any problem.
 func (r *Runner) Healthy() error {
@@ -414,10 +431,17 @@ const healthCheckInterval = 60 * time.Second
 
 func (r *Runner) launchOsqueryInstance() error {
 	o := r.instance
+
+	// What binary name to look for
+	lookFor := "osqueryd"
+	if runtime.GOOS == "windows" {
+		lookFor = lookFor + ".exe"
+	}
+
 	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
 	// try to find it in the path.
 	if o.opts.binaryPath == "" {
-		path, err := exec.LookPath("osqueryd")
+		path, err := exec.LookPath(lookFor)
 		if err != nil {
 			return errors.Wrap(err, "osqueryd not supplied and not found")
 		}
@@ -477,16 +501,39 @@ func (r *Runner) launchOsqueryInstance() error {
 		o.opts.distributedPluginFlag = "internal_noop"
 	}
 
+	// If we're on windows, ensure that we're looking for the .exe
+	if runtime.GOOS == "windows" && !strings.HasSuffix(o.opts.binaryPath, ".exe") {
+		o.opts.binaryPath = o.opts.binaryPath + ".exe"
+	}
+
+	// before we start osqueryd, check with the update system to
+	// see if we have the newest version. Do this everytime. If
+	// this prove undesirable, we can expost a function to set
+	// o.opts.binaryPath in the finalizer to call.
+	//
+	// FindNewest uses context as a way to get a logger, so we need to
+	// create and pass a ctxlog in.
+	currentOsquerydBinaryPath := autoupdate.FindNewest(
+		ctxlog.NewContext(context.TODO(), o.logger),
+		o.opts.binaryPath,
+	)
+
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = createOsquerydCommand(o.opts.binaryPath, paths, o.opts.configPluginFlag, o.opts.loggerPluginFlag, o.opts.distributedPluginFlag, o.opts.stdout, o.opts.stderr)
+	o.cmd, err = createOsquerydCommand(currentOsquerydBinaryPath, paths, o.opts.configPluginFlag, o.opts.loggerPluginFlag, o.opts.distributedPluginFlag, o.opts.stdout, o.opts.stderr)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create osqueryd command")
 	}
 
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	o.cmd.SysProcAttr = setpgid()
+
+	level.Debug(o.logger).Log(
+		"msg", "launching osqueryd",
+		"arg0", o.cmd.Path,
+		"args", strings.Join(o.cmd.Args, " "),
+	)
 
 	// Launch osquery process (async)
 	err = o.cmd.Start()
@@ -607,19 +654,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return o.doneCtx.Err()
 	})
-
-	return nil
-}
-
-// Restart allows you to cleanly shutdown the current instance and launch a new
-// instance with the same configurations.
-func (r *Runner) Restart() error {
-	r.instanceLock.Lock()
-	defer r.instanceLock.Unlock()
-	// Cancelling will cause all of the cleanup routines to execute, and a
-	// new instance will start.
-	r.instance.cancel()
-	r.instance.errgroup.Wait()
 
 	return nil
 }

@@ -3,12 +3,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"syscall"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 )
 
@@ -24,9 +27,19 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 				"stack", fmt.Sprintf("%+v", err),
 			)
 		}
+		// find the newest version of launcher on disk
+		// FindNewest uses context as a way to get a logger, so we need to create and pass one.
+		binaryPath := autoupdate.FindNewest(
+			ctxlog.NewContext(context.TODO(), logger),
+			os.Args[0],
+		)
+
 		// replace launcher
-		level.Info(logger).Log("msg", "Exec for updated launcher")
-		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+		level.Info(logger).Log(
+			"msg", "Exec updated launcher",
+			"newPath", binaryPath,
+		)
+		if err := syscall.Exec(binaryPath, os.Args, os.Environ()); err != nil {
 			return errors.Wrap(err, "restarting launcher")
 		}
 		return nil

@@ -14,9 +14,11 @@ import (
 	"github.com/kolide/updater/tuf"
 )
 
+// updaterConfig is a struct of update related options. It's used to
+// simplify the call to `createUpdater` from launcher's main blocks.
 type updaterConfig struct {
 	Logger             log.Logger
-	RootDirectory      string
+	RootDirectory      string // launcher's root dir. use for holding tuf staging and updates
 	AutoupdateInterval time.Duration
 	UpdateChannel      autoupdate.UpdateChannel
 
@@ -29,18 +31,19 @@ type updaterConfig struct {
 	SigChannel chan os.Signal
 }
 
+// createUpdater returns an Actor suitable for an oklog/run group. It
+// is a light wrapper around autoupdate.NewUpdater to simplify having
+// multiple ones in launcher.
 func createUpdater(
 	ctx context.Context,
 	binaryPath string,
 	finalizer autoupdate.UpdateFinalizer,
-	logger log.Logger,
 	config *updaterConfig,
 ) (*actor.Actor, error) {
 	// create the updater
 	updater, err := autoupdate.NewUpdater(
 		binaryPath,
 		config.RootDirectory,
-		config.Logger,
 		autoupdate.WithLogger(config.Logger),
 		autoupdate.WithHTTPClient(config.HTTPClient),
 		autoupdate.WithNotaryURL(config.NotaryURL),
@@ -85,7 +88,6 @@ func createUpdater(
 				case <-time.After(30 * time.Minute):
 					break
 				}
-
 			}
 
 			// Don't exit unless there's a done signal TODO: remove when

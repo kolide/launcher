@@ -21,6 +21,11 @@ func FromContext(ctx context.Context) log.Logger {
 		return log.NewNopLogger()
 	}
 	span := trace.FromContext(ctx).SpanContext()
+
+	if span.TraceID.String() == "00000000000000000000000000000000" {
+		return v
+	}
+
 	return log.With(
 		v,
 		"trace_id", span.TraceID.String(),
