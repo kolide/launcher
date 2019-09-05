@@ -3,7 +3,6 @@ cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=
 cloud.google.com/go v0.43.0 h1:banaiRPAM8kUVYneOSkhgcDsLzEvL25FinuiSZaH/2w=
 cloud.google.com/go v0.43.0/go.mod h1:BOSR3VbTLkk6FDC/TcffxP4NF/FFBGA5ku+jvKOP7pg=
-git.apache.org/thrift.git v0.0.0-20180705132951-f12cacf56145/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
@@ -148,8 +147,6 @@ github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541 h1:fS9QdXZooZXKxA1SsbVG
 github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d h1:2/+lLTfZan4IGrD8TGC1ZVkehWLtrRuah47FASAnifE=
 github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d/go.mod h1:umPEbeG8R8RDJpQ0EMyRdj+6pfnJK4FTzjafwgovDUk=
-github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d h1:alVW+rIOMejarlhjLl4AYaQaGAyfvIUDg9NyyKRhSek=
-github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d/go.mod h1:QVQKz6+eKB0syu5u8BS1E4S/nTMuy44d9WbRFQ4nLnQ=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80/go.mod h1:x3dEGYbZovhD1t8OwEgdyu/4ZCvrn9QvkbPtOZnul8k=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
