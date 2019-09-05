@@ -118,6 +118,13 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		countSplit := strings.Split(countOutStr, ":")
 		fingerprintCount := strings.ReplaceAll(countSplit[1], "\t", "")[:1]
 
+		// If the fingerprint count is 0, set effective values to 0
+		// This is due to a bug in `bioutil -r` incorrectly always returning 1
+		// See https://github.com/kolide/launcher/pull/502#pullrequestreview-284351577
+		if fingerprintCount == "0" {
+			effectiveApplePay, effectiveUnlock = "0", "0"
+		}
+
 		result := map[string]string{
 			"uid":                     strconv.Itoa(uid),
 			"fingerprints_registered": fingerprintCount,
