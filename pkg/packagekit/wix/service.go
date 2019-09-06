@@ -163,6 +163,16 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// and CamelCase it. (eg: daemon.exe becomes DaemonSvc). It is
 	// probably better to specific a ServiceName, but this might be an
 	// okay default.
+	//
+	// It's not really clear what we want for Vital and Wait. Vital is
+	// whether the MSI should error out if the service fails. While that
+	// _sounds_ appropriate, it turns out it will break if something
+	// caused a prior service to still be present. (Note that not
+	// rebooting enough can trigger that)
+	//
+	// Wait refers to whether the MSI should wait for the service. Which
+	// seems like an obvious tradeoff between MSIs just working, and
+	// services working.
 	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
 	si := &ServiceInstall{
 		Name:          defaultName,
@@ -171,7 +181,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 		Start:         StartAuto,
 		Type:          "ownProcess",
 		ErrorControl:  ErrorControlNormal,
-		Vital:         Yes,
+		Vital:         No,
 		ServiceConfig: sconfig,
 	}
 
@@ -181,7 +191,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 		Stop:   InstallUninstallBoth,
 		Start:  InstallUninstallInstall,
 		Remove: InstallUninstallUninstall,
-		Wait:   No,
+		Wait:   Yes,
 	}
 
 	s := &Service{

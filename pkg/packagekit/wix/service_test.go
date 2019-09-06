@@ -26,10 +26,10 @@ func TestService(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, expectTrue2)
 
-	expectedXml := `<ServiceInstall Account="[SERVICEACCOUNT]" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes">
+	expectedXml := `<ServiceInstall Account="[SERVICEACCOUNT]" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="no">
                         <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
                     </ServiceInstall>
-                    <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
+                    <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="yes"></ServiceControl>`
 
 	var xmlString bytes.Buffer
 
