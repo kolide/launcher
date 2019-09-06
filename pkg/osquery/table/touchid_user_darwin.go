@@ -139,7 +139,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 	return results, nil
 }
 
-// runCommand runs a given command and arguments as the supplied user
+// runCommandContext runs a given command and arguments as the supplied user
 func runCommandContext(ctx context.Context, uid int, cmd string, args ...string) (string, error) {
 	// Set up the command
 	var stdout bytes.Buffer
