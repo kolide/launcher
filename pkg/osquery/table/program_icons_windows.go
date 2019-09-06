@@ -12,10 +12,9 @@ import (
 	"strings"
 
 	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
 	"golang.org/x/sys/windows/registry"
-
-	"github.com/mat/besticon/ico"
 )
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
@@ -55,7 +54,7 @@ func generateUninstallerProgramIcons() []map[string]string {
 
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.ALL_ACCESS)
+			key, err := registry.OpenKey(key, path, registry.READ)
 			defer key.Close()
 			if err != nil {
 				continue
@@ -93,7 +92,7 @@ func generateInstallersProgramIcons() []map[string]string {
 
 	for key, paths := range productRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.ALL_ACCESS)
+			key, err := registry.OpenKey(key, path, registry.READ)
 			defer key.Close()
 			if err != nil {
 				continue
@@ -120,12 +119,10 @@ func generateInstallersProgramIcons() []map[string]string {
 	return installerIcons
 }
 
-/*
-	Parse an ico returing a base64 encoded version and a hash of the ico.
-
-	This doesn't support extracting an icon from a exe. Windows stores some icon in
-	the exe like 'OneDriveSetup.exe,-101'
-*/
+//	Parse an ico returing a base64 encoded version and a hash of the ico.
+//
+//	This doesn't support extracting an icon from a exe. Windows stores some icon in
+//	the exe like 'OneDriveSetup.exe,-101'
 func parseIcoFile(fullPath string) (icon, error) {
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
@@ -147,16 +144,14 @@ func parseIcoFile(fullPath string) (icon, error) {
 	return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
 }
 
-/*
-	expand registry keys one layer deep for a hive and path.
-
-	For example expandRegistryKey(registry.USERS, `*\Software\Microsoft\Installer\Products\*`)
-	expands to
-	USER1\Software\Microsoft\Installer\Products\2CCC92FB8B3D5F6499511F546A784ACD
-	USER1\Software\Microsoft\Installer\Products\1AAA2FB8B3D5F6499511F546A784ACD
-	USER2\Software\Microsoft\Installer\Products\3FFF92FB8B3D5F6499511F546A784ACD
-	USER2\Software\Microsoft\Installer\Products\5DDD92FB8B3D5F6499511F546A784ACD
-*/
+//	expand registry keys one layer deep for a hive and path.
+//
+//	For example expandRegistryKey(registry.USERS, `*\Software\Microsoft\Installer\Products\*`)
+//	expands to
+//	USER1\Software\Microsoft\Installer\Products\2CCC92FB8B3D5F6499511F546A784ACD
+//	USER1\Software\Microsoft\Installer\Products\1AAA2FB8B3D5F6499511F546A784ACD
+//	USER2\Software\Microsoft\Installer\Products\3FFF92FB8B3D5F6499511F546A784ACD
+//	USER2\Software\Microsoft\Installer\Products\5DDD92FB8B3D5F6499511F546A784ACD
 func expandRegistryKey(hive registry.Key, pattern string) []string {
 	var paths []string
 	magicChar := `*`
@@ -173,7 +168,7 @@ func expandRegistryKey(hive registry.Key, pattern string) []string {
 		}
 
 		patternParts := strings.SplitN(expandablePattern, magicChar, 2)
-		key, err := registry.OpenKey(hive, patternParts[0], registry.ALL_ACCESS)
+		key, err := registry.OpenKey(hive, patternParts[0], registry.READ)
 		if err != nil {
 			continue
 		}
