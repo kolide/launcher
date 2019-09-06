@@ -35,7 +35,12 @@ table.ext: .pre-build
 	go run cmd/make/make.go -targets=table-extension -linkstamp
 
 osqueryi-tables: table.ext
-	osqueryd -S --extension ./build/darwin/tables.ext
+	osqueryd -S --allow-unsafe --extension ./build/darwin/tables.ext
+sudo-osqueryi-tables: table.ext
+	sudo osqueryd -S --allow-unsafe --extension ./build/darwin/tables.ext
+launchas-osqueryi-tables: table.ext
+	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --extension ./build/darwin/tables.ext
+
 
 extension: .pre-build
 	go run cmd/make/make.go -targets=extension
