@@ -149,7 +149,7 @@ func parseIcoFile(fullPath string) (icon, error) {
 // For example expandRegistryKey(registry.USERS, `*\Software\Microsoft\Installer\Products\*`)
 //	expands to
 // USER1\Software\Microsoft\Installer\Products\2CCC92FB8B3D5F6499511F546A784ACD
-//	USER1\Software\Microsoft\Installer\Products\1AAA2FB8B3D5F6499511F546A784ACD
+// USER1\Software\Microsoft\Installer\Products\1AAA2FB8B3D5F6499511F546A784ACD
 // USER2\Software\Microsoft\Installer\Products\3FFF92FB8B3D5F6499511F546A784ACD
 //	USER2\Software\Microsoft\Installer\Products\5DDD92FB8B3D5F6499511F546A784ACD
 func expandRegistryKey(hive registry.Key, pattern string) []string {
