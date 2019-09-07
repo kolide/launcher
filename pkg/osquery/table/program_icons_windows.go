@@ -144,7 +144,7 @@ func parseIcoFile(fullPath string) (icon, error) {
 	return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
 }
 
-//	expand registry keys one layer deep for a hive and path.
+// expandRegistryKey takes a hive and path, and does a non-recursive glob expansion
 //
 // For example expandRegistryKey(registry.USERS, `*\Software\Microsoft\Installer\Products\*`)
 //	expands to
