@@ -122,7 +122,7 @@ func generateInstallersProgramIcons() []map[string]string {
 // parseIcoFile returns a base64 encoded version and a hash of the ico.
 //
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
-//	the exe like 'OneDriveSetup.exe,-101'
+// the exe like 'OneDriveSetup.exe,-101'
 func parseIcoFile(fullPath string) (icon, error) {
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
