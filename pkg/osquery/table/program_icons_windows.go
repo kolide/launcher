@@ -147,7 +147,7 @@ func parseIcoFile(fullPath string) (icon, error) {
 // expandRegistryKey takes a hive and path, and does a non-recursive glob expansion
 //
 // For example expandRegistryKey(registry.USERS, `*\Software\Microsoft\Installer\Products\*`)
-//	expands to
+// expands to
 // USER1\Software\Microsoft\Installer\Products\2CCC92FB8B3D5F6499511F546A784ACD
 // USER1\Software\Microsoft\Installer\Products\1AAA2FB8B3D5F6499511F546A784ACD
 // USER2\Software\Microsoft\Installer\Products\3FFF92FB8B3D5F6499511F546A784ACD
