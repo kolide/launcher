@@ -32,6 +32,10 @@ Windows uses guids to identify how MSIs related to one another. Windows defines 
 For a given input, we need a stable guid. Convinently, md5 produces a
 string of the correct length for these guids.
 
+Note: MSIs can get quiet unhappy if they PackageCode changes, while
+the ProductCode remains the same. That will result in an error about
+"Another version of this product is already installed"
+
 References
 
   1. http://wixtoolset.org/
