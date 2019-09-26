@@ -1,3 +1,4 @@
+# Launcher Auto Update Process Version 2
 
 ## Authors
 
@@ -39,25 +40,27 @@ These lead us to needing a new update process.
 ## Decision
 
 Instead of replacing the running binary, we will launch the updated
-binary from a staging area. This new flow will look like:
+binary from an updates area. This new flow will look like:
 
 1. a new binary is downloaded into the staging area
 2. It is moved into the updates directory
-3. It is spawned from the updates directory 
-
-The implementation is documented as part of [/pkg/autoupdate], or
-[godoc](https://godoc.org/github.com/kolide/launcher/pkg/autoupdate)
+3. It is spawned from the updates directory
 
 There are several corollaries:
 
 * When launcher starts, it needs to look for a newer version to spawn
 * Some cleanup process occurs to keep the number of binaries low. 
 
-Some of this design stems from assumptions made by
+This design stems from assumptions made by
 [TUF](https://godoc.org/github.com/kolide/updater/tuf)
 
-## Consequences
 
+
+The implementation is documented as part of [/pkg/autoupdate], or
+[godoc](https://godoc.org/github.com/kolide/launcher/pkg/autoupdate)
+
+
+## Consequences
 
 ### Working around deficiencies in TUF
 
@@ -69,3 +72,5 @@ a binary mismatch. This means that if the local `launcher` executable
 changes, it will not be refreshed until the tuf metadata
 changes. (This is contrary to the expectation that that the update
 cycle would notice and repair it)
+
+### exec

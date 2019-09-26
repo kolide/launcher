@@ -299,6 +299,7 @@ func (r *Runner) Shutdown() error {
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
 func (r *Runner) Restart() error {
+	level.Debug(r.instance.logger).Log("msg", "runner.Restart called")
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	// Cancelling will cause all of the cleanup routines to execute, and a

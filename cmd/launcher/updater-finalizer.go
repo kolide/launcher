@@ -27,8 +27,9 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 				"stack", fmt.Sprintf("%+v", err),
 			)
 		}
-		// find the newest version of launcher on disk
+		// find the newest version of launcher on disk.
 		// FindNewest uses context as a way to get a logger, so we need to create and pass one.
+		// FIXME: add delete/cleanup here
 		binaryPath := autoupdate.FindNewest(
 			ctxlog.NewContext(context.TODO(), logger),
 			os.Args[0],
@@ -40,7 +41,7 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 			"newPath", binaryPath,
 		)
 		if err := syscall.Exec(binaryPath, os.Args, os.Environ()); err != nil {
-			return errors.Wrap(err, "restarting launcher")
+			return errors.Wrap(err, "exec updated launcher")
 		}
 		return nil
 	}
