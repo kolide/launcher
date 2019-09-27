@@ -88,11 +88,26 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		)
 
 		if err := u.finalizer(); err != nil {
+			// Some kinds of updates, require a full
+			// launcher restart. For example, windows
+			// doesn't have an exec, so launcher exits so
+			// the service manager will restart it. There
+			// may be others.
+			if IsLauncherRestartNeededErr(err) {
+				level.Info(u.logger).Log(
+					"msg", "signaling for a full restart",
+					"binary", outputBinary,
+				)
+				u.sigChannel <- os.Interrupt
+				return
+			}
+
 			level.Error(u.logger).Log(
 				"msg", "calling restart function for updated binary",
 				"binary", outputBinary,
 				"err", err)
 			return
+			// FIXME: I'm pretty sure if we get here, launcher hangs
 		}
 
 		level.Debug(u.logger).Log("msg", "completed update for binary", "binary", outputBinary)

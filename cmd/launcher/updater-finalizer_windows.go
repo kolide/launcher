@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
+	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
 // updateFinalizer finalizes a launcher update. As windows does not
@@ -26,6 +26,6 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 			)
 		}
 		level.Info(logger).Log("msg", "Exiting launcher to allow a service manager to start the new one")
-		return errors.New("Exiting launcher to allow a service manager restart")
+		return autoupdate.NewLauncherRestartNeededErr("Exiting launcher to allow a service manager restart")
 	}
 }
