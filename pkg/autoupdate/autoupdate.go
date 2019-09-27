@@ -10,12 +10,12 @@
 //    signed metadata. When the metadata changes, it will download the
 //    linked file. (This idiom is a bit confusing, and a bit
 //    limiting. It downloads on _metadata_ change, and not as a file
-//    sync)
+//    comparison)
 //
 //    tuf.NotificationHandler is responsible for moving the downloaded
 //    binary into the desired location. It defined by this package,
 //    and is passed to TUF as a function. It is also used by TUF as a
-//    janky logging mechanism.
+//    ad-hoc logging mechanism.
 //
 //    autoupdate.UpdateFinalizer is responsible for finalizing the
 //    update. Eg: restarting the service appropriately. As it is
@@ -129,12 +129,11 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	// The staging directory is used as a temporary download
 	// location for TUF. The updatesDirectory is used as a place
 	// to hold newer binary versions. The updated binaries are
-	// executated from that directory. It's not clear if we can
-	// keep that in the rootDirectory, or if it will need to be in
-	// the binaryPath. I think it's cleaner in rootDirectory, but
-	// that may, potentially, run into noexec filesystems.
-	//
-	// FIXME: words are wrong
+	// executated from this directory. We store the update
+	// relatative to the binaryPath primarily so that command line
+	// executions can find it, without needing to know where the
+	// rootDirectory is. (it likely also helps uncommon noexec
+	// cases)
 	updater.stagingPath = filepath.Join(rootDirectory, fmt.Sprintf("%s-staging", binaryName))
 	updater.updatesDirectory = filepath.Join(FindBaseDir(binaryPath), fmt.Sprintf("%s-updates", binaryName))
 

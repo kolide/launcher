@@ -6,9 +6,9 @@
 
 ## Status
 
-Proposed
+Accepted: October, 2019
 
-Supersedes [Launcher Auto Update Process](2019-03-11_autoupdate.md)
+Supersedes: [Launcher Auto Update Process](2019-03-11_autoupdate.md)
 
 ## Context
 
@@ -37,40 +37,45 @@ There are some inherent problems with this design:
 
 These lead us to needing a new update process.
 
+### Assumptions in TUF
+
+Additionally, our implementation must work within the assumptions of
+[TUF](https://godoc.org/github.com/kolide/updater/tuf).
+
+TUF has a very simple model. It's designed to notice remote metadata
+changes for a single file, download it into a given location, and
+trigger into a callback function.
+
+Because it has a single file model, we cannot easily store these by
+version.
+
+Furthermore, updates happen when the tuf metadata changes. Not when on
+a binary mismatch. This means that if the local `launcher` executable
+changes, it will not be refreshed until the tuf metadata
+changes. This makes testing somewhat harder.
+
 ## Decision
 
-Instead of replacing the running binary, we will launch the updated
-binary from an updates area. This new flow will look like:
+Instead of replacing the running binary, we will create a directory to
+store updates in. These updates will be launched from there. This new
+flow will look like:
 
 1. a new binary is downloaded into the staging area
-2. It is moved into the updates directory
+2. It is moved into the updates directory, and stored by date
 3. It is spawned from the updates directory
-
-There are several corollaries:
-
-* When launcher starts, it needs to look for a newer version to spawn
-* Some cleanup process occurs to keep the number of binaries low. 
-
-This design stems from assumptions made by
-[TUF](https://godoc.org/github.com/kolide/updater/tuf)
-
 
 
 The implementation is documented as part of [/pkg/autoupdate], or
 [godoc](https://godoc.org/github.com/kolide/launcher/pkg/autoupdate)
 
-
 ## Consequences
 
-### Working around deficiencies in TUF
+Because we're not replacing the binary on disk, if we want _all_
+execution to use an update, we need to hook into the main
+function. Thus all subsequent executions find the latest download.
 
-TUF is has some stuff baked pretty deep about writing to a staging
-path, and no more. I'm not sure I want to change that so deeply.
+To support this we need to store the updates in a configuration
+agnostic fashion. We will use `<binaryPath>-updates`.
 
-Furthermore, updates happen when the tuf metadata changes. Not when on
-a binary mismatch. This means that if the local `launcher` executable
-changes, it will not be refreshed until the tuf metadata
-changes. (This is contrary to the expectation that that the update
-cycle would notice and repair it)
-
-### exec
+We will need to remove old updates. This cleanup routine can run as
+part of finding the current binaries.
