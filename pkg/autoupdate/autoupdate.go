@@ -269,7 +269,7 @@ func WithMirrorURL(url string) UpdaterOption {
 // WithLogger configures a logger.
 func WithLogger(logger log.Logger) UpdaterOption {
 	return func(u *Updater) {
-		u.logger = logger
+		u.logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 }
 

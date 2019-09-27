@@ -15,7 +15,7 @@ import (
 )
 
 func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "execwrapper")
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
 	cmd.Env = envv

@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/boltdb/bolt"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/logutil"
@@ -32,7 +33,7 @@ const defaultOsquerydPath = "/usr/local/kolide/bin/osqueryd"
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! Autoupdate will kill the entire rungroup, and trigger FIXME
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
-	logger := ctxlog.FromContext(ctx)
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory

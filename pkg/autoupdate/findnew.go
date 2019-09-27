@@ -34,7 +34,7 @@ func DeleteOldUpdates() newestOption {
 // as determined by os.Executable. However, if the current running
 // version is the same as the newest on disk, it will return empty string.
 func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "autoupdate.FindNewestSelf")
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	exPath, err := os.Executable()
 	if err != nil {
@@ -69,7 +69,7 @@ func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
 // original path. It will return the same fullBinaryPath if that is
 // the newest version.
 func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption) string {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "autoupdate.FindNewest")
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	if fullBinaryPath == "" {
 		level.Debug(logger).Log("msg", "called with empty string")
