@@ -29,6 +29,9 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	// If there's a newer version of launcher on disk, use it.
+	// This does not call DeleteOldUpdates, on the theory that
+	// it's better left to the service to handle cleanup. This is
+	// a straight forward exec.
 	newerBinary, err := autoupdate.FindNewestSelf(ctx)
 	if err != nil {
 		logutil.Fatal(logger, err, "checking for updated version")

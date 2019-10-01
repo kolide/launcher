@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -97,20 +96,21 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	sort.Strings(possibleUpdates)
 
 	// iterate backwards over files, looking for a suitable binary
+	foundCount := 0
 	foundFile := ""
 	for i := len(possibleUpdates) - 1; i >= 0; i-- {
 		file := possibleUpdates[i]
 
-		if foundFile != "" {
+		// If we've already found at least 2 files, (newest, and presumed
+		// current), trigger delete routine
+		if foundCount >= 2 {
 			if !newestSettings.deleteOld {
 				continue
 			}
 
 			basedir := filepath.Dir(file)
-			spew.Dump(basedir)
 			level.Debug(logger).Log("msg", "deleting old updates", "dir", basedir)
 			if err := os.RemoveAll(basedir); err != nil {
-				spew.Dump(err)
 				level.Error(logger).Log("msg", "error deleting old update dir", "dir", basedir, "err", err)
 			}
 		}
@@ -120,6 +120,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			continue
 		}
 
+		foundCount = foundCount + 1
 		foundFile = file
 	}
 

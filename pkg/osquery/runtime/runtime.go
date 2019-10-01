@@ -517,6 +517,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	currentOsquerydBinaryPath := autoupdate.FindNewest(
 		ctxlog.NewContext(context.TODO(), o.logger),
 		o.opts.binaryPath,
+		autoupdate.DeleteOldUpdates(),
 	)
 
 	// Now that we have accepted options from the caller and/or determined what
