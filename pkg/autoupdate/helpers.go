@@ -1,5 +1,3 @@
-// +build !windows
-
 package autoupdate
 
 import (
@@ -18,13 +16,13 @@ func checkExecutable(potentialBinary string) error {
 	stat, err := os.Stat(potentialBinary)
 	switch {
 	case os.IsNotExist(err):
-		return errors.Errorf("No such file %s", potentialBinary)
+		return errors.New("No such file")
 	case stat.IsDir():
-		return errors.Errorf("%s is a directory", potentialBinary)
+		return errors.New("is a directory")
 	case err != nil:
-		return errors.Wrapf(err, "statting file %s", potentialBinary)
+		return errors.Wrap(err, "statting file")
 	case stat.Mode()&0111 == 0:
-		return errors.Errorf("file %s not executable", potentialBinary)
+		return errors.New("not executable")
 	}
 
 	return nil
