@@ -103,11 +103,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 		// If we've already found at least 2 files, (newest, and presumed
 		// current), trigger delete routine
-		if foundCount >= 2 {
-			if !newestSettings.deleteOld {
-				continue
-			}
-
+		if newestSettings.deleteOld && foundCount >= 2 {
 			basedir := filepath.Dir(file)
 			level.Debug(logger).Log("msg", "deleting old updates", "dir", basedir)
 			if err := os.RemoveAll(basedir); err != nil {
@@ -120,8 +116,13 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			continue
 		}
 
+		// We always want to increment the foundCount, since it's what triggers deletion.
 		foundCount = foundCount + 1
-		foundFile = file
+
+		// Only set what we've found, if it's unset.
+		if foundFile == "" {
+			foundFile = file
+		}
 	}
 
 	if foundFile != "" {
