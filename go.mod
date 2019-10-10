@@ -18,7 +18,6 @@ require (
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/boltdb/bolt v1.3.1
-	github.com/boltdb/boltd v0.0.0-20150220181201-1f04e2021e45
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
