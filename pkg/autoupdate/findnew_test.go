@@ -9,20 +9,15 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/stretchr/testify/require"
 )
 
-// TestFindNewestSelf tests the FindNewestSelf. Hard to test this, as it's a light wrapper around os.Executable
+// TestFindNewestSelf tests the FindNewestSelf. Hard to test this, as
+// it's a light wrapper around os.Executable
 func TestFindNewestSelf(t *testing.T) {
 	t.Parallel()
 
-	ctx := ctxlog.NewContext(
-		context.Background(),
-		log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout)),
-	)
+	ctx := context.TODO()
 
 	{
 		newest, err := FindNewestSelf(ctx)
@@ -106,47 +101,40 @@ func TestFindBaseDir(t *testing.T) {
 
 }
 
-func TestFindNewest(t *testing.T) {
+func TestFindNewestEmpty(t *testing.T) {
 	t.Parallel()
 
-	ctx := ctxlog.NewContext(context.TODO(), logutil.NewCLILogger(true))
-
-	// Setup the tests
-	tmpDir, err := ioutil.TempDir("", "test-autoupdate-find-newest")
-	//defer os.RemoveAll(tmpDir)
-	require.NoError(t, err)
-
-	// Create the fake binary
-	binaryName := "binary"
-	if runtime.GOOS == "windows" {
-		binaryName = binaryName + ".exe"
-	}
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, emptySetup)
+	defer cleanupFunc()
+	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
-	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
-	{
-		tmpFile, err := os.Create(binaryPath)
-		require.NoError(t, err, "os create")
-		tmpFile.Close()
-		require.NoError(t, os.Chmod(binaryPath, 0755))
-	}
 
 	// Basic tests, test with binary and no updates
 	require.Empty(t, FindNewest(ctx, ""), "passing empty string")
 	require.Empty(t, FindNewest(ctx, tmpDir), "passing directory as arg")
 	require.Equal(t, binaryPath, FindNewest(ctx, binaryPath), "no update directory")
+}
 
-	// make some update directories
-	// (these are out of order, to jumble up the create times)
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n), 0755))
-	}
+func TestFindNewestEmptyUpdateDirs(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, emptyUpdateDirs)
+	defer cleanupFunc()
+	ctx := context.TODO()
+	binaryPath := filepath.Join(tmpDir, binaryName)
+
 	require.Equal(t, binaryPath, FindNewest(ctx, binaryPath), "update dir, but no updates")
+}
 
-	for _, n := range []string{"2", "5", "3", "1"} {
-		f, err := os.Create(filepath.Join(updatesDir, n, binaryName))
-		require.NoError(t, err)
-		f.Close()
-	}
+func TestFindNewestNonExecutable(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
+	defer cleanupFunc()
+	ctx := context.TODO()
+	binaryPath := filepath.Join(tmpDir, binaryName)
+	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
+
 	require.Equal(t, binaryPath, FindNewest(ctx, binaryPath), "update dir, but only plain files")
 
 	require.NoError(t, os.Chmod(filepath.Join(updatesDir, "1", "binary"), 0755))
@@ -155,32 +143,116 @@ func TestFindNewest(t *testing.T) {
 		FindNewest(ctx, binaryPath),
 		"Should find number 1",
 	)
+}
 
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, "binary"), 0755))
-	}
-	require.Equal(t,
-		filepath.Join(updatesDir, "5", "binary"),
-		FindNewest(ctx, binaryPath),
-		"Should find number 5",
-	)
+func TestFindNewestExecutableUpdates(t *testing.T) {
+	t.Parallel()
 
-	// What if we're already running the newest version?
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
+	defer cleanupFunc()
+	ctx := context.TODO()
+	binaryPath := filepath.Join(tmpDir, binaryName)
+	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
+
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
+
+	require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 	require.Equal(t, expectedNewest, FindNewest(ctx, expectedNewest), "already running the newest")
 
-	// Test the cleanup routines
+}
+
+func TestFindNewestCleanup(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
+	_ = cleanupFunc
+	//defer cleanupFunc()
+	ctx := context.TODO()
+	binaryPath := filepath.Join(tmpDir, binaryName)
+	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
+
+	expectedNewest := filepath.Join(updatesDir, "5", "binary")
 	{
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(updatesOnDisk))
+		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 	}
 
 	{
 		_ = FindNewest(ctx, binaryPath, DeleteOldUpdates())
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(updatesOnDisk), "after delete")
+		require.Equal(t, 2, len(updatesOnDisk), "after delete")
+		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 	}
+
+}
+
+type setupState int
+
+const (
+	emptySetup setupState = iota
+	emptyUpdateDirs
+	nonExecutableUpdates
+	executableUpdates
+)
+
+// setupTestDir function to setup the test dirs. This work is broken
+// up in stages, allowing test functions to tap into various
+// points. This is setup this way to allow simpler isolation on test
+// faiulures.
+func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
+	tmpDir, err := ioutil.TempDir("", "test-autoupdate-find-newest")
+	require.NoError(t, err)
+
+	cleanupFunc := func() {
+		os.RemoveAll(tmpDir)
+	}
+
+	// Create the fake binary
+	binaryName := "binary"
+	if runtime.GOOS == "windows" {
+		binaryName = binaryName + ".exe"
+	}
+	binaryPath := filepath.Join(tmpDir, binaryName)
+	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
+
+	{
+		tmpFile, err := os.Create(binaryPath)
+		require.NoError(t, err, "os create")
+		tmpFile.Close()
+		require.NoError(t, os.Chmod(binaryPath, 0755))
+	}
+
+	if stage <= emptySetup {
+		return tmpDir, binaryName, cleanupFunc
+	}
+
+	// make some update directories
+	// (these are out of order, to jumble up the create times)
+	for _, n := range []string{"2", "5", "3", "1"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n), 0755))
+	}
+
+	if stage <= emptyUpdateDirs {
+		return tmpDir, binaryName, cleanupFunc
+	}
+
+	for _, n := range []string{"2", "5", "3", "1"} {
+		f, err := os.Create(filepath.Join(updatesDir, n, binaryName))
+		require.NoError(t, err)
+		f.Close()
+	}
+
+	if stage <= nonExecutableUpdates {
+		return tmpDir, binaryName, cleanupFunc
+	}
+
+	for _, n := range []string{"2", "5", "3", "1"} {
+		require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, binaryName), 0755))
+	}
+
+	return tmpDir, binaryName, cleanupFunc
 
 }
