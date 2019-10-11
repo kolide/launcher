@@ -91,7 +91,7 @@ func createUpdater(
 			// Don't exit unless there's a done signal TODO: remove when
 			// underlying libs are refactored, everything exits right now,
 			// so block this actor on the context finishing
-			level.Info(logger).Log("msg", "waiting")
+			level.Debug(logger).Log("msg", "waiting")
 			<-ctx.Done()
 
 			return nil
