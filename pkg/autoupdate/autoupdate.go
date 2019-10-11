@@ -258,6 +258,10 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 		"stagingPath", u.stagingPath,
 	)
 
+	// tuf.NewClient spawns a go thread with a running worker in
+	// the background. We don't get much for runtime
+	// communication back from it. Some can come in via the
+	// UpdateFinalizer function, but it's mostly fire-and-forget
 	client, err := tuf.NewClient(
 		u.settings,
 		updaterOpts...,
