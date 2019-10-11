@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
 # Script to be used for generating testing certs only for notary-server and notary-signer
-# Will also create a root-ca and intermediate-ca, deleting those keys when finished
+# Will also create a root-ca and intermediate-ca
+
+set -e
+
+mkdir keys
+cd keys
 
 OPENSSLCNF=
 for path in /etc/openssl/openssl.cnf /etc/ssl/openssl.cnf /usr/local/etc/openssl/openssl.cnf; do
@@ -29,8 +34,6 @@ EOL
 openssl x509 -req -days 3650 -in "root-ca.csr" -signkey "root-ca.key" -sha256 \
         -out "root-ca.crt" -extfile "root-ca.cnf" -extensions root_ca
 
-rm "root-ca.cnf" "root-ca.csr"
-
 # Then generate intermediate-ca
 openssl genrsa -out "intermediate-ca.key" 4096
 openssl req -new -key "intermediate-ca.key" -out "intermediate-ca.csr" -sha256 \
@@ -48,9 +51,6 @@ EOL
 openssl x509 -req -days 3650 -in "intermediate-ca.csr" -sha256 \
         -CA "root-ca.crt" -CAkey "root-ca.key"  -CAcreateserial \
         -out "intermediate-ca.crt" -extfile "intermediate-ca.cnf" -extensions intermediate_ca
-
-rm "intermediate-ca.cnf" "intermediate-ca.csr"
-rm "root-ca.key" "root-ca.srl"
 
 # Then generate notary-server
 openssl genrsa -out "notary-server.key" 4096
@@ -74,8 +74,6 @@ openssl x509 -req -days 750 -in "notary-server.csr" -sha256 \
 # append the intermediate cert to this one to make it a proper bundle
 cat "intermediate-ca.crt" >> "notary-server.crt"
 
-rm "notary-server.cnf" "notary-server.csr"
-
 # Then generate notary-signer
 openssl genrsa -out "notary-signer.key" 4096
 
@@ -98,8 +96,6 @@ openssl x509 -req -days 750 -in "notary-signer.csr" -sha256 \
 # append the intermediate cert to this one to make it a proper bundle
 cat "intermediate-ca.crt" >> "notary-signer.crt"
 
-rm "notary-signer.cnf" "notary-signer.csr"
-
 # Then generate notary-escrow
 openssl genrsa -out "notary-escrow.key" 4096
 # Use the existing notary-escrow key
@@ -121,5 +117,3 @@ openssl x509 -req -days 750 -in "notary-escrow.csr" -sha256 \
         -out "notary-escrow.crt" -extfile "notary-escrow.cnf" -extensions notary_escrow
 # append the intermediate cert to this one to make it a proper bundle
 cat "intermediate-ca.crt" >> "notary-escrow.crt"
-
-rm "notary-escrow.cnf" "notary-escrow.csr"
