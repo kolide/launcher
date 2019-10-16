@@ -51,7 +51,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 
 		if err := os.MkdirAll(updateDir, 0755); err != nil {
 			level.Error(u.logger).Log(
-				"msg", "making updated directory",
+				"msg", "making updates directory",
 				"dir", updateDir,
 				"err", err)
 			return
