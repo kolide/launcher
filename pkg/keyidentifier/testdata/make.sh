@@ -45,6 +45,12 @@ makeOpensshKey ed25519 2048
 # empirically this does not work. So we use puttygen (`brew install
 # putty` to generate these)
 
+# check if puttygen is installed
+hash puttygen 2>/dev/null || \
+    { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
+
+command -v puttygen
+
 function makePuttyKeyPuttyFormat {
     type=$1
     bits=$2

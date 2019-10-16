@@ -90,6 +90,18 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	// We're never testing the encryption name
 	keyInfo.Encryption = ""
 
+	// only test for existence of fingerprints, then clear them out,
+	// test for fingerprints at all for non-openssh-new formatted keys.
+	//
+	// there is a lot of work still to do regarding fingerprints for keys that
+	// are not in the standard ssh format.
+	if expected.Format == "openssh-new" {
+		require.NotEmpty(t, keyInfo.Fingerprint,
+			"expected to find a Fingerprint for openssh-new formatted key, format: %s",
+			keyInfo.Format)
+	}
+	keyInfo.Fingerprint = ""
+
 	// The elliptic keys don't always have a clear file format, so don't
 	// compare that in this test.
 	if expected.Type == "ecdsa" && keyInfo.Format == "" {
