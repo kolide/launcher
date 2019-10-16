@@ -85,6 +85,11 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	updateDir := getUpdateDir(fullBinaryPath)
 	binaryName := filepath.Base(fullBinaryPath)
 
+	// Find the possible updates. filepath.Glob returns a list of things
+	// that match the requested pattern. We sort the list to ensure that
+	// we can tell which ones are earlier or later (remember, these are
+	// timestamps). If no updates are found, the forloop is skipped, and
+	// we return eithier the seed fullBinaryPath or ""
 	fileGlob := filepath.Join(updateDir, "*", binaryName)
 
 	possibleUpdates, err := filepath.Glob(fileGlob)

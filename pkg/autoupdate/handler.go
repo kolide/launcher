@@ -17,8 +17,8 @@ import (
 //
 // Second, it's called when tuf detects a change with the remote metadata.
 // The handler method will do the following:
-// 1) untar the staged staged file,
-// 2) into the updated directory
+// 1) untar the staged download
+// 2) place binary into the updates/<timestamp> directory
 // 3) call the Updater's finalizer method, usually a restart function for the running binary.
 func (u *Updater) handler() tuf.NotificationHandler {
 	return func(stagingPath string, err error) {
