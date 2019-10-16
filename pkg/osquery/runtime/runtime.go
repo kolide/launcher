@@ -509,7 +509,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// before we start osqueryd, check with the update system to
 	// see if we have the newest version. Do this everytime. If
-	// this prove undesirable, we can expost a function to set
+	// this proves undesirable, we can expose a function to set
 	// o.opts.binaryPath in the finalizer to call.
 	//
 	// FindNewest uses context as a way to get a logger, so we need to
