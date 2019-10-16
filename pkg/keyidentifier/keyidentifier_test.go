@@ -1,7 +1,9 @@
 package keyidentifier
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -90,14 +92,16 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	// We're never testing the encryption name
 	keyInfo.Encryption = ""
 
-	// only test for existence of fingerprints, then clear them out,
-	// test for fingerprints at all for non-openssh-new formatted keys.
+	// FIXME:
+	// TODO: remove this, fingerprints are being tested on their own
+	// only test for existence of fingerprints, then clear them out, don't test
+	// for fingerprints at all for non-openssh-new formatted keys.
 	//
 	// there is a lot of work still to do regarding fingerprints for keys that
 	// are not in the standard ssh format.
 	if expected.Format == "openssh-new" {
 		require.NotEmpty(t, keyInfo.Fingerprint,
-			"expected to find a Fingerprint for openssh-new formatted key, format: %s",
+			"expected a Fingerprint for openssh-new formatted key, format: %s",
 			keyInfo.Format)
 	}
 	keyInfo.Fingerprint = ""
@@ -143,4 +147,52 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 
 	require.Equal(t, expected, keyInfo, fmt.Sprintf("%s (parsed by %s)", path, parsedBy))
 
+}
+
+func TestFingerprintGeneration(t *testing.T) {
+	kIdentifier, err := New(WithLogger(logutil.NewCLILogger(true)))
+	require.NoError(t, err)
+
+	testFiles := []string{}
+
+	err = filepath.Walk("testdata/fingerprints", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return errors.Wrap(err, "failure to access path in filepath.Walk")
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		// all json files in testdata/fingerprints are assumed to be valid test specifications
+		if strings.HasSuffix(path, ".json") {
+			testFiles = append(testFiles, path)
+			return nil
+		}
+
+		return nil
+	})
+	require.NoError(t, err, "filepath.Walk")
+	for _, path := range testFiles {
+		testFingerprintGeneration(t, kIdentifier, path)
+	}
+}
+
+func testFingerprintGeneration(t *testing.T, kIdentifier *KeyIdentifier, specPath string) {
+
+	type spec struct {
+		KeyPath             string
+		ExpectedFingerprint string
+	}
+	// load the json file
+	data, err := ioutil.ReadFile(specPath)
+	require.NoError(t, err, "reading spec file")
+	var example spec
+	err = json.Unmarshal(data, &example)
+	require.NoError(t, err, "parsing spec file json")
+
+	keyInfo, err := kIdentifier.IdentifyFile(example.KeyPath)
+	require.NoError(t, err, "identifying file at %s", example.KeyPath)
+
+	require.Equal(t, example.ExpectedFingerprint, keyInfo.Fingerprint)
 }
