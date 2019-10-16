@@ -201,7 +201,7 @@ const (
 // setupTestDir function to setup the test dirs. This work is broken
 // up in stages, allowing test functions to tap into various
 // points. This is setup this way to allow simpler isolation on test
-// faiulures.
+// failures.
 func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	tmpDir, err := ioutil.TempDir("", "test-autoupdate-find-newest")
 	require.NoError(t, err)
