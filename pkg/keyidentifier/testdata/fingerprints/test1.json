@@ -1,4 +1,0 @@
-{
-  "KeyPath": "testdata/fingerprints/plaintext_rsa_4096_putty",
-  "ExpectedFingerprint": "ssh-rsa 4095 d1:16:7c:eb:8f:23:50:11:c5:c4:37:3f:a8:23:49:dc"
-}

@@ -92,18 +92,8 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, path string) {
 	// We're never testing the encryption name
 	keyInfo.Encryption = ""
 
-	// FIXME:
-	// TODO: remove this, fingerprints are being tested on their own
-	// only test for existence of fingerprints, then clear them out, don't test
-	// for fingerprints at all for non-openssh-new formatted keys.
-	//
-	// there is a lot of work still to do regarding fingerprints for keys that
-	// are not in the standard ssh format.
-	if expected.Format == "openssh-new" {
-		require.NotEmpty(t, keyInfo.Fingerprint,
-			"expected a Fingerprint for openssh-new formatted key, format: %s",
-			keyInfo.Format)
-	}
+	// fingerprint support is at present not widespread across key types, and is
+	// tested on its own in another test
 	keyInfo.Fingerprint = ""
 
 	// The elliptic keys don't always have a clear file format, so don't
@@ -191,7 +181,7 @@ func testFingerprintGeneration(t *testing.T, kIdentifier *KeyIdentifier, specPat
 	err = json.Unmarshal(data, &example)
 	require.NoError(t, err, "parsing spec file json")
 
-	keyInfo, err := kIdentifier.IdentifyFile(example.KeyPath)
+	keyInfo, err := kIdentifier.IdentifyFile("testdata/fingerprints/" + example.KeyPath)
 	require.NoError(t, err, "identifying file at %s", example.KeyPath)
 
 	require.Equal(t, example.ExpectedFingerprint, keyInfo.Fingerprint)
