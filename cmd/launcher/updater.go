@@ -71,19 +71,19 @@ func createUpdater(
 			// see a simple way to ensure the updater is still running in
 			// the background.
 			for {
-				level.Info(logger).Log("msg", "updater started")
+				level.Info(config.Logger).Log("msg", "updater started")
 
 				// run the updater and set the stop function so that the interrupt has access to it
-				stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval), tuf.WithLogger(logger))
+				stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval), tuf.WithLogger(config.Logger))
 				if err == nil {
 					break
 				}
 
 				// err != nil, log it and loop again
-				level.Error(logger).Log("msg", "Error running updater. Will retry", "err", err)
+				level.Error(config.Logger).Log("msg", "Error running updater. Will retry", "err", err)
 				select {
 				case <-stopChan:
-					level.Debug(logger).Log("msg", "stop requested. Breaking loop")
+					level.Debug(config.Logger).Log("msg", "stop requested. Breaking loop")
 					return nil
 				case <-time.After(30 * time.Minute):
 					break
@@ -93,19 +93,19 @@ func createUpdater(
 			// Don't exit unless there's a done signal TODO: remove when
 			// underlying libs are refactored, everything exits right now,
 			// so block this actor on the context finishing
-			level.Debug(logger).Log("msg", "waiting")
+			level.Debug(config.Logger).Log("msg", "waiting")
 			<-ctx.Done()
 
 			return nil
 		},
 		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+			level.Info(config.Logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 
 			// non-blocking channel send
 			select {
 			case stopChan <- true:
 			default:
-				level.Debug(logger).Log("msg", "failed to send stop signal")
+				level.Debug(config.Logger).Log("msg", "failed to send stop signal")
 			}
 
 			if stop != nil {
