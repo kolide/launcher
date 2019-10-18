@@ -81,7 +81,7 @@ func TestNewUpdater(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
-			u, err := NewUpdater("/tmp/app", "/tmp/tuf", log.NewNopLogger(), tt.opts...)
+			u, err := NewUpdater("/tmp/app", "/tmp/tuf", tt.opts...)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.target, u.target)
@@ -107,4 +107,52 @@ func withPlatform(t *testing.T, format string) string {
 		t.Fatal(err)
 	}
 	return fmt.Sprintf(format, platform)
+}
+
+func TestFindCurrentUpdate(t *testing.T) {
+	t.Parallel()
+
+	// Setup the tests
+	tmpDir, err := ioutil.TempDir("", "test-autoupdate-findCurrentUpdate")
+	defer os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	updater := Updater{
+		binaryName:       "binary",
+		updatesDirectory: tmpDir,
+		logger:           log.NewNopLogger(),
+	}
+
+	// test with empty directory
+	require.Equal(t, updater.findCurrentUpdate(), "", "No subdirs, nothing should be found")
+
+	// make some (still empty) test directories
+	for _, n := range []string{"2", "5", "3", "1"} {
+		require.NoError(t, os.Mkdir(filepath.Join(tmpDir, n), 0755))
+	}
+
+	// empty directories -- should still be none
+	require.Equal(t, updater.findCurrentUpdate(), "", "Empty directories should not be found")
+
+	for _, n := range []string{"2", "5", "3", "1"} {
+		f, err := os.Create(filepath.Join(tmpDir, n, "binary"))
+		require.NoError(t, err)
+		f.Close()
+	}
+
+	// Nothing executable -- should still be none
+	require.Equal(t, updater.findCurrentUpdate(), "", "Non-executable files should not be found")
+
+	//
+	// Chmod some of them
+	//
+
+	require.NoError(t, os.Chmod(filepath.Join(tmpDir, "1", "binary"), 0755))
+	require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "1", "binary"), "Should find number 1")
+
+	for _, n := range []string{"2", "5", "3", "1"} {
+		require.NoError(t, os.Chmod(filepath.Join(tmpDir, n, "binary"), 0755))
+	}
+	require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "5", "binary"), "Should find number 5")
+
 }

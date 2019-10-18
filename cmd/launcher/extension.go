@@ -75,6 +75,15 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, logger log.Logger,
 		runtime.WithLogger(logger),
 	)
 
+	restartFunc := func() error {
+		level.Debug(logger).Log(
+			"caller", log.DefaultCaller,
+			"msg", "restart function",
+		)
+
+		return runner.Restart()
+	}
+
 	return &actor.Actor{
 			// and the methods for starting and stopping the extension
 			Execute: func() error {
@@ -117,7 +126,7 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, logger log.Logger,
 				}
 			},
 		},
-		runner.Restart,
+		restartFunc,
 		runner.Shutdown,
 		nil
 }

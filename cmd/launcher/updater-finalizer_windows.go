@@ -3,11 +3,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
+	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
 // updateFinalizer finalizes a launcher update. As windows does not
@@ -25,7 +28,19 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 				"stack", fmt.Sprintf("%+v", err),
 			)
 		}
-		level.Info(logger).Log("msg", "Exit for updated launcher")
-		return errors.New("Exiting launcher to allow a service manager restart")
+
+		// Use the FindNewest mechanism to delete old
+		// updates. We do this here, as windows will pick up
+		// the update in main, which does not delete.  Note
+		// that this will likely produce non-fatal errors when
+		// it tries to delete the running one.
+		_ = autoupdate.FindNewest(
+			ctxlog.NewContext(context.TODO(), logger),
+			os.Args[0],
+			autoupdate.DeleteOldUpdates(),
+		)
+
+		level.Info(logger).Log("msg", "Exiting launcher to allow a service manager to start the new one")
+		return autoupdate.NewLauncherRestartNeededErr("Exiting launcher to allow a service manager restart")
 	}
 }

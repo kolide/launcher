@@ -11,6 +11,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/pkg/errors"
@@ -45,6 +47,20 @@ func runWindowsSvc(args []string) error {
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
+
+	// Use the FindNewest mechanism to delete old
+	// updates. We do this here, as windows will pick up
+	// the update in main, which does not delete.  Note
+	// that this will likely produce non-fatal errors when
+	// it tries to delete the running one.
+	go func() {
+		time.Sleep(15 * time.Second)
+		_ = autoupdate.FindNewest(
+			ctxlog.NewContext(context.TODO(), logger),
+			os.Args[0],
+			autoupdate.DeleteOldUpdates(),
+		)
+	}()
 
 	run := svc.Run
 
@@ -82,8 +98,10 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx = ctxlog.NewContext(ctx, w.logger)
+
 	go func() {
-		err := runLauncher(ctx, cancel, w.opts, w.logger)
+		err := runLauncher(ctx, cancel, w.opts)
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}

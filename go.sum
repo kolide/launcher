@@ -33,8 +33,6 @@ github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 h1:DDGfHa7BWjL4Yn
 github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
 github.com/boltdb/bolt v1.3.1 h1:JQmyP4ZBrce+ZQu0dY660FMfatumYDLun9hBCUVIkF4=
 github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
-github.com/boltdb/boltd v0.0.0-20150220181201-1f04e2021e45 h1:ep0QrTbZFgXa8e4lTAdd/NPY9ZiSP/ysDf26+UNPogo=
-github.com/boltdb/boltd v0.0.0-20150220181201-1f04e2021e45/go.mod h1:512MO8jN3usqrPdyZ8YtG6vLsQ8wGV5W9cykDwCy1WI=
 github.com/bugsnag/bugsnag-go v1.3.2 h1:8bcRylldQKQiAx9/KPu9+1iLZwgK1eN1Ib3SROSXfIY=
 github.com/bugsnag/bugsnag-go v1.3.2/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
 github.com/bugsnag/panicwrap v1.2.0 h1:OzrKrRvXis8qEvOkfcxNcYbOd2O7xXS2nnKMEMABFQA=
