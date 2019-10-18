@@ -31,7 +31,8 @@ import (
 const defaultOsquerydPath = "/usr/local/kolide/bin/osqueryd"
 
 // runLauncher is the entry point into running launcher. It creates a
-// rungroups with the various options, and goes! Autoupdate will kill the entire rungroup, and trigger FIXME
+// rungroups with the various options, and goes! If autoupdate is
+// enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 

@@ -106,8 +106,9 @@ func (u *Updater) handler() tuf.NotificationHandler {
 				"msg", "calling restart function for updated binary",
 				"binary", outputBinary,
 				"err", err)
+			// Reaching this point represents an unclear error. Trigger a restart
+			u.sigChannel <- os.Interrupt
 			return
-			// FIXME: I'm pretty sure if we get here, launcher hangs
 		}
 
 		level.Debug(u.logger).Log("msg", "completed update for binary", "binary", outputBinary)
