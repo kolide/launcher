@@ -101,27 +101,3 @@ makePuttyKey ed25519 256 "openssh openssh-new"
 # openssl genpkey -algorithm RSA -pass pass:password -out private_key_enc.pem -pkeyopt rsa_keygen_bits:2048
 
 
-# generate some keys and the corresponding json spec files for testing fingerprints
-function makeOpensshKeyAndSpec {
-    type=$1
-    bits=$2
-    format="openssh7"
-
-    keyfile=$type-$bits-$format
-    keypath="fingerprints/$keyfile"
-
-    ssh-keygen -t $type -b $bits  -C "" -f $keypath -P ""
-    ssh-keygen -t $type -b $bits  -C "" -f $keypath-encrypted -P "$(rand)"
-
-    for key in $keyfile $keyfile-encrypted; do
-        fingerprint=$(ssh-keygen -l -f fingerprints/$key | cut -d' ' -f2)
-        echo "{ \"ExpectedFingerprint\": \"$fingerprint\", \"KeyPath\": \"$key\"}" > fingerprints/$key.json
-    done
-}
-
-makeOpensshKeyAndSpec rsa 1024
-makeOpensshKeyAndSpec rsa 2048
-makeOpensshKeyAndSpec rsa 4096
-makeOpensshKeyAndSpec dsa 1024
-makeOpensshKeyAndSpec ecdsa 256
-makeOpensshKeyAndSpec ecdsa 521
