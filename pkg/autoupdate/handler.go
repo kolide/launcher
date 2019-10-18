@@ -88,11 +88,9 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		)
 
 		if err := u.finalizer(); err != nil {
-			// Some kinds of updates, require a full
-			// launcher restart. For example, windows
-			// doesn't have an exec, so launcher exits so
-			// the service manager will restart it. There
-			// may be others.
+			// Some kinds of updates require a full launcher restart. For
+			// example, windows doesn't have an exec. Instead launcher exits
+			// so the service manager restarts it. There may be others.
 			if IsLauncherRestartNeededErr(err) {
 				level.Info(u.logger).Log(
 					"msg", "signaling for a full restart",
