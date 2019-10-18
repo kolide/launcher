@@ -22,7 +22,9 @@ func FromContext(ctx context.Context) log.Logger {
 	}
 	span := trace.FromContext(ctx).SpanContext()
 
-	if span.TraceID.String() == "00000000000000000000000000000000" {
+	// If the span is uninitialized, don't add the 0 values to the
+	// logs. They're noise.
+	if isTraceUninitialized(span) {
 		return v
 	}
 
@@ -32,4 +34,14 @@ func FromContext(ctx context.Context) log.Logger {
 		"span_id", span.SpanID.String(),
 		"trace_is_sampled", span.IsSampled(),
 	)
+}
+
+// isTraceUninitialized returns true when a span is is unconfigured.
+func isTraceUninitialized(span trace.SpanContext) bool {
+	for _, b := range span.TraceID {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
