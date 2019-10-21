@@ -478,8 +478,10 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "git describe")
 	}
 
-	// The `-` is included in the "additional" part of the regex, to
-	// make the later concatination correct.
+	// The `-` is included in the "additional" part of the regex,
+	// to make the later concatenation correct. If, and when, we
+	// move to a windows style 0.0.0.0 format, this will need to
+	// change.
 	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:(-.+))?$`)
 	if err != nil {
 		return "", errors.Wrap(err, "bad regex")
