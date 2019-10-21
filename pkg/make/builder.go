@@ -482,7 +482,7 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 	// to make the later concatenation correct. If, and when, we
 	// move to a windows style 0.0.0.0 format, this will need to
 	// change.
-	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:(-.+))?$`)
+	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))?(?:(-.+))?$`)
 	if err != nil {
 		return "", errors.Wrap(err, "bad regex")
 	}
@@ -491,7 +491,7 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 	matches := versionRegex.FindAllStringSubmatch(gitVersion, -1)
 
 	if len(matches) == 0 {
-		return "", errors.Errorf(`Version "%s" did not match expected format`, gitVersion)
+		return "", errors.Errorf(`Version "%s" did not match expected format. Expect major.minor[.patch][-additional]`, gitVersion)
 	}
 
 	if len(matches[0]) != 5 {

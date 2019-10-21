@@ -145,7 +145,11 @@ func TestGetVersion(t *testing.T) {
 		},
 		{
 			in:  "0.1",
-			err: true,
+			out: "0.1.0",
+		},
+		{
+			in:  "0.1-sha123",
+			out: "0.1.0-sha123",
 		},
 		{
 			in:  "0.10.3",
