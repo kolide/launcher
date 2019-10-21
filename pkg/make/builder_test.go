@@ -17,6 +17,12 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 	cs = append(cs, args...)
 	cmd = exec.CommandContext(ctx, os.Args[0], cs...)
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+
+	// Do we have an ENV key? (type assert)
+	if ctxEnv, ok := ctx.Value("ENV").([]string); ok {
+		cmd.Env = append(cmd.Env, ctxEnv...)
+	}
+
 	return cmd
 }
 
@@ -122,6 +128,72 @@ func TestExecOut(t *testing.T) {
 
 }
 
+func TestGetVersion(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		in  string
+		out string
+		err bool
+	}{
+		{
+			in:  "",
+			err: true,
+		},
+		{
+			in:  "1",
+			err: true,
+		},
+		{
+			in:  "0.1",
+			out: "0.1.0",
+		},
+		{
+			in:  "0.1-sha123",
+			out: "0.1.0-sha123",
+		},
+		{
+			in:  "0.10.3",
+			out: "0.10.3",
+		},
+		{
+			in:  "v0.11.0",
+			out: "0.11.0",
+		},
+		{
+			in:  "v0.11.0-1-gd6d5a56-dirty",
+			out: "0.11.0-1-gd6d5a56-dirty",
+		},
+		{
+			in:  "1.2.3-4",
+			out: "1.2.3-4",
+		},
+		{
+			in:  "0.1.2.3",
+			err: true,
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	b := &Builder{}
+	b.execCC = helperCommandContext
+
+	for _, tt := range tests {
+		ctx = context.WithValue(ctx, "ENV", []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
+		os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
+		ver, err := b.getVersion(ctx)
+		if tt.err == true {
+			require.Error(t, err, tt.in)
+			continue
+		}
+
+		require.NoError(t, err, tt.in)
+		require.Equal(t, tt.out, ver, tt.in)
+	}
+
+}
+
 // TestHelperProcess isn't a real test. It's used as a helper process
 // for TestParameterRun. It's comes from both
 // https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
@@ -162,6 +234,9 @@ func TestHelperProcess(t *testing.T) {
 		n, _ := strconv.Atoi(args[0])
 		os.Exit(n)
 	case cmd == "go" && args[0] == "mod" && args[1] == "download":
+		return
+	case cmd == "git" && args[0] == "describe":
+		fmt.Println(os.Getenv("FAKE_GIT_DESCRIBE"))
 		return
 	default:
 		fmt.Fprintf(os.Stderr, "Can't mock, unknown command(%q) args(%q) -- Fix TestHelperProcess", cmd, args)
