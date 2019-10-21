@@ -3,41 +3,54 @@
 # This script uses several tools to create ssh keys. We attempt to be
 # as exhaustive as possible to create a wide range of things to test.
 #
-# This puts them into a somewhat ugly filesystem hierarchy. The intent
-# is to group things to make it simpler for tools to test
-# groups. The layout should straightforward.
-
-
+# each function also generates a json spec file that describes various
+# attributes of a key, plus the name of the key described. This spec file is
+# consumed by golang tests, and the output of the keyidentifier package is
+# compared against these expected values.
 
 set -e
 #set -x
 
 function rand {
-    dd if=/dev/random bs=1 count=16 2> /dev/null  | base64
+    dd if=/dev/random bs=1 count=16 2> /dev/null  | base64 | sed 's/[^0-9a-zA-Z]//g'
 }
 
-# My openssh is so new, it only makes the new format
-function makeOpensshKey {
+DATA_DIR="fingerprints" # TODO: change me
+
+# generate some keys and the corresponding json spec files for testing fingerprints
+function makeOpensshKeyAndSpec {
     type=$1
     bits=$2
-    os="openssh7"
-    dir_fragment="$type/$bits/openssh-new"
-    mkdir -p {encrypted,plaintext}"/$dir_fragment"
-    ssh-keygen -t $type -b $bits  -C "" -f "plaintext/$dir_fragment/seph-$os" -P ""
-    ssh-keygen -t $type -b $bits  -C "" -f "encrypted/$dir_fragment/seph-$os" -P "$(rand)"
+    encrypted=$3
+    format="openssh7"
+
+    keyfile=$(rand)
+    keypath="$DATA_DIR/$keyfile"
+
+
+    if [ $encrypted == true ]; then
+        ssh-keygen -t $type -b $bits  -C "" -f $keypath -P "$(rand)"
+        cmd='ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P $(rand)'
+    else
+        ssh-keygen -t $type -b $bits  -C "" -f $keypath -P ""
+        cmd='ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P \"\"'
+    fi
+
+    fingerprint=$(ssh-keygen -l -f $keypath | awk '{print $2}')
+    md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath | awk '{print $2}' | sed 's/^MD5://')
+
+    cat <<EOF > $keypath.json
+    {
+      "ExpectedFingerprintSHA256": "$fingerprint",
+      "ExpectedFingerprintMD5": "$md5fingerprint",
+      "Type": "$type",
+      "Bits": $bits,
+      "Encrypted": $encrypted,
+      "KeyPath": "$keyfile",
+      "command": "$cmd"
+    }
+EOF
 }
-
-makeOpensshKey rsa 1024
-makeOpensshKey rsa 2048
-makeOpensshKey rsa 4096
-
-makeOpensshKey dsa 1024
-
-makeOpensshKey ecdsa 256
-makeOpensshKey ecdsa 521
-
-# ed25519 is fixed legth, bits is ignored
-makeOpensshKey ed25519 2048
 
 # ssh.com style
 #
@@ -49,20 +62,47 @@ makeOpensshKey ed25519 2048
 hash puttygen 2>/dev/null || \
     { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
 
-function makePuttyKeyPuttyFormat {
+function makePuttyKeyAndSpecFile {
     type=$1
     bits=$2
-    format="putty"
+    format=$3
+    encrypted=$4
 
     if [ "$type" == "rsa1" ]; then
         format="ssh1"
     fi
 
-    dir_fragment="$type/$bits/$format"
-    mkdir -p {encrypted,plaintext}"/$dir_fragment"
+    if [ "$format" == "putty" ]; then
+        format=""
+    else
+        format="-$format"
+    fi
 
-    puttygen -t $type -b $bits -C "" -o "plaintext/$dir_fragment/seph-putty" -O private --new-passphrase /dev/null
-    puttygen -t $type -b $bits -C "" -o "encrypted/$dir_fragment/seph-putty" -O private --new-passphrase <(rand)
+    keyfile=$(rand)
+    keypath="$DATA_DIR/$keyfile"
+
+    if [ $encrypted == true ]; then
+        puttygen -t $type -b $bits -C "" -o $keypath -O private$format --new-passphrase <(rand)
+        cmd='puttygen -t $type -b $bits -C \"\" -o $keypath -O private --new-passphrase <(rand)'
+    else
+        puttygen -t $type -b $bits -C "" -o $keypath -O private$format --new-passphrase <(cat /dev/null)
+        cmd='puttygen -t $type -b $bits -C "" -o $keypath -O private --new-passphrase <(cat /dev/null)'
+    fi
+
+    fingerprint="" # puttygen doesn't seem to support sha256 fingerprints
+    md5fingerprint=$(puttygen -l $keypath | awk '{print $3}')
+
+    cat <<EOF > $keypath.json
+    {
+      "ExpectedFingerprintSHA256": "$fingerprint",
+      "ExpectedFingerprintMD5": "$md5fingerprint",
+      "Type": "$type",
+      "Bits": $bits,
+      "Encrypted": $encrypted,
+      "KeyPath": "$keyfile",
+      "command": "$cmd"
+    }
+EOF
 }
 
 
@@ -82,20 +122,64 @@ function makePuttyKey {
     done
 }
 
+# -------------------------------------------------------------------------------------------
+# Actually make all the keys now that the functions have been defined
+# -------------------------------------------------------------------------------------------
+
+makeOpensshKeyAndSpec rsa 1024 true
+makeOpensshKeyAndSpec rsa 1024 false
+
+makeOpensshKeyAndSpec rsa 2048 true
+makeOpensshKeyAndSpec rsa 2048 false
+
+makeOpensshKeyAndSpec rsa 4096 true
+makeOpensshKeyAndSpec rsa 4096 false
+
+makeOpensshKeyAndSpec dsa 1024 true
+makeOpensshKeyAndSpec dsa 1024 false
+
+makeOpensshKeyAndSpec ecdsa 256 true
+makeOpensshKeyAndSpec ecdsa 256 false
+
+makeOpensshKeyAndSpec ecdsa 521 true
+makeOpensshKeyAndSpec ecdsa 521 false
+
+
+# don't gen the non-openssh keys yet
+exit 1
+
 # rsa1 is only supported in the old old old format
-makePuttyKey rsa1 1024
-makePuttyKey rsa1 2048
+makePuttyKeyAndSpecFile rsa1 1024 putty true
+makePuttyKeyAndSpecFile rsa1 1024 putty false
 
-makePuttyKey rsa 1024 "openssh openssh-new sshcom"
-makePuttyKey rsa 2048 "openssh openssh-new sshcom"
-makePuttyKey rsa 4096 "openssh openssh-new sshcom"
+makePuttyKeyAndSpecFile rsa1 2048 putty true
+makePuttyKeyAndSpecFile rsa1 2048 putty false
 
-makePuttyKey dsa 1024 "openssh openssh-new sshcom"
+for format in openssh openssh-new sshcom putty; do
+    makePuttyKeyAndSpecFile rsa 1024 $format true
+    makePuttyKeyAndSpecFile rsa 1024 $format false
 
-makePuttyKey ecdsa 256 "openssh openssh-new"
-makePuttyKey ecdsa 521 "openssh openssh-new"
+    makePuttyKeyAndSpecFile rsa 2048 $format true
+    makePuttyKeyAndSpecFile rsa 2048 $format false
 
-makePuttyKey ed25519 256 "openssh openssh-new"
+    makePuttyKeyAndSpecFile rsa 4096 $format true
+    makePuttyKeyAndSpecFile rsa 4096 $format false
+
+    makePuttyKeyAndSpecFile dsa 1024 $format true
+    makePuttyKeyAndSpecFile dsa 1024 $format false
+done
+
+for format in openssh openssh-new putty; do
+
+    makePuttyKeyAndSpecFile ecdsa 256 $format true
+    makePuttyKeyAndSpecFile ecdsa 256 $format false
+
+    makePuttyKeyAndSpecFile ecdsa 521 $format true
+    makePuttyKeyAndSpecFile ecdsa 521 $format false
+
+    makePuttyKeyAndSpecFile ed25519 256 $format true
+    makePuttyKeyAndSpecFile ed25519 256 $format false
+done
 
 # openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
 # openssl genpkey -algorithm RSA -pass pass:password -out private_key_enc.pem -pkeyopt rsa_keygen_bits:2048
