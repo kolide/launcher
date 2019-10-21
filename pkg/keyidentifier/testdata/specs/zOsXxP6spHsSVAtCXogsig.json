@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "3e:07:94:f2:5d:14:d3:39:13:97:e1:aa:09:08:9f:6f",
+      "Type": "rsa",
+      "Bits": 2048,
+      "Encrypted": true,
+      "KeyPath": "zOsXxP6spHsSVAtCXogsig",
+      "command": "puttygen -t rsa -b 2048 -C '' -o zOsXxP6spHsSVAtCXogsig -O private --new-passphrase 0ZhG5luWBnyREdfg9EKElA",
+      "Format": "putty",
+      "Source": "putty"
+    }

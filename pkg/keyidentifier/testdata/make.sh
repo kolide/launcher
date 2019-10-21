@@ -74,6 +74,9 @@ function makePuttyKeyAndSpecFile {
 
     if [ "$format" == "putty" ]; then
         putty_format=""
+        if [ "$type" == "rsa1" ]; then
+            format="ssh1"
+        fi
     else
         putty_format="-$format"
     fi
@@ -85,10 +88,10 @@ function makePuttyKeyAndSpecFile {
     if [ $encrypted == true ]; then
         passphrase=$(rand)
         puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase)
-        cmd='puttygen -t $type -b $bits -C \"\" -o $keypath -O private-$format --new-passphrase $(rand)'
+        cmd="puttygen -t $type -b $bits -C '' -o $keyfile -O private$putty_format --new-passphrase $passphrase"
     else
         puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(cat /dev/null)
-        cmd='puttygen -t $type -b $bits -C \"\" -o $keypath -O private-$format --new-passphrase <(cat /dev/null)'
+        cmd="puttygen -t $type -b $bits -C '' -o $keyfile -O private$putty_format --new-passphrase '<(cat /dev/null)'"
     fi
 
     fingerprint="" # puttygen doesn't seem to support sha256 fingerprints

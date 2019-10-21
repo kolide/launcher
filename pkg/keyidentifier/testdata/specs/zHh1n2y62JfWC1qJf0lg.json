@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "f9:f8:e6:93:c7:5e:43:17:14:7e:67:50:6a:42:df:4a",
+      "Type": "ecdsa",
+      "Bits": 256,
+      "Encrypted": true,
+      "KeyPath": "zHh1n2y62JfWC1qJf0lg",
+      "command": "puttygen -t ecdsa -b 256 -C '' -o zHh1n2y62JfWC1qJf0lg -O private-openssh --new-passphrase 1SSfuHRi9Njcsfqwk4XSNA",
+      "Format": "openssh",
+      "Source": "putty"
+    }

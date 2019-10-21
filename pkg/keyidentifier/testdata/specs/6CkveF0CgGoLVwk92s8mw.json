@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "67:99:7f:99:05:6c:6a:a9:d1:3d:a5:14:3c:c7:1e:37",
+      "Type": "dsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "KeyPath": "6CkveF0CgGoLVwk92s8mw",
+      "command": "puttygen -t dsa -b 1024 -C '' -o 6CkveF0CgGoLVwk92s8mw -O private-sshcom --new-passphrase '<(cat /dev/null)'",
+      "Format": "sshcom",
+      "Source": "putty"
+    }

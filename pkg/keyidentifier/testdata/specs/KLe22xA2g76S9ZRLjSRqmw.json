@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "a7:b6:6c:ed:4b:14:e3:32:c2:db:be:34:1e:7a:b6:62",
+      "Type": "dsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "KeyPath": "KLe22xA2g76S9ZRLjSRqmw",
+      "command": "puttygen -t dsa -b 1024 -C '' -o KLe22xA2g76S9ZRLjSRqmw -O private --new-passphrase '<(cat /dev/null)'",
+      "Format": "putty",
+      "Source": "putty"
+    }

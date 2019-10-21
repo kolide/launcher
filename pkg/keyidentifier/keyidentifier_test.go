@@ -2,7 +2,6 @@ package keyidentifier
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -77,18 +76,19 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 		example.Type = "ssh-dss"
 	case "ed25519":
 		example.Type = "ssh-ed25519"
-		if keyInfo.Format == "openssh" {
-			keyInfo.Format = "openssh-new" // ed25519 is always the new format
+		// ed25519 is always the new format
+		if keyInfo.Format == "openssh" || keyInfo.Format == "openssh-new" {
+			example.Format = "openssh-new"
+			keyInfo.Format = "openssh-new"
 		}
 	default:
 	}
 
-	// TODO: need to get encode expected 'format' in the specs
 	// The elliptic keys don't always have a clear file format, so don't
 	// compare that in this test.
-	// if expected.Type == "ecdsa" && keyInfo.Format == "" {
-	// 	expected.Format = ""
-	// }
+	if example.Type == "ecdsa" && keyInfo.Format == "" {
+		example.Format = ""
+	}
 
 	// The elliptic types carry more detail than we need. So whomp down
 	// how we test. eg `ecdsa-sha2-nistp256` becomes `ecdsa` for testing
@@ -109,10 +109,10 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	} else if keyInfo.Format == "sshcom" {
 		// Can't get bit size from sshcom key
 	} else {
-		require.Equal(t, example.Bits, keyInfo.Bits, "unexpected 'Bits' value")
+		require.Equal(t, example.Bits, keyInfo.Bits, "unexpected 'Bits' value, path: %s", example.KeyPath)
 	}
 
-	// test correct fingerprint reporting. limit support for now
+	// test correct fingerprint reporting. limited support for now
 	if keyInfo.Format == "openssh-new" {
 		if example.Source != "putty" {
 			require.Equal(t, example.ExpectedFingerprintSHA256, keyInfo.FingerprintSHA256,
@@ -122,13 +122,7 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 			"unexpected md5 fingerprint, path: %s", example.KeyPath)
 	}
 
-	require.Equal(t, example.Type, keyInfo.Type, "unexpected key type")
-	if example.Encrypted != *keyInfo.Encrypted {
-		// TODO: REMOVE debugging lines
-		fmt.Printf("\033[35m%v\033[0m\n", example.KeyPath)
-		fmt.Printf("\033[35m%v\033[0m\n", example.Type)
-		fmt.Printf("\033[35m%v\033[0m\n", keyInfo.Format)
-		// return
-	}
-	require.Equal(t, example.Encrypted, *keyInfo.Encrypted, "unexpected encrypted boolean")
+	require.Equal(t, example.Format, keyInfo.Format, "unexpected key format, path: %s", example.KeyPath)
+	require.Equal(t, example.Type, keyInfo.Type, "unexpected key type, path: %s", example.KeyPath)
+	require.Equal(t, example.Encrypted, *keyInfo.Encrypted, "unexpected encrypted boolean, path: %s", example.KeyPath)
 }

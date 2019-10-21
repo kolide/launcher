@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "a8:48:d5:ef:b6:ba:6f:e6:5d:fd:41:5e:49:6c:06:b9",
+      "Type": "ed25519",
+      "Bits": 256,
+      "Encrypted": false,
+      "KeyPath": "Gnvm6tCVFFZrdVzcIIXofA",
+      "command": "puttygen -t ed25519 -b 256 -C '' -o Gnvm6tCVFFZrdVzcIIXofA -O private --new-passphrase '<(cat /dev/null)'",
+      "Format": "putty",
+      "Source": "putty"
+    }

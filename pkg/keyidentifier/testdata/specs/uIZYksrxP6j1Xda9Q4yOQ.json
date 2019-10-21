@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "SHA256:IlaBxpG3QLVX7iEf6GR/S7K5uS7758XnxE72MK8wwl8",
+      "ExpectedFingerprintMD5": "6e:5a:6d:6c:a3:fa:07:85:35:95:fd:60:e5:7b:13:9c",
+      "Type": "rsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "KeyPath": "uIZYksrxP6j1Xda9Q4yOQ",
+      "command": "ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P \"\"",
+      "Format": "openssh-new",
+      "Source": "ssh-keygen"
+    }
