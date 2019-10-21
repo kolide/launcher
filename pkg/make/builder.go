@@ -480,7 +480,7 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 
 	// The `-` is included in the "additional" part of the regex, to
 	// make the later concatination correct.
-	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:(-.+))?`)
+	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:(-.+))?$`)
 	if err != nil {
 		return "", errors.Wrap(err, "bad regex")
 	}

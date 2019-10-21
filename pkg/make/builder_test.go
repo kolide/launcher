@@ -135,12 +135,38 @@ func TestGetVersion(t *testing.T) {
 		out string
 		err bool
 	}{
-		{in: "0.10.3", out: "0.10.3"},
-		{in: "v0.11.0", out: "0.11.0"},
-		{in: "v0.11.0-1-gd6d5a56-dirty", out: "0.11.0-1-gd6d5a56-dirty"},
-		{in: "", err: true},
-		{in: "badtag", err: true},
-		{in: "0.1", err: true},
+		{
+			in:  "",
+			err: true,
+		},
+		{
+			in:  "1",
+			err: true,
+		},
+		{
+			in:  "0.1",
+			err: true,
+		},
+		{
+			in:  "0.10.3",
+			out: "0.10.3",
+		},
+		{
+			in:  "v0.11.0",
+			out: "0.11.0",
+		},
+		{
+			in:  "v0.11.0-1-gd6d5a56-dirty",
+			out: "0.11.0-1-gd6d5a56-dirty",
+		},
+		{
+			in:  "1.2.3-4",
+			out: "1.2.3-4",
+		},
+		{
+			in:  "0.1.2.3",
+			err: true,
+		},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -154,12 +180,12 @@ func TestGetVersion(t *testing.T) {
 		os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
 		ver, err := b.getVersion(ctx)
 		if tt.err == true {
-			require.Error(t, err)
+			require.Error(t, err, tt.in)
 			continue
 		}
 
-		require.NoError(t, err)
-		require.Equal(t, tt.out, ver)
+		require.NoError(t, err, tt.in)
+		require.Equal(t, tt.out, ver, tt.in)
 	}
 
 }
