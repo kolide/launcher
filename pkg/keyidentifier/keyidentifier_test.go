@@ -21,6 +21,8 @@ type spec struct {
 	Encrypted                 bool
 	Bits                      int
 	Type                      string
+	Format                    string
+	Source                    string
 }
 
 // TestIdentifyFiles walks the testdata directory, and tests each
@@ -31,7 +33,7 @@ func TestIdentifyFiles(t *testing.T) {
 
 	testFiles := []string{}
 
-	err = filepath.Walk("testdata/fingerprints", func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk("testdata/specs", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return errors.Wrap(err, "failure to access path in filepath.Walk")
 		}
@@ -40,7 +42,7 @@ func TestIdentifyFiles(t *testing.T) {
 			return nil
 		}
 
-		// all json files in testdata/fingerprints are assumed to be valid test specifications
+		// all json files in testdata/specs are assumed to be valid test specifications
 		if strings.HasSuffix(path, ".json") {
 			testFiles = append(testFiles, path)
 			return nil
@@ -50,18 +52,18 @@ func TestIdentifyFiles(t *testing.T) {
 	})
 	require.NoError(t, err, "filepath.Walk")
 	for _, specPath := range testFiles {
-		testIdentifyFileV2(t, kIdentifier, specPath)
+		testIdentifyFile(t, kIdentifier, specPath)
 	}
 }
 
-func testIdentifyFileV2(t *testing.T, kIdentifer *KeyIdentifier, specFilePath string) {
+func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath string) {
 	// load the json file
 	data, err := ioutil.ReadFile(specFilePath)
 	require.NoError(t, err, "reading spec file")
 	var example spec
 	err = json.Unmarshal(data, &example)
 	require.NoError(t, err, "parsing json spec file: %s", specFilePath)
-	keyPath := "testdata/fingerprints/" + example.KeyPath
+	keyPath := "testdata/specs/" + example.KeyPath
 
 	keyInfo, err := kIdentifer.IdentifyFile(keyPath)
 	require.NoError(t, err, "path to unparseable key: %s", keyPath)
@@ -112,10 +114,12 @@ func testIdentifyFileV2(t *testing.T, kIdentifer *KeyIdentifier, specFilePath st
 
 	// test correct fingerprint reporting. limit support for now
 	if keyInfo.Format == "openssh-new" {
-		require.Equal(t, example.ExpectedFingerprintSHA256, keyInfo.FingerprintSHA256,
-			"unexpected sha256 fingerprint")
+		if example.Source != "putty" {
+			require.Equal(t, example.ExpectedFingerprintSHA256, keyInfo.FingerprintSHA256,
+				"unexpected sha256 fingerprint, path: %s", example.KeyPath)
+		}
 		require.Equal(t, example.ExpectedFingerprintMD5, keyInfo.FingerprintMD5,
-			"unexpected md5 fingerprint")
+			"unexpected md5 fingerprint, path: %s", example.KeyPath)
 	}
 
 	require.Equal(t, example.Type, keyInfo.Type, "unexpected key type")

@@ -1,9 +1,0 @@
-    {
-      "ExpectedFingerprintSHA256": "SHA256:XLgRTHG9g5+C/46j3+ypPApiqM27XnbvCdJujfUnwUg",
-      "ExpectedFingerprintMD5": "87:08:1c:1a:2a:1d:84:7f:20:ad:54:45:b9:fc:8b:39",
-      "Type": "ecdsa",
-      "Bits": 521,
-      "Encrypted": false,
-      "KeyPath": "28cmP95zyzfbl9HXecIEw",
-      "command": "ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P \"\""
-    }

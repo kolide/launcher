@@ -1,0 +1,11 @@
+    {
+      "ExpectedFingerprintSHA256": "",
+      "ExpectedFingerprintMD5": "ff:e5:f9:db:5c:fe:f9:4e:7f:5f:3a:b3:82:3a:a5:d6",
+      "Type": "rsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "KeyPath": "HfFhsPJThgDZLYOTnUaug",
+      "command": "puttygen -t $type -b $bits -C \"\" -o $keypath -O private-$format --new-passphrase <(cat /dev/null)",
+      "Format": "sshcom",
+      "Source": "putty"
+    }
