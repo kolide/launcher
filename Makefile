@@ -89,7 +89,7 @@ deps-go:
 deps: deps-go generate
 
 generate:
-	go generate ./pkg/packagekit
+	go generate ./pkg/packagekit ./pkg/packaging
 	go run cmd/make/make.go -targets=generate-tuf
 
 proto:
