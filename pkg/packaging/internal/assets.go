@@ -82,7 +82,7 @@ if [ ! -z "{{.InfoFilename}}" ]; then
 {{.InfoJson}}
 EOF
 
-    plutil -convert xml1 -o  "{{StringsTrimSuffix .InfoFilename `+"`"+`.json`+"`"+`}}.xml" "{{.InfoFilename}}"
+    plutil -convert xml1 -o  "{{StringsTrimSuffix .InfoFilename `+"`"+`.json`+"`"+`}}.plist" "{{.InfoFilename}}"
 fi
 
 # Sleep to let the stop take effect
