@@ -25,9 +25,7 @@ function makeOpensshKeyAndSpec {
     format="openssh7"
     source="openssh"
 
-    keyfile=$(rand)
-    keypath="$DATA_DIR/$keyfile"
-
+    keypath="$DATA_DIR/$(rand)"
 
     if [ $encrypted == true ]; then
         ssh-keygen -t $type -b $bits  -C "" -f $keypath -P "$(rand)"
@@ -47,7 +45,6 @@ function makeOpensshKeyAndSpec {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "KeyPath": "$keyfile",
       "command": "$cmd",
       "Format": "openssh-new",
       "Source": "ssh-keygen"
@@ -81,17 +78,16 @@ function makePuttyKeyAndSpecFile {
         putty_format="-$format"
     fi
 
-    keyfile=$(rand)
-    keypath="$DATA_DIR/$keyfile"
+    keypath="$DATA_DIR/$(rand)"
 
     passphrase=""
     if [ $encrypted == true ]; then
         passphrase=$(rand)
         puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase)
-        cmd="puttygen -t $type -b $bits -C '' -o $keyfile -O private$putty_format --new-passphrase $passphrase"
+        cmd="puttygen -t $type -b $bits -C '' -o $keypath -O private$putty_format --new-passphrase $passphrase"
     else
         puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(cat /dev/null)
-        cmd="puttygen -t $type -b $bits -C '' -o $keyfile -O private$putty_format --new-passphrase '<(cat /dev/null)'"
+        cmd="puttygen -t $type -b $bits -C '' -o $keypath -O private$putty_format --new-passphrase '<(cat /dev/null)'"
     fi
 
     fingerprint="" # puttygen doesn't seem to support sha256 fingerprints
@@ -104,7 +100,6 @@ function makePuttyKeyAndSpecFile {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "KeyPath": "$keyfile",
       "command": "$cmd",
       "Format": "$format",
       "Source": "$source"

@@ -32,6 +32,7 @@ func TestIdentifyFiles(t *testing.T) {
 
 	testFiles, err = filepath.Glob("testdata/specs/*.json")
 	require.NoError(t, err, "error in filepath.Glob")
+
 	for _, specPath := range testFiles {
 		testIdentifyFile(t, kIdentifier, specPath)
 	}
@@ -44,7 +45,7 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	var expected spec
 	err = json.Unmarshal(data, &expected)
 	require.NoError(t, err, "parsing json spec file: %s", specFilePath)
-	keyPath := "testdata/specs/" + expected.KeyPath
+	keyPath := strings.TrimSuffix(specFilePath, ".json")
 
 	actual, err := kIdentifer.IdentifyFile(keyPath)
 	require.NoError(t, err, "path to unparseable key: %s", keyPath)
@@ -88,20 +89,20 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	case (actual.Format == "putty"):
 	case (actual.Format == "sshcom"):
 	default:
-		require.Equal(t, expected.Bits, actual.Bits, "unexpected 'Bits' value, path: %s", expected.KeyPath)
+		require.Equal(t, expected.Bits, actual.Bits, "unexpected 'Bits' value, path: %s", keyPath)
 	}
 
 	// test correct fingerprint reporting. limited support for now
 	if actual.Format == "openssh-new" {
 		if expected.Source != "putty" {
 			require.Equal(t, expected.ExpectedFingerprintSHA256, actual.FingerprintSHA256,
-				"unexpected sha256 fingerprint, path: %s", expected.KeyPath)
+				"unexpected sha256 fingerprint, path: %s", keyPath)
 		}
 		require.Equal(t, expected.ExpectedFingerprintMD5, actual.FingerprintMD5,
-			"unexpected md5 fingerprint, path: %s", expected.KeyPath)
+			"unexpected md5 fingerprint, path: %s", keyPath)
 	}
 
-	require.Equal(t, expected.Format, actual.Format, "unexpected key format, path: %s", expected.KeyPath)
-	require.Equal(t, expected.Type, actual.Type, "unexpected key type, path: %s", expected.KeyPath)
-	require.Equal(t, expected.Encrypted, *actual.Encrypted, "unexpected encrypted boolean, path: %s", expected.KeyPath)
+	require.Equal(t, expected.Format, actual.Format, "unexpected key format, path: %s", keyPath)
+	require.Equal(t, expected.Type, actual.Type, "unexpected key type, path: %s", keyPath)
+	require.Equal(t, expected.Encrypted, *actual.Encrypted, "unexpected encrypted boolean, path: %s", keyPath)
 }
