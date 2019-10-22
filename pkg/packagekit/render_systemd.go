@@ -16,7 +16,7 @@ type systemdOptions struct {
 }
 
 func RenderSystemd(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.Systemd")
+	_, span := trace.StartSpan(ctx, "packagekit.Systemd")
 	defer span.End()
 
 	sOpts := &systemdOptions{
