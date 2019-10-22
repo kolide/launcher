@@ -3,13 +3,11 @@ package keyidentifier
 import (
 	"encoding/json"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/kolide/kit/logutil"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,24 +30,8 @@ func TestIdentifyFiles(t *testing.T) {
 
 	testFiles := []string{}
 
-	err = filepath.Walk("testdata/specs", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return errors.Wrap(err, "failure to access path in filepath.Walk")
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		// all json files in testdata/specs are assumed to be valid test specifications
-		if strings.HasSuffix(path, ".json") {
-			testFiles = append(testFiles, path)
-			return nil
-		}
-
-		return nil
-	})
-	require.NoError(t, err, "filepath.Walk")
+	testFiles, err = filepath.Glob("testdata/specs/*.json")
+	require.NoError(t, err, "finding spec files")
 	for _, specPath := range testFiles {
 		testIdentifyFile(t, kIdentifier, specPath)
 	}
