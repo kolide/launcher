@@ -31,7 +31,7 @@ func TestIdentifyFiles(t *testing.T) {
 	testFiles := []string{}
 
 	testFiles, err = filepath.Glob("testdata/specs/*.json")
-	require.NoError(t, err, "finding spec files")
+	require.NoError(t, err, "error in filepath.Glob")
 	for _, specPath := range testFiles {
 		testIdentifyFile(t, kIdentifier, specPath)
 	}
