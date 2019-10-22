@@ -12,7 +12,7 @@ set -e
 #set -x
 
 function rand {
-    dd if=/dev/random bs=1 count=16 2> /dev/null  | base64 | sed 's/[^0-9a-zA-Z]//g'
+   LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16
 }
 
 DATA_DIR="specs"
