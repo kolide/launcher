@@ -546,15 +546,15 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	}
 
 	var data = struct {
-		Identifier string
-		Path       string
-		InfoOutput string
-		InfoJson   string
+		Identifier   string
+		Path         string
+		InfoFilename string
+		InfoJson     string
 	}{
-		Identifier: p.Identifier,
-		Path:       p.initFile,
-		InfoOutput: p.canonicalizePath(filepath.Join(p.confDir, "installer-info.json")),
-		InfoJson:   string(jsonBlob),
+		Identifier:   p.Identifier,
+		Path:         p.initFile,
+		InfoFilename: p.canonicalizePath(filepath.Join(p.confDir, "installer-info.json")),
+		InfoJson:     string(jsonBlob),
 	}
 
 	funcsMap := template.FuncMap{

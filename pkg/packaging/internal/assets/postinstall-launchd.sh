@@ -4,12 +4,12 @@
 
 /bin/launchctl stop com.{{.Identifier}}.launcher
 
-if [ ! -z "{{.InfoOutput}}" ]; then
-    cat <<EOF > "{{.InfoOutput}}"
+if [ ! -z "{{.InfoFilename}}" ]; then
+    cat <<EOF > "{{.InfoFilename}}"
 {{.InfoJson}}
 EOF
 
-    plutil -convert xml1 -o  "{{StringsTrimSuffix .InfoOutput `.json`}}.xml" "{{.InfoOutput}}"
+    plutil -convert xml1 -o  "{{StringsTrimSuffix .InfoFilename `.json`}}.xml" "{{.InfoFilename}}"
 fi
 
 # Sleep to let the stop take effect

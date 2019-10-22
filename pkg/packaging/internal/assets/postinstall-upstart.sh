@@ -4,8 +4,8 @@
 # running. So stop and start are separate, and `set -e` is after the
 # stop.
 
-if [ ! -z "{{.InfoOutput}}" ]; then
-    cat <<EOF > "{{.InfoOutput}}"
+if [ ! -z "{{.InfoFilename}}" ]; then
+    cat <<EOF > "{{.InfoFilename}}"
 {{.InfoJson}}
 EOF
 fi
