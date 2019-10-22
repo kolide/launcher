@@ -1,5 +1,11 @@
 #!/bin/sh
 
+if [ ! -z "{{.InfoOutput}}" ]; then
+    cat <<EOF > "{{.InfoOutput}}"
+{{.InfoJson}}
+EOF
+fi
+
 set -e
 
 systemctl daemon-reload

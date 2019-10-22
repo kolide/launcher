@@ -3,6 +3,7 @@ package packaging
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -505,7 +506,6 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	}
 
 	var postinstTemplateName string
-	identifier := p.Identifier
 
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
@@ -528,14 +528,33 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return errors.Wrapf(err, "Failed to get template named %s", postinstTemplateName)
 	}
 
+	// installer info will be dumped into the filesystem
+	// somewhere. Note that some of these are OS variables (or exec
+	// calls) to be expanded at runtime
+	installerInfo := map[string]string{
+		"identifier":     p.Identifier,
+		"installer_id":   "$INSTALL_PKG_SESSION_ID",
+		"installer_path": "$PACKAGE_PATH",
+		"timestamp":      "$(date +%Y-%m-%dT%T%z)",
+		"version":        p.PackageVersion,
+		"user":           "$USER",
+	}
+
+	jsonBlob, err := json.MarshalIndent(installerInfo, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "marshaling installer info")
+	}
+
 	var data = struct {
 		Identifier string
 		Path       string
-		Version    string
+		InfoOutput string
+		InfoJson   string
 	}{
-		Identifier: identifier,
+		Identifier: p.Identifier,
 		Path:       p.initFile,
-		Version:    p.PackageVersion,
+		InfoOutput: "/tmp/FIXME-pkg.json", // FIXME: needs a real path
+		InfoJson:   string(jsonBlob),
 	}
 
 	t, err := template.New("postinstall").Parse(string(postinstTemplate))
