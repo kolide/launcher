@@ -98,17 +98,14 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	}
 
 	// Test correct 'bits' reporting
-	if keyInfo.Format == "openssh" && *keyInfo.Encrypted {
-		// Can't get keys from encrypted openssh keys. At least not yet.
-	} else if example.Type == "ecdsa" && *keyInfo.Encrypted {
-		// Can't get keys from encrypted ecdsa keys. At least not yet.
-	} else if keyInfo.Format == "openssh-new" {
-		// Can't get bit sizes from openssh-new keys (yet)
-	} else if keyInfo.Format == "putty" {
-		// Can't get bit sizes from putty keys. At least not yet.
-	} else if keyInfo.Format == "sshcom" {
-		// Can't get bit size from sshcom key
-	} else {
+	// there are several key types/formats that we don't retrieve 'bits' from yet
+	switch {
+	case (keyInfo.Format == "openssh" && *keyInfo.Encrypted):
+	case (example.Type == "ecdsa" && *keyInfo.Encrypted):
+	case (keyInfo.Format == "openssh-new"):
+	case (keyInfo.Format == "putty"):
+	case (keyInfo.Format == "sshcom"):
+	default:
 		require.Equal(t, example.Bits, keyInfo.Bits, "unexpected 'Bits' value, path: %s", example.KeyPath)
 	}
 
