@@ -48,22 +48,22 @@ extension: .pre-build
 
 xp: xp-launcher xp-extension xp-grpc-extension
 
-xp-%:
-	$(MAKE) -j darwin-xp-$* windows-xp-$* linux-xp-$*
+xp-%: darwin-xp-% windows-xp-% linux-xp-%
+	@true # make needs something here for the pattern rule
 
-darwin-xp-%: .pre-build
+darwin-xp-%: .pre-build deps
 	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
 
-linux-xp-%: .pre-build
+linux-xp-%: .pre-build deps
 	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
 
-windows-xp-%: .pre-build
+windows-xp-%: .pre-build deps
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
-codesign-darwin: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/launcher
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/osquery-extension.ext
+codesign-darwin: codesign-darwin-launcher codesign-darwin-osquery-extension.ext
+codesign-darwin-%: xp
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/$*
 
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
@@ -88,10 +88,12 @@ deps-go:
 
 deps: deps-go generate
 
+.PHONY: generate
 generate:
 	go generate ./pkg/packagekit ./pkg/packaging
 	go run cmd/make/make.go -targets=generate-tuf
 
+.PHONY: proto
 proto:
 	@(cd pkg/pb/launcher; go generate)
 	@(cd pkg/pb/querytarget; go generate)

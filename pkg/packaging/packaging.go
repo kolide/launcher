@@ -532,12 +532,12 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	// somewhere. Note that some of these are OS variables (or exec
 	// calls) to be expanded at runtime
 	installerInfo := map[string]string{
-		"identifier":     p.Identifier,
-		"installer_id":   "$INSTALL_PKG_SESSION_ID",
-		"installer_path": "$PACKAGE_PATH",
-		"timestamp":      "$(date +%Y-%m-%dT%T%z)",
-		"version":        p.PackageVersion,
-		"user":           "$USER",
+		"identifier":    p.Identifier,
+		"installer_id":  "$INSTALL_PKG_SESSION_ID",
+		"download_path": "$PACKAGE_PATH",
+		"timestamp":     "$(date +%Y-%m-%dT%T%z)",
+		"version":       p.PackageVersion,
+		"user":          "$USER",
 	}
 
 	jsonBlob, err := json.MarshalIndent(installerInfo, "", "  ")
@@ -553,11 +553,15 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	}{
 		Identifier: p.Identifier,
 		Path:       p.initFile,
-		InfoOutput: "/tmp/FIXME-pkg.json", // FIXME: needs a real path
+		InfoOutput: p.canonicalizePath(filepath.Join(p.confDir, "installer-info.json")),
 		InfoJson:   string(jsonBlob),
 	}
 
-	t, err := template.New("postinstall").Parse(string(postinstTemplate))
+	funcsMap := template.FuncMap{
+		"StringsTrimSuffix": strings.TrimSuffix,
+	}
+
+	t, err := template.New("postinstall").Funcs(funcsMap).Parse(string(postinstTemplate))
 	if err != nil {
 		return errors.Wrap(err, "not able to parse template")
 	}

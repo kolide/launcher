@@ -46,17 +46,13 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _internalAssetsInstallerinfoSh = []byte(`#!/bin/sh
-
-# Write installer info to a given path.
-OUTPUTJSON="{{.OutputJsonPath}}"
-
-cat <<EOF
+var _internalAssetsInstallerinfoSh = []byte(`{{- /* As this is shared between the installers, this is a reused template fragment */ -}}
+cat <<EOF > "{{.InfoOutput}}"
 {
   "identifier": "{{Identifier}}",
   "installer_id": "$INSTALL_PKG_SESSION_ID",
   "installer_path": "$PACKAGE_PATH",
-  "timestamp": {{.Timestamp}}",
+  "timestamp": "$(date +%Y-%m-%dT%T%z)",
   "version": "{{.Version}}"
 }
 EOF
@@ -81,15 +77,9 @@ var _internalAssetsPostinstallInitSh = []byte(`#!/bin/sh
 
 if [ ! -z "{{.InfoOutput}}" ]; then
     cat <<EOF > "{{.InfoOutput}}"
-{
-  "identifier": "{{.Identifier}}",
-  "installer_path": "$PACKAGE_PATH",
-  "timestamp": "{{.Timestamp}}",
-  "version": "{{.Version}}"
-}
+{{.InfoJson}}
  EOF
 fi
-
 
 sudo service launcher.{{.Identifier}} restart
 `)
@@ -117,14 +107,10 @@ var _internalAssetsPostinstallLaunchdSh = []byte(`#!/bin/sh
 
 if [ ! -z "{{.InfoOutput}}" ]; then
     cat <<EOF > "{{.InfoOutput}}"
-{
-  "identifier": "{{.Identifier}}",
-  "installer_id": "$INSTALL_PKG_SESSION_ID",
-  "installer_path": "$PACKAGE_PATH",
-  "timestamp": "{{.Timestamp}}",
-  "version": "{{.Version}}"
-}
- EOF
+{{.InfoJson}}
+EOF
+
+    plutil -convert xml1 -o  "{{StringsTrimSuffix .InfoOutput `+"`"+`.json`+"`"+`}}.xml" "{{.InfoOutput}}"
 fi
 
 # Sleep to let the stop take effect
@@ -153,15 +139,9 @@ var _internalAssetsPostinstallSystemdSh = []byte(`#!/bin/sh
 
 if [ ! -z "{{.InfoOutput}}" ]; then
     cat <<EOF > "{{.InfoOutput}}"
-{
-  "identifier": "{{.Identifier}}",
-  "installer_path": "$PACKAGE_PATH",
-  "timestamp": "{{.Timestamp}}",
-  "version": "{{.Version}}"
-}
- EOF
+{{.InfoJson}}
+EOF
 fi
-
 
 set -e
 
@@ -192,14 +172,11 @@ var _internalAssetsPostinstallUpstartSh = []byte(`#!/bin/sh
 # running. So stop and start are separate, and `+"`"+`set -e`+"`"+` is after the
 # stop.
 
-cat <<EOF
-{
-  "identifier": "{{Identifier}}",
-  "installer_path": "$PACKAGE_PATH",
-  "timestamp": {{.Timestamp}}",
-  "version": "{{.Version}}"
-}
+if [ ! -z "{{.InfoOutput}}" ]; then
+    cat <<EOF > "{{.InfoOutput}}"
+{{.InfoJson}}
 EOF
+fi
 
 stop launcher-{{.Identifier}}
 set -e
