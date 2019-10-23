@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "06:de:76:ef:9e:b8:1f:a8:9f:4c:43:5d:19:fe:78:ca",
+      "Type": "rsa",
+      "Bits": 1024,
+      "Encrypted": true,
+      "command": "puttygen -t rsa -b 1024 -C '' -o specs/0d13Zl7jAuqcRTGt -O private-sshcom --new-passphrase PyVOXB8nElO0DnJS",
+      "Format": "sshcom",
+      "Source": "putty"
+    }

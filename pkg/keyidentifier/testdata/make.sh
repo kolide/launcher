@@ -27,14 +27,14 @@ function makeOpensshKeyAndSpec {
 
     keypath="$DATA_DIR/$(rand)"
 
+    passphrase=""
     if [ $encrypted == true ]; then
-        ssh-keygen -t $type -b $bits  -C "" -f $keypath -P "$(rand)"
-        cmd='ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P $(rand)'
-    else
-        ssh-keygen -t $type -b $bits  -C "" -f $keypath -P ""
-        cmd='ssh-keygen -t $type -b $bits  -C \"\" -f $keypath -P \"\"'
+        passphrase=$(rand)
     fi
 
+    ssh-keygen -t $type -b $bits  -C "" -f $keypath -P "$passphrase"
+
+    cmd="ssh-keygen -t $type -b $bits  -C '' -f $keypath -P $passphrase"
     fingerprint=$(ssh-keygen -l -f $keypath | awk '{print $2}')
     md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath | awk '{print $2}' | sed 's/^MD5://')
 
@@ -69,13 +69,12 @@ function makePuttyKeyAndSpecFile {
     encrypted=$4
     source="putty"
 
+    putty_format="-$format"
     if [ "$format" == "putty" ]; then
         putty_format=""
         if [ "$type" == "rsa1" ]; then
             format="ssh1"
         fi
-    else
-        putty_format="-$format"
     fi
 
     keypath="$DATA_DIR/$(rand)"
@@ -83,12 +82,10 @@ function makePuttyKeyAndSpecFile {
     passphrase=""
     if [ $encrypted == true ]; then
         passphrase=$(rand)
-        puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase)
-        cmd="puttygen -t $type -b $bits -C '' -o $keypath -O private$putty_format --new-passphrase $passphrase"
-    else
-        puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(cat /dev/null)
-        cmd="puttygen -t $type -b $bits -C '' -o $keypath -O private$putty_format --new-passphrase '<(cat /dev/null)'"
     fi
+
+    puttygen -t $type -b $bits -C "" -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase)
+    cmd="puttygen -t $type -b $bits -C '' -o $keypath -O private$putty_format --new-passphrase $passphrase"
 
     fingerprint="" # puttygen doesn't seem to support sha256 fingerprints
     md5fingerprint=$(puttygen -l $keypath --old-passphrase <(echo $passphrase) | awk '{print $3}')

@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "45:8f:ec:80:27:cc:58:7a:2f:ba:5a:1c:d5:7f:99:93",
+      "Type": "rsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "command": "puttygen -t rsa -b 1024 -C '' -o specs/fd3KnHPpVH1mVwJq -O private --new-passphrase ",
+      "Format": "putty",
+      "Source": "putty"
+    }
