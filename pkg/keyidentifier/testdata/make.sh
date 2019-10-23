@@ -27,15 +27,19 @@ function makeOpensshKeyAndSpec {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase='""'
+    passphrase=""
     if [ $encrypted == true ]; then
         passphrase=$(rand)
     fi
 
-    cmd=(ssh-keygen -t $type -b $bits -f $keypath -P $passphrase)
-    eval ${cmd[*]}
-    echo returned $?
-    echo ${cmd[*]}
+    # set a bash array to the command, then use parameter expansion to
+    # invoke it. Using an array, lets us ensure consistency between
+    # what we call, and what we record.
+    cmd=(ssh-keygen -t $type -b $bits -f $keypath -P "$passphrase")
+    #echo "${cmd[@]}"
+    "${cmd[@]}"
+    #echo returned $?
+
 
     fingerprint=$(ssh-keygen -l -f $keypath | awk '{print $2}')
     md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath | awk '{print $2}' | sed 's/^MD5://')
@@ -47,7 +51,7 @@ function makeOpensshKeyAndSpec {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "command": "$(echo -n ${cmd[*]})",
+      "command": "${cmd[@]}",
       "Format": "openssh-new",
       "Source": "ssh-keygen"
     }
@@ -86,7 +90,7 @@ function makePuttyKeyAndSpecFile {
         passphrase=$(rand)
     fi
 
-    cmd=(puttygen -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase))
+    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase))
 
     eval ${cmd[*]}
     echo returned $?
@@ -112,6 +116,8 @@ EOF
 # -------------------------------------------------------------------------------------------
 # Actually make all the keys now that the functions have been defined
 # -------------------------------------------------------------------------------------------
+
+mkdir -p "$DATA_DIR"
 
 makeOpensshKeyAndSpec rsa 1024 true
 makeOpensshKeyAndSpec rsa 1024 false
