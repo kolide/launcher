@@ -1,0 +1,10 @@
+PuTTY-User-Key-File-2: ecdsa-sha2-nistp256
+Encryption: none
+Comment: ecdsa-key-20191023
+Public-Lines: 3
+AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLpZcm4KlAnr
+xUv01XS+nt/M4Y0upbpKTqHaKjx4Aqcj3h8/UGx9sqAWOoAFIf3vqjVwnFl5e8bU
+9Ng4zJxjYKY=
+Private-Lines: 1
+AAAAIQCZqei6NIIz5Sye1a2wsc1bMOdNMO3qmQ+Zjlf5nXFWIg==
+Private-MAC: 6d7e923bc28b5f8d30b3594d543584dcc2ffe00e

@@ -82,9 +82,10 @@ function makePuttyKeyAndSpecFile {
 
     keypath="$DATA_DIR/$(rand)"
 
+    passphrase=$(rand)
     cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format)
     if [ $encrypted == true ]; then
-        cmd+=(--new-passphrase <(echo -n $(rand)))
+        cmd+=(--new-passphrase <(echo -n $passphrase) )
     else
         cmd+=(--new-passphrase /dev/null)
     fi
@@ -94,7 +95,7 @@ function makePuttyKeyAndSpecFile {
     echo ${cmd[*]}
 
     fingerprint="" # puttygen doesn't seem to support sha256 fingerprints
-    md5fingerprint=$(puttygen -l $keypath --old-passphrase <(echo $passphrase) | awk '{print $3}')
+    md5fingerprint=$(puttygen -l $keypath --old-passphrase <(echo -n $passphrase) | awk '{print $3}')
 
     cat <<EOF > $keypath.json
     {

@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "ef:e4:ca:66:66:a6:5d:09:2b:ef:81:0e:1b:d7:e8:56",
+      "Type": "dsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "command": "puttygen --random-device /dev/urandom -t dsa -b 1024 -o specs/RNPyt2C7JxJ1Kx44 -O private --new-passphrase /dev/null",
+      "Format": "putty",
+      "Source": "putty"
+    }
