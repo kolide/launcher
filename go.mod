@@ -47,7 +47,7 @@ require (
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
-	github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541
+	github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23
 	github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect

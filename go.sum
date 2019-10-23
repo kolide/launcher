@@ -141,8 +141,8 @@ github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 h1:PJPDf8OUfOK1bb/
 github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
 github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7 h1:LkPVVNfGk7yrRiKwE5dchY9eqrER+99SddkLntU2YX0=
 github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7/go.mod h1:Ah+zOuAz6TBHVeG1UiExiExlo8jeuU9yTchmhDVrAdY=
-github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541 h1:fS9QdXZooZXKxA1SsbVGMbR5bgLVFFr03hGdmV+xWfY=
-github.com/kolide/kit v0.0.0-20190904172942-57bb6867d541/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
+github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23 h1:7rykD5+Wf11u+03TOsunGbg7f4gZEBgS0gwIRR+Han4=
+github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d h1:2/+lLTfZan4IGrD8TGC1ZVkehWLtrRuah47FASAnifE=
 github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d/go.mod h1:umPEbeG8R8RDJpQ0EMyRdj+6pfnJK4FTzjafwgovDUk=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
