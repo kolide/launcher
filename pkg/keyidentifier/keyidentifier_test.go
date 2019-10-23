@@ -12,14 +12,8 @@ import (
 )
 
 type spec struct {
-	KeyPath                   string
-	ExpectedFingerprintSHA256 string
-	ExpectedFingerprintMD5    string
-	Encrypted                 bool
-	Bits                      int
-	Type                      string
-	Format                    string
-	Source                    string
+	KeyInfo
+	Source string
 }
 
 // TestIdentifyFiles walks the testdata directory, and tests each
@@ -95,14 +89,14 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	// test correct fingerprint reporting. limited support for now
 	if actual.Format == "openssh-new" {
 		if expected.Source != "putty" {
-			require.Equal(t, expected.ExpectedFingerprintSHA256, actual.FingerprintSHA256,
+			require.Equal(t, expected.FingerprintSHA256, actual.FingerprintSHA256,
 				"unexpected sha256 fingerprint, path: %s", keyPath)
 		}
-		require.Equal(t, expected.ExpectedFingerprintMD5, actual.FingerprintMD5,
+		require.Equal(t, expected.FingerprintMD5, actual.FingerprintMD5,
 			"unexpected md5 fingerprint, path: %s", keyPath)
 	}
 
 	require.Equal(t, expected.Format, actual.Format, "unexpected key format, path: %s", keyPath)
 	require.Equal(t, expected.Type, actual.Type, "unexpected key type, path: %s", keyPath)
-	require.Equal(t, expected.Encrypted, *actual.Encrypted, "unexpected encrypted boolean, path: %s", keyPath)
+	require.Equal(t, *expected.Encrypted, *actual.Encrypted, "unexpected encrypted boolean, path: %s", keyPath)
 }

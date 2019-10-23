@@ -40,8 +40,8 @@ function makeOpensshKeyAndSpec {
 
     cat <<EOF > $keypath.json
     {
-      "ExpectedFingerprintSHA256": "$fingerprint",
-      "ExpectedFingerprintMD5": "$md5fingerprint",
+      "FingerprintSHA256": "$fingerprint",
+      "FingerprintMD5": "$md5fingerprint",
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
@@ -95,8 +95,8 @@ function makePuttyKeyAndSpecFile {
 
     cat <<EOF > $keypath.json
     {
-      "ExpectedFingerprintSHA256": "$fingerprint",
-      "ExpectedFingerprintMD5": "$md5fingerprint",
+      "FingerprintSHA256": "$fingerprint",
+      "FingerprintMD5": "$md5fingerprint",
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
