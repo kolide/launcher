@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "rsa-key-20191023",
+      "Type": "rsa1",
+      "Bits": 2048,
+      "Encrypted": true,
+      "command": "puttygen",
+      "Format": "ssh1",
+      "Source": "putty"
+    }

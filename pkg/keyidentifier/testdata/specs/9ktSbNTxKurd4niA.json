@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "SHA256:Dl19r4pCqid7cxDlFt7an4mMZ4hWlhwocZqWOIvC/8o",
+      "FingerprintMD5": "3e:39:b3:0d:30:1d:96:5f:ca:d9:41:b7:fd:71:5e:49",
+      "Type": "rsa",
+      "Bits": 2048,
+      "Encrypted": true,
+      "command": "ssh-keygen",
+      "Format": "openssh-new",
+      "Source": "ssh-keygen"
+    }
