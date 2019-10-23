@@ -27,15 +27,21 @@ function makeOpensshKeyAndSpec {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase='""'
+    # set a bash array to the command, then use parameter expansion to
+    # invoke it. Using an array, lets us ensure consistency between
+    # what we call, and what we record.
+    cmd=(ssh-keygen -t $type -b $bits -f $keypath -P "$passphrase")
+
     if [ $encrypted == true ]; then
-        passphrase=$(rand)
+        cmd+=(-P "$(rand)")
+    else
+        cmd+=(-P "")
     fi
 
-    cmd=(ssh-keygen -t $type -b $bits -f $keypath -P $passphrase)
-    eval ${cmd[*]}
-    echo returned $?
-    echo ${cmd[*]}
+    #echo "${cmd[@]}"
+    "${cmd[@]}"
+    #echo returned $?
+
 
     fingerprint=$(ssh-keygen -l -f $keypath | awk '{print $2}')
     md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath | awk '{print $2}' | sed 's/^MD5://')
@@ -47,7 +53,7 @@ function makeOpensshKeyAndSpec {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "command": "$(echo -n ${cmd[*]})",
+      "command": "${cmd[@]}",
       "Format": "openssh-new",
       "Source": "ssh-keygen"
     }
@@ -59,11 +65,6 @@ EOF
 # Note that openssh's ssh-keygen proportes to convert (using `-e`) but
 # empirically this does not work. So we use puttygen (`brew install
 # putty` to generate these)
-
-# check if puttygen is installed
-hash puttygen 2>/dev/null || \
-    { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
-
 function makePuttyKeyAndSpecFile {
     type=$1
     bits=$2
@@ -81,12 +82,12 @@ function makePuttyKeyAndSpecFile {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase=""
+    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format)
     if [ $encrypted == true ]; then
-        passphrase=$(rand)
+        cmd+=(--new-passphrase <(echo -n $(rand)))
+    else
+        cmd+=(--new-passphrase /dev/null)
     fi
-
-    cmd=(puttygen -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase))
 
     eval ${cmd[*]}
     echo returned $?
@@ -109,9 +110,20 @@ function makePuttyKeyAndSpecFile {
 EOF
 }
 
+# Prep
+
+# check if puttygen is installed
+hash puttygen 2>/dev/null || \
+    { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
+
+mkdir -p "$DATA_DIR"
+
+
 # -------------------------------------------------------------------------------------------
 # Actually make all the keys now that the functions have been defined
 # -------------------------------------------------------------------------------------------
+
+
 
 makeOpensshKeyAndSpec rsa 1024 true
 makeOpensshKeyAndSpec rsa 1024 false
