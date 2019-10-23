@@ -48,7 +48,7 @@ func WithPreStopScript(s []string) UpstartOption {
 }
 
 func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, uOpts ...UpstartOption) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.Upstart")
+	_, span := trace.StartSpan(ctx, "packagekit.Upstart")
 	defer span.End()
 
 	uOptions := &upstartOptions{}

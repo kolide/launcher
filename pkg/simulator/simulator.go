@@ -345,6 +345,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 				err = errors.Wrapf(err, "split grpc server host and port: %s", grpcURL)
 				h.state.failed = true
 				h.state.lock.Unlock()
+				level.Info(logger).Log("msg", "got error exiting simulator goroutine", "err", err)
 				return
 			}
 			creds := credentials.NewTLS(&tls.Config{
@@ -357,6 +358,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		if err != nil {
 			h.state.failed = true
 			h.state.lock.Unlock()
+			level.Info(logger).Log("msg", "got error exiting simulator goroutine", "err", err)
 			return
 		}
 		defer conn.Close()
@@ -371,6 +373,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 			level.Debug(h.logger).Log(
 				"msg", "enrollment failed",
 				"uuid", h.uuid,
+				"err", err,
 			)
 			h.state.failed = true
 			h.state.lock.Unlock()

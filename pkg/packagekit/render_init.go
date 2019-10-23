@@ -11,7 +11,7 @@ import (
 )
 
 func RenderInit(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.RenderInit")
+	_, span := trace.StartSpan(ctx, "packagekit.RenderInit")
 	defer span.End()
 
 	initdTemplate := `#!/bin/sh

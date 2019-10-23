@@ -607,9 +607,6 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	}
 
 	if invalid {
-		if err == nil {
-			err = errors.New("no further error")
-		}
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
@@ -766,10 +763,6 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	if invalid {
-		if err == nil {
-			err = errors.New("no further error")
-		}
-
 		if !reenroll {
 			return errors.New("enrollment invalid, reenroll disabled")
 		}
