@@ -27,15 +27,17 @@ function makeOpensshKeyAndSpec {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase=""
-    if [ $encrypted == true ]; then
-        passphrase=$(rand)
-    fi
-
     # set a bash array to the command, then use parameter expansion to
     # invoke it. Using an array, lets us ensure consistency between
     # what we call, and what we record.
     cmd=(ssh-keygen -t $type -b $bits -f $keypath -P "$passphrase")
+
+    if [ $encrypted == true ]; then
+        cmd+=(-P "$(rand)")
+    else
+        cmd+=(-P "")
+    fi
+
     #echo "${cmd[@]}"
     "${cmd[@]}"
     #echo returned $?
@@ -63,11 +65,6 @@ EOF
 # Note that openssh's ssh-keygen proportes to convert (using `-e`) but
 # empirically this does not work. So we use puttygen (`brew install
 # putty` to generate these)
-
-# check if puttygen is installed
-hash puttygen 2>/dev/null || \
-    { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
-
 function makePuttyKeyAndSpecFile {
     type=$1
     bits=$2
@@ -85,12 +82,12 @@ function makePuttyKeyAndSpecFile {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase=""
+    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format)
     if [ $encrypted == true ]; then
-        passphrase=$(rand)
+        cmd+=(--new-passphrase <(echo -n $(rand)))
+    else
+        cmd+=(--new-passphrase /dev/null)
     fi
-
-    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo $passphrase))
 
     eval ${cmd[*]}
     echo returned $?
@@ -113,11 +110,20 @@ function makePuttyKeyAndSpecFile {
 EOF
 }
 
+# Prep
+
+# check if puttygen is installed
+hash puttygen 2>/dev/null || \
+    { echo >&2 "puttygen must be installed to generate test data for putty keys. use 'brew install putty' to install puttygen on macos"; exit 1; }
+
+mkdir -p "$DATA_DIR"
+
+
 # -------------------------------------------------------------------------------------------
 # Actually make all the keys now that the functions have been defined
 # -------------------------------------------------------------------------------------------
 
-mkdir -p "$DATA_DIR"
+
 
 makeOpensshKeyAndSpec rsa 1024 true
 makeOpensshKeyAndSpec rsa 1024 false
