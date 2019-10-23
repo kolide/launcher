@@ -47,7 +47,7 @@ function makeOpensshKeyAndSpec {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "command": "$cmd",
+      "command": "$(echo -n ${cmd[*]})",
       "Format": "openssh-new",
       "Source": "ssh-keygen"
     }
@@ -102,7 +102,7 @@ function makePuttyKeyAndSpecFile {
       "Type": "$type",
       "Bits": $bits,
       "Encrypted": $encrypted,
-      "command": "$cmd",
+      "command": "$(echo -n ${cmd[*]})",
       "Format": "$format",
       "Source": "$source"
     }

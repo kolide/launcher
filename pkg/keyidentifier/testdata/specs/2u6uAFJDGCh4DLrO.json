@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "7f:41:7f:40:07:98:58:7c:76:46:7f:ab:89:b3:8e:8e",
+      "Type": "dsa",
+      "Bits": 1024,
+      "Encrypted": false,
+      "command": "puttygen -t dsa -b 1024 -o specs/2u6uAFJDGCh4DLrO -O private-openssh-new --new-passphrase /dev/fd/63",
+      "Format": "openssh-new",
+      "Source": "putty"
+    }

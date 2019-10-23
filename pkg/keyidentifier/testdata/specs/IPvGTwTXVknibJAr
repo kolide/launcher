@@ -1,0 +1,17 @@
+PuTTY-User-Key-File-2: ssh-dss
+Encryption: none
+Comment: dsa-key-20191023
+Public-Lines: 10
+AAAAB3NzaC1kc3MAAACBANERe6OK8684G2zRuLIkJCrKzqQK3mac1LyfbI2Ma6xB
+kcWBnI5z7A1G3MRuLnxXaGCwuW+jVxxgGwCtLLQwKX43drK3XCGUmcobojoCi2eG
+UwJOl35j3mTJPvb49+dyTLjViD096oq/zZiYJv8EJiSfSg2d8ypMKEFgIJzoyznd
+AAAAFQDnzqwLUsXZqUlLm9NPoIWbmuIWgQAAAIBk4jePXe+IdPGuNTCWUduR3Fqg
+MhV/0Afs6ldL6zv74dZXXzaiWxD3yMhB8jS/PpfDwrm/RJ6669bvl9WPPNDGGGkt
+1TDwB+gve+lnvH+dcXZ2U/AomiakGTSSNr5GGvARVel3cEdzDqPsKmf/IT/7DP3M
+xqbY7Z1gtjoVuiXJ0AAAAIEAy/XAKB+zNXd5hI5uIU4xsZXpq+MfSSiCvtHmPdNF
+uIWOPjJYHKptz/4R3gkzL0JHAkkJtOMZARi8B0ZSbU35Z+NzpUma1h+tcdc5flEv
+SwhOYcsNXgdzI9xn5bZqpw6Ice6p2aF9Ql/P257fIDpQ+iFseL3iXE83tvBtEci5
+fUA=
+Private-Lines: 1
+AAAAFB1nbmH/xoaBXoV+3SiW5HRmdxJe
+Private-MAC: b1b6d6af6f47bba73f2363967a909c85aaed01e6

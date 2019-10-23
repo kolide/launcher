@@ -1,0 +1,10 @@
+    {
+      "FingerprintSHA256": "",
+      "FingerprintMD5": "00:f9:74:e6:bb:e7:53:5c:11:2f:f2:36:81:6b:61:1a",
+      "Type": "ecdsa",
+      "Bits": 521,
+      "Encrypted": true,
+      "command": "puttygen -t ecdsa -b 521 -o specs/3I5J60HUDyODvEM2 -O private-openssh --new-passphrase /dev/fd/63",
+      "Format": "openssh",
+      "Source": "putty"
+    }
