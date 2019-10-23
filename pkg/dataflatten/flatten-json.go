@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func FlattenJson(rawdata []byte) ([]Row, error) {
+func Json(rawdata []byte) ([]Row, error) {
 	var data interface{}
 
 	if err := json.Unmarshal(rawdata, &data); err != nil {

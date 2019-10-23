@@ -94,7 +94,7 @@ func TestFlatten(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := FlattenJson([]byte(tt.in))
+		actual, err := Json([]byte(tt.in))
 		if tt.err {
 			require.Error(t, err, tt.in)
 			continue
