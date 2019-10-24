@@ -47,8 +47,8 @@ function makeOpensshKeyAndSpec {
     #echo returned $?
 
 
-    fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}')
-    md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath.pub | awk '{print $2}' | sed 's/^MD5://')
+    fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}' | sed -e 's/^SHA256://')
+    md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath.pub | awk '{print $2}' | sed -e 's/^MD5://')
 
     cat <<EOF > $keypath.json
 {
@@ -113,7 +113,7 @@ function makePuttyKeyAndSpecFile {
 
     # TODO: figure out how to get the md5 fingerprint for these
     if [ "$type" != "rsa1" ]; then
-        fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}')
+        fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}' | sed -e 's/^SHA256://')
     fi
 
     cat <<EOF > $keypath.json

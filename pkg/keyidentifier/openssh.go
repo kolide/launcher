@@ -3,6 +3,7 @@ package keyidentifier
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -48,8 +49,8 @@ func ParseOpenSSHPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	// If we can parse the public key. extract info
 	if pubKey, err := ssh.ParsePublicKey(w.PubKey); err == nil {
 		ki.Type = pubKey.Type()
-		ki.FingerprintSHA256 = ssh.FingerprintSHA256(pubKey)
-		ki.FingerprintMD5 = ssh.FingerprintLegacyMD5(pubKey)
+		ki.FingerprintSHA256 = strings.TrimPrefix(ssh.FingerprintSHA256(pubKey), "SHA256:")
+		ki.FingerprintMD5 = strings.TrimPrefix(ssh.FingerprintLegacyMD5(pubKey), "MD5:")
 		// We ought be able to get the size of the key, but I don't see
 		// how it's exposed. The ssh.PublicKey type is very bare.
 		// ki.Bits = len(pubKey.Parameters().Y.Bytes()) * 8

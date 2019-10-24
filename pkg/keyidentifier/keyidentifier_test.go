@@ -70,7 +70,6 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	// The elliptic types carry more detail than we need. So whomp down
 	// how we test. eg `ecdsa-sha2-nistp256` becomes `ecdsa` for testing
 	if strings.HasPrefix(actual.Type, "ecdsa-") {
-		expected.Type = "ecdsa"
 		actual.Type = "ecdsa"
 	}
 
@@ -88,10 +87,9 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 
 	// test correct fingerprint reporting. limited support for now
 	if actual.Format == "openssh-new" {
-		if expected.Source != "putty" {
-			require.Equal(t, expected.FingerprintSHA256, actual.FingerprintSHA256,
-				"unexpected sha256 fingerprint, path: %s", keyPath)
-		}
+		require.Equal(t, expected.FingerprintSHA256, actual.FingerprintSHA256,
+			"unexpected sha256 fingerprint, path: %s", keyPath)
+
 		require.Equal(t, expected.FingerprintMD5, actual.FingerprintMD5,
 			"unexpected md5 fingerprint, path: %s", keyPath)
 	}
