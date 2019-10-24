@@ -9,15 +9,17 @@
 # compared against these expected values.
 
 set -e
-#set -x
+set -o pipefail
+set -x
 
 function rand {
-   LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16
+    set +o pipefail
+    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16
+    set -o pipefail
 }
 
 DATA_DIR="specs"
 
-# generate some keys and the corresponding json spec files for testing fingerprints
 function makeOpensshKeyAndSpec {
     type=$1
     bits=$2
@@ -38,13 +40,13 @@ function makeOpensshKeyAndSpec {
         cmd+=(-P "")
     fi
 
-    #echo "${cmd[@]}"
+    echo "${cmd[@]}"
     "${cmd[@]}"
     #echo returned $?
 
 
-    fingerprint=$(ssh-keygen -l -f $keypath | awk '{print $2}')
-    md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath | awk '{print $2}' | sed 's/^MD5://')
+    fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}')
+    md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath.pub | awk '{print $2}' | sed 's/^MD5://')
 
     cat <<EOF > $keypath.json
     {
@@ -82,20 +84,32 @@ function makePuttyKeyAndSpecFile {
 
     keypath="$DATA_DIR/$(rand)"
 
-    passphrase=$(rand)
-    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format)
+    # We use `echo ""` instead of /dev/null, because it makes it
+    # easier to be consistent in how we extract the public key
+    passphrase=""
     if [ $encrypted == true ]; then
-        cmd+=(--new-passphrase <(echo -n $passphrase) )
-    else
-        cmd+=(--new-passphrase /dev/null)
+        passphrase=$(rand)
     fi
 
-    eval ${cmd[*]}
-    echo returned $?
-    echo ${cmd[*]}
+    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo -n $passphrase))
 
-    fingerprint="" # puttygen doesn't seem to support sha256 fingerprints
+    echo "${cmd[@]}"
+    "${cmd[@]}"
+    #echo returned $?
+
+
+    # make the public key pair
+    puttygen -L --old-passphrase <(echo -n "$passphrase") $keypath > $keypath.pub
+
+    # puttygen does not directly support thge sha256 fingerprint. But, we can use ssh-keygen for it.
+    # Usually. ssh-key fails on very old keys. So we probably just need to shrug about those.
     md5fingerprint=$(puttygen -l $keypath --old-passphrase <(echo -n $passphrase) | awk '{print $3}')
+    fingerprint=""
+
+    # TODO: figure out how to get the md5 fingerprint for these
+    if [ "$type" != "rsa1" ]; then
+        fingerprint=$(ssh-keygen -l -f $keypath.pub | awk '{print $2}')
+    fi
 
     cat <<EOF > $keypath.json
     {
@@ -180,3 +194,5 @@ done
 
 # openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
 # openssl genpkey -algorithm RSA -pass pass:password -out private_key_enc.pem -pkeyopt rsa_keygen_bits:2048
+
+echo "done"
