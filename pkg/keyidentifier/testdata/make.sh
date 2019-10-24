@@ -106,7 +106,7 @@ function makePuttyKeyAndSpecFile {
     # make the public key pair
     puttygen -L --old-passphrase <(echo -n "$passphrase") $keypath > $keypath.pub
 
-    # puttygen does not directly support thge sha256 fingerprint. But, we can use ssh-keygen for it.
+    # puttygen does not directly support the sha256 fingerprint. But, we can use ssh-keygen for it.
     # Usually. ssh-key fails on very old keys. So we probably just need to shrug about those.
     md5fingerprint=$(puttygen -l $keypath --old-passphrase <(echo -n $passphrase) | awk '{print $3}')
     fingerprint=""
