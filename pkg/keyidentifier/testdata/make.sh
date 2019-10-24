@@ -10,7 +10,7 @@
 
 set -e
 set -o pipefail
-set -x
+# set -x
 
 function rand {
     set +o pipefail
@@ -29,10 +29,12 @@ function makeOpensshKeyAndSpec {
 
     keypath="$DATA_DIR/$(rand)"
 
+    comment="comment -- $type/$bits by $source $(rand)"
+
     # set a bash array to the command, then use parameter expansion to
     # invoke it. Using an array, lets us ensure consistency between
     # what we call, and what we record.
-    cmd=(ssh-keygen -t $type -b $bits -f $keypath -P "$passphrase")
+    cmd=(ssh-keygen -t $type -b $bits -f $keypath -C "$comment")
 
     if [ $encrypted == true ]; then
         cmd+=(-P "$(rand)")
@@ -49,16 +51,17 @@ function makeOpensshKeyAndSpec {
     md5fingerprint=$(ssh-keygen -l -E md5 -f $keypath.pub | awk '{print $2}' | sed 's/^MD5://')
 
     cat <<EOF > $keypath.json
-    {
-      "FingerprintSHA256": "$fingerprint",
-      "FingerprintMD5": "$md5fingerprint",
-      "Type": "$type",
-      "Bits": $bits,
-      "Encrypted": $encrypted,
-      "command": "${cmd[@]}",
-      "Format": "openssh-new",
-      "Source": "ssh-keygen"
-    }
+{
+    "Comment": "$comment",
+    "FingerprintSHA256": "$fingerprint",
+    "FingerprintMD5": "$md5fingerprint",
+    "Type": "$type",
+    "Bits": $bits,
+    "Encrypted": $encrypted,
+    "command": "${cmd[@]}",
+    "Format": "openssh-new",
+    "Source": "ssh-keygen"
+}
 EOF
 }
 
@@ -73,6 +76,8 @@ function makePuttyKeyAndSpecFile {
     format=$3
     encrypted=$4
     source="putty"
+
+    comment="comment -- $type/$bits by $source $(rand)"
 
     putty_format="-$format"
     if [ "$format" == "putty" ]; then
@@ -91,7 +96,7 @@ function makePuttyKeyAndSpecFile {
         passphrase=$(rand)
     fi
 
-    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo -n $passphrase))
+    cmd=(puttygen --random-device /dev/urandom -t $type -b $bits -o $keypath -O private$putty_format --new-passphrase <(echo -n "$passphrase") -C "$comment")
 
     echo "${cmd[@]}"
     "${cmd[@]}"
@@ -112,16 +117,17 @@ function makePuttyKeyAndSpecFile {
     fi
 
     cat <<EOF > $keypath.json
-    {
-      "FingerprintSHA256": "$fingerprint",
-      "FingerprintMD5": "$md5fingerprint",
-      "Type": "$type",
-      "Bits": $bits,
-      "Encrypted": $encrypted,
-      "command": "$(echo -n ${cmd[*]})",
-      "Format": "$format",
-      "Source": "$source"
-    }
+{
+    "Comment": "$comment",
+    "FingerprintSHA256": "$fingerprint",
+    "FingerprintMD5": "$md5fingerprint",
+    "Type": "$type",
+    "Bits": $bits,
+    "Encrypted": $encrypted,
+    "command": "$(echo -n ${cmd[*]})",
+    "Format": "$format",
+    "Source": "$source"
+}
 EOF
 }
 
