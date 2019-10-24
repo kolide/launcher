@@ -15,9 +15,16 @@ type Row struct {
 
 const defaultPathSeperator = "/"
 
+type flattenOpts struct {
+	pathSeperator      string
+	keyForArraysOfMaps string
+}
+
+type FlattenOpts func(*flattenOpts)
+
 // TODO: Write this better
 // Note that this returns an array with an unstable order.
-func Flatten(data interface{}) ([]Row, error) {
+func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 
 	rows := []Row{}
 
