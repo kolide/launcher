@@ -70,33 +70,35 @@ func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath stri
 	// The elliptic types carry more detail than we need. So whomp down
 	// how we test. eg `ecdsa-sha2-nistp256` becomes `ecdsa` for testing
 	if strings.HasPrefix(actual.Type, "ecdsa-") {
-		expected.Type = "ecdsa"
 		actual.Type = "ecdsa"
 	}
 
-	// Test correct 'bits' reporting
+	// Test correct 'bits' reporting.
 	// there are several key types/formats that we don't retrieve 'bits' from yet
 	switch {
 	case (actual.Format == "openssh" && *actual.Encrypted):
+		expected.Bits = 0
 	case (expected.Type == "ecdsa" && *actual.Encrypted):
+		expected.Bits = 0
 	case (actual.Format == "openssh-new"):
+		expected.Bits = 0
 	case (actual.Format == "putty"):
+		expected.Bits = 0
 	case (actual.Format == "sshcom"):
-	default:
-		require.Equal(t, expected.Bits, actual.Bits, "unexpected 'Bits' value, path: %s", keyPath)
+		expected.Bits = 0
 	}
 
 	// test correct fingerprint reporting. limited support for now
-	if actual.Format == "openssh-new" {
-		if expected.Source != "putty" {
-			require.Equal(t, expected.FingerprintSHA256, actual.FingerprintSHA256,
-				"unexpected sha256 fingerprint, path: %s", keyPath)
-		}
-		require.Equal(t, expected.FingerprintMD5, actual.FingerprintMD5,
-			"unexpected md5 fingerprint, path: %s", keyPath)
+	if actual.Format != "openssh-new" {
+		expected.FingerprintSHA256 = ""
+		expected.FingerprintMD5 = ""
 	}
 
-	require.Equal(t, expected.Format, actual.Format, "unexpected key format, path: %s", keyPath)
-	require.Equal(t, expected.Type, actual.Type, "unexpected key type, path: %s", keyPath)
-	require.Equal(t, *expected.Encrypted, *actual.Encrypted, "unexpected encrypted boolean, path: %s", keyPath)
+	// Don't compare various bits of metadata
+	expected.Comment = ""
+	actual.Comment = ""
+	actual.Parser = ""
+	actual.Encryption = ""
+
+	require.EqualValues(t, &expected.KeyInfo, actual)
 }
