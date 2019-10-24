@@ -33,6 +33,8 @@ func SshKeys(client *osquery.ExtensionManagerClient, logger log.Logger) *table.P
 		table.TextColumn("type"),
 		table.IntegerColumn("encrypted"),
 		table.IntegerColumn("bits"),
+		table.TextColumn("fingerprint_sha256"),
+		table.TextColumn("fingerprint_md5"),
 	}
 
 	// we don't want the logging in osquery, so don't instantiate WithLogger()
@@ -97,6 +99,13 @@ func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryCon
 
 			if ki.Bits != 0 {
 				res["bits"] = strconv.FormatInt(int64(ki.Bits), 10)
+			}
+
+			if ki.FingerprintSHA256 != "" {
+				res["fingerprint_sha256"] = ki.FingerprintSHA256
+			}
+			if ki.FingerprintMD5 != "" {
+				res["fingerprint_md5"] = ki.FingerprintMD5
 			}
 
 			results = append(results, res)

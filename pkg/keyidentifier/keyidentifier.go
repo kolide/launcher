@@ -15,13 +15,15 @@ import (
 )
 
 type KeyInfo struct {
-	Type       string // Key type. rsa/dsa/etc
-	Format     string // file format
-	Bits       int    // number of bits in the key
-	Encryption string // key encryption algorythem
-	Encrypted  *bool  // is the key encrypted
-	Comment    string // comments attached to the key
-	Parser     string // what parser we used to determine information
+	Type              string // Key type. rsa/dsa/etc
+	Format            string // file format
+	Bits              int    // number of bits in the key
+	Encryption        string // key encryption algorythem
+	Encrypted         *bool  // is the key encrypted
+	Comment           string // comments attached to the key
+	Parser            string // what parser we used to determine information
+	FingerprintSHA256 string // the fingerprint of the key, as a SHA256 hash
+	FingerprintMD5    string // the fingerprint of the key, as an MD5 hash
 }
 
 // keyidentifier attempts to identify a key. It uses a set of
@@ -96,7 +98,6 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 
 	// Out of options
 	return nil, errors.New("Unable to parse key")
-
 }
 
 // attemptPem tries to decode the pem, and then work with the key. It's
