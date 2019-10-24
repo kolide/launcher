@@ -16,10 +16,9 @@ type Row struct {
 const defaultPathSeperator = "/"
 
 type Flattener struct {
-	keyForArraysOfMaps string
-	includeNils        bool
-	arrayKeyName       string
-	rows               []Row
+	includeNils  bool
+	arrayKeyName string
+	rows         []Row
 }
 
 type FlattenOpts func(*Flattener)
@@ -57,16 +56,19 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 func (fl *Flattener) descend(path []string, data interface{}) error {
 	switch v := data.(type) {
 	case []interface{}:
+
 		for i, e := range v {
 			if err := fl.descend(append(path, strconv.Itoa(i)), e); err != nil {
-				return errors.Wrap(err, "flattening")
+				return errors.Wrap(err, "flattening array")
 			}
+
+			return nil
 		}
-		return nil
+
 	case map[string]interface{}:
 		for k, e := range v {
 			if err := fl.descend(append(path, k), e); err != nil {
-				return errors.Wrap(err, "flattening")
+				return errors.Wrap(err, "flattening map")
 			}
 		}
 		return nil
@@ -88,6 +90,36 @@ func (fl *Flattener) descend(path []string, data interface{}) error {
 	}
 	return nil
 
+}
+
+/*
+func (fl *Flattener) isArrayOfMapsWithKeyName(data []interface{}) bool {
+
+	for _, element := range data {
+		elementAsMap, ok := element.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		foundInMap := false
+		for k, v := range elementAsMap {
+
+		}
+	}
+	return true
+}
+*/
+
+// extractKeyNameFromMap will iterate over a map. If it has an element
+func (fl *Flattener) extractKeyNameFromMap(data map[string]interface{}) string {
+	for k, v := range data {
+		if k != fl.arrayKeyName {
+			continue
+		}
+		if vString, err := stringify(v); err == nil {
+			return vString
+		}
+	}
+	return ""
 }
 
 func stringify(data interface{}) (string, error) {
