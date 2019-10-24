@@ -50,19 +50,29 @@ func TestFlatten(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		in  string
-		out []Row
-		err bool
+		in      string
+		out     []Row
+		options []FlattenOpts
+		err     bool
 	}{
 		{
 			in:  "a",
 			err: true,
 		},
 		{
-			in: `["a"]`,
+			in: `["a", null]`,
 			out: []Row{
 				Row{Path: []string{"0"}, Value: "a"},
 			},
+		},
+		{
+			in: `["a", "b", null]`,
+			out: []Row{
+				Row{Path: []string{"0"}, Value: "a"},
+				Row{Path: []string{"1"}, Value: "b"},
+				Row{Path: []string{"2"}, Value: ""},
+			},
+			options: []FlattenOpts{IncludeNulls()},
 		},
 		{
 			in: `["1"]`,
@@ -94,7 +104,7 @@ func TestFlatten(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Json([]byte(tt.in))
+		actual, err := Json([]byte(tt.in), tt.options...)
 		if tt.err {
 			require.Error(t, err, tt.in)
 			continue

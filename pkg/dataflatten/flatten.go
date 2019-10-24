@@ -15,45 +15,65 @@ type Row struct {
 
 const defaultPathSeperator = "/"
 
-type flattenOpts struct {
-	pathSeperator      string
+type Flattener struct {
 	keyForArraysOfMaps string
+	includeNils        bool
+	arrayKeyName       string
+	rows               []Row
 }
 
-type FlattenOpts func(*flattenOpts)
+type FlattenOpts func(*Flattener)
+
+func IncludeNulls() FlattenOpts {
+	return func(fl *Flattener) {
+		fl.includeNils = true
+	}
+}
+
+func ArrayKeyName(s string) FlattenOpts {
+	return func(fl *Flattener) {
+		fl.arrayKeyName = s
+	}
+}
 
 // TODO: Write this better
 // Note that this returns an array with an unstable order.
 func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
+	fl := &Flattener{
+		rows: []Row{},
+	}
 
-	rows := []Row{}
+	for _, opt := range opts {
+		opt(fl)
+	}
 
-	if err := flattenElement(&rows, []string{}, data); err != nil {
+	if err := fl.descend([]string{}, data); err != nil {
 		return nil, err
 	}
 
-	return rows, nil
+	return fl.rows, nil
 }
 
-func flattenElement(rows *[]Row, path []string, data interface{}) error {
+func (fl *Flattener) descend(path []string, data interface{}) error {
 	switch v := data.(type) {
 	case []interface{}:
 		for i, e := range v {
-			if err := flattenElement(rows, append(path, strconv.Itoa(i)), e); err != nil {
+			if err := fl.descend(append(path, strconv.Itoa(i)), e); err != nil {
 				return errors.Wrap(err, "flattening")
 			}
 		}
 		return nil
 	case map[string]interface{}:
 		for k, e := range v {
-			if err := flattenElement(rows, append(path, k), e); err != nil {
+			if err := fl.descend(append(path, k), e); err != nil {
 				return errors.Wrap(err, "flattening")
 			}
 		}
 		return nil
 	case nil:
-		// TODO should these be pruned?
-		*rows = append(*rows, Row{Path: path, Value: ""})
+		if fl.includeNils {
+			fl.rows = append(fl.rows, Row{Path: path, Value: ""})
+		}
 		return nil
 
 	default:
@@ -62,7 +82,7 @@ func flattenElement(rows *[]Row, path []string, data interface{}) error {
 		if err != nil {
 			return errors.Wrapf(err, "flattening at path %v", path)
 		}
-		*rows = append(*rows, Row{Path: path, Value: stringValue})
+		fl.rows = append(fl.rows, Row{Path: path, Value: stringValue})
 		return nil
 
 	}
