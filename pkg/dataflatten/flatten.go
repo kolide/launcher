@@ -7,8 +7,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultPathSeperator = "/"
-
 type Flattener struct {
 	includeNils  bool
 	arrayKeyName string
@@ -125,7 +123,7 @@ func (fl *Flattener) extractKeyNameFromMap(data map[string]interface{}, deleteKe
 	return ""
 }
 
-// stringify takes an arbitary piece of data, and attempst to coerce
+// stringify takes an arbitrary piece of data, and attempst to coerce
 // it into a string.
 func stringify(data interface{}) (string, error) {
 	switch v := data.(type) {

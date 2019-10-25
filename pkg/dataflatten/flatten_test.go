@@ -48,7 +48,7 @@ func TestRowParentFunctions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		parent, key := tt.in.ParentKey()
+		parent, key := tt.in.ParentKey("/")
 		require.Equal(t, tt.parent, parent)
 		require.Equal(t, tt.key, key)
 	}
@@ -188,8 +188,8 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
-		testFlattenCase(t, tt)
+		actual, err := Json([]byte(tt.in), tt.options...)
+		testFlattenCase(t, tt, actual, err)
 	}
 
 }
@@ -253,28 +253,28 @@ func TestFlatten(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		testFlattenCase(t, tt)
+		actual, err := Json([]byte(tt.in), tt.options...)
+		testFlattenCase(t, tt, actual, err)
 	}
 }
 
 // testFlattenCase runs tests for a single test case. Normally this
 // would be in a for loop, instead it's abstracted here to make it
 // simpler to split up a giant array of test cases.
-func testFlattenCase(t *testing.T, tt flattenTestCase) {
-	actual, err := Json([]byte(tt.in), tt.options...)
+func testFlattenCase(t *testing.T, tt flattenTestCase, actual []Row, actualErr error) {
 	if tt.err {
-		require.Error(t, err, "test %s %s", tt.in, tt.comment)
+		require.Error(t, actualErr, "test %s %s", tt.in, tt.comment)
 		return
 	}
 
-	require.NoError(t, err, "test %s %s", tt.in, tt.comment)
+	require.NoError(t, actualErr, "test %s %s", tt.in, tt.comment)
 
 	// Despite being an array. data is returned
 	// unordered. This greatly complicates our testing. We
 	// can either sort it, or use an unordered comparison
 	// operator. The `require.ElementsMatch` produces much
 	// harder to read diffs, so instead we'll sort things.
-	sort.SliceStable(tt.out, func(i, j int) bool { return tt.out[i].StringPath() < tt.out[j].StringPath() })
-	sort.SliceStable(actual, func(i, j int) bool { return actual[i].StringPath() < actual[j].StringPath() })
+	sort.SliceStable(tt.out, func(i, j int) bool { return tt.out[i].StringPath("/") < tt.out[j].StringPath("/") })
+	sort.SliceStable(actual, func(i, j int) bool { return actual[i].StringPath("/") < actual[j].StringPath("/") })
 	require.EqualValues(t, tt.out, actual, "test %s %s", tt.in, tt.comment)
 }
