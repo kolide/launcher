@@ -57,27 +57,28 @@ func (fl *Flattener) descend(path []string, data interface{}) error {
 	switch v := data.(type) {
 	case []interface{}:
 
+		isArrayOfMaps := fl.isArrayOfMapsWithKeyName(v)
+
 		for i, e := range v {
-			if err := fl.descend(append(path, strconv.Itoa(i)), e); err != nil {
-				return errors.Wrap(err, "flattening array")
+			key := strconv.Itoa(i)
+			if elementAsMap, ok := e.(map[string]interface{}); isArrayOfMaps && ok {
+				key = fl.extractKeyNameFromMap(elementAsMap, true)
 			}
 
-			return nil
+			if err := fl.descend(append(path, key), e); err != nil {
+				return errors.Wrap(err, "flattening array")
+			}
 		}
-
 	case map[string]interface{}:
 		for k, e := range v {
 			if err := fl.descend(append(path, k), e); err != nil {
 				return errors.Wrap(err, "flattening map")
 			}
 		}
-		return nil
 	case nil:
 		if fl.includeNils {
 			fl.rows = append(fl.rows, Row{Path: path, Value: ""})
 		}
-		return nil
-
 	default:
 		// non-iterable. stringify and be done
 		stringValue, err := stringify(v)
@@ -85,37 +86,39 @@ func (fl *Flattener) descend(path []string, data interface{}) error {
 			return errors.Wrapf(err, "flattening at path %v", path)
 		}
 		fl.rows = append(fl.rows, Row{Path: path, Value: stringValue})
-		return nil
 
 	}
 	return nil
 
 }
 
-/*
 func (fl *Flattener) isArrayOfMapsWithKeyName(data []interface{}) bool {
-
+	if len(data) < 1 {
+		return false
+	}
 	for _, element := range data {
+		// If any element is _not_ a map, then this array doesn't conform
+		// TODO: This only handles map[string]interface{}, not map[string]string
 		elementAsMap, ok := element.(map[string]interface{})
 		if !ok {
 			return false
 		}
-		foundInMap := false
-		for k, v := range elementAsMap {
-
+		// If this map doesn't contain an appropriate keyvalue, this array doesn't conform
+		if val := fl.extractKeyNameFromMap(elementAsMap, false); val == "" {
+			return false
 		}
 	}
 	return true
 }
-*/
 
-// extractKeyNameFromMap will iterate over a map. If it has an element
-func (fl *Flattener) extractKeyNameFromMap(data map[string]interface{}) string {
-	for k, v := range data {
-		if k != fl.arrayKeyName {
-			continue
-		}
-		if vString, err := stringify(v); err == nil {
+// extractKeyNameFromMap will return the value from a map, if it has
+// an appropriately named key, whose value can be stringified
+func (fl *Flattener) extractKeyNameFromMap(data map[string]interface{}, deleteKey bool) string {
+	if val, ok := data[fl.arrayKeyName]; ok {
+		if vString, err := stringify(val); err == nil {
+			if deleteKey {
+				delete(data, fl.arrayKeyName)
+			}
 			return vString
 		}
 	}

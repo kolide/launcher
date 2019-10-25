@@ -88,8 +88,108 @@ func TestExtractKeyNameFromMap(t *testing.T) {
 
 	for _, tt := range tests {
 		fl := &Flattener{arrayKeyName: tt.keyName}
-		actual := fl.extractKeyNameFromMap(record)
+		actual := fl.extractKeyNameFromMap(record, false)
 		require.Equal(t, tt.out, actual, `keyName "%s"`, tt.keyName)
+	}
+}
+
+func TestIsArrayOfMapsWithKeyName(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		in      []interface{}
+		keyName string
+		out     bool
+	}{
+		{
+			in:  nil,
+			out: false,
+		},
+		{
+			in:  []interface{}{},
+			out: false,
+		},
+		{
+			in:  []interface{}{"a", "b", "c"},
+			out: false,
+		},
+		{
+			in: []interface{}{
+				map[string]interface{}{"id": 1, "uuid": "abc123", "name": "Alice"},
+				map[string]interface{}{"id": 2, "uuid": "def456", "name": "Bob"},
+				map[string]interface{}{"id": "3", "uuid": "ghi789", "name": "Charlie"},
+			},
+			out: false,
+		},
+		{
+			in: []interface{}{
+				map[string]interface{}{"id": 4, "uuid": "abc123", "name": "Alice"},
+				map[string]interface{}{"id": 5, "uuid": "def456", "name": "Bob"},
+				map[string]interface{}{"id": "6", "uuid": "ghi789", "name": "Charlie"},
+			},
+			keyName: "id",
+			out:     true,
+		},
+		{
+			in: []interface{}{
+				map[string]interface{}{"id": 7, "uuid": "abc123", "name": "Alice"},
+				map[string]interface{}{"id": 8, "uuid": "def456", "name": "Bob"},
+				map[string]interface{}{"id": "9", "uuid": "ghi789", "name": "Charlie"},
+			},
+			keyName: "uuid",
+			out:     true,
+		},
+		{
+			in: []interface{}{
+				map[string]interface{}{"id": 7, "uuid": "abc123", "name": "Alice"},
+				map[string]interface{}{"uuid": "def456", "name": "Bob"},
+			},
+			keyName: "id",
+			out:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		fl := &Flattener{arrayKeyName: tt.keyName}
+		actual := fl.isArrayOfMapsWithKeyName(tt.in)
+		require.Equal(t, tt.out, actual, tt.in)
+	}
+
+}
+
+func TestFlatten_ArrayMaps(t *testing.T) {
+	t.Parallel()
+
+	var tests = []flattenTestCase{
+		{
+			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
+			out: []Row{
+				Row{Path: []string{"data", "0", "id"}, Value: "a"},
+				Row{Path: []string{"data", "0", "v"}, Value: "1"},
+
+				Row{Path: []string{"data", "1", "id"}, Value: "b"},
+				Row{Path: []string{"data", "1", "v"}, Value: "2"},
+
+				Row{Path: []string{"data", "2", "id"}, Value: "c"},
+				Row{Path: []string{"data", "2", "v"}, Value: "3"},
+			},
+			comment: "nested array as array",
+		},
+		{
+			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
+			out: []Row{
+				Row{Path: []string{"data", "a", "v"}, Value: "1"},
+				Row{Path: []string{"data", "b", "v"}, Value: "2"},
+				Row{Path: []string{"data", "c", "v"}, Value: "3"},
+			},
+			options: []FlattenOpts{ArrayKeyName("id")},
+			comment: "nested array as map",
+		},
+	}
+
+	for _, tt := range tests {
+
+		testFlattenCase(t, tt)
 	}
 
 }
@@ -107,7 +207,9 @@ func TestFlatten(t *testing.T) {
 			out: []Row{
 				Row{Path: []string{"0"}, Value: "a"},
 			},
+			comment: "skip null",
 		},
+
 		{
 			in: `["a", "b", null]`,
 			out: []Row{
@@ -116,7 +218,9 @@ func TestFlatten(t *testing.T) {
 				Row{Path: []string{"2"}, Value: ""},
 			},
 			options: []FlattenOpts{IncludeNulls()},
+			comment: "includes null",
 		},
+
 		{
 			in: `["1"]`,
 			out: []Row{
@@ -124,7 +228,7 @@ func TestFlatten(t *testing.T) {
 			},
 		},
 		{
-			in: `["a", true, false, 1, 2, 3.3]`,
+			in: `["a", true, false, "1", 2, 3.3]`,
 			out: []Row{
 				Row{Path: []string{"0"}, Value: "a"},
 				Row{Path: []string{"1"}, Value: "true"},
@@ -133,6 +237,7 @@ func TestFlatten(t *testing.T) {
 				Row{Path: []string{"4"}, Value: "2"},
 				Row{Path: []string{"5"}, Value: "3.3"},
 			},
+			comment: "mixed types",
 		},
 		{
 			in: `{"a": 1, "b": "2.2", "c": [1,2,3]}`,
@@ -143,33 +248,8 @@ func TestFlatten(t *testing.T) {
 				Row{Path: []string{"c", "1"}, Value: "2"},
 				Row{Path: []string{"c", "2"}, Value: "3"},
 			},
+			comment: "nested types",
 		},
-		{
-			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
-			out: []Row{
-				Row{Path: []string{"data", "0", "id"}, Value: "a"},
-				Row{Path: []string{"data", "0", "v"}, Value: "1"},
-
-				Row{Path: []string{"data", "1", "id"}, Value: "b"},
-				Row{Path: []string{"data", "1", "v"}, Value: "2"},
-
-				Row{Path: []string{"data", "2", "id"}, Value: "c"},
-				Row{Path: []string{"data", "2", "v"}, Value: "3"},
-			},
-			comment: "nested array as array",
-		},
-		/*
-			{
-				in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
-				out: []Row{
-					Row{Path: []string{"data", "a", "v"}, Value: "1"},
-					Row{Path: []string{"data", "b", "v"}, Value: "2"},
-					Row{Path: []string{"data", "c", "v"}, Value: "3"},
-				},
-				options: []FlattenOpts{ArrayKeyName("id")},
-				comment: "nested array as map",
-			},
-		*/
 	}
 
 	for _, tt := range tests {
