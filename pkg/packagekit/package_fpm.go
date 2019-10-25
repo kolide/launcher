@@ -9,7 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -59,6 +63,7 @@ func WithReplaces(r []string) FpmOpt {
 func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ...FpmOpt) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageRPM")
 	defer span.End()
+	logger := log.With(ctxlog.FromContext(ctx), "caller", "packagekit.PackageFPM")
 
 	f := fpmOptions{}
 	for _, opt := range fpmOpts {
@@ -118,7 +123,19 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
+
+	level.Debug(logger).Log(
+		"msg", "Running fpm",
+		"cmd", strings.Join(cmd.Args, " "),
+	)
+
 	if err := cmd.Run(); err != nil {
+		level.Error(logger).Log(
+			"msg", "Error running fpm",
+			"err", err,
+			"cmd", strings.Join(cmd.Args, " "),
+			"stderr", stderr,
+		)
 		return errors.Wrapf(err, "creating fpm package: %s", stderr)
 	}
 
