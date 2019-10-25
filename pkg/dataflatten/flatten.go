@@ -3,15 +3,9 @@ package dataflatten
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 )
-
-type Row struct {
-	Path  []string
-	Value string
-}
 
 const defaultPathSeperator = "/"
 
@@ -46,6 +40,7 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 		opt(fl)
 	}
 
+	fmt.Printf("Starting to flatten using %s\n", fl.arrayKeyName)
 	if err := fl.descend([]string{}, data); err != nil {
 		return nil, err
 	}
@@ -56,7 +51,6 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 func (fl *Flattener) descend(path []string, data interface{}) error {
 	switch v := data.(type) {
 	case []interface{}:
-
 		isArrayOfMaps := fl.isArrayOfMapsWithKeyName(v)
 
 		for i, e := range v {
@@ -64,7 +58,6 @@ func (fl *Flattener) descend(path []string, data interface{}) error {
 			if elementAsMap, ok := e.(map[string]interface{}); isArrayOfMaps && ok {
 				key = fl.extractKeyNameFromMap(elementAsMap, true)
 			}
-
 			if err := fl.descend(append(path, key), e); err != nil {
 				return errors.Wrap(err, "flattening array")
 			}
@@ -92,6 +85,13 @@ func (fl *Flattener) descend(path []string, data interface{}) error {
 
 }
 
+// isArrayOfMapsWithKeyName determines if an array is set of maps
+// suitable for coercing into a nested map. It does this by iterating
+// over the array, and checking that each element is a map, and has
+// the relevant key. If either is those is false, then this array is
+// not coercable.
+//
+// We may discover we need that we need a way to handle sparse data.
 func (fl *Flattener) isArrayOfMapsWithKeyName(data []interface{}) bool {
 	if len(data) < 1 {
 		return false
@@ -125,13 +125,17 @@ func (fl *Flattener) extractKeyNameFromMap(data map[string]interface{}, deleteKe
 	return ""
 }
 
+// stringify takes an arbitary piece of data, and attempst to coerce
+// it into a string.
 func stringify(data interface{}) (string, error) {
 	switch v := data.(type) {
 	case nil:
 		return "", nil
 	case string:
 		return v, nil
-	case float64:
+	case []byte:
+		return string(v), nil
+	case float64, uint64:
 		// using fmt is a shortcut around a bunch of ugly
 		// numeric parsing. json returns float64 for
 		// ~everything.
@@ -141,21 +145,6 @@ func stringify(data interface{}) (string, error) {
 	case bool:
 		return strconv.FormatBool(v), nil
 	default:
-		return "", errors.Errorf("unknown type on %v", v)
+		return "", errors.Errorf("unknown type on %v", data)
 	}
-}
-
-func (r Row) StringPath() string {
-	return strings.Join(r.Path, defaultPathSeperator)
-}
-
-func (r Row) ParentKey() (string, string) {
-	switch len(r.Path) {
-	case 0:
-		return "", ""
-	case 1:
-		return "", r.Path[0]
-	}
-
-	return strings.Join(r.Path[:len(r.Path)-1], defaultPathSeperator), r.Path[len(r.Path)-1]
 }
