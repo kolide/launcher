@@ -38,7 +38,6 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 		opt(fl)
 	}
 
-	fmt.Printf("Starting to flatten using %s\n", fl.arrayKeyName)
 	if err := fl.descend([]string{}, data); err != nil {
 		return nil, err
 	}
