@@ -87,8 +87,7 @@ func TestExtractKeyNameFromMap(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fl := &Flattener{arrayKeyName: tt.keyName}
-		actual := fl.extractKeyNameFromMap(record, false)
+		actual := extractKeyNameFromMap(record, tt.keyName, false)
 		require.Equal(t, tt.out, actual, `keyName "%s"`, tt.keyName)
 	}
 }

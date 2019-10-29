@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/dataflatten"
@@ -25,7 +26,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("parent"),
 		table.TextColumn("key"),
 		table.TextColumn("value"),
-		table.TextColumn("arraykeyname"),
+		table.TextColumn("query"),
 	}
 
 	t := &Table{
@@ -59,32 +60,48 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, errors.Wrap(err, "failed to read file")
 	}
 
-	opts := []dataflatten.FlattenOpts{}
+	if q, ok := queryContext.Constraints["query"]; ok {
+		for _, constraint := range q.Constraints {
+			plistQuery := constraint.Expression
 
-	arrayKeyName := ""
+			data, err := dataflatten.Plist(fileBytes, dataflatten.WithQuery(strings.Split(plistQuery, "/")))
+			if err != nil {
+				return results, errors.Wrap(err, "parsing data")
+			}
 
-	if q, ok := queryContext.Constraints["arraykeyname"]; ok && len(q.Constraints) > 0 {
-		arrayKeyName = q.Constraints[0].Expression
-		opts = append(opts, dataflatten.ArrayKeyName(q.Constraints[0].Expression))
-	}
+			for _, row := range data {
+				p, k := row.ParentKey("/")
 
-	data, err := dataflatten.Plist(fileBytes, opts...)
-	if err != nil {
-		return results, errors.Wrap(err, "parsing data")
-	}
-
-	for _, row := range data {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"path":         filePath,
-			"fullkey":      row.StringPath("/"),
-			"parent":       p,
-			"key":          k,
-			"value":        row.Value,
-			"arraykeyname": arrayKeyName,
+				res := map[string]string{
+					"path":    filePath,
+					"fullkey": row.StringPath("/"),
+					"parent":  p,
+					"key":     k,
+					"value":   row.Value,
+					"query":   plistQuery,
+				}
+				results = append(results, res)
+			}
 		}
-		results = append(results, res)
+	} else {
+		// no constraints
+		data, err := dataflatten.Plist(fileBytes)
+		if err != nil {
+			return results, errors.Wrap(err, "parsing data")
+		}
+		for _, row := range data {
+			p, k := row.ParentKey("/")
+
+			res := map[string]string{
+				"path":    filePath,
+				"fullkey": row.StringPath("/"),
+				"parent":  p,
+				"key":     k,
+				"value":   row.Value,
+			}
+			results = append(results, res)
+
+		}
 	}
 
 	return results, nil
