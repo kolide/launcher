@@ -535,7 +535,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		"identifier":    p.Identifier,
 		"installer_id":  "$INSTALL_PKG_SESSION_ID",
 		"download_path": "$PACKAGE_PATH",
-		"download_file": "$(basename \"$PACKAGE_PATH\")",
+		"download_file": "$PACKAGE_FILENAME",
 		"timestamp":     "$(date +%Y-%m-%dT%T%z)",
 		"version":       p.PackageVersion,
 		"user":          "$USER",

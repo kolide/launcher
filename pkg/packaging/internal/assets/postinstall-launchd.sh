@@ -5,6 +5,7 @@
 /bin/launchctl stop com.{{.Identifier}}.launcher
 
 if [ ! -z "{{.InfoFilename}}" ]; then
+    PACKAGE_FILENAME=$(basename "$PACKAGE_PATH")
     cat <<EOF > "{{.InfoFilename}}"
 {{.InfoJson}}
 EOF
