@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
@@ -14,7 +13,6 @@ import (
 
 type Flattener struct {
 	includeNils     bool
-	arrayKeyName    string
 	rows            []Row
 	logger          log.Logger
 	query           []string
@@ -27,12 +25,6 @@ type FlattenOpts func(*Flattener)
 func IncludeNulls() FlattenOpts {
 	return func(fl *Flattener) {
 		fl.includeNils = true
-	}
-}
-
-func ArrayKeyName(s string) FlattenOpts {
-	return func(fl *Flattener) {
-		fl.arrayKeyName = s
 	}
 }
 
@@ -83,10 +75,9 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 
 	switch v := data.(type) {
 	case []interface{}:
-		//level.Debug(logger).Log("msg", "checking a array", "path", strings.Join(path, "/"))
-
 		for i, e := range v {
 			pathKey := strconv.Itoa(i)
+			level.Debug(logger).Log("msg", "checking a array", "path", strings.Join(path, "/"), "indexStr", pathKey)
 
 			// If the queryTerm starts with
 			// queryKeyDenoter, then we want to rewrite
@@ -138,9 +129,12 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 		}
 	case map[string]interface{}:
-		// level.Debug(logger).Log("msg", "checking a map", "path", strings.Join(path, "/"))
+		level.Debug(logger).Log("msg", "checking a map", "path", strings.Join(path, "/"))
 
 		for k, e := range v {
+
+			// Check that the key name matches. If not, skip this enture
+			// branch of the map
 			if !(isQueryMatched || fl.queryMatchString(k, queryTerm)) {
 				continue
 			}
@@ -289,32 +283,6 @@ func (fl *Flattener) queryAtDepth(depth int) (string, bool) {
 	return q, q == fl.queryWildcard
 }
 
-// isArrayOfMapsWithKeyName determines if an array is set of maps
-// suitable for coercing into a nested map. It does this by iterating
-// over the array, and checking that each element is a map, and has
-// the relevant key. If either is those is false, then this array is
-// not coercable.
-//
-// We may discover we need that we need a way to handle sparse data.
-func (fl *Flattener) isArrayOfMapsWithKeyName(data []interface{}) bool {
-	if len(data) < 1 {
-		return false
-	}
-	for _, element := range data {
-		// If any element is _not_ a map, then this array doesn't conform
-		// TODO: This only handles map[string]interface{}, not map[string]string
-		elementAsMap, ok := element.(map[string]interface{})
-		if !ok {
-			return false
-		}
-		// If this map doesn't contain an appropriate keyvalue, this array doesn't conform
-		if val := extractKeyNameFromMap(elementAsMap, fl.arrayKeyName, false); val == "" {
-			return false
-		}
-	}
-	return true
-}
-
 // extractKeyNameFromMap will return the value from a map, if it has
 // an appropriately named key, whose value can be stringified
 // FIXME: This function should probably be remoed
@@ -351,7 +319,7 @@ func stringify(data interface{}) (string, error) {
 	case time.Time:
 		return strconv.FormatInt(v.Unix(), 10), nil
 	default:
-		spew.Dump(data)
+		//spew.Dump(data)
 		return "", errors.Errorf("unknown type on %v", data)
 	}
 }
