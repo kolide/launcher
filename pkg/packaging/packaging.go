@@ -3,6 +3,7 @@ package packaging
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,9 +15,12 @@ import (
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packagekit"
+	"github.com/kolide/launcher/pkg/packaging/internal"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
+
+//go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
 
 const (
 	// Enroll secret should be readable only by root
@@ -501,19 +505,17 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return nil
 	}
 
-	var postinstTemplate string
-	identifier := p.Identifier
+	var postinstTemplateName string
 
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
-		postinstTemplate = postinstallLauncherTemplate()
-		identifier = fmt.Sprintf("com.%s.launcher", p.Identifier)
+		postinstTemplateName = "internal/assets/postinstall-launchd.sh"
 	case p.target.Platform == Linux && p.target.Init == SystemD:
-		postinstTemplate = postinstallSystemdTemplate()
+		postinstTemplateName = "internal/assets/postinstall-systemd.sh"
 	case p.target.Platform == Linux && p.target.Init == Upstart:
-		postinstTemplate = postinstallUpstartTemplate()
+		postinstTemplateName = "internal/assets/postinstall-upstart.sh"
 	case p.target.Platform == Linux && p.target.Init == Init:
-		postinstTemplate = postinstallInitTemplate()
+		postinstTemplateName = "internal/assets/postinstall-init.sh"
 	default:
 		// If we don't match in the case statement, log that we're ignoring
 		// the setup, and move on. Don't throw an error.
@@ -521,15 +523,46 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return nil
 	}
 
-	var data = struct {
-		Identifier string
-		Path       string
-	}{
-		Identifier: identifier,
-		Path:       p.initFile,
+	postinstTemplate, err := internal.Asset(postinstTemplateName)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get template named %s", postinstTemplateName)
 	}
 
-	t, err := template.New("postinstall").Parse(postinstTemplate)
+	// installer info will be dumped into the filesystem
+	// somewhere. Note that some of these are OS variables (or exec
+	// calls) to be expanded at runtime
+	installerInfo := map[string]string{
+		"identifier":    p.Identifier,
+		"installer_id":  "$INSTALL_PKG_SESSION_ID",
+		"download_path": "$PACKAGE_PATH",
+		"download_file": "$PACKAGE_FILENAME",
+		"timestamp":     "$(date +%Y-%m-%dT%T%z)",
+		"version":       p.PackageVersion,
+		"user":          "$USER",
+	}
+
+	jsonBlob, err := json.MarshalIndent(installerInfo, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "marshaling installer info")
+	}
+
+	var data = struct {
+		Identifier   string
+		Path         string
+		InfoFilename string
+		InfoJson     string
+	}{
+		Identifier:   p.Identifier,
+		Path:         p.initFile,
+		InfoFilename: p.canonicalizePath(filepath.Join(p.confDir, "installer-info.json")),
+		InfoJson:     string(jsonBlob),
+	}
+
+	funcsMap := template.FuncMap{
+		"StringsTrimSuffix": strings.TrimSuffix,
+	}
+
+	t, err := template.New("postinstall").Funcs(funcsMap).Parse(string(postinstTemplate))
 	if err != nil {
 		return errors.Wrap(err, "not able to parse template")
 	}
@@ -549,44 +582,6 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func postinstallInitTemplate() string {
-	return `#!/bin/sh
-sudo service launcher.{{.Identifier}} restart`
-}
-
-func postinstallLauncherTemplate() string {
-	return `#!/bin/sh
-
-[[ $3 != "/" ]] && exit 0
-
-/bin/launchctl stop {{.Identifier}}
-
-sleep 5
-
-/bin/launchctl unload {{.Path}}
-/bin/launchctl load {{.Path}}`
-}
-
-// postinstallUpstartTemplate is a post install restart script.
-// upstart's stop and restart commands error out if the daemon isn't
-// running. So stop and start are separate, and `set -e` is after the
-// stop.
-func postinstallUpstartTemplate() string {
-	return `#!/bin/sh
-stop launcher-{{.Identifier}}
-set -e
-start launcher-{{.Identifier}}`
-}
-
-func postinstallSystemdTemplate() string {
-	return `#!/bin/sh
-set -e
-systemctl daemon-reload
-
-systemctl enable launcher.{{.Identifier}}
-systemctl restart launcher.{{.Identifier}}`
 }
 
 // prermSystemdTemplate returns a template suitable for stopping and
