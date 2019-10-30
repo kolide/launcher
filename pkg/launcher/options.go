@@ -60,6 +60,8 @@ type Options struct {
 
 	// Debug enables debug logging.
 	Debug bool
+	// OsqueryVerbose puts osquery into verbose mode
+	OsqueryVerbose bool
 	// DisableControlTLS disables TLS transport with the control server.
 	DisableControlTLS bool
 	// InsecureTLS disables TLS certificate verification.

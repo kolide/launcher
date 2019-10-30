@@ -140,7 +140,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, logger, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, client, opts)
 	if err != nil {
 		return errors.Wrap(err, "create extension with runtime")
 	}

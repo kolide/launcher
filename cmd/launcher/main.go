@@ -65,12 +65,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// reset the level on the logger
-	if opts.Debug {
-		logger = level.NewFilter(logger, level.AllowDebug())
-	} else {
-		logger = level.NewFilter(logger, level.AllowInfo())
-	}
+	// recreate the logger with  the appropriate level.
+	logger = logutil.NewServerLogger(opts.Debug)
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {

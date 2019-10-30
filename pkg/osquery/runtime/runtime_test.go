@@ -99,7 +99,14 @@ func TestCreateOsqueryCommand(t *testing.T) {
 
 	osquerydPath := testOsqueryBinaryDirectory
 
-	cmd, err := createOsquerydCommand(osquerydPath, paths, "config_plugin", "logger_plugin", "distributed_plugin", os.Stdout, os.Stderr)
+	osqOpts := &osqueryOptions{
+		configPluginFlag:      "config_plugin",
+		loggerPluginFlag:      "logger_plugin",
+		distributedPluginFlag: "distributed_plugin",
+		stdout:                os.Stdout,
+		stderr:                os.Stderr,
+	}
+	cmd, err := osqOpts.createOsquerydCommand(osquerydPath, paths)
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
