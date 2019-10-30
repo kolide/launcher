@@ -17,11 +17,10 @@ ARG FAKE
 WORKDIR /go/src/github.com/kolide/launcher
 
 # copy source into the docker builder. Perhaps this would be cleaner
-# via a volume mount. But, COPY allows the docker container to
-# have zero impact on the host's build directory. We want _all_ files
-# but `build`. Unfortunately there's no exclude. So, copy and rm.
+# via a volume mount. But, COPY allows the docker container to have
+# zero impact on the host's build directory. This uses .dockerignore
+# to exclude the build directory
 COPY . ./
-RUN rm -rf build
 
 # Build!
 RUN make deps

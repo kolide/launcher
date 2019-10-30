@@ -139,12 +139,12 @@ github.com/jmoiron/sqlx v0.0.0-20180406164412-2aeb6a910c2b/go.mod h1:IiEW3SEiiEr
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 h1:PJPDf8OUfOK1bb/NeTKd4f1QXZItOX389VN3B6qC8ro=
 github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
-github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7 h1:LkPVVNfGk7yrRiKwE5dchY9eqrER+99SddkLntU2YX0=
-github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7/go.mod h1:Ah+zOuAz6TBHVeG1UiExiExlo8jeuU9yTchmhDVrAdY=
+github.com/knightsc/system_policy v1.1.1-0.20191030190822-139971392acb h1:Xu+ciFy0JPiPCm2uk3TNUjE7rgBLA3eMNzrsR8J6ZSQ=
+github.com/knightsc/system_policy v1.1.1-0.20191030190822-139971392acb/go.mod h1:oYXhDWn3yazA1es4R9mvw//dKRDoZwLEmWOMkkG8IQE=
 github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23 h1:7rykD5+Wf11u+03TOsunGbg7f4gZEBgS0gwIRR+Han4=
 github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
-github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d h1:2/+lLTfZan4IGrD8TGC1ZVkehWLtrRuah47FASAnifE=
-github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d/go.mod h1:umPEbeG8R8RDJpQ0EMyRdj+6pfnJK4FTzjafwgovDUk=
+github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d h1:alVW+rIOMejarlhjLl4AYaQaGAyfvIUDg9NyyKRhSek=
+github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d/go.mod h1:QVQKz6+eKB0syu5u8BS1E4S/nTMuy44d9WbRFQ4nLnQ=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80/go.mod h1:x3dEGYbZovhD1t8OwEgdyu/4ZCvrn9QvkbPtOZnul8k=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
