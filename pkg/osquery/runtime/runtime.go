@@ -125,10 +125,9 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	}, nil
 }
 
-// createOsquerydCommand accepts a structure of relevant file paths relating to
-// an osquery instance and returns an *exec.Cmd which will launch a properly
-// configured osqueryd process.
-func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, configPlugin, loggerPlugin, distributedPlugin string, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
+// createOsquerydCommand uses osqueryOptions to returns an *exec.Cmd
+// which will launch a properly configured osqueryd process.
+func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
 		osquerydBinary,
@@ -137,9 +136,9 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		"--extensions_timeout=10",
-		fmt.Sprintf("--config_plugin=%s", configPlugin),
-		fmt.Sprintf("--logger_plugin=%s", loggerPlugin),
-		fmt.Sprintf("--distributed_plugin=%s", distributedPlugin),
+		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
+		fmt.Sprintf("--logger_plugin=%s", opts.loggerPluginFlag),
+		fmt.Sprintf("--distributed_plugin=%s", opts.distributedPluginFlag),
 		"--disable_distributed=false",
 		"--distributed_interval=5",
 		"--pack_delimiter=:",
@@ -148,6 +147,10 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 		"--disable_watchdog",
 		"--utc",
 	)
+
+	if opts.verbose {
+		cmd.Args = append(cmd.Args, "--verbose")
+	}
 
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
@@ -158,11 +161,11 @@ func createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths, confi
 	)
 
 	cmd.Args = append(cmd.Args, platformArgs()...)
-	if stdout != nil {
-		cmd.Stdout = stdout
+	if opts.stdout != nil {
+		cmd.Stdout = opts.stdout
 	}
-	if stderr != nil {
-		cmd.Stderr = stderr
+	if opts.stderr != nil {
+		cmd.Stderr = opts.stderr
 	}
 
 	return cmd, nil
@@ -281,6 +284,13 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 func WithLogger(logger log.Logger) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.logger = logger
+	}
+}
+
+// WithOsqueryVerbose sets whether or not osquery is in verbose mode
+func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.verbose = v
 	}
 }
 
@@ -524,7 +534,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = createOsquerydCommand(currentOsquerydBinaryPath, paths, o.opts.configPluginFlag, o.opts.loggerPluginFlag, o.opts.distributedPluginFlag, o.opts.stdout, o.opts.stderr)
+	o.cmd, err = o.opts.createOsquerydCommand(currentOsquerydBinaryPath, paths)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create osqueryd command")
 	}
