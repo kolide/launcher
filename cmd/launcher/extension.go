@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -23,12 +24,14 @@ import (
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, db *bolt.DB, logger log.Logger, launcherClient service.KolideService, opts *launcher.Options) (
+func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
 	err error,
 ) {
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
 	if opts.EnrollSecret != "" {
