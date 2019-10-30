@@ -1,11 +1,5 @@
 module github.com/kolide/launcher
 
-// Force references to thrift to use the new place.
-// https://github.com/knightsc/system_policy/pull/6 is the remaining one
-replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
-
-replace github.com/kolide/osquery-go => github.com/kolide/osquery-go v0.0.0-20190113061206-be0a8de4cf1d
-
 require (
 	cloud.google.com/go v0.43.0
 	github.com/Masterminds/semver v1.4.2
@@ -46,7 +40,7 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
-	github.com/knightsc/system_policy v1.1.1-0.20190125011806-04a47ae55cf7
+	github.com/knightsc/system_policy v1.1.1-0.20191030190822-139971392acb
 	github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23
 	github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
