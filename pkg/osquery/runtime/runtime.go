@@ -52,6 +52,7 @@ type osqueryOptions struct {
 	stdout                io.Writer
 	stderr                io.Writer
 	retries               uint
+	verbose               bool
 }
 
 // OsqueryInstance is the type which represents a currently running instance

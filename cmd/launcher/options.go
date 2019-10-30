@@ -57,6 +57,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 		// Development options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
@@ -143,6 +144,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnableInitialRunner: *flInitialRunner,
 		Autoupdate:          *flAutoupdate,
 		Debug:               *flDebug,
+		OsqueryVerbose:      *flOsqueryVerbose,
 		DisableControlTLS:   *flDisableControlTLS,
 		InsecureTLS:         *flInsecureTLS,
 		InsecureTransport:   *flInsecureTransport,
@@ -228,6 +230,7 @@ func developerUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "Development Options:\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("debug")
+	printOpt("osquery_verbose")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("insecure")
 	printOpt("insecure_transport")

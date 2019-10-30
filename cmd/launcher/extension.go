@@ -76,6 +76,7 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 		runtime.WithStdout(osqueryLogger),
 		runtime.WithStderr(osqueryLogger),
 		runtime.WithLogger(logger),
+		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
 	)
 
 	restartFunc := func() error {
