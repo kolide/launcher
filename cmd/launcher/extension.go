@@ -59,7 +59,7 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 	}
 
 	// create the logging adapter for osquery
-	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: level.Debug(log.With(logger, "component", "osquery"))}
+	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: log.With(logger, "component", "osquery")}
 
 	runner := runtime.LaunchUnstartedInstance(
 		runtime.WithOsquerydBinary(opts.OsquerydPath),
