@@ -71,13 +71,11 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 		"path", strings.Join(path, "/"),
 	)
 
-	//level.Debug(logger).Log("data", spew.Sdump(data))
-
 	switch v := data.(type) {
 	case []interface{}:
 		for i, e := range v {
 			pathKey := strconv.Itoa(i)
-			level.Debug(logger).Log("msg", "checking a array", "indexStr", pathKey)
+			level.Debug(logger).Log("msg", "checking an array", "indexStr", pathKey)
 
 			// If the queryTerm starts with
 			// queryKeyDenoter, then we want to rewrite
@@ -96,14 +94,14 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				innerlogger := log.With(logger, "arraykeyname", keyName)
 				level.Debug(logger).Log("msg", "attempting to coerce array into map")
 
-				elementAsMap, ok := e.(map[string]interface{})
+				e, ok := e.(map[string]interface{})
 				if !ok {
 					level.Debug(innerlogger).Log("msg", "can't coerce into map")
 					continue
 				}
 
 				// Is keyName in this array?
-				val, ok := elementAsMap[keyName]
+				val, ok := e[keyName]
 				if !ok {
 					level.Debug(innerlogger).Log("msg", "keyName not in map")
 					continue
@@ -115,33 +113,24 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 					continue
 				}
 
-				if !(isQueryMatched || fl.queryMatchArrayElement(elementAsMap, i, queryTerm)) {
-					level.Debug(logger).Log("msg", "query not matched")
-					continue
-				}
-
-				if err := fl.descend(append(path, pathKey), elementAsMap, depth+1); err != nil {
-					level.Debug(innerlogger).Log("msg", "got error decending into coerced map", "err", err)
-					continue // TODO is this a return of a FIXME?
-					//return errors.Wrap(err, "decending into coerced array")
-				}
-
-			} else {
-				if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
-					level.Debug(logger).Log("msg", "query not matched")
-					continue
-				}
-
-				if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
-					return errors.Wrap(err, "flattening array")
-				}
+				// Looks good to descend. we're overwritten both e and pathKey. Exit this conditional.
 			}
+
+			if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
+				level.Debug(logger).Log("msg", "query not matched")
+				continue
+			}
+
+			if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
+				return errors.Wrap(err, "flattening array")
+			}
+
 		}
 	case map[string]interface{}:
 		level.Debug(logger).Log("msg", "checking a map", "path", strings.Join(path, "/"))
 		for k, e := range v {
 
-			// Check that the key name matches. If not, skip this enture
+			// Check that the key name matches. If not, skip this entire
 			// branch of the map
 			if !(isQueryMatched || fl.queryMatchString(k, queryTerm)) {
 				continue
@@ -152,7 +141,8 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 		}
 	case nil:
-		if !(isQueryMatched || fl.queryMatchNil(queryTerm)) {
+		// Because we want to filter nils out, we do _not_ examine isQueryMatched here
+		if !(fl.queryMatchNil(queryTerm)) {
 			level.Debug(logger).Log("msg", "query not matched")
 			return nil
 		}
@@ -189,6 +179,13 @@ func (fl *Flattener) queryMatchNil(queryTerm string) bool {
 // We use `=>` as something that is reasonable intutive, and no very
 // likely to occur on it's own. Unfortunately, `==` shows up in base64
 func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, queryTerm string) bool {
+	logger := log.With(fl.logger,
+		"caller", "queryMatchArrayElement",
+		"rows-so-far", len(fl.rows),
+		"query", queryTerm,
+		"arrIndex", arrIndex,
+	)
+
 	// strip off the key re-write denotation before trying to match
 	queryTerm = strings.TrimPrefix(queryTerm, fl.queryKeyDenoter)
 
@@ -198,8 +195,11 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 
 	// If the queryTerm is an int, then we expect to match the index
 	if queryIndex, err := strconv.Atoi(queryTerm); err == nil {
+		level.Debug(logger).Log("msg", "using numeric index comparison")
 		return queryIndex == arrIndex
 	}
+
+	level.Debug(logger).Log("msg", "checking data type")
 
 	switch dataCasted := data.(type) {
 	case []interface{}:
