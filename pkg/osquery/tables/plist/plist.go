@@ -2,6 +2,7 @@ package plist
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -46,12 +47,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		filePath := pathConstraint.Expression
 
-		if q, ok := queryContext.Constraints["query"]; ok {
+		if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
+
 			for _, constraint := range q.Constraints {
 				plistQuery := constraint.Expression
 
-				data, err := dataflatten.PlistFile(filePath, dataflatten.WithQuery(strings.Split(plistQuery, "/")))
+				data, err := dataflatten.PlistFile(filePath,
+					dataflatten.WithLogger(t.logger),
+					dataflatten.WithQuery(strings.Split(plistQuery, "/")))
 				if err != nil {
+					fmt.Println("parse failjure")
 					return results, errors.Wrap(err, "parsing data")
 				}
 
@@ -70,8 +75,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				}
 			}
 		} else {
-			// no constraints
-			data, err := dataflatten.PlistFile(filePath)
+			data, err := dataflatten.PlistFile(filePath,
+				dataflatten.WithLogger(t.logger))
 			if err != nil {
 				return results, errors.Wrap(err, "parsing data")
 			}
