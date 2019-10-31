@@ -2,8 +2,6 @@ package plist
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -40,31 +38,40 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	q, ok := queryContext.Constraints["path"]
-	if !ok || len(q.Constraints) == 0 {
+	pathQ, ok := queryContext.Constraints["path"]
+	if !ok || len(pathQ.Constraints) == 0 {
 		return results, errors.New("The kolide_plist table requires that you specify a single constraint for path")
 	}
-	if len(q.Constraints) > 1 {
-		return results, errors.New("The kolide_plist table requires that you specify a single constraint for path")
-	}
+	for _, pathConstraint := range pathQ.Constraints {
 
-	filePath := q.Constraints[0].Expression
+		filePath := pathConstraint.Expression
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		return results, errors.Wrap(err, "failed to open file")
-	}
+		if q, ok := queryContext.Constraints["query"]; ok {
+			for _, constraint := range q.Constraints {
+				plistQuery := constraint.Expression
 
-	fileBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return results, errors.Wrap(err, "failed to read file")
-	}
+				data, err := dataflatten.PlistFile(filePath, dataflatten.WithQuery(strings.Split(plistQuery, "/")))
+				if err != nil {
+					return results, errors.Wrap(err, "parsing data")
+				}
 
-	if q, ok := queryContext.Constraints["query"]; ok {
-		for _, constraint := range q.Constraints {
-			plistQuery := constraint.Expression
+				for _, row := range data {
+					p, k := row.ParentKey("/")
 
-			data, err := dataflatten.Plist(fileBytes, dataflatten.WithQuery(strings.Split(plistQuery, "/")))
+					res := map[string]string{
+						"path":    filePath,
+						"fullkey": row.StringPath("/"),
+						"parent":  p,
+						"key":     k,
+						"value":   row.Value,
+						"query":   plistQuery,
+					}
+					results = append(results, res)
+				}
+			}
+		} else {
+			// no constraints
+			data, err := dataflatten.PlistFile(filePath)
 			if err != nil {
 				return results, errors.Wrap(err, "parsing data")
 			}
@@ -78,29 +85,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					"parent":  p,
 					"key":     k,
 					"value":   row.Value,
-					"query":   plistQuery,
 				}
 				results = append(results, res)
 			}
-		}
-	} else {
-		// no constraints
-		data, err := dataflatten.Plist(fileBytes)
-		if err != nil {
-			return results, errors.Wrap(err, "parsing data")
-		}
-		for _, row := range data {
-			p, k := row.ParentKey("/")
-
-			res := map[string]string{
-				"path":    filePath,
-				"fullkey": row.StringPath("/"),
-				"parent":  p,
-				"key":     k,
-				"value":   row.Value,
-			}
-			results = append(results, res)
-
 		}
 	}
 
