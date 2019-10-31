@@ -111,7 +111,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 					}
 
 					if !(isQueryMatched || fl.queryMatchString(pathKey, keyQueryTerm)) {
-						fmt.Println("seph val not matched %s", keyQueryTerm)
+						fmt.Printf("seph val not matched %s\n", keyQueryTerm)
 						level.Debug(logger).Log("msg", "query not matched", "array keyname", keyName)
 						continue
 					}
