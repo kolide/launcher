@@ -61,9 +61,30 @@ windows-xp-%: .pre-build deps
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
-codesign-darwin: codesign-darwin-launcher codesign-darwin-osquery-extension.ext
-codesign-darwin-%: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/$*
+codesign-darwin: xp
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/*
+
+notarize-darwin: codesign-darwin
+	rm -f build/notarization-upload.zip
+	zip -r build/notarization-upload.zip ./build/darwin/*
+	xcrun altool \
+	  --username "${NOTARIZE_APPLE_ID}" \
+	  --password @env:NOTARIZE_APP_PASSWD \
+	  --asc-provider "${NOTARIZE_ACCOUNT_ID}" \
+	  --notarize-app --file build/notarization-upload.zip \
+	  --primary-bundle-id com.kolide.launcher
+
+# notarize-check is a helper for checking uuids
+notarize-check:
+	@echo "Usage: make notarize-check-<uuid>"
+notarize-check-%:
+	xcrun altool \
+	  --username "${NOTARIZE_APPLE_ID}" \
+	  --password @env:NOTARIZE_APP_PASSWD \
+	  --asc-provider "${NOTARIZE_ACCOUNT_ID}" \
+	  --notarization-info "$*"
+
+
 
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
@@ -73,7 +94,7 @@ codesign-windows-%: xp
 	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
 	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
 
-codesign: codesign-darwin codesign-windows
+codesign: notarize-darwin codesign-windows
 
 package-builder: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp
@@ -177,13 +198,3 @@ docker-%: build-docker
 
 dockerpush-%: docker-%
 	docker push gcr.io/kolide-public-containers/launcher-$*
-
-
-
-# Porter is a kolide tool to update notary, part of the update framework
-porter-%: codesign
-	@if [ -z "${NOTARY_DELEGATION_PASSPHRASE}" ]; then echo "Missing NOTARY_DELEGATION_PASSPHRASE"; exit 1; fi
-	for p in darwin linux windows; do \
-	  porter mirror -debug -channel $* -platform $$p -launcher-all; \
-	  porter mirror -debug -channel $* -platform $$p -extension-tarball -extension-upload; \
-	done
