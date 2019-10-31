@@ -1,7 +1,6 @@
 package dataflatten
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +68,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 		"depth", depth,
 		"rows-so-far", len(fl.rows),
 		"query", queryTerm,
+		"path", strings.Join(path, "/"),
 	)
 
 	//level.Debug(logger).Log("data", spew.Sdump(data))
@@ -77,7 +77,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	case []interface{}:
 		for i, e := range v {
 			pathKey := strconv.Itoa(i)
-			level.Debug(logger).Log("msg", "checking a array", "path", strings.Join(path, "/"), "indexStr", pathKey)
+			level.Debug(logger).Log("msg", "checking a array", "indexStr", pathKey)
 
 			// If the queryTerm starts with
 			// queryKeyDenoter, then we want to rewrite
@@ -87,50 +87,58 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			// nothing. Etc.
 			//
 			// keyName == "name"
-			// keyValue == "alice" (need to test this againsty queryTerm
+			// keyValue == "alex" (need to test this againsty queryTerm
 			// pathKey == What we descend with
 			if strings.HasPrefix(queryTerm, fl.queryKeyDenoter) {
 				keyQuery := strings.SplitN(strings.TrimPrefix(queryTerm, fl.queryKeyDenoter), "=>", 2)
 				keyName := keyQuery[0]
-				keyQueryTerm := fl.queryWildcard
 
-				level.Info(logger).Log("msg", "attempting to coerce array into map", "array keyname", keyName)
-				fmt.Printf("seph coercing with %s\n", keyName)
+				innerlogger := log.With(logger, "arraykeyname", keyName)
+				level.Debug(logger).Log("msg", "attempting to coerce array into map")
 
-				if elementAsMap, ok := e.(map[string]interface{}); ok {
-					val, ok := elementAsMap[keyName]
-					if !ok {
-						fmt.Println("seph key not found")
-						continue
-					}
-
-					pathKey, ok = val.(string)
-					if !ok {
-						fmt.Println("seph val not string")
-						continue
-					}
-
-					if !(isQueryMatched || fl.queryMatchString(pathKey, keyQueryTerm)) {
-						fmt.Printf("seph val not matched %s\n", keyQueryTerm)
-						level.Debug(logger).Log("msg", "query not matched", "array keyname", keyName)
-						continue
-					}
-
-				}
-			} else {
-				if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
-					level.Debug(logger).Log("msg", "query not matched", "array index", i)
+				elementAsMap, ok := e.(map[string]interface{})
+				if !ok {
+					level.Debug(innerlogger).Log("msg", "can't coerce into map")
 					continue
 				}
-			}
 
-			if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
-				return errors.Wrap(err, "flattening array")
+				// Is keyName in this array?
+				val, ok := elementAsMap[keyName]
+				if !ok {
+					level.Debug(innerlogger).Log("msg", "keyName not in map")
+					continue
+				}
+
+				pathKey, ok = val.(string)
+				if !ok {
+					level.Debug(innerlogger).Log("msg", "can't coerce pathKey val into string")
+					continue
+				}
+
+				if !(isQueryMatched || fl.queryMatchArrayElement(elementAsMap, i, queryTerm)) {
+					level.Debug(logger).Log("msg", "query not matched")
+					continue
+				}
+
+				if err := fl.descend(append(path, pathKey), elementAsMap, depth+1); err != nil {
+					level.Debug(innerlogger).Log("msg", "got error decending into coerced map", "err", err)
+					continue // TODO is this a return of a FIXME?
+					//return errors.Wrap(err, "decending into coerced array")
+				}
+
+			} else {
+				if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
+					level.Debug(logger).Log("msg", "query not matched")
+					continue
+				}
+
+				if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
+					return errors.Wrap(err, "flattening array")
+				}
 			}
 		}
 	case map[string]interface{}:
 		level.Debug(logger).Log("msg", "checking a map", "path", strings.Join(path, "/"))
-
 		for k, e := range v {
 
 			// Check that the key name matches. If not, skip this enture
@@ -199,6 +207,14 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 		return false
 	case map[string]interface{}:
 		kvQuery := strings.SplitN(queryTerm, "=>", 2)
+
+		// If this is one long, then we're testing for whether or not there's a key with this name,
+		if len(kvQuery) == 1 {
+			_, ok := dataCasted[kvQuery[0]]
+			return ok
+		}
+
+		// Else see if the value matches
 		for k, v := range dataCasted {
 			// Since this needs to check against _every_
 			// member, return true. Or fall through to the
@@ -262,6 +278,9 @@ func (fl *Flattener) queryMatchString(v, queryTerm string) bool {
 	return v == queryTerm
 }
 
+// queryAtDepth returns the query parameter for a given depth, and
+// boolean indicating we've run out of queries. If we've run out of
+// queries, than we can start checking, everything is a match.
 func (fl *Flattener) queryAtDepth(depth int) (string, bool) {
 	// if we're nil, there's an implied wildcard
 	//
@@ -281,21 +300,6 @@ func (fl *Flattener) queryAtDepth(depth int) (string, bool) {
 	q := fl.query[depth]
 
 	return q, q == fl.queryWildcard
-}
-
-// extractKeyNameFromMap will return the value from a map, if it has
-// an appropriately named key, whose value can be stringified
-// FIXME: This function should probably be remoed
-func extractKeyNameFromMap(data map[string]interface{}, keyname string, deleteKey bool) string {
-	if val, ok := data[keyname]; ok {
-		if vString, err := stringify(val); err == nil {
-			if deleteKey {
-				delete(data, keyname)
-			}
-			return vString
-		}
-	}
-	return ""
 }
 
 // stringify takes an arbitrary piece of data, and attempst to coerce

@@ -104,9 +104,23 @@ func TestFlatten_Complex(t *testing.T) {
 		},
 		{
 			comment: "rewritten and filtered",
-			options: []FlattenOpts{WithQuery([]string{"users", "#name=>Ali*", "id"})},
+			options: []FlattenOpts{WithQuery([]string{"users", "#name=>Al*", "id"})},
 			out: []Row{
 				Row{Path: []string{"users", "Alex Aardvark", "id"}, Value: "1"},
+			},
+		},
+		{
+			comment: "bad key name",
+			options: []FlattenOpts{WithQuery([]string{"users", "#nokey"})},
+			out:     []Row{},
+		},
+		{
+			comment: "rewrite array to map",
+			options: []FlattenOpts{WithQuery([]string{"users", "#name", "id"})},
+			out: []Row{
+				Row{Path: []string{"users", "Alex Aardvark", "id"}, Value: "1"},
+				Row{Path: []string{"users", "Bailey Bobcat", "id"}, Value: "2"},
+				Row{Path: []string{"users", "Cam Chipmunk", "id"}, Value: "3"},
 			},
 		},
 	}
@@ -116,44 +130,6 @@ func TestFlatten_Complex(t *testing.T) {
 		testFlattenCase(t, tt, actual, err)
 	}
 
-}
-
-func TestExtractKeyNameFromMap(t *testing.T) {
-	t.Parallel()
-
-	record := map[string]interface{}{
-		"id":   123,
-		"uuid": "abc123",
-		"name": "alice",
-		"favs": []int{3, 4},
-	}
-
-	var tests = []struct {
-		out     string
-		keyName string
-	}{
-		{
-			out: "",
-		},
-		{
-			out:     "",
-			keyName: "notHere",
-		},
-		{
-			out:     "123",
-			keyName: "id",
-		},
-
-		{
-			out:     "abc123",
-			keyName: "uuid",
-		},
-	}
-
-	for _, tt := range tests {
-		actual := extractKeyNameFromMap(record, tt.keyName, false)
-		require.Equal(t, tt.out, actual, `keyName "%s"`, tt.keyName)
-	}
 }
 
 func TestIsArrayOfMapsWithKeyName(t *testing.T) {
