@@ -5,6 +5,33 @@
 // filter. This package knows how to flatten that structure, as well
 // as rewriting it as a nested array, or filtering it. It is akin to
 // xpath, though simpler.
+//
+// This tool works primarily through string interfaces, so type
+// information may be lost.
+//
+// Query Syntax
+//
+// The query syntax handles both filtering and basic rewriting. It is
+// not perfect. The idea behind it, is that we descend through an data
+// structure, specifying what matches at each level.
+//
+// Each level of query can do:
+//  * specify a filter, this is a simple string match with wildcard support. (prefix and/or postfix, but not infix)
+//  * If the data is an array, specify an index
+//  * For array-of-maps, specify a key to rewrite as a nested map
+//
+// Each query term has 3 parts: [#]string[=>kvmatch]
+//   1. An optional `#` This denotes a key to rewrite an array-of-maps with
+//   2. A search term. If this is an integer, it is interpreted as an array index.
+//   3. a key/value match string. For a map, this is to match the value of a key.
+//
+//  Some examples:
+//  *  data/users            Return everything under { data: { users: { ... } } }
+//  *  data/users/0          Return the first item in the users array
+//  *  data/users/name=>A*   Return users whose name starts with "A"
+//  *  data/users/#id        Return the users, and rewrite the users array to be a map with the id as the key
+//
+// See the test suite for extensive examples.
 package dataflatten
 
 import (
@@ -17,6 +44,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Flattener is an interface to flatten complex, nested, data
+// structures. It recurses through them, and returns a simplified
+// form. At the simplest level, this rewrites:
+//
+//   { foo: { bar: { baz: 1 } } }
+//
+// To:
+//
+//   [ { path: foo/bar/baz, value: 1 } ]
+//
+// It can optionally filtering and rewriting.
 type Flattener struct {
 	includeNils     bool
 	rows            []Row
@@ -28,26 +66,31 @@ type Flattener struct {
 
 type FlattenOpts func(*Flattener)
 
+// IncludeNulls indicates that Flatten should return null values,
+// instead of skipping over them.
 func IncludeNulls() FlattenOpts {
 	return func(fl *Flattener) {
 		fl.includeNils = true
 	}
 }
 
+// WithLogger sets the logger to use
 func WithLogger(logger log.Logger) FlattenOpts {
 	return func(fl *Flattener) {
 		fl.logger = logger
 	}
 }
 
+// WithQuery Specifies a query to flatten with. This is used both for
+// re-writing arrays into maps, and for filtering. See "Query
+// Specification" for docs.
 func WithQuery(q []string) FlattenOpts {
 	return func(fl *Flattener) {
 		fl.query = q
 	}
 }
 
-// TODO: Write this better
-// Note that this returns an array with an unstable order.
+// Flatten is the entry point to the Flattener functionality.
 func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 	fl := &Flattener{
 		rows:            []Row{},
@@ -67,6 +110,7 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 	return fl.rows, nil
 }
 
+// descend recurses through a given data structure flattening along the way.
 func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
@@ -169,15 +213,14 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 
 	}
 	return nil
-
 }
 
 func (fl *Flattener) queryMatchNil(queryTerm string) bool {
-	// FIXME, we should do something with queryTerm
+	// TODO: If needed, we could use queryTerm for optional nil filtering
 	return fl.includeNils
 }
 
-// queryMatchArray matches arrays. This one is magic.
+// queryMatchArrayElement matches arrays. This one is magic.
 //
 // Syntax:
 //   #i -- Match index i. For example `#0`
