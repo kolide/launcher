@@ -37,6 +37,12 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	flattenOpts := []dataflatten.FlattenOpts{}
+
+	if t.logger != nil {
+		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	}
+
 	var results []map[string]string
 
 	pathQ, ok := queryContext.Constraints["path"]
@@ -53,8 +59,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				plistQuery := constraint.Expression
 
 				data, err := dataflatten.PlistFile(filePath,
-					dataflatten.WithLogger(t.logger),
-					dataflatten.WithQuery(strings.Split(plistQuery, "/")))
+					append(flattenOpts, dataflatten.WithQuery(strings.Split(plistQuery, "/")))...)
 				if err != nil {
 					fmt.Println("parse failjure")
 					return results, errors.Wrap(err, "parsing data")
@@ -75,8 +80,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				}
 			}
 		} else {
-			data, err := dataflatten.PlistFile(filePath,
-				dataflatten.WithLogger(t.logger))
+			data, err := dataflatten.PlistFile(filePath, flattenOpts...)
 			if err != nil {
 				return results, errors.Wrap(err, "parsing data")
 			}

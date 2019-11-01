@@ -1,3 +1,10 @@
+// Package dataflatten contains tools to flatten complex data
+// structures.
+//
+// On macOS, many plists use an array of maps, these can be tricky to
+// filter. This package knows how to flatten that structure, as well
+// as rewriting it as a nested array, or filtering it. It is akin to
+// xpath, though simpler.
 package dataflatten
 
 import (
@@ -176,7 +183,7 @@ func (fl *Flattener) queryMatchNil(queryTerm string) bool {
 //   #i -- Match index i. For example `#0`
 //   k=>queryTerm -- If this is a map, it should have key k, that matches queryTerm
 //
-// We use `=>` as something that is reasonable intutive, and no very
+// We use `=>` as something that is reasonably intuitive, and not very
 // likely to occur on it's own. Unfortunately, `==` shows up in base64
 func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, queryTerm string) bool {
 	logger := log.With(fl.logger,
@@ -228,9 +235,6 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 		// non-iterable. stringify and be done
 		return fl.queryMatchStringify(dataCasted, queryTerm)
 	}
-
-	// Else, we need to think harder
-	return false
 }
 
 func (fl *Flattener) queryMatchStringify(data interface{}, queryTerm string) bool {
