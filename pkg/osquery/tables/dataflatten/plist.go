@@ -1,4 +1,4 @@
-package plist
+package dataflattentables
 
 import (
 	"context"
@@ -12,12 +12,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+type DataSourceType int
+
+const (
+	PlistType DataSourceType = iota + 1
+	JsonType
+)
+
 type Table struct {
-	client *osquery.ExtensionManagerClient
-	logger log.Logger
+	client    *osquery.ExtensionManagerClient
+	logger    log.Logger
+	dataFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+	tableName string
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
@@ -33,7 +42,19 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		logger: logger,
 	}
 
-	return table.NewPlugin("kolide_plist", columns, t.generate)
+	switch dataSourceType {
+	case PlistType:
+		t.dataFunc = dataflatten.PlistFile
+		t.tableName = "kolide_plist"
+	case JsonType:
+		t.dataFunc = dataflatten.JsonFile
+		t.tableName = "kolide_json"
+	default:
+		panic("Unknown data soure type")
+	}
+
+	return table.NewPlugin(t.tableName, columns, t.generate)
+
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -47,7 +68,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	pathQ, ok := queryContext.Constraints["path"]
 	if !ok || len(pathQ.Constraints) == 0 {
-		return results, errors.New("The kolide_plist table requires that you specify a single constraint for path")
+		return results, errors.Errorf("The %s table requires that you specify a single constraint for path", t.tableName)
 	}
 	for _, pathConstraint := range pathQ.Constraints {
 
@@ -56,12 +77,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
 
 			for _, constraint := range q.Constraints {
-				plistQuery := constraint.Expression
+				dataQuery := constraint.Expression
 
-				data, err := dataflatten.PlistFile(filePath,
-					append(flattenOpts, dataflatten.WithQuery(strings.Split(plistQuery, "/")))...)
+				data, err := t.dataFunc(filePath,
+					append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
-					fmt.Println("parse failjure")
+					fmt.Println("parse failure")
 					return results, errors.Wrap(err, "parsing data")
 				}
 
@@ -74,13 +95,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						"parent":  p,
 						"key":     k,
 						"value":   row.Value,
-						"query":   plistQuery,
+						"query":   dataQuery,
 					}
 					results = append(results, res)
 				}
 			}
 		} else {
-			data, err := dataflatten.PlistFile(filePath, flattenOpts...)
+			data, err := t.dataFunc(filePath, flattenOpts...)
 			if err != nil {
 				return results, errors.Wrap(err, "parsing data")
 			}

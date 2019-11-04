@@ -1,17 +1,18 @@
-package plist
+package dataflattentables
 
 import (
 	"context"
 	"path/filepath"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPlist(t *testing.T) {
 	t.Parallel()
-	plistTable := Table{}
+	plistTable := Table{dataFunc: dataflatten.PlistFile}
 
 	var tests = []struct {
 		paths    []string
