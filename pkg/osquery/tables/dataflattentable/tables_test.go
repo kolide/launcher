@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"context"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
@@ -60,6 +61,11 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 				delete(row, "path")
 				delete(row, "query")
 			}
+
+			// Despite being an array. data is returned
+			// unordered. Sort it.
+			sort.SliceStable(tt.expected, func(i, j int) bool { return tt.expected[i]["fullkey"] < tt.expected[j]["fullkey"] })
+			sort.SliceStable(rows, func(i, j int) bool { return rows[i]["fullkey"] < rows[j]["fullkey"] })
 
 			require.EqualValues(t, tt.expected, rows, "table type %s test", dataType)
 		}
