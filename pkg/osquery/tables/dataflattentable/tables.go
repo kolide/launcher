@@ -2,10 +2,10 @@ package dataflattentable
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -50,7 +50,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 		t.dataFunc = dataflatten.JsonFile
 		t.tableName = "kolide_json"
 	default:
-		panic("Unknown data soure type")
+		panic("Unknown data source type")
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -82,7 +82,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				data, err := t.dataFunc(filePath,
 					append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
-					fmt.Println("parse failure")
+					level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
 					return results, errors.Wrap(err, "parsing data")
 				}
 

@@ -62,8 +62,7 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 				delete(row, "query")
 			}
 
-			// Despite being an array. data is returned
-			// unordered. Sort it.
+			// Despite being an array. data is returned unordered. Sort it.
 			sort.SliceStable(tt.expected, func(i, j int) bool { return tt.expected[i]["fullkey"] < tt.expected[j]["fullkey"] })
 			sort.SliceStable(rows, func(i, j int) bool { return rows[i]["fullkey"] < rows[j]["fullkey"] })
 
