@@ -1,4 +1,4 @@
-package dataflattentables
+package dataflattentable
 
 import (
 	"context"
