@@ -32,7 +32,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		kextpolicy.TablePlugin(),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
 	}
