@@ -1,17 +1,18 @@
-package plist
+package dataflattentable
 
 import (
 	"context"
 	"path/filepath"
 	"testing"
 
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/stretchr/testify/require"
 )
 
+// TestPlist runs some real-world tests against sample plist data.
 func TestPlist(t *testing.T) {
 	t.Parallel()
-	plistTable := Table{}
+	plistTable := Table{dataFunc: dataflatten.PlistFile}
 
 	var tests = []struct {
 		paths    []string
@@ -65,24 +66,4 @@ func TestPlist(t *testing.T) {
 		require.EqualValues(t, tt.expected, rows)
 	}
 
-}
-
-func mockQueryContext(paths []string, queries []string) table.QueryContext {
-	pathConstraints := make([]table.Constraint, len(paths))
-	for i, path := range paths {
-		pathConstraints[i].Expression = path
-	}
-	queryConstraints := make([]table.Constraint, len(queries))
-	for i, q := range queries {
-		queryConstraints[i].Expression = q
-	}
-
-	queryContext := table.QueryContext{
-		Constraints: map[string]table.ConstraintList{
-			"path":  table.ConstraintList{Constraints: pathConstraints},
-			"query": table.ConstraintList{Constraints: queryConstraints},
-		},
-	}
-
-	return queryContext
 }
