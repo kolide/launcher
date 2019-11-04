@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -32,6 +33,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
+		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
 	}
 
 	// add in the platform specific ones (as denboted by build tags)
