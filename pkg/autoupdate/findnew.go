@@ -134,7 +134,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return foundFile
 	}
 
-	level.Info(logger).Log("msg", "no updates found")
+	level.Debug(logger).Log("msg", "no updates found")
 
 	if err := checkExecutable(fullBinaryPath); err == nil {
 		return fullBinaryPath

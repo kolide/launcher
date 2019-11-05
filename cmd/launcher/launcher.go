@@ -36,6 +36,8 @@ const defaultOsquerydPath = "/usr/local/kolide/bin/osqueryd"
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
+	level.Debug(logger).Log("msg", "runLauncher starting")
+
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
 	if rootDirectory == "" {
