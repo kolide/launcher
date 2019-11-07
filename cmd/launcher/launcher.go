@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -35,6 +36,8 @@ const defaultOsquerydPath = "/usr/local/kolide/bin/osqueryd"
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
+	level.Debug(logger).Log("msg", "runLauncher starting")
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
@@ -75,9 +78,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	// open the database for storing launcher data, we do it here because it's passed
-	// to multiple actors
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
+	// open the database for storing launcher data, we do it here
+	// because it's passed to multiple actors. Add a timeout to
+	// this. Note that the timeout is documented as failing
+	// unimplemented on windows, though empirically it seems to
+	// work.
+	boltOptions := &bolt.Options{Timeout: time.Duration(30) * time.Second}
+	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
 		return errors.Wrap(err, "open launcher db")
 	}
