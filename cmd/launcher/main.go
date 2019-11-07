@@ -23,6 +23,12 @@ func main() {
 	// re-leveled during options parsing.
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 
+	level.Info(logger).Log(
+		"msg", "Launcher starting up",
+		"version", version.Version().Version,
+		"revision", version.Version().Revision,
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -47,6 +53,8 @@ func main() {
 			logutil.Fatal(logger, err, "exec")
 		}
 		panic("how")
+	} else {
+		level.Info(logger).Log("msg", "Nothing new")
 	}
 
 	// if the launcher is being ran with a positional argument, handle that

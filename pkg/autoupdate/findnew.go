@@ -75,8 +75,6 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return ""
 	}
 
-	logger = log.With(logger, "fullBinaryPath", fullBinaryPath)
-
 	newestSettings := &newestSettings{}
 	for _, opt := range opts {
 		opt(newestSettings)
@@ -84,6 +82,12 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 	updateDir := getUpdateDir(fullBinaryPath)
 	binaryName := filepath.Base(fullBinaryPath)
+
+	logger = log.With(logger,
+		"fullBinaryPath", fullBinaryPath,
+		"updateDir", updateDir,
+		"binaryName", binaryName,
+	)
 
 	// Find the possible updates. filepath.Glob returns a list of things
 	// that match the requested pattern. We sort the list to ensure that
@@ -134,7 +138,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return foundFile
 	}
 
-	level.Info(logger).Log("msg", "no updates found")
+	level.Debug(logger).Log("msg", "no updates found")
 
 	if err := checkExecutable(fullBinaryPath); err == nil {
 		return fullBinaryPath

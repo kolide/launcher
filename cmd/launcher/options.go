@@ -107,6 +107,11 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		}
 	}
 
+	// On windows, we should make sure osquerydPath ends in .exe
+	if runtime.GOOS == "windows" && !strings.HasSuffix(osquerydPath, ".exe") {
+		osquerydPath = osquerydPath + ".exe"
+	}
+
 	if *flEnrollSecret != "" && *flEnrollSecretPath != "" {
 		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
 	}
