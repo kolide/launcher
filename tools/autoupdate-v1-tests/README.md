@@ -28,7 +28,7 @@ might need an extra param to adjust the buffer size.)
 For example:
 
 ``` shell
-PS C:\Users\seph> sc.exe qfailure upgradetest 5000
+PS C:\Users\example> sc.exe qfailure upgradetest 5000
 [SC] QueryServiceConfig2 SUCCESS
 
 SERVICE_NAME: upgradetest

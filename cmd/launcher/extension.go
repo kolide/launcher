@@ -31,7 +31,6 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 	err error,
 ) {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-	fmt.Println("seph createExtensionRuntime")
 
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
