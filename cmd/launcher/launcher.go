@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -78,8 +79,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// open the database for storing launcher data, we do it here because it's passed
-	// to multiple actors
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
+	// to multiple actors. Note that timeout might not work on windows
+	boltOptions := &bolt.Options{Timeout: time.Duration(30) * time.Second}
+	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
 		return errors.Wrap(err, "open launcher db")
 	}
