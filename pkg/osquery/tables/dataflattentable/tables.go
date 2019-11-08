@@ -59,12 +59,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	flattenOpts := []dataflatten.FlattenOpts{}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
-	}
-
 	var results []map[string]string
 
 	pathQ, ok := queryContext.Constraints["path"]
@@ -85,48 +79,85 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 				for _, constraint := range q.Constraints {
 					dataQuery := constraint.Expression
-
-					data, err := t.dataFunc(filePath,
-						append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+					subresults, err := t.generatePathQuery(filePath, dataQuery)
 					if err != nil {
-						level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
-						return results, errors.Wrap(err, "parsing data")
+						return results, errors.Wrapf(err, "generating for path %s with query", filePath)
 					}
 
-					for _, row := range data {
-						p, k := row.ParentKey("/")
-
-						res := map[string]string{
-							"path":    filePath,
-							"fullkey": row.StringPath("/"),
-							"parent":  p,
-							"key":     k,
-							"value":   row.Value,
-							"query":   dataQuery,
-						}
-						results = append(results, res)
-					}
+					results = append(results, subresults...)
 				}
 			} else {
-				data, err := t.dataFunc(filePath, flattenOpts...)
+				subresults, err := t.generatePath(filePath)
 				if err != nil {
-					return results, errors.Wrap(err, "parsing data")
+					return results, errors.Wrapf(err, "generating for path %s", filePath)
 				}
 
-				for _, row := range data {
-					p, k := row.ParentKey("/")
-
-					res := map[string]string{
-						"path":    filePath,
-						"fullkey": row.StringPath("/"),
-						"parent":  p,
-						"key":     k,
-						"value":   row.Value,
-					}
-					results = append(results, res)
-				}
+				results = append(results, subresults...)
 			}
 		}
+	}
+	return results, nil
+}
+
+func (t *Table) generatePathQuery(filePath string, dataQuery string) ([]map[string]string, error) {
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+	}
+
+	if t.logger != nil {
+		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	}
+
+	var results []map[string]string
+
+	data, err := t.dataFunc(filePath, flattenOpts...)
+	if err != nil {
+		level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
+		return results, errors.Wrap(err, "parsing data")
+	}
+
+	for _, row := range data {
+		p, k := row.ParentKey("/")
+
+		res := map[string]string{
+			"path":    filePath,
+			"fullkey": row.StringPath("/"),
+			"parent":  p,
+			"key":     k,
+			"value":   row.Value,
+			"query":   dataQuery,
+		}
+		results = append(results, res)
+	}
+
+	return results, nil
+}
+
+func (t *Table) generatePath(filePath string) ([]map[string]string, error) {
+	flattenOpts := []dataflatten.FlattenOpts{}
+
+	if t.logger != nil {
+		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	}
+
+	var results []map[string]string
+
+	data, err := t.dataFunc(filePath, flattenOpts...)
+	if err != nil {
+		return results, errors.Wrap(err, "parsing data")
+	}
+
+	for _, row := range data {
+		p, k := row.ParentKey("/")
+
+		res := map[string]string{
+			"path":    filePath,
+			"fullkey": row.StringPath("/"),
+			"parent":  p,
+			"key":     k,
+			"value":   row.Value,
+		}
+		results = append(results, res)
 	}
 
 	return results, nil
