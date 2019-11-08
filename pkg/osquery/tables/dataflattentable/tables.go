@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -72,17 +73,43 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 	for _, pathConstraint := range pathQ.Constraints {
 
-		filePath := pathConstraint.Expression
+		// We take globs in via the sql %, but glob needs *. So convert.
+		filePaths, err := filepath.Glob(strings.ReplaceAll(pathConstraint.Expression, `%`, `*`))
+		if err != nil {
+			return results, errors.Wrap(err, "bad glob")
+		}
 
-		if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
+		for _, filePath := range filePaths {
 
-			for _, constraint := range q.Constraints {
-				dataQuery := constraint.Expression
+			if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
 
-				data, err := t.dataFunc(filePath,
-					append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+				for _, constraint := range q.Constraints {
+					dataQuery := constraint.Expression
+
+					data, err := t.dataFunc(filePath,
+						append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+					if err != nil {
+						level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
+						return results, errors.Wrap(err, "parsing data")
+					}
+
+					for _, row := range data {
+						p, k := row.ParentKey("/")
+
+						res := map[string]string{
+							"path":    filePath,
+							"fullkey": row.StringPath("/"),
+							"parent":  p,
+							"key":     k,
+							"value":   row.Value,
+							"query":   dataQuery,
+						}
+						results = append(results, res)
+					}
+				}
+			} else {
+				data, err := t.dataFunc(filePath, flattenOpts...)
 				if err != nil {
-					level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
 					return results, errors.Wrap(err, "parsing data")
 				}
 
@@ -95,28 +122,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						"parent":  p,
 						"key":     k,
 						"value":   row.Value,
-						"query":   dataQuery,
 					}
 					results = append(results, res)
 				}
-			}
-		} else {
-			data, err := t.dataFunc(filePath, flattenOpts...)
-			if err != nil {
-				return results, errors.Wrap(err, "parsing data")
-			}
-
-			for _, row := range data {
-				p, k := row.ParentKey("/")
-
-				res := map[string]string{
-					"path":    filePath,
-					"fullkey": row.StringPath("/"),
-					"parent":  p,
-					"key":     k,
-					"value":   row.Value,
-				}
-				results = append(results, res)
 			}
 		}
 	}
