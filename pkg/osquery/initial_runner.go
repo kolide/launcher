@@ -77,7 +77,8 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 				Name:           queryName,
 				HostIdentifier: i.identifier,
 				UnixTime:       int(time.Now().UTC().Unix()),
-				DiffResults:    &DiffResults{Added: resp},
+				// HERE
+				DiffResults: &DiffResults{Added: resp},
 			})
 		}
 	}
