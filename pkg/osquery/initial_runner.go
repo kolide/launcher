@@ -87,6 +87,9 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			}
 
 			initialRunResults = append(initialRunResults, results)
+
+			// Don't overwhelm the socket
+			time.Sleep(1 * time.Second)
 		}
 	}
 
