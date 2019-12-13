@@ -73,13 +73,20 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 				continue
 			}
 
-			initialRunResults = append(initialRunResults, OsqueryResultLog{
+			results := OsqueryResultLog{
 				Name:           queryName,
 				HostIdentifier: i.identifier,
 				UnixTime:       int(time.Now().UTC().Unix()),
-				// HERE
-				DiffResults: &DiffResults{Added: resp},
-			})
+			}
+
+			// Format this as either a snapshot or a diff
+			if queryContent.Snapshot == nil {
+				results.DiffResults = &DiffResults{Added: resp}
+			} else {
+				results.Snapshot = resp
+			}
+
+			initialRunResults = append(initialRunResults, results)
 		}
 	}
 
