@@ -40,7 +40,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 
 	t := &Table{
 		client: client,
-		logger: logger,
+		logger: level.NewFilter(logger, level.AllowInfo()),
 	}
 
 	switch dataSourceType {
