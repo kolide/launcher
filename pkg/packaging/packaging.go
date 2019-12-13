@@ -593,7 +593,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 func prermSystemdTemplate() string {
 	return `#!/bin/sh
 set -e
-if [ "$1" = remove -o "$1" == "0" ] ; then
+if [ "$1" = remove -o "$1" = "0" ] ; then
   systemctl stop launcher.{{.Identifier}} || true
   systemctl disable launcher.{{.Identifier}} || true
 fi`
