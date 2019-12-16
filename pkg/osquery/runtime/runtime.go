@@ -610,7 +610,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 	}
 
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 300*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
 	}
@@ -712,6 +712,9 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not query the extension manager client")
+	}
+	if resp.Status == nil {
+		return nil, errors.New("query returned nil status")
 	}
 	if resp.Status.Code != int32(0) {
 		return nil, errors.New(resp.Status.Message)
