@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,7 +25,14 @@ type initialRunner struct {
 	db         *bolt.DB
 }
 
-func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
+type writeFunction func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error
+
+const initialRunnerResultsBatchSize = 10
+
+func (i *initialRunner) Execute(configBlob string, writeFn writeFunction) error {
+	// Sleep before starting to hammer on osquery
+	time.Sleep(5 * time.Second)
+
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
 		return errors.Wrap(err, "unmarshal osquery config blob")
@@ -43,6 +52,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 	}
 
+	// TODO: Why do we have this? It feels like overhead to remove.
 	toRun, err := i.queriesToRun(allQueries)
 	if err != nil {
 		return errors.Wrap(err, "checking if query should run")
@@ -53,11 +63,45 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		if !i.enabled { // only execute them when the plugin is enabled.
 			break
 		}
+
+		// hack for sorting
+		queryNames := []string{}
+		queryContents := map[string]QueryContent{}
+
 		for query, queryContent := range pack.Queries {
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			if _, ok := toRun[queryName]; !ok {
 				continue
 			}
+
+			// FIXME: remove this after testing.
+			toSkip := false
+			skipMe := []string{
+				"apps",              // too slow
+				"icloudsettingsset", // too slow
+				"homebrewpackages",  // too slow
+				"kernelextensions",  // FIXME: Why is this slow?
+				"softwareupdate",    // But why? This isn't slow
+				"tccentries",        // no such table, and we have an exit 1 in here.
+			}
+			for _, skipString := range skipMe {
+				if strings.Contains(queryName, skipString) {
+					toSkip = true
+					break
+				}
+			}
+			if toSkip {
+				continue
+			}
+
+			queryNames = append(queryNames, queryName)
+			queryContents[queryName] = queryContent
+		}
+
+		sort.Strings(queryNames)
+
+		for _, queryName := range queryNames {
+			queryContent := queryContents[queryName]
 			resp, err := i.client.Query(queryContent.Query)
 			// returning here causes the rest of the queries not to run
 			// this is a bummer because often configs have queries with bad syntax/tables that do not exist.
@@ -66,9 +110,16 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			level.Debug(i.logger).Log(
 				"msg", "querying for initial results",
 				"query_name", queryName,
+				"sql", queryContent.Query,
 				"err", err,
 				"results", len(resp),
 			)
+
+			// FIXME: remove this block
+			if err != nil {
+				os.Exit(1)
+			}
+
 			if err != nil || len(resp) == 0 {
 				continue
 			}
@@ -80,6 +131,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			}
 
 			// Format this as either a snapshot or a diff
+			// TODO: verify formatting on snapshots
 			if queryContent.Snapshot == nil {
 				results.DiffResults = &DiffResults{Added: resp}
 			} else {
@@ -88,19 +140,47 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 			initialRunResults = append(initialRunResults, results)
 
+			// Batch sending the responses back
+			if len(initialRunResults) > initialRunnerResultsBatchSize {
+				i.sendResults(writeFn, initialRunResults)
+				initialRunResults = []OsqueryResultLog{}
+
+				// Extra sleep for the batch to clear
+				time.Sleep(10 * time.Second)
+
+			}
+
 			// Don't overwhelm the socket
 			time.Sleep(1 * time.Second)
 		}
 	}
 
+	// Any trailing jobs outside the batch?
+	if len(initialRunResults) > 0 {
+		i.sendResults(writeFn, initialRunResults)
+	}
+
+	// note: caching would happen always on first use, even if the runner is not enabled.
+	// This avoids the problem of queries not being known even though they've been in the config for a long time.
+	if err := i.cacheRanQueries(toRun); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// sendResults takes a given batch of results, and sends them to the
+// server. As this is meant to run in a loop, errors are mostly ignored.
+func (i *initialRunner) sendResults(writeFn writeFunction, runResults []OsqueryResultLog) error {
 	cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	for _, result := range initialRunResults {
+	for _, result := range runResults {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(result); err != nil {
 			return errors.Wrap(err, "encoding initial run result")
 		}
+
 		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
 			level.Debug(i.logger).Log(
 				"msg", "writing initial result log to server",
@@ -110,13 +190,6 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			continue
 		}
 	}
-
-	// note: caching would happen always on first use, even if the runner is not enabled.
-	// This avoids the problem of queries not being known even though they've been in the config for a long time.
-	if err := i.cacheRanQueries(toRun); err != nil {
-		return err
-	}
-
 	return nil
 }
 
