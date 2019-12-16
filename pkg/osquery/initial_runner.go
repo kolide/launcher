@@ -77,7 +77,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn writeFunction) error 
 			// FIXME: remove this after testing.
 			toSkip := false
 			skipMe := []string{
-				"apps",              // too slow
+				// "apps", // too slow
 				"icloudsettingsset", // too slow
 				"homebrewpackages",  // too slow
 				"kernelextensions",  // FIXME: Why is this slow?
@@ -102,6 +102,8 @@ func (i *initialRunner) Execute(configBlob string, writeFn writeFunction) error 
 
 		for _, queryName := range queryNames {
 			queryContent := queryContents[queryName]
+			queryStartTime := time.Now()
+			// NOTE: This seems to have a 5s timeout
 			resp, err := i.client.Query(queryContent.Query)
 			// returning here causes the rest of the queries not to run
 			// this is a bummer because often configs have queries with bad syntax/tables that do not exist.
@@ -113,6 +115,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn writeFunction) error 
 				"sql", queryContent.Query,
 				"err", err,
 				"results", len(resp),
+				"query time", time.Since(queryStartTime),
 			)
 
 			// FIXME: remove this block
@@ -172,7 +175,10 @@ func (i *initialRunner) Execute(configBlob string, writeFn writeFunction) error 
 // sendResults takes a given batch of results, and sends them to the
 // server. As this is meant to run in a loop, errors are mostly ignored.
 func (i *initialRunner) sendResults(writeFn writeFunction, runResults []OsqueryResultLog) error {
-	cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// TODO: Is this timeout an issue? It doesn't seem to be what we're
+	// running into. Instead, we're running into something on the
+	// client.Query path.
+	cctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	for _, result := range runResults {
