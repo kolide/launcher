@@ -411,7 +411,7 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		dir = "/Library/LaunchDaemons"
 		file = fmt.Sprintf("com.%s.launcher.plist", p.Identifier)
 		renderFunc = packagekit.RenderLaunchd
-	case p.target.Platform == Linux && p.target.Init == SystemD:
+	case p.target.Platform == Linux && p.target.Init == Systemd:
 		// Default to dropping into /lib, it seems more common. But for
 		// rpm use /usr/lib.
 		dir = "/lib/systemd/system"
@@ -461,7 +461,7 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 	identifier := p.Identifier
 
 	switch {
-	case p.target.Platform == Linux && p.target.Init == SystemD:
+	case p.target.Platform == Linux && p.target.Init == Systemd:
 		prermTemplate = prermSystemdTemplate()
 	default:
 		// If we don't match in the case statement, log that we're ignoring
@@ -510,7 +510,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
 		postinstTemplateName = "internal/assets/postinstall-launchd.sh"
-	case p.target.Platform == Linux && p.target.Init == SystemD:
+	case p.target.Platform == Linux && p.target.Init == Systemd:
 		postinstTemplateName = "internal/assets/postinstall-systemd.sh"
 	case p.target.Platform == Linux && p.target.Init == Upstart:
 		postinstTemplateName = "internal/assets/postinstall-upstart.sh"

@@ -146,12 +146,12 @@ func testedTargets() []Target {
 		},
 		{
 			Platform: Linux,
-			Init:     SystemD,
+			Init:     Systemd,
 			Package:  Rpm,
 		},
 		{
 			Platform: Linux,
-			Init:     SystemD,
+			Init:     Systemd,
 			Package:  Deb,
 		},
 		{
