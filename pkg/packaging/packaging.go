@@ -602,9 +602,9 @@ fi`
 func (p *PackageOptions) setupDirectories() error {
 	switch p.target.Platform {
 	case Linux, Darwin:
-		p.binDir = filepath.Join("/usr/local", p.Identifier, "bin")
+		p.binDir = filepath.Join("/opt", p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
-		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
+		p.rootDir = filepath.Join("/var/lib", p.Identifier, sanitizeHostname(p.Hostname))
 	case Windows:
 		// On Windows, these paths end up rooted not at `c:`, but instead
 		// where the WiX template says. In our case, that's `c:\Program
