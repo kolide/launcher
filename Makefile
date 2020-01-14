@@ -17,6 +17,11 @@ ifneq ($(OS), Windows_NT)
 	endif
 endif
 
+fake-launcher: .pre-build
+	go run cmd/make/make.go -targets=launcher -linkstamp -fakedata
+	-rm build/darwin/launcher
+	mv build/launcher build/launcher-fake
+
 all: build
 build: launcher extension
 .pre-build: ${BUILD_DIR}
