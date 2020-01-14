@@ -79,3 +79,5 @@ require (
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
+
+go 1.13
