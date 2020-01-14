@@ -418,11 +418,11 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		if p.target.Package == Rpm {
 			dir = "/usr/lib/systemd/system"
 		}
-		file = fmt.Sprintf("launcher.%s.service", p.Identifier)
+		file = fmt.Sprintf("%s-launcher.service", p.Identifier)
 		renderFunc = packagekit.RenderSystemd
 	case p.target.Platform == Linux && p.target.Init == Upstart:
 		dir = "/etc/init"
-		file = fmt.Sprintf("launcher-%s.conf", p.Identifier)
+		file = fmt.Sprintf("%s-launcher.conf", p.Identifier)
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
 		}
