@@ -110,6 +110,10 @@ func TestPackageStrings(t *testing.T) {
 			in:  "msi",
 			out: Msi,
 		},
+		{
+			in:  "pacman",
+			out: "Pacman",
+		},
 	}
 
 	// Test error case

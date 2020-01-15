@@ -2,15 +2,26 @@
 
 ## Background & Requirements
 
-Kolide launcher packages are a bundle of binaries (`osqueryd`,
+Kolide launcher packages are a collection of binaries (`osqueryd`,
 `launcher`, and `osquery-extension.ext`), configuration, and init
-scripts. This repository contains `package-builder`, a tool to produce these.
+scripts. This repository contains `package-builder`, a tool to produce
+these packages.
+
+`package-builder` is written in go, and should run from most
+platforms. It is most commonly run on macOS and Windows. It can be
+cross compiled if desired.
+
+### Building macOS packages
+
+To produce macOS packages, you must be running on macOS.
 
 The macOS package is built and signed using the `pkgbuild` command,
 which is only found on macOS. [There are
 plans](https://github.com/kolide/launcher/issues/188) to allow for the
 building of mac packages on Linux but until then, it is a requirement
 to use a macOS machine when running the `package-builder` tool.
+
+### Building linux packages
 
 To build the Linux packages, `package-builder` will execute a docker
 container which contains the
@@ -22,45 +33,43 @@ this, run the following:
 docker run --rm -it kolide/fpm echo "it works"
 ```
 
-Finally, like any Go project, you must have this repo checked out to
-`$GOPATH/src/github.com/kolide/launcher`. If you're new to Go and you
-don't know about `$GOPATH`, then check out the repo to
-`$HOME/go/src/github.com/kolide/launcher`. Also, verify that
-`$GOPATH/bin` is listed in your `$PATH` (it may appear there as
-`$HOME/go/bin`).
+### Building windows packages
 
-So to recap, to use `package-builder`, you must:
+Windows packages use `wix` and `package-builder` must be run on a
+windows machine with binaries in the appropriate places.
 
-- Be on macOS
-- Be able to `docker run` something
-- Build `package-builder` from source
 
 ## Building the tool
 
 From the root of the repository, run the following:
 
-```
+``` shell
 make package-builder
 ./build/package-builder make --help
 ```
 
+If you want to cross compile for windows, you can use:
+
+``` shell
+make package-builder-windows
+ls build/windows/package-builder.exe
+```
+
 ## General Usage
 
-`package-builder` will package binaries from either local disk, or
+`package-builder` will fetch binaries from either local disk, or
 Kolide's Notary server. These are specified with version command line
 options. Arguments that look like a path (denoted by starting with `/`
 or `./`) will be pulled from local disk, otherwise the argument is
 parsed as a notary channel.
 
-The only required parameter is `--hostname`. 
+The only required parameter is `--hostname`.
 
 If you don't define an enrollment secret via `--enroll_secret`, then a
-blank enrollment secret will be used when connecting to the gRPC
-server defined by the supplied hostname. If you would like the
-resultant packages to not contain the enroll secret (so that you can
-distribute it via another mechanism), you can use the `--omit_secret`
-flag.
-
+blank enrollment secret will be used when connecting to the server
+defined by the supplied hostname. If you would like the resultant
+packages to not contain the enroll secret (so that you can distribute
+it via another mechanism), you can use the `--omit_secret` flag.
 
 ### Simplest Package Creation
 
@@ -69,20 +78,19 @@ server:
 
 ``` shell
 ./build/package-builder make \
-   --hostname=grpc.launcher.acme.biz:443 \
-   --enroll_secret=foobar123 \
-   --extension_version nightly
+   --hostname=grpc.launcher.example.com:443 \
+   --enroll_secret=foobar123
 ```
 
 
 ### Building a package with your own binaries
 
 
-To build binaries you'll want something like:
+To build launcher binaries you'll want something like:
 
 ```
-# Build unsigned
-make xp
+# Build unsigned launcher binaries
+make -j xp
 ```
 
 Or to build signed:
@@ -97,7 +105,7 @@ You can now use `package-builder` to make packages with those:
 
 ```
 ./build/package-builder make \
-   --hostname=grpc.launcher.acme.biz:443 \
+   --hostname=grpc.launcher.example.com:443 \
    --enroll_secret=foobar123 \
    --osquery_version stable \
    --launcher_version ./build/darwin/launcher \
@@ -129,7 +137,7 @@ By default, binaries will be installed to `/usr/local/launcher/bin`,
 configuration will be installed to `/etc/launcher`, logs will be
 outputted to `/var/log/launcher`, etc. If you'd like the `launcher`
 string to be something else (for example, your company name), you can
-use the `--identifier` flag to specify this value. 
+use the `--identifier` flag to specify this value.
 
 #### Cross Platform Binaries and Targets
 
@@ -139,7 +147,7 @@ specify multiple targets in a single invocation.  However, if you're
 using locally build binaries you will need to run `package-builder`
 for each target platform.
 
-Targets can be specificity as a _platform-init-packaging_ triple. 
+Targets can be specificity as a _platform-init-packaging_ triple.
 
 #### Docker Temp Directories
 
@@ -151,7 +159,7 @@ docker.
 This will manifest as an error along the lines of:
 
 ``` shell
-could not generate packages: making package: packaging, target linux-systemd-rpm: creating fpm package: docker: Error response from daemon: Mounts denied: 
+could not generate packages: making package: packaging, target linux-systemd-rpm: creating fpm package: docker: Error response from daemon: Mounts denied:
 The paths /var/folders/jj/ypss_3r13d374nz95cdw418r0000gn/T/package.scriptRoot916184548 and /var/folders/jj/ypss_3r13d374nz95cdw418r0000gn/T/package.packageRoot332969561
 are not shared from OS X and are not known to Docker.
 You can configure shared paths from Docker -> Preferences... -> File Sharing.

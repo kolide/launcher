@@ -335,6 +335,15 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames)); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
 		}
+
+	case p.target.Package == Tar:
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsTar(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+		}
+	case p.target.Package == Pacman:
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsPacman(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+		}
 	case p.target.Package == Pkg:
 		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
 			return errors.Wrapf(err, "packaging, target %s", p.target.String())
@@ -426,11 +435,15 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
 		}
+	case p.target.Platform == Linux && p.target.Init == Init:
+		dir = "/etc/init.d"
+		file = fmt.Sprintf("%s-launcher", p.Identifier)
+		renderFunc = packagekit.RenderInit
 	case p.target.Platform == Windows && p.target.Init == WindowsService:
 		// Do nothing, this is handled in the packaging step.
 		return nil
 	default:
-		return errors.Errorf("Unsupported target %s", p.target.String())
+		return errors.Errorf("Unsupported launcher target %s", p.target.String())
 	}
 
 	p.initFile = filepath.Join(dir, file)

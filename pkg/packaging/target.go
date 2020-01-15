@@ -37,11 +37,12 @@ const (
 type PackageFlavor string
 
 const (
-	Pkg PackageFlavor = "pkg"
-	Tar               = "tar"
-	Deb               = "deb"
-	Rpm               = "rpm"
-	Msi               = "msi"
+	Pkg    PackageFlavor = "pkg"
+	Tar                  = "tar"
+	Deb                  = "deb"
+	Rpm                  = "rpm"
+	Msi                  = "msi"
+	Pacman               = "pacman"
 )
 
 // Parse parses a string in the form platform-init-package and sets the target accordingly.
@@ -125,7 +126,7 @@ func (t *Target) PlatformFromString(s string) error {
 
 // PackageFromString sets a target's package flavor from string representation
 func (t *Target) PackageFromString(s string) error {
-	for _, testPackage := range []PackageFlavor{Pkg, Tar, Deb, Rpm, Msi} {
+	for _, testPackage := range []PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman} {
 		if testPackage.String() == s {
 			t.Package = testPackage
 			return nil
