@@ -20,7 +20,7 @@ func TestInitFromString(t *testing.T) {
 		},
 		{
 			in:  "systemd",
-			out: SystemD,
+			out: Systemd,
 		},
 		{
 			in:  "init",
@@ -146,7 +146,7 @@ func TestTargetParse(t *testing.T) {
 		},
 		{
 			in:  "linux-systemd-rpm",
-			out: &Target{Platform: Linux, Init: SystemD, Package: Rpm},
+			out: &Target{Platform: Linux, Init: Systemd, Package: Rpm},
 		},
 		{
 			in:         "windows-msi",

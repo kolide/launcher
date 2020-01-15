@@ -19,7 +19,7 @@ type InitFlavor string
 
 const (
 	LaunchD        InitFlavor = "launchd"
-	SystemD                   = "systemd"
+	Systemd                   = "systemd"
 	Init                      = "init"
 	Upstart                   = "upstart"
 	WindowsService            = "service"
@@ -103,7 +103,7 @@ func (t *Target) PlatformBinaryName(input string) string {
 
 // InitFromString sets a target's init flavor from string representation
 func (t *Target) InitFromString(s string) error {
-	for _, testInit := range []InitFlavor{LaunchD, SystemD, Init, Upstart, NoInit, WindowsService} {
+	for _, testInit := range []InitFlavor{LaunchD, Systemd, Init, Upstart, NoInit, WindowsService} {
 		if testInit.String() == s {
 			t.Init = testInit
 			return nil
