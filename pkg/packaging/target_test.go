@@ -112,7 +112,7 @@ func TestPackageStrings(t *testing.T) {
 		},
 		{
 			in:  "pacman",
-			out: "Pacman",
+			out: Pacman,
 		},
 	}
 
