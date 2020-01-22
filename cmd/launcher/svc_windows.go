@@ -79,6 +79,10 @@ func runWindowsSvcForeground(args []string) error {
 		os.Exit(1)
 	}
 
+	// set extra debug options
+	opts.Debug = true
+	opts.OsqueryVerbose = true
+
 	run := debug.Run
 
 	return run(serviceName, &winSvc{logger: logger, opts: opts})
