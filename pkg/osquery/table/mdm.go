@@ -3,6 +3,7 @@ package table
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strconv"
 
@@ -11,6 +12,40 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
+
+type profilesOutput struct {
+	ComputerLevel []profilePayload `plist:"_computerlevel"`
+}
+​
+type profilePayload struct {
+	ProfileIdentifier  string
+	ProfileInstallDate string
+	ProfileItems       []profileItem
+}
+​
+type profileItem struct {
+	PayloadContent *payloadContent
+	PayloadType    string
+}
+​
+type payloadContent struct {
+	AccessRights            int
+	CheckInURL              string
+	ServerURL               string
+	ServerCapabilities      []string
+	Topic                   string
+	IdentityCertificateUUID string
+	SignMessage             bool
+}
+​
+type profileStatus struct {
+	DEPEnrolled  bool
+	UserApproved bool
+}
+​
+type depStatus struct {
+	DEPCapable bool
+}
 
 func MDMInfo(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
@@ -36,11 +71,16 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 		return nil, err
 	}
 
-	depEnrolled, userApproved := "unknown", "unknown"
+	depEnrolled, depCapable, userApproved := "unknown", "unknown", "unknown"
 	status, err := getMDMProfileStatus()
 	if err == nil { // only supported on 10.13.4+
 		depEnrolled = strconv.FormatBool(status.DEPEnrolled)
 		userApproved = strconv.FormatBool(status.UserApproved)
+	}
+
+	depstatus, err := getDEPStatus()
+	if err == nil {
+		depCapable = strconv.FormatBool(depstatus.DEPCapable)
 	}
 
 	var enrollProfileItems []profileItem
@@ -66,6 +106,7 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 					"identity_certificate_uuid": enrollProfile.IdentityCertificateUUID,
 					"installed_from_dep":        depEnrolled,
 					"user_approved":             userApproved,
+					"dep_capable":               depCapable,
 				}
 				break
 			}
@@ -145,7 +186,20 @@ func getMDMProfileStatus() (profileStatus, error) {
 	}, nil
 }
 
-type profileStatus struct {
-	DEPEnrolled  bool
-	UserApproved bool
+func getDEPStatus() (depStatus, error) {
+	cmd := exec.Command("/usr/bin/profiles", "show", "-type", "enrollment")
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+​
+	lines := bytes.Split(out, []byte("\n"))
+​
+	depstatus := depStatus{DEPCapable: false}
+​
+	if len(lines) > 3 {
+		depstatus.DEPCapable = true
+	}
+​
+	return depstatus, nil
 }
