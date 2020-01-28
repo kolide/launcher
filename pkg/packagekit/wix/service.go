@@ -79,7 +79,7 @@ type ServiceControl struct {
 
 // ServiceConfig implements
 // https://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceconfig.html
-// This is used primarily to set DelayedAutoStart
+// This is used needed to set DelayedAutoStart
 type ServiceConfig struct {
 	// TODO: this should need a namespace, and yet. See https://github.com/golang/go/issues/36813
 	XMLName          xml.Name  `xml:"http://schemas.microsoft.com/wix/2006/wi ServiceConfig"`
@@ -174,6 +174,8 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 
 	serviceConfig := &ServiceConfig{
 		DelayedAutoStart: Yes,
+		OnInstall:        Yes,
+		OnReinstall:      Yes,
 	}
 
 	// If a service name is not specified, replace the .exe with a svc,
