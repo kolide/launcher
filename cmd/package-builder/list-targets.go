@@ -16,7 +16,7 @@ func runListTargets(_args []string) error {
 	outFH := os.Stdout
 
 	fmt.Fprintf(outFH, "Packaging Target Matrix\n")
-	fmt.Fprintf(outFH, "Select one from each column, hyphen seperated.\n")
+	fmt.Fprintf(outFH, "Select one from each column, hyphen separated.\n")
 	fmt.Fprintf(outFH, "Not all combinations make sense\n")
 	fmt.Fprintf(outFH, "For example: `darwin-launchd-pkg`\n")
 	fmt.Fprintf(outFH, "\n")
