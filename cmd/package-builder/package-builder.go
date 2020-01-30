@@ -277,8 +277,9 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "  %s <mode> --help\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "MODES\n")
-	fmt.Fprintf(os.Stderr, "  make         Generate a single launcher package for each platform\n")
-	fmt.Fprintf(os.Stderr, "  version      Print full version information\n")
+	fmt.Fprintf(os.Stderr, "  make          Generate a single launcher package for each platform\n")
+	fmt.Fprintf(os.Stderr, "  list-targets  List all known build targets\n")
+	fmt.Fprintf(os.Stderr, "  version       Print full version information\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "VERSION\n")
 	fmt.Fprintf(os.Stderr, "  %s\n", version.Version().Version)
@@ -297,6 +298,8 @@ func main() {
 		run = runVersion
 	case "make":
 		run = runMake
+	case "list-targets":
+		run = runListTargets
 	default:
 		usage()
 		os.Exit(1)

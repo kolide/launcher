@@ -26,6 +26,8 @@ const (
 	NoInit                    = "none"
 )
 
+var knownInitFlavors = [...]InitFlavor{LaunchD, Systemd, Init, Upstart, WindowsService, NoInit}
+
 type PlatformFlavor string
 
 const (
@@ -33,6 +35,8 @@ const (
 	Windows                = "windows"
 	Linux                  = "linux"
 )
+
+var knownPlatformFlavors = [...]PlatformFlavor{Darwin, Windows, Linux}
 
 type PackageFlavor string
 
@@ -44,6 +48,8 @@ const (
 	Msi                  = "msi"
 	Pacman               = "pacman"
 )
+
+var knownPackageFlavors = [...]PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman}
 
 // Parse parses a string in the form platform-init-package and sets the target accordingly.
 func (t *Target) Parse(s string) error {
@@ -104,7 +110,7 @@ func (t *Target) PlatformBinaryName(input string) string {
 
 // InitFromString sets a target's init flavor from string representation
 func (t *Target) InitFromString(s string) error {
-	for _, testInit := range []InitFlavor{LaunchD, Systemd, Init, Upstart, NoInit, WindowsService} {
+	for _, testInit := range knownInitFlavors {
 		if testInit.String() == s {
 			t.Init = testInit
 			return nil
@@ -115,7 +121,7 @@ func (t *Target) InitFromString(s string) error {
 
 // PlatformFromString sets a target's platform flavor from string representation
 func (t *Target) PlatformFromString(s string) error {
-	for _, testPlat := range []PlatformFlavor{Darwin, Windows, Linux} {
+	for _, testPlat := range knownPlatformFlavors {
 		if testPlat.String() == s {
 			t.Platform = testPlat
 			return nil
@@ -126,7 +132,7 @@ func (t *Target) PlatformFromString(s string) error {
 
 // PackageFromString sets a target's package flavor from string representation
 func (t *Target) PackageFromString(s string) error {
-	for _, testPackage := range []PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman} {
+	for _, testPackage := range knownPackageFlavors {
 		if testPackage.String() == s {
 			t.Package = testPackage
 			return nil
@@ -149,4 +155,28 @@ func (i *PlatformFlavor) String() string {
 // String returns the string representation
 func (i *PackageFlavor) String() string {
 	return strings.ToLower(string(*i))
+}
+
+func KnownInitFlavors() []string {
+	out := make([]string, len(knownInitFlavors))
+	for i, v := range knownInitFlavors {
+		out[i] = v.String()
+	}
+	return out
+}
+
+func KnownPlatformFlavors() []string {
+	out := make([]string, len(knownPlatformFlavors))
+	for i, v := range knownPlatformFlavors {
+		out[i] = v.String()
+	}
+	return out
+}
+
+func KnownPackageFlavors() []string {
+	out := make([]string, len(knownPackageFlavors))
+	for i, v := range knownPackageFlavors {
+		out[i] = v.String()
+	}
+	return out
 }

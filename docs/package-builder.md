@@ -149,6 +149,8 @@ for each target platform.
 
 Targets can be specificity as a _platform-init-packaging_ triple.
 
+To display the list of support targets, invoke `package-builder list-targets`
+
 #### Docker Temp Directories
 
 Packaging for linux used `fpm` via a docker container. This operates
