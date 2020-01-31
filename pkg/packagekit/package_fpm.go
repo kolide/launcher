@@ -123,7 +123,8 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),
 		"-v", fmt.Sprintf("%s:/pkgscripts", po.Scripts),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"kolide/fpm",
+		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
+		"kolide/fpm:latest",
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...)
