@@ -60,7 +60,7 @@ func MDMInfo(logger log.Logger) *table.Plugin {
 		table.TextColumn("has_scep_payload"),
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
-		table.TextColumn("dep_capable"),
+		table.TextColumn("has_dep_profile"),
 	}
 	return table.NewPlugin("kolide_mdm_info", columns, generateMDMInfo)
 }
@@ -106,7 +106,7 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 					"identity_certificate_uuid": enrollProfile.IdentityCertificateUUID,
 					"installed_from_dep":        depEnrolled,
 					"user_approved":             userApproved,
-					"dep_capable":               depCapable,
+					"has_dep_profile":           depCapable,
 				}
 				break
 			}
@@ -172,7 +172,7 @@ func getDEPStatus() (depStatus, error) {
 
 	var depstatus depStatus
 
-	if len(lines) > 3 {
+	if len(lines) > 3 { // This is less than ideal boolean logic and may someday break
 		depstatus.DEPCapable = true
 	}
 
