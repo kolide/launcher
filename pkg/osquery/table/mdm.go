@@ -3,7 +3,6 @@ package table
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 	"strconv"
 
@@ -166,12 +165,12 @@ func getDEPStatus() (depStatus, error) {
 	cmd := exec.Command("/usr/bin/profiles", "show", "-type", "enrollment")
 	out, err := cmd.Output()
 	if err != nil {
-		fmt.Println(err)
+		return depStatus{}, err
 	}
 
 	lines := bytes.Split(out, []byte("\n"))
 
-	depstatus := depStatus{DEPCapable: false}
+	var depstatus depStatus
 
 	if len(lines) > 3 {
 		depstatus.DEPCapable = true
