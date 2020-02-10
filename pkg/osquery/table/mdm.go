@@ -16,18 +16,18 @@ import (
 type profilesOutput struct {
 	ComputerLevel []profilePayload `plist:"_computerlevel"`
 }
-​
+
 type profilePayload struct {
 	ProfileIdentifier  string
 	ProfileInstallDate string
 	ProfileItems       []profileItem
 }
-​
+
 type profileItem struct {
 	PayloadContent *payloadContent
 	PayloadType    string
 }
-​
+
 type payloadContent struct {
 	AccessRights            int
 	CheckInURL              string
@@ -37,12 +37,12 @@ type payloadContent struct {
 	IdentityCertificateUUID string
 	SignMessage             bool
 }
-​
+
 type profileStatus struct {
 	DEPEnrolled  bool
 	UserApproved bool
 }
-​
+
 type depStatus struct {
 	DEPCapable bool
 }
@@ -61,6 +61,7 @@ func MDMInfo(logger log.Logger) *table.Plugin {
 		table.TextColumn("has_scep_payload"),
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
+		table.TextColumn("dep_capable"),
 	}
 	return table.NewPlugin("kolide_mdm_info", columns, generateMDMInfo)
 }
@@ -140,31 +141,6 @@ func getMDMProfile() (*profilesOutput, error) {
 	return &profiles, nil
 }
 
-type profilesOutput struct {
-	ComputerLevel []profilePayload `plist:"_computerlevel"`
-}
-
-type profilePayload struct {
-	ProfileIdentifier  string
-	ProfileInstallDate string
-	ProfileItems       []profileItem
-}
-
-type profileItem struct {
-	PayloadContent *payloadContent
-	PayloadType    string
-}
-
-type payloadContent struct {
-	AccessRights            int
-	CheckInURL              string
-	ServerURL               string
-	ServerCapabilities      []string
-	Topic                   string
-	IdentityCertificateUUID string
-	SignMessage             bool
-}
-
 func getMDMProfileStatus() (profileStatus, error) {
 	cmd := exec.Command("/usr/bin/profiles", "status", "-type", "enrollment")
 	out, err := cmd.Output()
@@ -192,14 +168,14 @@ func getDEPStatus() (depStatus, error) {
 	if err != nil {
 		fmt.Println(err)
 	}
-​
+
 	lines := bytes.Split(out, []byte("\n"))
-​
+
 	depstatus := depStatus{DEPCapable: false}
-​
+
 	if len(lines) > 3 {
 		depstatus.DEPCapable = true
 	}
-​
+
 	return depstatus, nil
 }
