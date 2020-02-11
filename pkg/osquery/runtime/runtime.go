@@ -551,15 +551,26 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Launch osquery process (async)
 	err = o.cmd.Start()
 	if err != nil {
+		level.Info(o.logger).Log(
+			"msg", "Error starting osquery",
+			"err", err,
+		)
 		return errors.Wrap(err, "starting osqueryd process")
 	}
 	o.errgroup.Go(func() error {
 		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
+			level.Debug(o.logger).Log(
+				"msg", "osquery exited okay",
+			)
 			// TODO: should this return nil?
 			return errors.New("osquery process exited")
 		default:
+			level.Info(o.logger).Log(
+				"msg", "Error running osquery command",
+				"err", err,
+			)
 			return errors.Wrap(err, "running osqueryd command")
 		}
 	})
