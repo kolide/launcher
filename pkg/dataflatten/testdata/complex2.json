@@ -16,9 +16,9 @@
         }
       ],
       "nest3": {
-        "string3": "null",
-        "string4": "null",
-        "string5": "null",
+        "string3": null,
+        "string4": null,
+        "string5": null,
         "string6": "null",
         "string7": "A Very Long Sentence",
         "string8": "short"

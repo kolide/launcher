@@ -18,10 +18,10 @@ type flattenTestCase struct {
 	err     bool
 }
 
-func TestFlatten_NullHandlingBug(t *testing.T) {
+func TestFlatten_Complex2(t *testing.T) {
 	t.Parallel()
 
-	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nulls.json"))
+	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "complex2.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
 	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")
@@ -31,10 +31,30 @@ func TestFlatten_NullHandlingBug(t *testing.T) {
 			out: []Row{
 				Row{Path: []string{"addons", "0", "bool1"}, Value: "true"},
 				Row{Path: []string{"addons", "0", "nest2", "0", "string2"}, Value: "foo"},
+				Row{Path: []string{"addons", "0", "nest3", "string6"}, Value: "null"},
 				Row{Path: []string{"addons", "0", "nest3", "string7"}, Value: "A Very Long Sentence"},
 				Row{Path: []string{"addons", "0", "nest3", "string8"}, Value: "short"},
 				Row{Path: []string{"addons", "0", "string1"}, Value: "hello"},
 			},
+		},
+		{
+			out: []Row{
+				Row{Path: []string{"addons", "0", "bool1"}, Value: "true"},
+				Row{Path: []string{"addons", "0", "nest2", "0", "null3"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest2", "0", "null4"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest2", "0", "string2"}, Value: "foo"},
+				Row{Path: []string{"addons", "0", "nest3", "string3"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest3", "string4"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest3", "string5"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest3", "string6"}, Value: "null"},
+				Row{Path: []string{"addons", "0", "nest3", "string7"}, Value: "A Very Long Sentence"},
+				Row{Path: []string{"addons", "0", "nest3", "string8"}, Value: "short"},
+				Row{Path: []string{"addons", "0", "null1"}, Value: ""},
+				Row{Path: []string{"addons", "0", "null2"}, Value: ""},
+				Row{Path: []string{"addons", "0", "string1"}, Value: "hello"},
+			},
+			options: []FlattenOpts{IncludeNulls()},
+			comment: "includes null",
 		},
 	}
 
@@ -61,9 +81,20 @@ func TestFlatten_NestingBug(t *testing.T) {
 				Row{Path: []string{"addons", "0", "nest1", "string4"}, Value: "string4"},
 				Row{Path: []string{"addons", "0", "nest1", "string5"}, Value: "string5"},
 				Row{Path: []string{"addons", "0", "nest1", "string6"}, Value: "string6"},
-				Row{Path: []string{"addons", "0", "nest1", "string7"}, Value: "string7"},
-				Row{Path: []string{"addons", "0", "nest1", "string8"}, Value: "string8"},
 			},
+		},
+		{
+			out: []Row{
+				Row{Path: []string{"addons", "0", "name"}, Value: "Nested Strings"},
+				Row{Path: []string{"addons", "0", "nest1", "string1"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest1", "string2"}, Value: ""},
+				Row{Path: []string{"addons", "0", "nest1", "string3"}, Value: "string3"},
+				Row{Path: []string{"addons", "0", "nest1", "string4"}, Value: "string4"},
+				Row{Path: []string{"addons", "0", "nest1", "string5"}, Value: "string5"},
+				Row{Path: []string{"addons", "0", "nest1", "string6"}, Value: "string6"},
+			},
+			options: []FlattenOpts{IncludeNulls()},
+			comment: "includes null",
 		},
 	}
 
@@ -102,7 +133,7 @@ func TestFlatten_Complex(t *testing.T) {
 				Row{Path: []string{"users", "0", "id"}, Value: "1"},
 				Row{Path: []string{"users", "0", "name"}, Value: "Alex Aardvark"},
 				Row{Path: []string{"users", "0", "uuid"}, Value: "abc123"},
-				Row{Path: []string{"users", "1", "favorites", "1"}, Value: "mice"},
+				Row{Path: []string{"users", "1", "favorites", "0"}, Value: "mice"},
 				Row{Path: []string{"users", "1", "favorites", "1"}, Value: "birds"},
 				Row{Path: []string{"users", "1", "id"}, Value: "2"},
 				Row{Path: []string{"users", "1", "name"}, Value: "Bailey Bobcat"},
@@ -112,6 +143,7 @@ func TestFlatten_Complex(t *testing.T) {
 				Row{Path: []string{"users", "2", "name"}, Value: "Cam Chipmunk"},
 				Row{Path: []string{"users", "2", "uuid"}, Value: "ghi789"},
 			},
+			comment: "all together",
 		},
 		{
 			options: []FlattenOpts{WithQuery([]string{"metadata"})},
