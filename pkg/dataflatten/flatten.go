@@ -175,12 +175,10 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
 				return errors.Wrap(err, "flattening array")
 			}
-
 		}
 	case map[string]interface{}:
-		level.Debug(logger).Log("msg", "checking a map", "path", strings.Join(path, "/"))
+		level.Debug(logger).Log("msg", "checking a map")
 		for k, e := range v {
-
 			// Check that the key name matches. If not, skip this entire
 			// branch of the map
 			if !(isQueryMatched || fl.queryMatchString(k, queryTerm)) {
@@ -197,10 +195,11 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			level.Debug(logger).Log("msg", "query not matched")
 			return nil
 		}
-		fl.rows = append(fl.rows, Row{Path: path, Value: ""})
+		fl.rows = append(fl.rows, NewRow(path, ""))
 	default:
 		// non-iterable. stringify and be done
 		stringValue, err := stringify(v)
+
 		if err != nil {
 			return errors.Wrapf(err, "flattening at path %v", path)
 		}
@@ -209,8 +208,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			level.Debug(logger).Log("msg", "query not matched")
 			return nil
 		}
-		fl.rows = append(fl.rows, Row{Path: path, Value: stringValue})
-
+		fl.rows = append(fl.rows, NewRow(path, stringValue))
 	}
 	return nil
 }
