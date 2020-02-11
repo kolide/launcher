@@ -45,6 +45,35 @@ func TestFlatten_NullHandlingBug(t *testing.T) {
 
 }
 
+func TestFlatten_NestingBug(t *testing.T) {
+	t.Parallel()
+
+	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nested.json"))
+	require.NoError(t, err, "reading file")
+	var dataIn interface{}
+	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")
+
+	var tests = []flattenTestCase{
+		{
+			out: []Row{
+				Row{Path: []string{"addons", "0", "name"}, Value: "Nested Strings"},
+				Row{Path: []string{"addons", "0", "nest1", "string3"}, Value: "string3"},
+				Row{Path: []string{"addons", "0", "nest1", "string4"}, Value: "string4"},
+				Row{Path: []string{"addons", "0", "nest1", "string5"}, Value: "string5"},
+				Row{Path: []string{"addons", "0", "nest1", "string6"}, Value: "string6"},
+				Row{Path: []string{"addons", "0", "nest1", "string7"}, Value: "string7"},
+				Row{Path: []string{"addons", "0", "nest1", "string8"}, Value: "string8"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		actual, err := Flatten(dataIn, tt.options...)
+		testFlattenCase(t, tt, actual, err)
+	}
+
+}
+
 func TestFlatten_Complex(t *testing.T) {
 	t.Parallel()
 

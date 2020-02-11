@@ -1,28 +1,28 @@
 {
   "addons": [
     {
-      "nest3": {
-        "string8": "short",
-        "string7": "A Very Long Sentence",
-        "string6": null,
-        "string5": null,
-        "string4": null,
-        "string3": null
-      },
-      "nest2": [
-        {
-          "string2": "foo",
-          "null4": null,
-          "null3": null
-        }
-      ],
+      "string1": "hello",
+      "null1": null,
+      "null2": null,
+      "bool1": true,
       "nest1": {
         "anArray": []
       },
-      "bool1": true,
-      "null2": null,
-      "null1": null,
-      "string1": "hello"
+      "nest2": [
+        {
+          "null3": null,
+          "null4": null,
+          "string2": "foo"
+        }
+      ],
+      "nest3": {
+        "string3": "null",
+        "string4": "null",
+        "string5": "null",
+        "string6": "null",
+        "string7": "A Very Long Sentence",
+        "string8": "short"
+      }
     }
   ]
 }
