@@ -8,6 +8,17 @@ type Row struct {
 	Value string
 }
 
+// NewRow does a copy of the path elements, and returns a row. We do
+// this copy to correct for some odd pointer passing bugs
+func NewRow(path []string, value string) Row {
+	copiedPath := make([]string, len(path))
+	copy(copiedPath, path)
+	return Row{
+		Path:  copiedPath,
+		Value: value,
+	}
+}
+
 func (r Row) StringPath(sep string) string {
 	return strings.Join(r.Path, sep)
 }
