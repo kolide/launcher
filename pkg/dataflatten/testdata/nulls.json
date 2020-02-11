@@ -1,0 +1,28 @@
+{
+  "addons": [
+    {
+      "nest3": {
+        "string8": "short",
+        "string7": "A Very Long Sentence",
+        "string6": null,
+        "string5": null,
+        "string4": null,
+        "string3": null
+      },
+      "nest2": [
+        {
+          "string2": "foo",
+          "null4": null,
+          "null3": null
+        }
+      ],
+      "nest1": {
+        "anArray": []
+      },
+      "bool1": true,
+      "null2": null,
+      "null1": null,
+      "string1": "hello"
+    }
+  ]
+}

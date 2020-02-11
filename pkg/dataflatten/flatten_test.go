@@ -18,6 +18,33 @@ type flattenTestCase struct {
 	err     bool
 }
 
+func TestFlatten_NullHandlingBug(t *testing.T) {
+	t.Parallel()
+
+	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nulls.json"))
+	require.NoError(t, err, "reading file")
+	var dataIn interface{}
+	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")
+
+	var tests = []flattenTestCase{
+		{
+			out: []Row{
+				Row{Path: []string{"addons", "0", "bool1"}, Value: "true"},
+				Row{Path: []string{"addons", "0", "nest2", "0", "string2"}, Value: "foo"},
+				Row{Path: []string{"addons", "0", "nest3", "string7"}, Value: "A Very Long Sentence"},
+				Row{Path: []string{"addons", "0", "nest3", "string8"}, Value: "short"},
+				Row{Path: []string{"addons", "0", "string1"}, Value: "hello"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		actual, err := Flatten(dataIn, tt.options...)
+		testFlattenCase(t, tt, actual, err)
+	}
+
+}
+
 func TestFlatten_Complex(t *testing.T) {
 	t.Parallel()
 
