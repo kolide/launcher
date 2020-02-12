@@ -21,9 +21,10 @@ import (
 type outputType string
 
 const (
-	Deb outputType = "deb"
-	RPM            = "rpm"
-	Tar            = "tar"
+	Deb    outputType = "deb"
+	RPM               = "rpm"
+	Tar               = "tar"
+	Pacman            = "pacman"
 )
 
 type fpmOptions struct {
@@ -48,6 +49,12 @@ func AsDeb() FpmOpt {
 func AsTar() FpmOpt {
 	return func(f *fpmOptions) {
 		f.outputType = Tar
+	}
+}
+
+func AsPacman() FpmOpt {
+	return func(f *fpmOptions) {
+		f.outputType = Pacman
 	}
 }
 
@@ -116,13 +123,16 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),
 		"-v", fmt.Sprintf("%s:/pkgscripts", po.Scripts),
 		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"kolide/fpm",
+		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
+		"kolide/fpm:latest",
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...)
 
 	stderr := new(bytes.Buffer)
+	stdout := new(bytes.Buffer)
 	cmd.Stderr = stderr
+	cmd.Stdout = stdout
 
 	level.Debug(logger).Log(
 		"msg", "Running fpm",
@@ -135,6 +145,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 			"err", err,
 			"cmd", strings.Join(cmd.Args, " "),
 			"stderr", stderr,
+			"stdout", stdout,
 		)
 		return errors.Wrapf(err, "creating fpm package: %s", stderr)
 	}
