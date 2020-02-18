@@ -39,6 +39,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
@@ -368,7 +369,7 @@ func stringify(data interface{}) (string, error) {
 	case time.Time:
 		return strconv.FormatInt(v.Unix(), 10), nil
 	default:
-		//spew.Dump(data)
+		spew.Dump(data)
 		return "", errors.Errorf("unknown type on %v", data)
 	}
 }
