@@ -74,8 +74,10 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	}
 	configOutStr := string(stdout.Bytes())
 	configSplit := strings.Split(configOutStr, ":")
-	touchIDEnabled = configSplit[2][1:2]
-	touchIDUnlock = configSplit[3][1:2]
+	if len(configSplit) >= 3 {
+		touchIDEnabled = configSplit[2][1:2]
+		touchIDUnlock = configSplit[3][1:2]
+	}
 
 	result := map[string]string{
 		"touchid_compatible": touchIDCompatible,
