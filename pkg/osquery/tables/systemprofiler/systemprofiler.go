@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -39,7 +39,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 
 	t := &Table{
 		client:    client,
-		logger:    logger, //level.NewFilter(logger, level.AllowInfo()),
+		logger:    level.NewFilter(logger, level.AllowInfo()),
 		tableName: "kolide_system_profiler",
 	}
 
@@ -47,8 +47,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	//ctx = ctxlog.NewContext(ctx, t.logger)
-
 	var results []map[string]string
 
 	datatypeQ, ok := queryContext.Constraints["datatype"]
@@ -56,89 +54,71 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, errors.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
 	}
 
-	datatypes := []string{}
-
+	// For each requested datatype, run system profiler This
+	// implementation has a couple of limitations -- It's an invocation
+	// per dataType requested, and it does not support an `all` type.
 	for _, datatypeConstraint := range datatypeQ.Constraints {
-		datatype := datatypeConstraint.Expression
+		dataType := datatypeConstraint.Expression
 
-		// If the constraint is the magic "%", then don't add any args.
-		if datatype == "%" {
-			continue
+		systemProfilerOutput, err := t.execSystemProfiler(ctx, []string{dataType})
+		if err != nil {
+			return results, errors.Wrap(err, "exec")
 		}
 
-		datatypes = append(datatypes, datatype)
+		if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
+			for _, constraint := range q.Constraints {
+				dataQuery := constraint.Expression
+				results = append(results, t.getRowsFromOutput(dataType, dataQuery, systemProfilerOutput)...)
+			}
+		} else {
+			results = append(results, t.getRowsFromOutput(dataType, "", systemProfilerOutput)...)
+		}
 	}
 
-	level.Debug(t.logger).Log("msg", "seph We're using args", "args", datatypes)
+	return results, nil
+}
 
-	flattenOpts := []dataflatten.FlattenOpts{
-		//dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+func (t *Table) getRowsFromOutput(dataType string, dataQuery string, systemProfilerOutput []byte) []map[string]string {
+	var results []map[string]string
+
+	flattenOpts := []dataflatten.FlattenOpts{}
+
+	if dataQuery != "" {
+		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 	}
 
 	if t.logger != nil {
 		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
 	}
 
-	systemProfilerOutput, err := t.execSystemProfiler(ctx, datatypes)
+	// Now that we have output, parse it into the underlying result
+	// structure. It might be nice to pre-process this, and remove the
+	// _properties, but that's hard to do cleanly, so just flatten it
+	// directly.
+	data, err := dataflatten.Plist(systemProfilerOutput, flattenOpts...)
 	if err != nil {
-		return results, errors.Wrap(err, "exec")
+		level.Info(t.logger).Log("msg", "failure flattening system_profile output", "err", err)
+		return nil
 	}
 
-	// Now that we have output, parse it into the underlying result structure.
-	var systemProfilerResults []Result
+	for _, row := range data {
+		p, k := row.ParentKey("/")
 
-	if err := plist.Unmarshal(systemProfilerOutput, &systemProfilerResults); err != nil {
-		return results, errors.Wrap(err, "unmarshalling system profiler output")
-	}
-
-	// Now create the osquery results set from the parsed data
-	for _, systemProfilerResult := range systemProfilerResults {
-		dataType := systemProfilerResult.DataType
-
-		data, err := dataflatten.Flatten(systemProfilerResult.Items)
-		if err != nil {
-			level.Info(t.logger).Log("msg", "failure parsing system_profile output", "err", err)
-			return results, errors.Wrap(err, "parsing data")
+		res := map[string]string{
+			"datatype": dataType,
+			"fullkey":  row.StringPath("/"),
+			"parent":   p,
+			"key":      k,
+			"value":    row.Value,
+			"query":    dataQuery,
 		}
-
-		for _, row := range data {
-			p, k := row.ParentKey("/")
-
-			res := map[string]string{
-				"datatype": dataType,
-				"fullkey":  row.StringPath("/"),
-				"parent":   p,
-				"key":      k,
-				"value":    row.Value,
-				//"query":   dataQuery,
-			}
-			results = append(results, res)
-		}
+		results = append(results, res)
 	}
 
-	//spew.Dump(results)
-
-	return results, nil
-}
-
-type Property struct {
-	Order                string `plist:"_order"`
-	SuppressLocalization string `plist:"_suppressLocalization"`
-	DetailLevel          string `plist:"_detailLevel"`
-}
-
-type Result struct {
-	Items          []map[string]interface{} `plist:"_items"`
-	DetailLevel    string                   `plist:"_detailLevel"`
-	DataType       string                   `plist:"_dataType"`
-	SPCommandLine  []string                 `plist:"_SPCommandLineArguments"`
-	ParentDataType string                   `plist:"_parentDataType"`
-	Properties     map[string]Property      `plist:"_properties"`
+	return results
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, subcommands []string) ([]byte, error) {
-	// logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
