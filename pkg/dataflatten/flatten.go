@@ -364,6 +364,8 @@ func stringify(data interface{}) (string, error) {
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case int:
 		return strconv.Itoa(v), nil
+	case int64:
+		return strconv.FormatInt(v, 10), nil
 	case bool:
 		return strconv.FormatBool(v), nil
 	case time.Time:
