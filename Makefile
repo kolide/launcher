@@ -44,7 +44,7 @@ osqueryi-tables: table.ext
 sudo-osqueryi-tables: table.ext
 	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
 launchas-osqueryi-tables: table.ext
-	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose--extension ./build/darwin/tables.ext
+	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
 
 
 extension: .pre-build

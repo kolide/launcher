@@ -1,7 +1,39 @@
 //+build darwin
 
-// Package systemprofiler provides a suite of tables for the various
-// subcommands of `system_profiler`
+// Package systemprofiler provides a suite table wrapper around
+// `system_profiler` macOS command. It supports some basic arguments
+// like `detaillevel` and requested data types.
+//
+// Note that some detail levels and data types will have performance
+// impact if requested.
+//
+// As the returned data is a complex nested plist, this uses the
+// dataflatten tooling. (See
+// https://godoc.org/github.com/kolide/launcher/pkg/dataflatten)
+//
+// Everything, minimal details:
+//
+//    osquery> select count(*) from kolide_system_profiler where datatype like "%" and detaillevel = "mini";
+//    +----------+
+//    | count(*) |
+//    +----------+
+//    | 1270     |
+//    +----------+
+//
+// Multiple data types (slightly redacted):
+//
+//    osquery> select fullkey, key, value, datatype from kolide_system_profiler where datatype in ("SPCameraDataType", "SPiBridgeDataType");
+//    +----------------------+--------------------+------------------------------------------+-------------------+
+//    | fullkey              | key                | value                                    | datatype          |
+//    +----------------------+--------------------+------------------------------------------+-------------------+
+//    | 0/spcamera_unique-id | spcamera_unique-id | 0x1111111111111111                       | SPCameraDataType  |
+//    | 0/_name              | _name              | FaceTime HD Camera                       | SPCameraDataType  |
+//    | 0/spcamera_model-id  | spcamera_model-id  | UVC Camera VendorID_1452 ProductID_30000 | SPCameraDataType  |
+//    | 0/_name              | _name              | Controller Information                   | SPiBridgeDataType |
+//    | 0/ibridge_build      | ibridge_build      | 14Y000                                   | SPiBridgeDataType |
+//    | 0/ibridge_model_name | ibridge_model_name | Apple T1 Security Chip                   | SPiBridgeDataType |
+//    +----------------------+--------------------+------------------------------------------+-------------------+
+
 package systemprofiler
 
 import (
@@ -141,11 +173,6 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
 	}
 
-	// Now that we have output, parse it into the underlying result
-	// structure. It might be nice to pre-process this, and remove the
-	// _properties, but that's hard to do cleanly, so just flatten it
-	// directly.
-	//data, err := dataflatten.Plist(systemProfilerOutput, flattenOpts...)
 	var systemProfilerResults []Result
 	if err := plist.Unmarshal(systemProfilerOutput, &systemProfilerResults); err != nil {
 		level.Info(t.logger).Log("msg", "error unmarshalling system_profile output", "err", err)
