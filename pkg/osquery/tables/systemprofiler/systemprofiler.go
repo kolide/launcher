@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -19,6 +20,30 @@ import (
 )
 
 const systemprofilerPath = "/usr/sbin/system_profiler"
+
+var knownDetailLevels = []string{
+	"mini",  // short report (contains no identifying or personal information)
+	"basic", // basic hardware and network information
+	"full",  // all available information
+}
+
+type Property struct {
+	Order                string `plist:"_order"`
+	SuppressLocalization string `plist:"_suppressLocalization"`
+	DetailLevel          string `plist:"_detailLevel"`
+}
+
+type Result struct {
+	Items          []interface{} `plist:"_items"`
+	DataType       string        `plist:"_dataType"`
+	SPCommandLine  []string      `plist:"_SPCommandLineArguments"`
+	ParentDataType string        `plist:"_parentDataType"`
+
+	// These would be nice to add, but they come back with inconsistent
+	// types, so doing a straight unmarshal is hard.
+	// DetailLevel    int                 `plist:"_detailLevel"`
+	// Properties     map[string]Property `plist:"_properties"`
+}
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -33,8 +58,11 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("parent"),
 		table.TextColumn("key"),
 		table.TextColumn("value"),
+		table.TextColumn("parentdatatype"),
+
 		table.TextColumn("query"),
 		table.TextColumn("datatype"),
+		table.TextColumn("detaillevel"),
 	}
 
 	t := &Table{
@@ -49,36 +77,58 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
+	requestedDatatypes := []string{}
+
 	datatypeQ, ok := queryContext.Constraints["datatype"]
 	if !ok || len(datatypeQ.Constraints) == 0 {
 		return results, errors.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
 	}
 
-	// For each requested datatype, run system profiler This
-	// implementation has a couple of limitations -- It's an invocation
-	// per dataType requested, and it does not support an `all` type.
 	for _, datatypeConstraint := range datatypeQ.Constraints {
-		dataType := datatypeConstraint.Expression
+		dt := datatypeConstraint.Expression
 
-		systemProfilerOutput, err := t.execSystemProfiler(ctx, []string{dataType})
-		if err != nil {
-			return results, errors.Wrap(err, "exec")
+		// If the constraint is the magic "%", it's eqivlent to an `all` style
+		if dt == "%" {
+			requestedDatatypes = []string{}
+			break
 		}
 
-		if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
-			for _, constraint := range q.Constraints {
-				dataQuery := constraint.Expression
-				results = append(results, t.getRowsFromOutput(dataType, dataQuery, systemProfilerOutput)...)
+		requestedDatatypes = append(requestedDatatypes, dt)
+	}
+
+	var detailLevel string
+	if q, ok := queryContext.Constraints["detaillevel"]; ok && len(q.Constraints) != 0 {
+		if len(q.Constraints) > 1 {
+			level.Info(t.logger).Log("msg", "WARNING: Only using the first detaillevel request")
+		}
+
+		dl := q.Constraints[0].Expression
+		for _, known := range knownDetailLevels {
+			if known == dl {
+				detailLevel = dl
 			}
-		} else {
-			results = append(results, t.getRowsFromOutput(dataType, "", systemProfilerOutput)...)
 		}
+
+	}
+
+	systemProfilerOutput, err := t.execSystemProfiler(ctx, detailLevel, requestedDatatypes)
+	if err != nil {
+		return results, errors.Wrap(err, "exec")
+	}
+
+	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
+		for _, constraint := range q.Constraints {
+			dataQuery := constraint.Expression
+			results = append(results, t.getRowsFromOutput(dataQuery, detailLevel, systemProfilerOutput)...)
+		}
+	} else {
+		results = append(results, t.getRowsFromOutput("", detailLevel, systemProfilerOutput)...)
 	}
 
 	return results, nil
 }
 
-func (t *Table) getRowsFromOutput(dataType string, dataQuery string, systemProfilerOutput []byte) []map[string]string {
+func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{}
@@ -95,36 +145,57 @@ func (t *Table) getRowsFromOutput(dataType string, dataQuery string, systemProfi
 	// structure. It might be nice to pre-process this, and remove the
 	// _properties, but that's hard to do cleanly, so just flatten it
 	// directly.
-	data, err := dataflatten.Plist(systemProfilerOutput, flattenOpts...)
-	if err != nil {
-		level.Info(t.logger).Log("msg", "failure flattening system_profile output", "err", err)
+	//data, err := dataflatten.Plist(systemProfilerOutput, flattenOpts...)
+	var systemProfilerResults []Result
+	if err := plist.Unmarshal(systemProfilerOutput, &systemProfilerResults); err != nil {
+		level.Info(t.logger).Log("msg", "error unmarshalling system_profile output", "err", err)
 		return nil
 	}
 
-	for _, row := range data {
-		p, k := row.ParentKey("/")
+	for _, systemProfilerResult := range systemProfilerResults {
 
-		res := map[string]string{
-			"datatype": dataType,
-			"fullkey":  row.StringPath("/"),
-			"parent":   p,
-			"key":      k,
-			"value":    row.Value,
-			"query":    dataQuery,
+		dataType := systemProfilerResult.DataType
+
+		data, err := dataflatten.Flatten(systemProfilerResult.Items, flattenOpts...)
+
+		if err != nil {
+			level.Info(t.logger).Log("msg", "failure flattening system_profile output", "err", err)
+			return nil
 		}
-		results = append(results, res)
+
+		for _, row := range data {
+			p, k := row.ParentKey("/")
+
+			res := map[string]string{
+				"datatype":       dataType,
+				"parentdatatype": systemProfilerResult.ParentDataType,
+				"fullkey":        row.StringPath("/"),
+				"parent":         p,
+				"key":            k,
+				"value":          row.Value,
+				"query":          dataQuery,
+				"detaillevel":    detailLevel,
+			}
+			results = append(results, res)
+		}
 	}
 
 	return results
 }
 
-func (t *Table) execSystemProfiler(ctx context.Context, subcommands []string) ([]byte, error) {
+func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	subcommands = append(subcommands, "-xml")
+	args := []string{"-xml"}
 
-	cmd := exec.CommandContext(ctx, systemprofilerPath, subcommands...)
+	if detailLevel != "" {
+		args = append(args, "-detailLevel", detailLevel)
+	}
+
+	args = append(args, subcommands...)
+
+	cmd := exec.CommandContext(ctx, systemprofilerPath, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
