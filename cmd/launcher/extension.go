@@ -58,8 +58,19 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 		return nil, nil, nil, errors.Wrap(err, "starting grpc extension")
 	}
 
-	// create the logging adapter for osquery
-	osqueryLogger := &kolidelog.OsqueryLogAdapter{Logger: log.With(logger, "component", "osquery")}
+	// create the logging adapters for osquery
+	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
+		logger,
+		kolidelog.WithLevelFunc(level.Info),
+		kolidelog.WithKeyValue("component", "osquery"),
+		kolidelog.WithKeyValue("level", "stderr"),
+	)
+	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
+		logger,
+		kolidelog.WithLevelFunc(level.Debug),
+		kolidelog.WithKeyValue("component", "osquery"),
+		kolidelog.WithKeyValue("level", "stdout"),
+	)
 
 	runner := runtime.LaunchUnstartedInstance(
 		runtime.WithOsquerydBinary(opts.OsquerydPath),
@@ -73,8 +84,8 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
 		),
 		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
-		runtime.WithStdout(osqueryLogger),
-		runtime.WithStderr(osqueryLogger),
+		runtime.WithStdout(osqueryStdoutLogger),
+		runtime.WithStderr(osqueryStderrLogger),
 		runtime.WithLogger(logger),
 		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
 	)
