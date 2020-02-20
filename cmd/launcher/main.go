@@ -78,7 +78,8 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
-		logutil.Fatal(logger, err, "run launcher", "stack", fmt.Sprintf("%+v", err))
+		level.Debug(logger).Log(err, "run launcher", "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, err, "run launcher")
 	}
 }
 

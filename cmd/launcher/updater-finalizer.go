@@ -21,11 +21,8 @@ import (
 func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
 	return func() error {
 		if err := shutdownOsquery(); err != nil {
-			level.Info(logger).Log(
-				"method", "updateFinalizer",
-				"err", err,
-				"stack", fmt.Sprintf("%+v", err),
-			)
+			level.Info(logger).Log("method", "updateFinalizer", "err", err)
+			level.Debug(logger).Log("method", "updateFinalizer", "err", err, "stack", fmt.Sprintf("%+v", err))
 		}
 		// find the newest version of launcher on disk.
 		// FindNewest uses context as a way to get a logger, so we need to create and pass one.

@@ -121,11 +121,13 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 				return nil
 			},
 			Interrupt: func(err error) {
-				level.Info(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+				level.Info(logger).Log("msg", "extension interrupted", "err", err)
+				level.Debug(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 				ext.Shutdown()
 				if runner != nil {
 					if err := runner.Shutdown(); err != nil {
-						level.Info(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
+						level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
+						level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
 					}
 				}
 			},

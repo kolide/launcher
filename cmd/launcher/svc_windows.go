@@ -107,7 +107,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	go func() {
 		err := runLauncher(ctx, cancel, w.opts)
 		if err != nil {
-			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
+			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
+			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
