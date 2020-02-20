@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -41,12 +42,14 @@ func main() {
 		osquery.ServerTimeout(timeout),
 	)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
+		level.Debug(logger).Log("err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
 	}
 
 	client, err := osquery.NewClient(*flSocketPath, timeout)
 	if err != nil {
-		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
+		level.Debug(logger).Log("err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", err, "creating osquery extension client")
 	}
 
 	var plugins []osquery.OsqueryPlugin
@@ -56,6 +59,7 @@ func main() {
 	server.RegisterPlugin(plugins...)
 
 	if err := server.Run(); err != nil {
-		logutil.Fatal(logger, "err", err, "stack", fmt.Sprintf("%+v", err))
+		level.Debug(logger).Log("err", err, "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", err)
 	}
 }

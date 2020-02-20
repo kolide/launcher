@@ -99,7 +99,8 @@ func createUpdater(
 			return nil
 		},
 		Interrupt: func(err error) {
-			level.Info(config.Logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+			level.Info(config.Logger).Log("msg", "updater interrupted", "err", err)
+			level.Debug(config.Logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 
 			// non-blocking channel send
 			select {

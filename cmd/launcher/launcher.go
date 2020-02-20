@@ -122,7 +122,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return nil
 		}
 	}, func(err error) {
-		level.Info(logger).Log("msg", "interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+		level.Info(logger).Log("msg", "interrupted", "err", err)
+		level.Debug(logger).Log("msg", "interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
 		cancel()
 		close(sigChannel)
 	})

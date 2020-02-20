@@ -21,12 +21,8 @@ import (
 func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
 	return func() error {
 		if err := shutdownOsquery(); err != nil {
-			level.Info(logger).Log(
-				"msg", "calling shutdownOsquery",
-				"method", "updateFinalizer",
-				"err", err,
-				"stack", fmt.Sprintf("%+v", err),
-			)
+			level.Info(logger).Log("msg", "calling shutdownOsquery", "method", "updateFinalizer", "err", err)
+			level.Debug(logger).Log("msg", "calling shutdownOsquery", "method", "updateFinalizer", "err", err, "stack", fmt.Sprintf("%+v", err))
 		}
 
 		// Use the FindNewest mechanism to delete old
