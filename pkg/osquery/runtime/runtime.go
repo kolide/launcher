@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -542,7 +543,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	o.cmd.SysProcAttr = setpgid()
 
-	level.Debug(o.logger).Log(
+	level.Info(o.logger).Log(
 		"msg", "launching osqueryd",
 		"arg0", o.cmd.Path,
 		"args", strings.Join(o.cmd.Args, " "),
@@ -551,26 +552,37 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Launch osquery process (async)
 	err = o.cmd.Start()
 	if err != nil {
-		level.Info(o.logger).Log(
-			"msg", "Error starting osquery",
+		// Failure here is indicative of a failure to exec. A missing
+		// binary? Bad permissions? TODO: Consider catching errors in the
+		// update system and falling back to an earlier version.
+		msgPairs := append(
+			getOsqueryInfoForLog(o.cmd.Path),
+			"msg", "Fatal error starting osquery. Could not exec.",
 			"err", err,
 		)
-		return errors.Wrap(err, "starting osqueryd process")
+
+		level.Info(o.logger).Log(msgPairs...)
+		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
+
+	// This loop runs in the background when the process was
+	// successfully started. ("successful" is independent of exit
+	// code. eg: this runs if we could exec. Failure to exec is above.)
 	o.errgroup.Go(func() error {
 		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
-			level.Debug(o.logger).Log(
-				"msg", "osquery exited okay",
-			)
+			level.Info(o.logger).Log("msg", "osquery exited successfully")
 			// TODO: should this return nil?
-			return errors.New("osquery process exited")
+			return errors.New("osquery process exited successfully")
 		default:
-			level.Info(o.logger).Log(
+			msgPairs := append(
+				getOsqueryInfoForLog(o.cmd.Path),
 				"msg", "Error running osquery command",
 				"err", err,
 			)
+
+			level.Info(o.logger).Log(msgPairs...)
 			return errors.Wrap(err, "running osqueryd command")
 		}
 	})
@@ -581,11 +593,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		if o.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(o.cmd); err != nil {
-				if !strings.Contains(err.Error(), "process already finished") {
-					level.Info(o.logger).Log(
-						"msg", "killing osquery process",
-						"err", err,
-					)
+				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
+					level.Debug(o.logger).Log("process already gone")
+				} else {
+					level.Info(o.logger).Log("msg", "killing osquery process", "err", err)
 				}
 			}
 		}
@@ -729,4 +740,42 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
+}
+
+// getOsqueryInfoForLog will log info about an osquery instance. It's
+// called when osquery unexpected fails to start. (returns as an
+// interface for go-kit's logger)
+func getOsqueryInfoForLog(path string) []interface{} {
+	msgPairs := []interface{}{
+		"path", path,
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "opening file"))
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "stat file"))
+	}
+
+	msgPairs = append(
+		msgPairs,
+		"sizeBytes", fileInfo.Size(),
+		"mode", fileInfo.Mode(),
+	)
+
+	sum := sha256.New()
+	if _, err := io.Copy(sum, file); err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "hashing file"))
+	}
+
+	msgPairs = append(
+		msgPairs,
+		"sha256", fmt.Sprintf("%x", sum.Sum(nil)),
+	)
+
+	return msgPairs
 }
