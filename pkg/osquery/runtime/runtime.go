@@ -566,7 +566,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// This loop runs in the background when the process was
-	// successfully started. ("successful" is independant of exit
+	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
 	o.errgroup.Go(func() error {
 		err := o.cmd.Wait()
