@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -554,10 +555,13 @@ func (r *Runner) launchOsqueryInstance() error {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
 		// update system and falling back to an earlier version.
-		level.Info(o.logger).Log(
+		msgPairs := append(
+			getOsqueryInfoForLog(o.cmd.Path),
 			"msg", "Fatal error starting osquery. Could not exec.",
 			"err", err,
 		)
+
+		level.Info(o.logger).Log(msgPairs...)
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
 
@@ -572,7 +576,13 @@ func (r *Runner) launchOsqueryInstance() error {
 			// TODO: should this return nil?
 			return errors.New("osquery process exited successfully")
 		default:
-			level.Info(o.logger).Log("msg", "Error running osquery command", "err", err)
+			msgPairs := append(
+				getOsqueryInfoForLog(o.cmd.Path),
+				"msg", "Error running osquery command",
+				"err", err,
+			)
+
+			level.Info(o.logger).Log(msgPairs...)
 			return errors.Wrap(err, "running osqueryd command")
 		}
 	})
@@ -730,4 +740,42 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	}
 
 	return resp.Response, nil
+}
+
+// getOsqueryInfoForLog will log info about an osquery instance. It's
+// called when osquery unexpected fails to start. (returns as an
+// interface for go-kit's logger)
+func getOsqueryInfoForLog(path string) []interface{} {
+	msgPairs := []interface{}{
+		"path", path,
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "opening file"))
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "stat file"))
+	}
+
+	msgPairs = append(
+		msgPairs,
+		"sizeBytes", fileInfo.Size(),
+		"mode", fileInfo.Mode(),
+	)
+
+	sum := sha256.New()
+	if _, err := io.Copy(sum, file); err != nil {
+		return append(msgPairs, "extraerr", errors.Wrap(err, "hashing file"))
+	}
+
+	msgPairs = append(
+		msgPairs,
+		"sha256", fmt.Sprintf("%x", sum.Sum(nil)),
+	)
+
+	return msgPairs
 }
