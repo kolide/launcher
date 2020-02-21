@@ -542,7 +542,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	o.cmd.SysProcAttr = setpgid()
 
-	level.Debug(o.logger).Log(
+	level.Info(o.logger).Log(
 		"msg", "launching osqueryd",
 		"arg0", o.cmd.Path,
 		"args", strings.Join(o.cmd.Args, " "),
@@ -551,26 +551,28 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Launch osquery process (async)
 	err = o.cmd.Start()
 	if err != nil {
+		// Failure here is indicative of a failure to exec. A missing
+		// binary? Bad permissions? TODO: Consider catching errors in the
+		// update system and falling back to an earlier version.
 		level.Info(o.logger).Log(
-			"msg", "Error starting osquery",
+			"msg", "Fatal error starting osquery. Could not exec.",
 			"err", err,
 		)
-		return errors.Wrap(err, "starting osqueryd process")
+		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
+
+	// This loop runs in the background when the process was
+	// successfully started. ("successful" is independant of exit
+	// code. eg: this runs if we could exec. Failure to exec is above.)
 	o.errgroup.Go(func() error {
 		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
-			level.Debug(o.logger).Log(
-				"msg", "osquery exited okay",
-			)
+			level.Info(o.logger).Log("msg", "osquery exited successfully")
 			// TODO: should this return nil?
-			return errors.New("osquery process exited")
+			return errors.New("osquery process exited successfully")
 		default:
-			level.Info(o.logger).Log(
-				"msg", "Error running osquery command",
-				"err", err,
-			)
+			level.Info(o.logger).Log("msg", "Error running osquery command", "err", err)
 			return errors.Wrap(err, "running osqueryd command")
 		}
 	})
@@ -581,11 +583,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		if o.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(o.cmd); err != nil {
-				if !strings.Contains(err.Error(), "process already finished") {
-					level.Info(o.logger).Log(
-						"msg", "killing osquery process",
-						"err", err,
-					)
+				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
+					level.Debug(o.logger).Log("process already gone")
+				} else {
+					level.Info(o.logger).Log("msg", "killing osquery process", "err", err)
 				}
 			}
 		}
