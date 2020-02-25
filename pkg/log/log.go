@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
 
@@ -52,9 +53,16 @@ func NewOsqueryLogAdapter(logger kitlog.Logger, opts ...Option) *OsqueryLogAdapt
 }
 
 func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
+	// Work around osquery being overly verbose with it's logs
+	// see: https://github.com/osquery/osquery/pull/6271
+	lf := l.levelFunc
+	if bytes.Contains(p, []byte("Executing scheduled query pack")) {
+		lf = level.Debug
+	}
+
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	if err := l.levelFunc(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
+	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
 		return 0, err
 	}
 	return len(p), nil
