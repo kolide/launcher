@@ -267,11 +267,10 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
 	defer span.End()
 
-	/* First, we generate a bindata file from an empty directory so that the symbols
-	   are present (Asset, AssetDir, etc). Once the symbols are present, we can run
-	   the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
-	   the bindata file with the real TUF metadata.
-	*/
+	// First, we generate a bindata file from an empty directory so that the symbols
+	// are present (Asset, AssetDir, etc). Once the symbols are present, we can run
+	// the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
+	// the bindata file with the real TUF metadata.
 	dir, err := ioutil.TempDir("", "bootstrap-launcher-bindata")
 	if err != nil {
 		return errors.Wrapf(err, "create empty dir for bindata")
@@ -287,7 +286,12 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		"launcher",
 	}
 
-	notaryConfigDir := filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/tools/notary/config")
+	// previous this depended on fs.Gopath to find the templated
+	// notary files. As not everyone uses gopath, we make
+	// assuptions about how this is called to find the template dir.
+	// https://github.com/kolide/launcher/pull/503 is a better route.
+	_, myFilename, _, _ := runtime.Caller(1)
+	notaryConfigDir := filepath.Join(filepath.Dir(myFilename), "..", "..", "tools", "notary", "config")
 	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
 	if err != nil {
 		return errors.Wrap(err, "opening notary config file")
