@@ -67,7 +67,7 @@ windows-xp-%: .pre-build deps
 
 
 
-# `-o runtime` should be enough, however there was a cataline bug that
+# `-o runtime` should be enough, however there was a catalina bug that
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
 codesign-darwin: xp
