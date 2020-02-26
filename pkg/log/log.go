@@ -60,6 +60,10 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		lf = level.Debug
 	}
 
+	if bytes.Contains(p, []byte("Accelerating distributed query checkins")) {
+		lf = level.Debug
+	}
+
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
 	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
