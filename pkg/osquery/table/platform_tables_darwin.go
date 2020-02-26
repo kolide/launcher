@@ -33,6 +33,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		kextpolicy.TablePlugin(),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
+		dataflattentable.TablePluginExecPlist(client, logger, "kolide_pwpolicy", "/usr/bin/pwpolicy", "getaccountpolicies"),
 		systemprofiler.TablePlugin(client, logger),
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
