@@ -103,6 +103,10 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"-C", "/pkgsrc",
 	}
 
+	if f.outputType == Pacman {
+		fpmCommand = append(fpmCommand, "--pacman-compression", "gz")
+	}
+
 	// Pass each replaces in. Set it as a conflict and a replace.
 	for _, r := range f.replaces {
 		fpmCommand = append(fpmCommand, "--replaces", r, "--conflicts", r)
