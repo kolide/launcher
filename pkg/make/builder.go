@@ -44,6 +44,8 @@ type Builder struct {
 	race         bool
 	stampVersion bool
 	fakedata     bool
+	notaryServer string
+	notaryPrefix string
 
 	goVer  *semver.Version
 	cmdEnv []string
@@ -61,6 +63,17 @@ func WithOS(o string) Option {
 func WithArch(a string) Option {
 	return func(b *Builder) {
 		b.arch = a
+	}
+}
+
+func WithNotaryServer(s string) Option {
+	return func(b *Builder) {
+		b.notaryServer = s
+	}
+}
+func WithNotaryPrefix(p string) Option {
+	return func(b *Builder) {
+		b.notaryPrefix = p
 	}
 }
 
@@ -105,6 +118,14 @@ func New(opts ...Option) (*Builder, error) {
 
 	for _, opt := range opts {
 		opt(&b)
+	}
+
+	if b.notaryServer == "" {
+		return nil, errors.New("notaryServer unset")
+	}
+
+	if b.notaryPrefix == "" {
+		return nil, errors.New("notaryPrefix unset")
 	}
 
 	// Some default environment things
@@ -263,54 +284,70 @@ func (b *Builder) installTool(ctx context.Context, importPath string) error {
 	return nil
 }
 
+type notaryRemoteServer struct {
+	URL string `json:"url"`
+}
+
+type notaryConf struct {
+	RemoteServer notaryRemoteServer `json:"remote_server"`
+}
+
+// GenerateTUF setups up a bunch of TUF metadata for the auto
+// updater. There are several steps:
+//
+// 1. Run generate_tuf.go tool to generate TUF metadata
+// 2. Recreate the bindata file with the real TUF metadata
 func (b *Builder) GenerateTUF(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
 	defer span.End()
 
-	/* First, we generate a bindata file from an empty directory so that the symbols
-	   are present (Asset, AssetDir, etc). Once the symbols are present, we can run
-	   the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
-	   the bindata file with the real TUF metadata.
-	*/
-	dir, err := ioutil.TempDir("", "bootstrap-launcher-bindata")
+	dir, err := ioutil.TempDir("", "bootstrap-launcher-autoupdate-bindata")
 	if err != nil {
 		return errors.Wrapf(err, "create empty dir for bindata")
 	}
 	defer os.RemoveAll(dir)
 
-	if err := b.execBindata(ctx, dir); err != nil {
-		return errors.Wrap(err, "exec bindata for empty dir")
+	//
+	// Populate the asset dir, and package it.
+	//
+
+	// config file pulls in values from the autoupdate package
+	notaryConfig := notaryConf{
+		RemoteServer: notaryRemoteServer{URL: b.notaryServer},
 	}
 
-	binaryTargets := []string{ // binaries that are autoupdated.
+	configFileOut, err := os.Create(filepath.Join(dir, "config.json"))
+	if err != nil {
+		return errors.Wrap(err, "opening config.json")
+	}
+	defer configFileOut.Close()
+
+	jsonEnc := json.NewEncoder(configFileOut)
+	if err = jsonEnc.Encode(notaryConfig); err != nil {
+		return errors.Wrap(err, "writing config.json")
+	}
+
+	// binaries that are autoupdated.
+	binaryTargets := []string{
 		"osqueryd",
 		"launcher",
-	}
-
-	notaryConfigDir := filepath.Join(fs.Gopath(), "src/github.com/kolide/launcher/tools/notary/config")
-	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
-	if err != nil {
-		return errors.Wrap(err, "opening notary config file")
-	}
-	defer notaryConfigFile.Close()
-	var conf struct {
-		RemoteServer struct {
-			URL string `json:"url"`
-		} `json:"remote_server"`
-	}
-	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
-		return errors.Wrap(err, "decoding notary config file")
+		"osquery-extension",
 	}
 
 	for _, t := range binaryTargets {
-		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", conf.RemoteServer.URL)
-		gun := path.Join("kolide", t)
+		level.Debug(ctxlog.FromContext(ctx)).Log(
+			"target", "generate-tuf",
+			"msg", "bootstrap notary",
+			"binary", t,
+			"remote_server_url", notaryConfig.RemoteServer.URL,
+		)
+		gun := path.Join(b.notaryPrefix, t)
 		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
 		if err := os.MkdirAll(localRepo, 0755); err != nil {
 			return errors.Wrapf(err, "make autoupdate dir %s", localRepo)
 		}
 
-		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun); err != nil {
+		if err := bootstrapFromNotary(dir, notaryConfig.RemoteServer.URL, localRepo, gun); err != nil {
 			return errors.Wrapf(err, "bootstrap notary GUN %s", gun)
 		}
 	}
@@ -322,17 +359,30 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	return nil
 }
 
+// execBindata runs go-bindat as asset packaging.
 func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	ctx, span := trace.StartSpan(ctx, "make.execBindata")
 	defer span.End()
 
-	cmd := b.execCC(
-		ctx,
-		"go-bindata",
+	logger := ctxlog.FromContext(ctx)
+
+	// FIXME: this is a relative path
+	args := []string{
 		"-o", "pkg/autoupdate/bindata.go",
 		"-pkg", "autoupdate",
 		dir,
+	}
+	cmd := b.execCC(
+		ctx,
+		"go-bindata",
+		args...,
 	)
+
+	level.Debug(logger).Log(
+		"msg", "Running go-bindata",
+		"args", args,
+	)
+
 	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
 	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
