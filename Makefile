@@ -66,8 +66,12 @@ windows-xp-%: .pre-build deps
 	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
 
 
+
+# `-o runtime` should be enough, however there was a catalina bug that
+# required we add `library`. This was fixed in 10.15.4. (from
+# macadmins slack)
 codesign-darwin: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime --timestamp ./build/darwin/*
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin/*
 
 notarize-darwin: codesign-darwin
 	rm -f build/notarization-upload.zip
@@ -88,7 +92,6 @@ notarize-check-%:
 	  --password @env:NOTARIZE_APP_PASSWD \
 	  --asc-provider "${NOTARIZE_ACCOUNT_ID}" \
 	  --notarization-info "$*"
-
 
 
 # Using the `osslsigncode` we can sign windows binaries from
