@@ -427,6 +427,9 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		if p.target.Package == Rpm {
 			dir = "/usr/lib/systemd/system"
 		}
+		if p.target.Package == Pacman {
+			dir = "/usr/lib/systemd/system"
+		}
 		file = fmt.Sprintf("launcher.%s.service", p.Identifier)
 		renderFunc = packagekit.RenderSystemd
 	case p.target.Platform == Linux && p.target.Init == Upstart:
