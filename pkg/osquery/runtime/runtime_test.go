@@ -144,13 +144,8 @@ func buildOsqueryExtensionInBinDir(rootDirectory string) error {
 		return err
 	}
 
-	goPath := os.Getenv("GOPATH")
-	if goPath == "" {
-		goPath = filepath.Join(os.Getenv("HOME"), "go")
-		if stat, err := os.Stat(goPath); err != nil || !stat.IsDir() {
-			return errors.New("GOPATH is not set and default doesn't exist")
-		}
-	}
+	_, myFilename, _, _ := runtime.Caller(1)
+	launcherSrcDir := filepath.Join(filepath.Dir(myFilename), "..", "..", "..")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -160,7 +155,7 @@ func buildOsqueryExtensionInBinDir(rootDirectory string) error {
 		"build",
 		"-o",
 		filepath.Join(rootDirectory, "osquery-extension.ext"),
-		filepath.Join(goPath, "src/github.com/kolide/launcher/cmd/osquery-extension/osquery-extension.go"),
+		filepath.Join(launcherSrcDir, "cmd/osquery-extension/osquery-extension.go"),
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
