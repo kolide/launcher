@@ -24,10 +24,12 @@ const (
 type Table struct {
 	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
-	dataFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
-	execPath  string
-	execArgs  []string
 	tableName string
+
+	dataFunc func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+
+	execDataFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+	execArgs     []string
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {

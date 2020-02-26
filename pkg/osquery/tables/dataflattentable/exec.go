@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TablePluginExecPlist(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, execArgs ...string) *table.Plugin {
+func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("fullkey"),
 		table.TextColumn("parent"),
@@ -23,17 +23,20 @@ func TablePluginExecPlist(client *osquery.ExtensionManagerClient, logger log.Log
 		table.TextColumn("query"),
 	}
 
-	if len(execArgs) < 1 {
-		level.Error(logger).Log("msg", "Missing exec arguments for TablePluginExecPlist. Skipping", "table", tableName)
-		return nil
-
-	}
-
 	t := &Table{
 		client:    client,
 		logger:    level.NewFilter(logger, level.AllowInfo()),
 		tableName: tableName,
 		execArgs:  execArgs,
+	}
+
+	switch dataSourceType {
+	case PlistType:
+		t.execDataFunc = dataflatten.Plist
+	case JsonType:
+		t.execDataFunc = dataflatten.Json
+	default:
+		panic("Unknown data source type")
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generateExec)
@@ -89,7 +92,7 @@ func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[str
 		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
 	}
 
-	data, err := dataflatten.Plist(execOutput, flattenOpts...)
+	data, err := t.execDataFunc(execOutput, flattenOpts...)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
 		return nil
