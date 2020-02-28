@@ -18,13 +18,18 @@ type DataSourceType int
 const (
 	PlistType DataSourceType = iota + 1
 	JsonType
+	ExecType
 )
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
-	dataFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	tableName string
+
+	dataFunc func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+
+	execDataFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+	execArgs     []string
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
