@@ -1,18 +1,21 @@
 package dataflatten
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/clbanning/mxj"
 	"github.com/pkg/errors"
 )
 
 func XmlFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	rawdata, err := ioutil.ReadFile(file)
+	rdr, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
-	return Xml(rawdata, opts...)
+
+	mv, err := mxj.NewMapXmlReader(rdr)
+
+	return Flatten(mv.Old())
 }
 
 func Xml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
