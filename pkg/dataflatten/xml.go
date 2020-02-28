@@ -14,6 +14,9 @@ func XmlFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	}
 
 	mv, err := mxj.NewMapXmlReader(rdr)
+	if err != nil {
+		return nil, err
+	}
 
 	return Flatten(mv.Old())
 }
