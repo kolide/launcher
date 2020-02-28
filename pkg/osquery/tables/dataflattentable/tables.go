@@ -59,7 +59,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case XmlType:
 		t.dataFunc = dataflatten.XmlFile
 		t.tableName = "kolide_xml"
-
 	default:
 		panic("Unknown data source type")
 	}
