@@ -35,9 +35,12 @@
 package dataflatten
 
 import (
+	"bytes"
+	"encoding/base64"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -64,6 +67,7 @@ type Flattener struct {
 	queryWildcard     string
 	queryKeyDenoter   string
 	expandNestedPlist bool
+	includeNestedRaw  bool
 }
 
 type FlattenOpts func(*Flattener)
@@ -206,9 +210,10 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 		}
 		fl.rows = append(fl.rows, NewRow(path, ""))
 	case string:
-		return fl.descendMaybePlist(path, v, depth)
+		return fl.descendMaybePlist(path, []byte(v), depth)
 	case []byte:
-		return fl.descendMaybePlist(path, string(v), depth)
+		// Most string like data comes in this way
+		return fl.descendMaybePlist(path, v, depth)
 	default:
 		if err := fl.handleStringLike(logger, path, v, depth); err != nil {
 			return errors.Wrapf(err, "flattening at path %v", path)
@@ -234,7 +239,10 @@ func (fl *Flattener) handleStringLike(logger log.Logger, path []string, v interf
 	return nil
 }
 
-func (fl *Flattener) descendMaybePlist(path []string, data string, depth int) error {
+// descendMaybePlist optionally tries to decode []byte data as an
+// embedded plist. In the case of failures, it falls back to treating
+// it like a plain string.
+func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) error {
 	logger := log.With(fl.logger,
 		"caller", "descendMaybePlist",
 		"depth", depth,
@@ -247,26 +255,26 @@ func (fl *Flattener) descendMaybePlist(path []string, data string, depth int) er
 		return fl.handleStringLike(logger, path, data, depth)
 	}
 
-	// Skip if this doesn't look like a plist. This check is, perhaps, optional.
-	if !strings.HasPrefix(data, "bplist0") &&
-		!(strings.HasPrefix(data, `<?xml version="1.0"`) &&
-			strings.Contains(data, `<!DOCTYPE plist PUBLIC`)) {
+	// Skip if this doesn't look like a plist.
+	if !isPlist(data) {
 		return fl.handleStringLike(logger, path, data, depth)
 	}
 
 	// Looks like a plist. Try parsing it
-	level.Info(logger).Log("msg", "found a plist to parse")
+	level.Debug(logger).Log("msg", "Parsing inner plist")
 
 	var innerData interface{}
 
-	if err := plist.Unmarshal([]byte(data), &innerData); err != nil {
+	if err := plist.Unmarshal(data, &innerData); err != nil {
 		level.Info(logger).Log("msg", "plist parsing failed", "err", err)
 		return fl.handleStringLike(logger, path, data, depth)
 	}
 
 	// have a parsed plist. Descend and return from here.
-	if err := fl.handleStringLike(logger, append(path, "_raw"), data, depth); err != nil {
-		level.Error(logger).Log("msg", "Failed to add _raw key", "err", err)
+	if fl.includeNestedRaw {
+		if err := fl.handleStringLike(logger, append(path, "_raw"), data, depth); err != nil {
+			level.Error(logger).Log("msg", "Failed to add _raw key", "err", err)
+		}
 	}
 
 	if err := fl.descend(path, innerData, depth+1); err != nil {
@@ -419,7 +427,11 @@ func stringify(data interface{}) (string, error) {
 	case string:
 		return v, nil
 	case []byte:
-		return string(v), nil
+		s := string(v)
+		if utf8.ValidString(s) {
+			return s, nil
+		}
+		return base64.StdEncoding.EncodeToString(v), nil
 	case uint64:
 		return strconv.FormatUint(v, 10), nil
 	case float64:
@@ -436,4 +448,26 @@ func stringify(data interface{}) (string, error) {
 		// spew.Dump(data)
 		return "", errors.Errorf("unknown type on %v", data)
 	}
+}
+
+// isPlist returns whether or not something looks like it might be a
+// plist. It uses Contains, instead of HasPrefix, as some encodings
+// have a leading character.
+func isPlist(data []byte) bool {
+	var dataPrefix []byte
+	if len(data) <= 30 {
+		dataPrefix = data
+	} else {
+		dataPrefix = data[0:30]
+	}
+
+	if bytes.Contains(dataPrefix, []byte("bplist0")) {
+		return true
+	}
+
+	if bytes.Contains(dataPrefix, []byte(`xml version="1.0"`)) && bytes.Contains(data, []byte(`<!DOCTYPE plist PUBLIC`)) {
+		return true
+	}
+
+	return false
 }
