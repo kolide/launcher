@@ -41,6 +41,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/groob/plist"
 	"github.com/pkg/errors"
 )
 
@@ -56,12 +57,13 @@ import (
 //
 // It can optionally filtering and rewriting.
 type Flattener struct {
-	includeNils     bool
-	rows            []Row
-	logger          log.Logger
-	query           []string
-	queryWildcard   string
-	queryKeyDenoter string
+	includeNils       bool
+	rows              []Row
+	logger            log.Logger
+	query             []string
+	queryWildcard     string
+	queryKeyDenoter   string
+	expandNestedPlist bool
 }
 
 type FlattenOpts func(*Flattener)
@@ -71,6 +73,13 @@ type FlattenOpts func(*Flattener)
 func IncludeNulls() FlattenOpts {
 	return func(fl *Flattener) {
 		fl.includeNils = true
+	}
+}
+
+// WithNestedPlist indicates that nested plists should be expanded
+func WithNestedPlist() FlattenOpts {
+	return func(fl *Flattener) {
+		fl.expandNestedPlist = true
 	}
 }
 
@@ -196,20 +205,74 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			return nil
 		}
 		fl.rows = append(fl.rows, NewRow(path, ""))
+	case string:
+		return fl.descendMaybePlist(path, v, depth)
+	case []byte:
+		return fl.descendMaybePlist(path, string(v), depth)
 	default:
-		// non-iterable. stringify and be done
-		stringValue, err := stringify(v)
-
-		if err != nil {
+		if err := fl.handleStringLike(logger, path, v, depth); err != nil {
 			return errors.Wrapf(err, "flattening at path %v", path)
 		}
-
-		if !(isQueryMatched || fl.queryMatchString(stringValue, queryTerm)) {
-			level.Debug(logger).Log("msg", "query not matched")
-			return nil
-		}
-		fl.rows = append(fl.rows, NewRow(path, stringValue))
 	}
+	return nil
+}
+
+func (fl *Flattener) handleStringLike(logger log.Logger, path []string, v interface{}, depth int) error {
+	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
+
+	stringValue, err := stringify(v)
+	if err != nil {
+		return err
+	}
+
+	if !(isQueryMatched || fl.queryMatchString(stringValue, queryTerm)) {
+		level.Debug(logger).Log("msg", "query not matched")
+		return nil
+	}
+
+	fl.rows = append(fl.rows, NewRow(path, stringValue))
+	return nil
+}
+
+func (fl *Flattener) descendMaybePlist(path []string, data string, depth int) error {
+	logger := log.With(fl.logger,
+		"caller", "descendMaybePlist",
+		"depth", depth,
+		"rows-so-far", len(fl.rows),
+		"path", strings.Join(path, "/"),
+	)
+
+	// Skip if we're not expanding nested plists
+	if !fl.expandNestedPlist {
+		return fl.handleStringLike(logger, path, data, depth)
+	}
+
+	// Skip if this doesn't look like a plist. This check is, perhaps, optional.
+	if !strings.HasPrefix(data, "bplist0") &&
+		!(strings.HasPrefix(data, `<?xml version="1.0"`) &&
+			strings.Contains(data, `<!DOCTYPE plist PUBLIC`)) {
+		return fl.handleStringLike(logger, path, data, depth)
+	}
+
+	// Looks like a plist. Try parsing it
+	level.Info(logger).Log("msg", "found a plist to parse")
+
+	var innerData interface{}
+
+	if err := plist.Unmarshal([]byte(data), &innerData); err != nil {
+		level.Info(logger).Log("msg", "plist parsing failed", "err", err)
+		return fl.handleStringLike(logger, path, data, depth)
+	}
+
+	// have a parsed plist. Descend and return from here.
+	if err := fl.handleStringLike(logger, append(path, "_raw"), data, depth); err != nil {
+		level.Error(logger).Log("msg", "Failed to add _raw key", "err", err)
+	}
+
+	if err := fl.descend(path, innerData, depth+1); err != nil {
+		return errors.Wrap(err, "flattening plist data")
+	}
+
 	return nil
 }
 

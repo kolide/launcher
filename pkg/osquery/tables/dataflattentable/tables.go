@@ -107,6 +107,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) generatePathQuery(filePath string, dataQuery string) ([]map[string]string, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+		dataflatten.WithNestedPlist(),
 	}
 
 	if t.logger != nil {
@@ -139,7 +140,9 @@ func (t *Table) generatePathQuery(filePath string, dataQuery string) ([]map[stri
 }
 
 func (t *Table) generatePath(filePath string) ([]map[string]string, error) {
-	flattenOpts := []dataflatten.FlattenOpts{}
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithNestedPlist(),
+	}
 
 	if t.logger != nil {
 		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
