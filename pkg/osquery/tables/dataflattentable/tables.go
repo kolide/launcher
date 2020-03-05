@@ -19,6 +19,7 @@ const (
 	PlistType DataSourceType = iota + 1
 	JsonType
 	ExecType
+	XmlType
 )
 
 type Table struct {
@@ -55,6 +56,9 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case JsonType:
 		t.dataFunc = dataflatten.JsonFile
 		t.tableName = "kolide_json"
+	case XmlType:
+		t.dataFunc = dataflatten.XmlFile
+		t.tableName = "kolide_xml"
 	default:
 		panic("Unknown data source type")
 	}

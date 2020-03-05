@@ -15,6 +15,7 @@ require (
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
+	github.com/clbanning/mxj v1.8.4
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
 	github.com/davecgh/go-spew v1.1.1

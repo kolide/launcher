@@ -34,6 +34,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
+		dataflattentable.TablePlugin(client, logger, dataflattentable.XmlType),
 	}
 
 	// add in the platform specific ones (as denboted by build tags)

@@ -27,6 +27,7 @@ func main() {
 	var (
 		flPlist = flagset.String("plist", "", "Path to plist")
 		flJson  = flagset.String("json", "", "Path to json file")
+		flXml   = flagset.String("xml", "", "Path to xml file")
 		flQuery = flagset.String("q", "", "query")
 
 		flDebug = flagset.Bool("debug", false, "use a debug logger")
@@ -60,6 +61,12 @@ func main() {
 	if *flJson != "" {
 		data, err := dataflatten.JsonFile(*flJson, opts...)
 		checkError(errors.Wrap(err, "flattening json file"))
+		rows = append(rows, data...)
+	}
+
+	if *flXml != "" {
+		data, err := dataflatten.XmlFile(*flXml, opts...)
+		checkError(errors.Wrap(err, "flattening xml file"))
 		rows = append(rows, data...)
 	}
 
