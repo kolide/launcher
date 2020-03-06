@@ -59,8 +59,10 @@ func TestFlatten_Complex2(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Flatten(dataIn, tt.options...)
-		testFlattenCase(t, tt, actual, err)
+		t.Run(tt.comment, func(t *testing.T) {
+			actual, err := Flatten(dataIn, tt.options...)
+			testFlattenCase(t, tt, actual, err)
+		})
 	}
 
 }
@@ -99,8 +101,10 @@ func TestFlatten_NestingBug(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Flatten(dataIn, tt.options...)
-		testFlattenCase(t, tt, actual, err)
+		t.Run(tt.comment, func(t *testing.T) {
+			actual, err := Flatten(dataIn, tt.options...)
+			testFlattenCase(t, tt, actual, err)
+		})
 	}
 
 }
@@ -214,8 +218,10 @@ func TestFlatten_Complex(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Flatten(dataIn, tt.options...)
-		testFlattenCase(t, tt, actual, err)
+		t.Run(tt.comment, func(t *testing.T) {
+			actual, err := Flatten(dataIn, tt.options...)
+			testFlattenCase(t, tt, actual, err)
+		})
 	}
 }
 
@@ -255,8 +261,10 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Json([]byte(tt.in), tt.options...)
-		testFlattenCase(t, tt, actual, err)
+		t.Run(tt.comment, func(t *testing.T) {
+			actual, err := Json([]byte(tt.in), tt.options...)
+			testFlattenCase(t, tt, actual, err)
+		})
 	}
 
 }
@@ -320,8 +328,10 @@ func TestFlatten(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		actual, err := Json([]byte(tt.in), tt.options...)
-		testFlattenCase(t, tt, actual, err)
+		t.Run(tt.comment, func(t *testing.T) {
+			actual, err := Json([]byte(tt.in), tt.options...)
+			testFlattenCase(t, tt, actual, err)
+		})
 	}
 }
 
