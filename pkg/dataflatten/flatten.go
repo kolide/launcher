@@ -277,7 +277,7 @@ func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) er
 		}
 	}
 
-	if err := fl.descend(path, innerData, depth+1); err != nil {
+	if err := fl.descend(path, innerData, depth); err != nil {
 		return errors.Wrap(err, "flattening plist data")
 	}
 

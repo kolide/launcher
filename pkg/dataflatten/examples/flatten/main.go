@@ -43,6 +43,7 @@ func main() {
 
 	opts := []dataflatten.FlattenOpts{
 		dataflatten.WithLogger(logger),
+		dataflatten.WithNestedPlist(),
 	}
 
 	if *flQuery != "" {
