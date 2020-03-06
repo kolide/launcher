@@ -222,6 +222,9 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	return nil
 }
 
+// handleStringLike is called when we finally have an object we think
+// can be converted to a string. It uses the depth to compare against
+// the query, and returns a stringify'ed value
 func (fl *Flattener) handleStringLike(logger log.Logger, path []string, v interface{}, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
