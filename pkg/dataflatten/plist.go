@@ -3,8 +3,8 @@ package dataflatten
 import (
 	"io/ioutil"
 
-	"github.com/groob/plist"
 	"github.com/pkg/errors"
+	"howett.net/plist"
 )
 
 func PlistFile(file string, opts ...FlattenOpts) ([]Row, error) {
@@ -18,7 +18,7 @@ func PlistFile(file string, opts ...FlattenOpts) ([]Row, error) {
 func Plist(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 	var data interface{}
 
-	if err := plist.Unmarshal(rawdata, &data); err != nil {
+	if _, err := plist.Unmarshal(rawdata, &data); err != nil {
 		return nil, errors.Wrap(err, "unmarshalling plist")
 	}
 
