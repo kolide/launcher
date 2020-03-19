@@ -76,8 +76,6 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 		touchIDCompatible = "1"
 		touchIDEnabled = configSplit[2][1:2]
 		touchIDUnlock = configSplit[3][1:2]
-	} else {
-		touchIDCompatible = "0"
 	}
 
 	result := map[string]string{
