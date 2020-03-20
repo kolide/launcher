@@ -58,10 +58,8 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	r := regexp.MustCompile(` (?P<chip>T\d) `) // Matching on: Apple T[1|2] Security Chip
 	match := r.FindStringSubmatch(string(stdout.Bytes()))
 	if len(match) == 0 {
-		touchIDCompatible = "0"
 		secureEnclaveCPU = ""
 	} else {
-		touchIDCompatible = "1"
 		secureEnclaveCPU = match[1]
 	}
 
@@ -75,6 +73,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	configOutStr := string(stdout.Bytes())
 	configSplit := strings.Split(configOutStr, ":")
 	if len(configSplit) >= 3 {
+		touchIDCompatible = "1"
 		touchIDEnabled = configSplit[2][1:2]
 		touchIDUnlock = configSplit[3][1:2]
 	}
