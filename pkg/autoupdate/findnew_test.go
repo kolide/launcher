@@ -48,10 +48,8 @@ func TestFindNewestSelf(t *testing.T) {
 
 	expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
 
-	f, err := os.Create(expectedNewest)
-	require.NoError(t, err)
-	f.Close()
-	require.NoError(t, os.Chmod(f.Name(), 0755))
+	require.NoError(t, copyFile(expectedNewest, binaryPath), "copy executable")
+	require.NoError(t, os.Chmod(expectedNewest, 0755), "chmod")
 
 	{
 		newest, err := FindNewestSelf(ctx)
@@ -208,7 +206,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	require.NoError(t, err)
 
 	cleanupFunc := func() {
-		os.RemoveAll(tmpDir)
+		//os.RemoveAll(tmpDir)
 	}
 
 	// Create a test binary
@@ -219,21 +217,10 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
-	{
-		// copy the running test binary for general testing purposes
-		sourceBinary, err := os.Open(os.Args[0])
-		require.NoError(t, err, "os open arg0 %s", os.Args[0])
-		defer sourceBinary.Close()
-
-		tmpFile, err := os.Create(binaryPath)
-		require.NoError(t, err, "os create")
-
-		_, err = io.Copy(tmpFile, sourceBinary)
-		require.NoError(t, err, "io.copy binary")
-		fmt.Printf("made file %s\n", sourceBinary.Name())
-		tmpFile.Close()
-		require.NoError(t, os.Chmod(binaryPath, 0755))
-	}
+	arg0Path, err := os.Executable()
+	require.NoError(t, err, "finding os executable")
+	require.NoError(t, copyFile(binaryPath, arg0Path), "copy executable")
+	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
 
 	if stage <= emptySetup {
 		return tmpDir, binaryName, cleanupFunc
@@ -250,9 +237,8 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	for _, n := range []string{"2", "5", "3", "1"} {
-		f, err := os.Create(filepath.Join(updatesDir, n, binaryName))
-		require.NoError(t, err)
-		f.Close()
+		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath), "copy executable")
 	}
 
 	if stage <= nonExecutableUpdates {
@@ -265,6 +251,27 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 
 	return tmpDir, binaryName, cleanupFunc
 
+}
+
+func copyFile(dstPath, srcPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+	dst.Close()
+
+	return nil
 }
 
 func TestCheckExecutable(t *testing.T) {
@@ -291,9 +298,13 @@ func TestCheckExecutable(t *testing.T) {
 		},
 	}
 
+	arg0Path, err := os.Executable()
+	require.NoError(t, err, "finding os executable")
+
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
+
+			err := checkExecutable(context.TODO(), arg0Path, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
 			} else {
@@ -312,8 +323,11 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.NoError(t, err, "make temp file")
 	defer os.Remove(truncatedBinary.Name())
 
-	sourceBinary, err := os.Open(os.Args[0])
-	require.NoError(t, err, "os open arg0 %s", os.Args[0])
+	arg0Path, err := os.Executable()
+	require.NoError(t, err, "finding os executable")
+
+	sourceBinary, err := os.Open(arg0Path)
+	require.NoError(t, err, "os open arg0 %s", arg0Path)
 	defer sourceBinary.Close()
 
 	_, err = io.Copy(truncatedBinary, sourceBinary)
