@@ -224,7 +224,7 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 
 // supressNormalErrors attempts to tell whether the error was a
 // program that has executed, and then exited, vs one that's execution
-// was entirely unsuccessful. This differenciation allows us to
+// was entirely unsuccessful. This differentiation allows us to
 // detect, and recover, from corrupt updates vs something in-app.
 func supressRoutineErrors(err error) error {
 	if err == nil {
