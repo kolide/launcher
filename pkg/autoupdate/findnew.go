@@ -122,8 +122,14 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			}
 		}
 
+		// Sanity check that the executable is executable. Remove the update if it fails
 		if err := checkExecutable(ctx, file, "--version"); err != nil {
-			level.Error(logger).Log("msg", "not executable!!", "binary", file, "reason", err)
+			level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
+			basedir := filepath.Dir(file)
+			if err := os.RemoveAll(basedir); err != nil {
+				level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+			}
+
 			continue
 		}
 
