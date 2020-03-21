@@ -9,13 +9,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// checkExecutable checks wehether a specific file looks like it's
-// executable. This is used in evaluating whether something is an
-// updated version.
+// checkExecutablePermissions checks wehether a specific file looks
+// like it's executable. This is used in evaluating whether something
+// is an updated version.
 //
 // Windows does not have executable bits, so we omit those. And
 // instead check the file extension.
-func checkExecutable(potentialBinary string) error {
+func checkExecutablePermissions(potentialBinary string) error {
 	if potentialBinary == "" {
 		return errors.New("empty string isn't executable")
 	}

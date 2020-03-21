@@ -3,6 +3,7 @@ package autoupdate
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -210,7 +211,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 		os.RemoveAll(tmpDir)
 	}
 
-	// Create the fake binary
+	// Create a test binary
 	binaryName := "binary"
 	if runtime.GOOS == "windows" {
 		binaryName = binaryName + ".exe"
@@ -219,8 +220,17 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	{
+		// copy the running test binary for general testing purposes
+		sourceBinary, err := os.Open(os.Args[0])
+		require.NoError(t, err, "os open arg0 %s", os.Args[0])
+		defer sourceBinary.Close()
+
 		tmpFile, err := os.Create(binaryPath)
 		require.NoError(t, err, "os create")
+
+		_, err = io.Copy(tmpFile, sourceBinary)
+		require.NoError(t, err, "io.copy binary")
+		fmt.Printf("made file %s\n", sourceBinary.Name())
 		tmpFile.Close()
 		require.NoError(t, os.Chmod(binaryPath, 0755))
 	}
@@ -255,4 +265,105 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 
 	return tmpDir, binaryName, cleanupFunc
 
+}
+
+func TestCheckExecutable(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		testName    string
+		expectedErr bool
+	}{
+		{
+			testName:    "exit0",
+			expectedErr: false,
+		},
+		{
+			testName:    "exit1",
+			expectedErr: false,
+		},
+		{
+			testName:    "exit2",
+			expectedErr: false,
+		},
+		{
+			testName:    "sleep",
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
+			if tt.expectedErr {
+				require.Error(t, err, tt.testName)
+			} else {
+				require.NoError(t, err, tt.testName)
+			}
+		})
+
+	}
+}
+
+func TestCheckExecutableTruncated(t *testing.T) {
+	t.Parallel()
+
+	// First make a broken truncated binary. Lots of setup for this.
+	truncatedBinary, err := ioutil.TempFile("", "test-autoupdate-check-executable-truncation")
+	require.NoError(t, err, "make temp file")
+	defer os.Remove(truncatedBinary.Name())
+
+	sourceBinary, err := os.Open(os.Args[0])
+	require.NoError(t, err, "os open arg0 %s", os.Args[0])
+	defer sourceBinary.Close()
+
+	_, err = io.Copy(truncatedBinary, sourceBinary)
+	require.NoError(t, err, "io.copy binary")
+	truncatedBinary.Seek(0, io.SeekStart)
+
+	require.NoError(t, truncatedBinary.Sync(), "sync")
+	stat, err := truncatedBinary.Stat()
+
+	truncatedBinary.Truncate(stat.Size() / 2)
+	require.NoError(t, truncatedBinary.Sync(), "sync")
+	require.NoError(t, truncatedBinary.Close(), "close")
+	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
+
+	require.Error(t,
+		checkExecutable(context.TODO(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
+		"truncated binary")
+}
+
+// TestHelperProcess isn't a real test. It's used as a helper process
+// to make a portableish binary. See
+// https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
+// and https://npf.io/2015/06/testing-exec-command/
+func TestHelperProcess(t *testing.T) {
+	t.Parallel()
+
+	// find out magic arguments
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		// Indicates an error, or just being run in the test suite.
+		return
+	}
+
+	switch args[0] {
+	case "sleep":
+		select {}
+	case "exit0":
+		os.Exit(0)
+	case "exit1":
+		os.Exit(1)
+	case "exit2":
+		os.Exit(2)
+	}
+
+	// default behavior nothing
 }

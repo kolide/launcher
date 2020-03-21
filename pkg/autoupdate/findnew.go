@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -120,7 +122,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			}
 		}
 
-		if err := checkExecutable(file); err != nil {
+		if err := checkExecutable(ctx, file, "--version"); err != nil {
 			level.Error(logger).Log("msg", "not executable!!", "binary", file, "reason", err)
 			continue
 		}
@@ -140,7 +142,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 	level.Debug(logger).Log("msg", "no updates found")
 
-	if err := checkExecutable(fullBinaryPath); err == nil {
+	if err := checkExecutable(ctx, fullBinaryPath, "--version"); err == nil {
 		return fullBinaryPath
 	}
 
@@ -183,4 +185,54 @@ func FindBaseDir(path string) string {
 
 	components := strings.SplitN(path, updateDirSuffix, 2)
 	return filepath.Dir(components[0])
+}
+
+// checkExecutable tests whether something is an executable. It
+// examines permissions, mode, and tries to exec it directly.
+func checkExecutable(ctx context.Context, potentialBinary string, args ...string) error {
+	if err := checkExecutablePermissions(potentialBinary); err != nil {
+		return err
+	}
+
+	// Run the command in a cancelable context. We do the timout
+	// manually, instead of using WithTimeout, so we can hook it
+	// and adjust how we return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	timedout := false
+	time.AfterFunc(5*time.Second, func() {
+		timedout = true
+		cancel()
+	})
+
+	cmd := exec.CommandContext(ctx, potentialBinary, args...)
+	err := supressRoutineErrors(cmd.Run())
+
+	// timeout indicates something pretty amiss. So ensure there's an
+	// error if that happens.
+	if timedout && err != nil {
+		return errors.New("timeout execing")
+	}
+	return err
+}
+
+// supressNormalErrors attempts to tell whether the error was a
+// program that has executed, and then exited, vs one that's execution
+// was entirely unsuccessful. This differenciation allows us to
+// detect, and recover, from corrupt updates vs something in-app.
+func supressRoutineErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Suppress exit codes of 1 or 2. These are generally indicative of
+	// an unknown command line flag, _not_ a corrupt download. (exit
+	// code 0 will be nil, and never trigger this block)
+	if exitError, ok := err.(*exec.ExitError); ok {
+		if exitError.ExitCode() == 1 || exitError.ExitCode() == 2 {
+			// suppress these
+			return nil
+		}
+	}
+	return err
 }
