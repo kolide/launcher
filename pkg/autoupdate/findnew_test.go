@@ -27,8 +27,7 @@ func TestFindNewestSelf(t *testing.T) {
 	}
 
 	// Let's try making a set of update directories
-	binaryPath, err := os.Executable()
-	require.NoError(t, err)
+	binaryPath := os.Args[0]
 	updatesDir := getUpdateDir(binaryPath)
 	require.NotEmpty(t, updatesDir)
 	defer os.RemoveAll(updatesDir)
@@ -129,7 +128,10 @@ func TestFindNewestNonExecutable(t *testing.T) {
 	t.Parallel()
 
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
-	defer cleanupFunc()
+	//defer cleanupFunc()
+	fmt.Println(binaryName)
+	_ = cleanupFunc
+
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
@@ -217,9 +219,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
-	arg0Path, err := os.Executable()
-	require.NoError(t, err, "finding os executable")
-	require.NoError(t, copyFile(binaryPath, arg0Path), "copy executable")
+	require.NoError(t, copyFile(binaryPath, os.Args[0]), "copy executable")
 	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
 
 	if stage <= emptySetup {
@@ -298,13 +298,10 @@ func TestCheckExecutable(t *testing.T) {
 		},
 	}
 
-	arg0Path, err := os.Executable()
-	require.NoError(t, err, "finding os executable")
-
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
 
-			err := checkExecutable(context.TODO(), arg0Path, "-test.run=TestHelperProcess", "--", tt.testName)
+			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
 			} else {
@@ -323,11 +320,8 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.NoError(t, err, "make temp file")
 	defer os.Remove(truncatedBinary.Name())
 
-	arg0Path, err := os.Executable()
-	require.NoError(t, err, "finding os executable")
-
-	sourceBinary, err := os.Open(arg0Path)
-	require.NoError(t, err, "os open arg0 %s", arg0Path)
+	sourceBinary, err := os.Open(os.Args[0])
+	require.NoError(t, err, "os open arg0 %s", os.Args[0])
 	defer sourceBinary.Close()
 
 	_, err = io.Copy(truncatedBinary, sourceBinary)

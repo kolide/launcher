@@ -200,26 +200,12 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 		return err
 	}
 
-	// Run the command in a cancelable context. We do the timout
-	// manually, instead of using WithTimeout, so we can hook it
-	// and adjust how we return.
-	ctx, cancel := context.WithCancel(ctx)
+	// FIXME: Gotta test this on windows
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	timedout := false
-	time.AfterFunc(5*time.Second, func() {
-		timedout = true
-		cancel()
-	})
 
 	cmd := exec.CommandContext(ctx, potentialBinary, args...)
-	err := supressRoutineErrors(cmd.Run())
-
-	// timeout indicates something pretty amiss. So ensure there's an
-	// error if that happens.
-	if timedout && err != nil {
-		return errors.New("timeout execing")
-	}
-	return err
+	return supressRoutineErrors(cmd.Run())
 }
 
 // supressNormalErrors attempts to tell whether the error was a
