@@ -1,6 +1,7 @@
 package autoupdate
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -78,6 +79,24 @@ func (u *Updater) handler() tuf.NotificationHandler {
 				"binary", outputBinary,
 				"err", err,
 			)
+			return
+		}
+
+		// Check that it all came through okay
+		if err := checkExecutable(context.TODO(), outputBinary, "--version"); err != nil {
+			level.Error(u.logger).Log(
+				"msg", "Broken updated binary. Removing",
+				"target", u.target,
+				"outputBinary", outputBinary,
+				"err", err,
+			)
+			if err := os.RemoveAll(updateDir); err != nil {
+				level.Error(u.logger).Log(
+					"msg", "failed to removed broken update directory",
+					"updateDir", updateDir,
+					"err", err,
+				)
+			}
 			return
 		}
 
