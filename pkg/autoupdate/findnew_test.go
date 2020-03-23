@@ -128,8 +128,7 @@ func TestFindNewestNonExecutable(t *testing.T) {
 	t.Parallel()
 
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
-	//defer cleanupFunc()
-	fmt.Println(binaryName)
+	defer cleanupFunc()
 	_ = cleanupFunc
 
 	ctx := context.TODO()
@@ -208,7 +207,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	require.NoError(t, err)
 
 	cleanupFunc := func() {
-		//os.RemoveAll(tmpDir)
+		os.RemoveAll(tmpDir)
 	}
 
 	// Create a test binary
@@ -270,7 +269,6 @@ func copyFile(dstPath, srcPath string) error {
 		return err
 	}
 	dst.Close()
-
 	return nil
 }
 
@@ -339,6 +337,11 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.Error(t,
 		checkExecutable(context.TODO(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
 		"truncated binary")
+}
+
+func TestCheckExecutableCorruptCleanup(t *testing.T) {
+	t.Parallel()
+
 }
 
 // TestHelperProcess isn't a real test. It's used as a helper process

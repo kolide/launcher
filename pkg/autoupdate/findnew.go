@@ -20,7 +20,8 @@ import (
 const updateDirSuffix = "-updates"
 
 type newestSettings struct {
-	deleteOld bool
+	deleteOld     bool
+	deleteCorrupt bool
 }
 
 type newestOption func(*newestSettings)
@@ -28,6 +29,12 @@ type newestOption func(*newestSettings)
 func DeleteOldUpdates() newestOption {
 	return func(no *newestSettings) {
 		no.deleteOld = true
+	}
+}
+
+func DeleteCorruptUpdates() newestOption {
+	return func(no *newestSettings) {
+		no.deleteCorrupt = true
 	}
 }
 
@@ -122,12 +129,15 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			}
 		}
 
-		// Sanity check that the executable is executable. Remove the update if it fails
+		// Sanity check that the executable is executable. Also remove the update if appropriate
 		if err := checkExecutable(ctx, file, "--version"); err != nil {
 			level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
-			basedir := filepath.Dir(file)
-			if err := os.RemoveAll(basedir); err != nil {
-				level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+			if newestSettings.deleteCorrupt {
+				// FIXME: This needs testing before it should be enabled
+				basedir := filepath.Dir(file)
+				if err := os.RemoveAll(basedir); err != nil {
+					level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+				}
 			}
 
 			continue
