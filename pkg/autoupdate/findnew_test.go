@@ -129,8 +129,6 @@ func TestFindNewestNonExecutable(t *testing.T) {
 
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
 	defer cleanupFunc()
-	_ = cleanupFunc
-
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)

@@ -131,12 +131,14 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 		// Sanity check that the executable is executable. Also remove the update if appropriate
 		if err := checkExecutable(ctx, file, "--version"); err != nil {
-			level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
 			if newestSettings.deleteCorrupt {
+				level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
 				basedir := filepath.Dir(file)
 				if err := os.RemoveAll(basedir); err != nil {
 					level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
 				}
+			} else {
+				level.Error(logger).Log("msg", "not executable. Skipping", "binary", file, "reason", err)
 			}
 
 			continue
