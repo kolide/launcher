@@ -5,7 +5,7 @@ orbs:
   go: circleci/go@1.1.0
 
 jobs:
-  build:
+  build-and-test-linux:
     executor:
       name: go/default
       tag: '1.14'
@@ -16,7 +16,16 @@ jobs:
       - go/save-cache
       - run: make deps
       - run: make -j lint
-      - run: make -j {linux,windows}-xp-{launcher,extension,grpc-extension}
+      - run: make -j {linux,windows}-xp-{launcher,extension,grpc-extension} package-builder
+      - run: make test
+  build-and-test-windows:
+    executor:
+      name: win/default
+      size: "medium"
+    steps:
+      - checkout
+      - run: make deps
+      - run: make -j all
       - run: make test
 
 workflows:
