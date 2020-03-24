@@ -20,7 +20,7 @@ jobs:
       - run: make test
   build-and-test-windows:
     executor:
-      name: win/default
+      name: windows/default
       size: "medium"
     steps:
       - checkout
