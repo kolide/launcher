@@ -24,9 +24,13 @@ jobs:
       size: "medium"
     steps:
       - checkout
+      - run: choco install --no-progress make
       - run: make deps
+        shell: bash.exe
       - run: make -j all
+        shell: bash.exe
       - run: make test
+        shell: bash.exe
 
 workflows:
   version: 2.1
