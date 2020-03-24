@@ -30,6 +30,7 @@ jobs:
 
 workflows:
   version: 2.1
-  build:
+  build_and_test
     jobs:
-      - build
+      - build-and-test-linux
+      - build-and-test-windows
