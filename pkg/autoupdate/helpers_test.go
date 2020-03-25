@@ -39,12 +39,16 @@ func TestCheckExecutablePermissions(t *testing.T) {
 	symLink := filepath.Join(tmpDir, "symlink") + dotExe
 	require.NoError(t, os.Symlink(fileName, symLink), "making symlink")
 
-	require.Error(t, checkExecutablePermissions(fileName), "plain file")
-	require.Error(t, checkExecutablePermissions(hardLink), "hard link")
-	require.Error(t, checkExecutablePermissions(symLink), "symlink")
-
 	// windows doesn't have an executable bit
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "windows" {
+		require.NoError(t, checkExecutablePermissions(fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(symLink), "symlink")
+	} else {
+		require.Error(t, checkExecutablePermissions(fileName), "plain file")
+		require.Error(t, checkExecutablePermissions(hardLink), "hard link")
+		require.Error(t, checkExecutablePermissions(symLink), "symlink")
+
 		require.NoError(t, os.Chmod(fileName, 0755))
 		require.NoError(t, checkExecutablePermissions(fileName), "plain file")
 		require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
