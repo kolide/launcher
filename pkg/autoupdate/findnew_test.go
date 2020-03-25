@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +48,7 @@ func TestFindNewestSelf(t *testing.T) {
 
 	expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
 
-	require.NoError(t, copyFile(expectedNewest, binaryPath), "copy executable")
+	require.NoError(t, copyFile(expectedNewest, binaryPath, false), "copy executable")
 	require.NoError(t, os.Chmod(expectedNewest, 0755), "chmod")
 
 	{
@@ -241,7 +242,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
-	require.NoError(t, copyFile(binaryPath, os.Args[0]), "copy executable")
+	require.NoError(t, copyFile(binaryPath, os.Args[0], false), "copy executable")
 	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
 
 	if stage <= emptySetup {
@@ -260,7 +261,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 
 	for _, n := range []string{"2", "5", "3", "1"} {
 		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
-		require.NoError(t, copyFile(updatedBinaryPath, binaryPath), "copy executable")
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
 	}
 
 	if stage <= nonExecutableUpdates {
@@ -277,14 +278,17 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 
 	for _, n := range []string{"5", "1"} {
 		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
-		require.NoError(t, truncateFile(updatedBinaryPath), "truncate executable")
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, true), "copy & truncate executable")
 	}
 
 	return tmpDir, binaryName, cleanupFunc
 
 }
 
-func copyFile(dstPath, srcPath string) error {
+// copyFile copies a file from srcPath to dstPath. If truncate is set,
+// only half the file is copied. (This is a trivial wrapper to
+// simplify setting up test cases)
+func copyFile(dstPath, srcPath string, truncate bool) error {
 	src, err := os.Open(srcPath)
 	if err != nil {
 		return err
@@ -295,31 +299,21 @@ func copyFile(dstPath, srcPath string) error {
 	if err != nil {
 		return err
 	}
+	defer dst.Close()
 
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		return err
-	}
-	dst.Close()
-	return nil
-}
+	if !truncate {
+		if _, err := io.Copy(dst, src); err != nil {
+			return err
+		}
+	} else {
+		stat, err := src.Stat()
+		if err != nil {
+			return errors.Wrap(err, "statting srcFile")
+		}
 
-func truncateFile(filename string) error {
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0755)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	f.Seek(0, io.SeekStart)
-
-	stat, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	if err := f.Truncate(stat.Size() / 2); err != nil {
-		return err
+		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
+			return errors.Wrap(err, "statting srcFile")
+		}
 	}
 
 	return nil
@@ -372,8 +366,7 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	defer os.Remove(truncatedBinary.Name())
 	truncatedBinary.Close()
 
-	require.NoError(t, copyFile(truncatedBinary.Name(), os.Args[0]), "copy executable")
-	require.NoError(t, truncateFile(truncatedBinary.Name()), "truncate executable")
+	require.NoError(t, copyFile(truncatedBinary.Name(), os.Args[0], true), "copy executable")
 	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
 
 	require.Error(t,
