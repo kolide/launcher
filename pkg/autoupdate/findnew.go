@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -211,7 +212,6 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 		return err
 	}
 
-	// FIXME: Gotta test this on windows
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -227,6 +227,9 @@ func supressRoutineErrors(err error) error {
 	if err == nil {
 		return nil
 	}
+
+	fmt.Println("hi seph")
+	spew.Dump(err)
 
 	// Suppress exit codes of 1 or 2. These are generally indicative of
 	// an unknown command line flag, _not_ a corrupt download. (exit
