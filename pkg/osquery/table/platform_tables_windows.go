@@ -11,5 +11,6 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
 	return []*table.Plugin{
 		ProgramIcons(),
+		wmitable.TablePlugin(client, logger),
 	}
 }
