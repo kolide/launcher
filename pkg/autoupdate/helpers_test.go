@@ -43,8 +43,11 @@ func TestCheckExecutablePermissions(t *testing.T) {
 	require.Error(t, checkExecutablePermissions(hardLink), "hard link")
 	require.Error(t, checkExecutablePermissions(symLink), "symlink")
 
-	require.NoError(t, os.Chmod(fileName, 0755))
-	require.NoError(t, checkExecutablePermissions(fileName), "plain file")
-	require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
-	require.NoError(t, checkExecutablePermissions(symLink), "symlink")
+	// windows doesn't have an executable bit
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.Chmod(fileName, 0755))
+		require.NoError(t, checkExecutablePermissions(fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(symLink), "symlink")
+	}
 }
