@@ -132,7 +132,7 @@ func TestFindCurrentUpdate(t *testing.T) {
 	}
 
 	// empty directories -- should still be none
-	require.Equal(t, updater.findCurrentUpdate(), "", "Empty directories should not be found")
+	require.Equal(t, "", updater.findCurrentUpdate(), "Empty directories should not be found")
 
 	for _, n := range []string{"2", "5", "3", "1"} {
 		f := filepath.Join(tmpDir, n, "binary")
@@ -144,22 +144,22 @@ func TestFindCurrentUpdate(t *testing.T) {
 
 	// Windows doesn't have an executable bit, so skip some tests.
 	if runtime.GOOS == "windows" {
-		require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "5", "binary.exe"), "Should find number 5")
+		require.Equal(t, filepath.Join(tmpDir, "5", "binary.exe"), "Should find number 5", updater.findCurrentUpdate())
 	}
 
 	// Nothing executable -- should still be none
-	require.Equal(t, updater.findCurrentUpdate(), "", "Non-executable files should not be found")
+	require.Equal(t, "", updater.findCurrentUpdate(), "Non-executable files should not be found")
 
 	//
 	// Chmod some of them
 	//
 
 	require.NoError(t, os.Chmod(filepath.Join(tmpDir, "1", "binary"), 0755))
-	require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "1", "binary"), "Should find number 1")
+	require.Equal(t, filepath.Join(tmpDir, "1", "binary"), updater.findCurrentUpdate(), "Should find number 1")
 
 	for _, n := range []string{"2", "5", "3", "1"} {
 		require.NoError(t, os.Chmod(filepath.Join(tmpDir, n, "binary"), 0755))
 	}
-	require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "5", "binary"), "Should find number 5")
+	require.Equal(t, filepath.Join(tmpDir, "5", "binary"), updater.findCurrentUpdate(), "Should find number 5")
 
 }
