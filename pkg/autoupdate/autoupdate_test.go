@@ -123,6 +123,10 @@ func TestFindCurrentUpdate(t *testing.T) {
 		logger:           log.NewNopLogger(),
 	}
 
+	if runtime.GOOS == "windows" {
+		updater.binaryName = updater.binaryName + ".exe"
+	}
+
 	// test with empty directory
 	require.Equal(t, updater.findCurrentUpdate(), "", "No subdirs, nothing should be found")
 
@@ -144,7 +148,7 @@ func TestFindCurrentUpdate(t *testing.T) {
 
 	// Windows doesn't have an executable bit, so skip some tests.
 	if runtime.GOOS == "windows" {
-		require.Equal(t, filepath.Join(tmpDir, "5", "binary.exe"), "Should find number 5", updater.findCurrentUpdate())
+		require.Equal(t, filepath.Join(tmpDir, "5", "binary.exe"), updater.findCurrentUpdate(), "Should find number 5")
 	}
 
 	// Nothing executable -- should still be none
