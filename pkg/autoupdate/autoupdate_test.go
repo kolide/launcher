@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -84,13 +84,13 @@ func TestNewUpdater(t *testing.T) {
 			u, err := NewUpdater("/tmp/app", "/tmp/tuf", tt.opts...)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.target, u.target)
+			require.Equal(t, tt.target, u.target)
 
 			// check tuf.Settings derived from NewUpdater defaults.
-			assert.Equal(t, u.settings.GUN, gun)
-			assert.Equal(t, u.settings.LocalRepoPath, tt.localRepoPath)
-			assert.Equal(t, u.settings.NotaryURL, tt.notaryURL)
-			assert.Equal(t, u.settings.MirrorURL, tt.mirrorURL)
+			require.Equal(t, gun, u.settings.GUN)
+			require.Equal(t, filepath.Clean(tt.localRepoPath), u.settings.LocalRepoPath)
+			require.Equal(t, tt.notaryURL, u.settings.NotaryURL)
+			require.Equal(t, tt.mirrorURL, u.settings.MirrorURL)
 
 			// must have a non-nil finalizer
 			require.NotNil(t, u.finalizer)
@@ -135,9 +135,16 @@ func TestFindCurrentUpdate(t *testing.T) {
 	require.Equal(t, updater.findCurrentUpdate(), "", "Empty directories should not be found")
 
 	for _, n := range []string{"2", "5", "3", "1"} {
-		f, err := os.Create(filepath.Join(tmpDir, n, "binary"))
-		require.NoError(t, err)
-		f.Close()
+		f := filepath.Join(tmpDir, n, "binary")
+		if runtime.GOOS == "windows" {
+			f = f + ".exe"
+		}
+		require.NoError(t, copyFile(f, os.Args[0], false), "copy executable")
+	}
+
+	// Windows doesn't have an executable bit, so skip some tests.
+	if runtime.GOOS == "windows" {
+		require.Equal(t, updater.findCurrentUpdate(), filepath.Join(tmpDir, "5", "binary.exe"), "Should find number 5")
 	}
 
 	// Nothing executable -- should still be none

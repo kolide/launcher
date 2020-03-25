@@ -90,12 +90,12 @@ func TestFindBaseDir(t *testing.T) {
 		out string
 	}{
 		{in: "", out: ""},
-		{in: "/a/path/launcher", out: "/a/path"},
-		{in: "/a/path/launcher-updates/1569339163/launcher", out: "/a/path"},
+		{in: "/a/path/launcher", out: filepath.Clean("/a/path")},
+		{in: "/a/path/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path")},
 	}
 
 	for _, tt := range tests {
-		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", filepath.Clean(tt.in))
+		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", tt.in)
 	}
 
 }
@@ -127,6 +127,10 @@ func TestFindNewestEmptyUpdateDirs(t *testing.T) {
 
 func TestFindNewestNonExecutable(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows doesn't use executable bit")
+	}
 
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
 	defer cleanupFunc()
