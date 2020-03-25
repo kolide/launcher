@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,15 +23,20 @@ func TestCheckExecutablePermissions(t *testing.T) {
 
 	require.Error(t, checkExecutablePermissions(tmpDir), "directory should not be executable")
 
-	fileName := filepath.Join(tmpDir, "file")
+	dotExe := ""
+	if runtime.GOOS == "windows" {
+		dotExe = ".exe"
+	}
+
+	fileName := filepath.Join(tmpDir, "file") + dotExe
 	tmpFile, err := os.Create(fileName)
 	require.NoError(t, err, "os create")
 	tmpFile.Close()
 
-	hardLink := filepath.Join(tmpDir, "hardlink")
+	hardLink := filepath.Join(tmpDir, "hardlink") + dotExe
 	require.NoError(t, os.Link(fileName, hardLink), "making link")
 
-	symLink := filepath.Join(tmpDir, "symlink")
+	symLink := filepath.Join(tmpDir, "symlink") + dotExe
 	require.NoError(t, os.Symlink(fileName, symLink), "making symlink")
 
 	require.Error(t, checkExecutablePermissions(fileName), "plain file")
