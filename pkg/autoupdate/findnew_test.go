@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
@@ -173,6 +175,7 @@ func TestFindNewestCleanup(t *testing.T) {
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
 	defer cleanupFunc()
 	ctx := context.TODO()
+	ctx = ctxlog.NewContext(context.TODO(), log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout)))
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
@@ -192,8 +195,9 @@ func TestFindNewestCleanup(t *testing.T) {
 		_ = FindNewest(ctx, binaryPath, DeleteOldUpdates())
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(updatesOnDisk), "after delete")
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
+		require.Equal(t, 2, len(updatesOnDisk), "after delete")
+
 	}
 }
 
