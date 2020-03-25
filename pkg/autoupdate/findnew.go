@@ -216,7 +216,13 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, potentialBinary, args...)
-	return supressRoutineErrors(cmd.Run())
+	execErr := cmd.Run()
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return supressRoutineErrors(execErr)
 }
 
 // supressNormalErrors attempts to tell whether the error was a
