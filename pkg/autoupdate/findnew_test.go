@@ -95,7 +95,7 @@ func TestFindBaseDir(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", tt.in)
+		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", filepath.Clean(tt.in))
 	}
 
 }
@@ -154,6 +154,9 @@ func TestFindNewestExecutableUpdates(t *testing.T) {
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
+	}
 
 	require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 	require.Equal(t, expectedNewest, FindNewest(ctx, expectedNewest), "already running the newest")
@@ -170,6 +173,10 @@ func TestFindNewestCleanup(t *testing.T) {
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
+	}
+
 	{
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
@@ -196,6 +203,10 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	expectedNewest := filepath.Join(updatesDir, "3", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
+	}
+
 	{
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
