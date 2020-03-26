@@ -14,7 +14,7 @@ func TestCheckExecutablePermissions(t *testing.T) {
 	t.Parallel()
 
 	require.Error(t, checkExecutablePermissions(""), "passing empty string")
-	require.Error(t, checkExecutablePermissions("/random/path/should/not/exist"), "passing empty string")
+	require.Error(t, checkExecutablePermissions("/random/path/should/not/exist"), "passing non-existent file path")
 
 	// Setup the tests
 	tmpDir, err := ioutil.TempDir("", "test-autoupdate-check-executable")
