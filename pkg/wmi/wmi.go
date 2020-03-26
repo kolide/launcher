@@ -73,11 +73,6 @@ func Query(ctx context.Context, className string, properties []string) ([]map[st
 	result := resultRaw.ToIDispatch()
 	defer result.Release()
 
-	countVar, _ := oleutil.GetProperty(result, "Count")
-	count := int(countVar.Val)
-
-	level.Debug(logger).Log("msg", "SEPH: result count", "c", count)
-
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
 		return nil, errors.Wrap(err, "ole foreach")
 	}
@@ -100,8 +95,6 @@ func NewOleHandler(ctx context.Context, properties []string) *oleHandler {
 }
 
 func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
-	level.Debug(oh.logger).Log("msg", "SEPH: handling")
-
 	item := v.ToIDispatch()
 	defer item.Release()
 

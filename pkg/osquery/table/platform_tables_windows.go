@@ -3,6 +3,8 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/osquery/tables/wmitable"
+
 	"github.com/go-kit/kit/log"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
