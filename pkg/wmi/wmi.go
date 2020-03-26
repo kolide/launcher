@@ -6,10 +6,14 @@
 // We do _not_ use the stackdriver library [2], because that uses reflect
 // and wants typed objects. Our use case is too dynamic.
 //
+// To understand the available classes, take a look at the Microsoft
+// documention [3]
+
 // References:
 //
 // 1. https://stackoverflow.com/questions/20365286/query-wmi-from-go
 // 2. https://github.com/StackExchange/wmi
+// 3. https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/operating-system-classes
 package wmi
 
 import (
@@ -24,6 +28,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// S_FALSE is returned by CoInitializeEx if it was already called on this thread.
+const S_FALSE = 0x00000001
+
 func Query(ctx context.Context, className string, properties []string) ([]map[string]interface{}, error) {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", "wmi.Query")
 	handler := NewOleHandler(ctx, properties)
@@ -35,10 +42,9 @@ func Query(ctx context.Context, className string, properties []string) ([]map[st
 	queryString := fmt.Sprintf("SELECT * FROM %s", className)
 
 	// Initialize the COM system.
-	// This is using a single threaded model. See Docs.
-	if err := ole.CoInitialize(0); err != nil {
-		code := err.(*ole.OleError).Code()
-		if code != 0x00000001 {
+	if err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED); err != nil {
+		oleCode := err.(*ole.OleError).Code()
+		if oleCode != ole.S_OK && oleCode != S_FALSE {
 			return nil, errors.Wrap(err, "CoInitialize returned error")
 		}
 		level.Debug(logger).Log("msg", "The COM library is already initialized on this thread")
@@ -102,12 +108,19 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 
 	for _, p := range oh.properties {
 		val, err := oleutil.GetProperty(item, p)
+		defer val.Clear()
 		if err != nil {
 			level.Debug(oh.logger).Log("msg", "Got error looking for property", "property", p, "err", err)
-			//continue
-		} else {
-			result[p] = val.ToString()
+			continue
 		}
+
+		// Not sure if we need to special case the nil, or iv Value() handles it.
+		if val.VT == 0x1 { //VT_NULL
+			result[p] = nil
+			continue
+		}
+
+		result[p] = val.Value()
 	}
 	if len(result) > 0 {
 		oh.results = append(oh.results, result)
