@@ -3,12 +3,14 @@ package autoupdate
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,8 +28,7 @@ func TestFindNewestSelf(t *testing.T) {
 	}
 
 	// Let's try making a set of update directories
-	binaryPath, err := os.Executable()
-	require.NoError(t, err)
+	binaryPath := os.Args[0]
 	updatesDir := getUpdateDir(binaryPath)
 	require.NotEmpty(t, updatesDir)
 	defer os.RemoveAll(updatesDir)
@@ -47,10 +48,8 @@ func TestFindNewestSelf(t *testing.T) {
 
 	expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
 
-	f, err := os.Create(expectedNewest)
-	require.NoError(t, err)
-	f.Close()
-	require.NoError(t, os.Chmod(f.Name(), 0755))
+	require.NoError(t, copyFile(expectedNewest, binaryPath, false), "copy executable")
+	require.NoError(t, os.Chmod(expectedNewest, 0755), "chmod")
 
 	{
 		newest, err := FindNewestSelf(ctx)
@@ -91,8 +90,8 @@ func TestFindBaseDir(t *testing.T) {
 		out string
 	}{
 		{in: "", out: ""},
-		{in: "/a/path/launcher", out: "/a/path"},
-		{in: "/a/path/launcher-updates/1569339163/launcher", out: "/a/path"},
+		{in: "/a/path/launcher", out: filepath.Clean("/a/path")},
+		{in: "/a/path/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path")},
 	}
 
 	for _, tt := range tests {
@@ -129,6 +128,10 @@ func TestFindNewestEmptyUpdateDirs(t *testing.T) {
 func TestFindNewestNonExecutable(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows doesn't use executable bit")
+	}
+
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
 	defer cleanupFunc()
 	ctx := context.TODO()
@@ -155,6 +158,9 @@ func TestFindNewestExecutableUpdates(t *testing.T) {
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
+	}
 
 	require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 	require.Equal(t, expectedNewest, FindNewest(ctx, expectedNewest), "already running the newest")
@@ -164,14 +170,24 @@ func TestFindNewestExecutableUpdates(t *testing.T) {
 func TestFindNewestCleanup(t *testing.T) {
 	t.Parallel()
 
+	// delete doesn't seem to work on windows. It gets a
+	// "Access is denied" error". This may be a test setup
+	// issue, or something with an open file handle.
+	if runtime.GOOS == "windows" {
+		t.Skip("TODO: Windows deletion test is broken")
+	}
+
 	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-	_ = cleanupFunc
-	//defer cleanupFunc()
+	defer cleanupFunc()
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
+	}
+
 	{
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
@@ -183,10 +199,40 @@ func TestFindNewestCleanup(t *testing.T) {
 		_ = FindNewest(ctx, binaryPath, DeleteOldUpdates())
 		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(updatesOnDisk), "after delete")
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
+		require.Equal(t, 2, len(updatesOnDisk), "after delete")
+
+	}
+}
+
+func TestCheckExecutableCorruptCleanup(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, truncatedUpdates)
+	defer cleanupFunc()
+	ctx := context.TODO()
+	binaryPath := filepath.Join(tmpDir, binaryName)
+	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
+
+	expectedNewest := filepath.Join(updatesDir, "3", "binary")
+	if runtime.GOOS == "windows" {
+		expectedNewest = expectedNewest + ".exe"
 	}
 
+	{
+		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(updatesOnDisk))
+		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
+	}
+
+	{
+		_ = FindNewest(ctx, binaryPath, DeleteCorruptUpdates())
+		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(updatesOnDisk), "after cleaning corruption")
+		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
+	}
 }
 
 type setupState int
@@ -196,6 +242,7 @@ const (
 	emptyUpdateDirs
 	nonExecutableUpdates
 	executableUpdates
+	truncatedUpdates
 )
 
 // setupTestDir function to setup the test dirs. This work is broken
@@ -210,7 +257,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 		os.RemoveAll(tmpDir)
 	}
 
-	// Create the fake binary
+	// Create a test binary
 	binaryName := "binary"
 	if runtime.GOOS == "windows" {
 		binaryName = binaryName + ".exe"
@@ -218,12 +265,8 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
-	{
-		tmpFile, err := os.Create(binaryPath)
-		require.NoError(t, err, "os create")
-		tmpFile.Close()
-		require.NoError(t, os.Chmod(binaryPath, 0755))
-	}
+	require.NoError(t, copyFile(binaryPath, os.Args[0], false), "copy executable")
+	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
 
 	if stage <= emptySetup {
 		return tmpDir, binaryName, cleanupFunc
@@ -240,9 +283,8 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	for _, n := range []string{"2", "5", "3", "1"} {
-		f, err := os.Create(filepath.Join(updatesDir, n, binaryName))
-		require.NoError(t, err)
-		f.Close()
+		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
 	}
 
 	if stage <= nonExecutableUpdates {
@@ -253,6 +295,138 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 		require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, binaryName), 0755))
 	}
 
+	if stage <= executableUpdates {
+		return tmpDir, binaryName, cleanupFunc
+	}
+
+	for _, n := range []string{"5", "1"} {
+		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, true), "copy & truncate executable")
+	}
+
 	return tmpDir, binaryName, cleanupFunc
 
+}
+
+// copyFile copies a file from srcPath to dstPath. If truncate is set,
+// only half the file is copied. (This is a trivial wrapper to
+// simplify setting up test cases)
+func copyFile(dstPath, srcPath string, truncate bool) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	if !truncate {
+		if _, err := io.Copy(dst, src); err != nil {
+			return err
+		}
+	} else {
+		stat, err := src.Stat()
+		if err != nil {
+			return errors.Wrap(err, "statting srcFile")
+		}
+
+		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
+			return errors.Wrap(err, "statting srcFile")
+		}
+	}
+
+	return nil
+}
+
+func TestCheckExecutable(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		testName    string
+		expectedErr bool
+	}{
+		{
+			testName:    "exit0",
+			expectedErr: false,
+		},
+		{
+			testName:    "exit1",
+			expectedErr: false,
+		},
+		{
+			testName:    "exit2",
+			expectedErr: false,
+		},
+		{
+			testName:    "sleep",
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
+			if tt.expectedErr {
+				require.Error(t, err, tt.testName)
+			} else {
+				require.NoError(t, err, tt.testName)
+			}
+		})
+
+	}
+}
+
+func TestCheckExecutableTruncated(t *testing.T) {
+	t.Parallel()
+
+	// First make a broken truncated binary. Lots of setup for this.
+	truncatedBinary, err := ioutil.TempFile("", "test-autoupdate-check-executable-truncation")
+	require.NoError(t, err, "make temp file")
+	defer os.Remove(truncatedBinary.Name())
+	truncatedBinary.Close()
+
+	require.NoError(t, copyFile(truncatedBinary.Name(), os.Args[0], true), "copy executable")
+	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
+
+	require.Error(t,
+		checkExecutable(context.TODO(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
+		"truncated binary")
+}
+
+// TestHelperProcess isn't a real test. It's used as a helper process
+// to make a portableish binary. See
+// https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
+// and https://npf.io/2015/06/testing-exec-command/
+func TestHelperProcess(t *testing.T) {
+	t.Parallel()
+
+	// find out magic arguments
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		// Indicates an error, or just being run in the test suite.
+		return
+	}
+
+	switch args[0] {
+	case "sleep":
+		select {}
+	case "exit0":
+		os.Exit(0)
+	case "exit1":
+		os.Exit(1)
+	case "exit2":
+		os.Exit(2)
+	}
+
+	// default behavior nothing
 }

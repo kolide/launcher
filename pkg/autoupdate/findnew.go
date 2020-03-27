@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -18,7 +20,8 @@ import (
 const updateDirSuffix = "-updates"
 
 type newestSettings struct {
-	deleteOld bool
+	deleteOld     bool
+	deleteCorrupt bool
 }
 
 type newestOption func(*newestSettings)
@@ -26,6 +29,12 @@ type newestOption func(*newestSettings)
 func DeleteOldUpdates() newestOption {
 	return func(no *newestSettings) {
 		no.deleteOld = true
+	}
+}
+
+func DeleteCorruptUpdates() newestOption {
+	return func(no *newestSettings) {
+		no.deleteCorrupt = true
 	}
 }
 
@@ -120,8 +129,18 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			}
 		}
 
-		if err := checkExecutable(file); err != nil {
-			level.Error(logger).Log("msg", "not executable!!", "binary", file, "reason", err)
+		// Sanity check that the executable is executable. Also remove the update if appropriate
+		if err := checkExecutable(ctx, file, "--version"); err != nil {
+			if newestSettings.deleteCorrupt {
+				level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
+				basedir := filepath.Dir(file)
+				if err := os.RemoveAll(basedir); err != nil {
+					level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+				}
+			} else {
+				level.Error(logger).Log("msg", "not executable. Skipping", "binary", file, "reason", err)
+			}
+
 			continue
 		}
 
@@ -140,7 +159,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 	level.Debug(logger).Log("msg", "no updates found")
 
-	if err := checkExecutable(fullBinaryPath); err == nil {
+	if err := checkExecutable(ctx, fullBinaryPath, "--version"); err == nil {
 		return fullBinaryPath
 	}
 
@@ -183,4 +202,45 @@ func FindBaseDir(path string) string {
 
 	components := strings.SplitN(path, updateDirSuffix, 2)
 	return filepath.Dir(components[0])
+}
+
+// checkExecutable tests whether something is an executable. It
+// examines permissions, mode, and tries to exec it directly.
+func checkExecutable(ctx context.Context, potentialBinary string, args ...string) error {
+	if err := checkExecutablePermissions(potentialBinary); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, potentialBinary, args...)
+	execErr := cmd.Run()
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return supressRoutineErrors(execErr)
+}
+
+// supressNormalErrors attempts to tell whether the error was a
+// program that has executed, and then exited, vs one that's execution
+// was entirely unsuccessful. This differentiation allows us to
+// detect, and recover, from corrupt updates vs something in-app.
+func supressRoutineErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Suppress exit codes of 1 or 2. These are generally indicative of
+	// an unknown command line flag, _not_ a corrupt download. (exit
+	// code 0 will be nil, and never trigger this block)
+	if exitError, ok := err.(*exec.ExitError); ok {
+		if exitError.ExitCode() == 1 || exitError.ExitCode() == 2 {
+			// suppress these
+			return nil
+		}
+	}
+	return err
 }
