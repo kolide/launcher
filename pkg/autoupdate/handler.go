@@ -58,6 +58,16 @@ func (u *Updater) handler() tuf.NotificationHandler {
 			return
 		}
 
+		cleanupBrokenUpdate := func() {
+			if err := os.RemoveAll(updateDir); err != nil {
+				level.Error(u.logger).Log(
+					"msg", "failed to removed broken update directory",
+					"updateDir", updateDir,
+					"err", err,
+				)
+			}
+		}
+
 		// The UntarBundle(destination, source) paths are a
 		// little weird. Source is a tarball, obvious
 		// enough. But destination is a string that's passed
@@ -69,6 +79,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 				"binary", outputBinary,
 				"err", err,
 			)
+			cleanupBrokenUpdate()
 			return
 		}
 
@@ -79,6 +90,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 				"binary", outputBinary,
 				"err", err,
 			)
+			cleanupBrokenUpdate()
 			return
 		}
 
@@ -90,13 +102,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 				"outputBinary", outputBinary,
 				"err", err,
 			)
-			if err := os.RemoveAll(updateDir); err != nil {
-				level.Error(u.logger).Log(
-					"msg", "failed to removed broken update directory",
-					"updateDir", updateDir,
-					"err", err,
-				)
-			}
+			cleanupBrokenUpdate()
 			return
 		}
 
