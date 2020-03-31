@@ -65,7 +65,7 @@ require (
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.5.1
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
 	go.opencensus.io v0.22.1
