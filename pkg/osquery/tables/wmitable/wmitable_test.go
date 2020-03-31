@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,7 +74,7 @@ func TestQueries(t *testing.T) {
 
 			if tt.err {
 				require.Error(t, err)
-				continue
+				return
 			}
 
 			require.NoError(t, err)
@@ -85,7 +86,7 @@ func TestQueries(t *testing.T) {
 			for _, row := range rows {
 				for column, data := range row {
 					assert.NotEmpty(t, column, "column")
-					assert.NotEmpty(t, data, "column data")
+					assert.NotEmpty(t, data, "column data for %s", column)
 				}
 			}
 
