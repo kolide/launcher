@@ -20,47 +20,45 @@ func TestQueries(t *testing.T) {
 		name       string
 		class      string
 		properties []string
-		expected   []map[string]string
-		errRequire require.ErrorAssertionFunc
-
-		err bool
+		minRows    int
+		err        bool
 	}{
 		{
 			name:       "simple operating system query",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name,version"},
-			errRequire: require.NoError,
+			minRows:    1,
 		},
 		{
 			name:       "queries with non-string types",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"InstallDate,primary"},
-			errRequire: require.NoError,
+			minRows:    1,
 		},
 		{
 			name:       "multiple operating system query",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name", "version"},
-			errRequire: require.NoError,
+			minRows:    1,
 		},
 
 		{
 			name:       "process query",
 			class:      "WIN32_process",
 			properties: []string{"Caption,CommandLine,CreationDate,Name,Handle,ReadTransferCount"},
-			errRequire: require.NoError,
+			minRows:    10,
 		},
 		{
 			name:       "bad class name",
 			class:      "Win32_OperatingSystem;",
 			properties: []string{"name,version"},
-			errRequire: require.Error,
+			err:        true,
 		},
 		{
 			name:       "bad properties",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name,ver;sion"},
-			errRequire: require.Error,
+			err:        true,
 		},
 	}
 
@@ -72,7 +70,25 @@ func TestQueries(t *testing.T) {
 			})
 
 			rows, err := wmiTable.generate(context.TODO(), mockQC)
-			tt.errRequire(t, err)
+
+			if tt.err {
+				require.Error(t, err)
+				continue
+			}
+
+			require.NoError(t, err)
+
+			// It's hard to model what we expect to get
+			// from a random windows machine. So let's
+			// just check for non-empty data.
+			assert.GreaterOrEqual(t, len(rows), tt.minRows, "Expected minimum rows")
+			for _, row := range rows {
+				for column, data := range row {
+					assert.NotEmpty(t, column, "column")
+					assert.NotEmpty(t, data, "column data")
+				}
+			}
+
 		})
 	}
 
