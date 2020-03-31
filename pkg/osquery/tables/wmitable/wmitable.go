@@ -5,6 +5,7 @@ package wmitable
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/wmi"
@@ -77,6 +78,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
+			// Set a timeout in case wmi hangs
+			ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+			defer cancel()
+
 			wmiResults, err := wmi.Query(ctx, classConstraint.Expression, properties)
 			if err != nil {
 				level.Info(t.logger).Log(
@@ -101,7 +106,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return results, nil
-
 }
 
 func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties string) []map[string]string {
