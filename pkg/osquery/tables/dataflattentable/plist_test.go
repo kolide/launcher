@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +51,12 @@ func TestPlist(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		rows, err := plistTable.generate(context.TODO(), mockQueryContext(tt.paths, tt.queries))
+		mockQC := tablehelpers.MockQueryContext(map[string][]string{
+			"path":  tt.paths,
+			"query": tt.queries,
+		})
+
+		rows, err := plistTable.generate(context.TODO(), mockQC)
 		if tt.err {
 			require.Error(t, err)
 			continue
