@@ -84,13 +84,15 @@ func TestQueries(t *testing.T) {
 			// just check for non-empty data.
 			assert.GreaterOrEqual(t, len(rows), tt.minRows, "Expected minimum rows")
 			for _, row := range rows {
-				for column, data := range row {
-					assert.NotEmpty(t, column, "column")
-					assert.NotEmpty(t, data, "column data for %s", column)
+				// this has gone through dataflatten. Test for various expected results
+				require.Contains(t, row, "class", "class column")
+				require.Equal(t, tt.class, row["class"], "class name is equal")
+
+				for _, columnName := range []string{"fullkey", "parent", "key", "value"} {
+					require.Contains(t, row, columnName, "%s column", columnName)
+					assert.NotEmpty(t, tt.class, row[columnName], "%s column not empty", columnName)
 				}
 			}
-
 		})
 	}
-
 }
