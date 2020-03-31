@@ -146,14 +146,3 @@ func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]int
 	}
 	return results
 }
-
-const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
-
-func onlyAllowedCharacters(input string) bool {
-	for _, char := range input {
-		if !strings.ContainsRune(allowedCharacters, char) {
-			return false
-		}
-	}
-	return true
-}
