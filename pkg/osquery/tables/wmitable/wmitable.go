@@ -60,7 +60,18 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, classConstraint := range classQ.Constraints {
+		if !onlyAllowedCharacters(classConstraint.Expression) {
+			level.Info(t.logger).Log("msg", "Disallowed character in class expression")
+			return nil, errors.New("Disallowed character in class expression")
+		}
+
 		for _, propertiesConstraint := range propertiesQ.Constraints {
+
+			if !onlyAllowedCharacters(strings.Replace(propertiesConstraint.Expression, ",", "", -1)) {
+				level.Info(t.logger).Log("msg", "Disallowed character in properties expression")
+				return nil, errors.New("Disallowed character in properties expression")
+			}
+
 			properties := strings.Split(propertiesConstraint.Expression, ",")
 			if len(properties) == 0 {
 				continue
@@ -134,4 +145,15 @@ func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]int
 		results = append(results, res)
 	}
 	return results
+}
+
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+
+func onlyAllowedCharacters(input string) bool {
+	for _, char := range input {
+		if !strings.ContainsRune(allowedCharacters, char) {
+			return false
+		}
+	}
+	return true
 }
