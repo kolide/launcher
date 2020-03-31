@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
@@ -13,14 +14,14 @@ import (
 func TestQueries(t *testing.T) {
 	t.Parallel()
 
-	wmiTable := Table{}
+	wmiTable := Table{logger: log.NewNopLogger()}
 
 	var tests = []struct {
 		name       string
 		class      string
 		properties []string
 		expected   []map[string]string
-		errRequire require.BoolAssertionFunc
+		errRequire require.ErrorAssertionFunc
 
 		err bool
 	}{
@@ -47,7 +48,7 @@ func TestQueries(t *testing.T) {
 			name:       "process query",
 			class:      "WIN32_process",
 			properties: []string{"Caption,CommandLine,CreationDate,Name,Handle,ReadTransferCount"},
-			errRequire: require.Error,
+			errRequire: require.NoError,
 		},
 		{
 			name:       "bad class name",
@@ -66,7 +67,7 @@ func TestQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
-				"class":      tt.class,
+				"class":      []string{tt.class},
 				"properties": tt.properties,
 			})
 
