@@ -56,7 +56,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	propertiesQ, ok := queryContext.Constraints["properties"]
 	if !ok || len(propertiesQ.Constraints) == 0 {
-		// TODO: consider defaulting to "name" here?
 		return nil, errors.New("The kolide_wmi table requires wmi properties")
 	}
 

@@ -68,6 +68,8 @@ func Query(ctx context.Context, className string, properties []string) ([]map[st
 	if err != nil {
 		return nil, errors.Wrap(err, "wmi connectserver")
 	}
+	defer serviceRaw.Clear()
+
 	service := serviceRaw.ToIDispatch()
 	defer service.Release()
 
@@ -76,6 +78,8 @@ func Query(ctx context.Context, className string, properties []string) ([]map[st
 	if err != nil {
 		return nil, errors.Wrapf(err, "Running query %s", queryString)
 	}
+	defer resultRaw.Clear()
+
 	result := resultRaw.ToIDispatch()
 	defer result.Release()
 
@@ -108,11 +112,11 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 
 	for _, p := range oh.properties {
 		val, err := oleutil.GetProperty(item, p)
-		defer val.Clear()
 		if err != nil {
 			level.Debug(oh.logger).Log("msg", "Got error looking for property", "property", p, "err", err)
 			continue
 		}
+		defer val.Clear()
 
 		// Not sure if we need to special case the nil, or iv Value() handles it.
 		if val.VT == 0x1 { //VT_NULL
