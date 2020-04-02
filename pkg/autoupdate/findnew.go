@@ -20,8 +20,9 @@ import (
 const updateDirSuffix = "-updates"
 
 type newestSettings struct {
-	deleteOld     bool
-	deleteCorrupt bool
+	deleteOld               bool
+	deleteCorrupt           bool
+	skipFullBinaryPathCheck bool
 }
 
 type newestOption func(*newestSettings)
@@ -35,6 +36,16 @@ func DeleteOldUpdates() newestOption {
 func DeleteCorruptUpdates() newestOption {
 	return func(no *newestSettings) {
 		no.deleteCorrupt = true
+	}
+}
+
+// SkipFullBinaryPathCheck skips the final check on FindNewest. This
+// is desirable when being called by FindNewestSelf, otherewise we end
+// up in a infineite recursion. (The recursion is saved by the exec
+// check, but it's better not to trigger it.
+func SkipFullBinaryPathCheck() newestOption {
+	return func(no *newestSettings) {
+		no.skipFullBinaryPathCheck = true
 	}
 }
 
@@ -52,6 +63,8 @@ func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
 	if exPath == "" {
 		return "", errors.New("can't find newest empty string")
 	}
+
+	opts = append(opts, SkipFullBinaryPathCheck())
 
 	newest := FindNewest(ctx, exPath, opts...)
 
@@ -158,6 +171,10 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	}
 
 	level.Debug(logger).Log("msg", "no updates found")
+
+	if newestSettings.skipFullBinaryPathCheck {
+		return fullBinaryPath
+	}
 
 	if err := checkExecutable(ctx, fullBinaryPath, "--version"); err == nil {
 		return fullBinaryPath
