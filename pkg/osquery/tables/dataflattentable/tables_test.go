@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,7 +52,12 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 	for _, tt := range tests {
 		for dataType, tableFunc := range testTables {
 			testFile := filepath.Join("testdata", "animals."+dataType)
-			rows, err := tableFunc.generate(context.TODO(), mockQueryContext([]string{testFile}, tt.queries))
+			mockQC := tablehelpers.MockQueryContext(map[string][]string{
+				"path":  []string{testFile},
+				"query": tt.queries,
+			})
+
+			rows, err := tableFunc.generate(context.TODO(), mockQC)
 
 			require.NoError(t, err)
 
@@ -70,24 +75,4 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 		}
 	}
 
-}
-
-func mockQueryContext(paths []string, queries []string) table.QueryContext {
-	pathConstraints := make([]table.Constraint, len(paths))
-	for i, path := range paths {
-		pathConstraints[i].Expression = path
-	}
-	queryConstraints := make([]table.Constraint, len(queries))
-	for i, q := range queries {
-		queryConstraints[i].Expression = q
-	}
-
-	queryContext := table.QueryContext{
-		Constraints: map[string]table.ConstraintList{
-			"path":  table.ConstraintList{Constraints: pathConstraints},
-			"query": table.ConstraintList{Constraints: queryConstraints},
-		},
-	}
-
-	return queryContext
 }

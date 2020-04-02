@@ -28,6 +28,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-kit/kit v0.8.0
+	github.com/go-ole/go-ole v1.2.4
 	github.com/gogo/protobuf v1.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
@@ -64,7 +65,7 @@ require (
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.5.1
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9
 	go.opencensus.io v0.22.1
