@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -440,6 +441,9 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildUser=%s (%s)"`, usr.Name, usr.Username))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
 		}
+
+		// Set the build time for autoupdate.FindNewest
+		ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/launcher/pkg/autoupdate.buildTimestamp=%s"`, strconv.FormatInt(time.Now().Unix(), 10)))
 
 		if len(ldFlags) != 0 {
 			baseArgs = append(baseArgs, fmt.Sprintf("--ldflags=%s", strings.Join(ldFlags, " ")))

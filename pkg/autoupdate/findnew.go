@@ -16,6 +16,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// buildTimestamp is used to set the _oldest_ allowed update. Eg, if
+// there's an update with a download timestamp older than build, just
+// ignore it. It's probably indicative of a machine that's been re-installed.
+//
+// This is a private variable. It needs to be set via build time LDFLAGS
+const buildTimestamp = "0"
+
 // This suffix is added to the binary path to find the updates
 const updateDirSuffix = "-updates"
 
@@ -131,11 +138,33 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	foundFile := ""
 	for i := len(possibleUpdates) - 1; i >= 0; i-- {
 		file := possibleUpdates[i]
+		basedir := filepath.Dir(file)
+		updateDownloadTime := filepath.Base(basedir)
+
+		// We only want to consider updates with a download time _newer_
+		// than our build timestamp. Note that we're not comparing against
+		// the update's build time, only the download time. This is an
+		// important distinction to allow for downgrades.
+		if strings.Compare(buildTimestamp, updateDownloadTime) > 0 {
+			// FIXME: need tests
+			level.Debug(logger).Log(
+				"msg", "update download is older than buildtime",
+				"dir", basedir,
+				"buildtime", buildTimestamp,
+			)
+
+			if newestSettings.deleteOld {
+				if err := os.RemoveAll(basedir); err != nil {
+					level.Error(logger).Log("msg", "error deleting old update dir", "dir", basedir, "err", err)
+				}
+			}
+
+			continue
+		}
 
 		// If we've already found at least 2 files, (newest, and presumed
 		// current), trigger delete routine
 		if newestSettings.deleteOld && foundCount >= 2 {
-			basedir := filepath.Dir(file)
 			level.Debug(logger).Log("msg", "deleting old updates", "dir", basedir)
 			if err := os.RemoveAll(basedir); err != nil {
 				level.Error(logger).Log("msg", "error deleting old update dir", "dir", basedir, "err", err)
@@ -146,7 +175,6 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		if err := checkExecutable(ctx, file, "--version"); err != nil {
 			if newestSettings.deleteCorrupt {
 				level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
-				basedir := filepath.Dir(file)
 				if err := os.RemoveAll(basedir); err != nil {
 					level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
 				}
