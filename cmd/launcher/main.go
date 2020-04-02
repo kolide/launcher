@@ -40,7 +40,7 @@ func main() {
 	// a straight forward exec.
 	//
 	// launcher is _also_ called when we're checking update
-	// validity (with autoupdate.checkExectuable). This is
+	// validity (with autoupdate.checkExecutable). This is
 	// somewhat awkward as we end up with extra call layers.
 	newerBinary, err := autoupdate.FindNewestSelf(ctx)
 	if err != nil {
