@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -30,9 +29,9 @@ func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 		// the update in main, which does not delete.  Note
 		// that this will likely produce non-fatal errors when
 		// it tries to delete the running one.
-		_ = autoupdate.FindNewest(
+		autoupdate.FindNewestSelf(
 			ctxlog.NewContext(context.TODO(), logger),
-			os.Args[0],
+			autoupdate.DeleteCorruptUpdates(),
 			autoupdate.DeleteOldUpdates(),
 		)
 

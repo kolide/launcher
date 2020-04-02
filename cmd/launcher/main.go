@@ -38,6 +38,10 @@ func main() {
 	// This does not call DeleteOldUpdates, on the theory that
 	// it's better left to the service to handle cleanup. This is
 	// a straight forward exec.
+	//
+	// launcher is _also_ called when we're checking update
+	// validity (with autoupdate.checkExecutable). This is
+	// somewhat awkward as we end up with extra call layers.
 	newerBinary, err := autoupdate.FindNewestSelf(ctx)
 	if err != nil {
 		logutil.Fatal(logger, err, "checking for updated version")
