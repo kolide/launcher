@@ -41,7 +41,7 @@ func main() {
 	//
 	// launcher is _also_ called when we're checking update
 	// validity (with autoupdate.checkExectuable). This is
-	// somewhat awkward as we emnd up with extra call layers.
+	// somewhat awkward as we end up with extra call layers.
 	newerBinary, err := autoupdate.FindNewestSelf(ctx)
 	if err != nil {
 		logutil.Fatal(logger, err, "checking for updated version")
