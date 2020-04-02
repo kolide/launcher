@@ -16,12 +16,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// buildTimestamp is used to set the _oldest_ allowed update. Eg, if
+// defaultBuildTimestamp is used to set the _oldest_ allowed update. Eg, if
 // there's an update with a download timestamp older than build, just
 // ignore it. It's probably indicative of a machine that's been re-installed.
 //
-// This is a private variable. It needs to be set via build time LDFLAGS
-const buildTimestamp = "0"
+// This is a private variable. It should be set via build time
+// LDFLAGS.
+const defaultBuildTimestamp = "0"
 
 // This suffix is added to the binary path to find the updates
 const updateDirSuffix = "-updates"
@@ -30,6 +31,7 @@ type newestSettings struct {
 	deleteOld               bool
 	deleteCorrupt           bool
 	skipFullBinaryPathCheck bool
+	buildTimestamp          string
 }
 
 type newestOption func(*newestSettings)
@@ -43,6 +45,15 @@ func DeleteOldUpdates() newestOption {
 func DeleteCorruptUpdates() newestOption {
 	return func(no *newestSettings) {
 		no.deleteCorrupt = true
+	}
+}
+
+// overrideBuildTimestamp overrides the buildTimestamp constant. This
+// is to allow tests to mock that behavior. It is not exported, as it
+// is expected to only be used for testing.
+func overrideBuildTimestamp(ts string) newestOption {
+	return func(no *newestSettings) {
+		no.buildTimestamp = ts
 	}
 }
 
@@ -104,7 +115,9 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return ""
 	}
 
-	newestSettings := &newestSettings{}
+	newestSettings := &newestSettings{
+		buildTimestamp: defaultBuildTimestamp,
+	}
 	for _, opt := range opts {
 		opt(newestSettings)
 	}
@@ -145,12 +158,11 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		// than our build timestamp. Note that we're not comparing against
 		// the update's build time, only the download time. This is an
 		// important distinction to allow for downgrades.
-		if strings.Compare(buildTimestamp, updateDownloadTime) > 0 {
-			// FIXME: need tests
+		if strings.Compare(newestSettings.buildTimestamp, updateDownloadTime) >= 0 {
 			level.Debug(logger).Log(
 				"msg", "update download is older than buildtime",
 				"dir", basedir,
-				"buildtime", buildTimestamp,
+				"buildtime", newestSettings.buildTimestamp,
 			)
 
 			if newestSettings.deleteOld {
