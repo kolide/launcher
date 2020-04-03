@@ -428,9 +428,7 @@ func TestBuildTimestamp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("buildTimestamp="+tt.buildTimestamp, func(t *testing.T) {
 			tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-			fmt.Println(tmpDir)
-			//defer cleanupFunc()
-			_ = cleanupFunc
+			defer cleanupFunc()
 			ctx := context.TODO()
 
 			binaryPath := filepath.Join(tmpDir, binaryName)
