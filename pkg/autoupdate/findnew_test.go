@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -394,6 +395,67 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.Error(t,
 		checkExecutable(context.TODO(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
 		"truncated binary")
+}
+
+func TestBuildTimestamp(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		buildTimestamp string
+		expectedNewest string
+		expectedOnDisk int
+	}{
+		{
+			buildTimestamp: "0",
+			expectedNewest: "5",
+			expectedOnDisk: 2,
+		},
+		{
+			buildTimestamp: "3",
+			expectedNewest: "5",
+			expectedOnDisk: 1, // remember, 4 is broken, so there should only be update 5 on disk
+		},
+		{
+			buildTimestamp: "5",
+			expectedOnDisk: 0,
+		},
+		{
+			buildTimestamp: "6",
+			expectedOnDisk: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("buildTimestamp="+tt.buildTimestamp, func(t *testing.T) {
+			tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
+			defer cleanupFunc()
+			ctx := context.TODO()
+
+			binaryPath := filepath.Join(tmpDir, binaryName)
+			updatesDir := binaryPath + updateDirSuffix
+
+			returnedNewest := FindNewest(
+				ctx,
+				binaryPath,
+				overrideBuildTimestamp(tt.buildTimestamp),
+				DeleteOldUpdates(),
+			)
+
+			updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedOnDisk, len(updatesOnDisk), "remaining updates on disk")
+
+			if tt.expectedNewest == "" {
+				require.Equal(t, binaryPath, returnedNewest, "Expected to get original binary path")
+			} else {
+				updateFragment := strings.TrimPrefix(strings.TrimPrefix(returnedNewest, updatesDir), "/")
+				expectedNewest := filepath.Join(tt.expectedNewest, "binary")
+				require.Equal(t, expectedNewest, updateFragment)
+			}
+
+		})
+	}
+
 }
 
 // TestHelperProcess isn't a real test. It's used as a helper process
