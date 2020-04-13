@@ -272,6 +272,10 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, potentialBinary, args...)
+
+	// Set env, this should prevent launcher for fork-bombing
+	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+
 	execErr := cmd.Run()
 
 	if ctx.Err() != nil {

@@ -42,23 +42,30 @@ func main() {
 	// launcher is _also_ called when we're checking update
 	// validity (with autoupdate.checkExecutable). This is
 	// somewhat awkward as we end up with extra call layers.
-	newerBinary, err := autoupdate.FindNewestSelf(ctx)
-	if err != nil {
-		logutil.Fatal(logger, err, "checking for updated version")
-	}
-
-	if newerBinary != "" {
-		level.Debug(logger).Log(
-			"msg", "preparing to exec new binary",
-			"oldVersion", version.Version().Version,
-			"newBinary", newerBinary,
-		)
-		if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
-			logutil.Fatal(logger, err, "exec")
+	//
+	// Allow a caller to set `LAUNCHER_SKIP_UPDATES` as a way to
+	// skip exec'ing an update. This helps prevent launcher from
+	// fork-bombing itself. This is an ENV, because there's no
+	// good way to pass it through the flags.
+	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
+		newerBinary, err := autoupdate.FindNewestSelf(ctx)
+		if err != nil {
+			logutil.Fatal(logger, err, "checking for updated version")
 		}
-		panic("how")
-	} else {
-		level.Info(logger).Log("msg", "Nothing new")
+
+		if newerBinary != "" {
+			level.Debug(logger).Log(
+				"msg", "preparing to exec new binary",
+				"oldVersion", version.Version().Version,
+				"newBinary", newerBinary,
+			)
+			if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
+				logutil.Fatal(logger, err, "exec")
+			}
+			panic("how")
+		} else {
+			level.Debug(logger).Log("msg", "Nothing new")
+		}
 	}
 
 	// if the launcher is being ran with a positional argument, handle that
