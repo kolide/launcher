@@ -6,11 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
