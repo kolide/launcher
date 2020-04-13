@@ -68,9 +68,9 @@ func SkipFullBinaryPathCheck() newestOption {
 	}
 }
 
-// withRunningExectuable sets the current exectuable. This is because
+// withRunningExectuable sets the current executable. This is because
 // we never need to run an executable check against ourselves. (And
-// doing so will triggern a fork bomb)
+// doing so will trigger a fork bomb)
 func withRunningExectuable(exe string) newestOption {
 	return func(no *newestSettings) {
 		no.runningExecutable = exe
