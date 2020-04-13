@@ -285,6 +285,14 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 		return err
 	}
 
+	// If we can determine that the requested executable is
+	// ourself, don't try to exec. It's needless, and a potential
+	// fork bomb. Ignore errors, either we get an answer or we don't.
+	selfPath, _ := os.Executable()
+	if filepath.Clean(selfPath) == filepath.Clean(potentialBinary) {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
