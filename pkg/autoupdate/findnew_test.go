@@ -50,12 +50,14 @@ func TestFindNewestSelf(t *testing.T) {
 		require.Empty(t, newest, "No correct binaries, should be empty")
 	}
 
-	expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
-
-	require.NoError(t, copyFile(expectedNewest, binaryPath, false), "copy executable")
-	require.NoError(t, os.Chmod(expectedNewest, 0755), "chmod")
+	for _, n := range []string{"2", "3"} {
+		updatedBinaryPath := filepath.Join(updatesDir, n, filepath.Base(binaryPath))
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
+		require.NoError(t, os.Chmod(updatedBinaryPath, 0755), "chmod")
+	}
 
 	{
+		expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
 		newest, err := FindNewestSelf(ctx)
 		require.NoError(t, err)
 		require.Equal(t, expectedNewest, newest, "Should find newer binary")
