@@ -156,7 +156,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	// distributed query logs with the distributed query that
 	// caused them. While we're thinking through the longer term
 	// fix, we have a quick mitagation in dropping osquery into
-	// verbose mode. (This is duplicative wirth the opts.verbose
+	// verbose mode. (This is duplicative with the opts.verbose
 	// parsing, because this whole block should be struck once we
 	// have a better approach)
 	cmd.Args = append(cmd.Args, "--verbose")
