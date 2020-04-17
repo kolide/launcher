@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/pkg/errors"
 )
 
@@ -26,7 +27,21 @@ func killProcessGroup(cmd *exec.Cmd) error {
 }
 
 func socketPath(rootDir string) string {
-	return `\\.\pipe\kolide.em`
+	// On windows, local names pipes paths are all rooted in \\.\pipe\
+	// their names are limited to 256 characters, and can include any
+	// character other than backslash. They are case insensitive.
+	//
+	// They have some set of security parameters, which can be set at
+	// create time. They are automatically removed when the last handle
+	// to pipe is closed.
+	//
+	// Our usage of the pipe is for shared communication between
+	// launcher and osquery. We would like to be able to run multiple
+	// launchers.
+	//
+	// We could use something based on the laumcher root, but given the
+	// context this runs in a ulid seems simpler.
+	return fmt.Sprintf(`\\.\pipe\kolide-osquery-%s`, ulid.New())
 }
 
 func platformArgs() []string {
