@@ -32,6 +32,7 @@ type newestSettings struct {
 	deleteCorrupt           bool
 	skipFullBinaryPathCheck bool
 	buildTimestamp          string
+	runningExecutable       string
 }
 
 type newestOption func(*newestSettings)
@@ -67,6 +68,15 @@ func SkipFullBinaryPathCheck() newestOption {
 	}
 }
 
+// withRunningExectuable sets the current executable. This is because
+// we never need to run an executable check against ourselves. (And
+// doing so will trigger a fork bomb)
+func withRunningExectuable(exe string) newestOption {
+	return func(no *newestSettings) {
+		no.runningExecutable = exe
+	}
+}
+
 // FindNewestSelf invokes `FindNewest` with the running binary path,
 // as determined by os.Executable. However, if the current running
 // version is the same as the newest on disk, it will return empty string.
@@ -82,7 +92,7 @@ func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
 		return "", errors.New("can't find newest empty string")
 	}
 
-	opts = append(opts, SkipFullBinaryPathCheck())
+	opts = append(opts, SkipFullBinaryPathCheck(), withRunningExectuable(exPath))
 
 	newest := FindNewest(ctx, exPath, opts...)
 
@@ -183,18 +193,25 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 			}
 		}
 
-		// Sanity check that the executable is executable. Also remove the update if appropriate
-		if err := checkExecutable(ctx, file, "--version"); err != nil {
-			if newestSettings.deleteCorrupt {
-				level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
-				if err := os.RemoveAll(basedir); err != nil {
-					level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+		// If the file is _not_ the running executable, sanity
+		// check that executions work. If the exec fails,
+		// there's clearly an issue and we should remove it.
+		if newestSettings.runningExecutable != file {
+			if err := checkExecutable(ctx, file, "--version"); err != nil {
+				if newestSettings.deleteCorrupt {
+					level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
+					if err := os.RemoveAll(basedir); err != nil {
+						level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
+					}
+				} else {
+					level.Error(logger).Log("msg", "not executable. Skipping", "binary", file, "reason", err)
 				}
-			} else {
-				level.Error(logger).Log("msg", "not executable. Skipping", "binary", file, "reason", err)
-			}
 
-			continue
+				continue
+			}
+		} else {
+			// This logging is mostly here to make test coverage of the conditional clear
+			level.Debug(logger).Log("msg", "Skipping checkExecutable against self", "file", file)
 		}
 
 		// We always want to increment the foundCount, since it's what triggers deletion.
@@ -268,10 +285,22 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 		return err
 	}
 
+	// If we can determine that the requested executable is
+	// ourself, don't try to exec. It's needless, and a potential
+	// fork bomb. Ignore errors, either we get an answer or we don't.
+	selfPath, _ := os.Executable()
+	if filepath.Clean(selfPath) == filepath.Clean(potentialBinary) {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, potentialBinary, args...)
+
+	// Set env, this should prevent launcher for fork-bombing
+	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+
 	execErr := cmd.Run()
 
 	if ctx.Err() != nil {

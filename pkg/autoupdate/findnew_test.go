@@ -47,12 +47,14 @@ func TestFindNewestSelf(t *testing.T) {
 		require.Empty(t, newest, "No correct binaries, should be empty")
 	}
 
-	expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
-
-	require.NoError(t, copyFile(expectedNewest, binaryPath, false), "copy executable")
-	require.NoError(t, os.Chmod(expectedNewest, 0755), "chmod")
+	for _, n := range []string{"2", "3"} {
+		updatedBinaryPath := filepath.Join(updatesDir, n, filepath.Base(binaryPath))
+		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
+		require.NoError(t, os.Chmod(updatedBinaryPath, 0755), "chmod")
+	}
 
 	{
+		expectedNewest := filepath.Join(updatesDir, "3", filepath.Base(binaryPath))
 		newest, err := FindNewestSelf(ctx)
 		require.NoError(t, err)
 		require.Equal(t, expectedNewest, newest, "Should find newer binary")
@@ -345,6 +347,13 @@ func copyFile(dstPath, srcPath string, truncate bool) error {
 
 func TestCheckExecutable(t *testing.T) {
 	t.Parallel()
+
+	// We need to run this from a temp dir, else the early return
+	// from matching os.Executable bypasses the point of this.
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
+	defer cleanupFunc()
+	targetExe := filepath.Join(tmpDir, binaryName)
+
 	var tests = []struct {
 		testName    string
 		expectedErr bool
@@ -369,9 +378,16 @@ func TestCheckExecutable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
+			err := checkExecutable(context.TODO(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
+
+				// As a bonus, we can test that if we call os.Args[0],
+				// we still don't get an error. This is because we
+				// trigger the match against os.Executable and don't
+				// invoked. This is here, and not a dedicated test,
+				// because we ensure the same test arguments.
+				require.NoError(t, checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
 			} else {
 				require.NoError(t, err, tt.testName)
 			}
