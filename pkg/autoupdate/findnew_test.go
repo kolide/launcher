@@ -347,6 +347,13 @@ func copyFile(dstPath, srcPath string, truncate bool) error {
 
 func TestCheckExecutable(t *testing.T) {
 	t.Parallel()
+
+	// We need to run this from a temp dir, else the early return
+	// from matching os.Executable bypasses the point of this.
+	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
+	defer cleanupFunc()
+	targetExe := filepath.Join(tmpDir, binaryName)
+
 	var tests = []struct {
 		testName    string
 		expectedErr bool
@@ -371,9 +378,16 @@ func TestCheckExecutable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			err := checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName)
+			err := checkExecutable(context.TODO(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
+
+				// As a bonus, we can test that if we call os.Args[0],
+				// we still don't get an error. This is because we
+				// trigger the match against os.Executable and don't
+				// invoked. This is here, and not a dedicated test,
+				// because we ensure the same test arguments.
+				require.NoError(t, checkExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
 			} else {
 				require.NoError(t, err, tt.testName)
 			}
