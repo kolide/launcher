@@ -46,6 +46,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/pkg/errors"
+	howett "howett.net/plist"
 )
 
 // Flattener is an interface to flatten complex, nested, data
@@ -451,6 +452,8 @@ func stringify(data interface{}) (string, error) {
 		return strconv.FormatBool(v), nil
 	case time.Time:
 		return strconv.FormatInt(v.Unix(), 10), nil
+	case howett.UID:
+		return strconv.FormatUint(uint64(v), 10), nil
 	default:
 		// spew.Dump(data)
 		return "", errors.Errorf("unknown type on %v", data)
