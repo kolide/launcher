@@ -136,6 +136,12 @@ func ServiceDescription(desc string) ServiceOpt {
 	}
 }
 
+func WithDelayedStart() ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.ServiceConfig.DelayedAutoStart = Yes
+	}
+}
+
 // ServiceArgs takes an array of args, wraps them in spaces, then
 // joins them into a string. Handling spaces in the arguments is a bit
 // gnarly. Some parts of windows use ` as an escape character, but
@@ -173,9 +179,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	serviceConfig := &ServiceConfig{
-		DelayedAutoStart: Yes,
-		OnInstall:        Yes,
-		OnReinstall:      Yes,
+		//DelayedAutoStart: No,
+		OnInstall:   Yes,
+		OnReinstall: Yes,
 	}
 
 	// If a service name is not specified, replace the .exe with a svc,
