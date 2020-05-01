@@ -48,21 +48,22 @@ const (
 
 // ServiceInstall implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
 type ServiceInstall struct {
-	Account          string           `xml:",attr,omitempty"`
-	Arguments        string           `xml:",attr,omitempty"`
-	Description      string           `xml:",attr,omitempty"`
-	DisplayName      string           `xml:",attr,omitempty"`
-	EraseDescription bool             `xml:",attr,omitempty"`
-	ErrorControl     ErrorControlType `xml:",attr,omitempty"`
-	Id               string           `xml:",attr,omitempty"`
-	Interactive      YesNoType        `xml:",attr,omitempty"`
-	LoadOrderGroup   string           `xml:",attr,omitempty"`
-	Name             string           `xml:",attr,omitempty"`
-	Password         string           `xml:",attr,omitempty"`
-	Start            StartType        `xml:",attr,omitempty"`
-	Type             string           `xml:",attr,omitempty"`
-	Vital            YesNoType        `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
-	ServiceConfig    *ServiceConfig   `xml:",omitempty"`
+	Account           string             `xml:",attr,omitempty"`
+	Arguments         string             `xml:",attr,omitempty"`
+	Description       string             `xml:",attr,omitempty"`
+	DisplayName       string             `xml:",attr,omitempty"`
+	EraseDescription  bool               `xml:",attr,omitempty"`
+	ErrorControl      ErrorControlType   `xml:",attr,omitempty"`
+	Id                string             `xml:",attr,omitempty"`
+	Interactive       YesNoType          `xml:",attr,omitempty"`
+	LoadOrderGroup    string             `xml:",attr,omitempty"`
+	Name              string             `xml:",attr,omitempty"`
+	Password          string             `xml:",attr,omitempty"`
+	Start             StartType          `xml:",attr,omitempty"`
+	Type              string             `xml:",attr,omitempty"`
+	Vital             YesNoType          `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
+	UtilServiceConfig *UtilServiceConfig `xml:",omitempty"`
+	ServiceConfig     *ServiceConfig     `xml:",omitempty"`
 }
 
 // ServiceControl implements
@@ -77,6 +78,18 @@ type ServiceControl struct {
 }
 
 // ServiceConfig implements
+// https://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceconfig.html
+// This is used needed to set DelayedAutoStart
+type ServiceConfig struct {
+	// TODO: this should need a namespace, and yet. See https://github.com/golang/go/issues/36813
+	XMLName          xml.Name  `xml:"http://schemas.microsoft.com/wix/2006/wi ServiceConfig"`
+	DelayedAutoStart YesNoType `xml:",attr,omitempty"`
+	OnInstall        YesNoType `xml:",attr,omitempty"`
+	OnReinstall      YesNoType `xml:",attr,omitempty"`
+	OnUninstall      YesNoType `xml:",attr,omitempty"`
+}
+
+// UtilServiceConfig implements
 // http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
 // This is used to set FailureActions. There are some
 // limitations. Notably, reset period is in days here, though the
@@ -86,7 +99,7 @@ type ServiceControl struct {
 // Docs are a bit confusing. This schema is supported, and should
 // work. The non-util ServiceConfig generates unsupported CNDL1150
 // errors.
-type ServiceConfig struct {
+type UtilServiceConfig struct {
 	XMLName                      xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
 	FirstFailureActionType       string   `xml:",attr,omitempty"`
 	SecondFailureActionType      string   `xml:",attr,omitempty"`
@@ -123,6 +136,12 @@ func ServiceDescription(desc string) ServiceOpt {
 	}
 }
 
+func WithDelayedStart() ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.ServiceConfig.DelayedAutoStart = Yes
+	}
+}
+
 // ServiceArgs takes an array of args, wraps them in spaces, then
 // joins them into a string. Handling spaces in the arguments is a bit
 // gnarly. Some parts of windows use ` as an escape character, but
@@ -151,12 +170,17 @@ func ServiceArgs(args []string) ServiceOpt {
 func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// Set some defaults. It's not clear we can reset in under a
 	// day. See https://github.com/wixtoolset/issues/issues/5963
-	sconfig := &ServiceConfig{
+	utilServiceConfig := &UtilServiceConfig{
 		FirstFailureActionType:       "restart",
 		SecondFailureActionType:      "restart",
 		ThirdFailureActionType:       "restart",
 		ResetPeriodInDays:            1,
 		RestartServiceDelayInSeconds: 5,
+	}
+
+	serviceConfig := &ServiceConfig{
+		OnInstall:   Yes,
+		OnReinstall: Yes,
 	}
 
 	// If a service name is not specified, replace the .exe with a svc,
@@ -165,14 +189,15 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// okay default.
 	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
 	si := &ServiceInstall{
-		Name:          defaultName,
-		Id:            defaultName,
-		Account:       `[SERVICEACCOUNT]`, // Wix resolves this to `LocalSystem`
-		Start:         StartAuto,
-		Type:          "ownProcess",
-		ErrorControl:  ErrorControlNormal,
-		Vital:         Yes,
-		ServiceConfig: sconfig,
+		Name:              defaultName,
+		Id:                defaultName,
+		Account:           `[SERVICEACCOUNT]`, // Wix resolves this to `LocalSystem`
+		Start:             StartAuto,
+		Type:              "ownProcess",
+		ErrorControl:      ErrorControlNormal,
+		Vital:             Yes,
+		UtilServiceConfig: utilServiceConfig,
+		ServiceConfig:     serviceConfig,
 	}
 
 	sc := &ServiceControl{

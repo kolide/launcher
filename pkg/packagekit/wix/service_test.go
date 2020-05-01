@@ -28,6 +28,7 @@ func TestService(t *testing.T) {
 
 	expectedXml := `<ServiceInstall Account="[SERVICEACCOUNT]" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes">
                         <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
+                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/2006/wi" OnInstall="yes" OnReinstall="yes"></ServiceConfig>
                     </ServiceInstall>
                     <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
 
@@ -42,8 +43,9 @@ func TestServiceOptions(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		in  *Service
-		out []string
+		in   *Service
+		out  []string
+		name string
 	}{
 		{
 			in:  NewService("snake-case.exe"),
@@ -78,15 +80,22 @@ func TestServiceOptions(t *testing.T) {
 			in:  NewService("daemon.exe", ServiceName("myDaemon_svc"), ServiceArgs([]string{"first", "second", "third has spaces"})),
 			out: []string{`Id="MyDaemonSvc"`, `Name="MyDaemonSvc"`, `Arguments="first second &#34;third has spaces&#34;"`},
 		},
+		{
+			in:   NewService("snake-case.exe", WithDelayedStart()),
+			out:  []string{`DelayedAutoStart="yes"`},
+			name: "DelayedStart",
+		},
 	}
 
 	for _, tt := range tests {
-		var xmlString bytes.Buffer
-		err := tt.in.Xml(&xmlString)
-		require.NoError(t, err)
-		for _, outStr := range tt.out {
-			require.Contains(t, strings.TrimSpace(xmlString.String()), outStr)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			var xmlString bytes.Buffer
+			err := tt.in.Xml(&xmlString)
+			require.NoError(t, err)
+			for _, outStr := range tt.out {
+				require.Contains(t, strings.TrimSpace(xmlString.String()), outStr)
+			}
+		})
 	}
 
 }
