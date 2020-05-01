@@ -179,7 +179,6 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	serviceConfig := &ServiceConfig{
-		//DelayedAutoStart: No,
 		OnInstall:   Yes,
 		OnReinstall: Yes,
 	}
