@@ -99,8 +99,8 @@ notarize-check-%:
 codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
 codesign-windows-%: xp
 	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2019.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
 
 codesign: notarize-darwin codesign-windows
 
