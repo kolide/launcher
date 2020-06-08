@@ -1,6 +1,6 @@
 // +build darwin
 
-package table
+package munki
 
 import (
 	"context"
@@ -17,6 +17,10 @@ import (
 
 type MunkiInfo struct {
 	report *munkiReport
+}
+
+func New() *MunkiInfo {
+	return &MunkiInfo{}
 }
 
 func (m *MunkiInfo) MunkiReport(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
