@@ -15,12 +15,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+const defaultReportPath = "/Library/Managed Installs/ManagedInstallReport.plist"
+
 type MunkiInfo struct {
-	report *munkiReport
+	reportPath string
+	report     *munkiReport
 }
 
 func New() *MunkiInfo {
-	return &MunkiInfo{}
+	return &MunkiInfo{
+		reportPath: defaultReportPath,
+	}
 }
 
 func (m *MunkiInfo) MunkiReport(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -51,6 +56,11 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 	if err := m.loadReport(); err != nil {
 		return nil, err
 	}
+
+	if m.report == nil {
+		return nil, nil
+	}
+
 	var results []map[string]string
 
 	for _, install := range m.report.ManagedInstalls {
@@ -68,6 +78,10 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	if err := m.loadReport(); err != nil {
 		return nil, err
+	}
+
+	if m.report == nil {
+		return nil, nil
 	}
 
 	errors := strings.Join(m.report.Errors, ";")
@@ -107,17 +121,29 @@ type managedInstall struct {
 }
 
 func (m *MunkiInfo) loadReport() error {
-	const reportPath = "/Library/Managed Installs/ManagedInstallReport.plist"
-	file, err := os.Open(reportPath)
+	if !fileExists(m.reportPath) {
+		return nil
+	}
+
+	file, err := os.Open(m.reportPath)
 	if err != nil {
 		return errors.Wrap(err, "open ManagedInstallReport file")
 	}
 	defer file.Close()
 
 	var report munkiReport
+	m.report = &report
+
 	if err := plist.NewDecoder(file).Decode(&report); err != nil {
 		return errors.Wrap(err, "decode ManagedInstallReport plist")
 	}
-	m.report = &report
 	return nil
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
