@@ -50,6 +50,7 @@ type osqueryOptions struct {
 	loggerPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
+	osqueryFlags          []string
 	stdout                io.Writer
 	stderr                io.Writer
 	retries               uint
@@ -126,7 +127,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	}, nil
 }
 
-// createOsquerydCommand uses osqueryOptions to returns an *exec.Cmd
+// createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
 func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
@@ -179,6 +180,12 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	}
 	if opts.stderr != nil {
 		cmd.Stderr = opts.stderr
+	}
+
+	// Apply user-provided flags last so that they can override any other flags
+	// set by Launcher
+	for _, flag := range opts.osqueryFlags {
+		cmd.Args = append(cmd.Args, "--"+flag)
 	}
 
 	return cmd, nil
@@ -304,6 +311,13 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.verbose = v
+	}
+}
+
+// WithOsqueryFlags sets additional flags to pass to osquery
+func WithOsqueryFlags(flags []string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.osqueryFlags = flags
 	}
 }
 

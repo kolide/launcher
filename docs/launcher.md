@@ -36,6 +36,21 @@ You can also define the enroll secret via a file path (`--enroll_secret_path`) o
 
 You may need to define the `--insecure` and/or `--insecure_grpc` flag depending on your server configurations.
 
+## Override Osquery Flags
+
+In some scenarios, users may wish to specify additional flags for osquery, or override the default values set by Launcher. To do this, use `--osquery_flag`. This option may be specified more than once to set multiple flags:
+
+```
+./build/launcher \
+  --hostname=fleet.acme.net:443 \
+  --osquery_flag windows_event_channels=foo,bar
+  --osquery_flag logger_plugin=filesystem
+```
+
+Any flags specified in this manner will be passed at the end of the osquery command. They will take precedence over any other flags set.
+
+Note that it is entirely possible to break Launcher's expected functionality using this option. **Be careful when overriding flags!**
+
 ## Examples
 
 ### Connecting to Fleet

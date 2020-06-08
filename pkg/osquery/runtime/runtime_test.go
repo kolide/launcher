@@ -112,6 +112,24 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.Equal(t, os.Stdout, cmd.Stdout)
 }
 
+func TestCreateOsqueryCommandWithFlags(t *testing.T) {
+	t.Parallel()
+	osqOpts := &osqueryOptions{
+		osqueryFlags: []string{"verbose=false", "windows_event_channels=foo,bar"},
+	}
+	cmd, err := osqOpts.createOsquerydCommand(
+		testOsqueryBinaryDirectory,
+		&osqueryFilePaths{},
+	)
+	require.NoError(t, err)
+	// Ensure that the provided flags were placed last (so that they can override)
+	assert.Equal(
+		t,
+		[]string{"--verbose=false", "--windows_event_channels=foo,bar"},
+		cmd.Args[len(cmd.Args)-2:len(cmd.Args)],
+	)
+}
+
 // downloadOsqueryInBinDir downloads osqueryd. This allows the test
 // suite to run on hosts lacking osqueryd. We could consider moving this into a deps step.
 func downloadOsqueryInBinDir(binDirectory string) error {
@@ -174,6 +192,21 @@ func TestBadBinaryPath(t *testing.T) {
 	)
 	assert.Error(t, err)
 	assert.Nil(t, runner)
+}
+
+func TestWithOsqueryFlags(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithOsqueryFlags([]string{"verbose=false"}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else

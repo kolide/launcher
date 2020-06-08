@@ -22,6 +22,19 @@ const (
 	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 )
 
+// Adapted from
+// https://stackoverflow.com/questions/28322997/how-to-get-a-list-of-values-into-a-flag-in-golang/28323276#28323276
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return strings.Join(*i, " ")
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
@@ -45,6 +58,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
 		flRootPEM           = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion           = flagset.Bool("version", false, "Print Launcher version and exit")
+		flOsqueryFlags      arrayFlags // set below with flagset.Var
 		_                   = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
@@ -63,6 +77,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 	)
+	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
 
 	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
@@ -150,6 +165,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		Autoupdate:          *flAutoupdate,
 		Debug:               *flDebug,
 		OsqueryVerbose:      *flOsqueryVerbose,
+		OsqueryFlags:        flOsqueryFlags,
 		DisableControlTLS:   *flDisableControlTLS,
 		InsecureTLS:         *flInsecureTLS,
 		InsecureTransport:   *flInsecureTransport,
@@ -199,6 +215,8 @@ func shortUsage(flagset *flag.FlagSet) {
 	printOpt("control_hostname")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("osquery_flag")
 	fmt.Fprintf(os.Stderr, "\n")
 	if !skipEnvParse {
 		fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
