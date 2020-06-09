@@ -90,9 +90,3 @@ func TestGenerateMunkiReport(t *testing.T) {
 		})
 	}
 }
-
-func TestGenerateMunkiInstalls(t *testing.T) {
-	t.Parallel()
-
-	//m := New()
-}
