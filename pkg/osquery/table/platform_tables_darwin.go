@@ -7,6 +7,7 @@ import (
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/munki"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -14,7 +15,7 @@ import (
 )
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
-	munki := new(MunkiInfo)
+	munki := munki.New()
 
 	return []*table.Plugin{
 		Airdrop(client),
