@@ -133,12 +133,6 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
 		osquerydBinary,
-		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
-		fmt.Sprintf("--database_path=%s", paths.databasePath),
-		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
-		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
-		"--extensions_timeout=10",
-		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 		fmt.Sprintf("--logger_plugin=%s", opts.loggerPluginFlag),
 		fmt.Sprintf("--distributed_plugin=%s", opts.distributedPluginFlag),
 		"--disable_distributed=false",
@@ -182,11 +176,23 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		cmd.Stderr = opts.stderr
 	}
 
-	// Apply user-provided flags last so that they can override any other flags
-	// set by Launcher
+	// Apply user-provided flags last so that they can override other flags set
+	// by Launcher (besides the six flags below)
 	for _, flag := range opts.osqueryFlags {
 		cmd.Args = append(cmd.Args, "--"+flag)
 	}
+
+	// These flags cannot be overridden (to prevent users from breaking Launcher
+	// by providing invalid flags)
+	cmd.Args = append(
+		cmd.Args,
+		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
+		fmt.Sprintf("--database_path=%s", paths.databasePath),
+		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
+		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
+		"--extensions_timeout=10",
+		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
+	)
 
 	return cmd, nil
 }

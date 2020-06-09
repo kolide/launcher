@@ -216,8 +216,6 @@ func shortUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("osquery_flag")
-	fmt.Fprintf(os.Stderr, "\n")
 	if !skipEnvParse {
 		fmt.Fprintf(os.Stderr, "  All options can be set as environment variables using the following convention:\n")
 		fmt.Fprintf(os.Stderr, "      KOLIDE_LAUNCHER_OPTION=value launcher\n")
@@ -268,6 +266,8 @@ func developerUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
 	printOpt("disable_control_tls")
+	fmt.Fprintf(os.Stderr, "\n")
+	printOpt("osquery_flag")
 	fmt.Fprintf(os.Stderr, "\n")
 	usageFooter()
 }

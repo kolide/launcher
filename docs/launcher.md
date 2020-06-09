@@ -51,6 +51,15 @@ Any flags specified in this manner will be passed at the end of the osquery comm
 
 Note that it is entirely possible to break Launcher's expected functionality using this option. **Be careful when overriding flags!**
 
+Because of likely breakage, the following flags cannot be overridden:
+
+- `--pidfile`
+- `--database_path`
+- `--extensions_socket`
+- `--extensions_autoload`
+- `--extensions_timeout`
+- `--config_plugin`
+
 ## Examples
 
 ### Connecting to Fleet

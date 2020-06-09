@@ -126,7 +126,8 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	assert.Equal(
 		t,
 		[]string{"--verbose=false", "--windows_event_channels=foo,bar"},
-		cmd.Args[len(cmd.Args)-2:len(cmd.Args)],
+		// 6 is for the 6 flags that cannot be overridden with this option.
+		cmd.Args[len(cmd.Args)-2-6:len(cmd.Args)-6],
 	)
 }
 
