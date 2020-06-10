@@ -127,7 +127,18 @@ of the following flags, include them with the invocation of
 - `--update_channel`
 - `--cert_pins`
 
+### Override Osquery Flags
 
+[Osquery override flags](./launcher.md#override-osquery-flags) can be built into packages made with `package-builder`. Use the `--osquery_flag` option. This option may be specified more than once to set multiple flags:
+
+```
+./build/package-builder make \
+  --hostname=fleet.acme.net:443 \
+  --osquery_flag windows_event_channels=foo,bar
+  --osquery_flag logger_plugin=filesystem
+```
+
+Any flags specified in this manner will be passed at the end of the osquery command. They will take precedence over any other flags set.
 
 ### Caveats
 

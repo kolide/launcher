@@ -30,8 +30,11 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion    string
+	PackageVersion string // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion string
+	// OsuqeryFlags is a slice of flags to add to the config file to override
+	// flags passed to osquery.
+	OsqueryFlags      []string
 	LauncherVersion   string
 	ExtensionVersion  string
 	Hostname          string
@@ -179,13 +182,19 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Write the flags to the flagFile
 	for _, k := range launcherBoolFlags {
 		if _, err := flagFile.WriteString(fmt.Sprintf("%s\n", k)); err != nil {
-			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+			return errors.Wrapf(err, "failed to write %s to flagfile", k)
 		}
 	}
 	for k, v := range launcherMapFlags {
 		if _, err := flagFile.WriteString(fmt.Sprintf("%s %s\n", k, v)); err != nil {
-			return errors.Wrapf(err, "failed to write write %s to flagfile", k)
+			return errors.Wrapf(err, "failed to write %s to flagfile", k)
 		}
+	}
+	for _, flag := range p.OsqueryFlags {
+		if _, err := flagFile.WriteString(fmt.Sprintf("osquery_flag %s\n", flag)); err != nil {
+			return errors.Wrapf(err, "failed to write osquery_flag to flagfile: %s", flag)
+		}
+
 	}
 
 	// Wixtoolset seems to get unhappy if the flagFile is open, and since

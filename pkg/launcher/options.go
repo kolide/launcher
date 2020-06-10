@@ -62,6 +62,9 @@ type Options struct {
 	Debug bool
 	// OsqueryVerbose puts osquery into verbose mode
 	OsqueryVerbose bool
+	// OsqueryFlags defines additional flags to pass to osquery (possibly
+	// overriding Launcher defaults)
+	OsqueryFlags []string
 	// DisableControlTLS disables TLS transport with the control server.
 	DisableControlTLS bool
 	// InsecureTLS disables TLS certificate verification.

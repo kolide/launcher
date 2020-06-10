@@ -50,6 +50,7 @@ type osqueryOptions struct {
 	loggerPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
+	osqueryFlags          []string
 	stdout                io.Writer
 	stderr                io.Writer
 	retries               uint
@@ -126,18 +127,12 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	}, nil
 }
 
-// createOsquerydCommand uses osqueryOptions to returns an *exec.Cmd
+// createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
 func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	cmd := exec.Command(
 		osquerydBinary,
-		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
-		fmt.Sprintf("--database_path=%s", paths.databasePath),
-		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
-		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
-		"--extensions_timeout=10",
-		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 		fmt.Sprintf("--logger_plugin=%s", opts.loggerPluginFlag),
 		fmt.Sprintf("--distributed_plugin=%s", opts.distributedPluginFlag),
 		"--disable_distributed=false",
@@ -180,6 +175,24 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	if opts.stderr != nil {
 		cmd.Stderr = opts.stderr
 	}
+
+	// Apply user-provided flags last so that they can override other flags set
+	// by Launcher (besides the six flags below)
+	for _, flag := range opts.osqueryFlags {
+		cmd.Args = append(cmd.Args, "--"+flag)
+	}
+
+	// These flags cannot be overridden (to prevent users from breaking Launcher
+	// by providing invalid flags)
+	cmd.Args = append(
+		cmd.Args,
+		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
+		fmt.Sprintf("--database_path=%s", paths.databasePath),
+		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
+		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
+		"--extensions_timeout=10",
+		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
+	)
 
 	return cmd, nil
 }
@@ -304,6 +317,13 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.verbose = v
+	}
+}
+
+// WithOsqueryFlags sets additional flags to pass to osquery
+func WithOsqueryFlags(flags []string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.osqueryFlags = flags
 	}
 }
 

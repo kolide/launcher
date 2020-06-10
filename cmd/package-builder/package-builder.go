@@ -26,6 +26,19 @@ func runVersion(args []string) error {
 	return nil
 }
 
+// Adapted from
+// https://stackoverflow.com/questions/28322997/how-to-get-a-list-of-values-into-a-flag-in-golang/28323276#28323276
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return strings.Join(*i, " ")
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 func runMake(args []string) error {
 	flagset := flag.NewFlagSet("macos", flag.ExitOnError)
 	var (
@@ -154,7 +167,9 @@ func runMake(args []string) error {
 			env.String("NOTARY_PREFIX", ""),
 			"The prefix for Notary path that contains the collections",
 		)
+		flOsqueryFlags arrayFlags // set below with flagset.Var
 	)
+	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
 
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
 	if err := flagset.Parse(args); err != nil {
@@ -199,6 +214,7 @@ func runMake(args []string) error {
 	packageOptions := packaging.PackageOptions{
 		PackageVersion:    *flPackageVersion,
 		OsqueryVersion:    *flOsqueryVersion,
+		OsqueryFlags:      flOsqueryFlags,
 		LauncherVersion:   *flLauncherVersion,
 		ExtensionVersion:  *flExtensionVersion,
 		Hostname:          *flHostname,
