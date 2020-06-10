@@ -16,6 +16,11 @@
       Manufacturer="https://kolide.com"
       UpgradeCode="{{.UpgradeCode}}" >
 
+    <UI>
+      <Dialog Id="ExitDlg" Width="370" Height="270" Title="Kolide {{.Opts.Name}}">
+      </Dialog>
+    </UI>
+
     <Package
 	Id="*"
 	Keywords='Installer'
