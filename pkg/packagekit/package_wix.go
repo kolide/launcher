@@ -72,6 +72,10 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixArgs := []wix.WixOpt{}
 
+	if po.WixPath != "" {
+		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
+	}
+
 	if includeService {
 		launcherService := wix.NewService("launcher.exe",
 			wix.WithDelayedStart(),

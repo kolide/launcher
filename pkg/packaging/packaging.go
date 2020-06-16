@@ -30,11 +30,9 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion string
-	// OsuqeryFlags is a slice of flags to add to the config file to override
-	// flags passed to osquery.
-	OsqueryFlags      []string
+	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion    string
+	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
 	LauncherVersion   string
 	ExtensionVersion  string
 	Hostname          string
@@ -54,6 +52,7 @@ type PackageOptions struct {
 	NotaryURL         string
 	MirrorURL         string
 	NotaryPrefix      string
+	WixPath           string
 
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
@@ -283,6 +282,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		WindowsSigntoolArgs: p.WindowsSigntoolArgs,
 		Version:             p.PackageVersion,
 		FlagFile:            p.canonicalizePath(flagFilePath),
+		WixPath:             p.WixPath,
 	}
 
 	if err := p.makePackage(ctx); err != nil {

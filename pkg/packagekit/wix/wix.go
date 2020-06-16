@@ -81,7 +81,7 @@ func WithDocker(image string) WixOpt {
 // packages with.
 func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
 	wo := &wixTool{
-		wixPath:     `C:\wix311`,
+		wixPath:     FindWixInstall(),
 		packageRoot: packageRoot,
 
 		execCC: exec.CommandContext,
@@ -303,4 +303,36 @@ func (wo *wixTool) execOut(ctx context.Context, argv0 string, args ...string) (s
 		return "", errors.Wrapf(err, "run command %s %v\nstdout=%s\nstderr=%s", argv0, args, stdout, stderr)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// FindWixInstall will return the path wix will be executed from. This
+// is exposed here, and not an internal method, as a convinience to
+// `package-builder`
+func FindWixInstall() string {
+	// wix exe installers set an env
+	if p := os.Getenv("WIX"); p != "" {
+		return p + `\bin`
+	}
+
+	for _, p := range []string{`C:\wix311`} {
+		if isDirectory(p) == nil {
+			return p
+		}
+	}
+
+	return ""
+}
+
+func isDirectory(d string) error {
+	dStat, err := os.Stat(d)
+
+	if os.IsNotExist(err) {
+		return errors.Wrapf(err, "missing packageRoot %s", d)
+	}
+
+	if !dStat.IsDir() {
+		return errors.Errorf("packageRoot (%s) isn't a directory", d)
+	}
+
+	return nil
 }

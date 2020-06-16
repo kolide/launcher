@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/pkg/errors"
 )
@@ -38,6 +39,8 @@ func (i *arrayFlags) Set(value string) error {
 	*i = append(*i, value)
 	return nil
 }
+
+var defaultWixPath = wix.FindWixInstall()
 
 func runMake(args []string) error {
 	flagset := flag.NewFlagSet("macos", flag.ExitOnError)
@@ -167,6 +170,11 @@ func runMake(args []string) error {
 			env.String("NOTARY_PREFIX", ""),
 			"The prefix for Notary path that contains the collections",
 		)
+		flWixPath = flagset.String(
+			"wix_path",
+			defaultWixPath,
+			fmt.Sprintf(`Location of wix binaries (default: "%s")`, defaultWixPath),
+		)
 		flOsqueryFlags arrayFlags // set below with flagset.Var
 	)
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -235,6 +243,7 @@ func runMake(args []string) error {
 		NotaryURL:         *flNotaryURL,
 		MirrorURL:         *flMirrorURL,
 		NotaryPrefix:      *flNotaryPrefix,
+		WixPath:           *flWixPath,
 	}
 
 	outputDir := *flOutputDir
