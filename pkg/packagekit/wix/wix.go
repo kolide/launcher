@@ -251,6 +251,7 @@ func (wo *wixTool) light(ctx context.Context) error {
 		"-dcl:high", // compression level
 		"-dSourceDir=" + wo.packageRoot,
 		"-ext", "WixUtilExtension",
+		"-ext", "WixUIExtension",
 		"AppFiles.wixobj",
 		"Installer.wixobj",
 		"-out", "out.msi",
