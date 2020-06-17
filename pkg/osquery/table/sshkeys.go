@@ -1,5 +1,9 @@
 package table
 
+// The kolide_ssh_keys table is deprecated in favor of using the
+// underlying osquery file table joined against kolide_keyinfo. The
+// latter provides more control over the directories we iterate over
+
 import (
 	"context"
 	"runtime"
