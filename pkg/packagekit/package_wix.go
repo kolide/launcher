@@ -76,6 +76,20 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
 	}
 
+	if po.WixUI {
+		wixArgs = append(wixArgs, wix.WithUI())
+
+		// FIXME: The icon should be outside the UI block
+		for _, f := range []string{"msi_banner.bmp", "msi_splash.bmp", "kolide.ico"} {
+			fileBytes, err := internal.Asset("internal/assets/" + f)
+			if err != nil {
+				return errors.Wrapf(err, "getting go-bindata %s", f)
+			}
+
+			wixArgs = append(wixArgs, wix.WithFile(f, fileBytes))
+		}
+	}
+
 	if includeService {
 		launcherService := wix.NewService("launcher.exe",
 			wix.WithDelayedStart(),
