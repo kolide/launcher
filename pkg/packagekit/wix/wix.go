@@ -95,7 +95,6 @@ func WithFile(name string, content []byte) WixOpt {
 		if wo.extraFiles == nil {
 			wo.extraFiles = []extraFile{}
 		}
-		fmt.Printf("attempting to add %s\n", name)
 		wo.extraFiles = append(wo.extraFiles, extraFile{name, content})
 	}
 }
