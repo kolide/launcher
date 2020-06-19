@@ -73,7 +73,9 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	// fix, we have a quick mitagation in dropping osquery into
 	// verbose mode, but we also want to filter out the
 	// unimportant logs
-	if bytes.HasPrefix(p, []byte("I")) && !bytes.Contains(p, []byte("Executing scheduled query")) {
+	if bytes.HasPrefix(p, []byte("I")) &&
+		!bytes.Contains(p, []byte("Executing scheduled query")) &&
+		!bytes.Contains(p, []byte("Executing distributed query")) {
 		lf = level.Debug
 	}
 
