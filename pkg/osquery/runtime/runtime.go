@@ -144,8 +144,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--utc",
 	)
 
-	// TODO: This is a short term hack.
-	// In https://github.com/osquery/osquery/pull/6271 osquery
+	// TODO: This is a short term hack.  In
+	// https://github.com/osquery/osquery/pull/6271 osquery
 	// shifted some debugging info from INFO to VERBOSE. This has
 	// the unfortunate effect of making it hard to correlate
 	// distributed query logs with the distributed query that
@@ -153,7 +153,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	// fix, we have a quick mitagation in dropping osquery into
 	// verbose mode. (This is duplicative with the opts.verbose
 	// parsing, because this whole block should be struck once we
-	// have a better approach)
+	// have a better approach) Additionally we filter out the
+	// verbosity in the log handler.
 	cmd.Args = append(cmd.Args, "--verbose")
 
 	if opts.verbose {

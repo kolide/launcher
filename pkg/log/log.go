@@ -64,6 +64,19 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		lf = level.Debug
 	}
 
+	// TODO: This is a short term hack.  In
+	// https://github.com/osquery/osquery/pull/6271 osquery
+	// shifted some debugging info from INFO to VERBOSE. This has
+	// the unfortunate effect of making it hard to correlate
+	// distributed query logs with the distributed query that
+	// caused them. While we're thinking through the longer term
+	// fix, we have a quick mitagation in dropping osquery into
+	// verbose mode, but we also want to filter out the
+	// unimportant logs
+	if bytes.HasPrefix(p, []byte("I")) && !bytes.Contains(p, []byte("Executing scheduled query")) {
+		lf = level.Debug
+	}
+
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
 	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
