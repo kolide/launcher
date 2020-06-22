@@ -5,7 +5,7 @@
 // While this could be implemneted as a
 // `dataflattentable.TablePluginExec` table, instead we have a
 // dedicated table. This allows us to have a consistent set of
-// columns, and changing the implementation as desired.
+// columns, and change the implementation as desired.
 
 package screenlock
 
