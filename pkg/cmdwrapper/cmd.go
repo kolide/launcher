@@ -1,5 +1,9 @@
 package cmdwrapper
 
+// Package cmdwrapper is a simple wrapper around exec.Command. It
+// exists to provide a unified place to keep `runas` code, as well as
+// enforcing execution timeouts.
+
 import (
 	"bytes"
 	"context"
