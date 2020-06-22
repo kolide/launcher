@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -93,6 +92,5 @@ func Run(ctx context.Context, arg0 string, args []string, opts ...Option) (strin
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	cmdErr := cmd.Run()
-	spew.Dump(stdout.String())
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), cmdErr
 }

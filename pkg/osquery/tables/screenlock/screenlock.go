@@ -2,18 +2,19 @@
 
 // Screenlock calls out to osquery to get the screenlock status.
 //
-// Implemented as it's own table, and not a
-// `dataflattentable.TablePluginExec` call, because of the `user`
-// constraint. May change at any time.
+// While this could be implemneted as a
+// `dataflattentable.TablePluginExec` table, instead we have a
+// dedicated table. This allows us to have a consistent set of
+// columns, and changing the implementation as desired.
 
 package screenlock
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/cmdwrapper"
-	"github.com/kolide/launcher/pkg/dataflatten"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -28,14 +29,17 @@ type Table struct {
 	osqueryd string
 }
 
+type osqueryScreenLockRow struct {
+	Enabled     string `json:"enabled"`
+	GracePeriod string `json:"grace_period"`
+}
+
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, osqueryd string) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		table.TextColumn("user"),
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
+		table.IntegerColumn("enabled"),
+		table.IntegerColumn("grace_period"),
 	}
 
 	t := &Table{
@@ -69,7 +73,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"--config_path", "/dev/null",
 				"-S",
 				"--json",
-				"select * from screenlock",
+				"select enabled, grace_period from screenlock",
 			},
 			cmdwrapper.RunAsUser(userConstraint.Expression),
 		)
@@ -79,30 +83,27 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"msg", "Error getting screenlock status",
 				"stderr", stderr,
 				"stdout", stdout,
+				"err", err,
 			)
 			continue
 		}
 
-		flattenOpts := []dataflatten.FlattenOpts{}
-		if t.logger != nil {
-			flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
-		}
+		var osqueryResults []osqueryScreenLockRow
 
-		data, err := dataflatten.Json([]byte(stdout), flattenOpts...)
-		if err != nil {
-			level.Info(t.logger).Log("msg", "failure flattening", "err", err)
+		if err := json.Unmarshal([]byte(stdout), &osqueryResults); err != nil {
+			level.Info(t.logger).Log(
+				"msg", "error unmarshalling json",
+				"err", err,
+				"stdout", stdout,
+			)
 			continue
 		}
 
-		for _, row := range data {
-			p, k := row.ParentKey("/")
-
+		for _, row := range osqueryResults {
 			res := map[string]string{
-				"user":    userConstraint.Expression,
-				"fullkey": row.StringPath("/"),
-				"parent":  p,
-				"key":     k,
-				"value":   row.Value,
+				"user":         userConstraint.Expression,
+				"enabled":      row.Enabled,
+				"grace_period": row.GracePeriod,
 			}
 			results = append(results, res)
 		}
