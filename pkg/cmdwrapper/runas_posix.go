@@ -1,3 +1,5 @@
+// +build posix
+
 package cmdwrapper
 
 import (

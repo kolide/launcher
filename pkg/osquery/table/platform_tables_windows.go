@@ -10,7 +10,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{
 		ProgramIcons(),
 		wmitable.TablePlugin(client, logger),
