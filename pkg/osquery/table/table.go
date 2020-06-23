@@ -21,7 +21,7 @@ func LauncherTables(db *bolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	// Common tables to all platforms
 	tables := []*table.Plugin{
 		BestPractices(client),
@@ -38,7 +38,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger) [
 	}
 
 	// add in the platform specific ones (as denboted by build tags)
-	tables = append(tables, platformTables(client, logger)...)
+	tables = append(tables, platformTables(client, logger, currentOsquerydBinaryPath)...)
 
 	return tables
 }
