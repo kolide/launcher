@@ -37,7 +37,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.TablePlugin(client, logger, dataflattentable.XmlType),
 	}
 
-	// add in the platform specific ones (as denboted by build tags)
+	// add in the platform specific ones (as denoted by build tags)
 	tables = append(tables, platformTables(client, logger, currentOsquerydBinaryPath)...)
 
 	return tables
