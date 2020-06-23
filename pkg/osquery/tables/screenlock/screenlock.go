@@ -6,7 +6,7 @@
 // `dataflattentable.TablePluginExec` table, instead we have a
 // dedicated table. This allows us to have a consistent set of
 // columns, and change the implementation as desired. It's also
-// simpler to add the `launchctl` functionlity.
+// simpler to add the `launchctl` functionality.
 //
 // Getting User Information
 //
@@ -14,7 +14,7 @@
 // PR adding the table. See
 // https://github.com/osquery/osquery/pull/6243
 //
-// Empiracally, it only works when run in the specific user
+// Empirically, it only works when run in the specific user
 // context. Furthermore, setting the effective uid (as sudo might) is
 // in adequate. Intead, we need to use `launchctl asuser`.
 //
