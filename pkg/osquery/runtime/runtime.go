@@ -670,7 +670,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	plugins := o.opts.extensionPlugins
-	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger) {
+	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
 	}
 	o.extensionManagerServer.RegisterPlugin(plugins...)
