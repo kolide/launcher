@@ -7,6 +7,7 @@ import (
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
 	"github.com/kolide/launcher/pkg/osquery/tables/screenlock"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
@@ -22,6 +23,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		Airdrop(client),
 		AppIcons(),
 		ChromeLoginKeychainInfo(client, logger),
+		firmwarepasswd.TablePlugin(client, logger),
 		GDriveSyncConfig(client, logger),
 		GDriveSyncHistoryInfo(client, logger),
 		KolideVulnerabilities(client, logger),
