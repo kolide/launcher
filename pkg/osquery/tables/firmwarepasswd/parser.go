@@ -33,8 +33,7 @@ func NewParser(logger log.Logger, matchers []Matcher) *OutputParser {
 func (p *OutputParser) Parse(input *bytes.Buffer) []map[string]string {
 	var results []map[string]string
 
-	// FIXME: should be possible to do this without a string in the middle
-	scanner := bufio.NewScanner(input) // strings.NewReader(input.String()))
+	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
