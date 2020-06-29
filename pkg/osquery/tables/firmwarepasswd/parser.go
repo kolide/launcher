@@ -29,7 +29,7 @@ func NewParser(logger log.Logger, matchers []Matcher) *OutputParser {
 	return p
 }
 
-// Parse looks at command output, line by line. It assumes kv output deliminated by a :
+// Parse looks at command output, line by line. It uses the defined Matchers to set any appropriate values
 func (p *OutputParser) Parse(input *bytes.Buffer) []map[string]string {
 	var results []map[string]string
 
