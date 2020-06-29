@@ -27,6 +27,19 @@ type Table struct {
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.IntegerColumn("option_roms_allowed"),
+		table.IntegerColumn("password_enabled"),
+		table.TextColumn("mode"),
+	}
+
+	t := New(client, logger)
+
+	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
+
+}
+
+func New(client *osquery.ExtensionManagerClient, logger log.Logger) *Table {
 	parser := NewParser(logger,
 		[]Matcher{
 			Matcher{
@@ -39,20 +52,18 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 				KeyFunc: func(_ string) (string, error) { return "mode", nil },
 				ValFunc: func(in string) (string, error) { return modeValue(in) },
 			},
+			Matcher{
+				Match:   func(in string) bool { return strings.HasPrefix(in, "Option roms ") },
+				KeyFunc: func(_ string) (string, error) { return "option_roms_allowed", nil },
+				ValFunc: func(in string) (string, error) { return optionRomValue(in) },
+			},
 		})
 
-	columns := []table.ColumnDefinition{
-		table.IntegerColumn("password_enabled"),
-		table.TextColumn("mode"),
-	}
-
-	t := &Table{
+	return &Table{
 		client: client,
 		logger: level.NewFilter(logger, level.AllowInfo()),
 		parser: parser,
 	}
-
-	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
 
 }
 
@@ -70,7 +81,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		// Merge merge merge
+		// Merge resulting matches
 		for _, row := range t.parser.Parse(output) {
 			for k, v := range row {
 				result[k] = v
@@ -136,4 +147,14 @@ func passwordValue(in string) (string, error) {
 		return "1", err
 	}
 	return "0", err
+}
+
+func optionRomValue(in string) (string, error) {
+	switch strings.TrimPrefix(in, "Option roms ") {
+	case "not allowed":
+		return "0", nil
+	case "allowed":
+		return "1", nil
+	}
+	return "", errors.Errorf("Can't tell value from %s", in)
 }
