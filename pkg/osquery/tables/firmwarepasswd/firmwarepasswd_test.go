@@ -21,12 +21,14 @@ func TestParser(t *testing.T) {
 			input:    "check-no.txt",
 			expected: map[string]string{"password_enabled": "0"},
 		},
-
+		{
+			input:    "check-garbage.txt",
+			expected: map[string]string{"password_enabled": "0"},
+		},
 		{
 			input:    "check-yes.txt",
 			expected: map[string]string{"password_enabled": "1"},
 		},
-
 		{
 			input: "mode-command.txt",
 			expected: map[string]string{
@@ -34,7 +36,6 @@ func TestParser(t *testing.T) {
 				"option_roms_allowed": "0",
 			},
 		},
-
 		{
 			input: "mode-none.txt",
 			expected: map[string]string{

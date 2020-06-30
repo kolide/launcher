@@ -158,3 +158,14 @@ func optionRomValue(in string) (string, error) {
 	}
 	return "", errors.Errorf("Can't tell value from %s", in)
 }
+
+func discernValBool(in string) (bool, error) {
+	switch strings.TrimSpace(strings.ToLower(in)) {
+	case "true", "t", "1", "y", "yes":
+		return true, nil
+	case "false", "f", "0", "n", "no":
+		return false, nil
+	}
+
+	return false, errors.Errorf("Can't discern boolean from string <%s>", in)
+}
