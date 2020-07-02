@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/wmi"
 
 	"github.com/go-kit/kit/log"
@@ -33,6 +34,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("query"),
 
 		// wmi columns
+		table.TextColumn("namespace"),
 		table.TextColumn("class"),
 		table.TextColumn("properties"),
 	}
@@ -49,65 +51,72 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	classQ, ok := queryContext.Constraints["class"]
-	if !ok || len(classQ.Constraints) == 0 {
+	classes := tablehelpers.GetConstraints(queryContext, "class")
+	for _, c := range classes {
+		if !onlyAllowedCharacters(c) {
+			return nil, errors.New("Disallowed character in class expression")
+		}
+	}
+	if len(classes) == 0 {
 		return nil, errors.New("The kolide_wmi table requires a wmi class")
 	}
 
-	propertiesQ, ok := queryContext.Constraints["properties"]
-	if !ok || len(propertiesQ.Constraints) == 0 {
+	properties := tablehelpers.GetConstraints(queryContext, "properties")
+	for _, p := range properties {
+		if !onlyAllowedCharacters(p) {
+			return nil, errors.New("Disallowed character in properties expression")
+		}
+	}
+	if len(properties) == 0 {
 		return nil, errors.New("The kolide_wmi table requires wmi properties")
 	}
 
-	for _, classConstraint := range classQ.Constraints {
-		if !onlyAllowedCharacters(classConstraint.Expression) {
-			level.Info(t.logger).Log("msg", "Disallowed character in class expression")
-			return nil, errors.New("Disallowed character in class expression")
+	// Get the list of namespaces to query. If not specified, that's
+	// okay too, default to ""
+	namespaces := tablehelpers.GetConstraints(queryContext, "namespace", "")
+	for _, ns := range namespaces {
+		if !onlyAllowedCharacters(ns) {
+			return nil, errors.New("Disallowed character in namespace expression")
 		}
+	}
 
-		for _, propertiesConstraint := range propertiesQ.Constraints {
+	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", "")
 
-			if !onlyAllowedCharacters(strings.Replace(propertiesConstraint.Expression, ",", "", -1)) {
-				level.Info(t.logger).Log("msg", "Disallowed character in properties expression")
-				return nil, errors.New("Disallowed character in properties expression")
-			}
-
-			properties := strings.Split(propertiesConstraint.Expression, ",")
+	for _, class := range classes {
+		for _, rawProperties := range properties {
+			properties := strings.Split(rawProperties, ",")
 			if len(properties) == 0 {
 				continue
 			}
+			for _, ns := range namespaces {
+				// Set a timeout in case wmi hangs
+				ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+				defer cancel()
 
-			// Set a timeout in case wmi hangs
-			ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-			defer cancel()
-
-			wmiResults, err := wmi.Query(ctx, classConstraint.Expression, properties)
-			if err != nil {
-				level.Info(t.logger).Log(
-					"msg", "wmi query failure",
-					"err", err,
-					"class", classConstraint.Expression,
-					"properties", propertiesConstraint.Expression,
-				)
-				continue
-			}
-
-			if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
-				for _, constraint := range q.Constraints {
-					dataQuery := constraint.Expression
-					results = append(results, t.flattenRowsFromWmi(dataQuery, wmiResults, classConstraint.Expression, propertiesConstraint.Expression)...)
+				// FIXME: pass namespace here
+				wmiResults, err := wmi.Query(ctx, class, properties)
+				if err != nil {
+					level.Info(t.logger).Log(
+						"msg", "wmi query failure",
+						"err", err,
+						"class", class,
+						"properties", rawProperties,
+						"namespace", ns,
+					)
+					continue
 				}
-			} else {
-				results = append(results, t.flattenRowsFromWmi("", wmiResults, classConstraint.Expression, propertiesConstraint.Expression)...)
-			}
 
+				for _, dataQuery := range flattenQueries {
+					results = append(results, t.flattenRowsFromWmi(dataQuery, wmiResults, class, rawProperties, ns)...)
+				}
+			}
 		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties string) []map[string]string {
+func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace string) []map[string]string {
 	flattenOpts := []dataflatten.FlattenOpts{}
 
 	if dataQuery != "" {
@@ -144,6 +153,7 @@ func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]int
 			"query":      dataQuery,
 			"class":      wmiClass,
 			"properties": wmiProperties,
+			"namespace":  wmiNamespace,
 		}
 		results = append(results, res)
 	}
