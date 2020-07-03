@@ -1,6 +1,8 @@
 package tablehelpers
 
-import "github.com/kolide/osquery-go/plugin/table"
+import (
+	"github.com/kolide/osquery-go/plugin/table"
+)
 
 // GetConstraints returns a []string of the constraint expressions on
 // a column. It's meant for the common, simple, usecase of iterating over them.
@@ -10,13 +12,19 @@ func GetConstraints(queryContext table.QueryContext, columnName string, defaults
 		return defaults
 	}
 
-	constraints := make([]string, len(q.Constraints))
+	constraintSet := make(map[string]struct{})
 
-	for i, c := range q.Constraints {
-		constraints[i] = c.Expression
+	for _, c := range q.Constraints {
+		constraintSet[c.Expression] = struct{}{}
 	}
 
-	// FIXME: need uniq
+	constraints := make([]string, len(constraintSet))
+
+	i := 0
+	for key := range constraintSet {
+		constraints[i] = key
+		i++
+	}
 
 	return constraints
 }

@@ -10,10 +10,12 @@ func TestGetConstraints(t *testing.T) {
 	t.Parallel()
 
 	mockQC := MockQueryContext(map[string][]string{
-		"empty_array": []string{},
-		"blank":       []string{""},
-		"single":      []string{"a"},
-		"double":      []string{"a", "b"},
+		"empty_array":      []string{},
+		"blank":            []string{""},
+		"single":           []string{"a"},
+		"double":           []string{"a", "b"},
+		"duplicates":       []string{"a", "a", "b", "b"},
+		"duplicate_blanks": []string{"a", "a", "", ""},
 	})
 
 	var tests = []struct {
@@ -60,6 +62,14 @@ func TestGetConstraints(t *testing.T) {
 		{
 			name:     "double",
 			expected: []string{"a", "b"},
+		},
+		{
+			name:     "duplicates",
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "duplicate_blanks",
+			expected: []string{"a", ""},
 		},
 	}
 
