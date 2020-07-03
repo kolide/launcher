@@ -8,7 +8,13 @@
 //
 // To understand the available classes, take a look at the Microsoft
 // documention [3]
-
+//
+// Servers, Namespaces, and connection parameters:
+//
+// WMI has a fairly rich set of connection options. It allows querying
+// on remove servers, via authentiated users names, in different name
+// spaces... These options are exposed through functional arguments.
+//
 // References:
 //
 // 1. https://stackoverflow.com/questions/20365286/query-wmi-from-go
@@ -70,12 +76,16 @@ func (qs *querySettings) ConnectServerArgs() []interface{} {
 
 type Option func(*querySettings)
 
+// ConnectServer sets the server to connect to. It defaults to "",
+// which is localhost.
 func ConnectServer(s string) Option {
 	return func(qs *querySettings) {
 		qs.connectServer = s
 	}
 }
 
+// ConnectNamespace sets the namespace to query against. It defaults
+// to "", which is the same as `ROOT\CIMV2`
 func ConnectNamespace(s string) Option {
 	return func(qs *querySettings) {
 		qs.connectNamespace = s
@@ -83,7 +93,8 @@ func ConnectNamespace(s string) Option {
 }
 
 // ConnectUseMaxWait requires that ConnectServer use a timeout. The
-// call is then guaranteed to return in 2 minutes or less.
+// call is then guaranteed to return in 2 minutes or less. This option
+// is strongly recommended, as without it calls can block forever.
 func ConnectUseMaxWait() Option {
 	return func(qs *querySettings) {
 		// see the definition of iSecurityFlags in
