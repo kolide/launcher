@@ -71,35 +71,36 @@ func TestQuery(t *testing.T) {
 			name:       "blank namespace",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name", "version"},
-			options:    ConnectNamespace(""),
+			options:    []Option{ConnectNamespace("")},
 			minRows:    1,
 		},
 		{
 			name:       "default namespace",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name", "version"},
-			options:    ConnectNamespace(`root\cimv2`),
+			options:    []Option{ConnectNamespace(`root\cimv2`)},
 			minRows:    1,
 		},
 		{
 			name:       "unknown namespace",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name", "version"},
-			options:    ConnectNamespace(`no\such\namespace`),
-			minRows:    1,
+			options:    []Option{ConnectNamespace(`no\such\namespace`)},
+			noData:     true,
+			err:        true,
 		},
 		{
 			name:       "different namespace",
 			class:      "MSKeyboard_PortInformation",
 			properties: []string{"ConnectorType", "FunctionKeys", "Indicators"},
-			options:    ConnectNamespace(`root\wmi`),
-			minRows:    3,
+			options:    []Option{ConnectNamespace(`root\wmi`)},
+			minRows:    1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rows, err := Query(ctx, tt.class, tt.properties)
+			rows, err := Query(ctx, tt.class, tt.properties, tt.options...)
 			if tt.err {
 				require.Error(t, err)
 				return
@@ -114,6 +115,7 @@ func TestQuery(t *testing.T) {
 
 			if tt.minRows > 0 {
 				assert.GreaterOrEqual(t, len(rows), tt.minRows, "Expected minimum rows")
+
 			}
 
 		})

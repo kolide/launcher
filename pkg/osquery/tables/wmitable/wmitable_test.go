@@ -21,7 +21,9 @@ func TestQueries(t *testing.T) {
 		name       string
 		class      string
 		properties []string
+		namespace  string
 		minRows    int
+		noData     bool
 		err        bool
 	}{
 		{
@@ -61,6 +63,22 @@ func TestQueries(t *testing.T) {
 			properties: []string{"name,ver;sion"},
 			err:        true,
 		},
+
+		{
+			name:       "bad namespace",
+			class:      "Win32_OperatingSystem",
+			properties: []string{"name,version"},
+			namespace:  `root\unknown\namespace`,
+			noData:     true,
+		},
+
+		{
+			name:       "different namespace",
+			class:      "MSKeyboard_PortInformation",
+			properties: []string{"ConnectorType,FunctionKeys,Indicators"},
+			namespace:  `root\wmi`,
+			minRows:    3,
+		},
 	}
 
 	for _, tt := range tests {
@@ -68,6 +86,7 @@ func TestQueries(t *testing.T) {
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
 				"class":      []string{tt.class},
 				"properties": tt.properties,
+				"namespace":  []string{tt.namespace},
 			})
 
 			rows, err := wmiTable.generate(context.TODO(), mockQC)
@@ -78,6 +97,11 @@ func TestQueries(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			if tt.noData {
+				assert.Empty(t, rows, "Expected no results")
+				return
+			}
 
 			// It's hard to model what we expect to get
 			// from a random windows machine. So let's

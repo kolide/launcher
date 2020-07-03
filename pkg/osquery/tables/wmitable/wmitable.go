@@ -63,7 +63,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	properties := tablehelpers.GetConstraints(queryContext, "properties")
 	for _, p := range properties {
-		if !onlyAllowedCharacters(p) {
+		// Allow comma, since we're going to split on it later.
+		if !onlyAllowedCharacters(p, `,`) {
 			return nil, errors.New("Disallowed character in properties expression")
 		}
 	}
