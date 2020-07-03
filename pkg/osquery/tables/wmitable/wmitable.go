@@ -94,7 +94,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 				defer cancel()
 
-				// FIXME: pass namespace here
 				wmiResults, err := wmi.Query(ctx, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns))
 				if err != nil {
 					level.Info(t.logger).Log(
