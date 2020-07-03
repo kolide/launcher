@@ -75,7 +75,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	// okay too, default to ""
 	namespaces := tablehelpers.GetConstraints(queryContext, "namespace", "")
 	for _, ns := range namespaces {
-		if !onlyAllowedCharacters(ns) {
+		if !onlyAllowedCharacters(ns, `\`) {
 			return nil, errors.New("Disallowed character in namespace expression")
 		}
 	}
@@ -94,7 +94,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				defer cancel()
 
 				// FIXME: pass namespace here
-				wmiResults, err := wmi.Query(ctx, class, properties)
+				wmiResults, err := wmi.Query(ctx, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns))
 				if err != nil {
 					level.Info(t.logger).Log(
 						"msg", "wmi query failure",

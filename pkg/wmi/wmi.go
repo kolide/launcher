@@ -14,6 +14,15 @@
 // 1. https://stackoverflow.com/questions/20365286/query-wmi-from-go
 // 2. https://github.com/StackExchange/wmi
 // 3. https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/operating-system-classes
+//
+// Namespaces, ongoing:
+//
+// To list them: gwmi -namespace "root" -class "__Namespace" | Select Name
+// To list classes: gwmi -namespace root\cimv2 -list
+// Default: ROOT\CIMV2
+//
+// Get-WmiObject -Query "select * from win32_service where name='WinRM'"
+// Get-WmiObject  -namespace root\cimv2\security\MicrosoftTpm -Query "SELECT * FROM Win32_Tpm"
 package wmi
 
 import (
@@ -31,9 +40,67 @@ import (
 // S_FALSE is returned by CoInitializeEx if it was already called on this thread.
 const S_FALSE = 0x00000001
 
-func Query(ctx context.Context, className string, properties []string) ([]map[string]interface{}, error) {
+// querySettings contains various options. Mostly for the
+// connectServerArgs args. See
+// https://docs.microsoft.com/en-us/windows/win32/wmisdk/swbemlocator-connectserver
+// for details.
+type querySettings struct {
+	connectServer        string
+	connectNamespace     string
+	connectUser          string
+	connectPassword      string
+	connectLocale        string
+	connectAuthority     string
+	connectSecurityFlags uint
+}
+
+// ConnectServerArgs returns an array suitable for being passed to ole
+// call ConnectServer
+func (qs *querySettings) ConnectServerArgs() []interface{} {
+	return []interface{}{
+		qs.connectServer,
+		qs.connectNamespace,
+		qs.connectUser,
+		qs.connectPassword,
+		qs.connectLocale,
+		qs.connectAuthority,
+		qs.connectSecurityFlags,
+	}
+}
+
+type Option func(*querySettings)
+
+func ConnectServer(s string) Option {
+	return func(qs *querySettings) {
+		qs.connectServer = s
+	}
+}
+
+func ConnectNamespace(s string) Option {
+	return func(qs *querySettings) {
+		qs.connectNamespace = s
+	}
+}
+
+// ConnectUseMaxWait requires that ConnectServer use a timeout. The
+// call is then guaranteed to return in 2 minutes or less.
+func ConnectUseMaxWait() Option {
+	return func(qs *querySettings) {
+		// see the definition of iSecurityFlags in
+		// https://docs.microsoft.com/en-us/windows/win32/wmisdk/swbemlocator-connectserver
+		qs.connectSecurityFlags = qs.connectSecurityFlags & 128
+	}
+}
+
+func Query(ctx context.Context, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", "wmi.Query")
 	handler := NewOleHandler(ctx, properties)
+
+	// settings
+	qs := &querySettings{}
+	for _, opt := range opts {
+		opt(qs)
+	}
 
 	// If we query for the exact fields, _and_ one of the property
 	// names is wrong, we get no results. (clearly an error. but I
@@ -64,7 +131,7 @@ func Query(ctx context.Context, className string, properties []string) ([]map[st
 	defer wmi.Release()
 
 	// service is a SWbemServices
-	serviceRaw, err := oleutil.CallMethod(wmi, "ConnectServer")
+	serviceRaw, err := oleutil.CallMethod(wmi, "ConnectServer", qs.ConnectServerArgs()...)
 	if err != nil {
 		return nil, errors.Wrap(err, "wmi connectserver")
 	}

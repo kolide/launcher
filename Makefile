@@ -38,6 +38,9 @@ launcher: .pre-build
 
 table.ext: .pre-build
 	go run cmd/make/make.go -targets=table-extension -linkstamp
+table.ext-windows: .pre-build deps
+	go run cmd/make/make.go -targets=table-extension -linkstamp --os windows
+
 
 osqueryi-tables: table.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
