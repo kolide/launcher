@@ -1,3 +1,5 @@
+// +build windows
+
 package authenticode
 
 import (
@@ -6,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -20,10 +21,6 @@ const (
 
 func TestSign(t *testing.T) {
 	t.Parallel()
-
-	if runtime.GOOS != "windows" {
-		t.Skip("not windows")
-	}
 
 	// create a signtoolOptions object so we can call the exec method
 	so := &signtoolOptions{
