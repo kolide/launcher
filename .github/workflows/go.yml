@@ -46,5 +46,11 @@ jobs:
     - name: Upload Build
       uses: actions/upload-artifact@v2
         with:
-          name: my-artifact
-          path: path/to/artifact/ # or path/to/artifact
+          name: build
+          path: build/
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v2
+        with:
+          name: coverage.out
+          path: build
