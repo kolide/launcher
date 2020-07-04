@@ -11,6 +11,7 @@ jobs:
     name: launcher
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # Consider changing this sometime
       matrix:
         os:
           - ubuntu-18.04
