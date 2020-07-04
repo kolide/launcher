@@ -33,6 +33,7 @@ else
 	mkdir -p ${BUILD_DIR}
 endif
 
+# Simple things, pointers into our build
 launcher: .pre-build
 	go run cmd/make/make.go -targets=launcher -linkstamp
 
@@ -42,6 +43,14 @@ table.ext-windows: .pre-build deps
 	go run cmd/make/make.go -targets=table-extension -linkstamp --os windows
 
 
+extension: .pre-build
+	go run cmd/make/make.go -targets=extension
+
+grpc-extension: .pre-build
+	go run cmd/make/make.go -targets=grpc-extension
+
+
+# Convenience tools
 osqueryi-tables: table.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
 sudo-osqueryi-tables: table.ext
@@ -49,9 +58,6 @@ sudo-osqueryi-tables: table.ext
 launchas-osqueryi-tables: table.ext
 	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
 
-
-extension: .pre-build
-	go run cmd/make/make.go -targets=extension
 
 
 xp: xp-launcher xp-extension xp-grpc-extension
