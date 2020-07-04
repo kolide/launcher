@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -29,30 +30,33 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 func TestNamingHelpers(t *testing.T) {
 	t.Parallel()
 	var tests = []struct {
-		b            Builder
+		platform     string
 		extensionOut string
 		binaryOut    string
 	}{
 		{
-			b:            Builder{os: "linux"},
+			platform:     "linux",
 			extensionOut: "build/linux/test.ext",
 			binaryOut:    "build/linux/test",
 		},
 		{
-			b:            Builder{os: "windows"},
+			platform:     "windows",
 			extensionOut: "build/windows/test.exe",
 			binaryOut:    "build/windows/test.exe",
 		},
 		{
-			b:            Builder{os: "darwin"},
+			platform:     "darwin",
 			extensionOut: "build/darwin/test.ext",
 			binaryOut:    "build/darwin/test",
 		},
 	}
 
 	for _, tt := range tests {
-		require.Equal(t, tt.binaryOut, tt.b.PlatformBinaryName("test"))
-		require.Equal(t, tt.extensionOut, tt.b.PlatformExtensionName("test"))
+		t.Run("platform="+tt.platform, func(t *testing.T) {
+			b := Builder{os: platform}
+			require.Equal(t, filepath.Clean(tt.binaryOut), tt.b.PlatformBinaryName("test"))
+			require.Equal(t, filepath.Clean(tt.extensionOut), tt.b.PlatformExtensionName("test"))
+		})
 	}
 }
 

@@ -98,7 +98,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	opts := &launcher.Options{
 		Control:            true,
-		OsquerydPath:       "/dev/null",
+		OsquerydPath:       windowsAddExe("/dev/null"),
 		KolideServerURL:    randomHostname,
 		GetShellsInterval:  60 * time.Second,
 		LoggingInterval:    time.Duration(randomInt) * time.Second,
