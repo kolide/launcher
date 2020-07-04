@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/env"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,6 +22,10 @@ const (
 
 func TestSign(t *testing.T) {
 	t.Parallel()
+
+	if !env.Bool("CI_TEST_WINDOWS_SIGNING", false) {
+		t.Skip("No codesign")
+	}
 
 	// create a signtoolOptions object so we can call the exec method
 	so := &signtoolOptions{
