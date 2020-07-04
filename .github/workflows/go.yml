@@ -45,12 +45,12 @@ jobs:
 
     - name: Upload Build
       uses: actions/upload-artifact@v2
-        with:
-          name: build
-          path: build/
+      with:
+        name: build
+        path: build/
 
     - name: Upload coverage
       uses: actions/upload-artifact@v2
-        with:
-          name: coverage.out
-          path: build
+      with:
+        name: coverage.out
+        path: build
