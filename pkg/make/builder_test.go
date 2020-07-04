@@ -53,9 +53,9 @@ func TestNamingHelpers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("platform="+tt.platform, func(t *testing.T) {
-			b := Builder{os: platform}
-			require.Equal(t, filepath.Clean(tt.binaryOut), tt.b.PlatformBinaryName("test"))
-			require.Equal(t, filepath.Clean(tt.extensionOut), tt.b.PlatformExtensionName("test"))
+			b := Builder{os: tt.platform}
+			require.Equal(t, filepath.Clean(tt.binaryOut), b.PlatformBinaryName("test"))
+			require.Equal(t, filepath.Clean(tt.extensionOut), b.PlatformExtensionName("test"))
 		})
 	}
 }
