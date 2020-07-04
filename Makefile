@@ -167,11 +167,13 @@ lint-go-vet:
 lint-go-nakedret: deps-go
 	nakedret ./...
 
-# This is a big ugly, since go-fmt doesn't have a simple exit code. Thus the doubled echo and test.
-lint-go-fmt: export FMTFAILS = $(shell gofmt -l ./pkg/ ./cmd/ | grep -vE 'assets.go|bindata.go')
+# This is ugly. since go-fmt doesn't have a simple exit code, we use
+# some make trickery to handle failing if there;s output.
+lint-go-fmt: $(foreach c,$(shell gofmt -l ./pkg/ ./cmd/ | grep -vE 'assets.go|bindata.go'),fmt-fail/$(c))
 lint-go-fmt: deps-go
-	@test -z "$(FMTFAILS)" || echo gofmt failures in: "$(FMTFAILS)"
-	@test -z "$(FMTFAILS)"
+fmt-fail/%:
+	@echo fmt failure in: $*
+	@false
 
 ##
 ## Release Process Stuff
