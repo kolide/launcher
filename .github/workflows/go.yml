@@ -35,7 +35,7 @@ jobs:
       run: make -j lint
 
     - name: Build
-      run: make -j darwin-xp-{launcher,extension,grpc-extension}
+      run: make -j launcher extension grpc-extension table.ext
 
     - name: Test
       run: make test
