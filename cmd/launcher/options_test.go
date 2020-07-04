@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		"--hostname":           randomHostname,
 		"-autoupdate_interval": "48h",
 		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
-		"-osqueryd_path":       "/dev/null",
+		"-osqueryd_path":       windowsAddExe("/dev/null"),
 		"-transport":           "grpc",
 	}
 
@@ -110,4 +111,12 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	return args, opts
+}
+
+func windowsAddExe(in string) string {
+	if runtime.GOOS == "windows" {
+		return in + ".exe"
+	}
+
+	return in
 }

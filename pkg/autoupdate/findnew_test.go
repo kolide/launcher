@@ -261,10 +261,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	// Create a test binary
-	binaryName := "binary"
-	if runtime.GOOS == "windows" {
-		binaryName = binaryName + ".exe"
-	}
+	binaryName := windowsAddExe("binary")
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
 
@@ -507,4 +504,12 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	// default behavior nothing
+}
+
+func windowsAddExe(in string) string {
+	if runtime.GOOS == "windows" {
+		return in + ".exe"
+	}
+
+	return in
 }
