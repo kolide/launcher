@@ -36,6 +36,7 @@ jobs:
 
     - name: Lint
       run: make -j lint
+      if: runner.os != 'Windows'
 
     - name: Build
       run: make -j launcher extension grpc-extension table.ext
