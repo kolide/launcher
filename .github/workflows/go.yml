@@ -47,11 +47,11 @@ jobs:
     - name: Upload Build
       uses: actions/upload-artifact@v2
       with:
-        name: build
+        name: ${{ matrix.os }}/build
         path: build/
 
     - name: Upload coverage
       uses: actions/upload-artifact@v2
       with:
-        name: coverage.out
+        name: ${{ matrix.os }}/coverage.out
         path: coverage.out
