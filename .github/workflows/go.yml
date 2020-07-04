@@ -9,6 +9,7 @@ on:
 jobs:
   build_and_test:
     name: launcher
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os:
