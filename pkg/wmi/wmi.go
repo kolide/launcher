@@ -12,7 +12,7 @@
 // Servers, Namespaces, and connection parameters:
 //
 // WMI has a fairly rich set of connection options. It allows querying
-// on remove servers, via authentiated users names, in different name
+// on remote servers, via authenticated users names, in different name
 // spaces... These options are exposed through functional arguments.
 //
 // References:
