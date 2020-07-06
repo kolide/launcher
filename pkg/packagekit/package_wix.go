@@ -86,7 +86,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 			wixArgs = append(wixArgs, wix.WithUI())
 		}
 
-		for _, f := range []string{"msi_banner.bmp", "msi_splash.bmp", "kolide.ico"} {
+		for _, f := range assetFiles {
 			fileBytes, err := internal.Asset("internal/assets/" + f)
 			if err != nil {
 				return errors.Wrapf(err, "getting go-bindata %s", f)
