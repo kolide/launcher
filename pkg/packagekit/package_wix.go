@@ -44,16 +44,29 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		return errors.Wrap(err, "getting go-bindata main.wxs")
 	}
 
+	// We include a random nonce as part of the ProductCode
+	// guid. This is so that any MSI rebuild triggers the Major
+	// Upgrade flow, and not the "Another version of this product
+	// is already installed" error. The Minor Upgrade Flow might
+	// be more appropriate, but requires substantial reworking of
+	// how versions and builds are calculated. See
+	// https://www.firegiant.com/wix/tutorial/upgrades-and-modularization/
+	// for opinionated background
+	guidNonce, err := uuid.NewRandom()
+	if err != nil {
+		return errors.Wrap(err, "generating uuid as guid nonce")
+
+	}
 	extraGuidIdentifiers := []string{
 		po.Version,
 		runtime.GOARCH,
+		guidNonce.String(),
 	}
 
 	var templateData = struct {
 		Opts        *PackageOptions
 		UpgradeCode string
 		ProductCode string
-		PackageCode string
 	}{
 		Opts:        po,
 		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
