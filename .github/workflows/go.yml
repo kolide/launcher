@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_and_test:
+    name: launcher
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Consider changing this sometime
+      matrix:
+        os:
+          - ubuntu-18.04
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.13 # 1.14 has issues with bolt's pointers
+      id: go
+
+    - name: Get dependencies
+      run: make deps
+
+    - name: Lint
+      run: make -j lint
+      if: runner.os != 'Windows'
+
+    - name: Build
+      run: make -j launcher extension grpc-extension table.ext
+
+    - name: Test
+      run: make test
+
+    - name: Upload Build
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}-build
+        path: build/
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}-coverage.out
+        path: coverage.out

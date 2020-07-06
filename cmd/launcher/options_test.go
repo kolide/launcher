@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +35,11 @@ func TestOptionsFromFlags(t *testing.T) {
 }
 
 func TestOptionsFromEnv(t *testing.T) {
+
+	if runtime.GOOS == "windows" {
+		t.Skip("TODO: Windows Testing")
+	}
+
 	os.Clearenv()
 
 	testArgs, expectedOpts := getArgsAndResponse()
@@ -91,13 +97,13 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		"--hostname":           randomHostname,
 		"-autoupdate_interval": "48h",
 		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
-		"-osqueryd_path":       "/dev/null",
+		"-osqueryd_path":       windowsAddExe("/dev/null"),
 		"-transport":           "grpc",
 	}
 
 	opts := &launcher.Options{
 		Control:            true,
-		OsquerydPath:       "/dev/null",
+		OsquerydPath:       windowsAddExe("/dev/null"),
 		KolideServerURL:    randomHostname,
 		GetShellsInterval:  60 * time.Second,
 		LoggingInterval:    time.Duration(randomInt) * time.Second,
@@ -110,4 +116,12 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	return args, opts
+}
+
+func windowsAddExe(in string) string {
+	if runtime.GOOS == "windows" {
+		return in + ".exe"
+	}
+
+	return in
 }

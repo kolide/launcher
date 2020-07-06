@@ -1,3 +1,5 @@
+// +build !windows
+
 package debug
 
 import (
@@ -57,6 +59,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 
 func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
+
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
 

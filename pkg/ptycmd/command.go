@@ -1,3 +1,5 @@
+// +build !windows
+
 package ptycmd
 
 import (
@@ -11,30 +13,6 @@ import (
 	"github.com/kr/pty"
 	"github.com/pkg/errors"
 )
-
-// Cmd is a shelled out command and an attached pty
-type Cmd struct {
-	// the command that is being relayed
-	command string
-
-	// args passed to the command
-	argv []string
-
-	// the external command struct
-	cmd *exec.Cmd
-
-	// the pseudoterminal attached to the command
-	pty *os.File
-
-	// channel to signal closing the pty
-	ptyClosed chan struct{}
-
-	// signal to close process
-	closeSignal syscall.Signal
-
-	// time to wait to close process
-	closeTimeout time.Duration
-}
 
 // NewCmd creates a new command attached to a pty
 func NewCmd(command string, argv []string, options ...Option) (*Cmd, error) {
