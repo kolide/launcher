@@ -9,6 +9,7 @@ on:
 jobs:
   build_and_test:
     name: launcher
+    timeout-minutes: 25
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -21,12 +22,12 @@ jobs:
     steps:
     - name: Check out code
       id: checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@722adc63f1aa60a57ec37892e133b1d319cae598 # Pinned at v2.0.0
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Set up Go 1.x
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@78bd24e01a1a907f7ea3e614b4d7c15e563585a8 # Pinned at v2
       with:
         go-version: 1.13 # 1.14 has issues with bolt's pointers
       id: go
@@ -45,13 +46,13 @@ jobs:
       run: make test
 
     - name: Upload Build
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@97b7dace6c8d860ce9708aba808be6a2ee4cbc3a # Pinned at v2
       with:
         name: ${{ matrix.os }}-build
         path: build/
 
     - name: Upload coverage
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@97b7dace6c8d860ce9708aba808be6a2ee4cbc3a # Pinned at v2
       with:
         name: ${{ matrix.os }}-coverage.out
         path: coverage.out
