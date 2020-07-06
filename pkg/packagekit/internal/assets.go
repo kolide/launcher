@@ -191,6 +191,11 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
+
+    <!-- The icon is used in the add/remove program dialog -->
+    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+
     {{if .Opts.WixUI}}
     <!--
 	UI Notes:
@@ -216,11 +221,6 @@ This is based on a modified WixUI_Minimal
     <WixVariable Id="WixUIBannerBmp" Value="msi_banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="msi_splash.bmp" />
 
-    <!-- FIXME: This should be outside the UI if block -->
-    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
-    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
-
-
     <UI>
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
       <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
@@ -233,12 +233,7 @@ This is based on a modified WixUI_Minimal
       <DialogRef Id="FatalError" />
       <DialogRef Id="FilesInUse" />
       <DialogRef Id="MsiRMFilesInUse" />
-      <!-- <DialogRef Id="PrepareDlg" /> -->
-      <!-- <DialogRef Id="ProgressDlg" /> -->
-      <!-- <DialogRef Id="ResumeDlg" /> -->
       <DialogRef Id="UserExit" />
-      <!-- <DialogRef Id="WelcomeDlg" /> -->
-      <!-- <DialogRef Id="WelcomeEulaDlg" /> -->
 
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
 
@@ -251,16 +246,8 @@ This is based on a modified WixUI_Minimal
       <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
       <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
 
-      <!--
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">Installed AND PATCH</Publish>
-      -->
 
       <InstallUISequence>
-	<!--
-	<Show Dialog="WelcomeDlg" Before="WelcomeEulaDlg">Installed AND PATCH</Show>
-	<Show Dialog="WelcomeEulaDlg" Before="ProgressDlg">NOT Installed</Show>
-	-->
       </InstallUISequence>
 
       <Property Id="ARPNOMODIFY" Value="1" />
@@ -268,29 +255,6 @@ This is based on a modified WixUI_Minimal
 
     <UIRef Id="WixUI_Common" />
 {{ end }}
-	<!--
-    <UI>
-      <Property Id="DefaultUIFont">DlgFont8</Property>
-
-      <Dialog Id="InstallDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
-	<Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes">
-	  <Text>{\DlgTitleFont}Ready to Install</Text>
-	</Control>
-	<Control Id="Install" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Text="Install">
-	  <Publish Event="EndDialog" Value="Return" />
-	</Control>
-      </Dialog>
-
-      <TextStyle Id="DlgFont8" FaceName="Tahoma" Size="8" />
-      <TextStyle Id="DlgTitleFont" FaceName="Tahoma" Size="8" Bold="yes" />
-
-      <InstallUISequence>
-	<Show Dialog="InstallDlg" Before="ProgressDlg" />
-      </InstallUISequence>
-    </UI>
-
--->
-
   </Product>
 </Wix>
 `)

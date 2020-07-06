@@ -76,10 +76,16 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
 	}
 
-	if po.WixUI {
-		wixArgs = append(wixArgs, wix.WithUI())
+	{
+		// Regardless of whether or not there's a UI in the MSI, we
+		// still want the icon file to be included.
+		assetFiles := []string{"kolide.ico"}
 
-		// FIXME: The icon should be outside the UI block
+		if po.WixUI {
+			assetFiles = append(assetFiles, "msi_banner.bmp", "msi_splash.bmp")
+			wixArgs = append(wixArgs, wix.WithUI())
+		}
+
 		for _, f := range []string{"msi_banner.bmp", "msi_splash.bmp", "kolide.ico"} {
 			fileBytes, err := internal.Asset("internal/assets/" + f)
 			if err != nil {

@@ -55,6 +55,11 @@
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
+
+    <!-- The icon is used in the add/remove program dialog -->
+    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+
     {{if .Opts.WixUI}}
     <!--
 	UI Notes:
@@ -79,11 +84,6 @@ This is based on a modified WixUI_Minimal
 
     <WixVariable Id="WixUIBannerBmp" Value="msi_banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="msi_splash.bmp" />
-
-    <!-- FIXME: This should be outside the UI if block -->
-    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
-    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
-
 
     <UI>
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
