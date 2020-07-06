@@ -412,7 +412,10 @@ func TestCheckExecutableTruncated(t *testing.T) {
 
 func TestBuildTimestamp(t *testing.T) {
 	t.Parallel()
-	t.Skip("FIXME: Windows")
+
+	if runtime.GOOS == "windows" {
+		t.Skip("FIXME: Windows")
+	}
 
 	var tests = []struct {
 		buildTimestamp string
