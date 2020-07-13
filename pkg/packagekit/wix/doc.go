@@ -27,7 +27,7 @@ Windows uses guids to identify how MSIs related to one another. Windows defines 
 
   * UpgradeCode: Consistent for all releases of a product -- guid(name, identifier)
   * ProductCode: Identifies a product release -- guid(name, identifier, hostname, version)
-  * PackageCode: Identifiers a MSI package itself. WiX recommends this be left blank, and auto-generated
+  * PackageCode: Identifies a MSI package itself. WiX recommends this be left blank, and auto-generated
 
 For a given input, we need a stable guid. Convinently, md5 produces a
 string of the correct length for these guids.
