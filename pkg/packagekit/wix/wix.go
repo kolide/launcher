@@ -92,9 +92,6 @@ func WithUI() WixOpt {
 
 func WithFile(name string, content []byte) WixOpt {
 	return func(wo *wixTool) {
-		if wo.extraFiles == nil {
-			wo.extraFiles = []extraFile{}
-		}
 		wo.extraFiles = append(wo.extraFiles, extraFile{name, content})
 	}
 }
