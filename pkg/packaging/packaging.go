@@ -53,6 +53,7 @@ type PackageOptions struct {
 	MirrorURL         string
 	NotaryPrefix      string
 	WixPath           string
+	MSIUI             bool
 
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
@@ -283,6 +284,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Version:             p.PackageVersion,
 		FlagFile:            p.canonicalizePath(flagFilePath),
 		WixPath:             p.WixPath,
+		WixUI:               p.MSIUI,
 	}
 
 	if err := p.makePackage(ctx); err != nil {

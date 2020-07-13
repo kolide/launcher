@@ -27,7 +27,7 @@ Windows uses guids to identify how MSIs related to one another. Windows defines 
 
   * UpgradeCode: Consistent for all releases of a product -- guid(name, identifier)
   * ProductCode: Identifies a product release -- guid(name, identifier, hostname, version)
-  * PackageCode: Identifiers a MSI package itself -- guid(name, identifier, hostname, version)
+  * PackageCode: Identifies a MSI package itself. WiX recommends this be left blank, and auto-generated
 
 For a given input, we need a stable guid. Convinently, md5 produces a
 string of the correct length for these guids.
@@ -43,6 +43,7 @@ References
   3. https://blogs.msdn.microsoft.com/pusu/2009/06/10/what-are-upgrade-product-and-package-codes-used-for/
   4. https://docs.microsoft.com/en-us/windows/desktop/Msi/preparing-an-application-for-future-major-upgrades
   5. https://docs.microsoft.com/en-us/windows/desktop/Msi/productcode
+  6. https://www.firegiant.com/wix/tutorial/upgrades-and-modularization/
 
 */
 package wix

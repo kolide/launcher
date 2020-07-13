@@ -55,5 +55,69 @@
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
+
+    <!-- The icon is used in the add/remove program dialog -->
+    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
+    <Property Id="ARPPRODUCTICON" Value="icon.ico" />
+
+    {{if .Opts.WixUI}}
+    <!--
+	UI Notes:
+	WiX provides a UI toolkit, and some precanned templates.
+
+https://stackoverflow.com/questions/16865666/cant-show-dialog-in-wix-installer
+says that: If a package has any dialogs, Windows Installer requires
+that it have a minimum set to show UI, mostly under error
+conditions. The ICE20 documentation has the full list.
+
+https://docs.microsoft.com/en-us/windows/win32/msi/ice20?redirectedfrom=MSDN describes the following as needed:
+* FilesInUse Dialog
+* Error Dialog
+* Exit Dialog
+* UserExit Dialog
+* FatalError Dialog
+
+Luckily. we can import these from wix.
+
+This is based on a modified WixUI_Minimal
+    -->
+
+    <WixVariable Id="WixUIBannerBmp" Value="msi_banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="msi_splash.bmp" />
+
+    <UI>
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="Minimal" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="UserExit" />
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+
+      <!-- Keep this. Else weird things happen -->
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+
+
+      <InstallUISequence>
+      </InstallUISequence>
+
+      <Property Id="ARPNOMODIFY" Value="1" />
+    </UI>
+
+    <UIRef Id="WixUI_Common" />
+{{ end }}
   </Product>
 </Wix>

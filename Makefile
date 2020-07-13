@@ -159,6 +159,7 @@ lint-go-deadcode: deps-go
 lint-misspell: deps-go
 	git ls-files \
 	  | grep -v pkg/simulator/testdata/bad_symlink \
+	  | grep -v assets.go$ \
 	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
 
 lint-go-vet:

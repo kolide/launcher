@@ -1,6 +1,7 @@
 package tablehelpers
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -69,13 +70,14 @@ func TestGetConstraints(t *testing.T) {
 		},
 		{
 			name:     "duplicate_blanks",
-			expected: []string{"a", ""},
+			expected: []string{"", "a"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual := GetConstraints(mockQC, tt.name, tt.defaults...)
+			sort.Strings(actual)
 			require.Equal(t, tt.expected, actual)
 		})
 	}

@@ -15,4 +15,5 @@ type PackageOptions struct {
 	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key
 
 	WixPath string // path to wix installation
+	WixUI   bool   //include the wix ui or not
 }
