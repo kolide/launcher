@@ -27,7 +27,7 @@ import (
 
 const ioregPath = "/usr/sbin/ioreg"
 
-const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -46,8 +46,9 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 
 		// ioreg options. It feels awkward using the single
 		// character form, but the full names are too generic
-		// and conflict with our established dataflattebnn columns
+		// and conflict with our established dataflatten columns
 		table.TextColumn("c"),
+		table.IntegerColumn("d"),
 		table.TextColumn("k"),
 		table.TextColumn("n"),
 		table.TextColumn("p"),
@@ -79,62 +80,69 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			ioregArgs = append(ioregArgs, "-c", ioC)
 		}
 
-		for _, ioK := range tablehelpers.GetConstraints(queryContext, "k", gcOpts...) {
-			if ioK != "" {
-				ioregArgs = append(ioregArgs, "-k", ioK)
+		for _, ioD := range tablehelpers.GetConstraints(queryContext, "d", gcOpts...) {
+			if ioD != "" {
+				ioregArgs = append(ioregArgs, "-d", ioD)
 			}
-			for _, ioN := range tablehelpers.GetConstraints(queryContext, "n", gcOpts...) {
-				if ioN != "" {
-					ioregArgs = append(ioregArgs, "-n", ioN)
-				}
 
-				for _, ioP := range tablehelpers.GetConstraints(queryContext, "p", gcOpts...) {
-					if ioP != "" {
-						ioregArgs = append(ioregArgs, "-p", ioP)
+			for _, ioK := range tablehelpers.GetConstraints(queryContext, "k", gcOpts...) {
+				if ioK != "" {
+					ioregArgs = append(ioregArgs, "-k", ioK)
+				}
+				for _, ioN := range tablehelpers.GetConstraints(queryContext, "n", gcOpts...) {
+					if ioN != "" {
+						ioregArgs = append(ioregArgs, "-n", ioN)
 					}
 
-					for _, ioR := range tablehelpers.GetConstraints(queryContext, "r", gcOpts...) {
-						switch ioR {
-						case "", "0":
-							// do nothing
-						case "1":
-							ioregArgs = append(ioregArgs, "-r")
-						default:
-							level.Info(t.logger).Log("msg", "r should be blank, 0, or 1")
-							continue
+					for _, ioP := range tablehelpers.GetConstraints(queryContext, "p", gcOpts...) {
+						if ioP != "" {
+							ioregArgs = append(ioregArgs, "-p", ioP)
 						}
 
-						for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
-							// Finally, an inner loop
-
-							ioregOutput, err := t.execIoreg(ctx, ioregArgs)
-							if err != nil {
-								level.Info(t.logger).Log("msg", "ioreg failed", "err", err)
+						for _, ioR := range tablehelpers.GetConstraints(queryContext, "r", gcOpts...) {
+							switch ioR {
+							case "", "0":
+								// do nothing
+							case "1":
+								ioregArgs = append(ioregArgs, "-r")
+							default:
+								level.Info(t.logger).Log("msg", "r should be blank, 0, or 1")
 								continue
 							}
 
-							flatData, err := t.flattenOutput(dataQuery, ioregOutput)
-							if err != nil {
-								level.Info(t.logger).Log("msg", "flatten failed", "err", err)
-								continue
-							}
+							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+								// Finally, an inner loop
 
-							for _, row := range flatData {
-								p, k := row.ParentKey("/")
-
-								res := map[string]string{
-									"fullkey": row.StringPath("/"),
-									"parent":  p,
-									"key":     k,
-									"value":   row.Value,
-									"query":   dataQuery,
-									"c":       ioC,
-									"k":       ioK,
-									"n":       ioN,
-									"p":       ioP,
-									"r":       ioR,
+								ioregOutput, err := t.execIoreg(ctx, ioregArgs)
+								if err != nil {
+									level.Info(t.logger).Log("msg", "ioreg failed", "err", err)
+									continue
 								}
-								results = append(results, res)
+
+								flatData, err := t.flattenOutput(dataQuery, ioregOutput)
+								if err != nil {
+									level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+									continue
+								}
+
+								for _, row := range flatData {
+									p, k := row.ParentKey("/")
+
+									res := map[string]string{
+										"fullkey": row.StringPath("/"),
+										"parent":  p,
+										"key":     k,
+										"value":   row.Value,
+										"query":   dataQuery,
+										"c":       ioC,
+										"d":       ioD,
+										"k":       ioK,
+										"n":       ioN,
+										"p":       ioP,
+										"r":       ioR,
+									}
+									results = append(results, res)
+								}
 							}
 						}
 					}
