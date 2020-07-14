@@ -22,43 +22,24 @@ func TestGetConstraints(t *testing.T) {
 	var tests = []struct {
 		name     string
 		expected []string
-		defaults []string
+		opts     []GetConstraintOpts
 	}{
+		// Basic queries
+		{
+			name:     "single",
+			expected: []string{"a"},
+		},
 		{
 			name:     "does_not_exist",
 			expected: []string(nil),
 		},
 		{
-			name:     "does_not_exist_with_defaults",
-			expected: []string{"a", "b"},
-			defaults: []string{"a", "b"},
-		},
-		{
-			name:     "empty_array",
-			expected: []string{"a", "b"},
-			defaults: []string{"a", "b"},
-		},
-		{
 			name:     "empty_array",
 			expected: []string(nil),
 		},
 		{
 			name:     "blank",
 			expected: []string{""},
-		},
-		{
-			name:     "blank",
-			expected: []string{""},
-			defaults: []string{"a", "b"},
-		},
-		{
-			name:     "single",
-			expected: []string{"a"},
-		},
-		{
-			name:     "single",
-			expected: []string{"a"},
-			defaults: []string{"a", "b"},
 		},
 		{
 			name:     "double",
@@ -72,11 +53,59 @@ func TestGetConstraints(t *testing.T) {
 			name:     "duplicate_blanks",
 			expected: []string{"", "a"},
 		},
+
+		// defaults
+		{
+			name:     "does_not_exist_with_defaults",
+			expected: []string{"a", "b"},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b")},
+		},
+		{
+			name:     "does_not_exist_with_defaults_empty_string",
+			expected: []string{""},
+			opts:     []GetConstraintOpts{WithDefaults("")},
+		},
+
+		{
+			name:     "empty_array",
+			expected: []string{"a", "b"},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b")},
+		},
+		{
+			name:     "blank",
+			expected: []string{""},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b")},
+		},
+		{
+			name:     "single",
+			expected: []string{"a"},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b")},
+		},
+
+		// default plus allowed
+		{
+
+			name:     "double",
+			expected: []string{"a"},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b"), WithAllowedCharacters("a")},
+		},
+		{
+			// allowed zeros everything, no default is returned.
+			name:     "double",
+			expected: []string{},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b"), WithAllowedCharacters("z")},
+		},
+		{
+			// no matches, so defaults applies, even if it doesn't match allowed
+			name:     "does_not_exist_with_defaults",
+			expected: []string{"a", "b"},
+			opts:     []GetConstraintOpts{WithDefaults("a", "b"), WithAllowedCharacters("z")},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := GetConstraints(mockQC, tt.name, tt.defaults...)
+			actual := GetConstraints(mockQC, tt.name, tt.opts...)
 			sort.Strings(actual)
 			require.Equal(t, tt.expected, actual)
 		})
