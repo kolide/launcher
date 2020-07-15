@@ -44,9 +44,8 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("value"),
 		table.TextColumn("query"),
 
-		// ioreg options. It feels awkward using the single
-		// character form, but the full names are too generic
-		// and conflict with our established dataflatten columns
+		// ioreg input options. These match the ioreg 
+		// command line. See the ioreg man page.
 		table.TextColumn("c"),
 		table.IntegerColumn("d"),
 		table.TextColumn("k"),
