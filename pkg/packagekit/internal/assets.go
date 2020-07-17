@@ -185,6 +185,25 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       </Directory>
     </Directory>
 
+
+    <!-- Post install file. Via so much indirection -->
+    <DirectoryRef Id="DATADIR">
+      <Component Id="InstallerInfo" Guid="*">
+	<!-- <File Id="InstallerInfo" Source="installer-info.xml" KeyPath="yes" /> -->
+	<util:XmlConfig Id="InstallerInfoMSIName"
+			File="[DATADIR]\installer-info.xml"
+			Action="create"
+			Name="download_file"
+			ElementPath="download_file"
+			Node="value"
+			On="install"
+			Value="[OriginalDatabase]"/>
+      </Component>
+    </DirectoryRef>
+
+
+
+
     <!-- Install the files -->
     <Feature
 	Id="LauncherFiles"
@@ -199,23 +218,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	Title="Post Install Data"
 	Level="1"
 	Display="hidden">
-
-	  <!-- Save some notes about how this was installed. This is
-	   analogous to the postinstall script on other platforms. We
-	   set KeyPath to no, which means "don't use the directory as a
-	   key path" thus allowing automatic guid generation -->
-	  <Component Id="InstallerInfo" Guid="633da9f0-10ba-4ea3-b3d2-cb53997c2883" Directory="DATADIR">
-	    <CreateFolder/>
-	    <util:XmlConfig Id="InstallerInfoMSIName"
-			    File="installer-info.xml"
-			    Action="create"
-			    Name="download_file"
-			    ElementPath="download_file"
-			    Node="value"
-			    On="install"
-			    Value="[OriginalDatabase]"/>
-	  </Component>
-
+      <ComponentRef Id="InstallerInfo" />
     </Feature>
 
 
