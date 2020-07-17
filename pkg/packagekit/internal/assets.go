@@ -181,11 +181,30 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       </Directory>
       <Directory Id="CommonAppDataFolder">
 	<Directory Id="DATADIR" Name="Kolide">
+	</Directory>
+      </Directory>
+    </Directory>
+
+    <!-- Install the files -->
+    <Feature
+	Id="LauncherFiles"
+	Title="Launcher"
+	Level="1"
+	Display="hidden">
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+
+    <Feature
+	Id="PostInstallData"
+	Title="Post Install Data"
+	Level="1"
+	Display="hidden">
+
 	  <!-- Save some notes about how this was installed. This is
 	   analogous to the postinstall script on other platforms. We
 	   set KeyPath to no, which means "don't use the directory as a
 	   key path" thus allowing automatic guid generation -->
-	  <Component Id="InstallerInfo" Guid="*">
+	  <Component Id="InstallerInfo" Guid="633da9f0-10ba-4ea3-b3d2-cb53997c2883" Directory="DATADIR">
 	    <CreateFolder/>
 	    <util:XmlConfig Id="InstallerInfoMSIName"
 			    File="installer-info.xml"
@@ -197,18 +216,8 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 			    Value="[OriginalDatabase]"/>
 	  </Component>
 
-	</Directory>
-      </Directory>
-    </Directory>
-
-    <!-- Install the files -->
-    <Feature
-	Id="LauncherFiles"
-	Title="Launcher"
-	Level="1">
-      <ComponentGroupRef Id="AppFiles" />
-
     </Feature>
+
 
     <!-- The icon is used in the add/remove program dialog -->
     <Icon Id="icon.ico" SourceFile="kolide.ico"/>
