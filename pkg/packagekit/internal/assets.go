@@ -189,7 +189,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     <!-- Post install file. Via so much indirection -->
     <DirectoryRef Id="DATADIR">
       <Component Id="InstallerInfo" Guid="*">
-	<!-- <File Id="InstallerInfo" Source="installer-info.xml" KeyPath="yes" /> -->
+	<File Id="InstallerInfo" Source="installer-info.xml" KeyPath="yes" />
 	<util:XmlConfig Id="InstallerInfoMSIName"
 			File="[DATADIR]\installer-info.xml"
 			Action="create"
