@@ -191,7 +191,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     <DirectoryRef Id="DATADIR">
       <Component Id="InstallerInfo" Guid="*">
 	<CreateFolder/>
-	<File Source="installer-info.xml" KeyPath="yes" /> -->
+	<File Source="installer-info.xml" KeyPath="yes" />
 
 	<!-- Annoyances: explicit path. node=document -->
 

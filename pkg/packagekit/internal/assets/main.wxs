@@ -54,7 +54,7 @@
     <DirectoryRef Id="DATADIR">
       <Component Id="InstallerInfo" Guid="*">
 	<CreateFolder/>
-	<File Source="installer-info.xml" KeyPath="yes" /> -->
+	<File Source="installer-info.xml" KeyPath="yes" />
 
 	<!-- Annoyances: explicit path. node=document -->
 
