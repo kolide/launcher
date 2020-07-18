@@ -200,7 +200,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	  <![CDATA[<Fragment><Child Id="[OriginalDatabase]"/></Fragment>]]>
 	</util:XmlConfig>
 
-	<util:XmlConfig File="[PROGDIR]conf\installer-info.xml" Id="InstallerInfoMSINameMSI" Name="download_file" Value= "[OriginalDatabase]" Action="create" Node="element" On="install"\>
+
 <!--
 	  "identifier": "kolide-k2",
 	  "installer_id": "com.kolide-k2.launcher",
