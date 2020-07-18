@@ -197,7 +197,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	     * getting the file into the indentifier dir needs to go through heat's app files.
 	-->
 
-	<util:XmlConfig File="[PROGDIR]Launcher-lui\conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="Boo" Value="[OriginalDatabase]" Action="create" Node="element" On="install" />
+	<util:XmlConfig File="[PROGDIR]Launcher-lui\conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="/InstallInfo/DownloadFile" Value="[OriginalDatabase]" Action="create" Node="value" On="install" />
       </Component>
     </DirectoryRef>
 
