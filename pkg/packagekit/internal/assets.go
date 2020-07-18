@@ -187,13 +187,14 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 
 
     <!-- Post install file. Via so much indirection -->
+    <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
     <DirectoryRef Id="DATADIR">
       <Component Id="InstallerInfo" Guid="ef05675d-4bcd-465f-838e-f8486f7b1f74">
 	<CreateFolder/>
 	<!-- <File Id="InstallerInfo" KeyPath="yes" /> -->
 	<util:XmlConfig Id="InstallerInfoMSIName"
-			 <!-- Bummer this is so explicit -->
-			File="[PROGDIR]conf\installer-info.xml"
+			<!-- Bummer this is so explicit -->
+			File="[PROGDIR]installer-info.xml"
 			Action="create"
 			Name="download_file"
 			ElementPath="download_file"
@@ -201,7 +202,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 			Node="document"
 			On="install"
 			Value="[OriginalDatabase]"/>
-      </Component>
+		      </Component>
     </DirectoryRef>
 
 
