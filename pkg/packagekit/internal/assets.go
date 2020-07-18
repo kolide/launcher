@@ -196,7 +196,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	<!-- Annoyances: explicit path. node=document -->
 
 	<!-- create the file -->
-	<util:XmlConfig File="[PROGDIR]conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="/Root" Action="create" Node="document" On="install">
+	<util:XmlConfig File="[PROGDIR]installer-info.xml" Id="InstallerInfoMSIName" ElementPath="/Root" Action="create" Node="document" On="install">
 	  <![CDATA[<Fragment><Child Id="[OriginalDatabase]"/></Fragment>]]>
 	</util:XmlConfig>
 
