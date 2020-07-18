@@ -51,20 +51,18 @@
 
     <!-- Post install file. Via so much indirection -->
     <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
-    <Component Id="InstallerInfo" Guid="*">
-      <!-- Annoyances:
-	   * explicit path.
-	   * node=document, other file creation?
-	   * getting the file into the indentifier dir needs to go through heat's app files.
+    <DirectoryRef Id="DATADIR">
+      <Component Id="InstallerInfo" Guid="*">
+	<CreateFolder/>
+	<!-- Annoyances:
+	     * explicit path.
+	     * node=document, other file creation?
+	     * getting the file into the indentifier dir needs to go through heat's app files.
+	-->
 
-      -->
-
-      <util:XmlConfig File="[PROGDIR]Launcher-lui\conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="Boo" Value="[OriginalDatabase]" Action="create" Node="element" On="install" />
-    </Component>
-
-
-
-
+	<util:XmlConfig File="[PROGDIR]Launcher-lui\conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="Boo" Value="[OriginalDatabase]" Action="create" Node="element" On="install" />
+      </Component>
+    </DirectoryRef>
 
     <!-- Install the files -->
     <Feature
