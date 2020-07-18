@@ -230,15 +230,14 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
-    <!--
+
     <Feature
 	Id="PostInstallData"
 	Title="Post Install Data"
-	Level="1"
+	Level="0"
 	Display="hidden">
       <ComponentRef Id="InstallerInfo" />
     </Feature>
--->
 
     <!-- The icon is used in the add/remove program dialog -->
     <Icon Id="icon.ico" SourceFile="kolide.ico"/>
