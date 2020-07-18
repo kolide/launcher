@@ -193,7 +193,12 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	<CreateFolder/>
 	<File Source="installer-info.xml" KeyPath="yes" />
 
-	<!-- Annoyances: explicit path. node=document -->
+	<!-- Annoyances:
+	     * explicit path.
+	     * node=document, other file creation?
+	     * getting the file into the indentifier dir needs to go through heat's app files.
+
+	-->
 
 	<!-- create the file -->
 	<util:XmlConfig File="[PROGDIR]installer-info.xml" Id="InstallerInfoMSIName" ElementPath="/Root" Action="create" Node="document" On="install">
@@ -225,6 +230,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
+    <!--
     <Feature
 	Id="PostInstallData"
 	Title="Post Install Data"
@@ -232,7 +238,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	Display="hidden">
       <ComponentRef Id="InstallerInfo" />
     </Feature>
-
+-->
 
     <!-- The icon is used in the add/remove program dialog -->
     <Icon Id="icon.ico" SourceFile="kolide.ico"/>
