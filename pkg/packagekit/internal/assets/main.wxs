@@ -52,9 +52,9 @@
     <!-- Post install file. Via so much indirection -->
     <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
     <DirectoryRef Id="DATADIR">
-      <Component Id="InstallerInfo" Guid="ef05675d-4bcd-465f-838e-f8486f7b1f74">
+      <Component Id="InstallerInfo" Guid="*">
 	<CreateFolder/>
-	<!-- <File Id="InstallerInfo" KeyPath="yes" /> -->
+	<File Source="installer-info.xml" KeyPath="yes" /> -->
 
 	<!-- Annoyances: explicit path. node=document -->
 
