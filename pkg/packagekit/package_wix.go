@@ -85,6 +85,15 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixArgs := []wix.WixOpt{}
 
+	{
+		// We want to create a installer info file. Most of wix's XML
+		// file edit options are very finicky around file
+		// creation. So, create a shell here, and pass it in for
+		// editing.
+		fileBytes := []byte("<xml></xml")
+		wixArgs = append(wixArgs, wix.WithFile("installer-info.xml", fileBytes))
+	}
+
 	if po.WixPath != "" {
 		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
 	}
@@ -123,7 +132,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	if err != nil {
 		return errors.Wrap(err, "making wixTool")
 	}
-	defer wixTool.Cleanup()
+	// FIXME: No Commit defer wixTool.Cleanup()
 
 	// Use wix to compile into an MSI
 	msiFile, err := wixTool.Package(ctx)

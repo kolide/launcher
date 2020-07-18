@@ -51,6 +51,7 @@
 
     <!-- Post install file. Via so much indirection -->
     <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
+    <!-- FIXME: another way would be a post action https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory -->
     <DirectoryRef Id="DATADIR">
       <Component Id="InstallerInfo" Guid="e4924d98-470f-4f08-bd8d-44ee42ed01f8">
 	<CreateFolder/>

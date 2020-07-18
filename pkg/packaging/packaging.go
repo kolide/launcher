@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -271,6 +272,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if err := p.setupInit(ctx); err != nil {
 		return errors.Wrapf(err, "setup init script for %s", p.target.String())
+	}
+
+	if p.target.Platform == Windows {
+		// horrific windows hack for installer info
+		if err := p.windowsInstallerInfo(); err != nil {
+			return errors.Wrap(err, "windows installer info xml file")
+		}
 	}
 
 	if err := p.setupPostinst(ctx); err != nil {
@@ -577,6 +585,33 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *PackageOptions) windowsInstallerInfo() error {
+	var info = struct {
+		XMLName      struct{} `xml:"InstallerInfo"`
+		Identifier   string
+		DownloadFile string
+		Timestamp    string
+		Version      string
+		User         string
+	}{
+		Identifier: p.Identifier,
+		Version:    p.PackageVersion,
+	}
+
+	fmt.Println("seph: 545")
+
+	xmlBytes, err := xml.MarshalIndent(info, "", "    ")
+	if err != nil {
+		return errors.Wrap(err, "marshal windows installer info")
+	}
+
+	return ioutil.WriteFile(
+		filepath.Join(p.packageRoot, p.confDir, "installer-info.xml"),
+		xmlBytes,
+		0644,
+	)
 }
 
 func (p *PackageOptions) setupPostinst(ctx context.Context) error {
