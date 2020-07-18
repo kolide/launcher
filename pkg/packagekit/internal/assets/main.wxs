@@ -55,7 +55,7 @@
 	<CreateFolder/>
 	<!-- <File Id="InstallerInfo" KeyPath="yes" /> -->
 	<util:XmlConfig Id="InstallerInfoMSIName"
-			File="[DATADIR]installer-info.xml"
+			File="[PROGDIR]conf\installer-info.xml"
 			Action="create"
 			Name="download_file"
 			ElementPath="download_file"
