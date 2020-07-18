@@ -192,11 +192,11 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	<CreateFolder/>
 	<!-- <File Id="InstallerInfo" KeyPath="yes" /> -->
 	<util:XmlConfig Id="InstallerInfoMSIName"
-			File="[PROGDIR]conf\installer-info.xml"
+			File="[PROGDIR]conf\installer-info.xml" <!-- Bummer this is so explicit -->
 			Action="create"
 			Name="download_file"
 			ElementPath="download_file"
-			Node="value"
+			Node="document"
 			On="install"
 			Value="[OriginalDatabase]"/>
       </Component>
