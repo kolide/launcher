@@ -216,7 +216,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     <Feature
 	Id="PostInstallData"
 	Title="Post Install Data"
-	Level="0"
+	Level="1"
 	Display="hidden">
       <ComponentRef Id="InstallerInfo" />
     </Feature>
