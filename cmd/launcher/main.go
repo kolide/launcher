@@ -106,6 +106,7 @@ func isSubCommand() bool {
 		"svc",
 		"svc-fg",
 		"version",
+		"postinst",
 	}
 
 	for _, sc := range subCommands {
@@ -132,6 +133,8 @@ func runSubcommands() error {
 		run = runWindowsSvcForeground
 	case "version":
 		run = runVersion
+	case "postinst":
+		run = runPostinst
 	}
 	err := run(os.Args[2:])
 	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
