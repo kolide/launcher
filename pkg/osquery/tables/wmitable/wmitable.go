@@ -18,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+
 type Table struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
@@ -51,37 +53,24 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	classes := tablehelpers.GetConstraints(queryContext, "class")
-	for _, c := range classes {
-		if !onlyAllowedCharacters(c) {
-			return nil, errors.New("Disallowed character in class expression")
-		}
-	}
+	classes := tablehelpers.GetConstraints(queryContext, "class", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(classes) == 0 {
 		return nil, errors.New("The kolide_wmi table requires a wmi class")
 	}
 
-	properties := tablehelpers.GetConstraints(queryContext, "properties")
-	for _, p := range properties {
-		// Allow comma, since we're going to split on it later.
-		if !onlyAllowedCharacters(p, `,`) {
-			return nil, errors.New("Disallowed character in properties expression")
-		}
-	}
+	properties := tablehelpers.GetConstraints(queryContext, "properties", tablehelpers.WithAllowedCharacters(allowedCharacters+`,`))
 	if len(properties) == 0 {
 		return nil, errors.New("The kolide_wmi table requires wmi properties")
 	}
 
 	// Get the list of namespaces to query. If not specified, that's
 	// okay too, default to ""
-	namespaces := tablehelpers.GetConstraints(queryContext, "namespace", "")
-	for _, ns := range namespaces {
-		if !onlyAllowedCharacters(ns, `\`) {
-			return nil, errors.New("Disallowed character in namespace expression")
-		}
-	}
+	namespaces := tablehelpers.GetConstraints(queryContext, "namespace",
+		tablehelpers.WithDefaults(""),
+		tablehelpers.WithAllowedCharacters(allowedCharacters+`\`),
+	)
 
-	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", "")
+	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults(""))
 
 	for _, class := range classes {
 		for _, rawProperties := range properties {
