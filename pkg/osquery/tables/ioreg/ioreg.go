@@ -44,7 +44,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("value"),
 		table.TextColumn("query"),
 
-		// ioreg input options. These match the ioreg 
+		// ioreg input options. These match the ioreg
 		// command line. See the ioreg man page.
 		table.TextColumn("c"),
 		table.IntegerColumn("d"),
