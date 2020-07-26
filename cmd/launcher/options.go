@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/peterbourgon/ff"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/pkg/errors"
 )
 
