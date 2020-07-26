@@ -449,6 +449,12 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
 		}
+	case p.target.Platform == Linux && p.target.Init == UpstartAmazonAMI:
+		dir = "/etc/init"
+		file = fmt.Sprintf("launcher-%s.conf", p.Identifier)
+		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
+			return packagekit.RenderUpstart(ctx, w, io, packagekit.WithUpstartFlavor("amazon-ami"))
+		}
 	case p.target.Platform == Linux && p.target.Init == Init:
 		dir = "/etc/init.d"
 		file = fmt.Sprintf("%s-launcher", p.Identifier)
