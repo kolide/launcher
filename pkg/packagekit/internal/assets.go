@@ -5,7 +5,6 @@
 // internal/assets/main.wxs
 // internal/assets/msi_banner.bmp
 // internal/assets/msi_splash.bmp
-// internal/assets/upstart-amazon.sh
 // internal/assets/upstart.sh
 package internal
 
@@ -310,80 +309,33 @@ func internalAssetsMsi_splashBmp() (*asset, error) {
 	return a, nil
 }
 
-var _internalAssetsUpstartAmazonSh = []byte(`#!upstart
-#
-# Name: {{ .Common.Name }}
-description     "{{.Common.Description}}"
-author          "kolide.com"
-
-start on (runlevel [345] and started network)
-stop on (runlevel [!345] or stopping network)
-
-# Respawn upto 15 times within 5 seconds.
-# Exceeding that will be considered a failure
-respawn
-respawn limit 15 5
-
-# Environment Variables
-{{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
-env {{$key}}={{$value}}
-{{- end }}{{- end }}
-
-{{- if .Opts.PreStopScript }}
-pre-stop script
-{{StringsJoin .Opts.PreStopScript "\n"}}
-end script
-{{- end }}
-
-{{- if .Opts.PreStartScript }}
-pre-start script
-{{StringsJoin .Opts.PreStartScript "\n"}}
-end script
-{{- end }}
-
-{{- if .Opts.PostStartScript }}
-post-start script
-{{StringsJoin .Opts.PostStartScript "\n"}}
-end script
-{{- end }}
-`)
-
-func internalAssetsUpstartAmazonShBytes() ([]byte, error) {
-	return _internalAssetsUpstartAmazonSh, nil
-}
-
-func internalAssetsUpstartAmazonSh() (*asset, error) {
-	bytes, err := internalAssetsUpstartAmazonShBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "internal/assets/upstart-amazon.sh", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _internalAssetsUpstartSh = []byte(`#!upstart
 #
 # Name: {{ .Common.Name }}
-# Description: {{.Common.Description}}
+description     "{{.Common.Description}} for {{.Common.Identifier}}"
+author          "kolide.com"
 
 {{ if .Opts.Expect }}
 expect {{ .Opts.Expect }}
 {{- end }}
 
-# Start and stop on boot events
-start on net-device-up
-stop on shutdown
+{{ if .Opts.StartOn }}
+start on {{ .Opts.StartOn }}
+{{- end }}
+{{ if .Opts.StopOn }}
+stop on {{ .Opts.StopOn }}
+{{- end }}
 
 # Respawn upto 15 times within 5 seconds.
 # Exceeding that will be considered a failure
 respawn
 respawn limit 15 5
 
+{{ if .Opts.ConsoleLog }}
 # Send logs to the default upstart location, /var/log/upstart/
 # (This should be rotated by the upstart managed logrotate)
 console log
+{{- end }}
 
 # Environment Variables
 {{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
@@ -483,7 +435,6 @@ var _bindata = map[string]func() (*asset, error){
 	"internal/assets/main.wxs": internalAssetsMainWxs,
 	"internal/assets/msi_banner.bmp": internalAssetsMsi_bannerBmp,
 	"internal/assets/msi_splash.bmp": internalAssetsMsi_splashBmp,
-	"internal/assets/upstart-amazon.sh": internalAssetsUpstartAmazonSh,
 	"internal/assets/upstart.sh": internalAssetsUpstartSh,
 }
 
@@ -534,7 +485,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"main.wxs": &bintree{internalAssetsMainWxs, map[string]*bintree{}},
 			"msi_banner.bmp": &bintree{internalAssetsMsi_bannerBmp, map[string]*bintree{}},
 			"msi_splash.bmp": &bintree{internalAssetsMsi_splashBmp, map[string]*bintree{}},
-			"upstart-amazon.sh": &bintree{internalAssetsUpstartAmazonSh, map[string]*bintree{}},
 			"upstart.sh": &bintree{internalAssetsUpstartSh, map[string]*bintree{}},
 		}},
 	}},

@@ -19,6 +19,9 @@ type upstartOptions struct {
 	PreStopScript   []string
 	Expect          string
 	Flavor          string
+	StartOn         string
+	StopOn          string
+	ConsoleLog      bool
 }
 
 type UpstartOption func(*upstartOptions)
@@ -52,15 +55,19 @@ func WithPreStopScript(s []string) UpstartOption {
 func WithUpstartFlavor(s string) UpstartOption {
 	return func(uo *upstartOptions) {
 		uo.Flavor = s
-	}
-}
 
-func (uo *upstartOptions) TemplateName() string {
-	switch uo.Flavor {
-	case "amazon-ami":
-		return "internal/assets/upstart-amazon.sh"
-	default:
-		return "internal/assets/upstart.sh"
+		switch s {
+		case "amazon-ami":
+			uo.StartOn = "(runlevel [345] and started network)"
+			uo.StopOn = "(runlevel [!345] or stopping network)"
+			uo.ConsoleLog = false
+		default:
+			// Also includes "" and "ubuntu":
+			uo.StartOn = "net-device-up"
+			uo.StopOn = "shutdown"
+			uo.ConsoleLog = true
+		}
+
 	}
 }
 
@@ -78,10 +85,9 @@ func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, u
 		initOptions.Flags = append([]string{""}, initOptions.Flags...)
 	}
 
-	templateName := uOptions.TemplateName()
-	upstartTemplate, err := internal.Asset(templateName)
+	upstartTemplate, err := internal.Asset("internal/assets/upstart.sh")
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get template named %s", templateName)
+		return errors.Wrapf(err, "Failed to get template named %s", "internal/assets/upstart.sh")
 	}
 
 	var data = struct {

@@ -545,7 +545,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		postinstTemplateName = "internal/assets/postinstall-launchd.sh"
 	case p.target.Platform == Linux && p.target.Init == Systemd:
 		postinstTemplateName = "internal/assets/postinstall-systemd.sh"
-	case p.target.Platform == Linux && p.target.Init == Upstart:
+	case p.target.Platform == Linux && (p.target.Init == Upstart || p.target.Init == UpstartAmazonAMI):
 		postinstTemplateName = "internal/assets/postinstall-upstart.sh"
 	case p.target.Platform == Linux && p.target.Init == Init:
 		postinstTemplateName = "internal/assets/postinstall-init.sh"
