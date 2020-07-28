@@ -342,7 +342,9 @@ console log
 env {{$key}}={{$value}}
 {{- end }}{{- end }}
 
-exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
+script
+  exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
+  end script
 
 {{- if .Opts.PreStopScript }}
 pre-stop script

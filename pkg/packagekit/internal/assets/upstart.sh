@@ -31,7 +31,12 @@ console log
 env {{$key}}={{$value}}
 {{- end }}{{- end }}
 
-exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
+script
+  {{ if .Opts.ExecLog }}
+  exec >>{{ .Opts.ExecLog }} 2>&1
+  {{- end }}
+  exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
+end script
 
 {{- if .Opts.PreStopScript }}
 pre-stop script
