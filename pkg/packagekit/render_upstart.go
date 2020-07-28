@@ -14,8 +14,8 @@ import (
 // upstartOptions contains upstart specific options that are passed to
 // the rendering template.
 type upstartOptions struct {
-	ConsoleLog      bool   // whether to include the console log directive (upstart 1.4)
-	ExecLog         string // use exec to force logging to somewhere
+	ConsoleLog      bool // whether to include the console log directive (upstart 1.4)
+	ExecLog         bool // use exec to force logging to somewhere reasonable
 	Expect          string
 	Flavor          string
 	PostStartScript []string
@@ -62,12 +62,13 @@ func WithUpstartFlavor(s string) UpstartOption {
 			uo.StartOn = "(runlevel [345] and started network)"
 			uo.StopOn = "(runlevel [!345] or stopping network)"
 			uo.ConsoleLog = false
-			uo.ExecLog = "/dev/kmsg"
+			uo.ExecLog = true
 		default:
 			// Also includes "" and "ubuntu":
 			uo.StartOn = "net-device-up"
 			uo.StopOn = "shutdown"
 			uo.ConsoleLog = true
+			uo.ExecLog = false
 		}
 
 	}

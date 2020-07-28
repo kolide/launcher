@@ -26,16 +26,17 @@ respawn limit 15 5
 console log
 {{- end }}
 
-# Environment Variables
 {{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
+# Environment Variables
 env {{$key}}={{$value}}
 {{- end }}{{- end }}
 
 script
-  {{ if .Opts.ExecLog }}
-  exec >>{{ .Opts.ExecLog }} 2>&1
-  {{- end }}
-  exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
+{{- if .Opts.ExecLog }}
+  mkdir -p /var/log/{{.Common.Identifier}}
+  exec > /var/log/{{.Common.Identifier}}/launcher.stdout.log 2> /var/log/{{.Common.Identifier}}/launcher.stderr.log
+{{- end }}
+  exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n    " }}
 end script
 
 {{- if .Opts.PreStopScript }}

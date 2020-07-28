@@ -244,6 +244,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		}
 	}
 
+	// amazon linux ami uses an upstart so old, it doesn't have
+	// integrated logging. So we'll need a logrotate config.
+	if p.target.Init == UpstartAmazonAMI {
+		if err := p.renderLogrotateConfig(ctx); err != nil {
+			return errors.Wrap(err, "render")
+		}
+	}
+
 	// The version string is the version of _launcher_ which we don't
 	// know until we've downloaded it.
 	if p.PackageVersion == "" {
@@ -403,6 +411,44 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 		return errors.Wrap(err, "not able to parse newsyslog template")
 	}
 	if err := tmpl.ExecuteTemplate(newSyslogFile, "syslog", logOptions); err != nil {
+		return errors.Wrap(err, "execute template")
+	}
+	return nil
+}
+
+func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
+	logDir := fmt.Sprintf("/var/log/%s", p.Identifier)
+	logrotateDirectory := filepath.Join("/etc", "logrotate.d")
+
+	if err := os.MkdirAll(filepath.Join(p.packageRoot, logrotateDirectory), fs.DirMode); err != nil {
+		return errors.Wrap(err, "making logrotate.d dir")
+	}
+
+	logrotatePath := filepath.Join(p.packageRoot, logrotateDirectory, fmt.Sprintf("%s", p.Identifier))
+	logrotateFile, err := os.Create(logrotatePath)
+	if err != nil {
+		return errors.Wrap(err, "creating logrotate conf file")
+	}
+	defer logrotateFile.Close()
+
+	logOptions := struct {
+		LogPath string
+		PidPath string
+	}{
+		LogPath: filepath.Join(logDir, "*.log"),
+		PidPath: filepath.Join(p.rootDir, "launcher.pid"),
+	}
+
+	logrotateTemplate, err := internal.Asset("internal/assets/logrotate.conf")
+	if err != nil {
+		return errors.Wrapf(err, "failed to get template named %s", "internal/assets/logrotate.conf")
+	}
+
+	tmpl, err := template.New("logrotate").Parse(string(logrotateTemplate))
+	if err != nil {
+		return errors.Wrap(err, "not able to parse logrotate template")
+	}
+	if err := tmpl.ExecuteTemplate(logrotateFile, "logrotate", logOptions); err != nil {
 		return errors.Wrap(err, "execute template")
 	}
 	return nil
