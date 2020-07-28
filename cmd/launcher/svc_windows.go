@@ -64,7 +64,14 @@ func runWindowsSvc(args []string) error {
 
 	run := svc.Run
 
-	return run(serviceName, &winSvc{logger: logger, opts: opts})
+	if err := run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
+		// TODO The caller doesn't have the event log configured, so we
+		// need to log here. this implies we need some deeper refactoring
+		// of the logging
+		level.Info(logger).Log("msg", "svc run", "err", err)
+		return err
+	}
+	return nil
 }
 
 func runWindowsSvcForeground(args []string) error {
