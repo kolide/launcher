@@ -31,6 +31,7 @@ require (
 	github.com/go-kit/kit v0.8.0
 	github.com/go-ole/go-ole v1.2.4
 	github.com/gogo/protobuf v1.2.1
+	github.com/golang/mock v1.4.4 // indirect
 	github.com/golang/protobuf v1.4.2
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/uuid v1.1.1
