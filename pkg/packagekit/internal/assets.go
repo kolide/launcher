@@ -5,6 +5,7 @@
 // internal/assets/main.wxs
 // internal/assets/msi_banner.bmp
 // internal/assets/msi_splash.bmp
+// internal/assets/upstart.sh
 package internal
 
 import (
@@ -308,6 +309,81 @@ func internalAssetsMsi_splashBmp() (*asset, error) {
 	return a, nil
 }
 
+var _internalAssetsUpstartSh = []byte(`#!upstart
+#
+# Name: {{ .Common.Name }}
+description     "{{.Common.Description}} for {{.Common.Identifier}}"
+author          "kolide.com"
+
+{{ if .Opts.Expect }}
+expect {{ .Opts.Expect }}
+{{- end }}
+
+{{ if .Opts.StartOn }}
+start on {{ .Opts.StartOn }}
+{{- end }}
+{{ if .Opts.StopOn }}
+stop on {{ .Opts.StopOn }}
+{{- end }}
+
+# Respawn upto 15 times within 5 seconds.
+# Exceeding that will be considered a failure
+respawn
+respawn limit 15 5
+
+{{ if .Opts.ConsoleLog }}
+# Send logs to the default upstart location, /var/log/upstart/
+# (This should be rotated by the upstart managed logrotate)
+console log
+{{- end }}
+
+{{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
+# Environment Variables
+env {{$key}}={{$value}}
+{{- end }}{{- end }}
+
+script
+{{- if .Opts.ExecLog }}
+  mkdir -p /var/log/{{.Common.Identifier}}
+  exec > /var/log/{{.Common.Identifier}}/launcher.stdout.log 2> /var/log/{{.Common.Identifier}}/launcher.stderr.log
+{{- end }}
+  exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n    " }}
+end script
+
+{{- if .Opts.PreStopScript }}
+pre-stop script
+{{StringsJoin .Opts.PreStopScript "\n"}}
+end script
+{{- end }}
+
+{{- if .Opts.PreStartScript }}
+pre-start script
+{{StringsJoin .Opts.PreStartScript "\n"}}
+end script
+{{- end }}
+
+{{- if .Opts.PostStartScript }}
+post-start script
+{{StringsJoin .Opts.PostStartScript "\n"}}
+end script
+{{- end }}
+`)
+
+func internalAssetsUpstartShBytes() ([]byte, error) {
+	return _internalAssetsUpstartSh, nil
+}
+
+func internalAssetsUpstartSh() (*asset, error) {
+	bytes, err := internalAssetsUpstartShBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "internal/assets/upstart.sh", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -365,6 +441,7 @@ var _bindata = map[string]func() (*asset, error){
 	"internal/assets/main.wxs": internalAssetsMainWxs,
 	"internal/assets/msi_banner.bmp": internalAssetsMsi_bannerBmp,
 	"internal/assets/msi_splash.bmp": internalAssetsMsi_splashBmp,
+	"internal/assets/upstart.sh": internalAssetsUpstartSh,
 }
 
 // AssetDir returns the file names below a certain
@@ -414,6 +491,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"main.wxs": &bintree{internalAssetsMainWxs, map[string]*bintree{}},
 			"msi_banner.bmp": &bintree{internalAssetsMsi_bannerBmp, map[string]*bintree{}},
 			"msi_splash.bmp": &bintree{internalAssetsMsi_splashBmp, map[string]*bintree{}},
+			"upstart.sh": &bintree{internalAssetsUpstartSh, map[string]*bintree{}},
 		}},
 	}},
 }}

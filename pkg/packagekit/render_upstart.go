@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -13,10 +14,15 @@ import (
 // upstartOptions contains upstart specific options that are passed to
 // the rendering template.
 type upstartOptions struct {
-	PreStartScript  []string
-	PostStartScript []string
-	PreStopScript   []string
+	ConsoleLog      bool // whether to include the console log directive (upstart 1.4)
+	ExecLog         bool // use exec to force logging to somewhere reasonable
 	Expect          string
+	Flavor          string
+	PostStartScript []string
+	PreStartScript  []string
+	PreStopScript   []string
+	StartOn         string
+	StopOn          string
 }
 
 type UpstartOption func(*upstartOptions)
@@ -47,6 +53,27 @@ func WithPreStopScript(s []string) UpstartOption {
 	}
 }
 
+func WithUpstartFlavor(s string) UpstartOption {
+	return func(uo *upstartOptions) {
+		uo.Flavor = s
+
+		switch s {
+		case "amazon-ami":
+			uo.StartOn = "(runlevel [345] and started network)"
+			uo.StopOn = "(runlevel [!345] or stopping network)"
+			uo.ConsoleLog = false
+			uo.ExecLog = true
+		default:
+			// Also includes "" and "ubuntu":
+			uo.StartOn = "net-device-up"
+			uo.StopOn = "shutdown"
+			uo.ConsoleLog = true
+			uo.ExecLog = false
+		}
+
+	}
+}
+
 func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, uOpts ...UpstartOption) error {
 	_, span := trace.StartSpan(ctx, "packagekit.Upstart")
 	defer span.End()
@@ -61,52 +88,10 @@ func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, u
 		initOptions.Flags = append([]string{""}, initOptions.Flags...)
 	}
 
-	upstartTemplate := `#!upstart
-#
-# Name: {{ .Common.Name }}
-# Description: {{.Common.Description}}
-
-{{ if .Opts.Expect }}
-expect {{ .Opts.Expect }}
-{{- end }}
-
-# Start and stop on boot events
-start on net-device-up
-stop on shutdown
-
-# Respawn upto 15 times within 5 seconds.
-# Exceeding that will be considered a failure
-respawn
-respawn limit 15 5
-
-# Send logs to the default upstart location, /var/log/upstart/
-# (This should be rotated by the upstart managed logrotate)
-console log
-
-# Environment Variables
-{{- if .Common.Environment}}{{- range $key, $value := .Common.Environment }}
-env {{$key}}={{$value}}
-{{- end }}{{- end }}
-
-exec {{.Common.Path}}{{ StringsJoin .Common.Flags " \\\n  " }}
-
-{{- if .Opts.PreStopScript }}
-pre-stop script
-{{StringsJoin .Opts.PreStopScript "\n"}}
-end script
-{{- end }}
-
-{{- if .Opts.PreStartScript }}
-pre-start script
-{{StringsJoin .Opts.PreStartScript "\n"}}
-end script
-{{- end }}
-
-{{- if .Opts.PostStartScript }}
-post-start script
-{{StringsJoin .Opts.PostStartScript "\n"}}
-end script
-{{- end }}`
+	upstartTemplate, err := internal.Asset("internal/assets/upstart.sh")
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get template named %s", "internal/assets/upstart.sh")
+	}
 
 	var data = struct {
 		Common InitOptions
@@ -120,7 +105,7 @@ end script
 		"StringsJoin": strings.Join,
 	}
 
-	t, err := template.New("UpstartConf").Funcs(funcsMap).Parse(upstartTemplate)
+	t, err := template.New("UpstartConf").Funcs(funcsMap).Parse(string(upstartTemplate))
 	if err != nil {
 		return errors.Wrap(err, "not able to parse Upstart template")
 	}

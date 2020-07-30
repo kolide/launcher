@@ -18,15 +18,16 @@ type Target struct {
 type InitFlavor string
 
 const (
-	LaunchD        InitFlavor = "launchd"
-	Systemd                   = "systemd"
-	Init                      = "init"
-	Upstart                   = "upstart"
-	WindowsService            = "service"
-	NoInit                    = "none"
+	LaunchD          InitFlavor = "launchd"
+	Systemd                     = "systemd"
+	Init                        = "init"
+	Upstart                     = "upstart"
+	WindowsService              = "service"
+	NoInit                      = "none"
+	UpstartAmazonAMI            = "upstart_amazon_ami"
 )
 
-var knownInitFlavors = [...]InitFlavor{LaunchD, Systemd, Init, Upstart, WindowsService, NoInit}
+var knownInitFlavors = [...]InitFlavor{LaunchD, Systemd, Init, Upstart, WindowsService, NoInit, UpstartAmazonAMI}
 
 type PlatformFlavor string
 

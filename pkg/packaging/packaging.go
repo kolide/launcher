@@ -244,6 +244,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		}
 	}
 
+	// amazon linux ami uses an upstart so old, it doesn't have
+	// integrated logging. So we'll need a logrotate config.
+	if p.target.Init == UpstartAmazonAMI {
+		if err := p.renderLogrotateConfig(ctx); err != nil {
+			return errors.Wrap(err, "render")
+		}
+	}
+
 	// The version string is the version of _launcher_ which we don't
 	// know until we've downloaded it.
 	if p.PackageVersion == "" {
@@ -408,6 +416,44 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	return nil
 }
 
+func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
+	logDir := fmt.Sprintf("/var/log/%s", p.Identifier)
+	logrotateDirectory := filepath.Join("/etc", "logrotate.d")
+
+	if err := os.MkdirAll(filepath.Join(p.packageRoot, logrotateDirectory), fs.DirMode); err != nil {
+		return errors.Wrap(err, "making logrotate.d dir")
+	}
+
+	logrotatePath := filepath.Join(p.packageRoot, logrotateDirectory, fmt.Sprintf("%s", p.Identifier))
+	logrotateFile, err := os.Create(logrotatePath)
+	if err != nil {
+		return errors.Wrap(err, "creating logrotate conf file")
+	}
+	defer logrotateFile.Close()
+
+	logOptions := struct {
+		LogPath string
+		PidPath string
+	}{
+		LogPath: filepath.Join(logDir, "*.log"),
+		PidPath: filepath.Join(p.rootDir, "launcher.pid"),
+	}
+
+	logrotateTemplate, err := internal.Asset("internal/assets/logrotate.conf")
+	if err != nil {
+		return errors.Wrapf(err, "failed to get template named %s", "internal/assets/logrotate.conf")
+	}
+
+	tmpl, err := template.New("logrotate").Parse(string(logrotateTemplate))
+	if err != nil {
+		return errors.Wrap(err, "not able to parse logrotate template")
+	}
+	if err := tmpl.ExecuteTemplate(logrotateFile, "logrotate", logOptions); err != nil {
+		return errors.Wrap(err, "execute template")
+	}
+	return nil
+}
+
 // setupInit setups the init scripts.
 //
 // Note that windows is a special
@@ -448,6 +494,12 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		file = fmt.Sprintf("launcher-%s.conf", p.Identifier)
 		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
 			return packagekit.RenderUpstart(ctx, w, io)
+		}
+	case p.target.Platform == Linux && p.target.Init == UpstartAmazonAMI:
+		dir = "/etc/init"
+		file = fmt.Sprintf("launcher-%s.conf", p.Identifier)
+		renderFunc = func(ctx context.Context, w io.Writer, io *packagekit.InitOptions) error {
+			return packagekit.RenderUpstart(ctx, w, io, packagekit.WithUpstartFlavor("amazon-ami"))
 		}
 	case p.target.Platform == Linux && p.target.Init == Init:
 		dir = "/etc/init.d"
@@ -539,7 +591,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		postinstTemplateName = "internal/assets/postinstall-launchd.sh"
 	case p.target.Platform == Linux && p.target.Init == Systemd:
 		postinstTemplateName = "internal/assets/postinstall-systemd.sh"
-	case p.target.Platform == Linux && p.target.Init == Upstart:
+	case p.target.Platform == Linux && (p.target.Init == Upstart || p.target.Init == UpstartAmazonAMI):
 		postinstTemplateName = "internal/assets/postinstall-upstart.sh"
 	case p.target.Platform == Linux && p.target.Init == Init:
 		postinstTemplateName = "internal/assets/postinstall-init.sh"

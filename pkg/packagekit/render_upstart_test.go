@@ -90,20 +90,38 @@ func TestRenderUpstartOptions(t *testing.T) {
 				"expect fork",
 			},
 		},
+		{
+			uOpts: []UpstartOption{WithUpstartFlavor("")},
+			expectedStrings: []string{
+				"console log",
+				"start on net-device-up",
+			},
+		},
+		{
+			uOpts: []UpstartOption{WithUpstartFlavor("amazon-ami")},
+			expectedStrings: []string{
+				"started network",
+			},
+			unexpectedStrings: []string{
+				"console log",
+			},
+		},
 	}
 
 	for _, tt := range tests {
-		var output bytes.Buffer
-		err := RenderUpstart(context.TODO(), &output, emptyInitOptions(), tt.uOpts...)
-		require.NoError(t, err)
-		require.True(t, len(output.String()) > 100)
+		t.Run("", func(t *testing.T) {
+			var output bytes.Buffer
+			err := RenderUpstart(context.TODO(), &output, emptyInitOptions(), tt.uOpts...)
+			require.NoError(t, err)
+			require.True(t, len(output.String()) > 100)
 
-		for _, s := range tt.expectedStrings {
-			require.Contains(t, output.String(), s)
-		}
+			for _, s := range tt.expectedStrings {
+				require.Contains(t, output.String(), s)
+			}
 
-		for _, s := range tt.unexpectedStrings {
-			require.NotContains(t, output.String(), s)
-		}
+			for _, s := range tt.unexpectedStrings {
+				require.NotContains(t, output.String(), s)
+			}
+		})
 	}
 }
