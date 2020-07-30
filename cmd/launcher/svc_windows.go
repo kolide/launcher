@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -33,7 +34,10 @@ func runWindowsSvc(args []string) error {
 	defer eventLogWriter.Close()
 
 	logger := eventlog.New(eventLogWriter)
-	level.Debug(logger).Log("msg", "service start requested")
+	level.Debug(logger).Log(
+		"msg", "service start requested",
+		"version", version.Version().Version,
+	)
 
 	opts, err := parseOptions(os.Args[2:])
 	if err != nil {
@@ -63,6 +67,11 @@ func runWindowsSvc(args []string) error {
 	}()
 
 	run := svc.Run
+
+	level.Info(logger).Log(
+		"msg", "launching service",
+		"version", version.Version().Version,
+	)
 
 	if err := run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
 		// TODO The caller doesn't have the event log configured, so we
