@@ -186,20 +186,20 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     </Directory>
 
 
-    <!-- Post install file. Via so much indirection -->
-    <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
-    <DirectoryRef Id="DATADIR">
-      <Component Id="InstallerInfo" Guid="e4924d98-470f-4f08-bd8d-44ee42ed01f8">
-	<CreateFolder/>
-	<!-- Annoyances:
-	     * explicit path.
-	     * node=document, other file creation?
-	     * getting the file into the indentifier dir needs to go through heat's app files.
-	-->
+    <!-- Run launcher in post-install mode
 
-	<util:XmlConfig File="[PROGDIR]Launcher-lui\conf\installer-info.xml" Id="InstallerInfoMSIName" ElementPath="/InstallInfo/DownloadFile" Value="[OriginalDatabase]" Action="create" Node="value" On="install" />
-      </Component>
-    </DirectoryRef>
+	 This _primarily_ creates the installer-info.json file, but
+	 also provides a hook for various host and service cleanup
+	 tasks.
+
+	 In theory, wix ought have been able to create a
+	 installer-info.xml, but I couldn't get that work.
+
+	 Some docs for creating custom actions:
+	 https://wixtoolset.org/documentation/manual/v3/howtos/ui_and_localization/run_program_after_install.html
+	 https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory
+
+    -->
 
     <!-- Install the files -->
     <Feature
@@ -353,7 +353,7 @@ start on {{ .Opts.StartOn }}
 stop on {{ .Opts.StopOn }}
 {{- end }}
 
-# Respawn upto 15 times within 5 seconds.
+# Respawn up to 15 times within 5 seconds.
 # Exceeding that will be considered a failure
 respawn
 respawn limit 15 5
