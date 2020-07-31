@@ -85,6 +85,10 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixArgs := []wix.WixOpt{}
 
+	if po.WixSkipCleanup {
+		wixArgs = append(wixArgs, wix.SkipCleanup())
+	}
+
 	if po.WixPath != "" {
 		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
 	}
