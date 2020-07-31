@@ -55,6 +55,7 @@ type PackageOptions struct {
 	NotaryPrefix      string
 	WixPath           string
 	MSIUI             bool
+	WixSkipCleanup    bool
 
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
@@ -301,6 +302,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		FlagFile:            p.canonicalizePath(flagFilePath),
 		WixPath:             p.WixPath,
 		WixUI:               p.MSIUI,
+		WixSkipCleanup:      p.WixSkipCleanup,
 	}
 
 	if err := p.makePackage(ctx); err != nil {
@@ -599,8 +601,6 @@ func (p *PackageOptions) windowsInstallerInfo() error {
 		Identifier: p.Identifier,
 		Version:    p.PackageVersion,
 	}
-
-	fmt.Println("seph: 545")
 
 	xmlBytes, err := xml.MarshalIndent(info, "", "    ")
 	if err != nil {

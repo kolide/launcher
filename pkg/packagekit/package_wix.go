@@ -94,6 +94,10 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		wixArgs = append(wixArgs, wix.WithFile("installer-info.xml", fileBytes))
 	}
 
+	if po.WixSkipCleanup {
+		wixArgs = append(wixArgs, wix.SkipCleanup())
+	}
+
 	if po.WixPath != "" {
 		wixArgs = append(wixArgs, wix.WithWix(po.WixPath))
 	}
@@ -132,7 +136,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	if err != nil {
 		return errors.Wrap(err, "making wixTool")
 	}
-	// FIXME: No Commit defer wixTool.Cleanup()
+	defer wixTool.Cleanup()
 
 	// Use wix to compile into an MSI
 	msiFile, err := wixTool.Package(ctx)

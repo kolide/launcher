@@ -24,6 +24,7 @@ type wixTool struct {
 	services       []*Service // array of services.
 	dockerImage    string     // If in docker, what image?
 	skipValidation bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
+	skipCleanup    bool       // Skip cleaning temp dirs. Useful when debugging wix generation
 	cleanDirs      []string   // directories to rm on cleanup
 	ui             bool       // whether or not to include a ui
 	extraFiles     []extraFile
@@ -96,6 +97,12 @@ func WithFile(name string, content []byte) WixOpt {
 	}
 }
 
+func SkipCleanup() WixOpt {
+	return func(wo *wixTool) {
+		wo.skipCleanup = true
+	}
+}
+
 // New takes a packageRoot of files, and a wxsContent of xml wix
 // configuration, and will return a struct with methods for building
 // packages with.
@@ -154,6 +161,10 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 
 // Cleanup removes temp directories. Meant to be called in a defer.
 func (wo *wixTool) Cleanup() {
+	if wo.skipCleanup {
+		return
+	}
+
 	for _, d := range wo.cleanDirs {
 		os.RemoveAll(d)
 	}
