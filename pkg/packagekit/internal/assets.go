@@ -196,10 +196,58 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	 installer-info.xml, but I couldn't get that work.
 
 	 Some docs for creating custom actions:
+	 https://wixtoolset.org/documentation/manual/v3/xsd/wix/customaction.html
 	 https://wixtoolset.org/documentation/manual/v3/howtos/ui_and_localization/run_program_after_install.html
+	 https://stackoverflow.com/questions/6044069/how-to-execute-wix-custom-action-after-installation
 	 https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory
 
+	 TODO read https://wixtoolset.org/documentation/manual/v3/customactions/qtexec.html
     -->
+
+    <CustomAction Id="EXECUTE_AFTER_FINALIZE"
+		  Execute="immediate"
+		  Return="check"
+		  Impersonate="no"
+		  Directory="TARGETDIR"
+		  ExeCommand="C:\Program Files\Kolide\Launcher-launcher\bin\launcher.exe postinst --installer_path [OriginalDatabase] --target C:\Users\seph\x.json" />
+
+    <InstallExecuteSequence>
+      <Custom Action="EXECUTE_AFTER_FINALIZE" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+
+
+    <!-- Post install file. Via so much indirection -->
+    <!-- http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Possibility-to-create-new-xml-file-during-install-td709942.html -->
+    <!-- FIXME: another way would be a post action https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory -->
+       <!-- Annoyances:
+	    * explicit path.
+	    * node=document, other file creation?
+	    * getting the file into the identifier dir needs to go through heat's app files.
+       -->
+
+       <!--
+       <DirectoryRef Id="DATADIR">
+	 <Component Id="InstallerInfo" Guid="*">
+	   <?define XmlFilePath="/Users/seph/test.xml"?>
+
+	   <File Id="InstallerInfo"  Source="$(var.BuildDir)\installer-info.xml" KeyPath="yes" />
+
+	   <util:XmlConfig On="install" Action="create" Id="CreateSnippetDir" Node="document" File="[#InstallerInfo]" ElementPath="//SnippetCollection//Language"
+			   xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+	     <![CDATA[<SnippetDir><OnOff>Off</OnOff></SnippetDir>]]>
+	   </util:XmlConfig>
+	 </Component>
+       </DirectoryRef>
+       -->
+
+	 <!--
+	   <util:XmlConfig Id="elem1" Action="create" ElementPath="cars/motos" File="$(var.XmlFilePath)" Node="element" On="install" Name="moto">
+	     <util:XmlConfig Id="elem11" ElementId="elem1" Name="name" Value="yamaha" File="$(var.XmlFilePath)" />
+	     <util:XmlConfig Id="elem12" ElementId="elem1" Name="type" Value="chopper" File="$(var.XmlFilePath)" />
+	   </util:XmlConfig>
+	 -->
+
+
 
     <!-- Install the files -->
     <Feature
@@ -210,6 +258,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
+    <!--
 
     <Feature
 	Id="PostInstallData"
@@ -218,6 +267,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	Display="hidden">
       <ComponentRef Id="InstallerInfo" />
     </Feature>
+    -->
 
     <!-- The icon is used in the add/remove program dialog -->
     <Icon Id="icon.ico" SourceFile="kolide.ico"/>
