@@ -85,15 +85,6 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixArgs := []wix.WixOpt{}
 
-	{
-		// We want to create a installer info file. Most of wix's XML
-		// file edit options are very finicky around file
-		// creation. So, create a shell here, and pass it in for
-		// editing.
-		fileBytes := []byte("<xml></xml")
-		wixArgs = append(wixArgs, wix.WithFile("installer-info.xml", fileBytes))
-	}
-
 	if po.WixSkipCleanup {
 		wixArgs = append(wixArgs, wix.SkipCleanup())
 	}
