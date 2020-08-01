@@ -64,7 +64,9 @@
 	 https://stackoverflow.com/questions/6044069/how-to-execute-wix-custom-action-after-installation
 	 https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory
 
-	 TODO read https://wixtoolset.org/documentation/manual/v3/customactions/qtexec.html
+	 TODO:
+	   * read https://wixtoolset.org/documentation/manual/v3/customactions/qtexec.html
+	   * Does this work in silent mode?
     -->
 
     <CustomAction Id="EXECUTE_AFTER_FINALIZE"
