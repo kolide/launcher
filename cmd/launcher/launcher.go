@@ -28,9 +28,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// defaultOsquerydPath is the default path to the bundled osqueryd binary
-const defaultOsquerydPath = "/usr/local/kolide/bin/osqueryd"
-
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
