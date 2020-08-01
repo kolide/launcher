@@ -60,8 +60,8 @@ func runPostinst(args []string) error {
 
 	// If identifier is unset, autodetect from the config path. We do
 	// this by traversing elements upwards until we get something that
-	// looks reasonable.
-	if *flIdentifier == "" {
+	// looks reasonable. This is not very reliable.
+	if *flIdentifier == "" && *flConfig != "" {
 		// never iterate more than 20 times
 		for i := 0; i < 20; i++ {
 			*flIdentifier = filepath.Base(filepath.Dir(*flConfig))
