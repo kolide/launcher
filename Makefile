@@ -128,7 +128,7 @@ deps: deps-go generate
 
 .PHONY: generate
 generate:
-	go generate ./pkg/packagekit ./pkg/packaging
+	go generate ./pkg/packagekit/... ./pkg/packaging/...
 	go run cmd/make/make.go -targets=generate-tuf
 
 .PHONY: proto
