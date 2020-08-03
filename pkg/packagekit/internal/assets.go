@@ -351,7 +351,7 @@ start on {{ .Opts.StartOn }}
 stop on {{ .Opts.StopOn }}
 {{- end }}
 
-# Respawn upto 15 times within 5 seconds.
+# Respawn up to 15 times within 5 seconds.
 # Exceeding that will be considered a failure
 respawn
 respawn limit 15 5
