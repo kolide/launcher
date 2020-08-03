@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Fragment>
+        <DirectoryRef Id="PROGDIR">
+            <Directory Id="dirA3A6C6BFB7F9B802231F19CD6BA08D14" Name="Launcher-launcher">
+                <Directory Id="dir267476B291CA4136F063CF1667280891" Name="bin">
+                    <Component Id="cmp63BE9DE02D7F287E5375DC8A97082BA1" Guid="1207359E-7DB7-415F-86D7-0CCABE40D4B2">
+                        <File Id="filAB00B78AE8FCAB877E80B80D648EE3ED" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\bin\launcher.exe" />
+                    <ServiceInstall Account="[SERVICEACCOUNT]" Arguments="svc -config &#34;C:\Program Files\Kolide\Launcher-launcher\conf\launcher.flags&#34;" Description="The Kolide Launcher (launcher)" ErrorControl="normal" Id="LauncherLauncherSvc" Name="LauncherLauncherSvc" Start="auto" Type="ownProcess" Vital="yes">
+                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
+                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/2006/wi" DelayedAutoStart="yes" OnInstall="yes" OnReinstall="yes"></ServiceConfig>
+                    </ServiceInstall>
+                    <ServiceControl Name="LauncherLauncherSvc" Id="LauncherLauncherSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>
+                    </Component>
+                    <Component Id="cmp6205DC9F26BBF66F417269A9FFCEF619" Guid="03DFB79A-7EFB-46E0-8091-5965E456818E">
+                        <File Id="fil18922CBCEA791408C8FC27189729677C" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\bin\osquery-extension.exe" />
+                    </Component>
+                    <Component Id="cmp838E227FF799096AA7FCEFBF35D25C07" Guid="1F9D4DE0-63DD-45EA-8819-E756DAB29617">
+                        <File Id="filBDF75C1B11BE37E33D4035C843B3E147" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\bin\osqueryd.exe" />
+                    </Component>
+                </Directory>
+                <Directory Id="dir5C078A3FAD43B7DA086990E01D9D3905" Name="conf">
+                    <Component Id="cmp72E16C193649FF23A808CA876BD8678D" Guid="60BC8B34-239F-45E9-9F3E-8C49218A7426">
+                        <File Id="fil8D6965454EC90BBC3A3426D0D49FEC53" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\conf\installer-info.xml" />
+                    </Component>
+                    <Component Id="cmpFF05A58A3ABD7BCFCD2BDB4119ADDFA2" Guid="43E5C5C2-8EF3-414D-9DF8-40CE751BC630">
+                        <File Id="fil2D6AA082EFCB559A36C9A1939CD0F5A6" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\conf\launcher.flags" />
+                    </Component>
+                    <Component Id="cmp1B3E66E9BFA4F82E5FC38E16029105B1" Guid="DA7A85EA-2BDF-4B83-ABE5-328CB0E9D0B2">
+                        <File Id="fil65D833A357F62546DF7DC5CD82053062" KeyPath="yes" Source="$(var.SourceDir)\Launcher-launcher\conf\secret" />
+                    </Component>
+                </Directory>
+                <Directory Id="dir98055C82D97688C29A34F8821905771F" Name="data">
+                    <Component Id="cmp504A0B697A863ECA3C69F3A23EC6B8DC" Guid="94F6DC05-9900-41BD-B72F-565D67D55FB2" KeyPath="yes">
+                        <CreateFolder />
+                    </Component>
+                </Directory>
+            </Directory>
+        </DirectoryRef>
+    </Fragment>
+    <Fragment>
+        <ComponentGroup Id="AppFiles">
+            <ComponentRef Id="cmp63BE9DE02D7F287E5375DC8A97082BA1" />
+            <ComponentRef Id="cmp6205DC9F26BBF66F417269A9FFCEF619" />
+            <ComponentRef Id="cmp838E227FF799096AA7FCEFBF35D25C07" />
+            <ComponentRef Id="cmp72E16C193649FF23A808CA876BD8678D" />
+            <ComponentRef Id="cmpFF05A58A3ABD7BCFCD2BDB4119ADDFA2" />
+            <ComponentRef Id="cmp1B3E66E9BFA4F82E5FC38E16029105B1" />
+            <ComponentRef Id="cmp504A0B697A863ECA3C69F3A23EC6B8DC" />
+        </ComponentGroup>
+    </Fragment>
+</Wix>

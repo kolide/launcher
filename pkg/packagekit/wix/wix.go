@@ -3,6 +3,7 @@ package wix
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,17 +18,18 @@ import (
 )
 
 type wixTool struct {
-	wixPath        string     // Where is wix installed
-	packageRoot    string     // What's the root of the packaging files?
-	buildDir       string     // The wix tools want to work in a build dir.
-	msArch         string     // What's the Microsoft architecture name?
-	services       []*Service // array of services.
-	dockerImage    string     // If in docker, what image?
-	skipValidation bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
-	skipCleanup    bool       // Skip cleaning temp dirs. Useful when debugging wix generation
-	cleanDirs      []string   // directories to rm on cleanup
-	ui             bool       // whether or not to include a ui
-	extraFiles     []extraFile
+	wixPath          string     // Where is wix installed
+	packageRoot      string     // What's the root of the packaging files?
+	buildDir         string     // The wix tools want to work in a build dir.
+	msArch           string     // What's the Microsoft architecture name?
+	services         []*Service // array of services.
+	dockerImage      string     // If in docker, what image?
+	skipValidation   bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
+	skipCleanup      bool       // Skip cleaning temp dirs. Useful when debugging wix generation
+	cleanDirs        []string   // directories to rm on cleanup
+	ui               bool       // whether or not to include a ui
+	extraFiles       []extraFile
+	extractedFileIds map[string]string
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
@@ -108,8 +110,9 @@ func SkipCleanup() WixOpt {
 // packages with.
 func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
 	wo := &wixTool{
-		wixPath:     FindWixInstall(),
-		packageRoot: packageRoot,
+		wixPath:          FindWixInstall(),
+		packageRoot:      packageRoot,
+		extractedFileIds: make(map[string]string),
 
 		execCC: exec.CommandContext,
 	}
@@ -177,6 +180,10 @@ func (wo *wixTool) Package(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "running heat")
 	}
 
+	if err := wo.extractFileIds(); err != nil {
+		return "", errors.Wrap(err, "extracting file ids")
+	}
+
 	if err := wo.addServices(ctx); err != nil {
 		return "", errors.Wrap(err, "adding services")
 	}
@@ -235,6 +242,27 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+// extractFileIds will iterate over the generated AppFiles.wxs, and
+// extract the File Ids for later use.
+func (wo *wixTool) extractFileIds() error {
+	heatFile := filepath.Join(wo.buildDir, "AppFiles.wxs")
+	heatContent, err := ioutil.ReadFile(heatFile)
+	if err != nil {
+		return errors.Wrap(err, "reading AppFiles.wxs")
+	}
+
+	appFiles := &Wix{}
+	if err := xml.Unmarshal(heatContent, appFiles); err != nil {
+		return errors.Wrap(err, "unmarshalling")
+	}
+
+	for _, f := range appFiles.RetFiles() {
+		wo.extractedFileIds[f.Source] = f.Id
 	}
 
 	return nil
