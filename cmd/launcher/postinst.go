@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"os/user"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -27,6 +27,27 @@ type InstallerInfo struct {
 }
 
 func runPostinst(args []string) error {
+	hackLog, err := os.Create("/Users/seph/Downloads/postinst.log")
+	if err != nil {
+		return err
+	}
+	defer hackLog.Close()
+
+	fmt.Fprintf(hackLog, "postinst begin at %s\n", time.Now().Format(time.RFC3339))
+	hackLog.Sync()
+
+	if cwd, err := os.Getwd(); err != nil {
+		fmt.Fprintf(hackLog, "cwd: %v\n", err)
+	} else {
+		fmt.Fprintf(hackLog, "cwd: %s\n", cwd)
+	}
+	hackLog.Sync()
+
+	fmt.Fprintf(hackLog, "env:\n")
+	for _, e := range os.Environ() {
+		fmt.Fprintf(hackLog, "  %s\n", e)
+	}
+
 	flagset := flag.NewFlagSet("launcher postinstall", flag.ExitOnError)
 	flagset.Usage = commandUsage(flagset, "launcher postinstall")
 
@@ -43,8 +64,13 @@ func runPostinst(args []string) error {
 		ff.WithIgnoreUndefined(true), // covers unknowns from the config file _only_
 		ff.WithConfigFileParser(ff.PlainParser),
 	); err != nil {
+		fmt.Fprintf(hackLog, "error with flags: %v\n", err)
+		hackLog.Sync()
 		return err
 	}
+
+	fmt.Fprintf(hackLog, "flags ok\n")
+	hackLog.Sync()
 
 	_ = flDebug
 
@@ -57,6 +83,9 @@ func runPostinst(args []string) error {
 	if *flTargetFile == "" {
 		return errors.New("Unable to determine target file. Please use a `config` or `target` option")
 	}
+
+	fmt.Fprintf(hackLog, "targetfile: %s\n", *flTargetFile)
+	hackLog.Sync()
 
 	// If identifier is unset, autodetect from the config path. We do
 	// this by traversing elements upwards until we get something that
@@ -75,16 +104,12 @@ func runPostinst(args []string) error {
 	}
 
 	installerInfo := &InstallerInfo{
-		Identifier:   *flIdentifier,
-		DownloadPath: *flInstallerPath,
 		DownloadFile: filepath.Base(*flInstallerPath),
+		DownloadPath: *flInstallerPath,
+		Identifier:   *flIdentifier,
 		Timestamp:    time.Now().Format(time.RFC3339),
+		User:         os.Getenv("USERNAME"),
 		Version:      version.Version().Version,
-	}
-
-	// if user.Current fails, just ignore it
-	if usr, err := user.Current(); err == nil {
-		installerInfo.User = usr.Username
 	}
 
 	infoBytes, err := json.MarshalIndent(installerInfo, "", "  ")
@@ -93,5 +118,10 @@ func runPostinst(args []string) error {
 	}
 
 	fmt.Printf("Writing to %s\n", *flTargetFile)
-	return ioutil.WriteFile(*flTargetFile, infoBytes, 0644)
+	if err := ioutil.WriteFile(*flTargetFile, infoBytes, 0644); err != nil {
+		fmt.Fprintf(hackLog, "error with writefile: %v\n", err)
+		hackLog.Sync()
+		return err
+	}
+	return nil
 }
