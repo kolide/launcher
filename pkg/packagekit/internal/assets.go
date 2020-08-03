@@ -194,8 +194,6 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	  <RegistryValue Key="Identifier" Value="{{.Opts.Identifier}}" Type="string" />
 	  <RegistryValue Key="User" Value="[LogonUser]" Type="string" />
 	  <RegistryValue Key="Version" Value="{{.Opts.Version}}" Type="string" />
-	  <RegistryValue Key="Timestamp" Value="[DATE] [TIME]" Type="string" />
-
 	</RegistryKey>
       </Component>
     </DirectoryRef>
@@ -216,7 +214,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	Title="InstallerInfo"
 	Level="1"
 	Display="hidden">
-      <ComponentGroupRef Id="InstallerInfoRegistryEntries" />
+      <ComponentRef Id="InstallerInfoRegistryEntries" />
     </Feature>
 
 
