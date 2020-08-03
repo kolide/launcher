@@ -53,8 +53,12 @@
 	<RegistryKey Root="HKLM"
 		     Key="Software\Kolide\Launcher\{{.Opts.Identifier}}"
 		     Action="createAndRemoveOnUninstall">
-	  <RegistryValue Type="integer" Name="SomeIntegerValue" Value="1" KeyPath="yes"/>
-	  <RegistryValue Type="string" Value="Default Value"/>
+	  <RegistryValue Key="DownloadPath" Value="[OriginalDatabase]" Type="string" />
+	  <RegistryValue Key="Identifier" Value="{{.Opts.Identifier}}" Type="string" />
+	  <RegistryValue Key="User" Value="[LogonUser]" Type="string" />
+	  <RegistryValue Key="Version" Value="{{.Opts.Version}}" Type="string" />
+	  <RegistryValue Key="Timestamp" Value="[DATE] [TIME]" Type="string" />
+
 	</RegistryKey>
       </Component>
     </DirectoryRef>
@@ -65,14 +69,16 @@
     <Feature
 	Id="LauncherFiles"
 	Title="Launcher"
-	Level="1">
+	Level="1"
+	Display="hidden">
       <ComponentGroupRef Id="AppFiles" />
     </Feature>
 
     <Feature
 	Id="InstallerInfo"
 	Title="InstallerInfo"
-	Level="1">
+	Level="1"
+	Display="hidden">
       <ComponentGroupRef Id="InstallerInfoRegistryEntries" />
     </Feature>
 
