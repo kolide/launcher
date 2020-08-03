@@ -73,7 +73,7 @@ require (
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
 	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd
+	golang.org/x/sys v0.0.0-20200803150936-fd5f0c170ac3
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	google.golang.org/grpc v1.23.0
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
