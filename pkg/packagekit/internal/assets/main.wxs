@@ -70,7 +70,9 @@
 
 	 TODO:
 	   * read https://wixtoolset.org/documentation/manual/v3/customactions/qtexec.html
+	   * https://www.firegiant.com/wix/tutorial/standard-libraries/silence-please/
 	   * Does this work in silent mode?
+	   * Probably move to that qtexec stuff
     -->
 
     <CustomAction Id="EXECUTE_AFTER_FINALIZE"
