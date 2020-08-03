@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/go-kit/kit/log/level"
@@ -68,10 +69,9 @@ func main() {
 		}
 	}
 
-	// if the launcher is being ran with a positional argument, handle that
-	// argument. If a known positional argument is not supplied, fall-back to
-	// running an osquery instance.
-	if isSubCommand() {
+	// if the launcher is being ran with a positional argument,
+	// handle that argument. Fall-back to running launcher
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(); err != nil {
 			logutil.Fatal(logger, "err", errors.Wrap(err, "run with positional args"))
 		}
@@ -94,29 +94,6 @@ func main() {
 	}
 }
 
-func isSubCommand() bool {
-	if len(os.Args) < 2 {
-		return false
-	}
-
-	subCommands := []string{
-		"socket",
-		"query",
-		"flare",
-		"svc",
-		"svc-fg",
-		"version",
-	}
-
-	for _, sc := range subCommands {
-		if sc == os.Args[1] {
-			return true
-		}
-	}
-
-	return false
-}
-
 func runSubcommands() error {
 	var run func([]string) error
 	switch os.Args[1] {
@@ -132,7 +109,10 @@ func runSubcommands() error {
 		run = runWindowsSvcForeground
 	case "version":
 		run = runVersion
+	default:
+		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}
+
 	err := run(os.Args[2:])
 	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
 }

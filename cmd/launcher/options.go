@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -113,11 +114,8 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	// osqueryd found in the path
 	osquerydPath := *flOsquerydPath
 	if *flOsquerydPath == "" {
-		if _, err := os.Stat(defaultOsquerydPath); err == nil {
-			osquerydPath = defaultOsquerydPath
-		} else if path, err := exec.LookPath("osqueryd"); err == nil {
-			osquerydPath = path
-		} else {
+		*flOsquerydPath = findOsquery()
+		if *flOsquerydPath == "" {
 			return nil, errors.New("Could not find osqueryd binary")
 		}
 	}
@@ -289,4 +287,28 @@ func parseCertPins(pins string) ([][]byte, error) {
 		}
 	}
 	return certPins, nil
+}
+
+// findOsquery will attempt to find osquery. We don't much care about
+// errors here, either we find it, or we don't.
+func findOsquery() string {
+	osqBinaryName := "osqueryd"
+	if runtime.GOOS == "windows" {
+		osqBinaryName = osqBinaryName + ".exe"
+	}
+
+	if exPath, err := os.Executable(); err != nil {
+		maybeOsq := filepath.Join(filepath.Base(exPath), osqBinaryName)
+
+		info, err := os.Stat(maybeOsq)
+		if err != nil && !info.IsDir() {
+			return maybeOsq
+		}
+	}
+
+	if osqPath, err := exec.LookPath(osqBinaryName); err == nil {
+		return osqPath
+	}
+
+	return ""
 }

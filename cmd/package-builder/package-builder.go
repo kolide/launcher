@@ -175,6 +175,11 @@ func runMake(args []string) error {
 			defaultWixPath,
 			fmt.Sprintf(`Location of wix binaries (default: "%s")`, defaultWixPath),
 		)
+		flWixSkipCleanup = flagset.Bool(
+			"wix_skip_cleanup",
+			false,
+			"Keep wix temp files",
+		)
 		flOsqueryFlags arrayFlags // set below with flagset.Var
 	)
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -244,6 +249,7 @@ func runMake(args []string) error {
 		MirrorURL:         *flMirrorURL,
 		NotaryPrefix:      *flNotaryPrefix,
 		WixPath:           *flWixPath,
+		WixSkipCleanup:    *flWixSkipCleanup,
 	}
 
 	outputDir := *flOutputDir

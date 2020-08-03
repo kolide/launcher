@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate go-bindata -pkg testdata -o testdata/assets.go testdata/assets/
+//go:generate go-bindata  -nometadata -nocompress -pkg testdata -o testdata/assets.go testdata/assets/
 
 func TestWixPackage(t *testing.T) {
 	t.Parallel()
