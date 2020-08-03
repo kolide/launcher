@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"text/template"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
@@ -63,19 +66,27 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		guidNonce.String(),
 	}
 
+	// Fetch postinstall info
+	postinstCmd, err := generatePostinstallCommand(ctx, po)
+	if err != nil {
+		return errors.Wrap(err, "generate postinstall command")
+	}
+
 	var templateData = struct {
-		Opts        *PackageOptions
-		UpgradeCode string
-		ProductCode string
+		Opts           *PackageOptions
+		UpgradeCode    string
+		ProductCode    string
+		PostInstallCmd string
 	}{
-		Opts:        po,
-		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
-		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		Opts:           po,
+		UpgradeCode:    generateMicrosoftProductCode("launcher" + po.Identifier),
+		ProductCode:    generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		PostInstallCmd: postinstCmd,
 	}
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse main.wxs template")
+		return errors.Wrap(err, "parsing main.wxs template")
 	}
 
 	mainWxsContent := new(bytes.Buffer)
@@ -179,4 +190,65 @@ func generateMicrosoftProductCode(ident1 string, identN ...string) string {
 	guid := uuid.NewSHA1(uuidSpace, []byte(data))
 
 	return strings.ToUpper(guid.String())
+}
+
+// generatePostinstall creates a postinstall block for our wix
+// template. To make this work with the existing package/packagekit
+// split, this makes a lot of assumptions about paths. Other methods
+// would involve pulling the File.Id out of the heat generated
+// AppFiles.
+func generatePostinstallCommand(ctx context.Context, po *PackageOptions) (string, error) {
+	launcherPath, err := findFileInDir(ctx, po.Root, "launcher.exe")
+	if err != nil {
+		return "", err
+	}
+
+	confPath, err := findFileInDir(ctx, po.Root, "launcher.flags")
+	if err != nil {
+		return "", err
+	}
+
+	// A big string, of quoted strings. Joy
+	return strings.Join([]string{
+		fmt.Sprintf(`"%s"`, filepath.Clean(filepath.Join("[PROGDIR]", launcherPath))),
+		"postinstall",
+		"--installer_path", `"[OriginalDatabase]"`,
+		"--config", confPath,
+		"--identifier", po.Identifier,
+	}, " "), nil
+}
+
+func findFileInDir(ctx context.Context, dir, filename string) (string, error) {
+	logger := ctxlog.FromContext(ctx)
+
+	dir = filepath.Clean(dir)
+
+	level.Debug(logger).Log(
+		"msg", "Looking for file",
+		"file", filename,
+		"dir", dir,
+	)
+
+	found := []string{}
+
+	if err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if filepath.Base(path) == filename {
+			found = append(found, path)
+		}
+		return nil
+	}); err != nil {
+		return "", errors.Wrap(err, "walk")
+	}
+
+	if len(found) != 1 {
+		return "", errors.Errorf("Found %d %s, expected 1", len(found), filename)
+	}
+
+	rel := strings.TrimPrefix(filepath.Clean(found[0]), dir)
+	rel = strings.TrimPrefix(rel, `\`)
+	return rel, nil
 }

@@ -185,6 +185,7 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     </Directory>
 
 
+    {{if .PostInstallCmd }}
     <!-- Run launcher in post-install mode
 
 	 This _primarily_ creates the installer-info.json file, but
@@ -194,9 +195,13 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
 	 In theory, wix ought have been able to create a
 	 installer-info.xml, but I couldn't get that work.
 
+	 Important Notes:
+	 * Permissions: Anything running "immediate" is invoked with user permissions
+
 	 Some docs for creating custom actions:
 	 https://wixtoolset.org/documentation/manual/v3/xsd/wix/customaction.html
 	 https://wixtoolset.org/documentation/manual/v3/howtos/ui_and_localization/run_program_after_install.html
+	 https://wixtoolset.org/documentation/manual/v3/xsd/wix/customaction.html
 	 https://stackoverflow.com/questions/6044069/how-to-execute-wix-custom-action-after-installation
 	 https://stackoverflow.com/questions/19271862/wix-how-to-run-exe-files-after-installation-from-installed-directory
 
@@ -206,15 +211,17 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
     -->
 
     <CustomAction Id="EXECUTE_AFTER_FINALIZE"
-		  Execute="immediate"
-		  Return="check"
+		  Execute="deferred"
+		  Return="ignore"
 		  Impersonate="no"
-		  Directory="TARGETDIR"
-		  ExeCommand="C:\Program Files\Kolide\Launcher-launcher\bin\launcher.exe postinst --installer_path [OriginalDatabase] --target C:\Users\seph\x.json" />
+		  Directory="PROGDIR"
+		  ExeCommand='{{.PostInstallCmd}}'
+		  />
 
     <InstallExecuteSequence>
-      <Custom Action="EXECUTE_AFTER_FINALIZE" After="InstallFinalize">NOT Installed</Custom>
+      <Custom Action="EXECUTE_AFTER_FINALIZE" After="InstallFiles"/>
     </InstallExecuteSequence>
+    {{ end }}
 
     <!-- Install the files -->
     <Feature
