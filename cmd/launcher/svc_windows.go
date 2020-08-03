@@ -111,6 +111,7 @@ type winSvc struct {
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
+	level.Info(w.logger).Log("msg", "windows service executing")
 	changes <- svc.Status{State: svc.StartPending}
 	level.Info(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
