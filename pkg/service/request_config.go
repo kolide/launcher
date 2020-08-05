@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -31,6 +32,18 @@ func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{
 	}, nil
 }
 
+func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+	var req configRequest
+
+	if err := json.Unmarshal(msg, &req); err != nil {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("couldn't unmarshal body to configRequest: %s", err),
+		}
+	}
+	return req, nil
+}
+
 func encodeGRPCConfigRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(configRequest)
 	return &pb.AgentApiRequest{
@@ -53,6 +66,22 @@ func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 		NodeInvalid:    req.NodeInvalid,
 	}
 	return encodeResponse(resp, req.Err)
+}
+
+func encodeJSONRPCConfigResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+	res, ok := obj.(configResponse)
+	if !ok {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("Asserting result to *configResponse failed. Got %T, %+v", obj, obj),
+		}
+	}
+
+	b, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal response: %s", err)
+	}
+	return b, nil
 }
 
 func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
