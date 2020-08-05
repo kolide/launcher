@@ -4,7 +4,9 @@ import (
 	"github.com/go-kit/kit/log"
 )
 
-func LoggingMiddleware(logger log.Logger) func(KolideService) KolideService {
+type Middleware func(KolideService) KolideService
+
+func LoggingMiddleware(logger log.Logger) Middleware {
 	return func(next KolideService) KolideService {
 		return logmw{logger, next}
 	}
