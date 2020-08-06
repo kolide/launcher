@@ -184,12 +184,37 @@ var _internalAssetsMainWxs = []byte(`<?xml version="1.0" encoding="UTF-8"?>
       </Directory>
     </Directory>
 
+
+    <DirectoryRef Id="TARGETDIR">
+      <Component Id="InstallerInfoRegistryEntries" Guid="*">
+	<RegistryKey Root="HKLM"
+		     Key="Software\Kolide\Launcher\{{.Opts.Identifier}}"
+		     Action="createAndRemoveOnUninstall">
+	  <RegistryValue Key="DownloadPath" Value="[OriginalDatabase]" Type="string" />
+	  <RegistryValue Key="Identifier" Value="{{.Opts.Identifier}}" Type="string" />
+	  <RegistryValue Key="User" Value="[LogonUser]" Type="string" />
+	  <RegistryValue Key="Version" Value="{{.Opts.Version}}" Type="string" />
+	</RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+
+
     <!-- Install the files -->
     <Feature
 	Id="LauncherFiles"
 	Title="Launcher"
-	Level="1">
+	Level="1"
+	Display="hidden">
       <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+
+    <Feature
+	Id="InstallerInfo"
+	Title="InstallerInfo"
+	Level="1"
+	Display="hidden">
+      <ComponentRef Id="InstallerInfoRegistryEntries" />
     </Feature>
 
 
