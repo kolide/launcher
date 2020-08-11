@@ -77,7 +77,12 @@ func runWindowsSvc(args []string) error {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
-		level.Info(logger).Log("msg", "svc run", "err", err)
+		level.Info(logger).Log(
+			"msg",
+			"svc run",
+			"err", err,
+			"version", version.Version().Version,
+		)
 		return err
 	}
 	return nil
@@ -149,6 +154,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
+				level.Info(w.logger).Log("msg", "shutdown request recieved")
+
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(100 * time.Millisecond)
