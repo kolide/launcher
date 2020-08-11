@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
+	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -23,6 +25,9 @@ import (
 
 // TODO This should be inherited from some setting
 const serviceName = "launcher"
+
+func logToFileWrapper() {
+}
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
@@ -34,6 +39,19 @@ func runWindowsSvc(args []string) error {
 	defer eventLogWriter.Close()
 
 	logger := eventlog.New(eventLogWriter)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+
+	logTempFile, err := ioutil.TempFile("", "launcher-debug-logs")
+	if err != nil {
+		level.Info(logger).Log("msg", "failed to create file logger", "err", err)
+	} else {
+		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logTempFile))
+		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+		logger = teelogger.New(logger, fileLogger)
+
+		level.Info(logger).Log("msg", "mirroring logs to file", "file", logTempFile.Name())
+	}
+
 	level.Debug(logger).Log(
 		"msg", "service start requested",
 		"version", version.Version().Version,
@@ -155,7 +173,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				level.Info(w.logger).Log("msg", "shutdown request recieved")
-
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(100 * time.Millisecond)
