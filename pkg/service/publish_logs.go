@@ -57,6 +57,18 @@ func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 	}, nil
 }
 
+func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (interface{}, error) {
+	var req logCollection
+
+	if err := json.Unmarshal(msg, &req); err != nil {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("couldn't unmarshal body to logCollection: %s", err),
+		}
+	}
+	return req, nil
+}
+
 func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(logCollection)
 	logs := make([]*pb.LogCollection_Log, 0, len(req.Logs))
@@ -98,6 +110,22 @@ func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (inte
 		NodeInvalid: req.NodeInvalid,
 	}
 	return encodeResponse(resp, req.Err)
+}
+
+func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+	res, ok := obj.(publishLogsResponse)
+	if !ok {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("Asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj),
+		}
+	}
+
+	b, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal response: %s", err)
+	}
+	return b, nil
 }
 
 func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {

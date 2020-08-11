@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -69,6 +70,18 @@ func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interf
 	}, nil
 }
 
+func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+	var req enrollmentRequest
+
+	if err := json.Unmarshal(msg, &req); err != nil {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("couldn't unmarshal body to enrollment request: %s", err),
+		}
+	}
+	return req, nil
+}
+
 func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
 	if res.Error != nil {
 		return nil, *res.Error
@@ -80,6 +93,22 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 	}
 
 	return result, nil
+}
+
+func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+	res, ok := obj.(enrollmentResponse)
+	if !ok {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj),
+		}
+	}
+
+	b, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal response: %s", err)
+	}
+	return b, nil
 }
 
 func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {

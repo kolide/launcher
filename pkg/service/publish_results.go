@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -55,6 +56,18 @@ func decodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interfa
 		Results: results,
 		NodeKey: req.NodeKey,
 	}, nil
+}
+
+func decodeJSONRPCResultCollection(_ context.Context, msg json.RawMessage) (interface{}, error) {
+	var req resultCollection
+
+	if err := json.Unmarshal(msg, &req); err != nil {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("couldn't unmarshal body to resultCollection: %s", err),
+		}
+	}
+	return req, nil
 }
 
 func decodeJSONRPCPublishResultsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
@@ -120,6 +133,23 @@ func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (i
 		NodeInvalid: req.NodeInvalid,
 	}
 	return encodeResponse(resp, req.Err)
+}
+
+func encodeJSONRPCPublishResultsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+	res, ok := obj.(publishResultsResponse)
+	if !ok {
+		return nil, &jsonrpc.Error{
+			Code:    -32000,
+			Message: fmt.Sprintf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj),
+		}
+	}
+
+	b, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal response: %s", err)
+	}
+	return b, nil
+
 }
 
 func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
