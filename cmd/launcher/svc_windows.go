@@ -95,13 +95,22 @@ func runWindowsSvc(args []string) error {
 		"version", version.Version().Version,
 	)
 
+	// Log panics from the windows service
+	defer func() {
+		if r := recover(); r != nil {
+			level.Info(logger).Log(
+				"msg", "panic occurred",
+				"err", err,
+			)
+		}
+	}()
+
 	if err := run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
 		level.Info(logger).Log(
-			"msg",
-			"svc run",
+			"msg", "svc run",
 			"err", err,
 			"version", version.Version().Version,
 		)
