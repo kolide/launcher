@@ -102,6 +102,7 @@ func runWindowsSvc(args []string) error {
 				"msg", "panic occurred",
 				"err", err,
 			)
+			time.Sleep(time.Second)
 		}
 	}()
 
@@ -114,8 +115,13 @@ func runWindowsSvc(args []string) error {
 			"err", err,
 			"version", version.Version().Version,
 		)
+		time.Sleep(time.Second)
 		return err
 	}
+
+	level.Info(logger).Log("msg", "svc exited", "version", version.Version().Version)
+	time.Sleep(time.Second)
+
 	return nil
 }
 
