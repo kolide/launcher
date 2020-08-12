@@ -185,7 +185,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				level.Info(w.logger).Log("msg", "shutdown request recieved")
+				level.Info(w.logger).Log("msg", "shutdown request received")
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(100 * time.Millisecond)
