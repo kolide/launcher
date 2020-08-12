@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -41,17 +40,6 @@ func runWindowsSvc(args []string) error {
 	logger := eventlog.New(eventLogWriter)
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 
-	logTempFile, err := ioutil.TempFile("", "launcher-debug-logs")
-	if err != nil {
-		level.Info(logger).Log("msg", "failed to create file logger", "err", err)
-	} else {
-		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logTempFile))
-		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-		logger = teelogger.New(logger, fileLogger)
-
-		level.Info(logger).Log("msg", "mirroring logs to file", "file", logTempFile.Name())
-	}
-
 	level.Debug(logger).Log(
 		"msg", "service start requested",
 		"version", version.Version().Version,
@@ -61,6 +49,21 @@ func runWindowsSvc(args []string) error {
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
+	}
+
+	if opts.DebugLogFile != "" {
+		logMirror, err := os.Create(opts.DebugLogFile)
+		if err != nil {
+			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
+			os.Exit(2)
+		}
+
+		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
+		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+
+		logger = teelogger.New(logger, fileLogger)
+
+		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger

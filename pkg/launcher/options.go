@@ -60,6 +60,8 @@ type Options struct {
 
 	// Debug enables debug logging.
 	Debug bool
+	// Optional file to mirror debug logs to
+	DebugLogFile string
 	// OsqueryVerbose puts osquery into verbose mode
 	OsqueryVerbose bool
 	// OsqueryFlags defines additional flags to pass to osquery (possibly
