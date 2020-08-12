@@ -52,11 +52,12 @@ func runWindowsSvc(args []string) error {
 	}
 
 	if opts.DebugLogFile != "" {
-		logMirror, err := os.Create(opts.DebugLogFile)
+		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
 			os.Exit(2)
 		}
+		defer logMirror.Close()
 
 		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
 		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
