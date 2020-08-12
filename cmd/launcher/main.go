@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
+	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 )
 
@@ -86,6 +88,22 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
+
+	if opts.DebugLogFile != "" {
+		logMirror, err := os.Create(opts.DebugLogFile)
+		if err != nil {
+			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
+			os.Exit(2)
+		}
+
+		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
+		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+
+		logger = teelogger.New(logger, fileLogger)
+
+		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
+	}
+
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
