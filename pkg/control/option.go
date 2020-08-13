@@ -3,7 +3,6 @@ package control
 import (
 	"crypto/tls"
 	"net/http"
-	"time"
 
 	"github.com/go-kit/kit/log"
 )
@@ -24,12 +23,6 @@ func WithInsecureSkipVerify() Option {
 			},
 		}
 		c.insecure = true
-	}
-}
-
-func WithGetShellsInterval(i time.Duration) Option {
-	return func(c *Client) {
-		c.getShellsInterval = i
 	}
 }
 
