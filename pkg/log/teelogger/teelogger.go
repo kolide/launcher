@@ -1,5 +1,4 @@
-// Package filetee provides a go-kit compatible logger, which will
-// mirror logs into a tmp file. This is designed to aid in debugging.
+// Package filetee provides a go-kit compatible log mirroring tool.
 package teelogger
 
 import (
