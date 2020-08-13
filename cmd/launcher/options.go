@@ -72,6 +72,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 		// Development options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flDebugLogFile      = flagset.String("debug_log_file", "", "File to mirror debug logs to (optional)")
 		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
@@ -147,30 +148,31 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	opts := &launcher.Options{
-		KolideServerURL:     *flKolideServerURL,
-		Transport:           *flTransport,
+		Autoupdate:          *flAutoupdate,
+		AutoupdateInterval:  *flAutoupdateInterval,
+		CertPins:            certPins,
 		Control:             *flControl,
 		ControlServerURL:    *flControlServerURL,
-		GetShellsInterval:   *flGetShellsInterval,
+		Debug:               *flDebug,
+		DebugLogFile:        *flDebugLogFile,
+		DisableControlTLS:   *flDisableControlTLS,
+		EnableInitialRunner: *flInitialRunner,
 		EnrollSecret:        *flEnrollSecret,
 		EnrollSecretPath:    *flEnrollSecretPath,
-		RootDirectory:       *flRootDirectory,
-		OsquerydPath:        osquerydPath,
-		CertPins:            certPins,
-		RootPEM:             *flRootPEM,
-		LoggingInterval:     *flLoggingInterval,
-		EnableInitialRunner: *flInitialRunner,
-		Autoupdate:          *flAutoupdate,
-		Debug:               *flDebug,
-		OsqueryVerbose:      *flOsqueryVerbose,
-		OsqueryFlags:        flOsqueryFlags,
-		DisableControlTLS:   *flDisableControlTLS,
+		GetShellsInterval:   *flGetShellsInterval,
 		InsecureTLS:         *flInsecureTLS,
 		InsecureTransport:   *flInsecureTransport,
-		NotaryServerURL:     *flNotaryServerURL,
+		KolideServerURL:     *flKolideServerURL,
+		LoggingInterval:     *flLoggingInterval,
 		MirrorServerURL:     *flMirrorURL,
 		NotaryPrefix:        *flNotaryPrefix,
-		AutoupdateInterval:  *flAutoupdateInterval,
+		NotaryServerURL:     *flNotaryServerURL,
+		OsqueryFlags:        flOsqueryFlags,
+		OsqueryVerbose:      *flOsqueryVerbose,
+		OsquerydPath:        osquerydPath,
+		RootDirectory:       *flRootDirectory,
+		RootPEM:             *flRootPEM,
+		Transport:           *flTransport,
 		UpdateChannel:       updateChannel,
 	}
 	return opts, nil
@@ -250,6 +252,7 @@ func developerUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("debug")
 	printOpt("osquery_verbose")
+	printOpt("debug_log_file")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("insecure")
 	printOpt("insecure_transport")

@@ -11,10 +11,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
+	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -33,12 +35,33 @@ func runWindowsSvc(args []string) error {
 	defer eventLogWriter.Close()
 
 	logger := eventlog.New(eventLogWriter)
-	level.Debug(logger).Log("msg", "service start requested")
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+
+	level.Debug(logger).Log(
+		"msg", "service start requested",
+		"version", version.Version().Version,
+	)
 
 	opts, err := parseOptions(os.Args[2:])
 	if err != nil {
-		level.Info(logger).Log("err", err)
+		level.Info(logger).Log("msg", "Error parsing options", "err", err)
 		os.Exit(1)
+	}
+
+	if opts.DebugLogFile != "" {
+		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			level.Info(logger).Log("msg", "Failed to create file logger", "err", err)
+			os.Exit(2)
+		}
+		defer logMirror.Close()
+
+		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
+		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+
+		logger = teelogger.New(logger, fileLogger)
+
+		level.Info(logger).Log("msg", "Mirroring logs to file", "file", logMirror.Name())
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger
@@ -62,15 +85,38 @@ func runWindowsSvc(args []string) error {
 		)
 	}()
 
-	run := svc.Run
+	level.Info(logger).Log(
+		"msg", "launching service",
+		"version", version.Version().Version,
+	)
 
-	if err := run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
+	// Log panics from the windows service
+	defer func() {
+		if r := recover(); r != nil {
+			level.Info(logger).Log(
+				"msg", "panic occurred",
+				"err", err,
+			)
+			time.Sleep(time.Second)
+		}
+	}()
+
+	if err := svc.Run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
-		level.Info(logger).Log("msg", "svc run", "err", err)
+		level.Info(logger).Log(
+			"msg", "Error in service run",
+			"err", err,
+			"version", version.Version().Version,
+		)
+		time.Sleep(time.Second)
 		return err
 	}
+
+	level.Debug(logger).Log("msg", "Service exited", "version", version.Version().Version)
+	time.Sleep(time.Second)
+
 	return nil
 }
 
@@ -103,7 +149,7 @@ type winSvc struct {
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
-	level.Info(w.logger).Log("msg", "windows service starting")
+	level.Debug(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,6 +185,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
+				level.Info(w.logger).Log("msg", "shutdown request received")
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(100 * time.Millisecond)
