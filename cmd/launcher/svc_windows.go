@@ -114,7 +114,7 @@ func runWindowsSvc(args []string) error {
 		return err
 	}
 
-	level.Info(logger).Log("msg", "Service exited", "version", version.Version().Version)
+	level.Debug(logger).Log("msg", "Service exited", "version", version.Version().Version)
 	time.Sleep(time.Second)
 
 	return nil
@@ -148,9 +148,8 @@ type winSvc struct {
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	level.Info(w.logger).Log("msg", "windows service executing")
 	changes <- svc.Status{State: svc.StartPending}
-	level.Info(w.logger).Log("msg", "windows service starting")
+	level.Debug(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	ctx, cancel := context.WithCancel(context.Background())
