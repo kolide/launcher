@@ -25,9 +25,6 @@ import (
 // TODO This should be inherited from some setting
 const serviceName = "launcher"
 
-func logToFileWrapper() {
-}
-
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
 func runWindowsSvc(args []string) error {
@@ -47,14 +44,14 @@ func runWindowsSvc(args []string) error {
 
 	opts, err := parseOptions(os.Args[2:])
 	if err != nil {
-		level.Info(logger).Log("err", err)
+		level.Info(logger).Log("msg", "Error parsing options", "err", err)
 		os.Exit(1)
 	}
 
 	if opts.DebugLogFile != "" {
 		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
+			level.Info(logger).Log("msg", "Failed to create file logger", "err", err)
 			os.Exit(2)
 		}
 		defer logMirror.Close()
@@ -64,7 +61,7 @@ func runWindowsSvc(args []string) error {
 
 		logger = teelogger.New(logger, fileLogger)
 
-		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
+		level.Info(logger).Log("msg", "Mirroring logs to file", "file", logMirror.Name())
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger
@@ -88,8 +85,6 @@ func runWindowsSvc(args []string) error {
 		)
 	}()
 
-	run := svc.Run
-
 	level.Info(logger).Log(
 		"msg", "launching service",
 		"version", version.Version().Version,
@@ -106,12 +101,12 @@ func runWindowsSvc(args []string) error {
 		}
 	}()
 
-	if err := run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
+	if err := svc.Run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
 		level.Info(logger).Log(
-			"msg", "svc run",
+			"msg", "Error in service run",
 			"err", err,
 			"version", version.Version().Version,
 		)
@@ -119,7 +114,7 @@ func runWindowsSvc(args []string) error {
 		return err
 	}
 
-	level.Info(logger).Log("msg", "svc exited", "version", version.Version().Version)
+	level.Info(logger).Log("msg", "Service exited", "version", version.Version().Version)
 	time.Sleep(time.Second)
 
 	return nil

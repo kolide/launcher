@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -104,6 +105,16 @@ func main() {
 
 		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			level.Info(logger).Log(
+				"msg", "panic occurred",
+				"err", err,
+			)
+			time.Sleep(time.Second)
+		}
+	}()
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
