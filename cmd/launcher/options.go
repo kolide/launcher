@@ -45,22 +45,21 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 	var (
 		// Primary options
-		flCertPins          = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
-		flControl           = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
-		flControlServerURL  = flagset.String("control_hostname", "", "The hostname of the control server")
-		flEnrollSecret      = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
-		flEnrollSecretPath  = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
-		flGetShellsInterval = flagset.Duration("control_get_shells_interval", 60*time.Second, "The interval at which the 'get shells' request will be made")
-		flInitialRunner     = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
-		flKolideServerURL   = flagset.String("hostname", "", "The hostname of the gRPC server")
-		flTransport         = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
-		flLoggingInterval   = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
-		flOsquerydPath      = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flRootDirectory     = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
-		flRootPEM           = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
-		flVersion           = flagset.Bool("version", false, "Print Launcher version and exit")
-		flOsqueryFlags      arrayFlags // set below with flagset.Var
-		_                   = flagset.String("config", "", "config file to parse options from (optional)")
+		flCertPins         = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControl          = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
+		flControlServerURL = flagset.String("control_hostname", "", "The hostname of the control server")
+		flEnrollSecret     = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flInitialRunner    = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL  = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flTransport        = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flLoggingInterval  = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath     = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flRootDirectory    = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootPEM          = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion          = flagset.Bool("version", false, "Print Launcher version and exit")
+		flOsqueryFlags     arrayFlags // set below with flagset.Var
+		_                  = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
 		flAutoupdate         = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
@@ -159,7 +158,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnableInitialRunner: *flInitialRunner,
 		EnrollSecret:        *flEnrollSecret,
 		EnrollSecretPath:    *flEnrollSecretPath,
-		GetShellsInterval:   *flGetShellsInterval,
 		InsecureTLS:         *flInsecureTLS,
 		InsecureTransport:   *flInsecureTransport,
 		KolideServerURL:     *flKolideServerURL,

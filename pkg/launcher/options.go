@@ -40,9 +40,6 @@ type Options struct {
 	Control bool
 	// ControlServerURL URL for control server.
 	ControlServerURL string
-	// GetShellsInterval is the interval at which the control server should
-	// be checked for shells.
-	GetShellsInterval time.Duration
 
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -14,15 +13,14 @@ import (
 )
 
 type Client struct {
-	addr              string
-	baseURL           *url.URL
-	cancel            context.CancelFunc
-	client            *http.Client
-	db                *bolt.DB
-	getShellsInterval time.Duration
-	insecure          bool
-	disableTLS        bool
-	logger            log.Logger
+	addr       string
+	baseURL    *url.URL
+	cancel     context.CancelFunc
+	client     *http.Client
+	db         *bolt.DB
+	insecure   bool
+	disableTLS bool
+	logger     log.Logger
 }
 
 func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
@@ -31,12 +29,11 @@ func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error)
 		return nil, errors.Wrap(err, "parsing URL")
 	}
 	c := &Client{
-		logger:            log.NewNopLogger(),
-		baseURL:           baseURL,
-		client:            http.DefaultClient,
-		db:                db,
-		addr:              addr,
-		getShellsInterval: 5 * time.Second,
+		logger:  log.NewNopLogger(),
+		baseURL: baseURL,
+		client:  http.DefaultClient,
+		db:      db,
+		addr:    addr,
 	}
 
 	for _, opt := range opts {
@@ -52,13 +49,10 @@ func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error)
 
 func (c *Client) Start(ctx context.Context) {
 	ctx, c.cancel = context.WithCancel(ctx)
-	getShellsTicker := time.NewTicker(c.getShellsInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-getShellsTicker.C:
-			c.getShells(ctx)
 		}
 	}
 }

@@ -19,7 +19,6 @@ func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *la
 
 	controlOpts := []control.Option{
 		control.WithLogger(logger),
-		control.WithGetShellsInterval(opts.GetShellsInterval),
 	}
 	if opts.InsecureTLS {
 		controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
