@@ -81,7 +81,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	opts, err := parseOptions(os.Args[1:])
+	opts, _, err := parseOptions(os.Args[1:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
@@ -137,6 +137,8 @@ func runSubcommands() error {
 		run = runWindowsSvc
 	case "svc-fg":
 		run = runWindowsSvcForeground
+	case "use-version":
+		run = runUseVersion
 	case "version":
 		run = runVersion
 	default:

@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,7 +14,6 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -36,22 +33,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
-	// determine the root directory, create one if it's not provided
-	rootDirectory := opts.RootDirectory
-	if rootDirectory == "" {
-		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
-		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
-				return errors.Wrap(err, "creating temporary root directory")
-			}
-		}
-		level.Info(logger).Log(
-			"msg", "using default system root directory",
-			"path", rootDirectory,
-		)
-	}
-
-	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
+	if err := os.MkdirAll(opts.RootDirectory, 0700); err != nil {
 		return errors.Wrap(err, "creating root directory")
 	}
 
@@ -59,21 +41,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return errors.Wrap(err, "detecting platform")
 	}
 
-	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
+	debugAddrPath := filepath.Join(opts.RootDirectory, "debug_addr")
 	debug.AttachDebugHandler(debugAddrPath, logger)
 	defer os.Remove(debugAddrPath)
-
-	// construct the appropriate http client based on security settings
-	httpClient := http.DefaultClient
-	if opts.InsecureTLS {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
 
 	// open the database for storing launcher data, we do it here
 	// because it's passed to multiple actors. Add a timeout to
@@ -81,13 +51,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// unimplemented on windows, though empirically it seems to
 	// work.
 	boltOptions := &bolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	db, err := bolt.Open(filepath.Join(opts.RootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
 		return errors.Wrap(err, "open launcher db")
 	}
 	defer db.Close()
 
-	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
+	if err := writePidFile(filepath.Join(opts.RootDirectory, "launcher.pid")); err != nil {
 		return errors.Wrap(err, "write launcher pid to file")
 	}
 
@@ -175,13 +145,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.Autoupdate {
 		config := &updaterConfig{
 			Logger:             logger,
-			RootDirectory:      rootDirectory,
+			RootDirectory:      opts.RootDirectory,
 			AutoupdateInterval: opts.AutoupdateInterval,
 			UpdateChannel:      opts.UpdateChannel,
 			NotaryURL:          opts.NotaryServerURL,
 			MirrorURL:          opts.MirrorServerURL,
 			NotaryPrefix:       opts.NotaryPrefix,
-			HTTPClient:         httpClient,
+			HTTPClient:         httpClientFromOpts(opts),
 			SigChannel:         sigChannel,
 		}
 
