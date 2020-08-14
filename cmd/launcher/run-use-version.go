@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/updater/tuf"
 	"github.com/pkg/errors"
 )
 
@@ -47,23 +50,35 @@ func runUseVersion(args []string) error {
 		return errors.New("Missing requested binary")
 	}
 
+	//castedVersion, ok := autoupdate.UpdateChannelrequestedVersion.(),)
+
 	// This duplicates a bunch of the options parsing in
-	// updater.go. But refactoring and merging them is fraught
+	// cmd/launcher/updater.go. But refactoring and merging them is fraught
 	binaryUpdater, err := autoupdate.NewUpdater(
 		binaryPath,
-		opts.RootDirectory,
+		"/tmp/tuf-test-root", //opts.RootDirectory,
 		autoupdate.WithLogger(logger),
 		autoupdate.WithHTTPClient(httpClientFromOpts(opts)),
 		autoupdate.WithNotaryURL(opts.NotaryServerURL),
 		autoupdate.WithMirrorURL(opts.MirrorServerURL),
 		autoupdate.WithNotaryPrefix(opts.NotaryPrefix),
+		autoupdate.WithUpdateChannel(autoupdate.UpdateChannel(requestedVersion)),
 	)
-
 	if err != nil {
-		return errors.Wrap(err, "create osquery updater")
+		return errors.Wrap(err, "create updater")
 	}
 
-	_ = binaryUpdater
+	f, err := ioutil.TempFile("/tmp", "tuf-download")
+	if err != nil {
+		return errors.Wrap(err, "making tmpfile")
+	}
+	defer f.Close()
+
+	if err := binaryUpdater.Download(f, tuf.WithFrequency(opts.AutoupdateInterval), tuf.WithLogger(logger)); err != nil {
+		return errors.Wrap(err, "download")
+	}
+
+	fmt.Printf("\nDownloaded %s-%s to: %s\n", binaryPath, requestedVersion, f.Name())
 	return nil
 
 }
