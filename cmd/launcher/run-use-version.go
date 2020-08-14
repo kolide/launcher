@@ -56,7 +56,7 @@ func runUseVersion(args []string) error {
 	// cmd/launcher/updater.go. But refactoring and merging them is fraught
 	binaryUpdater, err := autoupdate.NewUpdater(
 		binaryPath,
-		"/tmp/tuf-test-root", //opts.RootDirectory,
+		opts.RootDirectory,
 		autoupdate.WithLogger(logger),
 		autoupdate.WithHTTPClient(httpClientFromOpts(opts)),
 		autoupdate.WithNotaryURL(opts.NotaryServerURL),
