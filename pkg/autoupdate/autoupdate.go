@@ -44,6 +44,7 @@ package autoupdate
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -296,13 +297,53 @@ func withoutBootstrap() UpdaterOption {
 
 // Run starts the updater, which will run until the stop function is called.
 func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
+	// Run is all about the autoupdater, so prepend it
 	updaterOpts := []tuf.Option{
-		tuf.WithHTTPClient(u.client),
 		tuf.WithAutoUpdate(u.target, u.stagingPath, u.handler()),
 	}
-	for _, opt := range opts {
-		updaterOpts = append(updaterOpts, opt)
+
+	updaterOpts = append(updaterOpts, opts...)
+
+	client, err := u.newTufClient(updaterOpts...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "launching %s updater service", filepath.Base(u.binaryName))
 	}
+	return client.Stop, nil
+}
+
+// Download uses the underlying TUF process to download and verify a
+// file. Under the hood, it's using the same code paths as Run, both
+// of them eventually call `rm.downloadTarget`
+func (u *Updater) Download(f io.Writer, opts ...tuf.Option) (err error) {
+	//opts = append(opts, tuf.WithAutoUpdate(u.target, u.stagingPath, nil))
+	client, err := u.newTufClient(opts...)
+	if err != nil {
+		return errors.Wrapf(err, "getting tuf client for %s", filepath.Base(u.binaryName))
+	}
+
+	// Since we're not using tuf.WithAutoUpdate, we need to manually call Update
+	if _, _, err := client.Update(); err != nil {
+		// Failure here may or may not be fatal. It might mean
+		// some deeper tuf issue, or it might mean we're
+		// running as a user that doesn't have write access to
+		// the local tuf repo. So, report it and move on.
+		level.Info(u.logger).Log(
+			"msg", "Error updating tuf. May not be fatal. Continueing",
+			"err", err,
+		)
+
+	}
+
+	return client.Download(u.target, f)
+}
+
+// newTufClient creates a TUF client with the settings from this updater.
+func (u *Updater) newTufClient(opts ...tuf.Option) (*tuf.Client, error) {
+	updaterOpts := []tuf.Option{
+		tuf.WithHTTPClient(u.client),
+	}
+
+	updaterOpts = append(updaterOpts, opts...)
 
 	level.Debug(u.logger).Log(
 		"msg", "Running Updater",
@@ -318,14 +359,11 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 	// the background. We don't get much for runtime
 	// communication back from it. Some can come in via the
 	// UpdateFinalizer function, but it's mostly fire-and-forget
-	client, err := tuf.NewClient(
+	return tuf.NewClient(
 		u.settings,
 		updaterOpts...,
 	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "launching %s updater service", filepath.Base(u.binaryName))
-	}
-	return client.Stop, nil
+
 }
 
 // setTargetPath uses the platform and the binary name to set the

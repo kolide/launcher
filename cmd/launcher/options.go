@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -36,10 +39,11 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
-// parseOptions parses the options that may be configured via command-line flags
-// and/or environment variables, determines order of precedence and returns a
-// typed struct of options for further application use
-func parseOptions(args []string) (*launcher.Options, error) {
+// parseOptions parses the options that may be configured via
+// command-line flags and/or environment variables, determines order
+// of precedence and returns a typed struct of options, and the
+// remaining arguments, for further application use
+func parseOptions(args []string) (*launcher.Options, []string, error) {
 	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
 
@@ -116,7 +120,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	if *flOsquerydPath == "" {
 		*flOsquerydPath = findOsquery()
 		if *flOsquerydPath == "" {
-			return nil, errors.New("Could not find osqueryd binary")
+			return nil, nil, errors.New("Could not find osqueryd binary")
 		}
 	}
 
@@ -126,7 +130,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	if *flEnrollSecret != "" && *flEnrollSecretPath != "" {
-		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
+		return nil, nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
 	}
 
 	updateChannel := autoupdate.Stable
@@ -138,12 +142,23 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	case "nightly":
 		updateChannel = autoupdate.Nightly
 	default:
-		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
+		return nil, nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
 	}
 
 	certPins, err := parseCertPins(*flCertPins)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	// determine the root directory, create one if it's not provided
+	rootDirectory := *flRootDirectory
+	if rootDirectory == "" {
+		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
+		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
+			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
+				return nil, nil, errors.Wrap(err, "creating temporary root directory")
+			}
+		}
 	}
 
 	opts := &launcher.Options{
@@ -173,7 +188,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		Transport:           *flTransport,
 		UpdateChannel:       updateChannel,
 	}
-	return opts, nil
+	return opts, flagset.Args(), nil
 }
 
 func shortUsage(flagset *flag.FlagSet) {
@@ -312,4 +327,19 @@ func findOsquery() string {
 	}
 
 	return ""
+}
+
+func httpClientFromOpts(opts *launcher.Options) *http.Client {
+	httpClient := http.DefaultClient
+	if opts.InsecureTLS {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	}
+
+	return httpClient
 }

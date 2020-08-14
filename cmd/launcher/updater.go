@@ -41,18 +41,24 @@ func createUpdater(
 	config *updaterConfig,
 ) (*actor.Actor, error) {
 	// create the updater
-	updater, err := autoupdate.NewUpdater(
-		binaryPath,
-		config.RootDirectory,
+	opts := []autoupdate.UpdaterOption{
 		autoupdate.WithLogger(config.Logger),
 		autoupdate.WithHTTPClient(config.HTTPClient),
 		autoupdate.WithNotaryURL(config.NotaryURL),
 		autoupdate.WithMirrorURL(config.MirrorURL),
 		autoupdate.WithNotaryPrefix(config.NotaryPrefix),
-		autoupdate.WithFinalizer(finalizer),
 		autoupdate.WithUpdateChannel(config.UpdateChannel),
-		autoupdate.WithSigChannel(config.SigChannel),
-	)
+	}
+
+	if config.SigChannel != nil {
+		opts = append(opts, autoupdate.WithSigChannel(config.SigChannel))
+	}
+
+	if finalizer != nil {
+		opts = append(opts, autoupdate.WithFinalizer(finalizer))
+	}
+
+	updater, err := autoupdate.NewUpdater(binaryPath, config.RootDirectory, opts...)
 	if err != nil {
 		return nil, err
 	}
