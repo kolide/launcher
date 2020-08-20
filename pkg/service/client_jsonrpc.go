@@ -47,6 +47,7 @@ func NewJSONRPCClient(
 	certPins [][]byte,
 	rootPool *x509.CertPool,
 	logger log.Logger,
+	options ...jsonrpc.ClientOption,
 ) KolideService {
 	serviceURL := &url.URL{
 		Scheme: "https",
@@ -77,6 +78,8 @@ func NewJSONRPCClient(
 			forceNoChunkedEncoding,
 		),
 	}
+
+	commonOpts = append(commonOpts, options...)
 
 	requestEnrollmentEndpoint := jsonrpc.NewClient(
 		serviceURL,

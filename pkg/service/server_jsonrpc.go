@@ -5,10 +5,11 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 )
 
-func NewJSONRPCServer(endpoints Endpoints, logger log.Logger) *jsonrpc.Server {
+func NewJSONRPCServer(endpoints Endpoints, logger log.Logger, options ...jsonrpc.ServerOption) *jsonrpc.Server {
+	options = append(options, jsonrpc.ServerErrorLogger(logger))
 	handler := jsonrpc.NewServer(
 		makeEndpointCodecMap(endpoints),
-		jsonrpc.ServerErrorLogger(logger),
+		options...,
 	)
 	return handler
 }
