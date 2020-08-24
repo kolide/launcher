@@ -202,7 +202,7 @@ CONTAINER_OSES = ubuntu16 ubuntu18 centos6 centos7 distroless
 
 .PHONY: containers
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
-containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerpush-fakedata-$(c))
+containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerfakepush-$(c))
 
 build-docker:
 	docker build -t launcher-build  .
@@ -210,11 +210,18 @@ build-docker:
 build-dockerfake:
 	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
 
-dockerfake-%:  build-dockerfake
+dockerfake-%:  #build-dockerfake
+	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
 
-docker-%: build-docker
+docker-%: #build-docker
+	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
 
 dockerpush-%: docker-%
+	@echo '#### Starting to push target: $@'
 	docker push gcr.io/kolide-public-containers/launcher-$*
+
+dockerfakepush-%: dockerfake-%
+	@echo '#### Starting to push target: $@'
+	docker push gcr.io/kolide-public-containers/launcher-fakedata-$*
