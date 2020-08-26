@@ -16,6 +16,7 @@ func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x
 		ServerName:         host,
 		InsecureSkipVerify: insecureTLS,
 		RootCAs:            rootPool,
+		MinVersion:         tls.VersionTLS12,
 	}
 
 	if len(certPins) > 0 {
