@@ -98,17 +98,11 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(enrollmentResponse)
 	if !ok {
-		return nil, &jsonrpc.Error{
-			Code:    -32000,
-			Message: fmt.Sprintf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj),
-		}
+		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal response: %s", err)
-	}
-	return b, nil
+	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
 }
 
 func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
