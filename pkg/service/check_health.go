@@ -15,8 +15,9 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
-	Status int32 `json:"status"`
-	Err    error
+	Status    int32  `json:"status"`
+	ErrorCode string `json:"error_code,omitempty"`
+	Err       error  `json:"err,omitempty"`
 }
 
 func decodeGRPCHealthCheckRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

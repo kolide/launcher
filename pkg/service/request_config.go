@@ -22,7 +22,8 @@ type configRequest struct {
 type configResponse struct {
 	ConfigJSONBlob string `json:"config"`
 	NodeInvalid    bool   `json:"node_invalid"`
-	Err            error  `json:"error_code,omitempty"`
+	ErrorCode      string `json:"error_code,omitempty"`
+	Err            error  `json:"err,omitempty"`
 }
 
 func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {

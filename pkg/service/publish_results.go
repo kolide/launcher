@@ -23,9 +23,9 @@ type resultCollection struct {
 
 type publishResultsResponse struct {
 	Message     string `json:"message"`
-	ErrorCode   string `json:"error_code"`
 	NodeInvalid bool   `json:"node_invalid"`
-	Err         error
+	ErrorCode   string `json:"error_code,omitempty"`
+	Err         error  `json:"err,omitempty"`
 }
 
 func decodeGRPCResultCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {

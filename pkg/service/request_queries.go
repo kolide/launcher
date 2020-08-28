@@ -23,8 +23,8 @@ type queriesRequest struct {
 type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
-	ErrorCode   string `json:"error_code"`
-	Err         error
+	ErrorCode   string `json:"error_code,omitempty"`
+	Err         error  `json:"err,omitempty"`
 }
 
 func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
