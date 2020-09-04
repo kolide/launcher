@@ -116,11 +116,14 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 		if err != nil {
 			return queryCollectionResponse{Err: err}, nil
 		}
-		return queryCollectionResponse{
-			Queries:     *result,
+		resp := queryCollectionResponse{
 			NodeInvalid: valid,
 			Err:         err,
-		}, nil
+		}
+		if result != nil {
+			resp.Queries = *result
+		}
+		return resp, nil
 	}
 }
 
