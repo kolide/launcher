@@ -53,6 +53,8 @@ grpc-extension: .pre-build
 # Convenience tools
 osqueryi-tables: table.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
+osqueryi-tables-windows: table.ext
+	C:\Program Files\osquery\osqueryd\osqueryd.exe -S --allow-unsafe --verbose --extension .\build\windows\tables.exe
 sudo-osqueryi-tables: table.ext
 	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
 launchas-osqueryi-tables: table.ext

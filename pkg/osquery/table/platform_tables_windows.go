@@ -13,6 +13,7 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{
 		ProgramIcons(),
+		NetAccounts(client, logger),
 		wmitable.TablePlugin(client, logger),
 	}
 }
