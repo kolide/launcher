@@ -120,6 +120,11 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 			wix.ServiceArgs([]string{"svc", "-config", po.FlagFile}),
 			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),
 		)
+
+		if po.DisableService {
+			wix.WithDisabledService()(launcherService)
+		}
+
 		wixArgs = append(wixArgs, wix.WithService(launcherService))
 	}
 
