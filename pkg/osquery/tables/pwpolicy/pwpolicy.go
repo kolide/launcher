@@ -25,8 +25,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-const PwpolicyPath = "/usr/bin/pwpolicy"
-const PwpolicyCmd = "getaccountpolicies"
+const pwpolicyPath = "/usr/bin/pwpolicy"
+const pwpolicyCmd = "getaccountpolicies"
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -58,17 +58,11 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	gcOpts := []tablehelpers.GetConstraintOpts{
-		tablehelpers.WithDefaults(""),
-		tablehelpers.WithLogger(t.logger),
-	}
-
-	for _, pwpolicyUsername := range tablehelpers.GetConstraints(queryContext, "username", gcOpts...) {
-		pwpolicyArgs := []string{PwpolicyCmd}
+	for _, pwpolicyUsername := range tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithDefaults("")) {
+		pwpolicyArgs := []string{pwpolicyCmd}
 
 		if pwpolicyUsername != "" {
-			pwpolicyArgs = append(pwpolicyArgs, "-u")
-			pwpolicyArgs = append(pwpolicyArgs, pwpolicyUsername)
+			pwpolicyArgs = append(pwpolicyArgs, "-u", pwpolicyUsername)
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
@@ -126,7 +120,7 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, PwpolicyPath, args...)
+	cmd := exec.CommandContext(ctx, pwpolicyPath, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
