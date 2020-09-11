@@ -53,7 +53,7 @@ func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) e
 		StandardErrorPath: filepath.Join("/var/log", initOptions.Identifier, "launcher-stderr.log"),
 		StandardOutPath:   filepath.Join("/var/log", initOptions.Identifier, "launcher-stdout.log"),
 		KeepAlive:         keepAlive,
-		RunAtLoad:         true,
+		RunAtLoad:         false,
 	}
 
 	enc := plist.NewEncoder(w)
