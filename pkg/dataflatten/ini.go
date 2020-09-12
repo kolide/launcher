@@ -53,9 +53,9 @@ func flattenIni(in interface{}, opts ...FlattenOpts) ([]Row, error) {
 // the converted value, and ok. The list of strings comes from go-ini
 func iniToBool(val string) (bool, bool) {
 	switch val {
-	case "1", "t", "T", "true", "TRUE", "True", "YES", "yes", "Yes", "y", "ON", "on", "On":
+	case "t", "T", "true", "TRUE", "True", "YES", "yes", "Yes", "y", "ON", "on", "On":
 		return true, true
-	case "0", "f", "F", "false", "FALSE", "False", "NO", "no", "No", "n", "OFF", "off", "Off":
+	case "f", "F", "false", "FALSE", "False", "NO", "no", "No", "n", "OFF", "off", "Off":
 		return false, true
 	}
 	return false, false
