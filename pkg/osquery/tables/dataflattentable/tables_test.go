@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"path"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -74,5 +75,19 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 			require.EqualValues(t, tt.expected, rows, "table type %s test", dataType)
 		}
 	}
+
+}
+
+func TestDataFlattenIniTable(t *testing.T) {
+	t.Parallel()
+
+	testTable := Table{dataFunc: dataflatten.IniFile}
+	mockQC := tablehelpers.MockQueryContext(map[string][]string{
+		"path": []string{path.Join("testdata", "secdata.ini")},
+	})
+
+	rows, err := testTable.generate(context.TODO(), mockQC)
+	require.NoError(t, err)
+	require.Len(t, rows, 87)
 
 }
