@@ -30,7 +30,7 @@ To use The Launcher to easily connect osquery to a server that is compliant with
 
 ```
 ./build/launcher \
-  --hostname=fleet.acme.net:443 \
+  --hostname=fleet.example.com:443 \
   --root_directory=/var/kolide-fleet \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5
 ```
@@ -124,13 +124,13 @@ $ cat queries.json | ./build/launcher query --socket=/tmp/osquery.sock
 
 ### Connecting to Fleet
 
-Let's say that you have [Kolide Fleet](https://github.com/kolide/fleet) running at https://fleet.acme.org, you could simply run the following to connect The Launcher to Fleet (assuming you replace the enroll secret with the correct string):
+Let's say that you have [Kolide Fleet](https://github.com/kolide/fleet) running at https://fleet.example.com, you could simply run the following to connect The Launcher to Fleet (assuming you replace the enroll secret with the correct string):
 
 ```
 launcher \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5 \
-  --hostname=fleet.acme.org:443 \
-  --root_directory=/var/acme/fleet
+  --hostname=fleet.example.com:443 \
+  --root_directory=/var/launcher/fleet
 ```
 
 If you're running Fleet on the default development location (https://localhost:8080), you can connect a launcher via:
@@ -139,7 +139,7 @@ If you're running Fleet on the default development location (https://localhost:8
 mkdir /tmp/fleet-launcher
 launcher \
   --enroll_secret=32IeN3QLgckHUmMD3iW40kyLdNJcGzP5 \
-  --hostname=fleet.acme.org:443 \
+  --hostname=fleet.example.com:443 \
   --root_directory=/tmp/fleet-launcher \
   --insecure
 ```

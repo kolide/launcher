@@ -61,7 +61,7 @@ As a result of receiving requests to start a shell session, *the Launcher will e
 
 ```bash
 curl -X POST \
-  http://launcher.acme.com/api/shells/991464f3-2745-4034-bcb7-64143422cd19 \
+  http://launcher.example.com/api/shells/991464f3-2745-4034-bcb7-64143422cd19 \
   -H 'Content-Type: application/json' \
 	-H 'Authorization: Bearer 0bf30053-d699-4808-a177-74a56946b181'
   -d '{}'
