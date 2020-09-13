@@ -69,9 +69,11 @@ Using `svc-fg` is the recommended approach
 
 ## Getting Help
 
-For support with our SaaS. [Kolide
-Cloud](https://kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher), please use the Help links inside that application.
+For support with our SaaS, [Kolide K2](https://app.kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher),
+please use the Intercom Help links inside that application, these are
+floating in the lower right. Or, email support@kolide.co
 
 For support regarding issues with our open-source projects, please
 feel free to reach out to us in the osquery Slack team in the #kolide
-channel: https://osquery-slack.herokuapp.com/
+channel, [invites are
+here](https://join.slack.com/t/osquery/shared_invite/zt-h29zm0gk-s2DBtGUTW4CFel0f0IjTEw)
