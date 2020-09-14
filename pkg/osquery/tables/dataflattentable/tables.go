@@ -20,6 +20,7 @@ const (
 	JsonType
 	ExecType
 	XmlType
+	IniType
 )
 
 type Table struct {
@@ -59,6 +60,9 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case XmlType:
 		t.dataFunc = dataflatten.XmlFile
 		t.tableName = "kolide_xml"
+	case IniType:
+		t.dataFunc = dataflatten.IniFile
+		t.tableName = "kolide_ini"
 	default:
 		panic("Unknown data source type")
 	}

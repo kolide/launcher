@@ -27,6 +27,7 @@ require (
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
+	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.8.0
 	github.com/go-ole/go-ole v1.2.4
 	github.com/gogo/protobuf v1.2.0
@@ -59,6 +60,7 @@ require (
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/pelletier/go-toml v1.6.0
 	github.com/peterbourgon/ff/v3 v3.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
