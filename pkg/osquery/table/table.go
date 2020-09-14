@@ -35,6 +35,13 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		SshKeys(client, logger),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.XmlType),
+
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
 	}
 
 	// add in the platform specific ones (as denoted by build tags)
