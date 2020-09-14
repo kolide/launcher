@@ -1,7 +1,7 @@
 module github.com/kolide/launcher
 
 require (
-	cloud.google.com/go v0.43.0
+	cloud.google.com/go v0.43.0 // indirect
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
@@ -20,7 +20,6 @@ require (
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/denisenkom/go-mssqldb v0.0.0-20181014144952-4e0d7dc8888f // indirect
-	github.com/dimchansky/utfbom v1.1.0
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
@@ -66,6 +65,7 @@ require (
 	github.com/prometheus/client_golang v0.9.2 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.4.0 // indirect
+	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.5.1
 	github.com/theupdateframework/notary v0.6.1
@@ -82,6 +82,7 @@ require (
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
+	gopkg.in/ini.v1 v1.61.0 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
 
