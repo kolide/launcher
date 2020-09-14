@@ -118,7 +118,7 @@ func (t *Table) execSecedit(ctx context.Context, area string) ([]byte, error) {
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
 	data, err := ioutil.ReadAll(rd)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot read file")
+		return nil, errors.Wrapf(err, "error reading secedit output file: %s", err)
 	}
 
 	return data, nil
