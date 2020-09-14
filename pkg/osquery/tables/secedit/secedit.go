@@ -81,16 +81,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) execSecedit(ctx context.Context, area string) ([]byte, error) {
-	// The secedit.exe binary does not suppot outputting the data we need to stdout
+	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-
 	dir, err := ioutil.TempDir("", "kolide_secedit_config")
 	if err != nil {
 		return nil, errors.Wrap(err, "creating kolide_secedit_config tmp dir")
 	}
+	defer os.RemoveAll(dir)
 
-	defer os.RemoveAll(dir) // clean up
 	dst := filepath.Join(dir, "tmpfile")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
