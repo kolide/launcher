@@ -36,6 +36,7 @@ const (
 	StartDisabled           = "disabled"
 	StartBoot               = "boot"
 	StartSystem             = "system"
+	StartNone               = ""
 )
 
 type InstallUninstallType string
@@ -144,10 +145,10 @@ func WithDelayedStart() ServiceOpt {
 
 func WithDisabledService() ServiceOpt {
 	return func(s *Service) {
-		s.serviceInstall.Start = "disabled"
-		// If this is not set to empty the installer hangs trying to start the
+		s.serviceInstall.Start = StartDisabled
+		// If this is not explicitly set to none, the installer hangs trying to start the
 		// disabled service.
-		s.serviceControl.Start = ""
+		s.serviceControl.Start = StartNone
 	}
 }
 
