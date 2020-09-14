@@ -114,6 +114,8 @@ func (t *Table) execSecedit(ctx context.Context, area string) ([]byte, error) {
 	}
 	defer file.Close()
 
+	// By default, secedit outputs files encoded in UTF16 Little Endian. Sadly the Go INI parser
+	// cannot read this format by default, therefore we decode the bytes into UTF-8
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
 	data, err := ioutil.ReadAll(rd)
 	if err != nil {
