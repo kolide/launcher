@@ -9,17 +9,22 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/go-ini/ini"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
+
+const seceditCmd = "secedit"
 
 type Table struct {
 	client *osquery.ExtensionManagerClient
@@ -29,10 +34,12 @@ type Table struct {
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
-		table.TextColumn("area"),
-		table.TextColumn("section"),
+		table.TextColumn("fullkey"),
+		table.TextColumn("parent"),
 		table.TextColumn("key"),
 		table.TextColumn("value"),
+		table.TextColumn("query"),
+		table.TextColumn("mergedpolicy"),
 	}
 
 	t := &Table{
@@ -46,41 +53,61 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	areaQ, ok := queryContext.Constraints["area"]
-	if !ok || len(areaQ.Constraints) == 0 {
-		return nil, errors.New("The kolide_secedit table requires an area (ex: SecurityPolicy")
-	}
-
-	for _, areaConstraint := range areaQ.Constraints {
-		area := areaConstraint.Expression
-
-		secEditResults, err := t.execSecedit(ctx, area)
+	for _, mergedpolicy := range tablehelpers.GetConstraints(queryContext, "mergedpolicy", tablehelpers.WithDefaults("")) {
+		useMergedPolicy, err := strconv.ParseBool(mergedpolicy)
 		if err != nil {
+			level.Info(t.logger).Log("msg", "Cannot convert mergedpolicy constraint into a boolean value. Try passing \"true\"", "err", err)
 			continue
 		}
 
-		iniFile, err := ini.Load(secEditResults)
-		if err != nil {
-			level.Info(t.logger).Log("msg", "ini parsing of secedit output failed", "err", err)
-			continue
-		}
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+			secEditResults, err := t.execSecedit(ctx, useMergedPolicy)
+			if err != nil {
+				level.Info(t.logger).Log("msg", "secedit failed", "err", err)
+				continue
+			}
 
-		for _, section := range iniFile.Sections() {
-			for _, key := range section.Keys() {
-				result := map[string]string{
-					"area":    area,
-					"section": section.Name(),
-					"key":     key.Name(),
-					"value":   key.Value(),
+			flatData, err := t.flattenOutput(dataQuery, secEditResults)
+			if err != nil {
+				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				continue
+			}
+
+			for _, row := range flatData {
+				p, k := row.ParentKey("/")
+
+				res := map[string]string{
+					"fullkey":      row.StringPath("/"),
+					"parent":       p,
+					"key":          k,
+					"value":        row.Value,
+					"query":        dataQuery,
+					"mergedpolicy": mergedpolicy,
 				}
-				results = append(results, result)
+				results = append(results, res)
 			}
 		}
 	}
 	return results, nil
 }
 
-func (t *Table) execSecedit(ctx context.Context, area string) ([]byte, error) {
+func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+	flattenOpts := []dataflatten.FlattenOpts{}
+
+	if dataQuery != "" {
+		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+	}
+
+	if t.logger != nil {
+		flattenOpts = append(flattenOpts,
+			dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
+		)
+	}
+
+	return dataflatten.Ini(systemOutput, flattenOpts...)
+}
+
+func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, error) {
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
@@ -97,7 +124,12 @@ func (t *Table) execSecedit(ctx context.Context, area string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "secedit", "/export", "/areas", area, "/cfg", dst)
+	args := []string{"/export", "/cfg", dst}
+	if mergedPolicy {
+		args = append(args, "/mergedpolicy")
+	}
+
+	cmd := exec.CommandContext(ctx, seceditCmd, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
