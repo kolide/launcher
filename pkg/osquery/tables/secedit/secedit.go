@@ -117,7 +117,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	}
 	defer os.RemoveAll(dir)
 
-	dst := filepath.Join(dir, "tmpfile")
+	dst := filepath.Join(dir, "tmpfile.ini")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
