@@ -55,6 +55,7 @@ type PackageOptions struct {
 	WixPath           string
 	MSIUI             bool
 	WixSkipCleanup    bool
+	DisableService    bool
 
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
@@ -295,6 +296,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		WixPath:             p.WixPath,
 		WixUI:               p.MSIUI,
 		WixSkipCleanup:      p.WixSkipCleanup,
+		DisableService:      p.DisableService,
 	}
 
 	if err := p.makePackage(ctx); err != nil {
