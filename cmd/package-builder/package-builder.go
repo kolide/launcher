@@ -180,6 +180,11 @@ func runMake(args []string) error {
 			false,
 			"Keep wix temp files",
 		)
+		flDisableService = flagset.Bool(
+			"disable_service",
+			false,
+			"Create persistence service in a disabled state",
+		)
 		flOsqueryFlags arrayFlags // set below with flagset.Var
 	)
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -250,6 +255,7 @@ func runMake(args []string) error {
 		NotaryPrefix:      *flNotaryPrefix,
 		WixPath:           *flWixPath,
 		WixSkipCleanup:    *flWixSkipCleanup,
+		DisableService:    *flDisableService,
 	}
 
 	outputDir := *flOutputDir

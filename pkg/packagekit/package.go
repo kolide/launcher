@@ -10,6 +10,8 @@ type PackageOptions struct {
 	Version    string // package version
 	FlagFile   string // Path to the flagfile for configuration
 
+	DisableService bool // Whether to install a system service in a disabled state
+
 	AppleSigningKey     string   // apple signing key
 	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
 	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key

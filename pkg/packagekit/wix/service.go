@@ -36,6 +36,7 @@ const (
 	StartDisabled           = "disabled"
 	StartBoot               = "boot"
 	StartSystem             = "system"
+	StartNone               = ""
 )
 
 type InstallUninstallType string
@@ -139,6 +140,15 @@ func ServiceDescription(desc string) ServiceOpt {
 func WithDelayedStart() ServiceOpt {
 	return func(s *Service) {
 		s.serviceInstall.ServiceConfig.DelayedAutoStart = Yes
+	}
+}
+
+func WithDisabledService() ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.Start = StartDisabled
+		// If this is not explicitly set to none, the installer hangs trying to start the
+		// disabled service.
+		s.serviceControl.Start = StartNone
 	}
 }
 
@@ -263,8 +273,8 @@ func (s *Service) Xml(w io.Writer) error {
 
 // cleanServiceName removes characters windows doesn't like in
 // services names, and converts everything to camel case. Right now,
-// it only removes likely bad characters. It is not as complete as a
-// whitelist.
+// it only removes likely bad characters. It is not as complete as an
+// allowlist.
 func cleanServiceName(in string) string {
 	r := strings.NewReplacer(
 		"-", "_",
