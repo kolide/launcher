@@ -136,7 +136,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	level.Debug(t.logger).Log("msg", "calling secedit", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling secedit. Got: %s", string(stderr.Bytes()))
+		return nil, errors.Wrapf(err, "calling secedit. Got: %s", stderr.String())
 	}
 
 	file, err := os.Open(dst)
