@@ -3,6 +3,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/osquery/tables/secedit"
 	"github.com/kolide/launcher/pkg/osquery/tables/wmitable"
 
 	"github.com/go-kit/kit/log"
@@ -13,6 +14,7 @@ import (
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{
 		ProgramIcons(),
+		secedit.TablePlugin(client, logger),
 		wmitable.TablePlugin(client, logger),
 	}
 }
