@@ -96,6 +96,29 @@ func TestQuery(t *testing.T) {
 			options:    []Option{ConnectNamespace(`root\wmi`)},
 			minRows:    1,
 		},
+		{
+			name:       "where clause",
+			class:      "CIM_DataFile",
+			properties: []string{"name", "hidden"},
+			options:    []Option{WhereClause(`name = 'c:\windows\system32\notepad.exe'`)},
+			minRows:    1,
+		},
+
+		{
+			name:       "where clause non-existent file",
+			class:      "CIM_DataFile",
+			properties: []string{"name", "hidden"},
+			options:    []Option{WhereClause(`name = 'c:\does\not\exist'`)},
+			noData:     true,
+		},
+		{
+			name:       "where clause non-existent file",
+			class:      "CIM_DataFile",
+			properties: []string{"name", "hidden"},
+			options:    []Option{WhereClause(`nameNope = 'c:\does\not\exist'`)},
+			noData:     true,
+			err:        true,
+		},
 	}
 
 	for _, tt := range tests {

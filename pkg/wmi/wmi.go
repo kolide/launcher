@@ -58,6 +58,7 @@ type querySettings struct {
 	connectLocale        string
 	connectAuthority     string
 	connectSecurityFlags uint
+	whereClause          string
 }
 
 // ConnectServerArgs returns an array suitable for being passed to ole
@@ -103,6 +104,12 @@ func ConnectUseMaxWait() Option {
 	}
 }
 
+func WithWhere(whereClause string) Option {
+	return func(qs *querySettings) {
+		qs.whereClause = whereClause
+	}
+}
+
 func Query(ctx context.Context, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", "wmi.Query")
 	handler := NewOleHandler(ctx, properties)
@@ -113,11 +120,16 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 		opt(qs)
 	}
 
+	var whereClause string
+	if qs.whereClause != "" {
+		whereClause = fmt.Sprintf(" WHERE %s", qs.whereClause)
+	}
+
 	// If we query for the exact fields, _and_ one of the property
 	// names is wrong, we get no results. (clearly an error. but I
 	// can't find it) So query for `*`, and then fetch the
 	// property. More testing might show this needs to change
-	queryString := fmt.Sprintf("SELECT * FROM %s", className)
+	queryString := fmt.Sprintf("SELECT * FROM %s%s", className, whereClause)
 
 	// Initialize the COM system.
 	if err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED); err != nil {
