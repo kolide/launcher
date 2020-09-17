@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
+	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
 	"github.com/kolide/launcher/pkg/osquery/tables/screenlock"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
@@ -37,6 +38,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		TouchIDSystemConfig(client, logger),
 		UserAvatar(logger),
 		ioreg.TablePlugin(client, logger),
+		profiles.TablePlugin(client, logger),
 		kextpolicy.TablePlugin(),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
