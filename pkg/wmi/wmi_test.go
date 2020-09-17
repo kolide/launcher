@@ -116,7 +116,6 @@ func TestQuery(t *testing.T) {
 			properties: []string{"name", "hidden"},
 			options:    []Option{WithWhere(`nameNope = 'c:\does\not\exist'`)},
 			noData:     true,
-			err:        true,
 		},
 	}
 

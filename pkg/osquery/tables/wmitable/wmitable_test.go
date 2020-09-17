@@ -18,13 +18,14 @@ func TestQueries(t *testing.T) {
 	wmiTable := Table{logger: log.NewNopLogger()}
 
 	var tests = []struct {
-		name       string
-		class      string
-		properties []string
-		namespace  string
-		minRows    int
-		noData     bool
-		err        bool
+		name        string
+		class       string
+		properties  []string
+		namespace   string
+		whereClause string
+		minRows     int
+		noData      bool
+		err         bool
 	}{
 		{
 			name:       "simple operating system query",
@@ -79,14 +80,29 @@ func TestQueries(t *testing.T) {
 			namespace:  `root\wmi`,
 			minRows:    3,
 		},
+		{
+			name:        "where clause non-existent file",
+			class:       "CIM_DataFile",
+			properties:  []string{"name", "hidden"},
+			whereClause: `name = 'c:\does\not\exist'`,
+			noData:      true,
+		},
+		{
+			name:        "where clause",
+			class:       "CIM_DataFile",
+			properties:  []string{"name", "hidden"},
+			whereClause: `name = 'c:\windows\system32\notepad.exe'`,
+			minRows:     1,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
-				"class":      []string{tt.class},
-				"properties": tt.properties,
-				"namespace":  []string{tt.namespace},
+				"class":       []string{tt.class},
+				"properties":  tt.properties,
+				"namespace":   []string{tt.namespace},
+				"whereclause": []string{tt.whereClause},
 			})
 
 			rows, err := wmiTable.generate(context.TODO(), mockQC)

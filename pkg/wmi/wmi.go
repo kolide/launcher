@@ -104,6 +104,7 @@ func ConnectUseMaxWait() Option {
 	}
 }
 
+// WithWhere will be used for the optional WHERE clause in wmi.
 func WithWhere(whereClause string) Option {
 	return func(qs *querySettings) {
 		qs.whereClause = whereClause
@@ -162,6 +163,8 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 
 	service := serviceRaw.ToIDispatch()
 	defer service.Release()
+
+	level.Debug(logger).Log("msg", "Running WMI query", "query", queryString)
 
 	// result is a SWBemObjectSet
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString)
