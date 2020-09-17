@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"path/filepath"
 	"sort"
@@ -15,10 +16,10 @@ import (
 // TestDataFlattenTable_Animals tests the basic generation
 // functionality for both plist and json parsing using the mock
 // animals data.
-func TestDataFlattenTable_Animals(t *testing.T) {
+func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	t.Parallel()
 
-	// Test this with both plist and json
+	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
 		"plist": Table{dataFunc: dataflatten.PlistFile},
 		"xml":   Table{dataFunc: dataflatten.PlistFile},
@@ -78,16 +79,62 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 
 }
 
-func TestDataFlattenIniTable(t *testing.T) {
+func TestDataFlattenTables(t *testing.T) {
 	t.Parallel()
 
-	testTable := Table{dataFunc: dataflatten.IniFile}
-	mockQC := tablehelpers.MockQueryContext(map[string][]string{
-		"path": []string{path.Join("testdata", "secdata.ini")},
-	})
+	var tests = []struct {
+		testTables   map[string]Table
+		testFile     string
+		queries      []string
+		expectedRows int
+		expectNoData bool
+	}{
+		// xml
+		{
+			testTables:   map[string]Table{"xml": Table{dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "animals.xml"),
+			expectedRows: 34,
+		},
+		{
+			testTables:   map[string]Table{"xml": Table{dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "animals.xml"),
+			queries:      []string{"this/does/not/exist"},
+			expectNoData: true,
+		},
 
-	rows, err := testTable.generate(context.TODO(), mockQC)
-	require.NoError(t, err)
-	require.Len(t, rows, 87)
+		// ini
+		{
+			testTables:   map[string]Table{"ini": Table{dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			expectedRows: 87,
+		},
+		{
+			testTables:   map[string]Table{"ini": Table{dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			queries:      []string{"this/does/not/exist"},
+			expectNoData: true,
+		},
+	}
+
+	for testN, tt := range tests {
+		for tableName, testTable := range tt.testTables {
+			t.Run(fmt.Sprintf("test%d/%s", testN, tableName), func(t *testing.T) {
+				mockQC := tablehelpers.MockQueryContext(map[string][]string{
+					"path":  []string{tt.testFile},
+					"query": tt.queries,
+				})
+
+				rows, err := testTable.generate(context.TODO(), mockQC)
+				require.NoError(t, err)
+
+				if tt.expectNoData {
+					require.Len(t, rows, 0)
+				} else {
+					require.Len(t, rows, tt.expectedRows)
+				}
+
+			})
+		}
+	}
 
 }

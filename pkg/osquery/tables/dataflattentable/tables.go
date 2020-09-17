@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -47,7 +48,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 
 	t := &Table{
 		client: client,
-		logger: level.NewFilter(logger, level.AllowInfo()),
+		logger: logger, //level.NewFilter(logger, level.AllowInfo()),
 	}
 
 	switch dataSourceType {
@@ -74,35 +75,24 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	pathQ, ok := queryContext.Constraints["path"]
-	if !ok || len(pathQ.Constraints) == 0 {
+	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
+	if len(requestedPaths) == 0 {
 		return results, errors.Errorf("The %s table requires that you specify a single constraint for path", t.tableName)
 	}
-	for _, pathConstraint := range pathQ.Constraints {
+
+	for _, requestedPath := range requestedPaths {
 
 		// We take globs in via the sql %, but glob needs *. So convert.
-		filePaths, err := filepath.Glob(strings.ReplaceAll(pathConstraint.Expression, `%`, `*`))
+		filePaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
 		if err != nil {
 			return results, errors.Wrap(err, "bad glob")
 		}
 
 		for _, filePath := range filePaths {
-
-			if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
-
-				for _, constraint := range q.Constraints {
-					dataQuery := constraint.Expression
-					subresults, err := t.generatePathQuery(filePath, dataQuery)
-					if err != nil {
-						return results, errors.Wrapf(err, "generating for path %s with query", filePath)
-					}
-
-					results = append(results, subresults...)
-				}
-			} else {
-				subresults, err := t.generatePath(filePath)
+			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+				subresults, err := t.generatePath(filePath, dataQuery)
 				if err != nil {
-					return results, errors.Wrapf(err, "generating for path %s", filePath)
+					return results, errors.Wrapf(err, "generating for path %s with query", filePath)
 				}
 
 				results = append(results, subresults...)
@@ -112,14 +102,22 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) generatePathQuery(filePath string, dataQuery string) ([]map[string]string, error) {
+func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]string, error) {
+	level.Info(t.logger).Log(
+		"msg", "seph: running query",
+		"query", dataQuery,
+	)
+
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		dataflatten.WithNestedPlist(),
 	}
 
 	if t.logger != nil {
 		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	}
+
+	if dataQuery != "" {
+		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 	}
 
 	var results []map[string]string
@@ -140,38 +138,6 @@ func (t *Table) generatePathQuery(filePath string, dataQuery string) ([]map[stri
 			"key":     k,
 			"value":   row.Value,
 			"query":   dataQuery,
-		}
-		results = append(results, res)
-	}
-
-	return results, nil
-}
-
-func (t *Table) generatePath(filePath string) ([]map[string]string, error) {
-	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithNestedPlist(),
-	}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
-	}
-
-	var results []map[string]string
-
-	data, err := t.dataFunc(filePath, flattenOpts...)
-	if err != nil {
-		return results, errors.Wrap(err, "parsing data")
-	}
-
-	for _, row := range data {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"path":    filePath,
-			"fullkey": row.StringPath("/"),
-			"parent":  p,
-			"key":     k,
-			"value":   row.Value,
 		}
 		results = append(results, res)
 	}
