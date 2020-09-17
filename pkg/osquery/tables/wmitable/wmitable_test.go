@@ -84,14 +84,14 @@ func TestQueries(t *testing.T) {
 			name:        "where clause non-existent file",
 			class:       "CIM_DataFile",
 			properties:  []string{"name", "hidden"},
-			whereClause: `name = 'c:\does\not\exist'`,
+			whereClause: `name = 'c:\\does\\not\\exist'`,
 			noData:      true,
 		},
 		{
 			name:        "where clause",
 			class:       "CIM_DataFile",
 			properties:  []string{"name", "hidden"},
-			whereClause: `name = 'c:\windows\system32\notepad.exe'`,
+			whereClause: `name = 'c:\\windows\\system32\\notepad.exe'`,
 			minRows:     1,
 		},
 	}
