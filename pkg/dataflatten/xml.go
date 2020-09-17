@@ -18,7 +18,7 @@ func XmlFile(file string, opts ...FlattenOpts) ([]Row, error) {
 		return nil, err
 	}
 
-	return Flatten(mv.Old())
+	return Flatten(mv.Old(), opts...)
 }
 
 func Xml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
@@ -28,5 +28,5 @@ func Xml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		return nil, errors.Wrap(err, "mxj parse")
 	}
 
-	return Flatten(mv.Old())
+	return Flatten(mv.Old(), opts...)
 }
