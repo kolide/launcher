@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
@@ -19,11 +20,13 @@ import (
 func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	t.Parallel()
 
+	logger := log.NewNopLogger()
+
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": Table{dataFunc: dataflatten.PlistFile},
-		"xml":   Table{dataFunc: dataflatten.PlistFile},
-		"json":  Table{dataFunc: dataflatten.JsonFile},
+		"plist": Table{logger: logger, dataFunc: dataflatten.PlistFile},
+		"xml":   Table{logger: logger, dataFunc: dataflatten.PlistFile},
+		"json":  Table{logger: logger, dataFunc: dataflatten.JsonFile},
 	}
 
 	var tests = []struct {
@@ -82,6 +85,8 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 func TestDataFlattenTables(t *testing.T) {
 	t.Parallel()
 
+	logger := log.NewNopLogger()
+
 	var tests = []struct {
 		testTables   map[string]Table
 		testFile     string
@@ -91,25 +96,37 @@ func TestDataFlattenTables(t *testing.T) {
 	}{
 		// xml
 		{
-			testTables:   map[string]Table{"xml": Table{dataFunc: dataflatten.XmlFile}},
-			testFile:     path.Join("testdata", "animals.xml"),
-			expectedRows: 34,
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
+			expectedRows: 6,
 		},
 		{
-			testTables:   map[string]Table{"xml": Table{dataFunc: dataflatten.XmlFile}},
-			testFile:     path.Join("testdata", "animals.xml"),
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
+			queries:      []string{"simple/Items"},
+			expectedRows: 3,
+		},
+		{
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
 		},
 
 		// ini
 		{
-			testTables:   map[string]Table{"ini": Table{dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			expectedRows: 87,
 		},
 		{
-			testTables:   map[string]Table{"ini": Table{dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			queries:      []string{"Registry Values"},
+			expectedRows: 59,
+		},
+		{
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
@@ -118,7 +135,7 @@ func TestDataFlattenTables(t *testing.T) {
 
 	for testN, tt := range tests {
 		for tableName, testTable := range tt.testTables {
-			t.Run(fmt.Sprintf("test%d/%s", testN, tableName), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%d/%s", testN, tableName), func(t *testing.T) {
 				mockQC := tablehelpers.MockQueryContext(map[string][]string{
 					"path":  []string{tt.testFile},
 					"query": tt.queries,

@@ -109,7 +109,7 @@ func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]st
 
 	if t.logger != nil {
 		// dataflatten is noisy, so unless we're not debugging it, filter it to info
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(level.NewFilter(logger, level.AllowInfo())))
+		flattenOpts = append(flattenOpts, dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())))
 	}
 
 	if dataQuery != "" {
