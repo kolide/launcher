@@ -48,7 +48,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 
 	t := &Table{
 		client: client,
-		logger: logger, //level.NewFilter(logger, level.AllowInfo()),
+		logger: logger,
 	}
 
 	switch dataSourceType {
@@ -103,17 +103,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]string, error) {
-	level.Info(t.logger).Log(
-		"msg", "seph: running query",
-		"query", dataQuery,
-	)
-
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithNestedPlist(),
 	}
 
 	if t.logger != nil {
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+		// dataflatten is noisy, so unless we're not debugging it, filter it to info
+		flattenOpts = append(flattenOpts, dataflatten.WithLogger(level.NewFilter(logger, level.AllowInfo())))
 	}
 
 	if dataQuery != "" {
