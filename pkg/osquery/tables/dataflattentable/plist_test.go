@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"context"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
@@ -61,6 +62,7 @@ func TestPlist(t *testing.T) {
 			require.Error(t, err)
 			continue
 		}
+		require.NoError(t, err)
 
 		// delete the path and query keys, so we don't need to enumerate them in the test case
 		for _, row := range rows {
@@ -68,7 +70,10 @@ func TestPlist(t *testing.T) {
 			delete(row, "query")
 		}
 
-		require.NoError(t, err)
+		// Despite being an array. data is returned unordered. Sort it.
+		sort.SliceStable(tt.expected, func(i, j int) bool { return tt.expected[i]["fullkey"] < tt.expected[j]["fullkey"] })
+		sort.SliceStable(rows, func(i, j int) bool { return rows[i]["fullkey"] < rows[j]["fullkey"] })
+
 		require.EqualValues(t, tt.expected, rows)
 	}
 

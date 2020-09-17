@@ -2,11 +2,13 @@ package dataflattentable
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"path/filepath"
 	"sort"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
@@ -15,14 +17,16 @@ import (
 // TestDataFlattenTable_Animals tests the basic generation
 // functionality for both plist and json parsing using the mock
 // animals data.
-func TestDataFlattenTable_Animals(t *testing.T) {
+func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	t.Parallel()
 
-	// Test this with both plist and json
+	logger := log.NewNopLogger()
+
+	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": Table{dataFunc: dataflatten.PlistFile},
-		"xml":   Table{dataFunc: dataflatten.PlistFile},
-		"json":  Table{dataFunc: dataflatten.JsonFile},
+		"plist": Table{logger: logger, dataFunc: dataflatten.PlistFile},
+		"xml":   Table{logger: logger, dataFunc: dataflatten.PlistFile},
+		"json":  Table{logger: logger, dataFunc: dataflatten.JsonFile},
 	}
 
 	var tests = []struct {
@@ -78,16 +82,76 @@ func TestDataFlattenTable_Animals(t *testing.T) {
 
 }
 
-func TestDataFlattenIniTable(t *testing.T) {
+func TestDataFlattenTables(t *testing.T) {
 	t.Parallel()
 
-	testTable := Table{dataFunc: dataflatten.IniFile}
-	mockQC := tablehelpers.MockQueryContext(map[string][]string{
-		"path": []string{path.Join("testdata", "secdata.ini")},
-	})
+	logger := log.NewNopLogger()
 
-	rows, err := testTable.generate(context.TODO(), mockQC)
-	require.NoError(t, err)
-	require.Len(t, rows, 87)
+	var tests = []struct {
+		testTables   map[string]Table
+		testFile     string
+		queries      []string
+		expectedRows int
+		expectNoData bool
+	}{
+		// xml
+		{
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
+			expectedRows: 6,
+		},
+		{
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
+			queries:      []string{"simple/Items"},
+			expectedRows: 3,
+		},
+		{
+			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testFile:     path.Join("testdata", "simple.xml"),
+			queries:      []string{"this/does/not/exist"},
+			expectNoData: true,
+		},
+
+		// ini
+		{
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			expectedRows: 87,
+		},
+		{
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			queries:      []string{"Registry Values"},
+			expectedRows: 59,
+		},
+		{
+			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testFile:     path.Join("testdata", "secdata.ini"),
+			queries:      []string{"this/does/not/exist"},
+			expectNoData: true,
+		},
+	}
+
+	for testN, tt := range tests {
+		for tableName, testTable := range tt.testTables {
+			t.Run(fmt.Sprintf("%d/%s", testN, tableName), func(t *testing.T) {
+				mockQC := tablehelpers.MockQueryContext(map[string][]string{
+					"path":  []string{tt.testFile},
+					"query": tt.queries,
+				})
+
+				rows, err := testTable.generate(context.TODO(), mockQC)
+				require.NoError(t, err)
+
+				if tt.expectNoData {
+					require.Len(t, rows, 0)
+				} else {
+					require.Len(t, rows, tt.expectedRows)
+				}
+
+			})
+		}
+	}
 
 }

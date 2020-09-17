@@ -9,11 +9,11 @@ import (
 )
 
 func IniFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	return flattenIni(file)
+	return flattenIni(file, opts...)
 }
 
 func Ini(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
-	return flattenIni(rawdata)
+	return flattenIni(rawdata, opts...)
 }
 
 // flattenIni uses go-ini to flatten ini data. The underlying library
