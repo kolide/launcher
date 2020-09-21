@@ -75,6 +75,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						profileArgs = append(profileArgs, "-type", profileType)
 					}
 
+					// setup the command line. This table overloads the `user`
+					// column so one can select either:
+					//   * All profiles merged, using the special value `_all` (this is the default)
+					//   * The device profiles, using the special value `_device`
+					//   * a user specific one, using the username
 					switch {
 					case user == "" || user == "_all":
 						profileArgs = append(profileArgs, "-all")
