@@ -72,12 +72,18 @@ func TestQueries(t *testing.T) {
 			namespace:  `root\unknown\namespace`,
 			noData:     true,
 		},
-
 		{
 			name:       "different namespace",
 			class:      "MSKeyboard_PortInformation",
 			properties: []string{"ConnectorType,FunctionKeys,Indicators"},
 			namespace:  `root\wmi`,
+			minRows:    3,
+		},
+		{
+			name:       "different namespace, double slash",
+			class:      "MSKeyboard_PortInformation",
+			properties: []string{"ConnectorType,FunctionKeys,Indicators"},
+			namespace:  `root\\wmi`,
 			minRows:    3,
 		},
 		{
