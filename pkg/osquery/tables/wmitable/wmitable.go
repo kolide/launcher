@@ -87,6 +87,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 			for _, ns := range namespaces {
+				// The namespace argument uses a bare
+				// backslash, not a doubled one. But,
+				// it's common to double backslashes
+				// to escape them through quoting
+				// blocks. We can collapse them it
+				// down here, and create a small ux
+				// improvement.
+				ns = strings.ReplaceAll(ns, `\\`, `\`)
+
 				for _, whereClause := range whereClauses {
 					// Set a timeout in case wmi hangs
 					ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
