@@ -314,32 +314,25 @@ func findOsquery() string {
 	)
 
 	for _, dir := range likelyDirectories {
-		maybeOsq := checkDirForOsquery(dir, osqBinaryName)
+		maybeOsq := filepath.Join(filepath.Clean(dir), osqBinaryName)
 
-		if maybeOsq != "" {
-			return maybeOsq
+		info, err := os.Stat(maybeOsq)
+		if err != nil {
+			continue
 		}
+
+		if info.IsDir() {
+			continue
+		}
+
+		// I guess it's good enough...
+		return maybeOsq
 	}
 
+	// last ditch, check for osquery on the PATH
 	if osqPath, err := exec.LookPath(osqBinaryName); err == nil {
 		return osqPath
 	}
 
 	return ""
-}
-
-func checkDirForOsquery(dir, osqBinaryName string) string {
-
-	maybeOsq := filepath.Join(filepath.Clean(dir), osqBinaryName)
-
-	info, err := os.Stat(maybeOsq)
-	if err != nil {
-		return ""
-	}
-
-	if info.IsDir() {
-		return ""
-	}
-
-	return maybeOsq
 }
