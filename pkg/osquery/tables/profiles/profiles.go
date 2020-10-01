@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -37,20 +38,14 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-
-		// profiles options. See `man profiles`. These may not be needed,
-		// we use `show -all` as the default, and it probably covers
-		// everything.
+	// profiles options. See `man profiles`. These may not be needed,
+	// we use `show -all` as the default, and it probably covers
+	// everything.
+	columns := dataflattentable.Columns(
 		table.TextColumn("user"),
 		table.TextColumn("command"),
 		table.TextColumn("type"),
-	}
+	)
 
 	t := &Table{
 		client:    client,
@@ -97,28 +92,29 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						continue
 					}
 
-					flatData, err := t.flattenOutput(dataQuery, profilesOutput)
+					flattenOpts := []dataflatten.FlattenOpts{
+						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+					}
+					if t.logger != nil {
+						flattenOpts = append(flattenOpts,
+							dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
+						)
+					}
+
+					flatData, err := dataflatten.Plist(profilesOutput, flattenOpts...)
 					if err != nil {
 						level.Info(t.logger).Log("msg", "flatten failed", "err", err)
 						continue
 					}
 
-					for _, row := range flatData {
-						p, k := row.ParentKey("/")
-
-						res := map[string]string{
-							"fullkey": row.StringPath("/"),
-							"parent":  p,
-							"key":     k,
-							"value":   row.Value,
-							"query":   dataQuery,
-
-							"command": command,
-							"type":    profileType,
-							"user":    user,
-						}
-						results = append(results, res)
+					rowData := map[string]string{
+						"command": command,
+						"type":    profileType,
+						"user":    user,
 					}
+
+					results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+
 				}
 			}
 		}

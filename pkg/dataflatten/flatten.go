@@ -91,6 +91,10 @@ func WithNestedPlist() FlattenOpts {
 // WithLogger sets the logger to use
 func WithLogger(logger log.Logger) FlattenOpts {
 	return func(fl *Flattener) {
+		if logger == nil {
+			return
+		}
+
 		fl.logger = logger
 	}
 }
@@ -100,6 +104,9 @@ func WithLogger(logger log.Logger) FlattenOpts {
 // Specification" for docs.
 func WithQuery(q []string) FlattenOpts {
 	return func(fl *Flattener) {
+		if q == nil || len(q) == 0 {
+			return
+		}
 		fl.query = q
 	}
 }
