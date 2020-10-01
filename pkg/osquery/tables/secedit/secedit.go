@@ -16,6 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -33,14 +34,9 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
+	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
-	}
+	)
 
 	t := &Table{
 		client: client,
@@ -73,19 +69,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
-			for _, row := range flatData {
-				p, k := row.ParentKey("/")
-
-				res := map[string]string{
-					"fullkey":      row.StringPath("/"),
-					"parent":       p,
-					"key":          k,
-					"value":        row.Value,
-					"query":        dataQuery,
-					"mergedpolicy": mergedpolicy,
-				}
-				results = append(results, res)
+			rowData := map[string]string{
+				"mergedpolicy": mergedpolicy,
 			}
+
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 		}
 	}
 	return results, nil

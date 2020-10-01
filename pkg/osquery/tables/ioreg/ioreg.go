@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -37,13 +38,7 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-
+	columns := dataflattentable.Columns(
 		// ioreg input options. These match the ioreg
 		// command line. See the ioreg man page.
 		table.TextColumn("c"),
@@ -52,7 +47,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("n"),
 		table.TextColumn("p"),
 		table.IntegerColumn("r"), // boolean
-	}
+	)
 
 	t := &Table{
 		client:    client,
@@ -133,7 +128,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 									"r": ioR,
 								}
 
-								results = append(results, dataflatten.ToMap(flatData, dataQuery, rowData)...)
+								results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 							}
 						}
 					}

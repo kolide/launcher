@@ -15,13 +15,7 @@ import (
 )
 
 func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string) *table.Plugin {
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-	}
+	columns := Columns()
 
 	t := &Table{
 		client:    client,
@@ -96,5 +90,5 @@ func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[str
 		return nil
 	}
 
-	return dataflatten.ToMap(data, dataQuery, nil)
+	return ToMap(data, dataQuery, nil)
 }

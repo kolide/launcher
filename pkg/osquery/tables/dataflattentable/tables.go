@@ -37,14 +37,7 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("path"),
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-	}
+	columns := Columns()
 
 	t := &Table{
 		client: client,
@@ -126,5 +119,5 @@ func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]st
 		"path": filePath,
 	}
 
-	return dataflatten.ToMap(data, dataQuery, rowData), nil
+	return ToMap(data, dataQuery, rowData), nil
 }
