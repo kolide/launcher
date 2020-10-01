@@ -13,10 +13,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
+
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
 type Table struct {
 	client *osquery.ExtensionManagerClient
@@ -44,14 +47,15 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	domainQ, ok := queryContext.Constraints["domain"]
-	if !ok || len(domainQ.Constraints) == 0 {
-		return nil, errors.New("the kolide_gsettings table requires a domain to be specified")
+	domains := tablehelpers.GetConstraints(queryContext, "domain", tablehelpers.WithAllowedCharacters(allowedCharacters))
+
+	if len(domains) == 0 {
+		return nil, errors.New("the kolide_gsettings table requires at least one domain to be specified")
 	}
 
-	for _, domainConstraint := range domainQ.Constraints {
-		// TODO: this doesn't handle wildcards or partial matches..
-		osqueryResults, err := t.gsettings(ctx, domainConstraint.Expression)
+	for _, domain := range domains {
+		// TODO: this doesn't handle wildcards etc
+		osqueryResults, err := t.gsettings(ctx, domain)
 		if err != nil {
 			continue
 		}
