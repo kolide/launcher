@@ -1,6 +1,6 @@
 //+build darwin
 
-// Package ioreg provides a tablle wrapper around the `ioreg` macOS
+// Package ioreg provides a table wrapper around the `ioreg` macOS
 // command.
 //
 // As the returned data is a complex nested plist, this uses the
@@ -124,24 +124,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 									continue
 								}
 
-								for _, row := range flatData {
-									p, k := row.ParentKey("/")
-
-									res := map[string]string{
-										"fullkey": row.StringPath("/"),
-										"parent":  p,
-										"key":     k,
-										"value":   row.Value,
-										"query":   dataQuery,
-										"c":       ioC,
-										"d":       ioD,
-										"k":       ioK,
-										"n":       ioN,
-										"p":       ioP,
-										"r":       ioR,
-									}
-									results = append(results, res)
+								rowData := map[string]string{
+									"c": ioC,
+									"d": ioD,
+									"k": ioK,
+									"n": ioN,
+									"p": ioP,
+									"r": ioR,
 								}
+
+								results = append(results, dataflatten.ToMap(flatData, dataQuery, rowData)...)
 							}
 						}
 					}

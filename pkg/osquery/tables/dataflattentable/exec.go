@@ -80,8 +80,6 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 }
 
 func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[string]string {
-	var results []map[string]string
-
 	flattenOpts := []dataflatten.FlattenOpts{}
 
 	if dataQuery != "" {
@@ -98,17 +96,5 @@ func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[str
 		return nil
 	}
 
-	for _, row := range data {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"fullkey": row.StringPath("/"),
-			"parent":  p,
-			"key":     k,
-			"value":   row.Value,
-			"query":   dataQuery,
-		}
-		results = append(results, res)
-	}
-	return results
+	return dataflatten.ToMap(data, dataQuery, nil)
 }
