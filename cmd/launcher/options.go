@@ -298,15 +298,39 @@ func findOsquery() string {
 		osqBinaryName = osqBinaryName + ".exe"
 	}
 
-	if exPath, err := os.Executable(); err != nil {
-		maybeOsq := filepath.Join(filepath.Base(exPath), osqBinaryName)
+	var likelyDirectories []string
 
-		info, err := os.Stat(maybeOsq)
-		if err != nil && !info.IsDir() {
-			return maybeOsq
-		}
+	if exPath, err := os.Executable(); err == nil {
+		likelyDirectories = append(likelyDirectories, filepath.Dir(exPath))
 	}
 
+	// Places to check. We could conditionalize on GOOS, but it doesn't
+	// seem important.
+	likelyDirectories = append(
+		likelyDirectories,
+		"/usr/local/kolide/bin",
+		"/usr/local/kolide-k2/bin",
+		"/usr/local/bin",
+		`C:\Program Files\osquery`,
+	)
+
+	for _, dir := range likelyDirectories {
+		maybeOsq := filepath.Join(filepath.Clean(dir), osqBinaryName)
+
+		info, err := os.Stat(maybeOsq)
+		if err != nil {
+			continue
+		}
+
+		if info.IsDir() {
+			continue
+		}
+
+		// I guess it's good enough...
+		return maybeOsq
+	}
+
+	// last ditch, check for osquery on the PATH
 	if osqPath, err := exec.LookPath(osqBinaryName); err == nil {
 		return osqPath
 	}
