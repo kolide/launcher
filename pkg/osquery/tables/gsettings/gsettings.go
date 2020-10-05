@@ -13,20 +13,29 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
+const gsettingsPath = "/usr/bin/gsettings"
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
-type Table struct {
+type GsettingsValues struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+type GsettingsMetadata struct {
+	client *osquery.ExtensionManagerClient
+	logger log.Logger
+}
+
+// Settings returns a table plugin for querying setting values from the
+// gsettings command.
+func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
 		table.TextColumn("domain"),
@@ -36,7 +45,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("description"),
 	}
 
-	t := &Table{
+	t := &GsettingsValues{
 		client: client,
 		logger: logger,
 	}
@@ -44,30 +53,63 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	return table.NewPlugin("kolide_gsettings", columns, t.generate)
 }
 
-func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
-
 	domains := tablehelpers.GetConstraints(queryContext, "domain", tablehelpers.WithAllowedCharacters(allowedCharacters))
-
 	if len(domains) == 0 {
 		return nil, errors.New("the kolide_gsettings table requires at least one domain to be specified")
 	}
 
 	for _, domain := range domains {
-		// TODO: this doesn't handle wildcards etc
-		osqueryResults, err := t.gsettings(ctx, domain)
+		output, err := t.execGsettings(ctx, domain)
 		if err != nil {
+			level.Info(t.logger).Log("msg", "gsettings failed", "err", err, "domain", domain)
 			continue
 		}
+		data, err := t.flatten("", output)
 
-		for _, row := range osqueryResults {
-			results = append(results, row)
+		for _, row := range data {
+			p, k := row.ParentKey("/")
+
+			res := map[string]string{
+				"fullkey": row.StringPath("/"),
+				"parent":  p,
+				"key":     k,
+				"value":   row.Value,
+				"domain":  p,
+				"query":   "",
+			}
+			results = append(results, res)
 		}
 	}
+
 	return results, nil
 }
 
-func (t *Table) gsettings(ctx context.Context, domain string) ([]map[string]string, error) {
+// func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+// 	var results []map[string]string
+
+// 	domains := tablehelpers.GetConstraints(queryContext, "domain", tablehelpers.WithAllowedCharacters(allowedCharacters))
+
+// 	if len(domains) == 0 {
+// 		return nil, errors.New("the kolide_gsettings table requires at least one domain to be specified")
+// 	}
+
+// 	for _, domain := range domains {
+// 		// TODO: this doesn't handle wildcards etc
+// 		osqueryResults, err := t.gsettings(ctx, domain)
+// 		if err != nil {
+// 			continue
+// 		}
+
+// 		for _, row := range osqueryResults {
+// 			results = append(results, row)
+// 		}
+// 	}
+// 	return results, nil
+// }
+
+func (t *GsettingsValues) execGsettings(ctx context.Context, domain string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -94,17 +136,87 @@ func (t *Table) gsettings(ctx context.Context, domain string) ([]map[string]stri
 		)
 		return nil, errors.Wrap(err, "running osquery")
 	}
-	osqueryResults := t.parse(stdout)
-	for _, row := range osqueryResults {
-		d, err := t.gsettingsDescribe(ctx, row["key"], row["domain"])
-		if err != nil {
-			continue
-		}
-		row["description"] = d.Description
-		row["type"] = d.Type
+	return stdout.Bytes(), nil
+
+}
+
+func (t *GsettingsValues) flatten(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+	buffer := bytes.NewBuffer(systemOutput)
+
+	rawResults := t.parse(buffer)
+	var rows []dataflatten.Row
+
+	for _, result := range rawResults {
+		row := dataflatten.NewRow([]string{result["domain"], result["key"]}, result["value"])
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+// func (t *Table) gsettings(ctx context.Context, domain string) ([]map[string]string, error) {
+// 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+// 	defer cancel()
+
+// 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", domain)
+// 	dir, err := ioutil.TempDir("", "osq-gsettings")
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "mktemp")
+// 	}
+// 	defer os.RemoveAll(dir)
+
+// 	if err := os.Chmod(dir, 0755); err != nil {
+// 		return nil, errors.Wrap(err, "chmod")
+// 	}
+// 	cmd.Dir = dir
+// 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
+// 	cmd.Stdout, cmd.Stderr = stdout, stderr
+
+// 	if err := cmd.Run(); err != nil {
+// 		level.Info(t.logger).Log(
+// 			"msg", "Error running gsettings",
+// 			"stderr", strings.TrimSpace(stderr.String()),
+// 			"stdout", strings.TrimSpace(stdout.String()),
+// 			"err", err,
+// 		)
+// 		return nil, errors.Wrap(err, "running osquery")
+// 	}
+// 	osqueryResults := t.parse(stdout)
+// 	for _, row := range osqueryResults {
+// 		d, err := t.gsettingsDescribe(ctx, row["key"], row["domain"])
+// 		if err != nil {
+// 			continue
+// 		}
+// 		row["description"] = d.Description
+// 		row["type"] = d.Type
+// 	}
+
+// 	return osqueryResults, nil
+// }
+
+// Metadata returns a table plugin for querying metadata about specific keys in
+// specific domains
+func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+
+	columns := []table.ColumnDefinition{
+		// TODO: maybe need to add 'path' for relocatable schemas..
+		table.TextColumn("domain"),
+		table.TextColumn("key"),
+		table.TextColumn("type"),
+		table.TextColumn("value"),
+		table.TextColumn("description"),
 	}
 
-	return osqueryResults, nil
+	t := &GsettingsMetadata{
+		client: client,
+		logger: logger,
+	}
+
+	return table.NewPlugin("kolide_gsettings_metadata", columns, t.generate)
+}
+
+func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	// TODO: Implement me
+	return []map[string]string{}, nil
 }
 
 type datatype struct {
@@ -116,7 +228,7 @@ type keyDescription struct {
 	Type        string
 }
 
-func (t *Table) gsettingsDescribe(ctx context.Context, key, domain string) (keyDescription, error) {
+func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, domain string) (keyDescription, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -156,7 +268,7 @@ func (t *Table) gsettingsDescribe(ctx context.Context, key, domain string) (keyD
 	return desc, nil
 }
 
-func (t *Table) getType(ctx context.Context, key, domain string) (string, error) {
+func (t *GsettingsValues) getType(ctx context.Context, key, domain string) (string, error) {
 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "range", domain, key)
 	dir, err := ioutil.TempDir("", "osq-gsettings-range")
 	if err != nil {
@@ -212,20 +324,6 @@ func (t *Table) getType(ctx context.Context, key, domain string) (string, error)
 
 // this feels.. not idiomatic
 var gvariantMapping = map[string]string{
-	/*
-		b: the type string of G_VARIANT_TYPE_BOOLEAN; a boolean value.
-		y: the type string of G_VARIANT_TYPE_BYTE; a byte.
-		n: the type string of G_VARIANT_TYPE_INT16; a signed 16 bit integer.
-		q: the type string of G_VARIANT_TYPE_UINT16; an unsigned 16 bit integer.
-		i: the type string of G_VARIANT_TYPE_INT32; a signed 32 bit integer.
-		u: the type string of G_VARIANT_TYPE_UINT32; an unsigned 32 bit integer.
-		x: the type string of G_VARIANT_TYPE_INT64; a signed 64 bit integer.
-		t: the type string of G_VARIANT_TYPE_UINT64; an unsigned 64 bit integer.
-		h: the type string of G_VARIANT_TYPE_HANDLE; a signed 32 bit value that, by convention, is used as an index into an array of file descriptors that are sent alongside a D-Bus message.
-		d: the type string of G_VARIANT_TYPE_DOUBLE; a double precision floating point value.
-		s: the type string of G_VARIANT_TYPE_STRING; a string.
-		a: used as a prefix on another type string to mean an array of that type; the type string "ai", for example, is the type of an array of signed 32-bit integers.
-	*/
 	"b": "bool",
 	"n": "int16",
 	"q": "uint16",
@@ -259,7 +357,7 @@ func convertType(typ string) string {
 	return fmt.Sprintf("%s%s", prefix, primitive_typ)
 }
 
-func (t *Table) parse(input *bytes.Buffer) []map[string]string {
+func (t *GsettingsValues) parse(input *bytes.Buffer) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)

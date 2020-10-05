@@ -13,6 +13,7 @@ import (
 // unimplemented platforms.
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{
-		gsettings.TablePlugin(client, logger),
+		gsettings.Settings(client, logger),
+		gsettings.Metadata(client, logger),
 	}
 }

@@ -38,7 +38,7 @@ func TestParser(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		table := Table{logger: log.NewNopLogger()}
+		table := GsettingsValues{logger: log.NewNopLogger()}
 		t.Run(tt.input, func(t *testing.T) {
 			inputBytes, err := ioutil.ReadFile(filepath.Join("testdata", tt.input))
 			require.NoError(t, err, "read file %s", tt.input)
