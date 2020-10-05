@@ -38,11 +38,9 @@ type GsettingsMetadata struct {
 func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
-		table.TextColumn("domain"),
+		table.TextColumn("schema"),
 		table.TextColumn("key"),
-		table.TextColumn("type"),
 		table.TextColumn("value"),
-		table.TextColumn("description"),
 	}
 
 	t := &GsettingsValues{
@@ -55,15 +53,15 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
-	domains := tablehelpers.GetConstraints(queryContext, "domain", tablehelpers.WithAllowedCharacters(allowedCharacters))
-	if len(domains) == 0 {
-		return nil, errors.New("the kolide_gsettings table requires at least one domain to be specified")
+	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
+	if len(schemas) == 0 {
+		return nil, errors.New("the kolide_gsettings table requires at least one schema to be specified")
 	}
 
-	for _, domain := range domains {
-		output, err := t.execGsettings(ctx, domain)
+	for _, schema := range schemas {
+		output, err := t.execGsettings(ctx, schema)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "gsettings failed", "err", err, "domain", domain)
+			level.Info(t.logger).Log("msg", "gsettings failed", "err", err, "schema", schema)
 			continue
 		}
 		data, err := t.flatten("", output)
@@ -76,7 +74,7 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 				"parent":  p,
 				"key":     k,
 				"value":   row.Value,
-				"domain":  p,
+				"schema":  p,
 				"query":   "",
 			}
 			results = append(results, res)
@@ -89,15 +87,15 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 // func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 // 	var results []map[string]string
 
-// 	domains := tablehelpers.GetConstraints(queryContext, "domain", tablehelpers.WithAllowedCharacters(allowedCharacters))
+// 	schema := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
 
-// 	if len(domains) == 0 {
-// 		return nil, errors.New("the kolide_gsettings table requires at least one domain to be specified")
+// 	if len(schemas) == 0 {
+// 		return nil, errors.New("the kolide_gsettings table requires at least one schema to be specified")
 // 	}
 
-// 	for _, domain := range domains {
+// 	for _, schema := range schemas {
 // 		// TODO: this doesn't handle wildcards etc
-// 		osqueryResults, err := t.gsettings(ctx, domain)
+// 		osqueryResults, err := t.gsettings(ctx, schema)
 // 		if err != nil {
 // 			continue
 // 		}
@@ -109,11 +107,11 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 // 	return results, nil
 // }
 
-func (t *GsettingsValues) execGsettings(ctx context.Context, domain string) ([]byte, error) {
+func (t *GsettingsValues) execGsettings(ctx context.Context, schema string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", domain)
+	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", schema)
 	dir, err := ioutil.TempDir("", "osq-gsettings")
 	if err != nil {
 		return nil, errors.Wrap(err, "mktemp")
@@ -147,17 +145,17 @@ func (t *GsettingsValues) flatten(dataQuery string, systemOutput []byte) ([]data
 	var rows []dataflatten.Row
 
 	for _, result := range rawResults {
-		row := dataflatten.NewRow([]string{result["domain"], result["key"]}, result["value"])
+		row := dataflatten.NewRow([]string{result["schema"], result["key"]}, result["value"])
 		rows = append(rows, row)
 	}
 	return rows, nil
 }
 
-// func (t *Table) gsettings(ctx context.Context, domain string) ([]map[string]string, error) {
+// func (t *Table) gsettings(ctx context.Context, schema string) ([]map[string]string, error) {
 // 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 // 	defer cancel()
 
-// 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", domain)
+// 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", schema)
 // 	dir, err := ioutil.TempDir("", "osq-gsettings")
 // 	if err != nil {
 // 		return nil, errors.Wrap(err, "mktemp")
@@ -182,7 +180,7 @@ func (t *GsettingsValues) flatten(dataQuery string, systemOutput []byte) ([]data
 // 	}
 // 	osqueryResults := t.parse(stdout)
 // 	for _, row := range osqueryResults {
-// 		d, err := t.gsettingsDescribe(ctx, row["key"], row["domain"])
+// 		d, err := t.gsettingsDescribe(ctx, row["key"], row["schema"])
 // 		if err != nil {
 // 			continue
 // 		}
@@ -194,15 +192,13 @@ func (t *GsettingsValues) flatten(dataQuery string, systemOutput []byte) ([]data
 // }
 
 // Metadata returns a table plugin for querying metadata about specific keys in
-// specific domains
+// specific schemas
 func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
-		table.TextColumn("domain"),
+		table.TextColumn("schema"),
 		table.TextColumn("key"),
-		table.TextColumn("type"),
-		table.TextColumn("value"),
 		table.TextColumn("description"),
 	}
 
@@ -228,12 +224,12 @@ type keyDescription struct {
 	Type        string
 }
 
-func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, domain string) (keyDescription, error) {
+func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, schema string) (keyDescription, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
 	var desc keyDescription
-	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "describe", domain, key)
+	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "describe", schema, key)
 	dir, err := ioutil.TempDir("", "osq-gsettings-desc")
 	if err != nil {
 		return keyDescription{}, errors.Wrap(err, "mktemp")
@@ -251,7 +247,7 @@ func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, domain str
 		level.Debug(t.logger).Log(
 			"msg", "Error running gsettings describe",
 			"key", key,
-			"domain", domain,
+			"schema", schema,
 			"stderr", strings.TrimSpace(stderr.String()),
 			"stdout", strings.TrimSpace(stdout.String()),
 			"err", err,
@@ -259,7 +255,7 @@ func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, domain str
 		return keyDescription{}, errors.Wrap(err, "running gsettings describe")
 	}
 	desc.Description = strings.TrimSpace(stdout.String())
-	datatype, err := t.getType(ctx, key, domain)
+	datatype, err := t.getType(ctx, key, schema)
 	if err != nil {
 		return desc, errors.Wrap(err, "discerning key's type")
 	}
@@ -268,8 +264,8 @@ func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, domain str
 	return desc, nil
 }
 
-func (t *GsettingsValues) getType(ctx context.Context, key, domain string) (string, error) {
-	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "range", domain, key)
+func (t *GsettingsValues) getType(ctx context.Context, key, schema string) (string, error) {
+	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "range", schema, key)
 	dir, err := ioutil.TempDir("", "osq-gsettings-range")
 	if err != nil {
 		return "", errors.Wrap(err, "mktemp")
@@ -287,7 +283,7 @@ func (t *GsettingsValues) getType(ctx context.Context, key, domain string) (stri
 		level.Debug(t.logger).Log(
 			"msg", "Error running gsettings range",
 			"key", key,
-			"domain", domain,
+			"schema", schema,
 			"stderr", strings.TrimSpace(stderr.String()),
 			"stdout", strings.TrimSpace(stdout.String()),
 			"err", err,
@@ -370,7 +366,7 @@ func (t *GsettingsValues) parse(input *bytes.Buffer) []map[string]string {
 
 		row := make(map[string]string)
 		parts := strings.SplitN(line, " ", 3)
-		row["domain"] = parts[0]
+		row["schema"] = parts[0]
 		row["key"] = parts[1]
 		row["value"] = parts[2]
 		results = append(results, row)
