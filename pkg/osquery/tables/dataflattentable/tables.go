@@ -37,14 +37,7 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("path"),
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-	}
+	columns := Columns()
 
 	t := &Table{
 		client: client,
@@ -116,27 +109,15 @@ func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]st
 		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 	}
 
-	var results []map[string]string
-
 	data, err := t.dataFunc(filePath, flattenOpts...)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
-		return results, errors.Wrap(err, "parsing data")
+		return nil, errors.Wrap(err, "parsing data")
 	}
 
-	for _, row := range data {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"path":    filePath,
-			"fullkey": row.StringPath("/"),
-			"parent":  p,
-			"key":     k,
-			"value":   row.Value,
-			"query":   dataQuery,
-		}
-		results = append(results, res)
+	rowData := map[string]string{
+		"path": filePath,
 	}
 
-	return results, nil
+	return ToMap(data, dataQuery, rowData), nil
 }

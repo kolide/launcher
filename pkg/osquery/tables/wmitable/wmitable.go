@@ -9,6 +9,7 @@ import (
 
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/wmi"
 
@@ -28,20 +29,12 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		// dataflatten columns
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-
-		// wmi columns
+	columns := dataflattentable.Columns(
 		table.TextColumn("namespace"),
 		table.TextColumn("class"),
 		table.TextColumn("properties"),
 		table.TextColumn("whereclause"),
-	}
+	)
 
 	t := &Table{
 		client: client,
@@ -152,23 +145,12 @@ func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]int
 		return nil
 	}
 
-	var results []map[string]string
-
-	for _, row := range flatData {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"fullkey":     row.StringPath("/"),
-			"parent":      p,
-			"key":         k,
-			"value":       row.Value,
-			"query":       dataQuery,
-			"class":       wmiClass,
-			"properties":  wmiProperties,
-			"namespace":   wmiNamespace,
-			"whereclause": whereClause,
-		}
-		results = append(results, res)
+	rowData := map[string]string{
+		"class":       wmiClass,
+		"properties":  wmiProperties,
+		"namespace":   wmiNamespace,
+		"whereclause": whereClause,
 	}
-	return results
+
+	return dataflattentable.ToMap(flatData, dataQuery, rowData)
 }

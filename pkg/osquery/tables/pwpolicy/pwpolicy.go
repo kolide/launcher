@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -36,15 +37,9 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
-		table.TextColumn("query"),
-
+	columns := dataflattentable.Columns(
 		table.TextColumn("username"),
-	}
+	)
 
 	t := &Table{
 		client:    client,
@@ -72,45 +67,30 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
-			flatData, err := t.flattenOutput(dataQuery, pwPolicyOutput)
+			flattenOpts := []dataflatten.FlattenOpts{
+				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+			}
+			if t.logger != nil {
+				flattenOpts = append(flattenOpts,
+					dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
+				)
+			}
+
+			flatData, err := dataflatten.Plist(pwPolicyOutput, flattenOpts...)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
 				continue
 			}
 
-			for _, row := range flatData {
-				p, k := row.ParentKey("/")
-
-				res := map[string]string{
-					"fullkey":  row.StringPath("/"),
-					"parent":   p,
-					"key":      k,
-					"value":    row.Value,
-					"query":    dataQuery,
-					"username": pwpolicyUsername,
-				}
-				results = append(results, res)
+			rowData := map[string]string{
+				"username": pwpolicyUsername,
 			}
+
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 		}
 	}
 
 	return results, nil
-}
-
-func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
-	flattenOpts := []dataflatten.FlattenOpts{}
-
-	if dataQuery != "" {
-		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
-	}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts,
-			dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
-		)
-	}
-
-	return dataflatten.Plist(systemOutput, flattenOpts...)
 }
 
 func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error) {

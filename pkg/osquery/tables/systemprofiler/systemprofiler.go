@@ -46,6 +46,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -85,17 +86,11 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("fullkey"),
-		table.TextColumn("parent"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
+	columns := dataflattentable.Columns(
 		table.TextColumn("parentdatatype"),
-
-		table.TextColumn("query"),
 		table.TextColumn("datatype"),
 		table.TextColumn("detaillevel"),
-	}
+	)
 
 	t := &Table{
 		client:    client,
@@ -183,28 +178,19 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 
 		dataType := systemProfilerResult.DataType
 
-		data, err := dataflatten.Flatten(systemProfilerResult.Items, flattenOpts...)
-
+		flatData, err := dataflatten.Flatten(systemProfilerResult.Items, flattenOpts...)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "failure flattening system_profile output", "err", err)
-			return nil
+			continue
 		}
 
-		for _, row := range data {
-			p, k := row.ParentKey("/")
-
-			res := map[string]string{
-				"datatype":       dataType,
-				"parentdatatype": systemProfilerResult.ParentDataType,
-				"fullkey":        row.StringPath("/"),
-				"parent":         p,
-				"key":            k,
-				"value":          row.Value,
-				"query":          dataQuery,
-				"detaillevel":    detailLevel,
-			}
-			results = append(results, res)
+		rowData := map[string]string{
+			"datatype":       dataType,
+			"parentdatatype": systemProfilerResult.ParentDataType,
+			"detaillevel":    detailLevel,
 		}
+
+		results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 	}
 
 	return results
