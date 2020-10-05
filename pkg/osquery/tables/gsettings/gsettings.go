@@ -14,7 +14,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -24,8 +24,9 @@ const gsettingsPath = "/usr/bin/gsettings"
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
 type GsettingsValues struct {
-	client *osquery.ExtensionManagerClient
-	logger log.Logger
+	client   *osquery.ExtensionManagerClient
+	logger   log.Logger
+	getBytes func(ctx context.Context, buf *bytes.Buffer) error
 }
 
 type GsettingsMetadata struct {
@@ -36,16 +37,20 @@ type GsettingsMetadata struct {
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
 func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := []table.ColumnDefinition{
-		// TODO: maybe need to add 'path' for relocatable schemas..
-		table.TextColumn("schema"),
-		table.TextColumn("key"),
-		table.TextColumn("value"),
+	var columns []table.ColumnDefinition
+
+	// we don't need the 'query' column.
+	// we could also just type out all the cols we do want
+	for _, col := range dataflattentable.Columns(table.TextColumn("schema")) {
+		if col.Name != "query" {
+			columns = append(columns, col)
+		}
 	}
 
 	t := &GsettingsValues{
-		client: client,
-		logger: logger,
+		client:   client,
+		logger:   logger,
+		getBytes: execGsettings,
 	}
 
 	return table.NewPlugin("kolide_gsettings", columns, t.generate)
@@ -53,143 +58,84 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
-	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
-	if len(schemas) == 0 {
-		return nil, errors.New("the kolide_gsettings table requires at least one schema to be specified")
+	var output bytes.Buffer
+
+	err := t.getBytes(ctx, &output)
+	if err != nil {
+		level.Info(t.logger).Log("msg", "gsettings failed", "err", err)
+
+		return results, err
+	}
+	data, err := t.flatten(&output)
+	if err != nil {
+		level.Info(t.logger).Log(
+			"msg", "error flattening data",
+			"err", err,
+		)
+		return results, err
 	}
 
-	for _, schema := range schemas {
-		output, err := t.execGsettings(ctx, schema)
-		if err != nil {
-			level.Info(t.logger).Log("msg", "gsettings failed", "err", err, "schema", schema)
-			continue
-		}
-		data, err := t.flatten("", output)
+	for _, row := range data {
+		p, k := row.ParentKey("/")
 
-		for _, row := range data {
-			p, k := row.ParentKey("/")
-
-			res := map[string]string{
-				"fullkey": row.StringPath("/"),
-				"parent":  p,
-				"key":     k,
-				"value":   row.Value,
-				"schema":  p,
-				"query":   "",
-			}
-			results = append(results, res)
+		res := map[string]string{
+			"fullkey": row.StringPath("/"),
+			"parent":  p,
+			"key":     k,
+			"value":   row.Value,
+			"schema":  p,
 		}
+		results = append(results, res)
 	}
 
 	return results, nil
 }
 
-// func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-// 	var results []map[string]string
-
-// 	schema := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
-
-// 	if len(schemas) == 0 {
-// 		return nil, errors.New("the kolide_gsettings table requires at least one schema to be specified")
-// 	}
-
-// 	for _, schema := range schemas {
-// 		// TODO: this doesn't handle wildcards etc
-// 		osqueryResults, err := t.gsettings(ctx, schema)
-// 		if err != nil {
-// 			continue
-// 		}
-
-// 		for _, row := range osqueryResults {
-// 			results = append(results, row)
-// 		}
-// 	}
-// 	return results, nil
-// }
-
-func (t *GsettingsValues) execGsettings(ctx context.Context, schema string) ([]byte, error) {
+// execGsettings writes the output of running 'gsettings' command into the supplied bytes buffer
+func execGsettings(ctx context.Context, buf *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", schema)
+	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively")
 	dir, err := ioutil.TempDir("", "osq-gsettings")
 	if err != nil {
-		return nil, errors.Wrap(err, "mktemp")
+		return errors.Wrap(err, "mktemp")
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return nil, errors.Wrap(err, "chmod")
+		return errors.Wrap(err, "chmod")
 	}
 	cmd.Dir = dir
-	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+	cmd.Stdout = buf
 
 	if err := cmd.Run(); err != nil {
-		level.Info(t.logger).Log(
-			"msg", "Error running gsettings",
-			"stderr", strings.TrimSpace(stderr.String()),
-			"stdout", strings.TrimSpace(stdout.String()),
-			"err", err,
-		)
-		return nil, errors.Wrap(err, "running osquery")
+		return errors.Wrap(err, "running osquery")
 	}
-	return stdout.Bytes(), nil
 
+	return nil
 }
 
-func (t *GsettingsValues) flatten(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
-	buffer := bytes.NewBuffer(systemOutput)
-
-	rawResults := t.parse(buffer)
+func (t *GsettingsValues) flatten(buffer *bytes.Buffer) ([]dataflatten.Row, error) {
+	flattenOpts := []dataflatten.FlattenOpts{}
+	if t.logger != nil {
+		flattenOpts = append(flattenOpts,
+			dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
+		)
+	}
+	results := t.parse(buffer)
 	var rows []dataflatten.Row
 
-	for _, result := range rawResults {
+	// rows, err := dataflatten.Flatten(results)
+
+	for _, result := range results {
 		row := dataflatten.NewRow([]string{result["schema"], result["key"]}, result["value"])
 		rows = append(rows, row)
 	}
 	return rows, nil
 }
-
-// func (t *Table) gsettings(ctx context.Context, schema string) ([]map[string]string, error) {
-// 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-// 	defer cancel()
-
-// 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively", schema)
-// 	dir, err := ioutil.TempDir("", "osq-gsettings")
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "mktemp")
-// 	}
-// 	defer os.RemoveAll(dir)
-
-// 	if err := os.Chmod(dir, 0755); err != nil {
-// 		return nil, errors.Wrap(err, "chmod")
-// 	}
-// 	cmd.Dir = dir
-// 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-// 	cmd.Stdout, cmd.Stderr = stdout, stderr
-
-// 	if err := cmd.Run(); err != nil {
-// 		level.Info(t.logger).Log(
-// 			"msg", "Error running gsettings",
-// 			"stderr", strings.TrimSpace(stderr.String()),
-// 			"stdout", strings.TrimSpace(stdout.String()),
-// 			"err", err,
-// 		)
-// 		return nil, errors.Wrap(err, "running osquery")
-// 	}
-// 	osqueryResults := t.parse(stdout)
-// 	for _, row := range osqueryResults {
-// 		d, err := t.gsettingsDescribe(ctx, row["key"], row["schema"])
-// 		if err != nil {
-// 			continue
-// 		}
-// 		row["description"] = d.Description
-// 		row["type"] = d.Type
-// 	}
-
-// 	return osqueryResults, nil
-// }
 
 // Metadata returns a table plugin for querying metadata about specific keys in
 // specific schemas
