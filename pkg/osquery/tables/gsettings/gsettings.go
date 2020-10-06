@@ -35,7 +35,7 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 	var columns []table.ColumnDefinition
 
 	// we don't need the 'query' column.
-	// we could also just type out all the cols we do want
+	// we could also just type out all the cols we *do* want..
 	for _, col := range dataflattentable.Columns(table.TextColumn("schema")) {
 		if col.Name != "query" {
 			columns = append(columns, col)
@@ -91,7 +91,7 @@ func execGsettings(ctx context.Context, buf *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-recursively")
+	cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively")
 	dir, err := ioutil.TempDir("", "osq-gsettings")
 	if err != nil {
 		return errors.Wrap(err, "mktemp")
@@ -114,12 +114,6 @@ func execGsettings(ctx context.Context, buf *bytes.Buffer) error {
 }
 
 func (t *GsettingsValues) flatten(buffer *bytes.Buffer) ([]dataflatten.Row, error) {
-	flattenOpts := []dataflatten.FlattenOpts{}
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts,
-			dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
-		)
-	}
 	results := t.parse(buffer)
 	var rows []dataflatten.Row
 
