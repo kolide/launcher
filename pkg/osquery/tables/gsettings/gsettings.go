@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -128,8 +129,6 @@ func (t *GsettingsValues) flatten(buffer *bytes.Buffer) ([]dataflatten.Row, erro
 	results := t.parse(buffer)
 	var rows []dataflatten.Row
 
-	// rows, err := dataflatten.Flatten(results)
-
 	for _, result := range results {
 		row := dataflatten.NewRow([]string{result["schema"], result["key"]}, result["value"])
 		rows = append(rows, row)
@@ -146,6 +145,7 @@ func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
 		table.TextColumn("description"),
+		table.TextColumn("type"),
 	}
 
 	t := &GsettingsMetadata{
@@ -157,8 +157,32 @@ func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	// TODO: Implement me
-	return []map[string]string{}, nil
+
+	var results []map[string]string
+
+	for _, schema := range tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters)) {
+		descriptions, err := t.gsettingsDescribeForSchema(ctx, schema, "")
+		if err != nil {
+			level.Info(t.logger).Log(
+				"msg", "error describing keys for schema",
+				"schema", schema,
+				"err", err,
+			)
+			continue
+		}
+		for _, d := range descriptions {
+			row := map[string]string{
+				"description": d.Description,
+				"type":        d.Type,
+				"schema":      schema,
+				"key":         d.Key,
+			}
+			results = append(results, row)
+		}
+
+	}
+
+	return results, nil
 }
 
 type datatype struct {
@@ -168,13 +192,92 @@ type datatype struct {
 type keyDescription struct {
 	Description string
 	Type        string
+	Key         string
 }
 
-func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, schema string) (keyDescription, error) {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
+func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema, key string) ([]keyDescription, error) {
+	var descriptions []keyDescription
+	var keys []string
+	var err error
 
-	var desc keyDescription
+	if key != "" {
+		keys = append(keys, key)
+	} else {
+		keys, err = t.listKeys(ctx, schema, t.logger)
+		if err != nil {
+			return descriptions, errors.Wrap(err, "fetching keys to describe")
+		}
+	}
+
+	for _, k := range keys {
+		desc, err := t.describeKey(ctx, schema, k)
+		if err != nil {
+			level.Info(t.logger).Log(
+				"msg", "error describing key",
+				"key", key,
+				"schema", schema,
+				"err", err,
+			)
+			continue
+		}
+		descriptions = append(descriptions, desc)
+	}
+
+	return descriptions, nil
+}
+
+func (t *GsettingsMetadata) listKeys(ctx context.Context, schema string, l log.Logger) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var keys []string
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "list-keys", schema)
+	dir, err := ioutil.TempDir("", "osq-gsettings-list-keys")
+	if err != nil {
+		return keys, errors.Wrap(err, "mktemp")
+	}
+	defer os.RemoveAll(dir)
+
+	if err := os.Chmod(dir, 0755); err != nil {
+		return keys, errors.Wrap(err, "chmod")
+	}
+	cmd.Dir = dir
+	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+
+	if err := cmd.Run(); err != nil {
+		level.Info(t.logger).Log(
+			"msg", "Error running gsettings list-keys",
+			"schema", schema,
+			"stderr", strings.TrimSpace(stderr.String()),
+			"stdout", strings.TrimSpace(stdout.String()),
+			"err", err,
+		)
+		return keys, errors.Wrap(err, "running gsettings list-keys")
+	}
+
+	scanner := bufio.NewScanner(stdout)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		keys = append(keys, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		level.Info(t.logger).Log("msg", "scanner error", "err", err)
+	}
+
+	return keys, nil
+}
+
+func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key string) (keyDescription, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	desc := keyDescription{Key: key}
 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "describe", schema, key)
 	dir, err := ioutil.TempDir("", "osq-gsettings-desc")
 	if err != nil {
@@ -200,6 +303,7 @@ func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, schema str
 		)
 		return keyDescription{}, errors.Wrap(err, "running gsettings describe")
 	}
+
 	desc.Description = strings.TrimSpace(stdout.String())
 	datatype, err := t.getType(ctx, key, schema)
 	if err != nil {
@@ -210,7 +314,7 @@ func (t *GsettingsValues) gsettingsDescribe(ctx context.Context, key, schema str
 	return desc, nil
 }
 
-func (t *GsettingsValues) getType(ctx context.Context, key, schema string) (string, error) {
+func (t *GsettingsMetadata) getType(ctx context.Context, key, schema string) (string, error) {
 	cmd := exec.CommandContext(ctx, "/usr/bin/gsettings", "range", schema, key)
 	dir, err := ioutil.TempDir("", "osq-gsettings-range")
 	if err != nil {

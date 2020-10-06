@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOutputParsing(t *testing.T) {
+func TestGsettingsValues(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
