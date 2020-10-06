@@ -49,9 +49,13 @@ func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 
 	var results []map[string]string
+	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
+	if len(schemas) < 1 {
+		return results, errors.New("kolide_gsettings_metadata table requires at least one schemas to be specified")
+	}
 
-	for _, schema := range tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters)) {
-		descriptions, err := t.gsettingsDescribeForSchema(ctx, schema, "")
+	for _, schema := range schemas {
+		descriptions, err := t.gsettingsDescribeForSchema(ctx, schema)
 		if err != nil {
 			level.Info(t.logger).Log(
 				"msg", "error describing keys for schema",
@@ -93,18 +97,12 @@ func (k *keyDescription) toMap() map[string]string {
 	}
 }
 
-func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema, key string) ([]keyDescription, error) {
+func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
 	var descriptions []keyDescription
-	var keys []string
-	var err error
 
-	if key != "" {
-		keys = append(keys, key)
-	} else {
-		keys, err = t.listKeys(ctx, schema)
-		if err != nil {
-			return descriptions, errors.Wrap(err, "fetching keys to describe")
-		}
+	keys, err := t.listKeys(ctx, schema)
+	if err != nil {
+		return descriptions, errors.Wrap(err, "fetching keys to describe")
 	}
 
 	for _, k := range keys {
@@ -112,7 +110,7 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 		if err != nil {
 			level.Info(t.logger).Log(
 				"msg", "error describing key",
-				"key", key,
+				"key", k,
 				"schema", schema,
 				"err", err,
 			)
