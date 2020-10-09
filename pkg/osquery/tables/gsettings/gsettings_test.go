@@ -27,19 +27,15 @@ func TestGsettingsValues(t *testing.T) {
 			filename: "simple.txt",
 			expected: []map[string]string{
 				{
-					"fullkey": "org.gnome.rhythmbox.plugins.webremote/access-key",
-					"parent":  "org.gnome.rhythmbox.plugins.webremote",
-					"key":     "access-key",
-					"value":   "''",
-					"schema":  "org.gnome.rhythmbox.plugins.webremote",
+					"key":    "access-key",
+					"value":  "''",
+					"schema": "org.gnome.rhythmbox.plugins.webremote",
 				},
 				{
 
-					"fullkey": "org.gnome.rhythmbox.plugins.webremote/foo-bar",
-					"parent":  "org.gnome.rhythmbox.plugins.webremote",
-					"key":     "foo-bar",
-					"value":   "2",
-					"schema":  "org.gnome.rhythmbox.plugins.webremote",
+					"key":    "foo-bar",
+					"value":  "2",
+					"schema": "org.gnome.rhythmbox.plugins.webremote",
 				},
 			},
 		},

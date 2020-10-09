@@ -12,8 +12,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/dataflatten"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -32,14 +30,10 @@ type GsettingsValues struct {
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
 func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	var columns []table.ColumnDefinition
-
-	// we don't need the 'query' column.
-	// we could also just type out all the cols we *do* want..
-	for _, col := range dataflattentable.Columns(table.TextColumn("schema")) {
-		if col.Name != "query" {
-			columns = append(columns, col)
-		}
+	columns := []table.ColumnDefinition{
+		table.TextColumn("schema"),
+		table.TextColumn("key"),
+		table.TextColumn("value"),
 	}
 
 	t := &GsettingsValues{
@@ -61,26 +55,13 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 
 		return results, err
 	}
-	data, err := t.flatten(&output)
+	results = t.parse(&output)
 	if err != nil {
 		level.Info(t.logger).Log(
 			"msg", "error flattening data",
 			"err", err,
 		)
 		return results, err
-	}
-
-	for _, row := range data {
-		p, k := row.ParentKey("/")
-
-		res := map[string]string{
-			"fullkey": row.StringPath("/"),
-			"parent":  p,
-			"key":     k,
-			"value":   row.Value,
-			"schema":  p,
-		}
-		results = append(results, res)
 	}
 
 	return results, nil
@@ -111,17 +92,6 @@ func execGsettings(ctx context.Context, buf *bytes.Buffer) error {
 	}
 
 	return nil
-}
-
-func (t *GsettingsValues) flatten(buffer *bytes.Buffer) ([]dataflatten.Row, error) {
-	results := t.parse(buffer)
-	var rows []dataflatten.Row
-
-	for _, result := range results {
-		row := dataflatten.NewRow([]string{result["schema"], result["key"]}, result["value"])
-		rows = append(rows, row)
-	}
-	return rows, nil
 }
 
 func (t *GsettingsValues) parse(input *bytes.Buffer) []map[string]string {
