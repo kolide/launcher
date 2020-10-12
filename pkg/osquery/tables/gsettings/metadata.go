@@ -51,7 +51,7 @@ func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.Que
 	var results []map[string]string
 	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(schemas) < 1 {
-		return results, errors.New("kolide_gsettings_metadata table requires at least one schemas to be specified")
+		return results, errors.New("kolide_gsettings_metadata table requires at least one schema to be specified")
 	}
 
 	for _, schema := range schemas {
