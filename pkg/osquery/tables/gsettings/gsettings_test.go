@@ -46,7 +46,7 @@ func TestGsettingsValues(t *testing.T) {
 	for _, tt := range tests {
 		table := GsettingsValues{
 			logger: log.NewNopLogger(),
-			getBytes: func(ctx context.Context, username string, l log.Logger, buf *bytes.Buffer) error {
+			getBytes: func(ctx context.Context, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
 				_, err = buf.ReadFrom(f)
@@ -94,7 +94,7 @@ func TestPerUser(t *testing.T) {
 			expected: map[string]string{
 				"user":   "blaed",
 				"key":    "idle-delay",
-				"value":  "uint32 240",
+				"value":  "uint32 240", //  TODO: should parse out the uint32...
 				"schema": "org.gnome.desktop.session",
 			},
 			unexpected: map[string]string{

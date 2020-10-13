@@ -26,7 +26,7 @@ const gsettingsPath = "/usr/bin/gsettings"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
-type gsettingsExecer func(ctx context.Context, username string, logger log.Logger, buf *bytes.Buffer) error
+type gsettingsExecer func(ctx context.Context, username string, buf *bytes.Buffer) error
 
 type GsettingsValues struct {
 	client   *osquery.ExtensionManagerClient
@@ -63,7 +63,7 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 	for _, username := range users {
 		var output bytes.Buffer
 
-		err := t.getBytes(ctx, username, t.logger, &output)
+		err := t.getBytes(ctx, username, &output)
 		if err != nil {
 			level.Info(t.logger).Log(
 				"msg", "error getting bytes for user",
@@ -83,16 +83,15 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 	return results, nil
 }
 
-// execGsettings writes the output of running 'gsettings' command into the supplied bytes buffer
-// TODO: would maybe be cleaner to make logger a functional option..
-func execGsettings(ctx context.Context, username string, l log.Logger, buf *bytes.Buffer) error {
+// execGsettings writes the output of running 'gsettings' command into the
+// supplied bytes buffer
+func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	u, err := user.Lookup(username)
 	if err != nil {
-		level.Info(l).Log("msg", "unable to lookup user by username", "username", username)
-		return errors.Wrap(err, "finding user by username")
+		return errors.Wrapf(err, "finding user by username '%s'", username)
 	}
 
 	cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively")
@@ -142,15 +141,7 @@ func execGsettings(ctx context.Context, username string, l log.Logger, buf *byte
 	cmd.Stdout = buf
 
 	if err := cmd.Run(); err != nil {
-		level.Error(l).Log(
-			"msg", "error running gsettings",
-			"stderr", strings.TrimSpace(stderr.String()),
-			"stdout", strings.TrimSpace(buf.String()),
-			"cmd", cmd.Args,
-			"err", err,
-		)
-
-		return errors.Wrapf(err, "exec-ing gsettings")
+		return errors.Wrapf(err, "running gsettings, err is: %s", stderr.String())
 	}
 
 	return nil
