@@ -60,7 +60,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			pwpolicyArgs = append(pwpolicyArgs, "-u", pwpolicyUsername)
 		}
 
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			pwPolicyOutput, err := t.execPwpolicy(ctx, pwpolicyArgs)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "pwpolicy failed", "err", err)

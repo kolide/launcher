@@ -71,7 +71,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		tablehelpers.WithAllowedCharacters(allowedCharacters+`:\= '".`),
 	)
 
-	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults(""))
+	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*"))
 
 	for _, class := range classes {
 		for _, rawProperties := range properties {
