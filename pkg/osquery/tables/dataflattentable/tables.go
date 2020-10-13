@@ -37,7 +37,7 @@ type Table struct {
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
 
-	columns := Columns()
+	columns := Columns(table.TextColumn("path"))
 
 	t := &Table{
 		client: client,
