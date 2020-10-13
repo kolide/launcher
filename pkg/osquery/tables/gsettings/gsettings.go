@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,7 +26,7 @@ const gsettingsPath = "/usr/bin/gsettings"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
-type gsettingsExecer func(ctx context.Context, uid int, logger log.Logger, buf *bytes.Buffer) error
+type gsettingsExecer func(ctx context.Context, username string, logger log.Logger, buf *bytes.Buffer) error
 
 type GsettingsValues struct {
 	client   *osquery.ExtensionManagerClient
@@ -57,25 +58,24 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 
 	users := tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(users) < 1 {
-		return results, errors.New("kolide_gsettings requires at least one user id to be specified")
+		return results, errors.New("kolide_gsettings requires at least one user name to be specified")
 	}
-
-	for _, u := range users {
+	for _, username := range users {
 		var output bytes.Buffer
-		uid, err := strconv.Atoi(u)
+
+		err := t.getBytes(ctx, username, t.logger, &output)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "unable to cast supplied uid as int", "uid", uid)
-		}
-		err = t.getBytes(ctx, uid, t.logger, &output)
-		if err != nil {
-			// assume that getBytes logs the error.. might be better to log it here, but for debugging it's nice to log it in getBytes to append the stdout and stderr
-			// return results, errors.Wrap(err, "calling getbytes")
-			return results, errors.Wrap(err, "getting bytes")
+			level.Info(t.logger).Log(
+				"msg", "error getting bytes for user",
+				"username", username,
+				"err", err,
+			)
+			continue
 		}
 
 		user_results := t.parse(&output)
 		for _, r := range user_results {
-			r["user"] = u
+			r["user"] = username
 			results = append(results, r)
 		}
 	}
@@ -85,19 +85,18 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 
 // execGsettings writes the output of running 'gsettings' command into the supplied bytes buffer
 // TODO: would maybe be cleaner to make logger a functional option..
-func execGsettings(ctx context.Context, uid int, l log.Logger, buf *bytes.Buffer) error {
+func execGsettings(ctx context.Context, username string, l log.Logger, buf *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	u, err := user.LookupId(string(uid))
+	u, err := user.Lookup(username)
 	if err != nil {
-		return errors.Wrap(err, "looking up user by uid")
+		level.Info(l).Log("msg", "unable to lookup user by username", "username", username)
+		return errors.Wrap(err, "finding user by username")
 	}
 
-	// cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively", "--schemadir", u.HomeDir)
 	cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively")
 
-	// EXPERIMENTAL: uncommenting this seems to cause no results to be returned.
 	// set the HOME for the the cmd so that gsettings is exec'd properly as the
 	// new user.
 	cmd.Env = append(os.Environ(), fmt.Sprintf("HOME=%s", u.HomeDir))
@@ -108,17 +107,19 @@ func execGsettings(ctx context.Context, uid int, l log.Logger, buf *bytes.Buffer
 		return errors.Wrap(err, "checking current user uid")
 	}
 
-	// adding a cmd.SysProcAttr.Credential sets the user the command is run
-	// under, as identified by the uid
-	if strconv.Itoa(uid) != currentUser.Uid {
-		// guid, err := strconv.Atoi(u.Gid)
-		// if err != nil {
-		// 	return errors.Wrap(err, "converting guid from string to int")
-		// }
+	if u.Uid != currentUser.Uid {
+		uid, err := strconv.Atoi(u.Uid)
+		if err != nil {
+			return errors.Wrap(err, "converting uid from string to int")
+		}
+		gid, err := strconv.Atoi(u.Gid)
+		if err != nil {
+			return errors.Wrap(err, "converting gid from string to int")
+		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 		cmd.SysProcAttr.Credential = &syscall.Credential{
 			Uid: uint32(uid),
-			Gid: 20,
+			Gid: uint32(gid),
 		}
 	}
 
@@ -128,9 +129,12 @@ func execGsettings(ctx context.Context, uid int, l log.Logger, buf *bytes.Buffer
 	}
 	defer os.RemoveAll(dir)
 
+	// if we don't chmod the dir, we get errors like:
+	// 'fork/exec /usr/bin/gsettings: permission denied'
 	if err := os.Chmod(dir, 0755); err != nil {
 		return errors.Wrap(err, "chmod")
 	}
+
 	cmd.Dir = dir
 
 	stderr := new(bytes.Buffer)
@@ -138,14 +142,15 @@ func execGsettings(ctx context.Context, uid int, l log.Logger, buf *bytes.Buffer
 	cmd.Stdout = buf
 
 	if err := cmd.Run(); err != nil {
-		// level.Error(l).Log(
-		// 	"msg", "error running gsettings",
-		// 	"stderr", strings.TrimSpace(stderr.String()),
-		// 	"stdout", strings.TrimSpace(buf.String()),
-		// 	"cmd", cmd.Args,
-		// 	"err", err,
-		// )
-		return errors.Wrapf(err, "exec-ing gsettings, cmd was %a, stderr: %s", cmd.Args)
+		level.Error(l).Log(
+			"msg", "error running gsettings",
+			"stderr", strings.TrimSpace(stderr.String()),
+			"stdout", strings.TrimSpace(buf.String()),
+			"cmd", cmd.Args,
+			"err", err,
+		)
+
+		return errors.Wrapf(err, "exec-ing gsettings")
 	}
 
 	return nil
@@ -162,26 +167,24 @@ func (t *GsettingsValues) parse(input *bytes.Buffer) []map[string]string {
 			continue
 		}
 
-		// parts := strings.SplitN(line, " ", 3)
-		// if len(parts) < 3 {
-		// 	level.Error(t.logger).Log(
-		// 		"msg", "unable to process line, not enough segments",
-		// 		"line", line,
-		// 	)
-		// 	continue
-		// }
+		parts := strings.SplitN(line, " ", 3)
+		if len(parts) < 3 {
+			level.Error(t.logger).Log(
+				"msg", "unable to process line, not enough segments",
+				"line", line,
+			)
+			continue
+		}
 		row := make(map[string]string)
-		// row["schema"] = parts[0]
-		// row["key"] = parts[1]
-		// row["value"] = parts[2]
+		row["schema"] = parts[0]
+		row["key"] = parts[1]
+		row["value"] = parts[2]
 
-		row["value"] = line
 		results = append(results, row)
 	}
 
 	if err := scanner.Err(); err != nil {
 		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
-		panic(err)
 	}
 
 	return results

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/user"
 	"path/filepath"
 	"testing"
 
@@ -27,12 +28,13 @@ func TestGsettingsValues(t *testing.T) {
 			filename: "simple.txt",
 			expected: []map[string]string{
 				{
+					"user":   "tester",
 					"key":    "access-key",
 					"value":  "''",
 					"schema": "org.gnome.rhythmbox.plugins.webremote",
 				},
 				{
-
+					"user":   "tester",
 					"key":    "foo-bar",
 					"value":  "2",
 					"schema": "org.gnome.rhythmbox.plugins.webremote",
@@ -44,7 +46,7 @@ func TestGsettingsValues(t *testing.T) {
 	for _, tt := range tests {
 		table := GsettingsValues{
 			logger: log.NewNopLogger(),
-			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
+			getBytes: func(ctx context.Context, username string, l log.Logger, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
 				_, err = buf.ReadFrom(f)
@@ -55,7 +57,9 @@ func TestGsettingsValues(t *testing.T) {
 		}
 		t.Run(tt.filename, func(t *testing.T) {
 			ctx := context.TODO()
-			qCon := tablehelpers.MockQueryContext(map[string][]string{})
+			qCon := tablehelpers.MockQueryContext(map[string][]string{
+				"user": []string{"tester"},
+			})
 
 			results, err := table.generate(ctx, qCon)
 			require.NoError(t, err, "generating results from %s", tt.filename)
@@ -64,57 +68,78 @@ func TestGsettingsValues(t *testing.T) {
 	}
 }
 
-// func TestGsettingsMetadata(t *testing.T) {
-// 	t.Parallel()
+func TestPerUser(t *testing.T) {
+	t.Parallel()
 
-// 	var tests = []struct {
-// 		filename string
-// 		expected []map[string]string
-// 	}{
-// 		{
-// 			filename: "simple.txt",
-// 			expected: []map[string]string{
-// 				{
-// 					"fullkey": "org.gnome.rhythmbox.plugins.webremote/access-key",
-// 					"parent":  "org.gnome.rhythmbox.plugins.webremote",
-// 					"key":     "access-key",
-// 					"value":   "''",
-// 					"schema":  "org.gnome.rhythmbox.plugins.webremote",
-// 				},
-// 				{
+	currentUser, err := user.Current()
+	require.NoError(t, err)
+	if currentUser.Username != "blaed" {
+		// all these tests will only pass if run as root, and with specific
+		// gnome desktop settings set. The setup to make this test run in CI
+		// is... complex
+		t.Skip("skipping - proper setup not detected")
+	}
 
-// 					"fullkey": "org.gnome.rhythmbox.plugins.webremote/foo-bar",
-// 					"parent":  "org.gnome.rhythmbox.plugins.webremote",
-// 					"key":     "foo-bar",
-// 					"value":   "2",
-// 					"schema":  "org.gnome.rhythmbox.plugins.webremote",
-// 				},
-// 			},
-// 		},
-// 	}
+	var tests = []struct {
+		usernames   []string
+		keyNames    []string
+		schemaNames []string
+		expected    map[string]string
+		unexpected  map[string]string
+	}{
+		{
+			usernames:   []string{"blaed"},
+			keyNames:    []string{"idle-delay"},
+			schemaNames: []string{"org.gnome.desktop.session"},
+			expected: map[string]string{
+				"user":   "blaed",
+				"key":    "idle-delay",
+				"value":  "uint32 240",
+				"schema": "org.gnome.desktop.session",
+			},
+			unexpected: map[string]string{
+				"user":   "blaed",
+				"key":    "idle-delay",
+				"value":  "uint32 300", // the default/global value
+				"schema": "org.gnome.desktop.session",
+			},
+		},
+		{
+			usernames:   []string{"kids"},
+			keyNames:    []string{"idle-delay"},
+			schemaNames: []string{"org.gnome.desktop.session"},
+			expected: map[string]string{
+				"user":   "kids",
+				"key":    "idle-delay",
+				"value":  "uint32 600",
+				"schema": "org.gnome.desktop.session",
+			},
+			unexpected: map[string]string{
+				"user":   "kids",
+				"key":    "idle-delay",
+				"value":  "uint32 300", // the default/global value
+				"schema": "org.gnome.desktop.session",
+			},
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		table := GsettingsValues{
-// 			logger: log.NewNopLogger(),
-// 			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
-// 				f, err := os.Open(filepath.Join("testdata", tt.filename))
-// 				require.NoError(t, err, "opening file %s", tt.filename)
-// 				_, err = buf.ReadFrom(f)
-// 				require.NoError(t, err, "read file %s", tt.filename)
+	for _, tt := range tests {
+		table := GsettingsValues{
+			logger:   log.NewNopLogger(),
+			getBytes: execGsettings,
+		}
+		mockQC := tablehelpers.MockQueryContext(map[string][]string{
+			"user":   tt.usernames,
+			"schema": tt.schemaNames,
+			"key":    tt.keyNames,
+		})
 
-// 				return nil
-// 			},
-// 		}
-// 		t.Run(tt.filename, func(t *testing.T) {
-// 			ctx := context.TODO()
-// 			qCon := tablehelpers.MockQueryContext(map[string][]string{})
-
-// 			results, err := table.generate(ctx, qCon)
-// 			require.NoError(t, err, "generating results from %s", tt.filename)
-// 			require.ElementsMatch(t, tt.expected, results)
-// 		})
-// 	}
-// }
+		rows, err := table.generate(context.TODO(), mockQC)
+		require.NoError(t, err, "generating results")
+		require.Contains(t, rows, tt.expected, "generated rows should contain the expected result")
+		require.NotContains(t, rows, tt.unexpected, "generated rows should not contain the unexpected result")
+	}
+}
 
 func TestListKeys(t *testing.T) {
 	t.Parallel()
