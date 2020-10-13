@@ -107,11 +107,11 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	}
 
 	if u.Uid != currentUser.Uid {
-		uid, err := strconv.Atoi(u.Uid)
+		uid, err := strconv.ParseInt(u.Uid, 10, 32)
 		if err != nil {
 			return errors.Wrap(err, "converting uid from string to int")
 		}
-		gid, err := strconv.Atoi(u.Gid)
+		gid, err := strconv.ParseInt(u.Gid, 10, 32)
 		if err != nil {
 			return errors.Wrap(err, "converting gid from string to int")
 		}
