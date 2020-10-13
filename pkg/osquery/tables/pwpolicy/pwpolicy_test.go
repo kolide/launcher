@@ -26,15 +26,15 @@ func TestQueries(t *testing.T) {
 	}{
 		{
 			name: "no data, just languages",
-			file: path.Join("testdata", "empty.out"),
+			file: path.Join("testdata", "empty.output"),
 			len:  41,
 		},
 		{
-			file: path.Join("testdata", "test1.out"),
+			file: path.Join("testdata", "test1.output"),
 			len:  148,
 		},
 		{
-			file:        path.Join("testdata", "test1.out"),
+			file:        path.Join("testdata", "test1.output"),
 			queryClause: []string{"policyCategoryAuthentication"},
 			len:         8,
 		},
