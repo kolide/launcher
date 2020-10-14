@@ -276,7 +276,7 @@ var gvariantMapping = map[string]string{
 //  - nested types (e.g.// array of tuples: `a(ss)`)
 // and other complex types are not supported.
 func convertType(typ string) string {
-	typ = strings.Replace(typ, "type ", "", 1) // remove any leading 'type ', eg 'type b'
+	typ = strings.TrimPrefix(typ, "type ") // remove any leading 'type ', eg in 'type b'
 	var prefix string
 	if strings.HasPrefix(typ, "a") {
 		typ = typ[1:]

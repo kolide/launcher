@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -149,7 +150,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	return nil
 }
 
-func (t *GsettingsValues) parse(input *bytes.Buffer) []map[string]string {
+func (t *GsettingsValues) parse(input io.Reader) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)
