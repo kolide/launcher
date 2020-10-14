@@ -98,7 +98,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 
 	// set the HOME for the the cmd so that gsettings is exec'd properly as the
 	// new user.
-	cmd.Env = append(os.Environ(), fmt.Sprintf("HOME=%s", u.HomeDir))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
 
 	// Check if the supplied UID is that of the current user
 	currentUser, err := user.Current()

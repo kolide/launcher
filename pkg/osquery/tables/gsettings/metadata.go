@@ -49,8 +49,8 @@ func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-
 	var results []map[string]string
+
 	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(schemas) < 1 {
 		return results, errors.New("kolide_gsettings_metadata table requires at least one schema to be specified")
@@ -269,9 +269,10 @@ var gvariantMapping = map[string]string{
 }
 
 // convertType returns a string describing the GVariantType corresponding to the
-// GVariant-formatted type string. see  https://developer.gnome.org/glib/unstable/glib-GVariantType.html
-// for documentation. Note that not all types listed in the documentation above
-// are supported, for example:
+// GVariant-formatted type string. see
+// https://developer.gnome.org/glib/unstable/glib-GVariantType.html for
+// documentation. Note that not all types listed in the documentation above are
+// supported, for example:
 //  - tuples (e.g. tuple of 2 strings `(ss)`)
 //  - nested types (e.g.// array of tuples: `a(ss)`)
 // and other complex types are not supported.

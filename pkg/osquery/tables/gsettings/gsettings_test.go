@@ -238,3 +238,68 @@ func TestGetType(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertType(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "b",
+			expected: "bool",
+		},
+		{
+			input:    "n",
+			expected: "int16",
+		},
+		{
+			input:    "q",
+			expected: "uint16",
+		},
+		{
+			input:    "u",
+			expected: "uint32",
+		},
+		{
+			input:    "x",
+			expected: "int64",
+		},
+		{
+			input:    "t",
+			expected: "uint64",
+		},
+		{
+			input:    "d",
+			expected: "double",
+		},
+		{
+			input:    "s",
+			expected: "string",
+		},
+		{
+			input:    "as",
+			expected: "array of string",
+		},
+		{
+			input:    "ax",
+			expected: "array of int64",
+		},
+		{
+			input:    "at",
+			expected: "array of uint64",
+		},
+		{
+			input:    "(ss)", // tuples currently unsupported
+			expected: "other",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := convertType(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
