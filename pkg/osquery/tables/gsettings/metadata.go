@@ -81,22 +81,10 @@ func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.Que
 	return results, nil
 }
 
-type datatype struct {
-	raw string
-}
-
 type keyDescription struct {
 	Description string
 	Type        string
 	Key         string
-}
-
-func (k *keyDescription) toMap() map[string]string {
-	return map[string]string{
-		"description": k.Description,
-		"type":        k.Type,
-		"key":         k.Key,
-	}
 }
 
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
@@ -192,6 +180,10 @@ func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmp
 	return strings.TrimSpace(output.String()), nil
 }
 
+// getType fetches the type _as described by the gsettings cli tool_ and
+// converts it into something human readable. The conversion of the actual
+// GVariant type from 'GVariant code' to golang-ish type descriptions is handled
+// by convertType
 func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir string) (string, error) {
 	output := new(bytes.Buffer)
 
