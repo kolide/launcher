@@ -24,7 +24,7 @@ import (
 type GsettingsMetadata struct {
 	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
-	cmdRunner func(ctx context.Context, args []string, output *bytes.Buffer) error
+	cmdRunner func(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error
 }
 
 // Metadata returns a table plugin for querying metadata about specific keys in
@@ -102,13 +102,23 @@ func (k *keyDescription) toMap() map[string]string {
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
 	var descriptions []keyDescription
 
-	keys, err := t.listKeys(ctx, schema)
+	dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-metadata-%s", schema))
+	if err != nil {
+		return descriptions, errors.Wrap(err, "mktemp")
+	}
+	defer os.RemoveAll(dir)
+
+	if err := os.Chmod(dir, 0755); err != nil {
+		return descriptions, errors.Wrap(err, "chmod")
+	}
+
+	keys, err := t.listKeys(ctx, schema, dir)
 	if err != nil {
 		return descriptions, errors.Wrap(err, "fetching keys to describe")
 	}
 
 	for _, k := range keys {
-		desc, err := t.describeKey(ctx, schema, k)
+		desc, err := t.describeKey(ctx, schema, k, dir)
 		if err != nil {
 			level.Info(t.logger).Log(
 				"msg", "error describing key",
@@ -124,11 +134,11 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 	return descriptions, nil
 }
 
-func (t *GsettingsMetadata) listKeys(ctx context.Context, schema string) ([]string, error) {
+func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string) ([]string, error) {
 	var keys []string
 	output := new(bytes.Buffer)
 
-	err := t.cmdRunner(ctx, []string{"list-keys", schema}, output)
+	err := t.cmdRunner(ctx, []string{"list-keys", schema}, tmpdir, output)
 	if err != nil {
 		return keys, errors.Wrap(err, "fetching keys")
 	}
@@ -150,16 +160,19 @@ func (t *GsettingsMetadata) listKeys(ctx context.Context, schema string) ([]stri
 	return keys, nil
 }
 
-func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key string) (keyDescription, error) {
+// describeKey returns a keyDescription struct that contains metadata about a
+// single key, namely a 'description' string/paragraph and an explanation of its
+// type
+func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir string) (keyDescription, error) {
 	desc := keyDescription{Key: key}
 
-	d, err := t.getDescription(ctx, schema, key)
+	d, err := t.getDescription(ctx, schema, key, tmpdir)
 	if err != nil {
 		return desc, errors.Wrap(err, "getting key's description")
 	}
 	desc.Description = d
 
-	datatype, err := t.getType(ctx, key, schema)
+	datatype, err := t.getType(ctx, schema, key, tmpdir)
 	if err != nil {
 		return desc, errors.Wrap(err, "discerning key's type")
 	}
@@ -168,10 +181,10 @@ func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key string)
 	return desc, nil
 }
 
-func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key string) (string, error) {
+func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmpdir string) (string, error) {
 	output := new(bytes.Buffer)
 
-	err := t.cmdRunner(ctx, []string{"describe", schema, key}, output)
+	err := t.cmdRunner(ctx, []string{"describe", schema, key}, tmpdir, output)
 	if err != nil {
 		return "", errors.Wrap(err, "describing key")
 	}
@@ -179,10 +192,10 @@ func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key stri
 	return strings.TrimSpace(output.String()), nil
 }
 
-func (t *GsettingsMetadata) getType(ctx context.Context, key, schema string) (string, error) {
+func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir string) (string, error) {
 	output := new(bytes.Buffer)
 
-	err := t.cmdRunner(ctx, []string{"range", schema, key}, output)
+	err := t.cmdRunner(ctx, []string{"range", schema, key}, tmpdir, output)
 	if err != nil {
 		return "", errors.Wrap(err, "running 'gsettings range'")
 	}
@@ -213,22 +226,25 @@ func (t *GsettingsMetadata) getType(ctx context.Context, key, schema string) (st
 	return convertType(result), nil
 }
 
-func execGsettingsCommand(ctx context.Context, args []string, output *bytes.Buffer) error {
+// execGsettingsCommand should be called with a tmpdir that will be cleaned up.
+func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	command := args[0]
 	cmd := exec.CommandContext(ctx, gsettingsPath, args...)
-	dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-%s", command))
-	if err != nil {
-		return errors.Wrap(err, "mktemp")
-	}
-	defer os.RemoveAll(dir)
 
-	if err := os.Chmod(dir, 0755); err != nil {
-		return errors.Wrap(err, "chmod")
-	}
-	cmd.Dir = dir
+	// dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-%s", command))
+	// if err != nil {
+	// 	return errors.Wrap(err, "mktemp")
+	// }
+	// defer os.RemoveAll(dir)
+
+	// if err := os.Chmod(dir, 0755); err != nil {
+	// 	return errors.Wrap(err, "chmod")
+	// }
+
+	cmd.Dir = tmpdir
 	cmd.Stderr = new(bytes.Buffer)
 	cmd.Stdout = output
 

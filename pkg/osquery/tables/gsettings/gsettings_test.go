@@ -5,6 +5,7 @@ package gsettings
 import (
 	"bytes"
 	"context"
+	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -60,7 +61,7 @@ func TestGsettingsValues(t *testing.T) {
 		t.Run(tt.filename, func(t *testing.T) {
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
-				"user": []string{"tester"},
+				"user": {"tester"},
 			})
 
 			results, err := table.generate(ctx, qCon)
@@ -171,7 +172,7 @@ func TestListKeys(t *testing.T) {
 	for _, tt := range tests {
 		table := GsettingsMetadata{
 			logger: log.NewNopLogger(),
-			cmdRunner: func(ctx context.Context, args []string, buf *bytes.Buffer) error {
+			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
 				_, err = buf.ReadFrom(f)
@@ -183,7 +184,14 @@ func TestListKeys(t *testing.T) {
 		t.Run(tt.filename, func(t *testing.T) {
 			ctx := context.TODO()
 
-			results, err := table.listKeys(ctx, "org.gnome.Mines")
+			dir, err := ioutil.TempDir("", "testlistkeys")
+			require.NoError(t, err, "making tmp dir")
+			defer os.RemoveAll(dir)
+
+			// err = os.Chmod(dir, 0755)
+			// require.NoError(t, err, "chmod tmp dir")
+
+			results, err := table.listKeys(ctx, "org.gnome.Mines", dir)
 			require.NoError(t, err, "generating results from %s", tt.filename)
 			require.ElementsMatch(t, tt.expected, results)
 		})
@@ -222,7 +230,7 @@ func TestGetType(t *testing.T) {
 	for _, tt := range tests {
 		table := GsettingsMetadata{
 			logger: log.NewNopLogger(),
-			cmdRunner: func(ctx context.Context, args []string, buf *bytes.Buffer) error {
+			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
 				_, err := buf.WriteString(tt.input)
 				require.NoError(t, err)
 
@@ -232,7 +240,14 @@ func TestGetType(t *testing.T) {
 		t.Run(tt.expected, func(t *testing.T) {
 			ctx := context.TODO()
 
-			result, err := table.getType(ctx, "key", "schema")
+			dir, err := ioutil.TempDir("", "testlistkeys")
+			require.NoError(t, err, "making tmp dir")
+			defer os.RemoveAll(dir)
+
+			// err = os.Chmod(dir, 0755)
+			// require.NoError(t, err, "chmod tmp dir")
+
+			result, err := table.getType(ctx, "key", "schema", dir)
 			require.NoError(t, err, "getting type", tt.expected)
 			require.Equal(t, tt.expected, result)
 		})
