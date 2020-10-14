@@ -30,16 +30,16 @@ func TestGsettingsValues(t *testing.T) {
 			filename: "simple.txt",
 			expected: []map[string]string{
 				{
-					"user":   "tester",
-					"key":    "access-key",
-					"value":  "''",
-					"schema": "org.gnome.rhythmbox.plugins.webremote",
+					"username": "tester",
+					"key":      "access-key",
+					"value":    "''",
+					"schema":   "org.gnome.rhythmbox.plugins.webremote",
 				},
 				{
-					"user":   "tester",
-					"key":    "foo-bar",
-					"value":  "2",
-					"schema": "org.gnome.rhythmbox.plugins.webremote",
+					"username": "tester",
+					"key":      "foo-bar",
+					"value":    "2",
+					"schema":   "org.gnome.rhythmbox.plugins.webremote",
 				},
 			},
 		},
@@ -60,7 +60,7 @@ func TestGsettingsValues(t *testing.T) {
 		t.Run(tt.filename, func(t *testing.T) {
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
-				"user": {"tester"},
+				"username": {"tester"},
 			})
 
 			results, err := table.generate(ctx, qCon)
@@ -94,16 +94,16 @@ func TestPerUser(t *testing.T) {
 			keyNames:    []string{"idle-delay"},
 			schemaNames: []string{"org.gnome.desktop.session"},
 			expected: map[string]string{
-				"user":   "blaed",
-				"key":    "idle-delay",
-				"value":  "uint32 240", //  TODO: should parse out the uint32...
-				"schema": "org.gnome.desktop.session",
+				"username": "blaed",
+				"key":      "idle-delay",
+				"value":    "uint32 240", //  TODO: should parse out the uint32...
+				"schema":   "org.gnome.desktop.session",
 			},
 			unexpected: map[string]string{
-				"user":   "blaed",
-				"key":    "idle-delay",
-				"value":  "uint32 300", // the default/global value
-				"schema": "org.gnome.desktop.session",
+				"username": "blaed",
+				"key":      "idle-delay",
+				"value":    "uint32 300", // the default/global value
+				"schema":   "org.gnome.desktop.session",
 			},
 		},
 		{
@@ -111,16 +111,16 @@ func TestPerUser(t *testing.T) {
 			keyNames:    []string{"idle-delay"},
 			schemaNames: []string{"org.gnome.desktop.session"},
 			expected: map[string]string{
-				"user":   "kids",
-				"key":    "idle-delay",
-				"value":  "uint32 600",
-				"schema": "org.gnome.desktop.session",
+				"username": "kids",
+				"key":      "idle-delay",
+				"value":    "uint32 600",
+				"schema":   "org.gnome.desktop.session",
 			},
 			unexpected: map[string]string{
-				"user":   "kids",
-				"key":    "idle-delay",
-				"value":  "uint32 300", // the default/global value
-				"schema": "org.gnome.desktop.session",
+				"username": "kids",
+				"key":      "idle-delay",
+				"value":    "uint32 300", // the default/global value
+				"schema":   "org.gnome.desktop.session",
 			},
 		},
 	}
@@ -131,9 +131,9 @@ func TestPerUser(t *testing.T) {
 			getBytes: execGsettings,
 		}
 		mockQC := tablehelpers.MockQueryContext(map[string][]string{
-			"user":   tt.usernames,
-			"schema": tt.schemaNames,
-			"key":    tt.keyNames,
+			"username": tt.usernames,
+			"schema":   tt.schemaNames,
+			"key":      tt.keyNames,
 		})
 
 		rows, err := table.generate(context.TODO(), mockQC)

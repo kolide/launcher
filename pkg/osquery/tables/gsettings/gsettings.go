@@ -44,7 +44,7 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
 		table.TextColumn("value"),
-		table.TextColumn("user"),
+		table.TextColumn("username"),
 	}
 
 	t := &GsettingsValues{
@@ -59,9 +59,9 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	users := tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(allowedCharacters))
+	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(users) < 1 {
-		return results, errors.New("kolide_gsettings requires at least one user name to be specified")
+		return results, errors.New("kolide_gsettings requires at least one username to be specified")
 	}
 	for _, username := range users {
 		var output bytes.Buffer
@@ -76,11 +76,8 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 			continue
 		}
 
-		user_results := t.parse(&output)
-		for _, r := range user_results {
-			r["user"] = username
-			results = append(results, r)
-		}
+		user_results := t.parse(username, &output)
+		results = append(results, user_results...)
 	}
 
 	return results, nil
@@ -150,7 +147,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	return nil
 }
 
-func (t *GsettingsValues) parse(input io.Reader) []map[string]string {
+func (t *GsettingsValues) parse(username string, input io.Reader) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)
@@ -173,6 +170,7 @@ func (t *GsettingsValues) parse(input io.Reader) []map[string]string {
 		row["schema"] = parts[0]
 		row["key"] = parts[1]
 		row["value"] = parts[2]
+		row["username"] = username
 
 		results = append(results, row)
 	}
