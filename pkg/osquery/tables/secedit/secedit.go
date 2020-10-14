@@ -56,7 +56,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			secEditResults, err := t.execSecedit(ctx, useMergedPolicy)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "secedit failed", "err", err)

@@ -82,7 +82,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		for _, filePath := range filePaths {
-			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 				subresults, err := t.generatePath(filePath, dataQuery)
 				if err != nil {
 					return results, errors.Wrapf(err, "generating for path %s with query", filePath)

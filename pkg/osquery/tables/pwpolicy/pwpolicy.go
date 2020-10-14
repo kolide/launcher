@@ -33,6 +33,7 @@ type Table struct {
 	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	tableName string
+	execCC    func(context.Context, string, ...string) *exec.Cmd
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -45,6 +46,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		client:    client,
 		logger:    logger,
 		tableName: "kolide_pwpolicy",
+		execCC:    exec.CommandContext,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -60,7 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			pwpolicyArgs = append(pwpolicyArgs, "-u", pwpolicyUsername)
 		}
 
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			pwPolicyOutput, err := t.execPwpolicy(ctx, pwpolicyArgs)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "pwpolicy failed", "err", err)
@@ -100,7 +102,7 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, pwpolicyPath, args...)
+	cmd := t.execCC(ctx, pwpolicyPath, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

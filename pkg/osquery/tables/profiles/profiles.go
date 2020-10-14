@@ -62,7 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, command := range tablehelpers.GetConstraints(queryContext, "command", tablehelpers.WithAllowedCharacters("abcdefghijklmnopqrstuvwxyz"), tablehelpers.WithDefaults("show")) {
 		for _, profileType := range tablehelpers.GetConstraints(queryContext, "type", tablehelpers.WithAllowedCharacters("abcdefghijklmnopqrstuvwxyz"), tablehelpers.WithDefaults("")) {
 			for _, user := range tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(userAllowedCharacters), tablehelpers.WithDefaults("_all")) {
-				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
 					profileArgs := []string{command, "-output", "stdout-xml"}
 

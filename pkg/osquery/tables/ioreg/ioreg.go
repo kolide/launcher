@@ -104,7 +104,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 								continue
 							}
 
-							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("")) {
+							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 								// Finally, an inner loop
 
 								ioregOutput, err := t.execIoreg(ctx, ioregArgs)
