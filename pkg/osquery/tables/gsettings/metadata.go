@@ -226,16 +226,6 @@ func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, out
 	command := args[0]
 	cmd := exec.CommandContext(ctx, gsettingsPath, args...)
 
-	// dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-%s", command))
-	// if err != nil {
-	// 	return errors.Wrap(err, "mktemp")
-	// }
-	// defer os.RemoveAll(dir)
-
-	// if err := os.Chmod(dir, 0755); err != nil {
-	// 	return errors.Wrap(err, "chmod")
-	// }
-
 	cmd.Dir = tmpdir
 	cmd.Stderr = new(bytes.Buffer)
 	cmd.Stdout = output
