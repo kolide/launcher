@@ -28,8 +28,6 @@ Because we understand the security implications of an osquery autoupdater, NCC G
 
 Osquery has a very extensible plugin architecture that allow it to be heavily customized with plugins. The included TLS plugins are used by many existing osquery management servers, but the design of the TLS API leaves much to be desired. The Launcher includes a set of gRPC plugins for remote communication with a gRPC server. The [server specification](https://github.com/kolide/launcher/tree/master/pkg/pb/launcher) is independently published and versioned.
 
-An implementation of the gRPC server is included with the [Kolide Fleet](https://github.com/kolide/fleet) osquery fleet manager. Kolide Fleet implements both the gRPC server as well as the legacy TLS server API, so it presents an easy migration path for existing TLS API users.
-
 ### Kolide's Best Practices
 
 Osquery allows you to ask a lot of great questions, but sometimes it's hard to know exactly which questions you should ask and what queries will expose the answers. The Launcher includes a table called `kolide_best_practices` which aggregates useful information in an easy "compliant" vs "not compliant" interface. Consider the following queries:
@@ -48,7 +46,7 @@ The following best practices, and many more, are included:
 
 ### Reduced Configuration Surface
 
-The osqueryd binary was designed to be very configurable, which allows it to be used in very different environments. The Launcher wraps osqueryd configuration and exposes very high-level options that allow you to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto) (such as [Kolide Fleet](https://github.com/kolide/fleet)).
+The osqueryd binary was designed to be very configurable, which allows it to be used in very different environments. The Launcher wraps osqueryd configuration and exposes very high-level options that allow you to easily connect osquery to a server that is compliant with the [gRPC specification]
 
 Consider the following side-by-side example of The Launcher's command-line help versus osqueryd's command-line help. The Launcher exposes the bare essentials as top-level configuration options. This makes getting started with Osquery easier than ever.
 
@@ -62,8 +60,8 @@ Deploying osquery and configuring it to communicate with a management server can
 
 To learn more about using `package-builder` to package and deploy osquery, check out the [documentation](./docs/package-builder.md).
 
-## Kolide Cloud
+## Kolide K2
 
 Want to go directly to insights? Not sure how to package Launcher or manage your Fleet?
 
-Try our [osquery SaaS platform](https://kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher) providing insights, alerting, fleet management and user-driven security tools. We also support advanced aggregation of osquery results for power users. Get started immediately, with your 30-day free trial [today](https://kolide.com/signup?utm_source=oss&utm_medium=readme&utm_campaign=launcher). Launcher packages customized for your organization can be downloaded in-app after signup.
+Try our [osquery SaaS platform](https://kolide.com/?utm_source=oss&utm_medium=readme&utm_campaign=launcher) providing insights, alerting, fleet management and user-focused security tools. We also support advanced aggregation of osquery results for power users. Get started immediately, with your 14-day free trial [today](https://kolide.com/signup?utm_source=oss&utm_medium=readme&utm_campaign=launcher). Launcher packages customized for your organization can be downloaded in-app after signup.
