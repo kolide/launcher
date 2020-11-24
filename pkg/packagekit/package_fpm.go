@@ -87,7 +87,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 
 	outputFilename := fmt.Sprintf("%s-%s.%s", po.Name, po.Version, f.outputType)
 
-	outputPathDir, err := ioutil.TempDir("/tmp", "packaging-fpm-output")
+	outputPathDir, err := ioutil.TempDir("", "packaging-fpm-output")
 	if err != nil {
 		return errors.Wrap(err, "making TempDir")
 	}
@@ -153,6 +153,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		)
 		return errors.Wrapf(err, "creating fpm package: %s", stderr)
 	}
+	level.Debug(logger).Log("msg", "fpm exited cleanly")
 
 	outputFH, err := os.Open(filepath.Join(outputPathDir, outputFilename))
 	if err != nil {
@@ -160,6 +161,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	}
 	defer outputFH.Close()
 
+	level.Debug(logger).Log("msg", "Copying fpm built to remote filehandle")
 	if _, err := io.Copy(w, outputFH); err != nil {
 		return errors.Wrap(err, "copying output")
 	}
