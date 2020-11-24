@@ -113,9 +113,9 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	// osqueryd path, but if it cannot be found, we will fail back to using an
 	// osqueryd found in the path
 	osquerydPath := *flOsquerydPath
-	if *flOsquerydPath == "" {
-		*flOsquerydPath = findOsquery()
-		if *flOsquerydPath == "" {
+	if osquerydPath == "" {
+		osquerydPath = findOsquery()
+		if osquerydPath == "" {
 			return nil, errors.New("Could not find osqueryd binary")
 		}
 	}
