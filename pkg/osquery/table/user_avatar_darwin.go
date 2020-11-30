@@ -53,6 +53,8 @@ import (
 	"golang.org/x/image/tiff"
 )
 
+var crcTable = crc64.MakeTable(crc64.ECMA)
+
 func UserAvatar(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),

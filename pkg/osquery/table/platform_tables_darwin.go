@@ -6,6 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
+	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
@@ -24,7 +25,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 
 	return []*table.Plugin{
 		Airdrop(client),
-		AppIcons(),
+		appicons.AppIcons(),
 		ChromeLoginKeychainInfo(client, logger),
 		firmwarepasswd.TablePlugin(client, logger),
 		GDriveSyncConfig(client, logger),
