@@ -101,7 +101,7 @@ func New(opts ...Option) (*Builder, error) {
 	b := Builder{
 		os:     runtime.GOOS,
 		arch:   runtime.GOARCH,
-		goPath: "go",
+		goPath: findGo(),
 		goVer:  strings.TrimPrefix(runtime.Version(), "go"),
 
 		execCC: exec.CommandContext,
@@ -556,4 +556,14 @@ func (b *Builder) execOut(ctx context.Context, argv0 string, args ...string) (st
 		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+func findGo() string {
+	// If we're being run with an explicit go, use it.
+	goPath, err := os.Executable()
+	if err != nil && (strings.HasSuffix(goPath, "go") || strings.HasSuffix(goPath, "go.exe")) {
+		return goPath
+	}
+
+	return "go"
 }
