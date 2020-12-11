@@ -1,4 +1,6 @@
-package table
+// +build darwin
+
+package appicons
 
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
