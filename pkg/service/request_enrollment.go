@@ -35,6 +35,7 @@ type EnrollmentDetails struct {
 	OSPlatformLike  string `json:"os_platform_like"`
 	GOOS            string `json:"goos"`
 	GOARCH          string `json:"goarch"`
+	HardwareUUID    string `json:"hardware_uuid"`
 }
 
 type enrollmentResponse struct {
@@ -61,6 +62,7 @@ func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interf
 			LauncherVersion: pbEnrollDetails.LauncherVersion,
 			OSName:          pbEnrollDetails.OsName,
 			OSPlatformLike:  pbEnrollDetails.OsPlatformLike,
+			HardwareUUID:    pbEnrollDetails.HardwareUuid,
 		}
 	}
 	return enrollmentRequest{

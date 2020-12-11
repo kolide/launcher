@@ -75,6 +75,7 @@ message EnrollmentDetails {
     string launcher_version = 9;
     string os_name = 10;
     string os_platform_like = 11;
+    string hardware_uuid = 12;
 }
 
 message EnrollmentResponse {

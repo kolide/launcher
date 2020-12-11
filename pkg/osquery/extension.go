@@ -795,7 +795,8 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		system_info.hardware_model,
 		system_info.hardware_serial,
 		system_info.hardware_vendor,
-		system_info.hostname
+		system_info.hostname,
+		system_info.uuid as hardware_uuid
 	FROM
 		os_version,
 		system_info,
@@ -838,6 +839,10 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	}
 	if val, ok := resp[0]["hostname"]; ok {
 		details.Hostname = val
+	}
+
+	if val, ok := resp[0]["hardware_uuid"]; ok {
+		details.HardwareUUID = val
 	}
 
 	// This runs before the extensions are registered. These mirror the

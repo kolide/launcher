@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/user"
 	"path/filepath"
 	"testing"
 
@@ -72,10 +71,7 @@ func TestGsettingsValues(t *testing.T) {
 
 func TestPerUser(t *testing.T) {
 	t.Parallel()
-
-	currentUser, err := user.Current()
-	require.NoError(t, err)
-	if currentUser.Username != "blaed" {
+	if os.Getenv("RUN_GSETTINGS_PER_USER_TEST") != "true" {
 		// all these tests will only pass if run as root, and with specific
 		// gnome desktop settings set. The setup to make this test run in CI
 		// is... complex
