@@ -80,7 +80,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 	args = append(args, outputPath)
 
 	level.Debug(logger).Log(
-		"msg", "Running pkbuild",
+		"msg", "Running pkgbuild",
 		"args", fmt.Sprintf("%v", args),
 	)
 
