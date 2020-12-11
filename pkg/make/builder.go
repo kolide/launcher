@@ -43,6 +43,7 @@ type Builder struct {
 	os           string
 	arch         string
 	goVer        string
+	goPath       string
 	static       bool
 	race         bool
 	stampVersion bool
@@ -53,6 +54,12 @@ type Builder struct {
 }
 
 type Option func(*Builder)
+
+func WithGoPath(goPath string) Option {
+	return func(b *Builder) {
+		b.goPath = goPath
+	}
+}
 
 func WithOS(o string) Option {
 	return func(b *Builder) {
@@ -92,9 +99,10 @@ func WithFakeData() Option {
 
 func New(opts ...Option) (*Builder, error) {
 	b := Builder{
-		os:    runtime.GOOS,
-		arch:  runtime.GOARCH,
-		goVer: strings.TrimPrefix(runtime.Version(), "go"),
+		os:     runtime.GOOS,
+		arch:   runtime.GOARCH,
+		goPath: "go",
+		goVer:  strings.TrimPrefix(runtime.Version(), "go"),
 
 		execCC: exec.CommandContext,
 	}
@@ -461,7 +469,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		}
 		args := append(baseArgs, src)
 
-		cmd := b.execCC(ctx, "go", args...)
+		cmd := b.execCC(ctx, b.goPath, args...)
 		cmd.Env = append(cmd.Env, b.cmdEnv...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

@@ -23,6 +23,7 @@ func main() {
 		flDebug        = flag.Bool("debug", false, "use a debug logger")
 		flBuildARCH    = flag.String("arch", runtime.GOARCH, "Architecture to build for.")
 		flBuildOS      = flag.String("os", runtime.GOOS, "Operating system to build for.")
+		flGoPath       = flag.String("go", "", "Path for go binary. Will attempt auto detection")
 		flRace         = flag.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic       = flag.Bool("static", false, "Build a static binary.")
 		flStampVersion = flag.Bool("linkstamp", false, "Add version info with ldflags.")
@@ -49,6 +50,10 @@ func main() {
 	}
 	if *flFakeData {
 		opts = append(opts, make.WithFakeData())
+	}
+
+	if *flGoPath != "" {
+		opts = append(opts, make.WithGoPath(*flGoPath))
 	}
 
 	b, err := make.New(opts...)
