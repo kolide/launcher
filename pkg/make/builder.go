@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -41,12 +42,12 @@ import (
 type Builder struct {
 	os           string
 	arch         string
+	goVer        string
 	static       bool
 	race         bool
 	stampVersion bool
 	fakedata     bool
 
-	goVer  *semver.Version
 	cmdEnv []string
 	execCC func(context.Context, string, ...string) *exec.Cmd
 }
@@ -90,16 +91,10 @@ func WithFakeData() Option {
 }
 
 func New(opts ...Option) (*Builder, error) {
-	verString := strings.TrimPrefix(runtime.Version(), "go")
-	goVer, err := semver.NewVersion(verString)
-	if err != nil {
-		return nil, errors.Wrapf(err, "parse go version %q as semver", verString)
-	}
-
 	b := Builder{
 		os:    runtime.GOOS,
 		arch:  runtime.GOARCH,
-		goVer: goVer,
+		goVer: strings.TrimPrefix(runtime.Version(), "go"),
 
 		execCC: exec.CommandContext,
 	}
@@ -120,7 +115,6 @@ func New(opts ...Option) (*Builder, error) {
 	b.cmdEnv = cmdEnv
 
 	return &b, nil
-
 }
 
 // PlatformExtensionName is a helper to return the platform specific extension name.
@@ -142,14 +136,28 @@ func (b *Builder) PlatformBinaryName(input string) string {
 	return input
 }
 
-func (b *Builder) goVersionCompatible() error {
-	if b.goVer == nil {
+func (b *Builder) goVersionCompatible(logger log.Logger) error {
+	if b.goVer == "" {
 		return errors.New("no go version. Is this a bad mock?")
 	}
+
+	if strings.HasPrefix(b.goVer, "devel") {
+		level.Info(logger).Log(
+			"msg", "Skipping version check for development version",
+			"version", b.goVer,
+		)
+		return nil
+	}
+
+	goVer, err := semver.NewVersion(b.goVer)
+	if err != nil {
+		return errors.Wrapf(err, "parse go version %q as semver", b.goVer)
+	}
+
 	goConstraint := ">= 1.11"
 	c, _ := semver.NewConstraint(goConstraint)
-	if !c.Check(b.goVer) {
-		return errors.Errorf("project requires Go version %s, have %s", goConstraint, b.goVer)
+	if !c.Check(goVer) {
+		return errors.Errorf("project requires Go version %s, have %s", goConstraint, goVer)
 	}
 	return nil
 }
@@ -165,7 +173,7 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 		"msg", "Starting",
 	)
 
-	if err := b.goVersionCompatible(); err != nil {
+	if err := b.goVersionCompatible(logger); err != nil {
 		return err
 	}
 	cmd := b.execCC(ctx, "go", "mod", "download")
@@ -450,12 +458,19 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 		}
 		args := append(baseArgs, src)
 
-		level.Debug(ctxlog.FromContext(ctx)).Log("mgs", "building binary", "app_name", appName, "output", output, "go_args", strings.Join(args, "  "))
-
 		cmd := b.execCC(ctx, "go", args...)
 		cmd.Env = append(cmd.Env, b.cmdEnv...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+
+		level.Debug(ctxlog.FromContext(ctx)).Log(
+			"mgs", "building binary",
+			"app_name", appName,
+			"output", output,
+			"go_args", strings.Join(args, "  "),
+			"env", fmt.Sprintf("%v", cmd.Env),
+		)
+
 		if err := cmd.Run(); err != nil {
 			return err
 		}

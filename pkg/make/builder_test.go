@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Masterminds/semver"
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,14 +82,15 @@ func TestGoVersionCompatible(t *testing.T) {
 			ver:    "1.12",
 			passes: true,
 		},
+		{
+			ver:    "devel +e012d0dc34",
+			passes: true,
+		},
 	}
 
 	for _, tt := range tests {
-		semVer, err := semver.NewVersion(tt.ver)
-		require.NoError(t, err)
-
-		b := Builder{goVer: semVer}
-		err = b.goVersionCompatible()
+		b := Builder{goVer: tt.ver}
+		err := b.goVersionCompatible(log.NewNopLogger())
 		if tt.passes {
 			require.NoError(t, err)
 		} else {
@@ -103,14 +104,10 @@ func TestDepsGo(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	semVer, err := semver.NewVersion("1.11")
-	require.NoError(t, err)
-
-	b := Builder{goVer: semVer}
+	b := Builder{goVer: "1.11"}
 	b.execCC = helperCommandContext
 
-	err = b.DepsGo(ctx)
-	require.NoError(t, err)
+	require.NoError(t, b.DepsGo(ctx))
 }
 
 func TestExecOut(t *testing.T) {
