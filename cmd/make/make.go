@@ -61,12 +61,12 @@ func main() {
 		"deps-go":         b.DepsGo,
 		"install-tools":   b.InstallTools,
 		"generate-tuf":    b.GenerateTUF,
-		"launcher":        b.BuildCmd("./cmd/launcher", b.PlatformBinaryName("launcher")),
-		"extension":       b.BuildCmd("./cmd/osquery-extension", b.PlatformExtensionName("osquery-extension")),
-		"table-extension": b.BuildCmd("./cmd/launcher.ext", b.PlatformExtensionName("tables")),
-		"grpc-extension":  b.BuildCmd("./cmd/grpc.ext", b.PlatformExtensionName("grpc")),
-		"package-builder": b.BuildCmd("./cmd/package-builder", b.PlatformBinaryName("package-builder")),
-		"make":            b.BuildCmd("./cmd/make", b.PlatformBinaryName("make")),
+		"launcher":        b.BuildCmd("./cmd/launcher", "launcher"),
+		"extension":       b.BuildCmd("./cmd/osquery-extension", "osquery-extension"),
+		"table-extension": b.BuildCmd("./cmd/launcher.ext", "tables"),
+		"grpc-extension":  b.BuildCmd("./cmd/grpc.ext", "grpc"),
+		"package-builder": b.BuildCmd("./cmd/package-builder", "package-builder"),
+		"make":            b.BuildCmd("./cmd/make", "make"),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {

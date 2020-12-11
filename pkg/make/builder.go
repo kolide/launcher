@@ -127,13 +127,16 @@ func (b *Builder) PlatformExtensionName(input string) string {
 	}
 }
 
-// PlatformBinaryName is a helper to return the platform specific binary suffix.
+// PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
-	input = filepath.Join("build", b.os, input)
+	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
+
+	output := filepath.Join("build", platformName, input)
 	if b.os == "windows" {
-		return input + ".exe"
+		return output + ".exe"
 	}
-	return input
+
+	return output
 }
 
 func (b *Builder) goVersionCompatible(logger log.Logger) error {
@@ -386,9 +389,9 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 	return nil
 }
 
-func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
+func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 	return func(ctx context.Context) error {
-		_, appName := filepath.Split(output)
+		output := b.PlatformBinaryName(appName)
 
 		ctx, span := trace.StartSpan(ctx, fmt.Sprintf("make.BuildCmd.%s", appName))
 		defer span.End()
@@ -478,14 +481,16 @@ func (b *Builder) BuildCmd(src, output string) func(context.Context) error {
 		// all the builds go to `build/<os>/binary`, but if the build OS is the same as the target OS,
 		// we also want to hardlink the resulting binary at the root of `build/` for convenience.
 		// ex: running ./build/launcher on macos instead of ./build/darwin/launcher
-		if b.os == runtime.GOOS {
-			platformPath := filepath.Join("build", appName)
-			if err := os.Remove(platformPath); err != nil && !os.IsNotExist(err) {
+		if b.os == runtime.GOOS && b.arch == runtime.GOARCH {
+			_, binName := filepath.Split(output)
+			symlinkTarget := filepath.Join("build", binName)
+
+			if err := os.Remove(symlinkTarget); err != nil && !os.IsNotExist(err) {
 				// log but don't fail. This could happen if for example ./build/launcher.exe is referenced by a running service.
 				// if this becomes clearer, we can either return an error here, or go back to silently ignoring.
 				level.Debug(ctxlog.FromContext(ctx)).Log("msg", "remove before hardlink failed", "err", err, "app_name", appName)
 			}
-			return os.Link(output, platformPath)
+			return os.Link(output, symlinkTarget)
 		}
 		return nil
 	}
