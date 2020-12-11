@@ -24,9 +24,9 @@ type logCollection struct {
 
 type publishLogsResponse struct {
 	Message     string `json:"message"`
-	ErrorCode   string `json:"error_code"`
 	NodeInvalid bool   `json:"node_invalid"`
-	Err         error
+	ErrorCode   string `json:"error_code,omitempty"`
+	Err         error  `json:"err,omitempty"`
 }
 
 func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -115,17 +115,11 @@ func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (inte
 func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(publishLogsResponse)
 	if !ok {
-		return nil, &jsonrpc.Error{
-			Code:    -32000,
-			Message: fmt.Sprintf("Asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj),
-		}
+		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal response: %s", err)
-	}
-	return b, nil
+	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
 }
 
 func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {

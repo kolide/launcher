@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -16,8 +15,9 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
-	Status int32 `json:"status"`
-	Err    error
+	Status    int32  `json:"status"`
+	ErrorCode string `json:"error_code,omitempty"`
+	Err       error  `json:"err,omitempty"`
 }
 
 func decodeGRPCHealthCheckRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
@@ -49,17 +49,11 @@ func encodeGRPCHealthcheckResponse(_ context.Context, request interface{}) (inte
 func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(healthcheckResponse)
 	if !ok {
-		return nil, &jsonrpc.Error{
-			Code:    -32000,
-			Message: fmt.Sprintf("Asserting result to *healthcheckResponse failed. Got %T, %+v", obj, obj),
-		}
+		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *healthcheckResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal response: %s", err)
-	}
-	return b, nil
+	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
 }
 
 func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {

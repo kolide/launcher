@@ -23,8 +23,8 @@ type queriesRequest struct {
 type queryCollectionResponse struct {
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
-	ErrorCode   string `json:"error_code"`
-	Err         error
+	ErrorCode   string `json:"error_code,omitempty"`
+	Err         error  `json:"err,omitempty"`
 }
 
 func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
@@ -102,17 +102,11 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(queryCollectionResponse)
 	if !ok {
-		return nil, &jsonrpc.Error{
-			Code:    -32000,
-			Message: fmt.Sprintf("Asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj),
-		}
+		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal response: %s", err)
-	}
-	return b, nil
+	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
 }
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
@@ -122,11 +116,14 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 		if err != nil {
 			return queryCollectionResponse{Err: err}, nil
 		}
-		return queryCollectionResponse{
-			Queries:     *result,
+		resp := queryCollectionResponse{
 			NodeInvalid: valid,
 			Err:         err,
-		}, nil
+		}
+		if result != nil {
+			resp.Queries = *result
+		}
+		return resp, nil
 	}
 }
 
