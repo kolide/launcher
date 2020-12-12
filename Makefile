@@ -86,7 +86,7 @@ rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), bu
 rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
-rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_target)
+rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
 
 ##
 ## Release Process Stuff
