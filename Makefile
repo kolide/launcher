@@ -58,19 +58,19 @@ extension: build_osquery-extension.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 
-# xp is a helper for quick cross platform builds, and sanity checking for breakage
+
+RELEASE_TARGETS=launcher osquery-extension.ext package-builder
 CROSS_OSES=darwin windows linux
 
-xp: xp-launcher xp-osquery-extension.ext
-xp-%: $(foreach os, $(CROSS_OSES), build_%_$(os))
-	@true
+# xp is a helper for quick cross platform builds, and sanity checking for breakage
+xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(CROSS_OSES), build_$(target)_$(os)))
 
-x-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
-x-amd64: xp
+# Actual release targets. Because of the m1 cgo cross stuff, this is uglier
+rel-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
+rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, darwin linux windows, build_$(target)_$(os)_amd64))
 
-
-x-arm64: CROSSGOPATH = /opt/homebrew/bin/go
-x-arm64: xp
+rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
+rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, darwin, build_$(target)_$(os)_arm64))
 
 
 ##
