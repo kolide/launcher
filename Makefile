@@ -10,20 +10,17 @@ PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on
 
-# If on macOS, set the shell to bash explicitly
+# If not windows, set the shell to bash explicitly
 ifneq ($(OS), Windows_NT)
 	ifeq ($(shell uname), Darwin)
 		SHELL := /bin/bash
 	endif
 endif
 
-fake-launcher: .pre-build
-	go run cmd/make/make.go -targets=launcher -linkstamp -fakedata
-	-rm build/darwin/launcher
-	mv build/launcher build/launcher-fake
 
 all: build
-build: launcher extension
+build: build_launcher build_extension
+
 .pre-build: ${BUILD_DIR}
 
 ${BUILD_DIR}:
@@ -33,62 +30,67 @@ else
 	mkdir -p ${BUILD_DIR}
 endif
 
-# Simple things, pointers into our build
-launcher: .pre-build
-	go run cmd/make/make.go -targets=launcher -linkstamp
+##
+## Build
+##
 
-table.ext: .pre-build
-	go run cmd/make/make.go -targets=table-extension -linkstamp
-table.ext-windows: .pre-build deps
-	go run cmd/make/make.go -targets=table-extension -linkstamp --os windows
+build_%: TARGET =  $(word 2, $(subst _, ,$@))
+build_%: OS = $(word 3, $(subst _, ,$@))
+build_%: OSARG = $(if $(OS), --os $(OS))
+build_%: ARCH = $(word 4, $(subst _, ,$@))
+build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
+build_%: .pre-build
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG)
+
+fake_%: TARGET =  $(word 2, $(subst _, ,$@))
+fake_%: OS = $(word 3, $(subst _, ,$@))
+fake_%: OSARG = $(if $(OS), --os $(OS))
+fake_%: ARCH = $(word 4, $(subst _, ,$@))
+fake_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
+fake_%: .pre-build
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
+
+# pointers, mostly for legacy reasons
+launcher: build_launcher
+tables.ext: build_tables.ext
+extension: build_osquery-extension.ext
+grpc.ext: build_grpc.ext
+fake-launcher: fake_launcher
+
+# xp is a helper for quick cross platform builds, and sanity checking for breakage
+CROSS_OSES=darwin windows linux
+
+xp: xp-launcher xp-osquery-extension.ext
+xp-%: $(foreach os, $(CROSS_OSES), build_%_$(os))
+	@true
 
 
-extension: .pre-build
-	go run cmd/make/make.go -targets=extension
 
-grpc-extension: .pre-build
-	go run cmd/make/make.go -targets=grpc-extension
+##
+## Handy osqueryi launcher
+##
 
-
-# Convenience tools
-osqueryi-tables: table.ext
+osqueryi-tables: build_tables.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-osqueryi-tables-linux: table.ext
+osqueryi-tables-linux: build_tables.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/linux/tables.ext
-osqueryi-tables-windows: table.ext
+osqueryi-tables-windows: build_tables.ext
 	osqueryd.exe -S --allow-unsafe --verbose --extension .\build\windows\tables.exe
-sudo-osqueryi-tables: table.ext
+sudo-osqueryi-tables: build_tables.ext
 	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-launchas-osqueryi-tables: table.ext
+launchas-osqueryi-tables: build_tables.ext
 	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-
-
-
-xp: xp-launcher xp-extension xp-grpc-extension
-
-xp-%: darwin-xp-% windows-xp-% linux-xp-%
-	@true # make needs something here for the pattern rule
-
-darwin-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
-
-linux-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
-
-windows-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
-
 
 
 # `-o runtime` should be enough, however there was a catalina bug that
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
 codesign-darwin: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin/*
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin*/*
 
 notarize-darwin: codesign-darwin
 	rm -f build/notarization-upload.zip
-	zip -r build/notarization-upload.zip ./build/darwin/*
+	zip -r build/notarization-upload.zip ./build/darwin*
 	xcrun altool \
 	  --username "${NOTARIZE_APPLE_ID}" \
 	  --password @env:NOTARIZE_APP_PASSWD \
@@ -170,7 +172,7 @@ lint-go-vet:
 	go vet ./cmd/... ./pkg/...
 
 lint-go-nakedret: deps-go
-	nakedret ./...
+	nakedret ./pkg/... ./cmd/...
 
 # This is ugly. since go-fmt doesn't have a simple exit code, we use
 # some make trickery to handle failing if there;s output.

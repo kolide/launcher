@@ -101,7 +101,7 @@ func New(opts ...Option) (*Builder, error) {
 	b := Builder{
 		os:     runtime.GOOS,
 		arch:   runtime.GOARCH,
-		goPath: findGo(),
+		goPath: "go",
 		goVer:  strings.TrimPrefix(runtime.Version(), "go"),
 
 		execCC: exec.CommandContext,
@@ -125,22 +125,14 @@ func New(opts ...Option) (*Builder, error) {
 	return &b, nil
 }
 
-// PlatformExtensionName is a helper to return the platform specific extension name.
-func (b *Builder) PlatformExtensionName(input string) string {
-	input = filepath.Join("build", b.os, input)
-	if b.os == "windows" {
-		return input + ".exe"
-	} else {
-		return input + ".ext"
-	}
-}
-
 // PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
 	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
 
 	output := filepath.Join("build", platformName, input)
 	if b.os == "windows" {
+		// If we end in .ext this is an extension, strip that before replacing with the .exe
+		strings.TrimSuffix(input, ".ext")
 		return output + ".exe"
 	}
 
@@ -556,14 +548,4 @@ func (b *Builder) execOut(ctx context.Context, argv0 string, args ...string) (st
 		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
 	}
 	return strings.TrimSpace(stdout.String()), nil
-}
-
-func findGo() string {
-	// If we're being run with an explicit go, use it.
-	goPath, err := os.Executable()
-	if err != nil && (strings.HasSuffix(goPath, "go") || strings.HasSuffix(goPath, "go.exe")) {
-		return goPath
-	}
-
-	return "go"
 }

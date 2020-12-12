@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
 	"runtime"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/make"
+	"github.com/peterbourgon/ff/v3"
 )
 
 func main() {
@@ -18,18 +20,30 @@ func main() {
 		"install-tools",
 	}, ",")
 
+	fs := flag.NewFlagSet("make", flag.ExitOnError)
+
 	var (
-		flTargets      = flag.String("targets", buildAll, "comma separated list of targets")
-		flDebug        = flag.Bool("debug", false, "use a debug logger")
-		flBuildARCH    = flag.String("arch", runtime.GOARCH, "Architecture to build for.")
-		flBuildOS      = flag.String("os", runtime.GOOS, "Operating system to build for.")
-		flGoPath       = flag.String("go", "", "Path for go binary. Will attempt auto detection")
-		flRace         = flag.Bool("race", false, "Build race-detector version of binaries.")
-		flStatic       = flag.Bool("static", false, "Build a static binary.")
-		flStampVersion = flag.Bool("linkstamp", false, "Add version info with ldflags.")
-		flFakeData     = flag.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
+		flTargets      = fs.String("targets", buildAll, "comma separated list of targets")
+		flDebug        = fs.Bool("debug", false, "use a debug logger")
+		flBuildARCH    = fs.String("arch", runtime.GOARCH, "Architecture to build for.")
+		flBuildOS      = fs.String("os", runtime.GOOS, "Operating system to build for.")
+		flGoPath       = fs.String("go", "", "Path for go binary. Will attempt auto detection")
+		flRace         = fs.Bool("race", false, "Build race-detector version of binaries.")
+		flStatic       = fs.Bool("static", false, "Build a static binary.")
+		flStampVersion = fs.Bool("linkstamp", false, "Add version info with ldflags.")
+		flFakeData     = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
 	)
-	flag.Parse()
+
+	ffOpts := []ff.Option{
+		ff.WithConfigFileFlag("config"),
+		ff.WithConfigFileParser(ff.PlainParser),
+		ff.WithEnvVarPrefix("MAKE"),
+	}
+
+	if err := ff.Parse(fs, os.Args[1:], ffOpts...); err != nil {
+		logger := logutil.NewCLILogger(true)
+		logutil.Fatal(logger, "msg", "Error parsing flags", "err", err)
+	}
 
 	logger := logutil.NewCLILogger(*flDebug)
 	ctx := context.Background()
@@ -63,15 +77,15 @@ func main() {
 	}
 
 	targetSet := map[string]func(context.Context) error{
-		"deps-go":         b.DepsGo,
-		"install-tools":   b.InstallTools,
-		"generate-tuf":    b.GenerateTUF,
-		"launcher":        b.BuildCmd("./cmd/launcher", "launcher"),
-		"extension":       b.BuildCmd("./cmd/osquery-extension", "osquery-extension"),
-		"table-extension": b.BuildCmd("./cmd/launcher.ext", "tables"),
-		"grpc-extension":  b.BuildCmd("./cmd/grpc.ext", "grpc"),
-		"package-builder": b.BuildCmd("./cmd/package-builder", "package-builder"),
-		"make":            b.BuildCmd("./cmd/make", "make"),
+		"deps-go":               b.DepsGo,
+		"install-tools":         b.InstallTools,
+		"generate-tuf":          b.GenerateTUF,
+		"launcher":              b.BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
+		"osquery-extension.ext": b.BuildCmd("./cmd/osquery-extension", "osquery-extension.ext"),
+		"tables.ext":            b.BuildCmd("./cmd/launcher.ext", "tables.ext"),
+		"grpc.ext":              b.BuildCmd("./cmd/grpc.ext", "grpc.ext"),
+		"package-builder":       b.BuildCmd("./cmd/package-builder", "package-builder"),
+		"make":                  b.BuildCmd("./cmd/make", "make"),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {
@@ -86,4 +100,12 @@ func main() {
 			}
 		}
 	}
+}
+
+func fakeName(binName string, fake bool) string {
+	if !fake {
+		return binName
+	}
+
+	return binName + "-fake"
 }
