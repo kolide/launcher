@@ -51,12 +51,20 @@ fake_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 fake_%: .pre-build
 	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
 
+# The lipo command will combine things into universal
+# binaries. Because of the go path needs, there is little point in
+# abstracting this further
+lipo_%: build/darwin.amd64/% build/darwin.arm64/%
+	mkdir -p build/darwin.universal
+	lipo -create $^ -output build/darwin.universal/$*
+
 # pointers, mostly for legacy reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
 extension: build_osquery-extension.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
+
 
 ##
 ## Cross Build targets
@@ -77,6 +85,9 @@ rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), bu
 
 rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
+
+
+rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_target)
 
 ##
 ## Release Process Stuff
