@@ -73,10 +73,10 @@ xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(MANUAL_CROSS_OSES), bu
 
 # Actual release targets. Because of the m1 cgo cross stuff, this requires explicit go paths
 rel-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
-rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_TARGETS), build_$(target)_$(os)_amd64))
+rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), build_$(target)_$(os)_amd64))
 
 rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
-rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_TARGETS), build_$(target)_$(os)_arm64))
+rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
 ##
 ## Release Process Stuff
