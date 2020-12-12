@@ -58,23 +58,54 @@ extension: build_osquery-extension.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 
+##
+## Cross Build targets
+##
 
 RELEASE_TARGETS=launcher osquery-extension.ext package-builder
-CROSS_OSES=darwin windows linux
+MANUAL_CROSS_OSES=darwin windows linux
+ARM64_OSES=darwin
+AMD64_OSES=darwin windows linux
 
-# xp is a helper for quick cross platform builds, and sanity checking for breakage
-xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(CROSS_OSES), build_$(target)_$(os)))
+# xp is a helper for quick cross platform builds, and sanity checking
+# for breakage. humans only
+xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(MANUAL_CROSS_OSES), build_$(target)_$(os)))
 
-# Actual release targets. Because of the m1 cgo cross stuff, this is uglier
+# Actual release targets. Because of the m1 cgo cross stuff, this requires explicit go paths
 rel-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
-rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, darwin linux windows, build_$(target)_$(os)_amd64))
+rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_TARGETS), build_$(target)_$(os)_amd64))
 
 rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
-rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, darwin, build_$(target)_$(os)_arm64))
+rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_TARGETS), build_$(target)_$(os)_arm64))
+
+##
+## Release Process Stuff
+##
+
+RELEASE_EXPECTED = $(foreach os, $(AMD64_TARGETS), build/$(os).amd64) $(foreach os, $(ARM64_TARGETS), build/$(os).arm64)
+RELEASE_VERSION = $(shell git describe --tags --always --dirty)
+
+release:
+	rm -rf build
+	$(MAKE) -j8 rel-amd64 rel-arm64
+#	$(MAKE) -j4 codesign
+	$(MAKE) -j8 binary-bundles
+
+
+# release: binary-bundle containers-push
+
+binary-bundles:
+	rm -rf build/binary-bundles
+	$(MAKE) -j4 $(foreach p, $(shell cd build && ls -d */ | tr -d /), build/binary-bundles/$(p))
+
+build/binary-bundles/%:
+	mkdir -p build/binary-bundles
+	mv build/$* build/$*_$(RELEASE_VERSION)
+	cd build && zip -r "binary-bundles/$*_$(RELEASE_VERSION)".zip $*_$(RELEASE_VERSION)
 
 
 ##
-## Handy osqueryi launcher
+## Handy osqueryi command line
 ##
 
 osqueryi-tables: build_tables.ext
@@ -92,7 +123,7 @@ launchas-osqueryi-tables: build_tables.ext
 # `-o runtime` should be enough, however there was a catalina bug that
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
-codesign-darwin: xp
+codesign-darwin:
 	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin*/*
 
 notarize-darwin: codesign-darwin
@@ -188,24 +219,6 @@ lint-go-fmt: deps-go
 fmt-fail/%:
 	@echo fmt failure in: $*
 	@false
-
-##
-## Release Process Stuff
-##
-
-release: binary-bundle containers-push
-
-binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
-binary-bundle: codesign
-	rm -rf build/binary-bundle
-	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
-	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
-
-build/binary-bundle/%:
-	mkdir -p $@
-	cp build/$*/launcher* $@/
-	cp build/$*/osquery-extension* $@/
-	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
 
 ##
 ## Docker Tooling
