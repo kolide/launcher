@@ -55,7 +55,7 @@ fake_%: .pre-build
 # binaries. Because of the go path needs, there is little point in
 # abstracting this further
 lipo_%: build/darwin.amd64/% build/darwin.arm64/%
-	mkdir -p build/darwin.universal
+	@mkdir -p build/darwin.universal
 	lipo -create $^ -output build/darwin.universal/$*
 
 # pointers, mostly for legacy reasons
