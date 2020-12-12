@@ -39,8 +39,9 @@ build_%: OS = $(word 3, $(subst _, ,$@))
 build_%: OSARG = $(if $(OS), --os $(OS))
 build_%: ARCH = $(word 4, $(subst _, ,$@))
 build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
+build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
 build_%: .pre-build
-	go run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG)
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
 
 fake_%: TARGET =  $(word 2, $(subst _, ,$@))
 fake_%: OS = $(word 3, $(subst _, ,$@))
@@ -64,7 +65,11 @@ xp: xp-launcher xp-osquery-extension.ext
 xp-%: $(foreach os, $(CROSS_OSES), build_%_$(os))
 	@true
 
+x-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
+x-amd64: xp
 
+x-arm64: CROSSGOPATH = /opt/homebrew/bin/go
+x-arm64: xp
 
 ##
 ## Handy osqueryi launcher

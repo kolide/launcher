@@ -14,5 +14,5 @@ GOX86=/Users/seph/go1.15.6.darwin-amd64/bin/go
 
 rm -rf build
 
-MAKE_GO=GOX86 make -j4 build_{launcher,"osquery-extension.ext"}_{darwin,windows,linux}_amd64
-MAKE_GO=GOARM make -j4 build_{launcher,"osquery-extension.ext"}_{darwin}_arm64
+CROSSGOPATH=${GOX86} make -j4 build_{launcher,"osquery-extension.ext"}_{darwin,windows,linux}_amd64
+CROSSGOPATH=${GOARM} make -j4 build_{launcher,"osquery-extension.ext"}_darwin_arm64
