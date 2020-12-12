@@ -87,16 +87,16 @@ RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 
 release:
 	rm -rf build
-	$(MAKE) -j8 rel-amd64 rel-arm64
-#	$(MAKE) -j4 codesign
-	$(MAKE) -j8 binary-bundles
+	$(MAKE) rel-amd64 rel-arm64
+#	$(MAKE) codesign
+	$(MAKE) binary-bundles
 
 
 # release: binary-bundle containers-push
 
 binary-bundles:
 	rm -rf build/binary-bundles
-	$(MAKE) -j4 $(foreach p, $(shell cd build && ls -d */ | tr -d /), build/binary-bundles/$(p))
+	$(MAKE) $(foreach p, $(shell cd build && ls -d */ | tr -d /), build/binary-bundles/$(p))
 
 build/binary-bundles/%:
 	mkdir -p build/binary-bundles
