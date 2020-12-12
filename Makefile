@@ -86,7 +86,6 @@ rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), bu
 rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
-
 rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_target)
 
 ##
@@ -99,6 +98,7 @@ RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 release:
 	rm -rf build
 	$(MAKE) rel-amd64 rel-arm64
+	$(MAKE) rel-lipo
 #	$(MAKE) codesign
 	$(MAKE) binary-bundles
 
