@@ -68,8 +68,10 @@ xp-%: $(foreach os, $(CROSS_OSES), build_%_$(os))
 x-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
 x-amd64: xp
 
+
 x-arm64: CROSSGOPATH = /opt/homebrew/bin/go
 x-arm64: xp
+
 
 ##
 ## Handy osqueryi launcher
