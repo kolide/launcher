@@ -48,6 +48,7 @@ type Builder struct {
 	race         bool
 	stampVersion bool
 	fakedata     bool
+	notStripped  bool
 
 	cmdEnv []string
 	execCC func(context.Context, string, ...string) *exec.Cmd
@@ -76,6 +77,12 @@ func WithArch(a string) Option {
 func WithStatic() Option {
 	return func(b *Builder) {
 		b.static = true
+	}
+}
+
+func WithOutStripped() Option {
+	return func(b *Builder) {
+		b.notStripped = true
 	}
 }
 
@@ -417,8 +424,13 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		var ldFlags []string
 		if b.static {
-			ldFlags = append(ldFlags, "-w -d -linkmode internal")
+			ldFlags = append(ldFlags, "-d -linkmode internal")
 		}
+
+		if !b.notStripped {
+			ldFlags = append(ldFlags, "-w -s")
+		}
+
 		if b.stampVersion {
 			v, err := b.getVersion(ctx)
 			if err != nil {
