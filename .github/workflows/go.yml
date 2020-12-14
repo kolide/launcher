@@ -39,7 +39,7 @@ jobs:
       if: runner.os != 'Windows'
 
     - name: Build
-      run: make -j launcher extension grpc-extension table.ext
+      run: make -j launcher extension grpc.ext table.ext package-builder
 
     - name: Test
       run: make test
