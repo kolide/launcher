@@ -134,16 +134,15 @@ func New(opts ...Option) (*Builder, error) {
 
 // PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
-	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
-
-	output := filepath.Join("build", platformName, input)
+	// On windows, everything must end in .exe. Strip off the .ect, if
+	// present, and add .exe
 	if b.os == "windows" {
-		// If we end in .ext this is an extension, strip that before replacing with the .exe
-		strings.TrimSuffix(input, ".ext")
-		return output + ".exe"
+		input = strings.TrimSuffix(input, ".ext") + ".exe"
 	}
 
-	return output
+	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
+
+	return filepath.Join("build", platformName, input)
 }
 
 func (b *Builder) goVersionCompatible(logger log.Logger) error {
