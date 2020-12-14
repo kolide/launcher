@@ -107,7 +107,7 @@ release-phase1:
 
 release-phase2:
 	rm -rf build
-	rsync 10.42.19.215:~/checkouts/kolide/launcher/build ./
+	rsync -av 10.42.19.215:~/checkouts/kolide/launcher/build ./
 #	$(MAKE) rel-amd64 rel-arm64
 #	$(MAKE) rel-lipo
 	$(MAKE) codesign
