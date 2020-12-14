@@ -92,7 +92,6 @@ rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
 ## Release Process Stuff
 ##
 
-RELEASE_EXPECTED = $(foreach os, $(AMD64_TARGETS), build/$(os).amd64) $(foreach os, $(ARM64_TARGETS), build/$(os).arm64)
 RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 
 release:
