@@ -160,10 +160,15 @@ notarize-check-%:
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
 codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
-codesign-windows-%: xp
+codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2020.p12
+codesign-windows-%:
 	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
+	osslsigncode sign -in build/windows.amd64/$*.tmp  -out build/windows.amd64/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 $(P12)  -pass "${AUTHENTICODE_PASSPHRASE}"
+	rm build/windows.amd64/$*.tmp
+	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
+	osslsigncode sign -in build/windows.amd64/$*.tmp  -out build/windows.amd64/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 $(P12)  -pass "${AUTHENTICODE_PASSPHRASE}"
+	rm build/windows.amd64/$*.tmp
 
 codesign: notarize-darwin codesign-windows
 
