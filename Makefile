@@ -95,10 +95,22 @@ rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
 RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 
 release:
+	@echo "Run 'make release-phase1' on the m1 machine"
+	@echo "Run 'make release-phase2' on a codesign machine"
+
+release-phase1:
 	rm -rf build
 	$(MAKE) rel-amd64 rel-arm64
 	$(MAKE) rel-lipo
 #	$(MAKE) codesign
+#	$(MAKE) binary-bundles
+
+release-phase2:
+	rm -rf build
+	rsync 10.42.19.215:~/checkouts/kolide/launcher/build ./
+#	$(MAKE) rel-amd64 rel-arm64
+#	$(MAKE) rel-lipo
+	$(MAKE) codesign
 	$(MAKE) binary-bundles
 
 
