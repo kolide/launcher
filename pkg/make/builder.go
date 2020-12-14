@@ -134,8 +134,8 @@ func New(opts ...Option) (*Builder, error) {
 
 // PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
-	// On windows, everything must end in .exe. Strip off the .ect, if
-	// present, and add .exe
+	// On windows, everything must end in .exe. Strip off the extension
+	// suffix, if present, and add .exe
 	if b.os == "windows" {
 		input = strings.TrimSuffix(input, ".ext") + ".exe"
 	}
