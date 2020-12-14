@@ -36,26 +36,26 @@ func TestNamingHelpers(t *testing.T) {
 	}{
 		{
 			platform:     "linux",
-			extensionOut: "build/linux/test.ext",
-			binaryOut:    "build/linux/test",
+			extensionOut: "build/linux.amd64/test.ext",
+			binaryOut:    "build/linux.amd64/test",
 		},
 		{
 			platform:     "windows",
-			extensionOut: "build/windows/test.exe",
-			binaryOut:    "build/windows/test.exe",
+			extensionOut: "build/windows.amd64/test.exe",
+			binaryOut:    "build/windows.amd64/test.exe",
 		},
 		{
 			platform:     "darwin",
-			extensionOut: "build/darwin/test.ext",
-			binaryOut:    "build/darwin/test",
+			extensionOut: "build/darwin.amd64/test.ext",
+			binaryOut:    "build/darwin.amd64/test",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run("platform="+tt.platform, func(t *testing.T) {
-			b := Builder{os: tt.platform}
+			b := Builder{os: tt.platform, arch: "amd64"}
 			require.Equal(t, filepath.Clean(tt.binaryOut), b.PlatformBinaryName("test"))
-			require.Equal(t, filepath.Clean(tt.extensionOut), b.PlatformExtensionName("test"))
+			require.Equal(t, filepath.Clean(tt.extensionOut), b.PlatformBinaryName("test.ext"))
 		})
 	}
 }

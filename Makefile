@@ -10,20 +10,17 @@ PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on
 
-# If on macOS, set the shell to bash explicitly
+# If not windows, set the shell to bash explicitly
 ifneq ($(OS), Windows_NT)
 	ifeq ($(shell uname), Darwin)
 		SHELL := /bin/bash
 	endif
 endif
 
-fake-launcher: .pre-build
-	go run cmd/make/make.go -targets=launcher -linkstamp -fakedata
-	-rm build/darwin/launcher
-	mv build/launcher build/launcher-fake
 
 all: build
-build: launcher extension
+build: build_launcher build_extension
+
 .pre-build: ${BUILD_DIR}
 
 ${BUILD_DIR}:
@@ -33,62 +30,127 @@ else
 	mkdir -p ${BUILD_DIR}
 endif
 
-# Simple things, pointers into our build
-launcher: .pre-build
-	go run cmd/make/make.go -targets=launcher -linkstamp
+##
+## Build
+##
 
-table.ext: .pre-build
-	go run cmd/make/make.go -targets=table-extension -linkstamp
-table.ext-windows: .pre-build deps
-	go run cmd/make/make.go -targets=table-extension -linkstamp --os windows
+build_%: TARGET =  $(word 2, $(subst _, ,$@))
+build_%: OS = $(word 3, $(subst _, ,$@))
+build_%: OSARG = $(if $(OS), --os $(OS))
+build_%: ARCH = $(word 4, $(subst _, ,$@))
+build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
+build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
+build_%: .pre-build
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
+
+fake_%: TARGET =  $(word 2, $(subst _, ,$@))
+fake_%: OS = $(word 3, $(subst _, ,$@))
+fake_%: OSARG = $(if $(OS), --os $(OS))
+fake_%: ARCH = $(word 4, $(subst _, ,$@))
+fake_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
+fake_%: .pre-build
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
+
+# The lipo command will combine things into universal
+# binaries. Because of the go path needs, there is little point in
+# abstracting this further
+lipo_%: build/darwin.amd64/% build/darwin.arm64/%
+	@mkdir -p build/darwin.universal
+	lipo -create $^ -output build/darwin.universal/$*
+
+# pointers, mostly for legacy reasons
+launcher: build_launcher
+tables.ext: build_tables.ext
+extension: build_osquery-extension.ext
+grpc.ext: build_grpc.ext
+fake-launcher: fake_launcher
 
 
-extension: .pre-build
-	go run cmd/make/make.go -targets=extension
+##
+## Cross Build targets
+##
 
-grpc-extension: .pre-build
-	go run cmd/make/make.go -targets=grpc-extension
+RELEASE_TARGETS=launcher osquery-extension.ext package-builder
+MANUAL_CROSS_OSES=darwin windows linux
+ARM64_OSES=darwin
+AMD64_OSES=darwin windows linux
+
+# xp is a helper for quick cross platform builds, and sanity checking
+# for breakage. humans only
+xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(MANUAL_CROSS_OSES), build_$(target)_$(os)))
+
+# Actual release targets. Because of the m1 cgo cross stuff, this requires explicit go paths
+rel-amd64: CROSSGOPATH = /Users/seph/go1.15.6.darwin-amd64/bin/go
+rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), build_$(target)_$(os)_amd64))
+
+rel-arm64: CROSSGOPATH = /opt/homebrew/bin/go
+rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
+
+rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
+
+##
+## Release Process Stuff
+##
+
+RELEASE_VERSION = $(shell git describe --tags --always --dirty)
+
+release:
+	@echo "Run 'make release-phase1' on the m1 machine"
+	@echo "Run 'make release-phase2' on a codesign machine"
+
+release-phase1:
+	rm -rf build
+	$(MAKE) rel-amd64 rel-arm64
+	$(MAKE) rel-lipo
+#	$(MAKE) codesign
+#	$(MAKE) binary-bundles
+
+release-phase2:
+	rm -rf build
+	rsync -av 10.42.19.215:~/checkouts/kolide/launcher/build ./
+#	$(MAKE) rel-amd64 rel-arm64
+#	$(MAKE) rel-lipo
+	$(MAKE) codesign
+	$(MAKE) binary-bundles
 
 
-# Convenience tools
-osqueryi-tables: table.ext
+# release: binary-bundle containers-push
+
+binary-bundles:
+	rm -rf build/binary-bundles
+	$(MAKE) $(foreach p, $(shell cd build && ls -d */ | tr -d /), build/binary-bundles/$(p))
+
+build/binary-bundles/%:
+	mkdir -p build/binary-bundles
+	mv build/$* build/$*_$(RELEASE_VERSION)
+	cd build && zip -r "binary-bundles/$*_$(RELEASE_VERSION)".zip $*_$(RELEASE_VERSION)
+
+
+##
+## Handy osqueryi command line
+##
+
+osqueryi-tables: build_tables.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-osqueryi-tables-linux: table.ext
+osqueryi-tables-linux: build_tables.ext
 	osqueryd -S --allow-unsafe --verbose --extension ./build/linux/tables.ext
-osqueryi-tables-windows: table.ext
+osqueryi-tables-windows: build_tables.ext
 	osqueryd.exe -S --allow-unsafe --verbose --extension .\build\windows\tables.exe
-sudo-osqueryi-tables: table.ext
+sudo-osqueryi-tables: build_tables.ext
 	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-launchas-osqueryi-tables: table.ext
+launchas-osqueryi-tables: build_tables.ext
 	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-
-
-
-xp: xp-launcher xp-extension xp-grpc-extension
-
-xp-%: darwin-xp-% windows-xp-% linux-xp-%
-	@true # make needs something here for the pattern rule
-
-darwin-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=darwin
-
-linux-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=linux
-
-windows-xp-%: .pre-build deps
-	go run cmd/make/make.go -targets=$* -linkstamp -os=windows
-
 
 
 # `-o runtime` should be enough, however there was a catalina bug that
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
-codesign-darwin: xp
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin/*
+codesign-darwin:
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin*/*
 
 notarize-darwin: codesign-darwin
 	rm -f build/notarization-upload.zip
-	zip -r build/notarization-upload.zip ./build/darwin/*
+	zip -r build/notarization-upload.zip ./build/darwin*
 	xcrun altool \
 	  --username "${NOTARIZE_APPLE_ID}" \
 	  --password @env:NOTARIZE_APP_PASSWD \
@@ -110,10 +172,15 @@ notarize-check-%:
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
 codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
-codesign-windows-%: xp
+codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2020.p12
+codesign-windows-%:
 	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
-	osslsigncode -in build/windows/$*  -out build/windows/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 ~/Documents/kolide-codesigning-2020.p12  -pass "${AUTHENTICODE_PASSPHRASE}"
+	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
+	osslsigncode sign -in build/windows.amd64/$*.tmp  -out build/windows.amd64/$*  -i https://kolide.com -h sha1 -t http://timestamp.verisign.com/scripts/timstamp.dll -pkcs12 $(P12)  -pass "${AUTHENTICODE_PASSPHRASE}"
+	rm build/windows.amd64/$*.tmp
+	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
+	osslsigncode sign -in build/windows.amd64/$*.tmp  -out build/windows.amd64/$*  -i https://kolide.com -h sha256 -nest -ts http://sha256timestamp.ws.symantec.com/sha256/timestamp -pkcs12 $(P12)  -pass "${AUTHENTICODE_PASSPHRASE}"
+	rm build/windows.amd64/$*.tmp
 
 codesign: notarize-darwin codesign-windows
 
@@ -170,7 +237,7 @@ lint-go-vet:
 	go vet ./cmd/... ./pkg/...
 
 lint-go-nakedret: deps-go
-	nakedret ./...
+	nakedret ./pkg/... ./cmd/...
 
 # This is ugly. since go-fmt doesn't have a simple exit code, we use
 # some make trickery to handle failing if there;s output.
@@ -179,24 +246,6 @@ lint-go-fmt: deps-go
 fmt-fail/%:
 	@echo fmt failure in: $*
 	@false
-
-##
-## Release Process Stuff
-##
-
-release: binary-bundle containers-push
-
-binary-bundle: VERSION = $(shell git describe --tags --always --dirty)
-binary-bundle: codesign
-	rm -rf build/binary-bundle
-	$(MAKE) -j $(foreach p, darwin linux windows, build/binary-bundle/$(p))
-	cd build/binary-bundle && zip -r "launcher_${VERSION}.zip" *
-
-build/binary-bundle/%:
-	mkdir -p $@
-	cp build/$*/launcher* $@/
-	cp build/$*/osquery-extension* $@/
-	go run ./tools/download-osquery.go --platform=$* --output=$@/osqueryd
 
 ##
 ## Docker Tooling
