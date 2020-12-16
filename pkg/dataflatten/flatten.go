@@ -444,6 +444,8 @@ func stringify(data interface{}) (string, error) {
 		return strconv.FormatUint(uint64(v), 10), nil
 	case uint64:
 		return strconv.FormatUint(v, 10), nil
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32), nil
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case int:
