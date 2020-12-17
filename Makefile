@@ -131,15 +131,13 @@ build/binary-bundles/%:
 ##
 
 osqueryi-tables: build_tables.ext
-	osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
-osqueryi-tables-linux: build_tables.ext
-	osqueryd -S --allow-unsafe --verbose --extension ./build/linux/tables.ext
+	osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
 osqueryi-tables-windows: build_tables.ext
-	osqueryd.exe -S --allow-unsafe --verbose --extension .\build\windows\tables.exe
+	osqueryd.exe -S --allow-unsafe --verbose --extension .\build\tables.exe
 sudo-osqueryi-tables: build_tables.ext
-	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
+	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
 launchas-osqueryi-tables: build_tables.ext
-	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/darwin/tables.ext
+	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
 
 
 # `-o runtime` should be enough, however there was a catalina bug that
