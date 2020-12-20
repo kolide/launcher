@@ -7,6 +7,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/osquery-go"
@@ -39,8 +40,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	// Read the system's fdesetup configuration
 	var stdout bytes.Buffer
-	stdout.Reset()
 	cmd := exec.CommandContext(ctx, fdesetupPath, "status")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
 		return nil, errors.Wrap(err, "calling fdesetup")
