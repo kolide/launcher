@@ -8,6 +8,7 @@ import (
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
@@ -41,6 +42,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		ioreg.TablePlugin(client, logger),
 		profiles.TablePlugin(client, logger),
 		kextpolicy.TablePlugin(),
+		filevault.TablePlugin(client, logger),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
 		dataflattentable.TablePluginExec(client, logger,
