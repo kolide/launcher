@@ -19,7 +19,7 @@ endif
 
 
 all: build
-build: build_launcher build_extension
+build: build_launcher build_osquery-extension.ext
 
 .pre-build: ${BUILD_DIR}
 
