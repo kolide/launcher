@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>os-version</key>
+	<string>10.14.6</string>
+	<key>product-errors</key>
+	<array>
+		<dict>
+			<key>code</key>
+			<integer>-22938</integer>
+			<key>message</key>
+			<string>Sign in with the app-specific password you generated. If you forgot the app-specific password or need to create a new one, go to appleid.apple.com</string>
+			<key>userInfo</key>
+			<dict>
+				<key>NSLocalizedDescription</key>
+				<string>Sign in with the app-specific password you generated. If you forgot the app-specific password or need to create a new one, go to appleid.apple.com</string>
+				<key>NSLocalizedFailureReason</key>
+				<string>Unable to validate your application.</string>
+			</dict>
+		</dict>
+	</array>
+	<key>tool-path</key>
+	<string>/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/Frameworks/ITunesSoftwareService.framework</string>
+	<key>tool-version</key>
+	<string>1.1.1138</string>
+</dict>
+</plist>

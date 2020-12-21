@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>os-version</key>
+	<string>10.14.6</string>
+	<key>product-errors</key>
+	<array>
+		<dict>
+			<key>code</key>
+			<integer>1519</integer>
+			<key>message</key>
+			<string>Could not find the RequestUUID.</string>
+			<key>userInfo</key>
+			<dict>
+				<key>NSLocalizedDescription</key>
+				<string>Could not find the RequestUUID.</string>
+				<key>NSLocalizedFailureReason</key>
+				<string>Apple Services operation failed.</string>
+				<key>NSLocalizedRecoverySuggestion</key>
+				<string>Could not find the RequestUUID.</string>
+			</dict>
+		</dict>
+	</array>
+	<key>tool-path</key>
+	<string>/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/Frameworks/ITunesSoftwareService.framework</string>
+	<key>tool-version</key>
+	<string>1.1.1138</string>
+</dict>
+</plist>

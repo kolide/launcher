@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>notarization-upload</key>
+	<dict>
+		<key>RequestUUID</key>
+		<string>11111111-aaaa-4444-aaaa-bbbbbbbbbbbb</string>
+	</dict>
+	<key>os-version</key>
+	<string>10.14.6</string>
+	<key>success-message</key>
+	<string>No errors uploading '/tmp/file.zip'.</string>
+	<key>tool-path</key>
+	<string>/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/Frameworks/ITunesSoftwareService.framework</string>
+	<key>tool-version</key>
+	<string>1.1.1138</string>
+</dict>
+</plist>
+
