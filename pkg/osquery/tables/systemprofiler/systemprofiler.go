@@ -41,6 +41,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -197,6 +198,13 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
+	timeout := 30 * time.Second
+	if detailLevel == "full" {
+		timeout = 5 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 

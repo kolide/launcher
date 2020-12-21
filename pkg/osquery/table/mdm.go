@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"strconv"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
@@ -31,13 +32,13 @@ func MDMInfo(logger log.Logger) *table.Plugin {
 }
 
 func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	profiles, err := getMDMProfile()
+	profiles, err := getMDMProfile(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	depEnrolled, userApproved := "unknown", "unknown"
-	status, err := getMDMProfileStatus()
+	status, err := getMDMProfileStatus(ctx)
 	if err == nil { // only supported on 10.13.4+
 		depEnrolled = strconv.FormatBool(status.DEPEnrolled)
 		userApproved = strconv.FormatBool(status.UserApproved)
@@ -84,8 +85,11 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 	return results, nil
 }
 
-func getMDMProfile() (*profilesOutput, error) {
-	cmd := exec.Command("/usr/bin/profiles", "-L", "-o", "stdout-xml")
+func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "-L", "-o", "stdout-xml")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, errors.Wrap(err, "calling /usr/bin/profiles to get MDM profile payload")
@@ -124,8 +128,11 @@ type payloadContent struct {
 	SignMessage             bool
 }
 
-func getMDMProfileStatus() (profileStatus, error) {
-	cmd := exec.Command("/usr/bin/profiles", "status", "-type", "enrollment")
+func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "status", "-type", "enrollment")
 	out, err := cmd.Output()
 	if err != nil {
 		return profileStatus{}, errors.Wrap(err, "calling /usr/bin/profiles to get MDM profile status")

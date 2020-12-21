@@ -157,13 +157,13 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 }
 
 func (t *Table) execIoreg(ctx context.Context, args []string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	args = append(args, "-a")
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 
 	cmd := exec.CommandContext(ctx, ioregPath, args...)
 	cmd.Stdout = &stdout

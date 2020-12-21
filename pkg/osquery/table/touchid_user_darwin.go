@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -141,6 +142,9 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 
 // runCommand runs a given command and arguments as the supplied user
 func runCommandContext(ctx context.Context, uid int, cmd string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	// Set up the command
 	var stdout bytes.Buffer
 	c := exec.CommandContext(ctx, cmd, args...)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -57,6 +58,9 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 }
 
 func (t *Table) exec(ctx context.Context) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 50*time.Second)
+	defer cancel()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 

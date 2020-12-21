@@ -36,22 +36,28 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	var results []map[string]string
 
 	// Read the system's fdesetup configuration
 	var stdout bytes.Buffer
+
 	cmd := exec.CommandContext(ctx, fdesetupPath, "status")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	cmd.Stdout = &stdout
+
 	if err := cmd.Run(); err != nil {
 		return nil, errors.Wrap(err, "calling fdesetup")
 	}
+
 	output := string(stdout.Bytes())
 	status := strings.TrimSuffix(output, "\n")
+
 	result := map[string]string{
 		"status": status,
 	}
+
 	results = append(results, result)
 
 	return results, nil
