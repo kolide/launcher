@@ -1,3 +1,6 @@
+// +build !windows
+// (skip building windows, since the newline replacement doesn't work there)
+
 package mdmclient
 
 import (
