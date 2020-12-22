@@ -58,21 +58,20 @@ func (n *Notarizer) Submit(ctx context.Context, filePath string, primaryBundleId
 		"--file", filePath,
 	})
 
+	if err != nil {
+		level.Error(logger).Log(
+			"msg", "error getting notarize-app",
+			"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
+		)
+		return "", errors.Wrap(err, "calling notarize")
+	}
+
 	// duplicate submissions
 	if len(response.ProductErrors) == 1 {
 		matches := duplicateSubmitRegexp.FindStringSubmatch(response.ProductErrors[0].Message)
 		if len(matches) == 2 {
 			return matches[1], nil
 		}
-	}
-
-	if err != nil {
-		level.Error(logger).Log(
-			"msg", "error getting notarize-app",
-			"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
-		)
-
-		return "", errors.Wrap(err, "calling notarize")
 	}
 
 	return response.NotarizationUpload.RequestUUID, nil
