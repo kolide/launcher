@@ -75,13 +75,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
-			converted, err := t.transformOutput(mdmclientOutput)
-			if err != nil {
-				level.Info(t.logger).Log("msg", "converting mdmclient output", "err", err)
-				continue
-			}
-
-			flatData, err := t.flattenOutput(dataQuery, converted)
+			flatData, err := t.flattenOutput(dataQuery, mdmclientOutput)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
 				continue
@@ -98,6 +92,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+	converted, err := t.transformOutput(systemOutput)
+	if err != nil {
+		level.Info(t.logger).Log("msg", "converting mdmclient output", "err", err)
+		return nil, errors.Wrap(err, "converting")
+	}
+
 	flattenOpts := []dataflatten.FlattenOpts{}
 
 	if dataQuery != "" {
@@ -110,7 +110,7 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 		)
 	}
 
-	return dataflatten.Plist(systemOutput, flattenOpts...)
+	return dataflatten.Plist(converted, flattenOpts...)
 }
 
 func (t *Table) execMdmclient(ctx context.Context, command string) ([]byte, error) {
