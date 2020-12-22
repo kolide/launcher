@@ -62,6 +62,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
+		if !strings.HasPrefix(mdmclientCommand, "Query") {
+			level.Info(t.logger).Log("msg", "Only Query commands are supported")
+			continue
+		}
+
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
 			mdmclientOutput, err := t.execMdmclient(ctx, mdmclientCommand)
