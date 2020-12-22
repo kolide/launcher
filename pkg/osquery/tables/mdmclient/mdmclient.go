@@ -36,7 +36,6 @@ type Table struct {
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("command"),
-		table.IntegerColumn("response_from"),
 	)
 
 	t := &Table{
@@ -133,11 +132,16 @@ func (t *Table) execMdmclient(ctx context.Context, command string) ([]byte, erro
 func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	out := bytes.Replace(in, []byte("Daemon response: {"), []byte("DaemonResponse = {"), 1)
 	out = bytes.Replace(out, []byte("Agent response: {"), []byte("AgentResponse = {"), 1)
-	out = bytes.Replace(out, []byte("}\n"), []byte("};\n"), 2)
+
+	// This would, honestly, be cleaner as a regex. The \n aren't
+	// quite right. We want to replace any unindented } with a
+	// };. Which is just a hack, because we really want to replace
+	// the one that matches the response structures.
+	out = bytes.Replace(out, []byte("\n}\n"), []byte("\n};\n"), 2)
 
 	var retOut []byte
 	retOut = append(retOut, "{\n"...)
 	retOut = append(retOut, out...)
-	retOut = append(retOut, "\n}"...)
+	retOut = append(retOut, "\n}\n"...)
 	return retOut, nil
 }
