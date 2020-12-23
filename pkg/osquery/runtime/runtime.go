@@ -182,6 +182,14 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 	)
 
+	// On darwin, run osquery using a magic macOS variable to ensure we
+	// get proper versions strings back. I'm not totally sure why apple
+	// did this, but reading SystemVersion.plist is different when this is set.
+	// See:
+	// https://eclecticlight.co/2020/08/13/macos-version-numbering-isnt-so-simple/
+	// https://github.com/osquery/osquery/pull/6824
+	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
+
 	return cmd, nil
 }
 
