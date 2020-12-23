@@ -42,7 +42,7 @@ void softwareUpdate(
 		*doesAppStoreAutoUpdates = 1;
 	}
 
-	// before 10.13 (build ver 17 (build ver 18) it's called doesMacOSAutoUpdate.
+	// before 10.13 (build ver 17) it's called doesMacOSAutoUpdate.
 	if (os_version >= 18) {
 		val = [manager doesMacOSAutoUpdate];
 		if (val) {
