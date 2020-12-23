@@ -42,8 +42,8 @@ void softwareUpdate(
 		*doesAppStoreAutoUpdates = 1;
 	}
 
-	// before 10.13 the method was called doesOSXAutoUpdates, since 10.14 it's called doesMacOSAutoUpdate.
-	if (os_version >= 14) {
+	// before 10.13 (build ver 17 (build ver 18) it's called doesMacOSAutoUpdate.
+	if (os_version >= 18) {
 		val = [manager doesMacOSAutoUpdate];
 		if (val) {
 			*doesOSXAutoUpdates = 1;
@@ -90,20 +90,20 @@ func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
 }
 
 type osUpdateTable struct {
-	client            *osquery.ExtensionManagerClient
-	macOSMinorVersion int
+	client                  *osquery.ExtensionManagerClient
+	macOSBuildVersionPrefix int
 }
 
 func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	if table.macOSMinorVersion == 0 {
-		minor, err := macOSVersionMinor(table.client)
+	if table.macOSBuildVersionPrefix == 0 {
+		buildPrefix, err := macOSBuildVersionPrefix(table.client)
 		if err != nil {
-			return nil, errors.Wrap(err, "determine macOS minor version for software update table")
+			return nil, errors.Wrap(err, "determine macOS build prefix for software update table")
 		}
-		table.macOSMinorVersion = minor
+		table.macOSBuildVersionPrefix = buildPrefix
 	}
 	var (
-		version                               = C.int(table.macOSMinorVersion)
+		version                               = C.int(table.macOSBuildVersionPrefix)
 		isAutomaticallyCheckForUpdatesManaged = C.int(0)
 		isAutomaticallyCheckForUpdatesEnabled = C.int(0)
 		doesBackgroundDownload                = C.int(0)
@@ -137,15 +137,15 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	return resp, nil
 }
 
-func macOSVersionMinor(client *osquery.ExtensionManagerClient) (int, error) {
-	query := `SELECT minor from os_version;`
+func macOSBuildVersionPrefix(client *osquery.ExtensionManagerClient) (int, error) {
+	query := `SELECT CAST(SUBSTR(build,0,3) AS int) AS build_prefix FROM os_version`
 	row, err := client.QueryRow(query)
 	if err != nil {
 		return 0, errors.Wrap(err, "querying for macOS version")
 	}
-	minor, err := strconv.Atoi(row["minor"])
+	buildPrefix, err := strconv.Atoi(row["build_prefix"])
 	if err != nil {
-		return 0, errors.Wrap(err, "converting minor version string to int")
+		return 0, errors.Wrap(err, "converting build prefix from string to int")
 	}
-	return minor, nil
+	return buildPrefix, nil
 }
