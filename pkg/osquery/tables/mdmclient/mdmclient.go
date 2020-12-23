@@ -1,3 +1,6 @@
+// +build !windows
+// (skip building windows, since the newline replacement doesn't work there)
+
 // Package mdmclient provides a table that parses the mdmclient
 // output. Empirically, this seems to be an almost gnustep
 // plist. With some headers. So, unwind that.
