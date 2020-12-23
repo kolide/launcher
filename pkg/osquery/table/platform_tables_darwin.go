@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
+	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
@@ -43,6 +44,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		profiles.TablePlugin(client, logger),
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
+		mdmclient.TablePlugin(client, logger),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
 		dataflattentable.TablePluginExec(client, logger,
