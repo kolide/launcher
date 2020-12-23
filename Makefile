@@ -42,7 +42,7 @@ build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
 build_%: GOBUILD = $(if $(CROSSGOPATH), $(CROSSGOPATH), go)
 build_%: .pre-build
-	go run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
+	$(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
 
 fake_%: TARGET =  $(word 2, $(subst _, ,$@))
 fake_%: OS = $(word 3, $(subst _, ,$@))
