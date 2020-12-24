@@ -182,6 +182,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          opts.MirrorServerURL,
 			NotaryPrefix:       opts.NotaryPrefix,
 			HTTPClient:         httpClient,
+			InitialDelay:       1 * time.Hour,
 			SigChannel:         sigChannel,
 		}
 
