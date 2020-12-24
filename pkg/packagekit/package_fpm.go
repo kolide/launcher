@@ -166,5 +166,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		return errors.Wrap(err, "copying output")
 	}
 
+	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+
 	return nil
 }

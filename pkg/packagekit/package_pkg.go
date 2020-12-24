@@ -18,12 +18,6 @@ import (
 	"go.opencensus.io/trace"
 )
 
-type contextKey int
-
-const (
-	ContextNotarizationUuidKey contextKey = iota
-)
-
 func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
 	defer span.End()
@@ -63,31 +57,9 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return errors.Wrap(err, "copying output")
 	}
 
+	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+
 	return nil
-}
-
-func InitContextForNotarizationUuid(ctx context.Context) context.Context {
-	var strPointer *string
-	s := ""
-	strPointer = &s
-
-	return context.WithValue(ctx, ContextNotarizationUuidKey, strPointer)
-}
-
-func setNotarizationUuidInContext(ctx context.Context, uuid string) {
-	ptr, ok := ctx.Value(ContextNotarizationUuidKey).(*string)
-	if !ok || ptr == nil {
-		return
-	}
-	*ptr = uuid
-}
-
-func GetNotarizationUuidFromContext(ctx context.Context) (string, error) {
-	ptr, ok := ctx.Value(ContextNotarizationUuidKey).(*string)
-	if !ok {
-		return "", errors.New("Wasn't a string pointer")
-	}
-	return *ptr, nil
 }
 
 // runNotarize takes a given input, and notarizes it
@@ -113,10 +85,7 @@ func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
 		"uuid", uuid,
 	)
 
-	// Passing data back through a pointer in context is kind of
-	// abhorrent. But, I'm not sure there's a simple way short of
-	// refactoring everything. So, here we are.
-	setNotarizationUuidInContext(ctx, uuid)
+	setInContext(ctx, ContextNotarizationUuidKey, uuid)
 
 	return nil
 }
