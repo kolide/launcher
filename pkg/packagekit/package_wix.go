@@ -9,12 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
-	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
@@ -25,13 +21,10 @@ import (
 //go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
 
 const (
-	signtoolPath    = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
-	signtoolRetries = 5
+	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
 )
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
 	defer span.End()
 
@@ -149,33 +142,12 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	// Sign?
 	if po.WindowsUseSigntool {
-		// The timestamp servers timeout sometimes. So we
-		// implement a little retry logic here.
-		attempt := 0
-		for {
-			attempt = attempt + 1
-			err := authenticode.Sign(
-				ctx, msiFile,
-				authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
-				authenticode.WithSigntoolPath(signtoolPath),
-			)
-			if err == nil {
-				break
-			}
-			if attempt > signtoolAttempts {
-				return errors.Wrap(err, "Reached max number of signtool attempts. %d is too many", attempt)
-			}
-			if strings.Contains(err.Error(), "FIXME MATCH TIMEOUT") {
-				level.Debug(logger).Log(
-					"msg", "Timeout talking to timestamp server. Sleep at try again",
-					"attempt", attempt,
-				)
-				time.Sleep(30 * time.Second)
-				continue
-			}
-			if err != nil {
-				return errors.Wrap(err, "authenticode signing")
-			}
+		if err := authenticode.Sign(
+			ctx, msiFile,
+			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
+			authenticode.WithSigntoolPath(signtoolPath),
+		); err != nil {
+			return errors.Wrap(err, "authenticode signing")
 		}
 	}
 
