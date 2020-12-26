@@ -18,15 +18,15 @@ const (
 // for data smuggling. Not the simplest way to move data around, but
 // it allows us not to adjust all the returns.
 func InitContext(ctx context.Context) context.Context {
-	var strPointer *string
-	s := ""
-	strPointer = &s
-
 	for _, key := range []contextKey{
 		ContextNotarizationUuidKey,
 		ContextLauncherVersionKey,
 		ContextOsqueryVersionKey,
 	} {
+		var strPointer *string
+		s := ""
+		strPointer = &s
+
 		ctx = context.WithValue(ctx, key, strPointer)
 	}
 
