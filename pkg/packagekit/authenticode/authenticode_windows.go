@@ -12,12 +12,19 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
+)
+
+const (
+	maxRetries         = 5
+	retryDelay         = 30 * time.Second
+	timeoutErrorString = "The specified timestamp server either could not be reached"
 )
 
 // Sign uses signtool to add authenticode signatures. It supports
@@ -81,6 +88,8 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 
 // signtoolSign appends some arguments and execs
 func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args ...string) error {
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
 	ctx, span := trace.StartSpan(ctx, "signtoolSign")
 	defer span.End()
 
@@ -92,8 +101,32 @@ func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args .
 
 	args = append(args, file)
 
-	if _, _, err := so.execOut(ctx, so.signtoolPath, args...); err != nil {
+	// The timestamp servers timeout sometimes. So we
+	// implement a retry logic here.
+	attempt := 0
+	for {
+		attempt = attempt + 1
+		_, stderr, err := so.execOut(ctx, so.signtoolPath, args...)
+		if err == nil {
+			return nil
+		}
+
+		if attempt > maxRetries {
+			return errors.Wrapf(err, "Reached max number of retries. %d is too many", attempt)
+		}
+
+		if !strings.Contains(stderr, timeoutErrorString) {
+			level.Debug(logger).Log(
+				"msg", "signtool got a retryable error. Sleeping and will try again",
+				"attempt", attempt,
+				"err", err,
+			)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Fallthrough to catch errors unrelated to timeouts
 		return errors.Wrap(err, "calling signtool")
 	}
-	return nil
+	return errors.New("How did you get here? Some logic bug")
 }
