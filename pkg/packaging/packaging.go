@@ -57,9 +57,12 @@ type PackageOptions struct {
 	WixSkipCleanup    bool
 	DisableService    bool
 
-	AppleSigningKey     string   // apple signing key
-	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
-	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key
+	AppleNotarizeAccountId   string   // The 10 character apple account id
+	AppleNotarizeAppPassword string   // app password for notarization service
+	AppleNotarizeUserId      string   // User id to authenticate to the notarization service with
+	AppleSigningKey          string   // apple signing key
+	WindowsSigntoolArgs      []string // Extra args for signtool. May be needed for finding a key
+	WindowsUseSigntool       bool     // whether to use signtool.exe on windows
 
 	target        Target                     // Target build platform
 	initOptions   *packagekit.InitOptions    // options we'll pass to the packagekit renderers
@@ -284,19 +287,22 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	p.packagekitops = &packagekit.PackageOptions{
-		Name:                "launcher",
-		Identifier:          p.Identifier,
-		Root:                p.packageRoot,
-		Scripts:             p.scriptRoot,
-		AppleSigningKey:     p.AppleSigningKey,
-		WindowsUseSigntool:  p.WindowsUseSigntool,
-		WindowsSigntoolArgs: p.WindowsSigntoolArgs,
-		Version:             p.PackageVersion,
-		FlagFile:            p.canonicalizePath(flagFilePath),
-		WixPath:             p.WixPath,
-		WixUI:               p.MSIUI,
-		WixSkipCleanup:      p.WixSkipCleanup,
-		DisableService:      p.DisableService,
+		Name:                     "launcher",
+		Identifier:               p.Identifier,
+		Root:                     p.packageRoot,
+		Scripts:                  p.scriptRoot,
+		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,
+		AppleNotarizeAppPassword: p.AppleNotarizeAppPassword,
+		AppleNotarizeUserId:      p.AppleNotarizeUserId,
+		AppleSigningKey:          p.AppleSigningKey,
+		WindowsUseSigntool:       p.WindowsUseSigntool,
+		WindowsSigntoolArgs:      p.WindowsSigntoolArgs,
+		Version:                  p.PackageVersion,
+		FlagFile:                 p.canonicalizePath(flagFilePath),
+		WixPath:                  p.WixPath,
+		WixUI:                    p.MSIUI,
+		WixSkipCleanup:           p.WixSkipCleanup,
+		DisableService:           p.DisableService,
 	}
 
 	if err := p.makePackage(ctx); err != nil {

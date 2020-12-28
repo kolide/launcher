@@ -13,6 +13,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/pkg/packagekit/applenotarization"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -42,6 +43,10 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return errors.Wrap(err, "running productbuild")
 	}
 
+	if err := runNotarize(ctx, distributionPkgPath, po); err != nil {
+		return errors.Wrap(err, "running notarize")
+	}
+
 	outputFH, err := os.Open(distributionPkgPath)
 	if err != nil {
 		return errors.Wrap(err, "opening resultant output file")
@@ -51,6 +56,36 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	if _, err := io.Copy(w, outputFH); err != nil {
 		return errors.Wrap(err, "copying output")
 	}
+
+	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+
+	return nil
+}
+
+// runNotarize takes a given input, and notarizes it
+func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
+	if po.AppleNotarizeUserId == "" || po.AppleNotarizeAppPassword == "" {
+		return nil
+	}
+
+	ctx, span := trace.StartSpan(ctx, "packagekit.runNotarize")
+	defer span.End()
+
+	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runNotarize")
+
+	bundleid := fmt.Sprintf("com.%s.launcher", po.Identifier)
+	notarizer := applenotarization.New(po.AppleNotarizeUserId, po.AppleNotarizeAppPassword, po.AppleNotarizeAccountId)
+	uuid, err := notarizer.Submit(ctx, file, bundleid)
+	if err != nil {
+		return errors.Wrap(err, "submitting file for notarization")
+	}
+
+	level.Debug(logger).Log(
+		"msg", "Got uuid",
+		"uuid", uuid,
+	)
+
+	setInContext(ctx, ContextNotarizationUuidKey, uuid)
 
 	return nil
 }

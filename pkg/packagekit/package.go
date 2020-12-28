@@ -12,9 +12,12 @@ type PackageOptions struct {
 
 	DisableService bool // Whether to install a system service in a disabled state
 
-	AppleSigningKey     string   // apple signing key
-	WindowsUseSigntool  bool     // whether to use signtool.exe on windows
-	WindowsSigntoolArgs []string // Extra args for signtool. May be needed for finding a key
+	AppleNotarizeAccountId   string   // The 10 character apple account id
+	AppleNotarizeAppPassword string   // app password for notarization service
+	AppleNotarizeUserId      string   // User id to authenticate to the notarization service with
+	AppleSigningKey          string   // apple signing key
+	WindowsSigntoolArgs      []string // Extra args for signtool. May be needed for finding a key
+	WindowsUseSigntool       bool     // whether to use signtool.exe on windows
 
 	WixPath        string // path to wix installation
 	WixUI          bool   //include the wix ui or not

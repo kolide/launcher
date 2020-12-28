@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>notarization-info</key>
+	<dict>
+		<key>Date</key>
+		<date>2019-10-04T22:05:48Z</date>
+		<key>LogFileURL</key>
+		<string>https://osxapps-ssl.itunes.apple.com/itunes-assets/Enigma113/v4/5a/20/75/11111111-1111-1111-1111-111111111111/developer_log.json?accessKey=REDACTEDLONGSTRING%3D</string>
+		<key>RequestUUID</key>
+		<string>11111111-2222-3333-4444-f4b2a99e443a</string>
+		<key>Status</key>
+		<string>success</string>
+		<key>Status Code</key>
+		<integer>0</integer>
+		<key>Status Message</key>
+		<string>Package Approved</string>
+	</dict>
+	<key>os-version</key>
+	<string>10.14.6</string>
+	<key>success-message</key>
+	<string>No errors getting notarization info.</string>
+	<key>tool-path</key>
+	<string>/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/Frameworks/ITunesSoftwareService.framework</string>
+	<key>tool-version</key>
+	<string>1.1.1138</string>
+</dict>
+</plist>
