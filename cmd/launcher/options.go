@@ -62,12 +62,13 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		_                  = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
-		flAutoupdate         = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
-		flNotaryServerURL    = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
-		flMirrorURL          = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
-		flAutoupdateInterval = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
-		flUpdateChannel      = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
-		flNotaryPrefix       = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
+		flAutoupdate             = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
+		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
+		flNotaryPrefix           = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
+		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 
 		// Development options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
@@ -147,31 +148,32 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	opts := &launcher.Options{
-		Autoupdate:          *flAutoupdate,
-		AutoupdateInterval:  *flAutoupdateInterval,
-		CertPins:            certPins,
-		Control:             *flControl,
-		ControlServerURL:    *flControlServerURL,
-		Debug:               *flDebug,
-		DebugLogFile:        *flDebugLogFile,
-		DisableControlTLS:   *flDisableControlTLS,
-		EnableInitialRunner: *flInitialRunner,
-		EnrollSecret:        *flEnrollSecret,
-		EnrollSecretPath:    *flEnrollSecretPath,
-		InsecureTLS:         *flInsecureTLS,
-		InsecureTransport:   *flInsecureTransport,
-		KolideServerURL:     *flKolideServerURL,
-		LoggingInterval:     *flLoggingInterval,
-		MirrorServerURL:     *flMirrorURL,
-		NotaryPrefix:        *flNotaryPrefix,
-		NotaryServerURL:     *flNotaryServerURL,
-		OsqueryFlags:        flOsqueryFlags,
-		OsqueryVerbose:      *flOsqueryVerbose,
-		OsquerydPath:        osquerydPath,
-		RootDirectory:       *flRootDirectory,
-		RootPEM:             *flRootPEM,
-		Transport:           *flTransport,
-		UpdateChannel:       updateChannel,
+		Autoupdate:             *flAutoupdate,
+		AutoupdateInterval:     *flAutoupdateInterval,
+		AutoupdateInitialDelay: *flAutoupdateInitialDelay,
+		CertPins:               certPins,
+		Control:                *flControl,
+		ControlServerURL:       *flControlServerURL,
+		Debug:                  *flDebug,
+		DebugLogFile:           *flDebugLogFile,
+		DisableControlTLS:      *flDisableControlTLS,
+		EnableInitialRunner:    *flInitialRunner,
+		EnrollSecret:           *flEnrollSecret,
+		EnrollSecretPath:       *flEnrollSecretPath,
+		InsecureTLS:            *flInsecureTLS,
+		InsecureTransport:      *flInsecureTransport,
+		KolideServerURL:        *flKolideServerURL,
+		LoggingInterval:        *flLoggingInterval,
+		MirrorServerURL:        *flMirrorURL,
+		NotaryPrefix:           *flNotaryPrefix,
+		NotaryServerURL:        *flNotaryServerURL,
+		OsqueryFlags:           flOsqueryFlags,
+		OsqueryVerbose:         *flOsqueryVerbose,
+		OsquerydPath:           osquerydPath,
+		RootDirectory:          *flRootDirectory,
+		RootPEM:                *flRootPEM,
+		Transport:              *flTransport,
+		UpdateChannel:          updateChannel,
 	}
 	return opts, nil
 }
