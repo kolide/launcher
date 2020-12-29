@@ -66,7 +66,7 @@ func createUpdater(
 	return &actor.Actor{
 		Execute: func() error {
 			// When launcher first starts, we'd like the
-			// Saas side to start recieving data
+			// server to start receiving data
 			// immediately. But, if updater is trying to
 			// run, this creates an awkward pause for restart.
 			// So, delay starting updates by an hour or two.
