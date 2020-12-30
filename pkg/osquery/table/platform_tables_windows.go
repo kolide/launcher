@@ -4,6 +4,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/osquery/tables/secedit"
+	"github.com/kolide/launcher/pkg/osquery/tables/wlan"
 	"github.com/kolide/launcher/pkg/osquery/tables/wmitable"
 
 	"github.com/go-kit/kit/log"
@@ -16,5 +17,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		ProgramIcons(),
 		secedit.TablePlugin(client, logger),
 		wmitable.TablePlugin(client, logger),
+		wlan.TablePlugin(client, logger),
 	}
 }
