@@ -3,12 +3,17 @@
 package wlan
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/pkg/errors"
 )
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -54,9 +59,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return nil, errors.Wrapf(err, "calling netsh wlan. Got: %s", stderr.String())
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(stdout))
+	scanner := bufio.NewScanner(strings.NewReader(stdout.String()))
 	for scanner.Scan() {
-		row = map[string]string{"output": scanner.Text()}
+		row := map[string]string{"output": scanner.Text()}
 		results = append(results, row)
 	}
 
