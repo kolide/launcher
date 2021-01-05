@@ -38,6 +38,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.IntegerColumn("signal_strength_percentage"),
 		table.TextColumn("bssid"),
 		table.TextColumn("radio_type"),
+		table.TextColumn("channel"),
 	}
 
 	parser := buildParser(logger)
@@ -149,6 +150,11 @@ func buildParser(logger log.Logger) *OutputParser {
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Radio type") },
 				KeyFunc: func(_ string) (string, error) { return "radio_type", nil },
+				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+			},
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Channel") },
+				KeyFunc: func(_ string) (string, error) { return "channel", nil },
 				ValFunc: func(in string) (string, error) { return wlanVal(in) },
 			},
 		})

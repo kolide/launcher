@@ -9,7 +9,6 @@ var (
 // blankLineSplitter implements the bufio.SplitFunc type, when used as the Split
 // function for a bufio.Scanner, it will return chunks of bytes separated by an
 // empty newline, e.g. \n\n or \r\n\r\n.
-// TODO: currently doesn't play well with utf-16
 func blankLineSplitter(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil

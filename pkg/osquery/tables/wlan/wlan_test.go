@@ -32,6 +32,7 @@ func TestTableGenerate(t *testing.T) {
 					"signal_strength_percentage": "92",
 					"bssid":                      "80:2a:9c:eb:bb:65",
 					"radio_type":                 "802.11n",
+					"channel":                    "1",
 				},
 				{
 					"name":                       "",
@@ -39,6 +40,7 @@ func TestTableGenerate(t *testing.T) {
 					"signal_strength_percentage": "92",
 					"bssid":                      "82:2a:a8:eb:bb:65",
 					"radio_type":                 "802.11n",
+					"channel":                    "1",
 				},
 				{
 					"name":                       "GMG_DB_315",
@@ -46,6 +48,7 @@ func TestTableGenerate(t *testing.T) {
 					"signal_strength_percentage": "34",
 					"bssid":                      "08:ea:88:84:cf:6c",
 					"radio_type":                 "802.11n",
+					"channel":                    "7",
 				},
 				{
 					"name":                       "MySpectrumWiFi90-2G",
@@ -53,6 +56,7 @@ func TestTableGenerate(t *testing.T) {
 					"signal_strength_percentage": "0",
 					"bssid":                      "7c:db:98:b3:e0:8e",
 					"radio_type":                 "802.11ac",
+					"channel":                    "11",
 				},
 			},
 		},
