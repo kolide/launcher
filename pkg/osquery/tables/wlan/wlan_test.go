@@ -3,8 +3,6 @@ package wlan
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"

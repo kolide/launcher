@@ -31,9 +31,9 @@ func NewParser(logger log.Logger, matchers []Matcher) *OutputParser {
 func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 	row := make(map[string]string)
 	scanner := bufio.NewScanner(input)
+	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// fmt.Println(line)
 
 		for _, m := range p.matchers {
 			if m.Match(line) {

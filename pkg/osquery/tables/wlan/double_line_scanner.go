@@ -3,7 +3,7 @@ package wlan
 import "regexp"
 
 var (
-	twoEOLs = regexp.MustCompile(`[\r\n]{2}`)
+	twoEOLs = regexp.MustCompile(`(\r?\n){2}`)
 )
 
 // blankLineSplitter implements the bufio.SplitFunc type, when used as the Split
