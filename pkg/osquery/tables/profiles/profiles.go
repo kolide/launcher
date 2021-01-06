@@ -73,10 +73,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			for _, user := range tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(userAllowedCharacters), tablehelpers.WithDefaults("_all")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-					// apple documents `-output stdout-xml` as sending the output
-					// to stdout, in xml. This, however, does not work for some
-					// subset of the profiles command. I've reported it, and while
-					// it may someday be fixed, we need to support it where it is.
+					// apple documents `-output stdout-xml` as sending the
+					// output to stdout, in xml. This, however, does not work
+					// for some subset of the profiles command. I've reported it
+					// to apple (feedback FB8962811), and while it may someday
+					// be fixed, we need to support it where it is.
 					dir, err := ioutil.TempDir("", "kolide_profiles")
 					if err != nil {
 						return nil, errors.Wrap(err, "creating kolide_profiles tmp dir")
