@@ -21,7 +21,7 @@ func New() *PowerShell {
 
 func runPos(ctx context.Context, output *bytes.Buffer) error {
 	posh := New()
-	err := posh.execute(output, getbssid)
+	err := posh.execute(output, simplecommand)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
@@ -30,7 +30,7 @@ func runPos(ctx context.Context, output *bytes.Buffer) error {
 }
 
 func (p *PowerShell) execute(out *bytes.Buffer, args ...string) error {
-	args = append([]string{}, args...)
+	args = append([]string{"-NoProfile", "-NonInteractive"}, args...)
 	cmd := exec.Command(p.powerShell, args...)
 
 	// var stdout bytes.Buffer
@@ -44,3 +44,24 @@ func (p *PowerShell) execute(out *bytes.Buffer, args ...string) error {
 	}
 	return err
 }
+
+const simplecommand = `
+$Source = @"
+public class BasicTest
+{
+  public static int Add(int a, int b)
+    {
+        return (a + b);
+    }
+  public int Multiply(int a, int b)
+    {
+    return (a * b);
+    }
+}
+"@
+
+Add-Type -TypeDefinition $Source
+[BasicTest]::Add(4, 3)
+$BasicTestObject = New-Object BasicTest
+$BasicTestObject.Multiply(5, 2)
+`
