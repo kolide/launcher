@@ -39,6 +39,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("bssid"),
 		table.TextColumn("radio_type"),
 		table.TextColumn("channel"),
+		table.TextColumn("output"),
 	}
 
 	parser := buildParser(logger)
@@ -50,7 +51,24 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execCmd,
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin(t.tableName, columns, t.generatePosh)
+}
+
+func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var results []map[string]string
+
+	var output bytes.Buffer
+
+	err := runPos(ctx, &output)
+	if err != nil {
+		return results, err
+	}
+
+	results = append(results, map[string]string{"output": output.String()})
+	return results, nil
 }
 
 func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
