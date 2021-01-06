@@ -9,8 +9,9 @@ import (
 )
 
 type constraintOptions struct {
-	defaults          []string
 	allowedCharacters string
+	allowedValues     []string
+	defaults          []string
 	logger            log.Logger
 }
 
@@ -38,6 +39,12 @@ func WithAllowedCharacters(allowed string) GetConstraintOpts {
 	}
 }
 
+func WithAllowedValues(allowed []string) GetConstraintOpts {
+	return func(co *constraintOptions) {
+		co.allowedValues = allowed
+	}
+}
+
 // GetConstraints returns a []string of the constraint expressions on
 // a column. It's meant for the common, simple, usecase of iterating over them.
 func GetConstraints(queryContext table.QueryContext, columnName string, opts ...GetConstraintOpts) []string {
@@ -58,13 +65,33 @@ func GetConstraints(queryContext table.QueryContext, columnName string, opts ...
 	constraintSet := make(map[string]struct{})
 
 	for _, c := range q.Constraints {
-		if !co.OnlyAllowedCharacters(c.Expression) {
+		// No point in checking allowed characters, if we have an allowedValues. Just use it.
+		if len(co.allowedValues) == 0 && !co.OnlyAllowedCharacters(c.Expression) {
 			level.Info(co.logger).Log(
 				"msg", "Disallowed character in expression",
 				"column", columnName,
 				"expression", c.Expression,
 			)
 			continue
+		}
+
+		if len(co.allowedValues) > 0 {
+			skip := true
+			for _, v := range co.allowedValues {
+				if v == c.Expression {
+					skip = false
+					break
+				}
+			}
+
+			if skip {
+				level.Info(co.logger).Log(
+					"msg", "Disallowed value in expression",
+					"column", columnName,
+					"expression", c.Expression,
+				)
+				continue
+			}
 		}
 
 		// empty struct is less ram than bool would be
