@@ -1,7 +1,7 @@
 package wlan
 
 const getBSSIDCommandTemplate = `
-Function Get-BSSID {
+function Get-Networks {
     function Convert-ByteArrayToString {
         [CmdletBinding()] Param (
             [Parameter(Mandatory = $True, ValueFromPipeline = $True)] [System.Byte[]] $ByteArray
@@ -14,14 +14,16 @@ Function Get-BSSID {
     Add-Type -Path "{{.NativeCodePath}}"
     $WlanClient = New-Object NativeWifi.WlanClient
 
-    $WlanClient.Interfaces |
-    ForEach-Object { $_.GetNetworkBssList() } |
+    $WlanClient.Interfaces | 
+    ForEach-Object { $_.GetNetworkBssList() } | 
     Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID).substring(0,$_.dot11ssid.SSIDlength)}} |
-    Select-Object ssid,phyId,rssi,linkQuality,timestamp
+    Select-Object ssid,phyId,rssi,linkQuality,timestamp 
 }
-Get-BSSID
+Get-Networks
 `
 
+// TODO: what is the memory impact of a string this
+// large? There are probably better ways to load this in
 const nativeWiFiCode = `
 $NativeWifiCode = @'
 using System;

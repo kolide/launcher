@@ -38,6 +38,7 @@ func runPos(ctx context.Context, output *bytes.Buffer) error {
 	if err != nil {
 		return errors.Wrap(err, "creating file for native wifi code")
 	}
+	// probably not needed, line 34 covers this
 	defer os.Remove(nativeCodeFile.Name())
 
 	_, err = nativeCodeFile.WriteString(nativeWiFiCode)
@@ -59,6 +60,7 @@ func runPos(ctx context.Context, output *bytes.Buffer) error {
 
 	err = posh.execute(output, command.String())
 	if err != nil {
+		// TODO: log, not printf
 		fmt.Printf("error: %s\n", err)
 	}
 
@@ -69,7 +71,6 @@ func (p *PowerShell) execute(out *bytes.Buffer, args ...string) error {
 	args = append([]string{"-NoProfile", "-NonInteractive"}, args...)
 	cmd := exec.Command(p.powerShell, args...)
 
-	// var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = out
 	cmd.Stderr = &stderr
