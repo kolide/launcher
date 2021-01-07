@@ -19,6 +19,7 @@ Function Get-BSSID {
     Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID).substring(0,$_.dot11ssid.SSIDlength)}} |
     Select-Object ssid,phyId,rssi,linkQuality,timestamp
 }
+Get-BSSID
 `
 
 const nativeWiFiCode = `

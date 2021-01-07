@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"text/template"
 
 	"github.com/pkg/errors"
@@ -25,12 +27,19 @@ func New() *PowerShell {
 
 func runPos(ctx context.Context, output *bytes.Buffer) error {
 	posh := New()
-	nativeCodeFile, err := os.Create("nativewificode.cs")
+	dir, err := ioutil.TempDir("", "nativewifi")
+	if err != nil {
+		return errors.Wrap(err, "creating nativewifi tmp dir")
+	}
+	defer os.RemoveAll(dir)
+
+	outputFile := filepath.Join(dir, "nativewificode.cs")
+	nativeCodeFile, err := os.Create(outputFile)
 	if err != nil {
 		return errors.Wrap(err, "creating file for native wifi code")
 	}
-
 	defer os.Remove(nativeCodeFile.Name())
+
 	_, err = nativeCodeFile.WriteString(nativeWiFiCode)
 	if err != nil {
 		return errors.Wrap(err, "writing native code file")
@@ -48,7 +57,7 @@ func runPos(ctx context.Context, output *bytes.Buffer) error {
 		return errors.Wrap(err, "executing template")
 	}
 
-	err = posh.execute(output, simplecommand)
+	err = posh.execute(output, command.String())
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
