@@ -107,7 +107,7 @@ func TestGetConstraints(t *testing.T) {
 
 			name:     "double",
 			expected: []string{"a"},
-			opts:     []GetConstraintOpts{WithAllowedCharacters("a")},
+			opts:     []GetConstraintOpts{WithAllowedValues([]string{"a"})},
 		},
 	}
 
