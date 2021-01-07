@@ -1,7 +1,27 @@
 package wlan
 
-const getbssid = `
+const getBSSIDCommandTemplate = `
 Function Get-BSSID {
+    function Convert-ByteArrayToString {
+        [CmdletBinding()] Param (
+            [Parameter(Mandatory = $True, ValueFromPipeline = $True)] [System.Byte[]] $ByteArray
+            )
+
+        $Encoding  = New-Object System.Text.ASCIIEncoding
+        $Encoding.GetString($ByteArray)
+    }
+
+    Add-Type -Path "{{.NativeCodePath}}"
+    $WlanClient = New-Object NativeWifi.WlanClient
+
+    $WlanClient.Interfaces |
+    ForEach-Object { $_.GetNetworkBssList() } |
+    Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID).substring(0,$_.dot11ssid.SSIDlength)}} |
+    Select-Object ssid,phyId,rssi,linkQuality,timestamp
+}
+`
+
+const nativeWiFiCode = `
 $NativeWifiCode = @'
 using System;
 using System.Collections.Generic;
@@ -1467,23 +1487,4 @@ namespace NativeWifi
 	}
 }
 '@
-
-    function Convert-ByteArrayToString {
-        [CmdletBinding()] Param (
-            [Parameter(Mandatory = $True, ValueFromPipeline = $True)] [System.Byte[]] $ByteArray
-            )
-
-        $Encoding  = New-Object System.Text.ASCIIEncoding
-        $Encoding.GetString($ByteArray)
-    }
-
-    Add-Type $NativeWifiCode
-    $WlanClient = New-Object NativeWifi.WlanClient
-
-    $WlanClient.Interfaces |
-    ForEach-Object { $_.GetNetworkBssList() } |
-    Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID).substring(0,$_.dot11ssid.SSIDlength)}} |
-    Select-Object ssid,phyId,rssi,linkQuality,timestamp
-}
-Get-BSSID
 `
