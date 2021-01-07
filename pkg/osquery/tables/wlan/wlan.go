@@ -214,7 +214,7 @@ func buildParserFull(logger log.Logger) *OutputParser {
 					if err != nil {
 						return rawval, err
 					}
-					return strings.ReplaceAll(rawval, "-", ":")
+					return strings.ReplaceAll(rawval, "-", ":"), nil
 				},
 			},
 		})
