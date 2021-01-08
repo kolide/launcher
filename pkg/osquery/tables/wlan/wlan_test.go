@@ -64,21 +64,6 @@ func TestTableGenerate(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	filename: "resultsps.txt",
-		// 	expected: []map[string]string{
-		// 		{
-		// 			"name":  "",
-		// 			"rssi":  "-43",
-		// 			"bssid": "82:2A:A8:EB:93:65",
-		// 		},
-		// 		{
-		// 			"name":  "ddu23n104",
-		// 			"rssi":  "-43",
-		// 			"bssid": "82:2A:A8:EB:93:65",
-		// 		},
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
