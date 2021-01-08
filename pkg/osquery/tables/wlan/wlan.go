@@ -105,7 +105,7 @@ func execCmd(ctx context.Context, buf *bytes.Buffer) error {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "calling netsh wlan. Got: %s", stderr.String())
+		return errors.Wrapf(err, "calling netsh wlan, got: %s", stderr.String())
 	}
 
 	return nil
@@ -118,27 +118,24 @@ func buildParser(logger log.Logger) *OutputParser {
 				Match: func(in string) bool {
 					m, err := regexp.MatchString("^SSID [0-9]+", in)
 					if err != nil {
-						level.Debug(logger).Log(
-							"msg", "unable to match regexp",
-							"err", err,
-						)
+						level.Debug(logger).Log("msg", "unable to match regexp", "err", err)
 						return false
 					}
 					return m
 				},
 				KeyFunc: func(_ string) (string, error) { return "name", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: extractTableValue,
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Authentication") },
 				KeyFunc: func(_ string) (string, error) { return "authentication", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: extractTableValue,
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Signal") },
 				KeyFunc: func(_ string) (string, error) { return "signal_strength_percentage", nil },
 				ValFunc: func(in string) (string, error) {
-					val, err := wlanVal(in)
+					val, err := extractTableValue(in)
 					if err != nil {
 						return val, err
 					}
@@ -149,7 +146,7 @@ func buildParser(logger log.Logger) *OutputParser {
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Signal") },
 				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
 				ValFunc: func(in string) (string, error) {
-					val, err := wlanVal(in)
+					val, err := extractTableValue(in)
 					if err != nil {
 						return val, err
 					}
@@ -157,6 +154,12 @@ func buildParser(logger log.Logger) *OutputParser {
 					if err != nil {
 						return "", errors.Wrap(err, "converting string to int")
 					}
+					// a signal strength value of 0 implies an RSSI of -100dbm a
+					// signal strength value of 100 implies an RSSI of -50dbm We
+					// can interpolate the values in between. This strategy was
+					// suggested by code comments from here:
+					// https://github.com/metageek-llc/ManagedWifi
+					// and, empirically, seems to work out.
 					rssi := (-100 + (intVal / 2))
 
 					return fmt.Sprintf("%d", rssi), nil
@@ -165,22 +168,22 @@ func buildParser(logger log.Logger) *OutputParser {
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "BSSID") },
 				KeyFunc: func(_ string) (string, error) { return "bssid", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: extractTableValue,
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Radio type") },
 				KeyFunc: func(_ string) (string, error) { return "radio_type", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: extractTableValue,
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Channel") },
 				KeyFunc: func(_ string) (string, error) { return "channel", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: extractTableValue,
 			},
 		})
 }
 
-func wlanVal(input string) (string, error) {
+func extractTableValue(input string) (string, error) {
 	// lines usually look something like:
 	//   Authentication       : WPA2-Personal
 	parts := strings.SplitN(strings.TrimSpace(input), ":", 2)
