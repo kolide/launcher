@@ -30,6 +30,7 @@ func TestTableGenerate(t *testing.T) {
 					"name":                       "ddu23n104",
 					"authentication":             "WPA2-Personal",
 					"signal_strength_percentage": "92",
+					"rssi":                       "-54",
 					"bssid":                      "80:2a:9c:eb:bb:65",
 					"radio_type":                 "802.11n",
 					"channel":                    "1",
@@ -38,6 +39,7 @@ func TestTableGenerate(t *testing.T) {
 					"name":                       "",
 					"authentication":             "WPA2-Personal",
 					"signal_strength_percentage": "92",
+					"rssi":                       "-54",
 					"bssid":                      "82:2a:a8:eb:bb:65",
 					"radio_type":                 "802.11n",
 					"channel":                    "1",
@@ -46,6 +48,7 @@ func TestTableGenerate(t *testing.T) {
 					"name":                       "GMG_DB_315",
 					"authentication":             "WPA2-Personal",
 					"signal_strength_percentage": "34",
+					"rssi":                       "-83",
 					"bssid":                      "08:ea:88:84:cf:6c",
 					"radio_type":                 "802.11n",
 					"channel":                    "7",
@@ -54,12 +57,28 @@ func TestTableGenerate(t *testing.T) {
 					"name":                       "MySpectrumWiFi90-2G",
 					"authentication":             "WPA2-Personal",
 					"signal_strength_percentage": "0",
+					"rssi":                       "-100",
 					"bssid":                      "7c:db:98:b3:e0:8e",
 					"radio_type":                 "802.11ac",
 					"channel":                    "11",
 				},
 			},
 		},
+		// {
+		// 	filename: "resultsps.txt",
+		// 	expected: []map[string]string{
+		// 		{
+		// 			"name":  "",
+		// 			"rssi":  "-43",
+		// 			"bssid": "82:2A:A8:EB:93:65",
+		// 		},
+		// 		{
+		// 			"name":  "ddu23n104",
+		// 			"rssi":  "-43",
+		// 			"bssid": "82:2A:A8:EB:93:65",
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, tt := range tests {

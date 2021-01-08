@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,8 +45,8 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("output"),
 	}
 
-	// parser := buildParser(logger)
-	parser := buildParserFull(logger)
+	parser := buildParser(logger)
+	// parser := buildParserFull(logger)
 	t := &WlanTable{
 		client:    client,
 		logger:    logger,
@@ -53,7 +55,8 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execCmd,
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generatePosh)
+	// return table.NewPlugin(t.tableName, columns, t.generatePosh)
+	return table.NewPlugin(t.tableName, columns, t.generate)
 }
 
 func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -173,6 +176,23 @@ func buildParser(logger log.Logger) *OutputParser {
 						return val, err
 					}
 					return strings.TrimSuffix(val, "%"), nil
+				},
+			},
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Signal") },
+				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
+				ValFunc: func(in string) (string, error) {
+					val, err := wlanVal(in)
+					if err != nil {
+						return val, err
+					}
+					intVal, err := strconv.Atoi(strings.TrimSuffix(val, "%"))
+					if err != nil {
+						return "", errors.Wrap(err, "converting string to int")
+					}
+					rssi := (-100 + (intVal / 2))
+
+					return fmt.Sprintf("%d", rssi), nil
 				},
 			},
 			{
