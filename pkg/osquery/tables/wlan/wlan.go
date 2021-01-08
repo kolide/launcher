@@ -42,9 +42,11 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("radio_type"),
 		table.TextColumn("rssi"),
 		table.TextColumn("channel"),
+		table.TextColumn("output"),
 	}
 
 	parser := buildParser(logger)
+	// parser := buildParserFull(logger)
 	t := &WlanTable{
 		client:    client,
 		logger:    logger,
@@ -53,7 +55,38 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execCmd,
 	}
 
+	// return table.NewPlugin(t.tableName, columns, t.generatePosh)
 	return table.NewPlugin(t.tableName, columns, t.generate)
+}
+
+func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var results []map[string]string
+
+	var output bytes.Buffer
+
+	err := runPos(ctx, &output)
+	if err != nil {
+		return results, err
+	}
+	scanner := bufio.NewScanner(&output)
+	scanner.Split(blankLineSplitter)
+	for scanner.Scan() {
+		chunk := scanner.Text()
+		row := t.parser.Parse(bytes.NewBufferString(chunk))
+		if row != nil {
+			results = append(results, row)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
+	}
+
+	// results = append(results, map[string]string{"output": output.String()})
+	return results, nil
 }
 
 func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -179,6 +212,33 @@ func buildParser(logger log.Logger) *OutputParser {
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "Channel") },
 				KeyFunc: func(_ string) (string, error) { return "channel", nil },
 				ValFunc: extractTableValue,
+			},
+		})
+}
+
+func buildParserFull(logger log.Logger) *OutputParser {
+	return NewParser(logger,
+		[]Matcher{
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "SSID") },
+				KeyFunc: func(_ string) (string, error) { return "name", nil },
+				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+			},
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "rssi") },
+				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
+				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+			},
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "BSSID") },
+				KeyFunc: func(_ string) (string, error) { return "bssid", nil },
+				ValFunc: func(in string) (string, error) {
+					rawval, err := wlanVal(in)
+					if err != nil {
+						return rawval, err
+					}
+					return strings.ReplaceAll(rawval, "-", ":"), nil
+				},
 			},
 		})
 }

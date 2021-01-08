@@ -1,0 +1,13 @@
+SSID        :
+phyId       : 2
+rssi        : -43
+linkQuality : 90
+timestamp   : 97812787584
+BSSID       : 82-2A-A8-EB-93-65
+
+SSID        : ddu23n104
+phyId       : 2
+rssi        : -43
+linkQuality : 90
+timestamp   : 97812739809
+BSSID       : 80-2A-A8-EB-93-65
