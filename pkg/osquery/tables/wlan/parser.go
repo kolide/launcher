@@ -27,7 +27,9 @@ func NewParser(logger log.Logger, matchers []Matcher) *OutputParser {
 	return p
 }
 
-// Parse looks at a chunk of input. It is assumed that the input contains information to fill in a single result. Do not provide input that contains data for multiple results.
+// Parse looks at a chunk of input. It is assumed that the input contains
+// information to fill in a single result. Do not provide input that contains
+// data for multiple results.
 func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 	row := make(map[string]string)
 	scanner := bufio.NewScanner(input)
@@ -61,11 +63,6 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 				continue
 			}
 		}
-
-		// if len(row) == 0 {
-		// 	level.Debug(p.logger).Log("msg", "No matched keys", "line", line)
-		// 	continue
-		// }
 	}
 	return row
 }
