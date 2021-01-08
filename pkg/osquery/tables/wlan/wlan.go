@@ -48,7 +48,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	t := &WlanTable{
 		client:    client,
 		logger:    logger,
-		tableName: "kolide_wlan",
+		tableName: "kolide_wifi_networks",
 		parser:    parser,
 		getBytes:  execCmd,
 	}
