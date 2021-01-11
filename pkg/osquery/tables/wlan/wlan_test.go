@@ -88,9 +88,9 @@ func TestTableGenerate(t *testing.T) {
 			parser: buildParser(logger),
 			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
+				require.NoError(t, err, "opening file %s", tt.filename)
 				defer f.Close()
 
-				require.NoError(t, err, "opening file %s", tt.filename)
 				_, err = buf.ReadFrom(f)
 				require.NoError(t, err, "read file %s", tt.filename)
 

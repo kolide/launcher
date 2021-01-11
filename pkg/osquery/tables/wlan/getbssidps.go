@@ -1,5 +1,6 @@
 package wlan
 
+// TODO: move this into a ps1 file for better reading/editing, and load from there.
 const getBSSIDCommandTemplate = `
 function Get-Networks {
     function Convert-ByteArrayToString {
@@ -14,8 +15,12 @@ function Get-Networks {
     Add-Type -Path "{{.NativeCodePath}}"
     $WlanClient = New-Object NativeWifi.WlanClient
 
+    $WlanClient.Interfaces | ForEach-Object { $_.Scan() }
+
+    Start-Sleep -Milliseconds 1750 # TODO: this should probably be done in go - split the scan and getNetworkList calls into separate scripts
+
     $WlanClient.Interfaces | 
-    ForEach-Object { $_.GetNetworkBssList() } | 
+    ForEach-Object { $_.GetNetworkBssList() } |
     Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID)}},
                     @{Name="BSSID";Expression={[System.BitConverter]::ToString($_.dot11Bssid) }} |
     Select-Object ssid,phyId,rssi,linkQuality,timestamp,bssid 
@@ -23,8 +28,6 @@ function Get-Networks {
 Get-Networks
 `
 
-// TODO: what is the memory impact of a string this
-// large? There are probably better ways to load this in
 const nativeWiFiCode = `
 $NativeWifiCode = @'
 using System;
