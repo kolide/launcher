@@ -42,11 +42,10 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		table.TextColumn("radio_type"),
 		table.TextColumn("rssi"),
 		table.TextColumn("channel"),
-		table.TextColumn("output"),
 	}
 
-	parser := buildParser(logger)
-	// parser := buildParserFull(logger)
+	// parser := buildParser(logger)
+	parser := buildParserFull(logger)
 	t := &WlanTable{
 		client:    client,
 		logger:    logger,
@@ -55,8 +54,8 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execCmd,
 	}
 
-	// return table.NewPlugin(t.tableName, columns, t.generatePosh)
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin(t.tableName, columns, t.generatePosh)
+	// return table.NewPlugin(t.tableName, columns, t.generate)
 }
 
 func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
