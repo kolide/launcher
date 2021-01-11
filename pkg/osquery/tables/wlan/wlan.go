@@ -222,18 +222,18 @@ func buildParserFull(logger log.Logger) *OutputParser {
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "SSID") },
 				KeyFunc: func(_ string) (string, error) { return "name", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "rssi") },
 				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
-				ValFunc: func(in string) (string, error) { return wlanVal(in) },
+				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
 			},
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "BSSID") },
 				KeyFunc: func(_ string) (string, error) { return "bssid", nil },
 				ValFunc: func(in string) (string, error) {
-					rawval, err := wlanVal(in)
+					rawval, err := extractTableValue(in)
 					if err != nil {
 						return rawval, err
 					}
