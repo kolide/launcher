@@ -70,7 +70,7 @@ func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContex
 		return results, err
 	}
 	scanner := bufio.NewScanner(&output)
-	scanner.Split(blankLineSplitter)
+	scanner.Split(tablehelpers.StanzaSplitter)
 	for scanner.Scan() {
 		chunk := scanner.Text()
 		row := t.parser.Parse(bytes.NewBufferString(chunk))

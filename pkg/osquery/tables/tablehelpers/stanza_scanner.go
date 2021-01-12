@@ -1,4 +1,4 @@
-package wifi_networks
+package tablehelpers
 
 import "regexp"
 
@@ -6,10 +6,10 @@ var (
 	twoEOLs = regexp.MustCompile(`(\r?\n){2}`)
 )
 
-// blankLineSplitter implements the bufio.SplitFunc type, when used as the Split
+// stanzaSplitter implements the bufio.SplitFunc type, when used as the Split
 // function for a bufio.Scanner, it will return chunks of bytes separated by an
 // empty newline, e.g. \n\n or \r\n\r\n.
-func blankLineSplitter(data []byte, atEOF bool) (int, []byte, error) {
+func StanzaSplitter(data []byte, atEOF bool) (int, []byte, error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
