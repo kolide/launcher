@@ -90,6 +90,9 @@ func execPwsh(logger log.Logger) execer {
 		ctx, cancel := context.WithTimeout(ctx, 4500*time.Millisecond)
 		defer cancel()
 
+		// write the c# code to a file, so the powershell script can load it
+		// from there. This works around a size limit on args passed to
+		// powershell.exe
 		dir, err := ioutil.TempDir("", "nativewifi")
 		if err != nil {
 			return errors.Wrap(err, "creating nativewifi tmp dir")
@@ -101,7 +104,6 @@ func execPwsh(logger log.Logger) execer {
 		if err != nil {
 			return errors.Wrap(err, "creating file for native wifi code")
 		}
-
 		_, err = nativeCodeFile.WriteString(nativeWiFiCode)
 		if err != nil {
 			return errors.Wrap(err, "writing native code file")
@@ -110,25 +112,12 @@ func execPwsh(logger log.Logger) execer {
 			return errors.Wrap(err, "closing native code file")
 		}
 
-		//tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
-		//if err != nil {
-		//	return errors.Wrap(err, "parsing template")
-		//}
-		//commandOpts := struct {
-		//	NativeCodePath string
-		//}{NativeCodePath: "./nativewificode.cs"}
-		//}{NativeCodePath: nativeCodeFile.Name()}
-		//var command bytes.Buffer
-		//if err := tmpl.ExecuteTemplate(&command, "command", commandOpts); err != nil {
-		//	return errors.Wrap(err, "executing template")
-		//}
-
 		pwsh, err := exec.LookPath("powershell.exe")
 		if err != nil {
 			return errors.Wrap(err, "finding powershell.exe path")
 		}
 
-		args := append([]string{"-NoProfile", "-NonInteractive"}, getBSSIDCommandTemplate)
+		args := append([]string{"-NoProfile", "-NonInteractive"}, getBSSIDCommand)
 		cmd := exec.CommandContext(ctx, pwsh, args...)
 		cmd.Dir = dir
 		var stderr bytes.Buffer

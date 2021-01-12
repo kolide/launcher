@@ -1,7 +1,7 @@
 package wifi_networks
 
 // TODO: move this into a ps1 file for better reading/editing, and load from there.
-const getBSSIDCommandTemplate = `
+const getBSSIDCommand = `
 function Get-Networks {
     function Convert-ByteArrayToString {
         [CmdletBinding()] Param (
