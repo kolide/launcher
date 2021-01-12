@@ -110,7 +110,7 @@ func execPwsh(logger log.Logger) execer {
 
 		nativeCode, err := internal.AssetString("internal/assets/nativewifi.cs")
 		if err != nil {
-			return errors.Wrapf(err, "failed to get asset named $s", "internal/assets/nativewifi.cs")
+			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/nativewifi.cs")
 		}
 		_, err = nativeCodeFile.WriteString(nativeCode)
 		if err != nil {
@@ -126,7 +126,7 @@ func execPwsh(logger log.Logger) execer {
 		}
 		psScript, err := internal.AssetString("internal/assets/get-networks.ps1")
 		if err != nil {
-			return errors.Wrapf(err, "failed to get asset named $s", "internal/assets/get-networks.ps1")
+			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/get-networks.ps1")
 		}
 		args := append([]string{"-NoProfile", "-NonInteractive"}, psScript)
 		cmd := exec.CommandContext(ctx, pwsh, args...)
