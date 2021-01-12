@@ -126,7 +126,9 @@ func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContex
 
 func execPwsh(logger log.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
-		ctx, cancel := context.WithTimeout(ctx, 4100*time.Millisecond)
+		// MS requires interfaces to complete network scans in <4 seconds
+		// give a bit more time for everything else to run.
+		ctx, cancel := context.WithTimeout(ctx, 4500*time.Millisecond)
 		defer cancel()
 
 		dir, err := ioutil.TempDir("", "nativewifi")
