@@ -12,7 +12,7 @@ function Get-Networks {
         $Encoding.GetString($ByteArray)
     }
 
-    Add-Type -Path "{{.NativeCodePath}}"
+    Add-Type -Path ".\nativewificode.cs"
     $WlanClient = New-Object NativeWifi.WlanClient
 
     $WlanClient.Interfaces | ForEach-Object { $_.Scan() }

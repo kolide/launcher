@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -111,26 +110,27 @@ func execPwsh(logger log.Logger) execer {
 			return errors.Wrap(err, "closing native code file")
 		}
 
-		tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
-		if err != nil {
-			return errors.Wrap(err, "parsing template")
-		}
-		commandOpts := struct {
-			NativeCodePath string
-		}{NativeCodePath: nativeCodeFile.Name()}
-		var command bytes.Buffer
-		if err := tmpl.ExecuteTemplate(&command, "command", commandOpts); err != nil {
-			return errors.Wrap(err, "executing template")
-		}
+		//tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
+		//if err != nil {
+		//	return errors.Wrap(err, "parsing template")
+		//}
+		//commandOpts := struct {
+		//	NativeCodePath string
+		//}{NativeCodePath: "./nativewificode.cs"}
+		//}{NativeCodePath: nativeCodeFile.Name()}
+		//var command bytes.Buffer
+		//if err := tmpl.ExecuteTemplate(&command, "command", commandOpts); err != nil {
+		//	return errors.Wrap(err, "executing template")
+		//}
 
 		pwsh, err := exec.LookPath("powershell.exe")
 		if err != nil {
 			return errors.Wrap(err, "finding powershell.exe path")
 		}
 
-		args := append([]string{"-NoProfile", "-NonInteractive"}, command.String())
+		args := append([]string{"-NoProfile", "-NonInteractive"}, getBSSIDCommandTemplate)
 		cmd := exec.CommandContext(ctx, pwsh, args...)
-
+		cmd.Dir = dir
 		var stderr bytes.Buffer
 		cmd.Stdout = buf
 		cmd.Stderr = &stderr
