@@ -2,15 +2,8 @@ package wifi_networks
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"text/template"
-
-	"github.com/pkg/errors"
 )
 
 type PowerShell struct {
@@ -25,50 +18,17 @@ func New() *PowerShell {
 	}
 }
 
-func runPos(ctx context.Context, output *bytes.Buffer) error {
-	posh := New()
-	dir, err := ioutil.TempDir("", "nativewifi")
-	if err != nil {
-		return errors.Wrap(err, "creating nativewifi tmp dir")
-	}
-	defer os.RemoveAll(dir)
+// func runPos(ctx context.Context, output *bytes.Buffer) error {
+// 	posh := New()
 
-	outputFile := filepath.Join(dir, "nativewificode.cs")
-	nativeCodeFile, err := os.Create(outputFile)
-	if err != nil {
-		return errors.Wrap(err, "creating file for native wifi code")
-	}
-	// probably not needed, line 34 covers this
-	defer os.Remove(nativeCodeFile.Name())
+// 	err = posh.execute(output, command.String())
+// 	if err != nil {
+// 		// TODO: log, not printf
+// 		fmt.Printf("error: %s\n", err)
+// 	}
 
-	_, err = nativeCodeFile.WriteString(nativeWiFiCode)
-	if err != nil {
-		return errors.Wrap(err, "writing native code file")
-	}
-	if err := nativeCodeFile.Close(); err != nil {
-		return errors.Wrap(err, "closing native code file")
-	}
-
-	tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
-	if err != nil {
-		return errors.Wrap(err, "parsing template")
-	}
-	commandOpts := struct {
-		NativeCodePath string
-	}{NativeCodePath: nativeCodeFile.Name()}
-	var command bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&command, "command", commandOpts); err != nil {
-		return errors.Wrap(err, "executing template")
-	}
-
-	err = posh.execute(output, command.String())
-	if err != nil {
-		// TODO: log, not printf
-		fmt.Printf("error: %s\n", err)
-	}
-
-	return err
-}
+// 	return err
+// }
 
 func (p *PowerShell) execute(out *bytes.Buffer, args ...string) error {
 	args = append([]string{"-NoProfile", "-NonInteractive"}, args...)

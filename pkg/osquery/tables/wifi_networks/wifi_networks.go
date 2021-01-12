@@ -5,10 +5,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -51,7 +55,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		logger:    logger,
 		tableName: "kolide_wifi_networks",
 		parser:    parser,
-		getBytes:  execCmd,
+		getBytes:  execPwsh(logger),
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generatePosh)
@@ -61,12 +65,10 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
 	var results []map[string]string
-
 	var output bytes.Buffer
 
-	err := runPos(ctx, &output)
+	err := t.getBytes(ctx, &output)
 	if err != nil {
 		return results, err
 	}
@@ -122,6 +124,65 @@ func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContex
 	}
 
 	return results, nil
+}
+
+func execPwsh(logger log.Logger) execer {
+	return func(ctx context.Context, buf *bytes.Buffer) error {
+		ctx, cancel := context.WithTimeout(ctx, 4100*time.Millisecond)
+		defer cancel()
+
+		dir, err := ioutil.TempDir("", "nativewifi")
+		if err != nil {
+			return errors.Wrap(err, "creating nativewifi tmp dir")
+		}
+		defer os.RemoveAll(dir)
+
+		outputFile := filepath.Join(dir, "nativewificode.cs")
+		nativeCodeFile, err := os.Create(outputFile)
+		if err != nil {
+			return errors.Wrap(err, "creating file for native wifi code")
+		}
+
+		_, err = nativeCodeFile.WriteString(nativeWiFiCode)
+		if err != nil {
+			return errors.Wrap(err, "writing native code file")
+		}
+		if err := nativeCodeFile.Close(); err != nil {
+			return errors.Wrap(err, "closing native code file")
+		}
+
+		tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
+		if err != nil {
+			return errors.Wrap(err, "parsing template")
+		}
+		commandOpts := struct {
+			NativeCodePath string
+		}{NativeCodePath: nativeCodeFile.Name()}
+		var command bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&command, "command", commandOpts); err != nil {
+			return errors.Wrap(err, "executing template")
+		}
+
+		pwsh, err := exec.LookPath("powershell.exe")
+		if err != nil {
+			return errors.Wrap(err, "finding powershell.exe path")
+		}
+
+		args := append([]string{"-NoProfile", "-NonInteractive"}, command.String())
+		cmd := exec.CommandContext(ctx, pwsh, args...)
+
+		var stderr bytes.Buffer
+		cmd.Stdout = buf
+		cmd.Stderr = &stderr
+
+		err = cmd.Run()
+		errOutput := stderr.String()
+		if err != nil || errOutput != "" {
+			level.Debug(logger).Log("stderr", errOutput)
+		}
+
+		return nil
+	}
 }
 
 func execCmd(ctx context.Context, buf *bytes.Buffer) error {
