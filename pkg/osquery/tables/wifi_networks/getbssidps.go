@@ -817,7 +817,7 @@ namespace NativeWifi
         }
 
         /// <summary>
-        /// Represents an error occuring during WLAN operations which indicate their failure via a <see cref="WlanReasonCode"/>.
+        /// Represents an error occurring during WLAN operations which indicate their failure via a <see cref="WlanReasonCode"/>.
         /// </summary>
         public class WlanException : Exception
         {
@@ -1597,7 +1597,7 @@ namespace NativeWifi
         }
 
         /// <summary>
-        /// Flags that specifiy the miniport driver's current operation mode.
+        /// Flags that specify the miniport driver's current operation mode.
         /// </summary>
         [Flags]
         public enum Dot11OperationMode : uint
@@ -1977,7 +1977,7 @@ namespace NativeWifi
 			/// <summary>
 			/// Connects to a network defined by a connection parameters structure.
 			/// </summary>
-			/// <param name="connectionParams">The connection paramters.</param>
+			/// <param name="connectionParams">The connection parameters.</param>
 			protected void Connect(Wlan.WlanConnectionParameters connectionParams)
 			{
 				Wlan.ThrowIfError(
