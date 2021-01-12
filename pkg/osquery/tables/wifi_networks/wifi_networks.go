@@ -40,12 +40,10 @@ type WlanTable struct {
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
-		table.TextColumn("authentication"),
 		table.IntegerColumn("signal_strength_percentage"),
 		table.TextColumn("bssid"),
-		table.TextColumn("radio_type"),
 		table.TextColumn("rssi"),
-		table.TextColumn("channel"),
+		// table.TextColumn("channel"), // TODO: figure out how to find this from nativewifi
 	}
 
 	// parser := buildParser(logger)
@@ -177,6 +175,9 @@ func execPwsh(logger log.Logger) execer {
 
 		err = cmd.Run()
 		errOutput := stderr.String()
+		// sometimes the powershell script logs errors to stderr, but returns a
+		// successful execution code. It's helpful to log the output of stderr
+		// in this case.
 		if err != nil || errOutput != "" {
 			level.Debug(logger).Log("stderr", errOutput)
 		}
@@ -287,6 +288,11 @@ func buildParserFull(logger log.Logger) *OutputParser {
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "rssi") },
 				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
+				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
+			},
+			{
+				Match:   func(in string) bool { return hasTrimmedPrefix(in, "linkQuality") },
+				KeyFunc: func(_ string) (string, error) { return "signal_strength_percentage", nil },
 				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
 			},
 			{
