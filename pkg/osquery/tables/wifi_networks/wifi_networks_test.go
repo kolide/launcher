@@ -63,7 +63,7 @@ func TestTableGenerate(t *testing.T) {
 		logger := log.NewNopLogger()
 		table := WlanTable{
 			logger: logger,
-			parser: buildParserFull(logger),
+			parser: buildParser(logger),
 			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
