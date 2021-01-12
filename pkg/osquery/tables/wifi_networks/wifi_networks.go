@@ -14,10 +14,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
+
+//go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
 
 const netshCmd = "netsh"
 
@@ -104,7 +107,12 @@ func execPwsh(logger log.Logger) execer {
 		if err != nil {
 			return errors.Wrap(err, "creating file for native wifi code")
 		}
-		_, err = nativeCodeFile.WriteString(nativeWiFiCode)
+
+		nativeCode, err := internal.AssetString("internal/assets/nativewifi.cs")
+		if err != nil {
+			return errors.Wrapf(err, "failed to get asset named $s", "internal/assets/nativewifi.cs")
+		}
+		_, err = nativeCodeFile.WriteString(nativeCode)
 		if err != nil {
 			return errors.Wrap(err, "writing native code file")
 		}
@@ -116,8 +124,11 @@ func execPwsh(logger log.Logger) execer {
 		if err != nil {
 			return errors.Wrap(err, "finding powershell.exe path")
 		}
-
-		args := append([]string{"-NoProfile", "-NonInteractive"}, getBSSIDCommand)
+		psScript, err := internal.AssetString("internal/assets/get-networks.ps1")
+		if err != nil {
+			return errors.Wrapf(err, "failed to get asset named $s", "internal/assets/get-networks.ps1")
+		}
+		args := append([]string{"-NoProfile", "-NonInteractive"}, psScript)
 		cmd := exec.CommandContext(ctx, pwsh, args...)
 		cmd.Dir = dir
 		var stderr bytes.Buffer
