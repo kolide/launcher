@@ -1,4 +1,4 @@
-package wlan
+package wifi_networks
 
 // TODO: move this into a ps1 file for better reading/editing, and load from there.
 const getBSSIDCommandTemplate = `

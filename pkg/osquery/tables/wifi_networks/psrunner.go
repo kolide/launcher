@@ -1,4 +1,4 @@
-package wlan
+package wifi_networks
 
 import (
 	"bytes"

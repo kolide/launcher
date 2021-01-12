@@ -1,4 +1,4 @@
-package wlan
+package wifi_networks
 
 import "regexp"
 
@@ -9,7 +9,7 @@ var (
 // blankLineSplitter implements the bufio.SplitFunc type, when used as the Split
 // function for a bufio.Scanner, it will return chunks of bytes separated by an
 // empty newline, e.g. \n\n or \r\n\r\n.
-func blankLineSplitter(data []byte, atEOF bool) (advance int, token []byte, err error) {
+func blankLineSplitter(data []byte, atEOF bool) (int, []byte, error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
