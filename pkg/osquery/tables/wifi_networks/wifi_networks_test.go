@@ -24,68 +24,29 @@ func TestTableGenerate(t *testing.T) {
 			expected: []map[string]string{},
 		},
 		{
-			filename: "multiple_results.txt",
+			filename: "results_pwsh.txt",
 			expected: []map[string]string{
 				{
-					"name":                       "ddu23n104",
-					"authentication":             "WPA2-Personal",
-					"signal_strength_percentage": "92",
-					"rssi":                       "-54",
-					"bssid":                      "80:2a:9c:eb:bb:65",
-					"radio_type":                 "802.11n",
-					"channel":                    "1",
-				},
-				{
 					"name":                       "",
-					"authentication":             "WPA2-Personal",
-					"signal_strength_percentage": "92",
-					"rssi":                       "-54",
-					"bssid":                      "82:2a:a8:eb:bb:65",
-					"radio_type":                 "802.11n",
-					"channel":                    "1",
+					"rssi":                       "-43",
+					"bssid":                      "82:2B:A3:EB:93:65",
+					"signal_strength_percentage": "90",
 				},
 				{
-					"name":                       "GMG_DB_315",
-					"authentication":             "WPA2-Personal",
-					"signal_strength_percentage": "34",
-					"rssi":                       "-83",
-					"bssid":                      "08:ea:88:84:cf:6c",
-					"radio_type":                 "802.11n",
-					"channel":                    "7",
-				},
-				{
-					"name":                       "MySpectrumWiFi90-2G",
-					"authentication":             "WPA2-Personal",
-					"signal_strength_percentage": "0",
-					"rssi":                       "-100",
-					"bssid":                      "7c:db:98:b3:e0:8e",
-					"radio_type":                 "802.11ac",
-					"channel":                    "11",
+					"name":                       "ddu23n104",
+					"rssi":                       "-43",
+					"bssid":                      "88:2B:A3:EB:93:65",
+					"signal_strength_percentage": "90",
 				},
 			},
 		},
-		// {
-		// 	filename: "resultsps.txt",
-		// 	expected: []map[string]string{
-		// 		{
-		// 			"name":  "",
-		// 			"rssi":  "-43",
-		// 			"bssid": "82:2A:A8:EB:93:65",
-		// 		},
-		// 		{
-		// 			"name":  "ddu23n104",
-		// 			"rssi":  "-43",
-		// 			"bssid": "82:2A:A8:EB:93:65",
-		// 		},
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
 		logger := log.NewNopLogger()
 		table := WlanTable{
 			logger: logger,
-			parser: buildParser(logger),
+			parser: buildParserFull(logger),
 			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
@@ -106,6 +67,5 @@ func TestTableGenerate(t *testing.T) {
 			require.NoError(t, err, "generating results from %s", tt.filename)
 			require.ElementsMatch(t, tt.expected, results)
 		})
-
 	}
 }
