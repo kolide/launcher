@@ -82,7 +82,7 @@ func TestGetConstraints(t *testing.T) {
 			opts:     []GetConstraintOpts{WithDefaults("a", "b")},
 		},
 
-		// default plus allowed
+		// default plus allowed characters
 		{
 
 			name:     "double",
@@ -100,6 +100,14 @@ func TestGetConstraints(t *testing.T) {
 			name:     "does_not_exist_with_defaults",
 			expected: []string{"a", "b"},
 			opts:     []GetConstraintOpts{WithDefaults("a", "b"), WithAllowedCharacters("z")},
+		},
+
+		// allowed values
+		{
+
+			name:     "double",
+			expected: []string{"a"},
+			opts:     []GetConstraintOpts{WithAllowedValues([]string{"a"})},
 		},
 	}
 

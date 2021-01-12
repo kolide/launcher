@@ -12,7 +12,10 @@ package profiles
 import (
 	"bytes"
 	"context"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,9 +29,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-const profilesPath = "/usr/bin/profiles"
+const (
+	profilesPath          = "/usr/bin/profiles"
+	userAllowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+	typeAllowedCharacters = "abcdefghijklmnopqrstuvwxyz"
+)
 
-const userAllowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+var (
+	allowedCommands = []string{"show", "list", "status"} // Consider "sync" but that's a write comand
+)
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -59,12 +68,25 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	for _, command := range tablehelpers.GetConstraints(queryContext, "command", tablehelpers.WithAllowedCharacters("abcdefghijklmnopqrstuvwxyz"), tablehelpers.WithDefaults("show")) {
-		for _, profileType := range tablehelpers.GetConstraints(queryContext, "type", tablehelpers.WithAllowedCharacters("abcdefghijklmnopqrstuvwxyz"), tablehelpers.WithDefaults("")) {
+	for _, command := range tablehelpers.GetConstraints(queryContext, "command", tablehelpers.WithAllowedValues(allowedCommands), tablehelpers.WithDefaults("show")) {
+		for _, profileType := range tablehelpers.GetConstraints(queryContext, "type", tablehelpers.WithAllowedCharacters(typeAllowedCharacters), tablehelpers.WithDefaults("")) {
 			for _, user := range tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(userAllowedCharacters), tablehelpers.WithDefaults("_all")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-					profileArgs := []string{command, "-output", "stdout-xml"}
+					// apple documents `-output stdout-xml` as sending the
+					// output to stdout, in xml. This, however, does not work
+					// for some subset of the profiles command. I've reported it
+					// to apple (feedback FB8962811), and while it may someday
+					// be fixed, we need to support it where it is.
+					dir, err := ioutil.TempDir("", "kolide_profiles")
+					if err != nil {
+						return nil, errors.Wrap(err, "creating kolide_profiles tmp dir")
+					}
+					defer os.RemoveAll(dir)
+
+					outputFile := filepath.Join(dir, "output.xml")
+
+					profileArgs := []string{command, "-output", outputFile}
 
 					if profileType != "" {
 						profileArgs = append(profileArgs, "-type", profileType)
@@ -86,8 +108,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, errors.Errorf("Unknown user argument: %s", user)
 					}
 
-					profilesOutput, err := t.execProfiles(ctx, profileArgs)
-					if err != nil {
+					if _, err := t.execProfiles(ctx, profileArgs); err != nil {
 						level.Info(t.logger).Log("msg", "exec failed", "err", err)
 						continue
 					}
@@ -101,7 +122,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						)
 					}
 
-					flatData, err := dataflatten.Plist(profilesOutput, flattenOpts...)
+					flatData, err := dataflatten.PlistFile(outputFile, flattenOpts...)
 					if err != nil {
 						level.Info(t.logger).Log("msg", "flatten failed", "err", err)
 						continue
