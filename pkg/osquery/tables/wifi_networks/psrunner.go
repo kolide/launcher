@@ -45,6 +45,9 @@ func runPos(ctx context.Context, output *bytes.Buffer) error {
 	if err != nil {
 		return errors.Wrap(err, "writing native code file")
 	}
+	if err := nativeCodeFile.Close(); err != nil {
+		return errors.Wrap(err, "closing native code file")
+	}
 
 	tmpl, err := template.New("command").Parse(getBSSIDCommandTemplate)
 	if err != nil {
@@ -76,9 +79,11 @@ func (p *PowerShell) execute(out *bytes.Buffer, args ...string) error {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("%s", stderr.String())
-	}
+
+	//if err != nil {
+	// need to log this to debug
+	fmt.Printf("std err: %s", stderr.String())
+	//}
 	return err
 }
 
