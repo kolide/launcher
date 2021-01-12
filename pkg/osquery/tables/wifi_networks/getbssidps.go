@@ -27,7 +27,7 @@ function Get-Networks {
           $scanInProgress = "true" 
         }
       }; 
-      Start-Sleep -Milliseconds 50
+      Start-Sleep -Milliseconds 100
     } while ($scanInProgress -eq "true")
 
     $WlanClient.Interfaces | 

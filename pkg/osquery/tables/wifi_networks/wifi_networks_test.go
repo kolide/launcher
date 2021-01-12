@@ -40,6 +40,23 @@ func TestTableGenerate(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "extra_blank_lines.txt",
+			expected: []map[string]string{
+				{
+					"name":                       "",
+					"rssi":                       "-43",
+					"bssid":                      "82:2B:A3:EB:93:65",
+					"signal_strength_percentage": "90",
+				},
+				{
+					"name":                       "ddu23n104",
+					"rssi":                       "-43",
+					"bssid":                      "88:2B:A3:EB:93:65",
+					"signal_strength_percentage": "90",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

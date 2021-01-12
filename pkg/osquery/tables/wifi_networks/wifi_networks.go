@@ -46,7 +46,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		// table.TextColumn("channel"), // TODO: figure out how to find this from nativewifi
 	}
 
-	// parser := buildParser(logger)
 	parser := buildParserFull(logger)
 	t := &WlanTable{
 		client:    client,
@@ -56,11 +55,10 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execPwsh(logger),
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generatePosh)
-	// return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin(t.tableName, columns, t.generate)
 }
 
-func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var results []map[string]string
@@ -75,7 +73,8 @@ func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryCo
 	for scanner.Scan() {
 		chunk := scanner.Text()
 		row := t.parser.Parse(bytes.NewBufferString(chunk))
-		if row != nil {
+		// check for blank rows
+		if row != nil && len(row) > 0 {
 			results = append(results, row)
 		}
 	}
@@ -84,11 +83,10 @@ func (t *WlanTable) generatePosh(ctx context.Context, queryContext table.QueryCo
 		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
 	}
 
-	// results = append(results, map[string]string{"output": output.String()})
 	return results, nil
 }
 
-func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *WlanTable) generateNetsh(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

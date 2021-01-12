@@ -36,6 +36,9 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line == "" {
+			continue
+		}
 
 		for _, m := range p.matchers {
 			if m.Match(line) {
