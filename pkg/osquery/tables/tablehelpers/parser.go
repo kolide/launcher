@@ -1,4 +1,4 @@
-package wifi_networks
+package tablehelpers
 
 import (
 	"bufio"
@@ -34,6 +34,7 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 	row := make(map[string]string)
 	scanner := bufio.NewScanner(input)
 	scanner.Split(bufio.ScanLines)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
@@ -68,4 +69,58 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 		}
 	}
 	return row
+}
+
+// Parse looks at command output, line by line. It uses the defined Matchers to set any appropriate values
+func (p *OutputParser) ParseMultiple(input *bytes.Buffer) []map[string]string {
+	var results []map[string]string
+
+	scanner := bufio.NewScanner(input)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		row := make(map[string]string)
+
+		// check each possible key match
+		for _, m := range p.matchers {
+			if m.Match(line) {
+				key, err := m.KeyFunc(line)
+				if err != nil {
+					level.Debug(p.logger).Log(
+						"msg", "key match failed",
+						"line", line,
+						"err", err,
+					)
+					continue
+				}
+
+				val, err := m.ValFunc(line)
+				if err != nil {
+					level.Debug(p.logger).Log(
+						"msg", "value match failed",
+						"line", line,
+						"err", err,
+					)
+					continue
+				}
+
+				row[key] = val
+				continue
+			}
+		}
+
+		if len(row) == 0 {
+			level.Debug(p.logger).Log("msg", "No matched keys", "line", line)
+			continue
+		}
+		results = append(results, row)
+
+	}
+	if err := scanner.Err(); err != nil {
+		level.Debug(p.logger).Log("msg", "scanner error", "err", err)
+	}
+	return results
 }

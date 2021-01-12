@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -34,7 +35,7 @@ type WlanTable struct {
 	logger    log.Logger
 	tableName string
 	getBytes  execer
-	parser    *OutputParser
+	parser    *tablehelpers.OutputParser
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -148,9 +149,9 @@ func execPwsh(logger log.Logger) execer {
 	}
 }
 
-func buildParser(logger log.Logger) *OutputParser {
-	return NewParser(logger,
-		[]Matcher{
+func buildParser(logger log.Logger) *tablehelpers.OutputParser {
+	return tablehelpers.NewParser(logger,
+		[]tablehelpers.Matcher{
 			{
 				Match:   func(in string) bool { return hasTrimmedPrefix(in, "SSID") },
 				KeyFunc: func(_ string) (string, error) { return "name", nil },
