@@ -86,7 +86,7 @@ func (t *WlanTable) generateFlattened(ctx context.Context, queryContext table.Qu
 		}
 		ssid := ""
 		for _, r := range rows {
-			if strings.HasSuffix(r.StringPath("/"), "SSID") {
+			if strings.HasSuffix(r.StringPath("/"), "/SSID") {
 				ssid = r.Value
 			}
 		}

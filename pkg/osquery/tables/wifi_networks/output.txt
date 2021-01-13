@@ -1,0 +1,58 @@
++-------------------------------+---------+-----------------------+-----------------------------+-------+---------------------+
+| fullkey                       | parent  | key                   | value                       | query | ssid                |
++-------------------------------+---------+-----------------------+-----------------------------+-------+---------------------+
+| DEFAULT/SSID                  | DEFAULT | SSID                  | ddu23n104                   |       | ddu23n104           |
+| DEFAULT/BSSID                 | DEFAULT | BSSID                 | XX-XX-XX-XX-XX-XX           |       | ddu23n104           |
+| DEFAULT/dot11BssPhyType       | DEFAULT | dot11BssPhyType       | 7                           |       | ddu23n104           |
+| DEFAULT/timestamp             | DEFAULT | timestamp             | 610829842048                |       | ddu23n104           |
+| DEFAULT/capabilityInformation | DEFAULT | capabilityInformation | 1073                        |       | ddu23n104           |
+| DEFAULT/ieOffset              | DEFAULT | ieOffset              | 1080                        |       | ddu23n104           |
+| DEFAULT/linkQuality           | DEFAULT | linkQuality           | 89                          |       | ddu23n104           |
+| DEFAULT/wlanRateSet           | DEFAULT | wlanRateSet           | NativeWifi.Wlan+WlanRateSet |       | ddu23n104           |
+| DEFAULT/ieSize                | DEFAULT | ieSize                | 182                         |       | ddu23n104           |
+| DEFAULT/dot11Bssid            | DEFAULT | dot11Bssid            | {128, 42, ..., 235...}      |       | ddu23n104           |
+| DEFAULT/dot11BssType          | DEFAULT | dot11BssType          | Infrastructure              |       | ddu23n104           |
+| DEFAULT/beaconPeriod          | DEFAULT | beaconPeriod          | 0                           |       | ddu23n104           |
+| DEFAULT/chCenterFrequency     | DEFAULT | chCenterFrequency     | 2412000                     |       | ddu23n104           |
+| DEFAULT/hostTimestamp         | DEFAULT | hostTimestamp         | 132550441422028881          |       | ddu23n104           |
+| DEFAULT/dot11Ssid             | DEFAULT | dot11Ssid             | NativeWifi.Wlan+Dot11Ssid   |       | ddu23n104           |
+| DEFAULT/phyId                 | DEFAULT | phyId                 | 2                           |       | ddu23n104           |
+| DEFAULT/rssi                  | DEFAULT | rssi                  | -45                         |       | ddu23n104           |
+| DEFAULT/inRegDomain           | DEFAULT | inRegDomain           | true                        |       | ddu23n104           |
+| DEFAULT/dot11BssType          | DEFAULT | dot11BssType          | Infrastructure              |       |                     |
+| DEFAULT/dot11BssPhyType       | DEFAULT | dot11BssPhyType       | 7                           |       |                     |
+| DEFAULT/wlanRateSet           | DEFAULT | wlanRateSet           | NativeWifi.Wlan+WlanRateSet |       |                     |
+| DEFAULT/dot11Ssid             | DEFAULT | dot11Ssid             | NativeWifi.Wlan+Dot11Ssid   |       |                     |
+| DEFAULT/phyId                 | DEFAULT | phyId                 | 2                           |       |                     |
+| DEFAULT/dot11Bssid            | DEFAULT | dot11Bssid            | {130, ..., 168, 235...}     |       |                     |
+| DEFAULT/inRegDomain           | DEFAULT | inRegDomain           | true                        |       |                     |
+| DEFAULT/beaconPeriod          | DEFAULT | beaconPeriod          | 0                           |       |                     |
+| DEFAULT/capabilityInformation | DEFAULT | capabilityInformation | 1073                        |       |                     |
+| DEFAULT/ieOffset              | DEFAULT | ieOffset              | 904                         |       |                     |
+| DEFAULT/linkQuality           | DEFAULT | linkQuality           | 88                          |       |                     |
+| DEFAULT/chCenterFrequency     | DEFAULT | chCenterFrequency     | 2412000                     |       |                     |
+| DEFAULT/ieSize                | DEFAULT | ieSize                | 184                         |       |                     |
+| DEFAULT/SSID                  | DEFAULT | SSID                  |                             |       |                     |
+| DEFAULT/BSSID                 | DEFAULT | BSSID                 | XX-XX-XX-XX-XX-XX           |       |                     |
+| DEFAULT/rssi                  | DEFAULT | rssi                  | -46                         |       |                     |
+| DEFAULT/timestamp             | DEFAULT | timestamp             | 610829926784                |       |                     |
+| DEFAULT/hostTimestamp         | DEFAULT | hostTimestamp         | 132550441422028881          |       |                     |
+| DEFAULT/dot11BssType          | DEFAULT | dot11BssType          | Infrastructure              |       | MySpectrumWiFi90-2G |
+| DEFAULT/dot11BssPhyType       | DEFAULT | dot11BssPhyType       | 8                           |       | MySpectrumWiFi90-2G |
+| DEFAULT/rssi                  | DEFAULT | rssi                  | -91                         |       | MySpectrumWiFi90-2G |
+| DEFAULT/beaconPeriod          | DEFAULT | beaconPeriod          | 0                           |       | MySpectrumWiFi90-2G |
+| DEFAULT/capabilityInformation | DEFAULT | capabilityInformation | 1073                        |       | MySpectrumWiFi90-2G |
+| DEFAULT/wlanRateSet           | DEFAULT | wlanRateSet           | NativeWifi.Wlan+WlanRateSet |       | MySpectrumWiFi90-2G |
+| DEFAULT/timestamp             | DEFAULT | timestamp             | 4591580365187               |       | MySpectrumWiFi90-2G |
+| DEFAULT/hostTimestamp         | DEFAULT | hostTimestamp         | 132550441422028881          |       | MySpectrumWiFi90-2G |
+| DEFAULT/dot11Ssid             | DEFAULT | dot11Ssid             | NativeWifi.Wlan+Dot11Ssid   |       | MySpectrumWiFi90-2G |
+| DEFAULT/phyId                 | DEFAULT | phyId                 | 2                           |       | MySpectrumWiFi90-2G |
+| DEFAULT/dot11Bssid            | DEFAULT | dot11Bssid            | {124, 219, ..., 122...}     |       | MySpectrumWiFi90-2G |
+| DEFAULT/linkQuality           | DEFAULT | linkQuality           | 0                           |       | MySpectrumWiFi90-2G |
+| DEFAULT/inRegDomain           | DEFAULT | inRegDomain           | true                        |       | MySpectrumWiFi90-2G |
+| DEFAULT/ieOffset              | DEFAULT | ieOffset              | 728                         |       | MySpectrumWiFi90-2G |
+| DEFAULT/SSID                  | DEFAULT | SSID                  | MySpectrumWiFi90-2G         |       | MySpectrumWiFi90-2G |
+| DEFAULT/BSSID                 | DEFAULT | BSSID                 | XX-XX-XX-XX-XX-XX           |       | MySpectrumWiFi90-2G |
+| DEFAULT/chCenterFrequency     | DEFAULT | chCenterFrequency     | 2462000                     |       | MySpectrumWiFi90-2G |
+| DEFAULT/ieSize                | DEFAULT | ieSize                | 219                         |       | MySpectrumWiFi90-2G |
++-------------------------------+---------+-----------------------+-----------------------------+-------+---------------------+
