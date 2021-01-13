@@ -3,6 +3,8 @@ package wifi_networks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,7 +82,14 @@ func TestTableGenerate(t *testing.T) {
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{})
 
-			results, err := table.generate(ctx, qCon)
+			// results, err := table.generate(ctx, qCon)
+			results, err := table.generateFlattened(ctx, qCon)
+
+			for _, r := range results {
+				jsonString, err := json.Marshal(r)
+				require.NoError(t, err, "marshalling json: %s", tt.filename)
+				fmt.Println(string(jsonString))
+			}
 			require.NoError(t, err, "generating results from %s", tt.filename)
 			require.ElementsMatch(t, tt.expected, results)
 		})

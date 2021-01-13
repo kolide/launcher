@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
 	"github.com/kolide/osquery-go"
@@ -39,13 +41,17 @@ type WlanTable struct {
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := []table.ColumnDefinition{
-		table.TextColumn("name"),
-		table.IntegerColumn("signal_strength_percentage"),
-		table.TextColumn("bssid"),
-		table.TextColumn("rssi"),
-		// table.TextColumn("channel"), // TODO: figure out how to find this from nativewifi
-	}
+	//columns := []table.ColumnDefinition{
+	//	table.TextColumn("name"),
+	//	table.IntegerColumn("signal_strength_percentage"),
+	//	table.TextColumn("bssid"),
+	//	table.TextColumn("rssi"),
+	//	// table.TextColumn("channel"), // TODO: figure out how to find this from nativewifi
+	//}
+
+	columns := dataflattentable.Columns(
+		table.TextColumn("ssid"),
+	)
 
 	parser := buildParser(logger)
 	t := &WlanTable{
@@ -57,6 +63,39 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
+}
+
+func (t *WlanTable) generateFlattened(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var results []map[string]string
+	var output bytes.Buffer
+
+	err := t.getBytes(ctx, &output)
+	if err != nil {
+		return results, err
+	}
+	scanner := bufio.NewScanner(&output)
+	scanner.Split(tablehelpers.StanzaSplitter)
+	for scanner.Scan() {
+		chunk := scanner.Bytes()
+		opts := []dataflatten.FlattenOpts{dataflatten.WithLogger(t.logger)}
+		rows, err := dataflatten.Ini(chunk, opts...)
+		if err != nil {
+			return results, errors.Wrap(err, "flattening data")
+		}
+		// rowData := map[string]string{
+		// 	"ssid": "",
+		// }
+		// results = append(results, map[string]string{"path": strings.Join(r.Path, "/"), "v": r.Value})
+		results = append(results, dataflattentable.ToMap(rows, "", map[string]string{})...)
+	}
+
+	if err := scanner.Err(); err != nil {
+		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
+	}
+
+	return results, nil
 }
 
 func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
