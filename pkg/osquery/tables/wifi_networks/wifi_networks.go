@@ -108,11 +108,11 @@ func execPwsh(logger log.Logger) execer {
 			return errors.Wrap(err, "creating file for native wifi code")
 		}
 
-		nativeCode, err := internal.AssetString("internal/assets/nativewifi.cs")
+		nativeCode, err := internal.Asset("internal/assets/nativewifi.cs")
 		if err != nil {
 			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/nativewifi.cs")
 		}
-		_, err = nativeCodeFile.WriteString(nativeCode)
+		_, err = nativeCodeFile.Write(nativeCode)
 		if err != nil {
 			return errors.Wrap(err, "writing native code file")
 		}
@@ -124,11 +124,11 @@ func execPwsh(logger log.Logger) execer {
 		if err != nil {
 			return errors.Wrap(err, "finding powershell.exe path")
 		}
-		psScript, err := internal.AssetString("internal/assets/get-networks.ps1")
+		psScript, err := internal.Asset("internal/assets/get-networks.ps1")
 		if err != nil {
 			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/get-networks.ps1")
 		}
-		args := append([]string{"-NoProfile", "-NonInteractive"}, psScript)
+		args := append([]string{"-NoProfile", "-NonInteractive"}, string(psScript))
 		cmd := exec.CommandContext(ctx, pwsh, args...)
 		cmd.Dir = dir
 		var stderr bytes.Buffer
