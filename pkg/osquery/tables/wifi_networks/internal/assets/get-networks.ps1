@@ -29,7 +29,6 @@ function Get-Networks {
     $WlanClient.Interfaces |
     ForEach-Object { $_.GetNetworkBssList() } |
     Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID)}},
-                    @{Name="BSSID";Expression={[System.BitConverter]::ToString($_.dot11Bssid) }} |
-    Select-Object ssid,phyId,rssi,linkQuality,timestamp,bssid
+                    @{Name="BSSID";Expression={[System.BitConverter]::ToString($_.dot11Bssid) }} 
 }
 Get-Networks

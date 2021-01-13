@@ -62,7 +62,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		getBytes:  execPwsh(logger),
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin(t.tableName, columns, t.generateFlattened)
 }
 
 func (t *WlanTable) generateFlattened(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -84,11 +84,17 @@ func (t *WlanTable) generateFlattened(ctx context.Context, queryContext table.Qu
 		if err != nil {
 			return results, errors.Wrap(err, "flattening data")
 		}
-		// rowData := map[string]string{
-		// 	"ssid": "",
-		// }
+		ssid := ""
+		for _, r := range rows {
+			if strings.HasSuffix(r.StringPath("/"), "SSID") {
+				ssid = r.Value
+			}
+		}
+		rowData := map[string]string{
+			"ssid": ssid,
+		}
 		// results = append(results, map[string]string{"path": strings.Join(r.Path, "/"), "v": r.Value})
-		results = append(results, dataflattentable.ToMap(rows, "", map[string]string{})...)
+		results = append(results, dataflattentable.ToMap(rows, "", rowData)...)
 	}
 
 	if err := scanner.Err(); err != nil {
