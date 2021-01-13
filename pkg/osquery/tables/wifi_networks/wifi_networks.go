@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -25,11 +24,6 @@ import (
 
 //go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
 
-const netshCmd = "netsh"
-
-var preludeInterfaceLineRegex = regexp.MustCompile(`Interface name :`)
-var preludeCountLineRegex = regexp.MustCompile(`There are [0-9]+ networks currently available`)
-
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
 type WlanTable struct {
@@ -37,71 +31,21 @@ type WlanTable struct {
 	logger    log.Logger
 	tableName string
 	getBytes  execer
-	parser    *tablehelpers.OutputParser
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	//columns := []table.ColumnDefinition{
-	//	table.TextColumn("name"),
-	//	table.IntegerColumn("signal_strength_percentage"),
-	//	table.TextColumn("bssid"),
-	//	table.TextColumn("rssi"),
-	//	// table.TextColumn("channel"), // TODO: figure out how to find this from nativewifi
-	//}
-
 	columns := dataflattentable.Columns(
 		table.TextColumn("ssid"),
 	)
 
-	parser := buildParser(logger)
 	t := &WlanTable{
 		client:    client,
 		logger:    logger,
 		tableName: "kolide_wifi_networks",
-		parser:    parser,
 		getBytes:  execPwsh(logger),
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generateFlattened)
-}
-
-func (t *WlanTable) generateFlattened(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	var results []map[string]string
-	var output bytes.Buffer
-
-	err := t.getBytes(ctx, &output)
-	if err != nil {
-		return results, err
-	}
-	scanner := bufio.NewScanner(&output)
-	scanner.Split(tablehelpers.StanzaSplitter)
-	for scanner.Scan() {
-		chunk := scanner.Bytes()
-		opts := []dataflatten.FlattenOpts{dataflatten.WithLogger(t.logger)}
-		rows, err := dataflatten.Ini(chunk, opts...)
-		if err != nil {
-			return results, errors.Wrap(err, "flattening data")
-		}
-		ssid := ""
-		for _, r := range rows {
-			if strings.HasSuffix(r.StringPath("/"), "/SSID") {
-				ssid = r.Value
-			}
-		}
-		rowData := map[string]string{
-			"ssid": ssid,
-		}
-		// results = append(results, map[string]string{"path": strings.Join(r.Path, "/"), "v": r.Value})
-		results = append(results, dataflattentable.ToMap(rows, "", rowData)...)
-	}
-
-	if err := scanner.Err(); err != nil {
-		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
-	}
-
-	return results, nil
+	return table.NewPlugin(t.tableName, columns, t.generate)
 }
 
 func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -117,12 +61,21 @@ func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContex
 	scanner := bufio.NewScanner(&output)
 	scanner.Split(tablehelpers.StanzaSplitter)
 	for scanner.Scan() {
-		chunk := scanner.Text()
-		row := t.parser.Parse(bytes.NewBufferString(chunk))
-		// check for blank rows
-		if row != nil && len(row) > 0 {
-			results = append(results, row)
+		chunk := scanner.Bytes()
+		rows, err := dataflatten.Ini(chunk, dataflatten.WithLogger(t.logger))
+		if err != nil {
+			return results, errors.Wrap(err, "flattening data")
 		}
+		ssid := ""
+		for _, r := range rows {
+			if strings.HasSuffix(r.StringPath("/"), "/SSID") {
+				ssid = r.Value
+			}
+		}
+		rowData := map[string]string{
+			"ssid": ssid,
+		}
+		results = append(results, dataflattentable.ToMap(rows, "", rowData)...)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -192,50 +145,4 @@ func execPwsh(logger log.Logger) execer {
 
 		return nil
 	}
-}
-
-func buildParser(logger log.Logger) *tablehelpers.OutputParser {
-	return tablehelpers.NewParser(logger,
-		[]tablehelpers.Matcher{
-			{
-				Match:   func(in string) bool { return hasTrimmedPrefix(in, "SSID") },
-				KeyFunc: func(_ string) (string, error) { return "name", nil },
-				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
-			},
-			{
-				Match:   func(in string) bool { return hasTrimmedPrefix(in, "rssi") },
-				KeyFunc: func(_ string) (string, error) { return "rssi", nil },
-				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
-			},
-			{
-				Match:   func(in string) bool { return hasTrimmedPrefix(in, "linkQuality") },
-				KeyFunc: func(_ string) (string, error) { return "signal_strength_percentage", nil },
-				ValFunc: func(in string) (string, error) { return extractTableValue(in) },
-			},
-			{
-				Match:   func(in string) bool { return hasTrimmedPrefix(in, "BSSID") },
-				KeyFunc: func(_ string) (string, error) { return "bssid", nil },
-				ValFunc: func(in string) (string, error) {
-					rawval, err := extractTableValue(in)
-					if err != nil {
-						return rawval, err
-					}
-					return strings.ReplaceAll(rawval, "-", ":"), nil
-				},
-			},
-		})
-}
-
-func extractTableValue(input string) (string, error) {
-	// lines usually look something like:
-	//   Authentication       : WPA2-Personal
-	parts := strings.SplitN(strings.TrimSpace(input), ":", 2)
-	if len(parts) < 2 {
-		return "", errors.Errorf("unable to determine value from %s", input)
-	}
-	return strings.TrimSpace(parts[1]), nil
-}
-
-func hasTrimmedPrefix(s, prefix string) bool {
-	return strings.HasPrefix(strings.TrimSpace(s), prefix)
 }

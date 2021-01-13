@@ -26,37 +26,26 @@ func TestTableGenerate(t *testing.T) {
 			expected: []map[string]string{},
 		},
 		{
-			filename: "results_pwsh.txt",
+			filename: "output.txt",
 			expected: []map[string]string{
-				{
-					"name":                       "",
-					"rssi":                       "-43",
-					"bssid":                      "82:2B:A3:EB:93:65",
-					"signal_strength_percentage": "90",
-				},
-				{
-					"name":                       "ddu23n104",
-					"rssi":                       "-43",
-					"bssid":                      "88:2B:A3:EB:93:65",
-					"signal_strength_percentage": "90",
-				},
-			},
-		},
-		{
-			filename: "extra_blank_lines.txt",
-			expected: []map[string]string{
-				{
-					"name":                       "",
-					"rssi":                       "-43",
-					"bssid":                      "82:2B:A3:EB:93:65",
-					"signal_strength_percentage": "90",
-				},
-				{
-					"name":                       "ddu23n104",
-					"rssi":                       "-43",
-					"bssid":                      "88:2B:A3:EB:93:65",
-					"signal_strength_percentage": "90",
-				},
+				{"fullkey": "DEFAULT/SSID", "parent": "DEFAULT", "key": "SSID", "value": "ddu23n104", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/BSSID", "parent": "DEFAULT", "key": "BSSID", "value": "A1-A2-A2-A2-A2-A2", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/dot11BssPhyType", "parent": "DEFAULT", "key": "dot11BssPhyType", "value": "7", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/timestamp", "parent": "DEFAULT", "key": "timestamp", "value": "610829842048", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/capabilityInformation", "parent": "DEFAULT", "key": "capabilityInformation", "value": "1073", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/ieOffset", "parent": "DEFAULT", "key": "ieOffset", "value": "1080", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/linkQuality", "parent": "DEFAULT", "key": "linkQuality", "value": "100", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/wlanRateSet", "parent": "DEFAULT", "key": "wlanRateSet", "value": "NativeWifi.Wlan+WlanRateSet", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/ieSize", "parent": "DEFAULT", "key": "ieSize", "value": "182", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/dot11Bssid", "parent": "DEFAULT", "key": "dot11Bssid", "value": "{128, 42, ..., 235...}", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/dot11BssType", "parent": "DEFAULT", "key": "dot11BssType", "value": "Infrastructure", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/beaconPeriod", "parent": "DEFAULT", "key": "beaconPeriod", "value": "0", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/chCenterFrequency", "parent": "DEFAULT", "key": "chCenterFrequency", "value": "2412000", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/hostTimestamp", "parent": "DEFAULT", "key": "hostTimestamp", "value": "132550441422028881", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/dot11Ssid", "parent": "DEFAULT", "key": "dot11Ssid", "value": "NativeWifi.Wlan+Dot11Ssid", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/phyId", "parent": "DEFAULT", "key": "phyId", "value": "2", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/rssi", "parent": "DEFAULT", "key": "rssi", "value": "-45", "query": "", "ssid": "ddu23n104"},
+				{"fullkey": "DEFAULT/inRegDomain", "parent": "DEFAULT", "key": "inRegDomain", "value": "true", "query": "", "ssid": "ddu23n104"},
 			},
 		},
 	}
@@ -65,7 +54,6 @@ func TestTableGenerate(t *testing.T) {
 		logger := log.NewNopLogger()
 		table := WlanTable{
 			logger: logger,
-			parser: buildParser(logger),
 			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
@@ -82,8 +70,7 @@ func TestTableGenerate(t *testing.T) {
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{})
 
-			// results, err := table.generate(ctx, qCon)
-			results, err := table.generateFlattened(ctx, qCon)
+			results, err := table.generate(ctx, qCon)
 
 			for _, r := range results {
 				jsonString, err := json.Marshal(r)

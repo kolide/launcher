@@ -1,0 +1,18 @@
+dot11Ssid             : NativeWifi.Wlan+Dot11Ssid
+phyId                 : 2
+dot11Bssid            : {128, 42, ..., 235...}
+dot11BssType          : Infrastructure
+dot11BssPhyType       : 7
+rssi                  : -45
+linkQuality           : 100
+inRegDomain           : True
+beaconPeriod          : 0
+timestamp             : 610829842048
+hostTimestamp         : 132550441422028881
+capabilityInformation : 1073
+chCenterFrequency     : 2412000
+wlanRateSet           : NativeWifi.Wlan+WlanRateSet
+ieOffset              : 1080
+ieSize                : 182
+SSID                  : ddu23n104
+BSSID                 : A1-A2-A2-A2-A2-A2
