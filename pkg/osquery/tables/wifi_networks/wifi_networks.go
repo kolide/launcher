@@ -70,6 +70,7 @@ func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContex
 		for _, r := range rows {
 			if strings.HasSuffix(r.StringPath("/"), "/SSID") {
 				ssid = r.Value
+				break
 			}
 		}
 		rowData := map[string]string{
