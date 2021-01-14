@@ -1,3 +1,5 @@
+// +build windows
+
 package wifi_networks
 
 import (
