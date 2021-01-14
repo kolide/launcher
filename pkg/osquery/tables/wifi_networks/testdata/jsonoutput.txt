@@ -1,0 +1,66 @@
+[
+    {
+        "dot11Ssid":  {
+                          "SSIDLength":  9,
+                          "SSID":  "100 100 117 50 51 110 49 48 52 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+                      },
+        "phyId":  2,
+        "dot11Bssid":  [
+                           346,
+                           34,
+                           346,
+                           346,
+                           346,
+                           346
+                       ],
+        "dot11BssType":  1,
+        "dot11BssPhyType":  7,
+        "rssi":  -40,
+        "linkQuality":  92,
+        "inRegDomain":  true,
+        "beaconPeriod":  0,
+        "timestamp":  682352053733,
+        "hostTimestamp":  132551156645261229,
+        "capabilityInformation":  1073,
+        "chCenterFrequency":  2412000,
+        "wlanRateSet":  {
+                            "Rates":  "32770 32772 32779 32790 32780 18"
+                        },
+        "ieOffset":  720,
+        "ieSize":  182,
+        "SSID":  "ddu23n104",
+        "BSSID":  "B2-B2-B2-B2-B2-B2"
+    },
+    {
+        "dot11Ssid":  {
+                          "SSIDLength":  0,
+                          "SSID":  "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+                      },
+        "phyId":  2,
+        "dot11Bssid":  [
+                           325,
+                           32,
+                           325,
+                           335,
+                           335,
+                           335
+                       ],
+        "dot11BssType":  1,
+        "dot11BssPhyType":  7,
+        "rssi":  -45,
+        "linkQuality":  89,
+        "inRegDomain":  true,
+        "beaconPeriod":  0,
+        "timestamp":  682352128384,
+        "hostTimestamp":  132551156645261229,
+        "capabilityInformation":  1073,
+        "chCenterFrequency":  2412000,
+        "wlanRateSet":  {
+                            "Rates":  "32770 32772 32779 32790 32780 18"
+                        },
+        "ieOffset":  544,
+        "ieSize":  184,
+        "SSID":  "",
+        "BSSID":  "A1-A2-A2-A2-A2-A2"
+    }
+]
