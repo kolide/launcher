@@ -3,6 +3,8 @@ package wifi_networks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,29 +48,38 @@ func TestTableGenerate(t *testing.T) {
 				{"fullkey": "DEFAULT/inRegDomain", "parent": "DEFAULT", "key": "inRegDomain", "value": "true", "query": "", "ssid": "ddu23n104"},
 			},
 		},
+		{
+			filename: "jsonoutput.txt",
+			expected: []map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {
-		logger := log.NewNopLogger()
-		table := WlanTable{
-			logger: logger,
-			getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
-				f, err := os.Open(filepath.Join("testdata", tt.filename))
-				require.NoError(t, err, "opening file %s", tt.filename)
-				defer f.Close()
-
-				_, err = buf.ReadFrom(f)
-				require.NoError(t, err, "read file %s", tt.filename)
-
-				return nil
-			},
-		}
-
 		t.Run(tt.filename, func(t *testing.T) {
+			logger := log.NewNopLogger()
+			table := Table{
+				logger: logger,
+				getBytes: func(ctx context.Context, buf *bytes.Buffer) error {
+					f, err := os.Open(filepath.Join("testdata", tt.filename))
+					require.NoError(t, err, "opening file %s", tt.filename)
+					defer f.Close()
+
+					_, err = buf.ReadFrom(f)
+					require.NoError(t, err, "read file %s", tt.filename)
+
+					return nil
+				},
+			}
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{})
 
-			results, err := table.generate(ctx, qCon)
+			results, err := table.generateJson(ctx, qCon)
+			for _, r := range results {
+				jsonData, err := json.Marshal(r)
+				require.NoError(t, err, "marshalling json: %s", tt.filename)
+				fmt.Println(string(jsonData))
+			}
+
 			require.NoError(t, err, "generating results from %s", tt.filename)
 			require.ElementsMatch(t, tt.expected, results)
 		})

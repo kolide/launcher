@@ -26,29 +26,54 @@ import (
 
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
-type WlanTable struct {
-	client    *osquery.ExtensionManagerClient
-	logger    log.Logger
-	tableName string
-	getBytes  execer
+type Table struct {
+	client   *osquery.ExtensionManagerClient
+	logger   log.Logger
+	getBytes execer
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := dataflattentable.Columns(
-		table.TextColumn("ssid"),
-	)
+	columns := dataflattentable.Columns()
 
-	t := &WlanTable{
-		client:    client,
-		logger:    logger,
-		tableName: "kolide_wifi_networks",
-		getBytes:  execPwsh(logger),
+	t := &Table{
+		client:   client,
+		logger:   logger,
+		getBytes: readFile("pkg/osquery/tables/wifi_networks/testdata/jsonoutput.txt"),
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin("kolide_wifi_networks", columns, t.generateJson)
 }
 
-func (t *WlanTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func readFile(filename string) execer {
+	return func(ctx context.Context, buf *bytes.Buffer) error {
+		f, err := os.Open(filename)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		_, err = buf.ReadFrom(f)
+		return nil
+	}
+}
+
+func (t *Table) generateJson(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var results []map[string]string
+	var output bytes.Buffer
+
+	err := t.getBytes(ctx, &output)
+	if err != nil {
+		return results, errors.Wrap(err, "getting raw data")
+	}
+	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
+	results = append(results, dataflattentable.ToMap(rows, "", map[string]string{})...)
+
+	return results, nil
+}
+
+func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var results []map[string]string
