@@ -1,21 +1,17 @@
 package wifi_networks
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -44,19 +40,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	return table.NewPlugin("kolide_wifi_networks", columns, t.generate)
 }
 
-func readFile(filename string) execer {
-	return func(ctx context.Context, buf *bytes.Buffer) error {
-		f, err := os.Open(filename)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		_, err = buf.ReadFrom(f)
-		return nil
-	}
-}
-
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -69,7 +52,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
 	if err != nil {
-		return results, errors.Wrap(er, "flattening json ouput")
+		return results, errors.Wrap(err, "flattening json output")
 	}
 
 	return append(results, dataflattentable.ToMap(rows, "", map[string]string{})...), nil
@@ -127,10 +110,12 @@ func execPwsh(logger log.Logger) execer {
 		err = cmd.Run()
 		errOutput := stderr.String()
 		// sometimes the powershell script logs errors to stderr, but returns a
-		// successful execution code. It's helpful to log the output of stderr
-		// in this case.
+		// successful execution code.
 		if err != nil || errOutput != "" {
-			level.Debug(logger).Log("stderr", errOutput)
+			if err == nil {
+				err = errors.Errorf("exec succeeded, but emitted to stderr")
+			}
+			return errors.Wrapf(err, "execing powershell, got: %s", errOutput)
 		}
 
 		return nil
