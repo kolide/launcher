@@ -6,7 +6,7 @@ var (
 	twoEOLs = regexp.MustCompile(`(\r?\n){2}`)
 )
 
-// stanzaSplitter implements the bufio.SplitFunc type, when used as the Split
+// StanzaSplitter implements the bufio.SplitFunc type, when used as the Split
 // function for a bufio.Scanner, it will return chunks of bytes separated by an
 // empty newline, e.g. \n\n or \r\n\r\n.
 func StanzaSplitter(data []byte, atEOF bool) (int, []byte, error) {

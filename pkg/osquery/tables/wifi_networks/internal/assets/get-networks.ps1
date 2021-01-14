@@ -13,7 +13,7 @@ function Get-Networks {
 
     $WlanClient.Interfaces | ForEach-Object { $_.Scan() }
 
-    #check scan progress for each interface every 50 milliseconds
+    # check scan progress for each interface
     $scanInProgress = "false"
     do {
       $scanInProgress = "false"
