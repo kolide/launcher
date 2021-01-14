@@ -68,9 +68,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, errors.Wrap(err, "getting raw data")
 	}
 	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
-	results = append(results, dataflattentable.ToMap(rows, "", map[string]string{})...)
+	if err != nil {
+		return results, errors.Wrap(er, "flattening json ouput")
+	}
 
-	return results, nil
+	return append(results, dataflattentable.ToMap(rows, "", map[string]string{})...), nil
 }
 
 func execPwsh(logger log.Logger) execer {
