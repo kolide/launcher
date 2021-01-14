@@ -38,10 +38,10 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	t := &Table{
 		client:   client,
 		logger:   logger,
-		getBytes: readFile("pkg/osquery/tables/wifi_networks/testdata/jsonoutput.txt"),
+		getBytes: execPwsh(logger),
 	}
 
-	return table.NewPlugin("kolide_wifi_networks", columns, t.generateJson)
+	return table.NewPlugin("kolide_wifi_networks", columns, t.generate)
 }
 
 func readFile(filename string) execer {
@@ -57,7 +57,7 @@ func readFile(filename string) execer {
 	}
 }
 
-func (t *Table) generateJson(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var results []map[string]string
@@ -69,44 +69,6 @@ func (t *Table) generateJson(ctx context.Context, queryContext table.QueryContex
 	}
 	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
 	results = append(results, dataflattentable.ToMap(rows, "", map[string]string{})...)
-
-	return results, nil
-}
-
-func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	var results []map[string]string
-	var output bytes.Buffer
-
-	err := t.getBytes(ctx, &output)
-	if err != nil {
-		return results, err
-	}
-	scanner := bufio.NewScanner(&output)
-	scanner.Split(tablehelpers.StanzaSplitter)
-	for scanner.Scan() {
-		chunk := scanner.Bytes()
-		rows, err := dataflatten.Ini(chunk, dataflatten.WithLogger(t.logger))
-		if err != nil {
-			return results, errors.Wrap(err, "flattening data")
-		}
-		ssid := ""
-		for _, r := range rows {
-			if strings.HasSuffix(r.StringPath("/"), "/SSID") {
-				ssid = r.Value
-				break
-			}
-		}
-		rowData := map[string]string{
-			"ssid": ssid,
-		}
-		results = append(results, dataflattentable.ToMap(rows, "", rowData)...)
-	}
-
-	if err := scanner.Err(); err != nil {
-		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
-	}
 
 	return results, nil
 }
