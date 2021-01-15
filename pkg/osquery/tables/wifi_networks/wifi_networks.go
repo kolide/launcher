@@ -81,6 +81,12 @@ func execPwsh(logger log.Logger) execer {
 			return errors.Wrap(err, "creating file for native wifi code")
 		}
 
+		// the c# .Net code in the asset below came from
+		// https://github.com/metageek-llc/ManagedWifi/, and has been modified
+		// slightly to support polling for scan completion. the powershell
+		// script initially came from
+		// https://jordanmills.wordpress.com/2014/01/12/updated-get-bssid-ps1-programmatic-access-to-available-wireless-networks/
+		// with some slight modifications
 		nativeCode, err := internal.Asset("internal/assets/nativewifi.cs")
 		if err != nil {
 			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/nativewifi.cs")
