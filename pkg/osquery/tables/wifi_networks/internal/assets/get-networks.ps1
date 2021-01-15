@@ -29,7 +29,7 @@ function Get-Networks {
     $WlanClient.Interfaces |
     ForEach-Object { $_.GetNetworkBssList() } |
     Select-Object *,@{Name="SSID";Expression={(Convert-ByteArrayToString -ByteArray $_.dot11ssid.SSID).substring(0,$_.dot11ssid.SSIDlength)}},
-                    @{Name="BSSID";Expression={[System.BitConverter]::ToString($_.dot11Bssid) }}
+                    @{Name="BSSID";Expression={[System.BitConverter]::ToString($_.dot11Bssid) }},
                     @{Name="BSSID2";Expression={[string]::join(":",($_.dot11Bssid | ForEach-Object {"{0:X2}" -f $_}))}} |
                     ConvertTo-Json 
 }
