@@ -21,6 +21,7 @@ type updaterConfig struct {
 	RootDirectory      string // launcher's root dir. use for holding tuf staging and updates
 	AutoupdateInterval time.Duration
 	UpdateChannel      autoupdate.UpdateChannel
+	InitialDelay       time.Duration // start delay, to avoid whomping critical early data
 
 	NotaryURL    string
 	MirrorURL    string
@@ -64,6 +65,15 @@ func createUpdater(
 
 	return &actor.Actor{
 		Execute: func() error {
+			// When launcher first starts, we'd like the
+			// server to start receiving data
+			// immediately. But, if updater is trying to
+			// run, this creates an awkward pause for restart.
+			// So, delay starting updates by an hour or two.
+			if config.InitialDelay != 0 {
+				time.Sleep(config.InitialDelay)
+			}
+
 			// Failing to start the updater is not a fatal launcher
 			// error. If there's a problem, sleep and try
 			// again. Implementing this is a bit gnarly. In the event of a

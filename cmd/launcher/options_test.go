@@ -102,16 +102,17 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	opts := &launcher.Options{
-		Control:            true,
-		OsquerydPath:       windowsAddExe("/dev/null"),
-		KolideServerURL:    randomHostname,
-		LoggingInterval:    time.Duration(randomInt) * time.Second,
-		AutoupdateInterval: 48 * time.Hour,
-		NotaryServerURL:    "https://notary.kolide.co",
-		MirrorServerURL:    "https://dl.kolide.co",
-		NotaryPrefix:       "kolide",
-		UpdateChannel:      "stable",
-		Transport:          "grpc",
+		Control:                true,
+		OsquerydPath:           windowsAddExe("/dev/null"),
+		KolideServerURL:        randomHostname,
+		LoggingInterval:        time.Duration(randomInt) * time.Second,
+		AutoupdateInterval:     48 * time.Hour,
+		AutoupdateInitialDelay: 1 * time.Hour,
+		NotaryServerURL:        "https://notary.kolide.co",
+		MirrorServerURL:        "https://dl.kolide.co",
+		NotaryPrefix:           "kolide",
+		UpdateChannel:          "stable",
+		Transport:              "grpc",
 	}
 
 	return args, opts

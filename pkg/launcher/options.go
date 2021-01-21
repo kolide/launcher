@@ -54,6 +54,8 @@ type Options struct {
 	UpdateChannel autoupdate.UpdateChannel
 	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
 	NotaryPrefix string
+	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
+	AutoupdateInitialDelay time.Duration
 
 	// Debug enables debug logging.
 	Debug bool
