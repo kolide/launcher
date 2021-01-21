@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -153,13 +154,45 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
-	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: patchOsqueryEmojiHandlingArray(logs)}
+	// Because osquery sometimes emits invalid utf-8, we attempt
+	// various re-encode attempts. The logic here is somewhat
+	// inverted -- this allows us to early return as soon as we
+	// succeed.
+
+	// Simple case first
+	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}
 	response, err := e.PublishLogsEndpoint(newCtx, request)
-	if err != nil {
-		return "", "", false, err
+	if err == nil {
+		resp := response.(publishLogsResponse)
+		return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 	}
-	resp := response.(publishLogsResponse)
-	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
+
+	// Attempt a simple repair
+	if strings.Contains(err.Error(), "contains invalid UTF-8") {
+		request = logCollection{NodeKey: nodeKey, LogType: logType, Logs: patchOsqueryEmojiHandlingArray(logs)}
+		response, err = e.PublishLogsEndpoint(newCtx, request)
+		if err == nil {
+			resp := response.(publishLogsResponse)
+			return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
+		}
+	}
+
+	// last ditch attempt at redacting non-UTF8 characters
+	if strings.Contains(err.Error(), "contains invalid UTF-8") {
+		for i, l := range logs {
+			logs[i] = redactNonUTF8(l)
+		}
+
+		request = logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}
+		response, err = e.PublishLogsEndpoint(newCtx, request)
+		if err == nil {
+			resp := response.(publishLogsResponse)
+			return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
+		}
+	}
+
+	// Giving up. Note that this will cause the log to be retransmitted in the future.
+	return "", "", false, err
 }
 
 func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*pb.AgentApiResponse, error) {

@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+const utf8Replacement = "�"
+
+func redactNonUTF8(in string) string {
+	return strings.ToValidUTF8(in, utf8Replacement)
+}
+
 // patchOsqueryEmojiHandling repairs utf8 data in the logs. See:
 //
 // https://github.com/kolide/launcher/issues/445
