@@ -25,7 +25,8 @@ type Table struct {
 	parser   tablehelpers.OutputParser
 }
 
-const nmcliPath = "/FILLMEIN"
+// TODO: are there other places this lives on various distros/flavors?
+const nmcliPath = "/usr/bin/nmcli"
 
 type execer func(ctx context.Context, fields []string) ([]byte, error)
 
@@ -34,7 +35,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	columns := []table.ColumnDefinition{
 		table.TextColumn("ssid"),
 		table.TextColumn("bssid"),
-		table.TextColumn("chan"),
+		table.TextColumn("channel"),
 		table.TextColumn("rate"),
 		table.TextColumn("signal"),
 		table.TextColumn("security"),
@@ -53,17 +54,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	fields := []string{"bssid", "ssid", "chan", "rate", "signal", "security"}
 	output, err := t.getBytes(ctx, fields)
+	if err != nil {
+		return rows, errors.Wrap(err, "getting output")
+	}
 	scanner := bufio.NewScanner(bytes.NewBuffer(output))
 	scanner.Split(numberOfLinesScanner(len(fields)))
 	for scanner.Scan() {
 		chunk := scanner.Text()
 		row := t.parser.Parse(bytes.NewBufferString(chunk))
-		// check for blank/null row here
+		// should check for blank/null row here
 		rows = append(rows, row)
-	}
-
-	if err != nil {
-		return rows, errors.Wrap(err, "getting output")
 	}
 
 	return rows, nil
@@ -79,7 +79,7 @@ func nmcliExecer(logger log.Logger) execer {
 
 		fieldsFlag := fmt.Sprintf("--fields=%s", strings.Join(fields, ","))
 		// TODO: nmcli automatically re-scans if the wifi list is > 30 seconds old, so we probably don't need to add "--rescan=yes".
-		args := []string{"device", "--mode=multiline", fieldsFlag, "device", "wifi", "list", "--rescan=yes"}
+		args := []string{"--mode=multiline", fieldsFlag, "device", "wifi", "list", "--rescan", "yes"}
 
 		cmd := exec.CommandContext(ctx, nmcliPath, args...)
 		cmd.Stdout = &stdout
@@ -88,7 +88,9 @@ func nmcliExecer(logger log.Logger) execer {
 		level.Debug(logger).Log("msg", "calling nmcli", "args", cmd.Args)
 
 		if err := cmd.Run(); err != nil {
-			return nil, errors.Wrapf(err, "calling nmcli. Got: %s", string(stderr.Bytes()))
+			errMsg := string(stderr.Bytes())
+			level.Debug(logger).Log("stderr", errMsg)
+			return []byte{}, errors.Wrapf(err, "calling nmcli, Got: %s", errMsg)
 		}
 		return stdout.Bytes(), nil
 	}
@@ -174,5 +176,5 @@ func value(in string) (string, error) {
 		return "", nil
 	}
 
-	return components[1], nil
+	return strings.TrimSpace(components[1]), nil
 }
