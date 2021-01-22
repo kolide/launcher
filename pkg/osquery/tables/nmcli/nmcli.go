@@ -61,12 +61,27 @@ func (t *Table) generateFlat(ctx context.Context, queryContext table.QueryContex
 		return results, errors.Wrap(err, "getting output")
 	}
 
-	rows, err := dataflatten.Ini(output, dataflatten.WithLogger(t.logger))
-	if err != nil {
-		return results, errors.Wrap(err, "flattening output (as ini)")
+	scanner := bufio.NewScanner(bytes.NewBuffer(output))
+	scanner.Split(numberOfLinesScanner(len(fields)))
+	for scanner.Scan() {
+		chunk := scanner.Text()
+		rows, err := dataflatten.Ini([]byte(chunk), dataflatten.WithLogger(t.logger))
+		if err != nil {
+			return results, errors.Wrap(err, "flattening data")
+		}
+		// should check for blank/null row here
+		bssid := ""
+		for _, r := range rows {
+			if strings.HasSuffix(r.StringPath("/"), "BSSID") {
+				bssid = r.Value
+				break
+			}
+		}
+
+		results = append(results, dataflattentable.ToMap(rows, "", map[string]string{"bssid": bssid})...)
 	}
 
-	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
+	return results, nil
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
