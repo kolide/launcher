@@ -42,7 +42,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	// 	table.TextColumn("signal"),
 	// 	table.TextColumn("security"),
 	// }
-	columns := dataflattentable.Columns()
+	columns := dataflattentable.Columns(table.TextColumn("bssid"))
 	t := &Table{
 		client:   client,
 		logger:   logger,
