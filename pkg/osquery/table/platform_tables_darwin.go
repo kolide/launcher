@@ -46,7 +46,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
 		legacyexec.TablePlugin(),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_apfs_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "list", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,

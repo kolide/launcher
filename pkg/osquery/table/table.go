@@ -36,6 +36,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.XmlType),
 		dataflattentable.TablePlugin(client, logger, dataflattentable.IniType),
+		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
 		dataflattentable.TablePluginExec(client, logger,
