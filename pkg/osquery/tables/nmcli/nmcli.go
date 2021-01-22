@@ -33,61 +33,32 @@ const nmcliPath = "/usr/bin/nmcli"
 type execer func(ctx context.Context, fields []string) ([]byte, error)
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-
-	// columns := []table.ColumnDefinition{
-	// 	table.TextColumn("ssid"),
-	// 	table.TextColumn("bssid"),
-	// 	table.TextColumn("channel"),
-	// 	table.TextColumn("rate"),
-	// 	table.TextColumn("signal"),
-	// 	table.TextColumn("security"),
-	// }
-	columns := dataflattentable.Columns(table.TextColumn("bssid"))
+	columns := []table.ColumnDefinition{
+		table.TextColumn("ssid"),
+		table.TextColumn("bssid"),
+		table.TextColumn("channel"),
+		table.TextColumn("rate"),
+		table.TextColumn("signal"),
+		table.TextColumn("security"),
+		table.TextColumn("frequency"),
+		table.TextColumn("mode"),
+		table.TextColumn("device"),
+		table.TextColumn("active"),
+		table.TextColumn("dbus_path"),
+	}
 	t := &Table{
 		client:   client,
 		logger:   logger,
 		getBytes: nmcliExecer(logger),
 		parser:   newParser(logger),
 	}
-	return table.NewPlugin("kolide_nmcli", columns, t.generateFlat)
-}
-
-func (t *Table) generateFlat(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	var results []map[string]string
-
-	fields := []string{"bssid", "ssid", "chan", "rate", "signal", "security"}
-	output, err := t.getBytes(ctx, fields)
-	if err != nil {
-		return results, errors.Wrap(err, "getting output")
-	}
-
-	scanner := bufio.NewScanner(bytes.NewBuffer(output))
-	scanner.Split(numberOfLinesScanner(len(fields)))
-	for scanner.Scan() {
-		chunk := scanner.Text()
-		rows, err := dataflatten.Ini([]byte(chunk), dataflatten.WithLogger(t.logger))
-		if err != nil {
-			return results, errors.Wrap(err, "flattening data")
-		}
-		// should check for blank/null row here
-		bssid := ""
-		for _, r := range rows {
-			if strings.HasSuffix(r.StringPath("/"), "BSSID") {
-				bssid = r.Value
-				break
-			}
-		}
-
-		results = append(results, dataflattentable.ToMap(rows, "", map[string]string{"bssid": bssid})...)
-	}
-
-	return results, nil
+	return table.NewPlugin("kolide_nmcli", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var rows []map[string]string
 
-	fields := []string{"bssid", "ssid", "chan", "rate", "signal", "security"}
+	fields := []string{"bssid", "ssid", "chan", "rate", "signal", "security", "frequency", "mode", "device", "active", "dbus_path"}
 	output, err := t.getBytes(ctx, fields)
 	if err != nil {
 		return rows, errors.Wrap(err, "getting output")
@@ -133,7 +104,6 @@ func nmcliExecer(logger log.Logger) execer {
 
 // only use this if you're sure the output doesn't omit lines with empty values.
 func numberOfLinesScanner(lines int) bufio.SplitFunc {
-
 	var eol = regexp.MustCompile(`\r?\n`)
 	// returns advance,token,err
 	// advance is where the scanner should start next time,
@@ -170,35 +140,54 @@ func newParser(logger log.Logger) tablehelpers.OutputParser {
 		logger,
 		[]tablehelpers.Matcher{
 			{
-				Match:   func(in string) bool { return strings.HasPrefix(in, "SSID") },
+				Match:   func(in string) bool { return strings.HasPrefix(in, "SSID:") },
 				KeyFunc: func(_ string) (string, error) { return "ssid", nil },
 				ValFunc: func(in string) (string, error) { return value(in) },
 			},
 			{
-				Match:   func(in string) bool { return strings.HasPrefix(in, "BSSID") },
+				Match:   func(in string) bool { return strings.HasPrefix(in, "BSSID:") },
 				KeyFunc: func(_ string) (string, error) { return "bssid", nil },
 				ValFunc: func(in string) (string, error) { return value(in) },
 			},
 			{
-				Match: func(in string) bool {
-					return strings.HasPrefix(in, "CHAN")
-				},
+				Match:   func(in string) bool { return strings.HasPrefix(in, "CHAN:") },
 				KeyFunc: func(_ string) (string, error) { return "channel", nil },
 				ValFunc: func(in string) (string, error) { return value(in) },
 			},
 			{
-				Match:   func(in string) bool { return strings.HasPrefix(in, "RATE") },
+				Match:   func(in string) bool { return strings.HasPrefix(in, "RATE:") },
 				KeyFunc: func(_ string) (string, error) { return "rate", nil },
 				ValFunc: func(in string) (string, error) { return value(in) },
 			},
 			{
-				Match:   func(in string) bool { return strings.HasPrefix(in, "SIGNAL") },
+				Match:   func(in string) bool { return strings.HasPrefix(in, "SIGNAL:") },
 				KeyFunc: func(_ string) (string, error) { return "signal", nil },
 				ValFunc: func(in string) (string, error) { return value(in) }, // TODO: Convert this to rssi
 			},
 			{
-				Match:   func(in string) bool { return strings.HasPrefix(in, "SECURITY") },
+				Match:   func(in string) bool { return strings.HasPrefix(in, "SECURITY:") },
 				KeyFunc: func(_ string) (string, error) { return "security", nil },
+				ValFunc: func(in string) (string, error) { return value(in) },
+			},
+			{
+				Match:   func(in string) bool { return strings.HasPrefix(in, "FREQ:") },
+				KeyFunc: func(_ string) (string, error) { return "frequency", nil },
+				ValFunc: func(in string) (string, error) { return value(in) },
+			},
+			{
+				Match:   func(in string) bool { return strings.HasPrefix(in, "MODE:") },
+				KeyFunc: func(_ string) (string, error) { return "mode", nil },
+				ValFunc: func(in string) (string, error) { return value(in) },
+			},
+			{
+				Match:   func(in string) bool { return strings.HasPrefix(in, "ACTIVE:") },
+				KeyFunc: func(_ string) (string, error) { return "active", nil },
+				ValFunc: func(in string) (string, error) { return value(in) }, // TODO: convert yes/no to true/false
+			},
+
+			{
+				Match:   func(in string) bool { return strings.HasPrefix(in, "DBUS-PATH:") },
+				KeyFunc: func(_ string) (string, error) { return "dbus_path", nil },
 				ValFunc: func(in string) (string, error) { return value(in) },
 			},
 		},
