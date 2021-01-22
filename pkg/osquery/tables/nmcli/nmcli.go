@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -32,21 +34,39 @@ type execer func(ctx context.Context, fields []string) ([]byte, error)
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
-	columns := []table.ColumnDefinition{
-		table.TextColumn("ssid"),
-		table.TextColumn("bssid"),
-		table.TextColumn("channel"),
-		table.TextColumn("rate"),
-		table.TextColumn("signal"),
-		table.TextColumn("security"),
-	}
+	// columns := []table.ColumnDefinition{
+	// 	table.TextColumn("ssid"),
+	// 	table.TextColumn("bssid"),
+	// 	table.TextColumn("channel"),
+	// 	table.TextColumn("rate"),
+	// 	table.TextColumn("signal"),
+	// 	table.TextColumn("security"),
+	// }
+	columns := dataflattentable.Columns()
 	t := &Table{
 		client:   client,
 		logger:   logger,
 		getBytes: nmcliExecer(logger),
 		parser:   newParser(logger),
 	}
-	return table.NewPlugin("nmcli", columns, t.generate)
+	return table.NewPlugin("kolide_nmcli", columns, t.generateFlat)
+}
+
+func (t *Table) generateFlat(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+
+	fields := []string{"bssid", "ssid", "chan", "rate", "signal", "security"}
+	output, err := t.getBytes(ctx, fields)
+	if err != nil {
+		return results, errors.Wrap(err, "getting output")
+	}
+
+	rows, err := dataflatten.Ini(output, dataflatten.WithLogger(t.logger))
+	if err != nil {
+		return results, errors.Wrap(err, "flattening output (as ini)")
+	}
+
+	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -71,7 +91,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func nmcliExecer(logger log.Logger) execer {
 	return func(ctx context.Context, fields []string) ([]byte, error) {
-		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 
 		var stderr bytes.Buffer
