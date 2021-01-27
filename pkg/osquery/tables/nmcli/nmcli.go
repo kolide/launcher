@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -62,7 +61,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return rows, errors.Wrap(err, "getting output")
 	}
 	scanner := bufio.NewScanner(bytes.NewBuffer(output))
-	scanner.Split(numberOfLinesScanner(len(fields)))
+	// scanner.Split(numberOfLinesScanner(len(fields)))
+	scanner.Split(onlyDashesScanner)
 	for scanner.Scan() {
 		chunk := scanner.Text()
 		row := t.parser.Parse(bytes.NewBufferString(chunk))
@@ -81,9 +81,8 @@ func nmcliExecer(logger log.Logger) execer {
 		var stderr bytes.Buffer
 		var stdout bytes.Buffer
 
-		fieldsFlag := fmt.Sprintf("--fields=%s", strings.Join(fields, ","))
 		// TODO: nmcli automatically re-scans if the wifi list is > 30 seconds old, so we probably don't need to add "--rescan=yes".
-		args := []string{"--mode=multiline", fieldsFlag, "device", "wifi", "list", "--rescan", "yes"}
+		args := []string{"--mode=multiline", "--pretty", "--fields=all", "device", "wifi", "list", "--rescan", "yes"}
 
 		cmd := exec.CommandContext(ctx, nmcliPath, args...)
 		cmd.Stdout = &stdout
@@ -98,6 +97,26 @@ func nmcliExecer(logger log.Logger) execer {
 		}
 		return stdout.Bytes(), nil
 	}
+}
+
+// split input on lines that only contain dashes
+func onlyDashesScanner(data []byte, atEOF bool) (int, []byte, error) {
+	var onlyDashes = regexp.MustCompile(`\r?\n-+[\s]*\r?\n`)
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+
+	loc := onlyDashes.FindIndex(data)
+	if loc != nil && loc[0] > 0 {
+		return loc[1], data[0:loc[0]], nil
+	}
+
+	if atEOF {
+		return len(data), data, nil
+	}
+
+	// Request more data.
+	return 0, nil, nil
 }
 
 // only use this if you're sure the output doesn't omit lines with empty values.
@@ -116,12 +135,10 @@ func numberOfLinesScanner(lines int) bufio.SplitFunc {
 		// asking the scanner to try again with more data
 		// if len(locs) < lines, then we have incomplete data probably
 		if locs != nil && len(locs) > 0 {
-			//firstMatch := locs[0]
 			lastMatch := locs[len(locs)-1]
 
 			return lastMatch[1], data[0:lastMatch[0]], nil
 		}
-		// ......
 
 		// If we're at EOF, we have a final, non-terminated line. Return it.
 		if atEOF {
