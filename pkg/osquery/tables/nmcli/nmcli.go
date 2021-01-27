@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -30,26 +32,14 @@ const nmcliPath = "/usr/bin/nmcli"
 type execer func(ctx context.Context, fields []string) ([]byte, error)
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := []table.ColumnDefinition{
-		table.TextColumn("ssid"),
-		table.TextColumn("bssid"),
-		table.TextColumn("channel"),
-		table.TextColumn("rate"),
-		table.TextColumn("signal"),
-		table.TextColumn("security"),
-		table.TextColumn("frequency"),
-		table.TextColumn("mode"),
-		table.TextColumn("device"),
-		table.TextColumn("active"),
-		table.TextColumn("dbus_path"),
-	}
+	columns := dataflattentable.Columns(table.TextColumn("bssid"))
 	t := &Table{
 		client:   client,
 		logger:   logger,
 		getBytes: nmcliExecer(logger),
 		parser:   newParser(logger),
 	}
-	return table.NewPlugin("kolide_nmcli", columns, t.generate)
+	return table.NewPlugin("kolide_nmcli", columns, t.generateFlat)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -61,7 +51,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return rows, errors.Wrap(err, "getting output")
 	}
 	scanner := bufio.NewScanner(bytes.NewBuffer(output))
-	// scanner.Split(numberOfLinesScanner(len(fields)))
 	scanner.Split(onlyDashesScanner)
 	for scanner.Scan() {
 		chunk := scanner.Text()
@@ -71,6 +60,39 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return rows, nil
+}
+
+func (t *Table) generateFlat(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+	// TODO: remove the fields param
+	fields := []string{"bssid"}
+	output, err := t.getBytes(ctx, fields)
+	if err != nil {
+		return results, errors.Wrap(err, "getting output")
+	}
+	scanner := bufio.NewScanner(bytes.NewBuffer(output))
+	scanner.Split(onlyDashesScanner)
+	// rows := []dataflatten.Row{}
+	for scanner.Scan() {
+		chunk := scanner.Bytes()
+		// TODO: this isn't really ini-formatted, but it actually works. Should
+		// make a simple `:`-delimited parser for dataflatten
+		rows, err := dataflatten.StringDelimited(chunk, ":", dataflatten.WithLogger(t.logger))
+		if err != nil {
+			return results, errors.Wrap(err, "flattening nmcli output")
+		}
+		if len(rows) > 0 {
+			bssid := ""
+			for _, r := range rows {
+				if strings.HasSuffix(r.StringPath("/"), "BSSID") {
+					bssid = r.Value
+				}
+			}
+			extraData := map[string]string{"bssid": bssid}
+			results = append(results, dataflattentable.ToMap(rows, "", extraData)...)
+		}
+	}
+	return results, nil
 }
 
 func nmcliExecer(logger log.Logger) execer {
