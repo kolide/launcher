@@ -50,6 +50,8 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_apfs_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "list", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, []string{"/usr/bin/tmutil", "destinationinfo", "-X"}),
 		screenlock.TablePlugin(client, logger, currentOsquerydBinaryPath),
 		pwpolicy.TablePlugin(client, logger),
 		systemprofiler.TablePlugin(client, logger),
