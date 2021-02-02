@@ -30,13 +30,13 @@ const nmcliPath = "/usr/bin/nmcli"
 type execer func(ctx context.Context) ([]byte, error)
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := dataflattentable.Columns(table.TextColumn("bssid"))
+	columns := dataflattentable.Columns()
 	t := &Table{
 		client:   client,
 		logger:   logger,
 		getBytes: nmcliExecer(logger),
 	}
-	return table.NewPlugin("kolide_nmcli", columns, t.generate)
+	return table.NewPlugin("kolide_nmcli", columns, t.generateDupeSplitStrategy)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -53,6 +53,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		if err != nil {
 			return results, errors.Wrap(err, "flattening nmcli output")
 		}
+
 		if len(rows) > 0 {
 			bssid := ""
 			for _, r := range rows {
@@ -67,6 +68,20 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
+func (t *Table) generateDupeSplitStrategy(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+	output, err := t.getBytes(ctx)
+	if err != nil {
+		return results, errors.Wrap(err, "getting output")
+	}
+	rows, err := dataflatten.StringDelimitedUnseparated(output, ":", t.logger, dataflatten.WithLogger(t.logger))
+	if err != nil {
+		return results, errors.Wrap(err, "flattening nmcli output")
+	}
+
+	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
+}
+
 func nmcliExecer(logger log.Logger) execer {
 	return func(ctx context.Context) ([]byte, error) {
 		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
@@ -75,7 +90,11 @@ func nmcliExecer(logger log.Logger) execer {
 		var stderr bytes.Buffer
 		var stdout bytes.Buffer
 
-		args := []string{"--mode=multiline", "--pretty", "--fields=all", "device", "wifi", "list", "--rescan", "yes"}
+		// --pretty will insert a line of dashes ('-') as a record seperator
+		// when used with --mode=multiline
+		//
+		//args := []string{"--mode=multiline", "--pretty", "--fields=all", "device", "wifi", "list", "--rescan", "yes"}
+		args := []string{"--mode=multiline", "--fields=all", "device", "wifi", "list", "--rescan", "auto"}
 
 		cmd := exec.CommandContext(ctx, nmcliPath, args...)
 		cmd.Stdout = &stdout
