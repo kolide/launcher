@@ -15,6 +15,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		gsettings.Settings(client, logger),
 		gsettings.Metadata(client, logger),
 		dataflattentable.TablePluginExec(client, logger,
-			"kolide_nmcli", dataflattentable.KeyValueType, []string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"}, dataflattentable.WithKVSeparator(":")),
+			"kolide_nmcli_wifi", dataflattentable.KeyValueType, []string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
+			dataflattentable.WithKVSeparator(":")),
 	}
 }
