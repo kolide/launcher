@@ -46,7 +46,9 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 	case JsonType:
 		t.execDataFunc = dataflatten.Json
 	case KeyValueType:
-		t.execDataFunc = dataflatten.StringDelimitedUnseparatedFunc(t.keyValueSeparator)
+		// TODO: allow callers of TablePluginExec to specify the record
+		// splitting strategy
+		t.execDataFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
 	default:
 		panic("Unknown data source type")
 	}

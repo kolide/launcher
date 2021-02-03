@@ -8,23 +8,41 @@ import (
 
 type dataFunc func(data []byte, opts ...FlattenOpts) ([]Row, error)
 
-// StringDelimitedUnseparatedFunc returns a function that conforms to the
-// interface expected by dataflattentable.Table's execDataFunc property.
-// properties are grouped into a single record based on 'duplicate key'
-// strategy: If a key/value pair is encountered, and the record being built
-// already has a value for that key, then that record is considered 'complete'.
-// The record is stored in the collection, and a new record is started. This
-// strategy is only suitable if the data output does not exclude k/v pairs with
-// blank/missing values, and assumes that the properties for a single record are
-// grouped together.
-func StringDelimitedUnseparatedFunc(delimiter string) dataFunc {
+type recordSplittingStrategy int
+
+const (
+	None recordSplittingStrategy = iota + 1
+	DuplicateKeys
+)
+
+func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingStrategy) dataFunc {
+	switch splittingStrategy {
+	case None:
+		return singleRecordFunc(kVDelimiter)
+	case DuplicateKeys:
+		return duplicateKeyFunc(kVDelimiter)
+	default:
+		panic("Unknown record splitting strategy")
+	}
+
+}
+
+// duplicateKeyFunc returns a function that conforms to the interface expected
+// by dataflattentable.Table's execDataFunc property. properties are grouped
+// into a single record based on 'duplicate key' strategy: If a key/value pair
+// is encountered, and the record being built already has a value for that key,
+// then that record is considered 'complete'. The record is stored in the
+// collection, and a new record is started. This strategy is only suitable if
+// the data output does not exclude k/v pairs with blank/missing values, and
+// assumes that the properties for a single record are grouped together.
+func duplicateKeyFunc(kVDelimiter string) dataFunc {
 	return func(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		results := []interface{}{}
 		scanner := bufio.NewScanner(bytes.NewReader(rawdata))
 		row := map[string]interface{}{}
 		for scanner.Scan() {
 			line := scanner.Text()
-			parts := strings.SplitN(line, delimiter, 2)
+			parts := strings.SplitN(line, kVDelimiter, 2)
 			if len(parts) < 2 {
 				continue
 			}
@@ -42,25 +60,25 @@ func StringDelimitedUnseparatedFunc(delimiter string) dataFunc {
 	}
 }
 
-// StringDelimited assumes that rawdata only holds key-value pairs for a single
-// record. Additionally, each k/v pair must be on its own line. Useful for
-// output that can be easily separated into separate records before 'flattening'
-func StringDelimited(rawdata []byte, delimiter string, opts ...FlattenOpts) ([]Row, error) {
-	return flattenStringDelimited(rawdata, delimiter, opts...)
-}
-
-func flattenStringDelimited(in []byte, delimiter string, opts ...FlattenOpts) ([]Row, error) {
-	v := map[string]interface{}{}
-	scanner := bufio.NewScanner(bytes.NewReader(in))
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, delimiter, 2)
-		if len(parts) < 2 {
-			continue
+// singleRecordFunc returns an execData function that assumes 'rawdata'
+// only holds key-value pairs for a single record. Additionally, each k/v pair
+// must be on its own line. Useful for output that can be easily separated into
+// separate records before 'flattening'
+func singleRecordFunc(kVDelimiter string) dataFunc {
+	return func(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
+		results := []interface{}{}
+		scanner := bufio.NewScanner(bytes.NewReader(rawdata))
+		for scanner.Scan() {
+			line := scanner.Text()
+			parts := strings.SplitN(line, kVDelimiter, 2)
+			if len(parts) < 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			results = append(results, map[string]interface{}{key: value})
 		}
-		k := parts[0]
-		v[k] = strings.TrimSpace(parts[1])
-	}
 
-	return Flatten(v, opts...)
+		return Flatten(results, opts...)
+	}
 }
