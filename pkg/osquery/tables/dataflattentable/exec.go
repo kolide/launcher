@@ -15,14 +15,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string) *table.Plugin {
+type ExecTableOpt func(*Table)
+
+func WithSeperator(separator string) ExecTableOpt {
+	return func(et *Table) {
+		et.KeyValueSeparator = separator
+	}
+}
+
+func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
-		client:    client,
-		logger:    level.NewFilter(logger, level.AllowInfo()),
-		tableName: tableName,
-		execArgs:  execArgs,
+		client:            client,
+		logger:            level.NewFilter(logger, level.AllowInfo()),
+		tableName:         tableName,
+		execArgs:          execArgs,
+		KeyValueSeparator: ":",
+	}
+
+	for _, opt := range opts {
+		opt(t)
 	}
 
 	switch dataSourceType {
@@ -30,6 +43,8 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 		t.execDataFunc = dataflatten.Plist
 	case JsonType:
 		t.execDataFunc = dataflatten.Json
+	case KeyValueType:
+		t.execDataFunc = dataflatten.StringDelimitedUnseparatedFunc(t.KeyValueSeparator)
 	default:
 		panic("Unknown data source type")
 	}
