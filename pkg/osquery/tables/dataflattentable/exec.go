@@ -18,8 +18,8 @@ import (
 type ExecTableOpt func(*Table)
 
 func WithSeperator(separator string) ExecTableOpt {
-	return func(et *Table) {
-		et.KeyValueSeparator = separator
+	return func(t *Table) {
+		t.KeyValueSeparator = separator
 	}
 }
 
