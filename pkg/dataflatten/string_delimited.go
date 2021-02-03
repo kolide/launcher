@@ -3,7 +3,6 @@ package dataflatten
 import (
 	"bufio"
 	"bytes"
-	"strconv"
 	"strings"
 )
 
@@ -20,10 +19,9 @@ type dataFunc func(data []byte, opts ...FlattenOpts) ([]Row, error)
 // grouped together.
 func StringDelimitedUnseparatedFunc(delimiter string) dataFunc {
 	return func(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
-		v := map[string]interface{}{}
+		results := []interface{}{}
 		scanner := bufio.NewScanner(bytes.NewReader(rawdata))
 		row := map[string]interface{}{}
-		i := 0
 		for scanner.Scan() {
 			line := scanner.Text()
 			parts := strings.SplitN(line, delimiter, 2)
@@ -33,15 +31,14 @@ func StringDelimitedUnseparatedFunc(delimiter string) dataFunc {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 			if _, ok := row[key]; ok { // this key already exists, so we want to start a new record.
-				v[strconv.Itoa(i)] = row // store the 'finished' record in the collection
-				i++
+				results = append(results, row) // store the 'finished' record in the collection
 				row = map[string]interface{}{} // reset the record
 			}
 			row[key] = value
 		}
-		v[strconv.Itoa(i)] = row // store the final record
+		results = append(results, row) // store the final record
 
-		return Flatten(v, opts...)
+		return Flatten(results, opts...)
 	}
 }
 
