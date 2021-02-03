@@ -17,9 +17,11 @@ import (
 
 type ExecTableOpt func(*Table)
 
-func WithSeperator(separator string) ExecTableOpt {
+// WithKVSeparator sets the delimiter between key and value. It replaces the
+// default ":" in dataflattentable.Table
+func WithKVSeparator(separator string) ExecTableOpt {
 	return func(t *Table) {
-		t.KeyValueSeparator = separator
+		t.keyValueSeparator = separator
 	}
 }
 
@@ -31,7 +33,7 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 		logger:            level.NewFilter(logger, level.AllowInfo()),
 		tableName:         tableName,
 		execArgs:          execArgs,
-		KeyValueSeparator: ":",
+		keyValueSeparator: ":",
 	}
 
 	for _, opt := range opts {
@@ -44,7 +46,7 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 	case JsonType:
 		t.execDataFunc = dataflatten.Json
 	case KeyValueType:
-		t.execDataFunc = dataflatten.StringDelimitedUnseparatedFunc(t.KeyValueSeparator)
+		t.execDataFunc = dataflatten.StringDelimitedUnseparatedFunc(t.keyValueSeparator)
 	default:
 		panic("Unknown data source type")
 	}

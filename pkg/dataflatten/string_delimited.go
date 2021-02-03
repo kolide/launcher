@@ -30,7 +30,7 @@ func StringDelimitedUnseparatedFunc(delimiter string) dataFunc {
 			if len(parts) < 2 {
 				continue
 			}
-			key := parts[0]
+			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 			if _, ok := row[key]; ok { // this key already exists, so we want to start a new record.
 				v[strconv.Itoa(i)] = row // store the 'finished' record in the collection
