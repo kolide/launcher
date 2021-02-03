@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"strconv"
 	"strings"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 )
 
 func StringDelimited(rawdata []byte, delimiter string, opts ...FlattenOpts) ([]Row, error) {

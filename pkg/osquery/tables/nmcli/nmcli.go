@@ -74,7 +74,7 @@ func (t *Table) generateDupeSplitStrategy(ctx context.Context, queryContext tabl
 	if err != nil {
 		return results, errors.Wrap(err, "getting output")
 	}
-	rows, err := dataflatten.StringDelimitedUnseparated(output, ":", t.logger, dataflatten.WithLogger(t.logger))
+	rows, err := dataflatten.StringDelimitedUnseparated(output, ":", dataflatten.WithLogger(t.logger))
 	if err != nil {
 		return results, errors.Wrap(err, "flattening nmcli output")
 	}
