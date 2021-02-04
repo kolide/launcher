@@ -45,6 +45,15 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
 	}
 
+	if fcargs := fcListCli(); fcargs != nil {
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_fclist",
+			dataflattentable.KeyValueType,
+			fcargs,
+			dataflattentable.WithKVSeparator(":"),
+		)
+	}
+
 	// add in the platform specific ones (as denoted by build tags)
 	tables = append(tables, platformTables(client, logger, currentOsquerydBinaryPath)...)
 
