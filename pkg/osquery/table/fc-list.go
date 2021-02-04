@@ -8,8 +8,8 @@ var fcArgs = []string{
 }
 
 var fcPossiblePaths = []string{
-	"/Xusr/local/bin/fc-list",
-	"/Xusr/bin/fc-list",
+	"/usr/local/bin/fc-list",
+	"/usr/bin/fc-list",
 }
 
 // findFcList finds the local fc-list binary. No errors, since we're
