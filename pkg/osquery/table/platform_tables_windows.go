@@ -3,6 +3,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/secedit"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks"
 	"github.com/kolide/launcher/pkg/osquery/tables/wmitable"
@@ -18,5 +19,18 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		secedit.TablePlugin(client, logger),
 		wmitable.TablePlugin(client, logger),
 		wifi_networks.TablePlugin(client, logger),
+		dataflattentable.TablePluginExec(client, logger, "kolide_windows_updates",
+			dataflattentable.JsonType,
+			[]string{
+				"powershell.exe",
+				"-NoProfile",
+				"-NonInteractive",
+				`$WUSession = New-Object -ComObject Microsoft.Update.Session
+$WUSearcher = $WUSession.CreateUpdateSearcher()
+$UpdateCollection = $WUSearcher.Search("Type='Software'")
+$UpdateCollection.Updates | ConvertTo-Json
+`,
+			},
+		),
 	}
 }
