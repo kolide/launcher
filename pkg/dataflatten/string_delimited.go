@@ -24,7 +24,6 @@ func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingSt
 	default:
 		panic("Unknown record splitting strategy")
 	}
-
 }
 
 // duplicateKeyFunc returns a function that conforms to the interface expected
