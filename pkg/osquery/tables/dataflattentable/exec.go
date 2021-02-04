@@ -15,14 +15,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string) *table.Plugin {
+type ExecTableOpt func(*Table)
+
+// WithKVSeparator sets the delimiter between key and value. It replaces the
+// default ":" in dataflattentable.Table
+func WithKVSeparator(separator string) ExecTableOpt {
+	return func(t *Table) {
+		t.keyValueSeparator = separator
+	}
+}
+
+func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
-		client:    client,
-		logger:    level.NewFilter(logger, level.AllowInfo()),
-		tableName: tableName,
-		execArgs:  execArgs,
+		client:            client,
+		logger:            level.NewFilter(logger, level.AllowInfo()),
+		tableName:         tableName,
+		execArgs:          execArgs,
+		keyValueSeparator: ":",
+	}
+
+	for _, opt := range opts {
+		opt(t)
 	}
 
 	switch dataSourceType {
@@ -30,6 +45,10 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 		t.execDataFunc = dataflatten.Plist
 	case JsonType:
 		t.execDataFunc = dataflatten.Json
+	case KeyValueType:
+		// TODO: allow callers of TablePluginExec to specify the record
+		// splitting strategy
+		t.execDataFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
 	default:
 		panic("Unknown data source type")
 	}

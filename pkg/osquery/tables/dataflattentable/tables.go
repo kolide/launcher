@@ -22,6 +22,7 @@ const (
 	ExecType
 	XmlType
 	IniType
+	KeyValueType
 )
 
 type Table struct {
@@ -33,6 +34,8 @@ type Table struct {
 
 	execDataFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	execArgs     []string
+
+	keyValueSeparator string
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
