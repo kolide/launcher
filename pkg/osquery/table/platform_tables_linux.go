@@ -19,15 +19,5 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			dataflattentable.WithKVSeparator(":")),
 	}
 
-	// only add this table if the underlying binary exists
-	if nmcliArgs := findNmcli(); nmcliArgs != nil {
-		dataflattentable.TablePluginExec(client, logger,
-			"kolide_nmcli_wifi",
-			dataflattentable.KeyValueType,
-			nmcliArgs,
-			dataflattentable.WithKVSeparator(":"),
-		)
-	}
-
 	return plugins
 }

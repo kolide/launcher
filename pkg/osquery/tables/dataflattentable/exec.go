@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -53,7 +54,23 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 		panic("Unknown data source type")
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generateExec)
+	generateFunc := t.generateExec
+
+	// if the binary doesn't exists, no-op the table's generate function.
+	if _, err := os.Stat(t.execArgs[0]); err != nil {
+		level.Info(t.logger).Log("msg", "unable to find binary to exec", "err", err)
+		generateFunc = errorGenerate(fmt.Sprintf("unable to find binary: %s", err))
+	}
+	return table.NewPlugin(t.tableName, columns, generateFunc)
+}
+
+// errorGenerate always returns a single error row. Useful for tables that need
+// to exist, but for which we have determined (at startup) will never return
+// useful information.
+func errorGenerate(errorMsg string) table.GenerateFunc {
+	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		return []map[string]string{"error": errorMsg}, nil
+	}
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
