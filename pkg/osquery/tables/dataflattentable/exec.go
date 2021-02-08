@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -69,7 +70,7 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 // useful information.
 func errorGenerate(errorMsg string) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		return []map[string]string{"error": errorMsg}, nil
+		return []map[string]string{{"error": errorMsg}}, nil
 	}
 }
 
