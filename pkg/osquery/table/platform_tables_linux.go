@@ -11,11 +11,23 @@ import (
 )
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
-	return []*table.Plugin{
+	plugins := []*table.Plugin{
 		gsettings.Settings(client, logger),
 		gsettings.Metadata(client, logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType, []string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
 			dataflattentable.WithKVSeparator(":")),
 	}
+
+	// only add this table if the underlying binary exists
+	if nmcliArgs := findNmcli(); nmcliArgs != nil {
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_nmcli_wifi",
+			dataflattentable.KeyValueType,
+			nmcliArgs,
+			dataflattentable.WithKVSeparator(":"),
+		)
+	}
+
+	return plugins
 }
