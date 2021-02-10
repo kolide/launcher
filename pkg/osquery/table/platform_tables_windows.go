@@ -23,8 +23,7 @@ $UpdateCollection.Updates | ConvertTo-Json
 	wuHistoryPowershell = `
 $WUSession = New-Object -ComObject Microsoft.Update.Session
 $WUSearcher = $WUSession.CreateUpdateSearcher()
-$UpdateCollection = $WUSearcher.QueryHistory(0, $WUSearcher.GetTotalHistoryCount())
-$UpdateCollection.Updates | ConvertTo-Json
+$WUSearcher.QueryHistory(0, $WUSearcher.GetTotalHistoryCount()) | ConvertTo-Json
 `
 )
 
