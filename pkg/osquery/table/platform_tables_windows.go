@@ -13,6 +13,21 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
+const (
+	wuUpdatesPowershell = `
+$WUSession = New-Object -ComObject Microsoft.Update.Session
+$WUSearcher = $WUSession.CreateUpdateSearcher()
+$UpdateCollection = $WUSearcher.Search("Type='Software'")
+$UpdateCollection.Updates | ConvertTo-Json
+`
+	wuHistoryPowershell = `
+$WUSession = New-Object -ComObject Microsoft.Update.Session
+$WUSearcher = $WUSession.CreateUpdateSearcher()
+$UpdateCollection = $WUSearcher.QueryHistory(0, $WUSearcher.GetTotalHistoryCount())
+$UpdateCollection.Updates | ConvertTo-Json
+`
+)
+
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{
 		ProgramIcons(),
@@ -21,16 +36,11 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		wifi_networks.TablePlugin(client, logger),
 		dataflattentable.TablePluginExec(client, logger, "kolide_windows_updates",
 			dataflattentable.JsonType,
-			[]string{
-				"powershell.exe",
-				"-NoProfile",
-				"-NonInteractive",
-				`$WUSession = New-Object -ComObject Microsoft.Update.Session
-$WUSearcher = $WUSession.CreateUpdateSearcher()
-$UpdateCollection = $WUSearcher.Search("Type='Software'")
-$UpdateCollection.Updates | ConvertTo-Json
-`,
-			},
+			[]string{"powershell.exe", "-NoProfile", "-NonInteractive", wuUpdatesPowershell},
+		),
+		dataflattentable.TablePluginExec(client, logger, "kolide_windows_update_history",
+			dataflattentable.JsonType,
+			[]string{"powershell.exe", "-NoProfile", "-NonInteractive", wuHistoryPowershell},
 		),
 	}
 }
