@@ -76,10 +76,10 @@ const (
 	configKey = "config"
 
 	// Default maximum number of bytes per batch (used if not specified in
-	// options). This 2MB limit is chosen based on the default grpc-go
+	// options). This 3MB limit is chosen based on the default grpc-go
 	// limit specified in https://github.com/grpc/grpc-go/blob/master/server.go#L51
-	// which is 4MB. We use 2MB to be conservative.
-	defaultMaxBytesPerBatch = 2 << 20
+	// which is 4MB. We use 3MB to be conservative.
+	defaultMaxBytesPerBatch = 3 << 20
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 60 * time.Second
@@ -549,6 +549,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"msg", "dropped log",
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
+					"header", string(v)[0:100],
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
 				// Buffer is filled
