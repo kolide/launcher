@@ -12,7 +12,6 @@ import (
 	"testing/quick"
 	"time"
 
-	"go.etcd.io/bbolt"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
@@ -21,6 +20,7 @@ import (
 	"github.com/mixer/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {

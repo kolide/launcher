@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
@@ -26,6 +25,7 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 // runLauncher is the entry point into running launcher. It creates a

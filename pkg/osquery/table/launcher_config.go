@@ -3,9 +3,9 @@ package table
 import (
 	"context"
 
-	"go.etcd.io/bbolt"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/osquery-go/plugin/table"
+	"go.etcd.io/bbolt"
 )
 
 func LauncherConfigTable(db *bbolt.DB) *table.Plugin {

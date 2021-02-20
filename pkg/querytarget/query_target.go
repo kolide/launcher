@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gogo/protobuf/proto"
@@ -12,6 +11,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

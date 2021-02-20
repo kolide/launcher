@@ -3,12 +3,12 @@ package table
 import (
 	"context"
 
-	"go.etcd.io/bbolt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/kolide/launcher/pkg/osquery"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 const TargetMembershipKey = "target_membership"

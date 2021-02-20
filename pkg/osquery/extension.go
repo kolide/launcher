@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
@@ -22,6 +21,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/mixer/clock"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

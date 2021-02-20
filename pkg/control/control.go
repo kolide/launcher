@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 type Client struct {

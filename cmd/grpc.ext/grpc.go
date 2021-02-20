@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -21,6 +20,7 @@ import (
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquery_logger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 func main() {

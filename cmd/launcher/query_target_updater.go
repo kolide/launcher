@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 
-	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/querytarget"
+	"go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 )
 
