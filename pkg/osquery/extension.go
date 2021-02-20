@@ -545,11 +545,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		for totalBytes := 0; k != nil; {
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
+				logheadSize := minInt(len(v), 100)
 				level.Info(e.Opts.Logger).Log(
 					"msg", "dropped log",
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
-					"loghead", string(v)[0:100],
+					"loghead", string(v)[0:logheadSize],
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
 				// Buffer is filled
@@ -977,4 +978,12 @@ func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
 		return nil
 	})
 	return errors.Wrap(err, "caching known initial result queries")
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
