@@ -5,14 +5,14 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
-	"github.com/boltdb/bolt"
+	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
 // LauncherTables returns launcher-specific tables
-func LauncherTables(db *bolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(db),
 		LauncherIdentifierTable(db),

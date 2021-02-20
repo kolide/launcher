@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 
-	"github.com/boltdb/bolt"
+	"go.etcd.io/bbolt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/kolide/launcher/pkg/osquery"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
@@ -14,7 +14,7 @@ import (
 const TargetMembershipKey = "target_membership"
 const targetMembershipTableName = "kolide_target_membership"
 
-func TargetMembershipTable(db *bolt.DB) *table.Plugin {
+func TargetMembershipTable(db *bbolt.DB) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("id"),
 	}
@@ -22,11 +22,11 @@ func TargetMembershipTable(db *bolt.DB) *table.Plugin {
 	return table.NewPlugin(targetMembershipTableName, columns, generateTargetMembershipTable(db))
 }
 
-func generateTargetMembershipTable(db *bolt.DB) table.GenerateFunc {
+func generateTargetMembershipTable(db *bbolt.DB) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 
 		var targetRespBytes []byte
-		if err := db.View(func(tx *bolt.Tx) error {
+		if err := db.View(func(tx *bbolt.Tx) error {
 			b := tx.Bucket([]byte(osquery.ServerProvidedDataBucket))
 			targetRespBytes = b.Get([]byte(TargetMembershipKey))
 

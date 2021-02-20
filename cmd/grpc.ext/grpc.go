@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/boltdb/bolt"
+	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -84,7 +84,7 @@ func main() {
 		LoggingInterval: loggingInterval,
 	}
 
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
+	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
 		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"), "stack", fmt.Sprintf("%+v", err))
 	}

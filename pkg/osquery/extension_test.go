@@ -12,7 +12,7 @@ import (
 	"testing/quick"
 	"time"
 
-	"github.com/boltdb/bolt"
+	"go.etcd.io/bbolt"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
@@ -23,13 +23,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
+func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 	file, err := ioutil.TempFile("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
 
-	db, err = bolt.Open(file.Name(), 0600, nil)
+	db, err = bbolt.Open(file.Name(), 0600, nil)
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
@@ -57,7 +57,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	db.Close()
 
 	// Open read-only DB
-	db, err = bolt.Open(path, 0600, &bolt.Options{ReadOnly: true})
+	db, err = bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true})
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
@@ -105,7 +105,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	require.Nil(t, err)
 
 	// Put garbage UUID in DB
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		return b.Put([]byte(uuidKey), []byte("garbage_uuid"))
 	})

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/boltdb/bolt"
+	"go.etcd.io/bbolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func createQueryTargetUpdater(logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) *actor.Actor {
+func createQueryTargetUpdater(logger log.Logger, db *bbolt.DB, grpcConn *grpc.ClientConn) *actor.Actor {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	updater := querytarget.NewQueryTargeter(logger, db, grpcConn)
