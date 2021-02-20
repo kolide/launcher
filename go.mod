@@ -87,4 +87,4 @@ require (
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
 
-go 1.13
+go 1.16
