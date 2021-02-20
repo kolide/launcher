@@ -549,7 +549,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"msg", "dropped log",
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
-					"header", string(v)[0:100],
+					"loghead", string(v)[0:100],
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
 				// Buffer is filled

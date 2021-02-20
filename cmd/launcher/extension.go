@@ -52,6 +52,13 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 		RunDifferentialQueriesImmediately: opts.EnableInitialRunner,
 	}
 
+	// We have a MaxBytesPerBatch set low enough to support GRPC's
+	// hardcoded 4mb limit. We don't need that for jsonrpc, so
+	// bump it up to 10 MB
+	if opts.Transport == "jsonrpc" {
+		extOpts.MaxBytesPerBatch = 10 << 20
+	}
+
 	// create the extension
 	ext, err := osquery.NewExtension(launcherClient, db, extOpts)
 	if err != nil {
