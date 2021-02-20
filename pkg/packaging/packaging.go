@@ -3,6 +3,7 @@ package packaging
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,12 +16,12 @@ import (
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packagekit"
-	"github.com/kolide/launcher/pkg/packaging/internal"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
-//go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
+//go:embed assets/*
+var assets embed.FS
 
 const (
 	// Enroll secret should be readable only by root
@@ -453,7 +454,7 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 		PidPath: filepath.Join(p.rootDir, "launcher.pid"),
 	}
 
-	logrotateTemplate, err := internal.Asset("internal/assets/logrotate.conf")
+	logrotateTemplate, err := assets.ReadFile("logrotate.conf")
 	if err != nil {
 		return errors.Wrapf(err, "failed to get template named %s", "internal/assets/logrotate.conf")
 	}
@@ -618,13 +619,13 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 
 	switch {
 	case p.target.Platform == Darwin && p.target.Init == LaunchD:
-		postinstTemplateName = "internal/assets/postinstall-launchd.sh"
+		postinstTemplateName = "postinstall-launchd.sh"
 	case p.target.Platform == Linux && p.target.Init == Systemd:
-		postinstTemplateName = "internal/assets/postinstall-systemd.sh"
+		postinstTemplateName = "postinstall-systemd.sh"
 	case p.target.Platform == Linux && (p.target.Init == Upstart || p.target.Init == UpstartAmazonAMI):
-		postinstTemplateName = "internal/assets/postinstall-upstart.sh"
+		postinstTemplateName = "postinstall-upstart.sh"
 	case p.target.Platform == Linux && p.target.Init == Init:
-		postinstTemplateName = "internal/assets/postinstall-init.sh"
+		postinstTemplateName = "postinstall-init.sh"
 	default:
 		// If we don't match in the case statement, log that we're ignoring
 		// the setup, and move on. Don't throw an error.
@@ -632,7 +633,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return nil
 	}
 
-	postinstTemplate, err := internal.Asset(postinstTemplateName)
+	postinstTemplate, err := assets.ReadFile(postinstTemplateName)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get template named %s", postinstTemplateName)
 	}
