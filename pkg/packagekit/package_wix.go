@@ -110,7 +110,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		for _, f := range assetFiles {
 			fileBytes, err := assets.ReadFile(f)
 			if err != nil {
-				return errors.Wrapf(err, "getting go-bindata %s", f)
+				return errors.Wrapf(err, "getting asset %s", f)
 			}
 
 			wixArgs = append(wixArgs, wix.WithFile(f, fileBytes))
