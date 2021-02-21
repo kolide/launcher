@@ -5,6 +5,7 @@
 // internal/assets/postinstall-launchd.sh
 // internal/assets/postinstall-systemd.sh
 // internal/assets/postinstall-upstart.sh
+// internal/assets/preinstall-darwin.sh
 package internal
 
 import (
@@ -204,6 +205,53 @@ func internalAssetsPostinstallUpstartSh() (*asset, error) {
 	return a, nil
 }
 
+var _internalAssetsPreinstallDarwinSh = []byte(`#!/bin/sh
+
+# As of the Big Sur general release, Apple M1 machines no longer ship
+# Rosetta 2. Instead, this must be installed manually. As osquery does
+# not yet ship a universal binary, launcher requires rosetta2.
+#
+# During an interactive install, the user is prompted to okay a
+# rosetta2 install, but this does not appear to happen during an MDM
+# install. So, we need to trigger than from a preinstall script.
+
+# If we're not Big Sur (build 20x), exit
+if [[ "$(/usr/bin/sw_vers -buildVersion)" != 20* ]]; then
+    exit 0
+fi
+
+# If we're not arm, exit
+if [ "$(/usr/bin/arch)" != "arm64" ]; then
+    exit 0
+fi
+
+# If it's already installed, exit.  If this check misfires, we'll
+# invoke software update an extra time, which should be okay.
+if [[ -f "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist" ]]; then
+    exit 0
+fi
+
+# report errors
+set -e
+
+/usr/sbin/softwareupdate --install-rosetta --agree-to-license
+`)
+
+func internalAssetsPreinstallDarwinShBytes() ([]byte, error) {
+	return _internalAssetsPreinstallDarwinSh, nil
+}
+
+func internalAssetsPreinstallDarwinSh() (*asset, error) {
+	bytes, err := internalAssetsPreinstallDarwinShBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "internal/assets/preinstall-darwin.sh", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -261,6 +309,7 @@ var _bindata = map[string]func() (*asset, error){
 	"internal/assets/postinstall-launchd.sh": internalAssetsPostinstallLaunchdSh,
 	"internal/assets/postinstall-systemd.sh": internalAssetsPostinstallSystemdSh,
 	"internal/assets/postinstall-upstart.sh": internalAssetsPostinstallUpstartSh,
+	"internal/assets/preinstall-darwin.sh": internalAssetsPreinstallDarwinSh,
 }
 
 // AssetDir returns the file names below a certain
@@ -310,6 +359,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"postinstall-launchd.sh": &bintree{internalAssetsPostinstallLaunchdSh, map[string]*bintree{}},
 			"postinstall-systemd.sh": &bintree{internalAssetsPostinstallSystemdSh, map[string]*bintree{}},
 			"postinstall-upstart.sh": &bintree{internalAssetsPostinstallUpstartSh, map[string]*bintree{}},
+			"preinstall-darwin.sh": &bintree{internalAssetsPreinstallDarwinSh, map[string]*bintree{}},
 		}},
 	}},
 }}
