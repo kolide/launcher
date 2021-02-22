@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"strings"
@@ -53,17 +56,36 @@ const (
 	badCert = "testdata/bad-cert.pem"
 	badKey  = "testdata/bad-key.pem"
 
-	goodCert = "testdata/good-cert.pem"
-	goodKey  = "testdata/good-key.pem"
+	goodCert = "testdata/good.crt"
+	goodKey  = "testdata/good.key"
 
 	leafCert = "testdata/certchain/leaf.crt"
 	leafKey  = "testdata/certchain/leaf.key"
+
+	intermediateCert = "testdata/certchain/intermediate.crt"
+	intermediateKey  = "testdata/certchain/intermediate.key"
 
 	rootCert = "testdata/certchain/root.crt"
 	rootKey  = "testdata/certchain/root.key"
 
 	chainPem = "testdata/certchain/chain.pem"
 )
+
+func calcCertFingerprint(t *testing.T, certpath string) string {
+	// openssl rsa -in certchain-old/leaf.key -outform der -pubout | openssl dgst -sha256
+	certcontents, err := ioutil.ReadFile(certpath)
+	require.NoError(t, err, "reading", certpath)
+
+	block, _ := pem.Decode(certcontents)
+	require.NotNil(t, block, "pem decoding", certpath)
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err, "x509.ParseCertificate", certpath)
+
+	digest := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
+
+	return fmt.Sprintf("%x", digest)
+}
 
 func TestSwappingCert(t *testing.T) {
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
@@ -82,7 +104,7 @@ func TestSwappingCert(t *testing.T) {
 	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer conn.Close()
 
 	client := NewGRPCClient(conn, log.NewNopLogger())
@@ -116,9 +138,9 @@ func TestCertRemainsBad(t *testing.T) {
 	<-timer.C
 
 	pem1, err := ioutil.ReadFile(badCert)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	pem2, err := ioutil.ReadFile(goodCert)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
@@ -126,13 +148,13 @@ func TestCertRemainsBad(t *testing.T) {
 	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer conn.Close()
 
 	client := NewGRPCClient(conn, log.NewNopLogger())
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	stop()
 
@@ -143,7 +165,7 @@ func TestCertRemainsBad(t *testing.T) {
 
 	// Should still fail with bad cert
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	stop()
 }
@@ -162,25 +184,29 @@ func TestCertPinning(t *testing.T) {
 	require.True(t, ok)
 
 	testCases := []struct {
-		pins    string
+		pins    []string
 		success bool
 	}{
 		// Success cases
 		// pin leaf
-		{"eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
+		{[]string{calcCertFingerprint(t, leafCert)}, true},
 		// pin leaf + extra garbage
-		{"deadb33f,eb46067da68f80b5d9f0b027985182aa875bcda6c0d8713dbdb8d1523993bd92", true},
+		{[]string{"deadb33f", calcCertFingerprint(t, leafCert)}, true},
 		// pin intermediate
-		{"73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e", true},
+		{[]string{calcCertFingerprint(t, intermediateCert)}, true},
 		// pin root
-		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
+		{[]string{calcCertFingerprint(t, rootCert)}, true},
 		// pin all three
-		{"b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b,73db41a73c5ede78709fc926a2b93e7ad044a40333ce4ce5ae0fb7424620646e,b48364002b8ac4dd3794d41c204a0282f8cd4f7dc80b26274659512c9619ac1b", true},
+		{[]string{
+			calcCertFingerprint(t, rootCert),
+			calcCertFingerprint(t, intermediateCert),
+			calcCertFingerprint(t, leafCert),
+		}, true},
 
 		// Failure cases
-		{"deadb33f", false},
-		{"deadb33f,34567fff", false},
-		{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281", false},
+		{[]string{"deadb33f"}, false},
+		{[]string{"deadb33f", "34567fff"}, false},
+		{[]string{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281"}, false},
 	}
 
 	for _, tt := range testCases {
@@ -194,7 +220,7 @@ func TestCertPinning(t *testing.T) {
 			conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
 				grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(tlsconf)}),
 			)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			defer conn.Close()
 
 			client := NewGRPCClient(conn, log.NewNopLogger())
@@ -211,15 +237,15 @@ func TestCertPinning(t *testing.T) {
 
 func TestRootCAs(t *testing.T) {
 	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	defer stop()
 	time.Sleep(1 * time.Second)
 
 	rootPEM, err := ioutil.ReadFile(rootCert)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	otherPEM, err := ioutil.ReadFile(goodCert)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	emptyPool := x509.NewCertPool()
 
@@ -253,7 +279,7 @@ func TestRootCAs(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
 			conn, err := DialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
-			require.Nil(t, err)
+			require.NoError(t, err)
 			defer conn.Close()
 
 			client := NewGRPCClient(conn, log.NewNopLogger())
@@ -268,10 +294,10 @@ func TestRootCAs(t *testing.T) {
 	}
 }
 
-func parseCertPins(pins string) ([][]byte, error) {
+func parseCertPins(pins []string) ([][]byte, error) {
 	var certPins [][]byte
-	if pins != "" {
-		for _, hexPin := range strings.Split(pins, ",") {
+	if len(pins) > 0 {
+		for _, hexPin := range pins {
 			pin, err := hex.DecodeString(hexPin)
 			if err != nil {
 				return nil, errors.Wrap(err, "decoding cert pin")

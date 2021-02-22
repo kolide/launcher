@@ -1,0 +1,21 @@
+[req]
+default_bits = 2048
+encrypt_key  = no
+default_md   = sha256
+prompt       = no
+utf8         = yes
+distinguished_name = req_distinguished_name
+
+# Extensions for SAN IP and SAN DNS
+req_extensions = v3_req
+
+[req_distinguished_name]
+O  = Kolide Test
+OU = Intermediate
+CN = localhost
+
+[v3_req]
+basicConstraints     = CA:TRUE
+subjectKeyIdentifier = hash
+keyUsage             = critical, keyCertSign
+extendedKeyUsage     = serverAuth
