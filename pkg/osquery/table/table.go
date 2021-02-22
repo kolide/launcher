@@ -15,6 +15,7 @@ import (
 func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(db),
+		LauncherDbInfo(db),
 		LauncherIdentifierTable(db),
 		TargetMembershipTable(db),
 		LauncherAutoupdateConfigTable(opts),
