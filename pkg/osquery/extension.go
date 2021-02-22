@@ -76,10 +76,10 @@ const (
 	configKey = "config"
 
 	// Default maximum number of bytes per batch (used if not specified in
-	// options). This 2MB limit is chosen based on the default grpc-go
+	// options). This 3MB limit is chosen based on the default grpc-go
 	// limit specified in https://github.com/grpc/grpc-go/blob/master/server.go#L51
-	// which is 4MB. We use 2MB to be conservative.
-	defaultMaxBytesPerBatch = 2 << 20
+	// which is 4MB. We use 3MB to be conservative.
+	defaultMaxBytesPerBatch = 3 << 20
 	// Default logging interval (used if not specified in
 	// options)
 	defaultLoggingInterval = 60 * time.Second
@@ -545,10 +545,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		for totalBytes := 0; k != nil; {
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
+				logheadSize := minInt(len(v), 100)
 				level.Info(e.Opts.Logger).Log(
 					"msg", "dropped log",
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
+					"loghead", string(v)[0:logheadSize],
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
 				// Buffer is filled
@@ -976,4 +978,12 @@ func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
 		return nil
 	})
 	return errors.Wrap(err, "caching known initial result queries")
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
