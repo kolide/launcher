@@ -43,6 +43,7 @@
 package autoupdate
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -193,13 +194,13 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 
 		// if fullAssetPath is a json file, we should copy it to localPath
 		if filepath.Ext(fullAssetPath) == ".json" {
-			// We need to ensure the file exists, but if it exists it has
-			// additional state. So, create when not present. This helps
-			// with an issue where the directory would be created, but the
-			// files not yet yet there -- Generating an invalid state. Note:
-			// this does not check the validity of the files, they might be
-			// corrupt.
-			if _, err := os.Stat(fullLocalPath); !os.IsNotExist(err) {
+			// The local file should exist and be
+			// valid. The starting condition comes from
+			// our bundled assets, and it is subsequently
+			// updated by TUF. We have seen benign
+			// corruption occur, so we want to detect and
+			// repair that.
+			if ok := u.validLocalFile(fullLocalPath); ok {
 				continue
 			}
 
@@ -223,6 +224,43 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 		}
 	}
 	return nil
+}
+
+// validLocalFile Checks whether the local file is valid. This was
+// originally a simple exists? check, but we've seen this become
+// corrupt on disk for benign reasons. So, if it's obviously bad, log
+// and allow it to be replaced with the one from assets. (Do not
+// attempt to rollback inside the TUF repo, that breaks the
+// abstraction of updater)
+func (u *Updater) validLocalFile(fullLocalPath string) bool {
+	// Check for a missing file. This state is invalid, but we
+	// don't need to log about it.
+	if _, err := os.Stat(fullLocalPath); os.IsNotExist(err) {
+		// No file. While this is invalid, we don't need to log
+		return false
+	}
+
+	logger := log.With(level.Info(u.logger),
+		"msg", "Replacing corrupt TUF file",
+		"file", fullLocalPath,
+	)
+
+	jsonFile, err := os.Open(fullLocalPath)
+	if err != nil {
+		logger.Log("err", err)
+		return false
+	}
+	defer jsonFile.Close()
+
+	// Check json validity. We use a Decoder, and not Valid, so we
+	// can get the json error back.
+	var v interface{}
+	if err := json.NewDecoder(jsonFile).Decode(&v); err != nil {
+		logger.Log("err", err)
+		return false
+	}
+
+	return true
 }
 
 // UpdaterOption customizes the Updater.

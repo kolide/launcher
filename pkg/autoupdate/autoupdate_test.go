@@ -1,6 +1,7 @@
 package autoupdate
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,10 +16,12 @@ import (
 )
 
 func TestCreateTUFRepoDirectory(t *testing.T) {
+	t.Parallel()
+
 	localTUFRepoPath, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 
-	u := &Updater{}
+	u := &Updater{logger: log.NewNopLogger()}
 	require.NoError(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
 
 	knownFilePaths := []string{
@@ -35,14 +38,114 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	}
 
 	for _, knownFilePath := range knownFilePaths {
-		_, err = os.Stat(filepath.Join(localTUFRepoPath, knownFilePath))
-		require.NoError(t, err)
+		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
+		_, err = os.Stat(fullFilePath)
+		require.NoError(t, err, "stat file")
+
+		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		require.NoError(t, err, "read file")
+
+		require.True(t, json.Valid(jsonBytes), "file is json")
+	}
+
+	// Corrupt some local files
+	require.NoError(t,
+		os.Remove(filepath.Join(localTUFRepoPath, knownFilePaths[0])),
+		"remove a tuf file")
+	require.NoError(t,
+		ioutil.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
+		"truncate a tuf file")
+
+	// Attempt to re-create
+	require.NoError(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
+
+	// And retest
+	for _, knownFilePath := range knownFilePaths {
+		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
+		_, err = os.Stat(fullFilePath)
+		require.NoError(t, err, "stat file")
+
+		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		require.NoError(t, err, "read file")
+
+		require.True(t, json.Valid(jsonBytes), "file is json")
 	}
 
 	require.NoError(t, os.RemoveAll(localTUFRepoPath))
 }
 
+func TestValidLocalFile(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		name      string
+		content   []byte
+		assertion require.BoolAssertionFunc
+		logCount  int
+	}{
+		{
+			name:      "no file",
+			assertion: require.False,
+		},
+		{
+			name:      "empty",
+			content:   []byte{},
+			assertion: require.False,
+			logCount:  1,
+		},
+
+		{
+			name:      "space",
+			content:   []byte(" "),
+			assertion: require.False,
+			logCount:  1,
+		},
+		{
+			name:      "dangle brace",
+			content:   []byte("{"),
+			assertion: require.False,
+			logCount:  1,
+		},
+		{
+			name:      "unquoted",
+			content:   []byte("{a: 1}"),
+			assertion: require.False,
+			logCount:  1,
+		},
+		{
+			name:      "valid",
+			content:   []byte("{}"),
+			assertion: require.True,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
+			require.NoError(t, err)
+			defer os.Remove(testFile.Name())
+
+			if tt.content == nil {
+				require.NoError(t, testFile.Close())
+				require.NoError(t, os.Remove(testFile.Name()))
+			} else {
+				if len(tt.content) > 0 {
+					_, err := testFile.Write(tt.content)
+					require.NoError(t, err)
+				}
+				require.NoError(t, testFile.Close())
+			}
+
+			l := &mockLogger{}
+			u := &Updater{logger: l}
+			tt.assertion(t, u.validLocalFile(testFile.Name()))
+			require.Equal(t, tt.logCount, l.Count(), "log count")
+		})
+	}
+
+}
+
 func TestNewUpdater(t *testing.T) {
+	t.Parallel()
 	var tests = []struct {
 		name          string
 		opts          []UpdaterOption
