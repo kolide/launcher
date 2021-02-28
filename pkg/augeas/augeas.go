@@ -7,6 +7,11 @@
 //
 // Also handy is seeing what files this will ingest:
 //    augtool  -S  -I .//assets/lenses print /files//*
+//
+// You can also explore the augeas space via osquery. Some interesting examples:
+//   select * from augeas;
+//   select * from augeas where node like "/augeas/load/%";     (requies osquery patches)
+//   select * from augeas where node like "/augeas/files/%%";   (requies osquery patches)
 package augeas
 
 import (
