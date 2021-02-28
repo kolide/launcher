@@ -198,7 +198,7 @@ deps: deps-go generate
 
 .PHONY: generate
 generate: deps-go
-	go generate ./pkg/packagekit/... ./pkg/packaging/... ./pkg/osquery/tables/...
+	go generate ./pkg/packagekit/... ./pkg/packaging/... ./pkg/osquery/tables/... ./pkg/augeas/...
 	go run cmd/make/make.go -targets=generate-tuf
 
 .PHONY: proto
