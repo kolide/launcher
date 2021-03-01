@@ -2,7 +2,7 @@
 // support.
 //
 // As we run a subset of the lenses, the simplest way to check for
-// missing dependancies is to augtool:
+// missing dependencies is to augtool:
 //    augtool -c -S  -I ./assets/lenses
 //
 // Also handy is seeing what files this will ingest:
