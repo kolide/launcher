@@ -1,6 +1,6 @@
 // +build windows
 
-package windows_associations
+package dsim_default_associations
 
 import (
 	"bytes"
@@ -38,7 +38,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		logger: logger,
 	}
 
-	return table.NewPlugin("kolide_windows_associations", columns, t.generate)
+	return table.NewPlugin("kolide_dsim_default_associations", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
