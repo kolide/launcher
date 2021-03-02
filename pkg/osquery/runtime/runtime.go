@@ -159,6 +159,11 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--config_accelerated_refresh=30",
 	)
 
+	// Augeas. No windows support, and only makes sense if we populated it.
+	if paths.augeasPath != "" && runtime.GOOS != "windows" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--augeas_lenses=%s", paths.augeasPath))
+	}
+
 	cmd.Args = append(cmd.Args, platformArgs()...)
 	if opts.stdout != nil {
 		cmd.Stdout = opts.stdout
@@ -177,7 +182,6 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	// by providing invalid flags)
 	cmd.Args = append(
 		cmd.Args,
-		fmt.Sprintf("--augeas_lenses=%s", paths.augeasPath),
 		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
 		fmt.Sprintf("--database_path=%s", paths.databasePath),
 		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
