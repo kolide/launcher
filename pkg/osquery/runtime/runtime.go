@@ -43,6 +43,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
+	augeasLensFunc        func(dir string) error
 	binaryPath            string
 	rootDirectory         string
 	extensionSocketPath   string
@@ -79,11 +80,12 @@ type OsqueryInstance struct {
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
 // launch an osqueryd instance.
 type osqueryFilePaths struct {
-	pidfilePath           string
+	augeasPath            string
 	databasePath          string
-	extensionPath         string
 	extensionAutoloadPath string
+	extensionPath         string
 	extensionSocketPath   string
+	pidfilePath           string
 }
 
 // calculateOsqueryPaths accepts a path to a working osqueryd binary and a root
@@ -121,6 +123,7 @@ func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePat
 	return &osqueryFilePaths{
 		pidfilePath:           filepath.Join(rootDir, "osquery.pid"),
 		databasePath:          filepath.Join(rootDir, "osquery.db"),
+		augeasPath:            filepath.Join(rootDir, "augeas-lenses"),
 		extensionPath:         extensionPath,
 		extensionAutoloadPath: extensionAutoloadPath,
 		extensionSocketPath:   extensionSocketPath,
@@ -155,6 +158,11 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--config_refresh=300",
 		"--config_accelerated_refresh=30",
 	)
+
+	// Augeas. No windows support, and only makes sense if we populated it.
+	if paths.augeasPath != "" && runtime.GOOS != "windows" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--augeas_lenses=%s", paths.augeasPath))
+	}
 
 	cmd.Args = append(cmd.Args, platformArgs()...)
 	if opts.stdout != nil {
@@ -320,6 +328,14 @@ func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 func WithOsqueryFlags(flags []string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.osqueryFlags = flags
+	}
+}
+
+// WithAugeasLensFunction defines a callback function. This can be
+// used during setup to populate the augeas lenses directory.
+func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.augeasLensFunc = f
 	}
 }
 
@@ -506,6 +522,17 @@ func (r *Runner) launchOsqueryInstance() error {
 	paths, err := calculateOsqueryPaths(o.opts.rootDirectory, o.opts.extensionSocketPath)
 	if err != nil {
 		return errors.Wrap(err, "could not calculate osquery file paths")
+	}
+
+	// Populate augeas lenses, if requested
+	if o.opts.augeasLensFunc != nil {
+		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
+			return errors.Wrap(err, "making augeas lenses directory")
+		}
+
+		if err := o.opts.augeasLensFunc(paths.augeasPath); err != nil {
+			return errors.Wrap(err, "setting up augeas lenses")
+		}
 	}
 
 	// If a config plugin has not been set by the caller, then it is likely

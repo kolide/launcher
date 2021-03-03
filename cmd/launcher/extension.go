@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
+	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	kolidelog "github.com/kolide/launcher/pkg/log"
@@ -23,7 +24,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: the extension, runtime, and client are all kind of entangled here. Untangle the underlying libraries and separate into units
+// TODO: the extension, runtime, and client are all kind of entangled
+// here. Untangle the underlying libraries and separate into units
 func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
@@ -96,6 +98,7 @@ func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient ser
 		runtime.WithLogger(logger),
 		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
 		runtime.WithOsqueryFlags(opts.OsqueryFlags),
+		runtime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
 
 	restartFunc := func() error {
