@@ -121,7 +121,7 @@ func execPwsh(logger log.Logger) execer {
 		// successful execution code.
 		if err != nil || errOutput != "" {
 			// if there is an error, inspect the contents of stdout
-			level.Debug(logger).Log("msg", "error occured, inspecting stdout contents", "stdout", buf.String())
+			level.Debug(logger).Log("msg", "error occurred, inspecting stdout contents", "stdout", buf.String())
 
 			if err == nil {
 				err = errors.Errorf("exec succeeded, but emitted to stderr")
