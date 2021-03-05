@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
@@ -43,7 +44,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var results []map[string]string
 	var output bytes.Buffer
@@ -61,9 +62,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func execPwsh(logger log.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
-		// MS requires interfaces to complete network scans in <4 seconds
-		// give a bit more time for everything else to run.
-		ctx, cancel := context.WithTimeout(ctx, 4500*time.Millisecond)
+		// MS requires interfaces to complete network scans in <4 seconds, but
+		// that appears not to be consistent
+		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
 
 		// write the c# code to a file, so the powershell script can load it
@@ -119,6 +120,9 @@ func execPwsh(logger log.Logger) execer {
 		// sometimes the powershell script logs errors to stderr, but returns a
 		// successful execution code.
 		if err != nil || errOutput != "" {
+			// if there is an error, inspect the contents of stdout
+			level.Debug(logger).Log("msg", "error occured, inspecting stdout contents", "stdout", buf.String())
+
 			if err == nil {
 				err = errors.Errorf("exec succeeded, but emitted to stderr")
 			}
