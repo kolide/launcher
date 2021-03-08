@@ -60,8 +60,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
-	debug.AttachDebugHandler(debugAddrPath, logger)
 	defer os.Remove(debugAddrPath)
+	debugTriggerPath := filepath.Join(rootDirectory, "debug_mode")
+	defer os.Remove(debugTriggerPath)
+	debug.AttachDebugHandler(debugTriggerPath, debugAddrPath, logger)
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient

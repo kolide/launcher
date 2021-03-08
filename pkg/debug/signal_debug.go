@@ -17,7 +17,7 @@ const debugSignal = syscall.SIGUSR1
 
 // AttachDebugHandler attaches a signal handler that toggles the debug server
 // state when SIGUSR1 is sent to the process.
-func AttachDebugHandler(addrPath string, logger log.Logger) {
+func AttachDebugHandler(_triggerPath string, addrPath string, logger log.Logger) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, debugSignal)
 	go func() {
