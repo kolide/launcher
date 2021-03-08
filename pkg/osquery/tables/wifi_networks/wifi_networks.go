@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
@@ -51,7 +52,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if err := t.getBytes(ctx, &output); err != nil {
 		return results, errors.Wrap(err, "getting raw data")
 	}
-	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
+	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())))
 	if err != nil {
 		return results, errors.Wrap(err, "flattening json output")
 	}
