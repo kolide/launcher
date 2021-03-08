@@ -20,8 +20,6 @@ import (
 	"github.com/scjalliance/comshim"
 )
 
-const enLocale = "1033" // English
-
 type Table struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
@@ -48,90 +46,65 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
-	// Handling locale is a bit gnarly. If not specified, we want
-	// to get the native locale, but we _also_ want to ensure we
-	// get enLocale. But, when a locale is specified, we must only
-	// fetch those, else sqlite will filter it out for us.
-	needEnLocale := true
-	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("default")) {
-		gotEnLocale, result, err := t.searchLocale(locale, queryContext)
+	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
+		result, err := t.searchLocale(locale, queryContext)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "got error searching for updates", "locale", locale, "err", err)
 			continue
 		}
 		results = append(results, result...)
 
-		if gotEnLocale {
-			needEnLocale = false
-		}
-	}
-
-	if needEnLocale {
-		if _, result, err := t.searchLocale(enLocale, queryContext); err != nil {
-			level.Info(t.logger).Log("msg", "got error searching for updates on default", "locale", enLocale, "err", err)
-		} else {
-			results = append(results, result...)
-		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) searchLocale(locale string, queryContext table.QueryContext) (bool, []map[string]string, error) {
+func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]map[string]string, error) {
 	level.Debug(t.logger).Log("msg", "Starting to search for updates", "locale", locale)
 
-	fetchedEnLocal := false
 	is_default := 0
 
 	var results []map[string]string
 
 	session, err := windowsupdate.NewUpdateSession()
 	if err != nil {
-		return fetchedEnLocal, nil, errors.Wrap(err, "NewUpdateSession")
+		return nil, errors.Wrap(err, "NewUpdateSession")
 	}
 
-	if locale == "default" {
+	// If a specific locale is requested, set it.
+	if locale == "_default" {
 		is_default = 1
-		var err error
-		localeUint, err := session.GetLocal()
-		if err != nil {
-			return fetchedEnLocal, nil, errors.Wrap(err, "getlocale")
-		}
-		locale = strconv.FormatUint(uint64(localeUint), 10)
 	} else {
-		origLocale, err := session.GetLocal()
+		requestedLocale, err := strconv.ParseUint(locale, 10, 32)
 		if err != nil {
-			return fetchedEnLocal, nil, errors.Wrapf(err, "Get locale")
+			return nil, errors.Wrapf(err, "Parse locale %s", locale)
 		}
-
-		localeUint, err := strconv.ParseUint(locale, 10, 32)
-		if err != nil {
-			return fetchedEnLocal, nil, errors.Wrapf(err, "Parse locale %s", locale)
+		if err := session.SetLocal(uint32(requestedLocale)); err != nil {
+			return nil, errors.Wrapf(err, "setting local to %d", uint32(requestedLocale))
 		}
-		if err := session.SetLocal(uint32(localeUint)); err != nil {
-			return fetchedEnLocal, nil, errors.Wrapf(err, "setting local to %d", uint32(localeUint))
-		}
-
-		if origLocale == uint32(localeUint) {
-			is_default = 1
-		}
-
-		// If the locale is specified, treat it like we've also gotten enLocale, since sqlite will filter it out.
-		fetchedEnLocal = true
 	}
 
-	if locale == enLocale {
-		fetchedEnLocal = true
+	// What local is this data for? If it doesn't match the
+	// requested one, throw an error, since sqlite is going to
+	// block it.
+	getLocale, err := session.GetLocal()
+	if err != nil {
+		return nil, errors.Wrap(err, "getlocale")
+	}
+	if strconv.FormatUint(uint64(getLocale), 10) != locale && is_default == 0 {
+		return nil, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, uint32(getLocale))
+	} else {
+		locale = strconv.FormatUint(uint64(getLocale), 10)
 	}
 
 	searcher, err := session.CreateUpdateSearcher()
 	if err != nil {
-		return fetchedEnLocal, nil, errors.Wrap(err, "new searcher")
+		return nil, errors.Wrap(err, "new searcher")
 	}
 
 	searchResults, err := searcher.Search("Type='Software'")
 	if err != nil {
-		return fetchedEnLocal, nil, errors.Wrap(err, "search")
+		return nil, errors.Wrap(err, "search")
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -151,7 +124,7 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) (bo
 
 	level.Debug(t.logger).Log("msg", "Found updates", "locale", locale, "count", len(results))
 
-	return fetchedEnLocal, results, nil
+	return results, nil
 }
 
 func (t *Table) flattenOutput(dataQuery string, searchResults *windowsupdate.ISearchResult) ([]dataflatten.Row, error) {
