@@ -25,7 +25,7 @@ type Table struct {
 	logger log.Logger
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func UpdatesTablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
@@ -37,13 +37,10 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 		logger: logger,
 	}
 
-	return table.NewPlugin("kolide_windows_updates", columns, t.generate)
+	return table.NewPlugin("kolide_windows_updates", columns, t.generateUpdates)
 }
 
-func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	comshim.Add(1)
-	defer comshim.Done()
-
+func (t *Table) generateUpdates(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
@@ -59,16 +56,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]map[string]string, error) {
-	level.Debug(t.logger).Log("msg", "Starting to search for updates", "locale", locale)
-
+func getSession(locale string) (*windowsupdate.IUpdateSession, string, int, error) {
 	is_default := 0
-
-	var results []map[string]string
 
 	session, err := windowsupdate.NewUpdateSession()
 	if err != nil {
-		return nil, errors.Wrap(err, "NewUpdateSession")
+		return nil, locale, is_default, errors.Wrap(err, "NewUpdateSession")
 	}
 
 	// If a specific locale is requested, set it.
@@ -77,10 +70,10 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 	} else {
 		requestedLocale, err := strconv.ParseUint(locale, 10, 32)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Parse locale %s", locale)
+			return nil, locale, is_default, errors.Wrapf(err, "Parse locale %s", locale)
 		}
 		if err := session.SetLocal(uint32(requestedLocale)); err != nil {
-			return nil, errors.Wrapf(err, "setting local to %d", uint32(requestedLocale))
+			return nil, locale, is_default, errors.Wrapf(err, "setting local to %d", uint32(requestedLocale))
 		}
 	}
 
@@ -89,12 +82,26 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 	// block it.
 	getLocale, err := session.GetLocal()
 	if err != nil {
-		return nil, errors.Wrap(err, "getlocale")
+		return nil, locale, is_default, errors.Wrap(err, "getlocale")
 	}
 	if strconv.FormatUint(uint64(getLocale), 10) != locale && is_default == 0 {
-		return nil, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, uint32(getLocale))
+		return nil, locale, is_default, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, uint32(getLocale))
 	} else {
 		locale = strconv.FormatUint(uint64(getLocale), 10)
+	}
+
+	return session, locale, is_default, err
+}
+
+func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]map[string]string, error) {
+	comshim.Add(1)
+	defer comshim.Done()
+
+	var results []map[string]string
+
+	session, setLocale, is_default, err := getSession(locale)
+	if err != nil {
+		return nil, errors.Wrap(err, "new session")
 	}
 
 	searcher, err := session.CreateUpdateSearcher()
@@ -115,19 +122,17 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 		}
 
 		rowData := map[string]string{
-			"locale":     locale,
+			"locale":     setLocale,
 			"is_default": strconv.Itoa(is_default),
 		}
 
 		results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 	}
 
-	level.Debug(t.logger).Log("msg", "Found updates", "locale", locale, "count", len(results))
-
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, searchResults *windowsupdate.ISearchResult) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{}
 
 	if dataQuery != "" {
