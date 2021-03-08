@@ -13,7 +13,7 @@ import (
 type IUpdate struct {
 	disp                            *ole.IDispatch
 	AutoSelectOnWebSites            bool
-	BundledUpdates                  []string
+	BundledUpdates                  []*IUpdateIdentity // These are full IUpdate objects, but we truncate them
 	CanRequireSource                bool
 	Categories                      []*ICategory
 	Deadline                        *time.Time
@@ -55,13 +55,14 @@ type IUpdate struct {
 	UninstallationSteps             []string
 }
 
+// toIUpdates takes a IUpdateCollection and returns a []*IUpdate
 func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
 	if err != nil {
 		return nil, err
 	}
 
-	updates := make([]*IUpdate, 0, count)
+	updates := make([]*IUpdate, count)
 	for i := 0; i < int(count); i++ {
 		updateDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updatesDisp, "Item", i))
 		if err != nil {
@@ -73,9 +74,38 @@ func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 			return nil, err
 		}
 
-		updates = append(updates, update)
+		updates[i] = update
 	}
 	return updates, nil
+}
+
+// toIUpdates takes a IUpdateCollection and returns the a
+// []*IUpdateIdentity of the contained IUpdates
+func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error) {
+	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
+	if err != nil {
+		return nil, err
+	}
+
+	identities := make([]*IUpdateIdentity, count)
+	for i := 0; i < int(count); i++ {
+		updateDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updatesDisp, "Item", i))
+		if err != nil {
+			return nil, err
+		}
+
+		identityDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Identity"))
+		if err != nil {
+			return nil, err
+		}
+		if identityDisp != nil {
+			if identities[i], err = toIUpdateIdentity(identityDisp); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return identities, nil
+
 }
 
 func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
@@ -88,8 +118,14 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if iUpdate.BundledUpdates, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "BundledUpdates")); err != nil {
+	if bundlesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "BundledUpdates")); err != nil {
 		return nil, err
+	} else {
+		if bundlesDisp != nil {
+			if iUpdate.BundledUpdates, err = toIUpdatesIdentities(bundlesDisp); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if iUpdate.CanRequireSource, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "CanRequireSource")); err != nil {
