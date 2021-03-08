@@ -28,6 +28,8 @@ func ToIDispatchErr(result *ole.VARIANT, err error) (*ole.IDispatch, error) {
 }
 
 func ToStringSliceErr(result *ole.VARIANT, err error) ([]string, error) {
+	// It's not clear anything uses this. The know use cases are
+	// better served by iStringCollectionToStringArrayErr
 	if err != nil {
 		return nil, err
 	}

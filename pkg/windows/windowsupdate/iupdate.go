@@ -80,8 +80,12 @@ func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 }
 
 // toIUpdates takes a IUpdateCollection and returns the a
-// []*IUpdateIdentity of the contained IUpdates
+// []*IUpdateIdentity of the contained IUpdates. This is *not* recursive, though possible is should be
 func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error) {
+	if updatesDisp == nil {
+		return nil, nil
+	}
+
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
 	if err != nil {
 		return nil, err
@@ -105,7 +109,6 @@ func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error
 		}
 	}
 	return identities, nil
-
 }
 
 func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
@@ -118,13 +121,12 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if bundlesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "BundledUpdates")); err != nil {
+	if arrDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "BundledUpdates")); err != nil {
 		return nil, err
 	} else {
-		if bundlesDisp != nil {
-			if iUpdate.BundledUpdates, err = toIUpdatesIdentities(bundlesDisp); err != nil {
-				return nil, err
-			}
+		if iUpdate.BundledUpdates, err = toIUpdatesIdentities(arrDisp); err != nil {
+			return nil, err
+
 		}
 	}
 
@@ -132,11 +134,9 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	categoriesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Categories"))
-	if err != nil {
+	if categoriesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Categories")); err != nil {
 		return nil, err
-	}
-	if categoriesDisp != nil {
+	} else if categoriesDisp != nil {
 		if iUpdate.Categories, err = toICategories(categoriesDisp); err != nil {
 			return nil, err
 		}
@@ -242,11 +242,11 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if iUpdate.KBArticleIDs, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "KBArticleIDs")); err != nil {
+	if iUpdate.KBArticleIDs, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "KBArticleIDs"))); err != nil {
 		return nil, err
 	}
 
-	if iUpdate.Languages, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "Languages")); err != nil {
+	if iUpdate.Languages, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Languages"))); err != nil {
 		return nil, err
 	}
 
@@ -262,7 +262,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if iUpdate.MoreInfoUrls, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "MoreInfoUrls")); err != nil {
+	if iUpdate.MoreInfoUrls, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "MoreInfoUrls"))); err != nil {
 		return nil, err
 	}
 
@@ -286,11 +286,11 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if iUpdate.SecurityBulletinIDs, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "SecurityBulletinIDs")); err != nil {
+	if iUpdate.SecurityBulletinIDs, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "SecurityBulletinIDs"))); err != nil {
 		return nil, err
 	}
 
-	if iUpdate.SupersededUpdateIDs, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "SupersededUpdateIDs")); err != nil {
+	if iUpdate.SupersededUpdateIDs, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "SupersededUpdateIDs"))); err != nil {
 		return nil, err
 	}
 
@@ -316,7 +316,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
-	if iUpdate.UninstallationSteps, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateDisp, "UninstallationSteps")); err != nil {
+	if iUpdate.UninstallationSteps, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "UninstallationSteps"))); err != nil {
 		return nil, err
 	}
 
