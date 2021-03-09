@@ -64,6 +64,7 @@ require (
 	github.com/peterbourgon/ff/v3 v3.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
+	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
