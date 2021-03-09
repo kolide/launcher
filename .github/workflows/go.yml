@@ -15,7 +15,7 @@ jobs:
       matrix:
         os:
           - ubuntu-18.04
-          - ubuntu-latest
+            #- ubuntu-latest # No support for go 1.13
           - macos-latest
           - windows-latest
     steps:
