@@ -1,6 +1,6 @@
 // +build windows
 
-package windowsupdate
+package windowsupdatetable
 
 import (
 	"context"
@@ -132,7 +132,8 @@ func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]da
 		)
 	}
 
-	// Works better if we bounce through json. yuck
+	// dataflatten won't parse the raw searchResults. As a workaround,
+	// we marshal to json. This is a deficiency in dataflatten.
 	jsonBytes, err := json.Marshal(searchResults)
 	if err != nil {
 		return nil, errors.Wrap(err, "json")
