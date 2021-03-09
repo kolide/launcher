@@ -11,35 +11,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUpdatesTable(t *testing.T) {
+func TestTable(t *testing.T) {
 	t.parallel()
 
-	table := Table{
-		logger:    log.NewNopLogger(),
-		queryFunc: queryUpdates,
+	var tests = []struct {
+		name      string
+		queryFunc queryFuncType
+	}{
+		{name: "updates", queryFunc: queryUpdates},
+		{name: "history", queryFunc: queryHistory},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			table := Table{
+				logger:    log.NewNopLogger(),
+				queryFunc: tt.queryFunc,
+			}
 
-	rows, err := table.generate(ctx.tablehelpers.MockQueryContext(nil))
-	require.NoError(t, err, "generate")
-	require.Greater(t, len(rows), 5, "got at least 5 rows")
-}
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
 
-func TestHistoryTable(t *testing.T) {
-	t.parallel()
+			rows, err := table.generate(ctx.tablehelpers.MockQueryContext(nil))
+			require.NoError(t, err, "generate")
+			require.Greater(t, len(rows), 5, "got at least 5 rows")
 
-	table := Table{
-		logger:    log.NewNopLogger(),
-		queryFunc: queryHistory,
+		})
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	rows, err := table.generate(ctx.tablehelpers.MockQueryContext(nil))
-	require.NoError(t, err, "generate")
-	require.Greater(t, len(rows), 5, "got at least 5 rows")
 
 }
