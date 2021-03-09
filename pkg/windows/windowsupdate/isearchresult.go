@@ -37,6 +37,7 @@ func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
 		}
 	}
 
+	// Updates is a IUpdateCollection, and we want the full details. So cast it ia toIUpdates
 	updatesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(searchResultDisp, "Updates"))
 	if err != nil {
 		return nil, errors.Wrap(err, "Updates")
