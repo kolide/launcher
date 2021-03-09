@@ -3,7 +3,6 @@
 package table
 
 import (
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dsim_default_associations"
 	"github.com/kolide/launcher/pkg/osquery/tables/secedit"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks"
