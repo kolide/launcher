@@ -12,6 +12,8 @@ import (
 // https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdate
 type IUpdate struct {
 	disp                            *ole.IDispatch
+	AutoDownload                    int32 // enum https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate5-get_autodownload
+	AutoSelection                   int32 // enum https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate5-get_autoselection
 	AutoSelectOnWebSites            bool
 	BundledUpdates                  []*IUpdateIdentity // These are full IUpdate objects, but we truncate them
 	BrowseOnly                      bool               // From IUpdate3
@@ -120,6 +122,14 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 	var err error
 	iUpdate := &IUpdate{
 		disp: updateDisp,
+	}
+
+	if iUpdate.AutoDownload, err = oleconv.ToInt32Err(oleutil.GetProperty(updateDisp, "AutoDownload")); err != nil {
+		return nil, err
+	}
+
+	if iUpdate.AutoSelection, err = oleconv.ToInt32Err(oleutil.GetProperty(updateDisp, "AutoSelection")); err != nil {
+		return nil, err
 	}
 
 	if iUpdate.AutoSelectOnWebSites, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "AutoSelectOnWebSites")); err != nil {
