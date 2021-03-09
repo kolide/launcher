@@ -193,7 +193,7 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
-	timeout := 30 * time.Second
+	timeout := 45 * time.Second
 	if detailLevel == "full" {
 		timeout = 5 * time.Minute
 	}
