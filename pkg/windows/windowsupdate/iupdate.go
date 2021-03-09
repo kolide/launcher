@@ -14,8 +14,10 @@ type IUpdate struct {
 	disp                            *ole.IDispatch
 	AutoSelectOnWebSites            bool
 	BundledUpdates                  []*IUpdateIdentity // These are full IUpdate objects, but we truncate them
+	BrowseOnly                      bool               // From IUpdate3
 	CanRequireSource                bool
 	Categories                      []*ICategory
+	CveIDs                          []string // From IUpdate2
 	Deadline                        *time.Time
 	DeltaCompressedContentAvailable bool
 	DeltaCompressedContentPreferred bool
@@ -34,6 +36,7 @@ type IUpdate struct {
 	IsHidden                        bool
 	IsInstalled                     bool
 	IsMandatory                     bool
+	IsPresent                       bool // From IUpdate2
 	IsUninstallable                 bool
 	KBArticleIDs                    []string
 	Languages                       []string
@@ -42,6 +45,8 @@ type IUpdate struct {
 	MinDownloadSize                 int64
 	MoreInfoUrls                    []string
 	MsrcSeverity                    string
+	PerUser                         bool // From IUpdate4
+	RebootRequired                  bool // From IUpdate2
 	RecommendedCpuSpeed             int32
 	RecommendedHardDiskSpace        int32
 	RecommendedMemory               int32
@@ -130,6 +135,10 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		}
 	}
 
+	if iUpdate.BrowseOnly, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "BrowseOnly")); err != nil {
+		return nil, err
+	}
+
 	if iUpdate.CanRequireSource, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "CanRequireSource")); err != nil {
 		return nil, err
 	}
@@ -140,6 +149,10 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		if iUpdate.Categories, err = toICategories(categoriesDisp); err != nil {
 			return nil, err
 		}
+	}
+
+	if iUpdate.CveIDs, err = iStringCollectionToStringArrayErr(oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "CveIDs"))); err != nil {
+		return nil, err
 	}
 
 	if iUpdate.Deadline, err = oleconv.ToTimeErr(oleutil.GetProperty(updateDisp, "Deadline")); err != nil {
@@ -238,6 +251,10 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 
+	if iUpdate.IsPresent, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "IsPresent")); err != nil {
+		return nil, err
+	}
+
 	if iUpdate.IsUninstallable, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "IsUninstallable")); err != nil {
 		return nil, err
 	}
@@ -267,6 +284,14 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 	}
 
 	if iUpdate.MsrcSeverity, err = oleconv.ToStringErr(oleutil.GetProperty(updateDisp, "MsrcSeverity")); err != nil {
+		return nil, err
+	}
+
+	if iUpdate.PerUser, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "PerUser")); err != nil {
+		return nil, err
+	}
+
+	if iUpdate.RebootRequired, err = oleconv.ToBoolErr(oleutil.GetProperty(updateDisp, "RebootRequired")); err != nil {
 		return nil, err
 	}
 
