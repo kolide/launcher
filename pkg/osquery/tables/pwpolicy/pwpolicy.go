@@ -70,12 +70,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			}
 
 			flattenOpts := []dataflatten.FlattenOpts{
+				dataflatten.WithLogger(t.logger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-			}
-			if t.logger != nil {
-				flattenOpts = append(flattenOpts,
-					dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
-				)
 			}
 
 			flatData, err := dataflatten.Plist(pwPolicyOutput, flattenOpts...)

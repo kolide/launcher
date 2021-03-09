@@ -100,16 +100,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]string, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithLogger(t.logger),
 		dataflatten.WithNestedPlist(),
-	}
-
-	if t.logger != nil {
-		// dataflatten is noisy, so unless we're not debugging it, filter it to info
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())))
-	}
-
-	if dataQuery != "" {
-		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	data, err := t.dataFunc(filePath, flattenOpts...)
