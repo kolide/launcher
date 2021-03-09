@@ -13,7 +13,7 @@ import (
 )
 
 func TestTable(t *testing.T) {
-	t.parallel()
+	t.Parallel()
 
 	var tests = []struct {
 		name      string
