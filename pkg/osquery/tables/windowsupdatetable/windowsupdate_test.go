@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,7 +33,7 @@ func TestTable(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
 
-			rows, err := table.generate(ctx.tablehelpers.MockQueryContext(nil))
+			rows, err := table.generate(ctx, tablehelpers.MockQueryContext(nil))
 			require.NoError(t, err, "generate")
 			require.Greater(t, len(rows), 5, "got at least 5 rows")
 
