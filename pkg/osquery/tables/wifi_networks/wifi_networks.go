@@ -52,7 +52,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if err := t.getBytes(ctx, &output); err != nil {
 		return results, errors.Wrap(err, "getting raw data")
 	}
-	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
+	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())))
 	if err != nil {
 		return results, errors.Wrap(err, "flattening json output")
 	}
