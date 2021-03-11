@@ -543,7 +543,10 @@ func (r *Runner) launchOsqueryInstance() error {
 				"event", "BCJ_",
 				"msg", "unsafe permissions detected on extension binary")
 
-			// chown the file
+			// chown the file. This could potentially be insecure, since we're
+			// basically chown-ing whatever is there to root, but a certain
+			// level of privilege is needed to place something in the launcher
+			// root directory.
 			err := os.Chown(paths.extensionPath, os.Getuid(), os.Getgid())
 			if err != nil {
 				return errors.Wrap(err, "attempting to chown extension binary")
