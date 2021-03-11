@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -525,33 +524,12 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	// TODO: should also handle windows. probably
-	if runtime.GOOS != "windows" {
-		// The extensions file should be owned by the process's UID or the file
-		// should be owned by root. Osquery will refuse to load the extension
-		// otherwise
-		fd, err := os.Stat(paths.extensionPath)
-		if err != nil {
-			return errors.Wrap(err, "stat-ing extension path")
-		}
-		sys := fd.Sys().(*syscall.Stat_t)
-		isRootOwned := (sys.Uid == 0)
-		isProcOwned := (sys.Uid == uint32(os.Geteuid()))
-
-		if !(isRootOwned || isProcOwned) {
-			level.Info(o.logger).Log(
-				"event", "BCJ_",
-				"msg", "unsafe permissions detected on extension binary")
-
-			// chown the file. This could potentially be insecure, since we're
-			// basically chown-ing whatever is there to root, but a certain
-			// level of privilege is needed to place something in the launcher
-			// root directory.
-			err := os.Chown(paths.extensionPath, os.Getuid(), os.Getgid())
-			if err != nil {
-				return errors.Wrap(err, "attempting to chown extension binary")
-			}
-		}
+	err = ensureProperPermissions(o, paths)
+	if err != nil {
+		level.Info(o.logger).Log(
+			"msg", "unable to ensure proper permissions",
+			"err", err,
+		)
 	}
 
 	// Populate augeas lenses, if requested

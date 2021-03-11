@@ -60,3 +60,7 @@ func isExitOk(err error) bool {
 	}
 	return false
 }
+
+func ensureProperPermissions(o *OsqueryInstance, paths *osqueryFilePaths) error {
+	return nil
+}
