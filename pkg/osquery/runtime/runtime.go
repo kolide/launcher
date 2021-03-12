@@ -524,6 +524,14 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
+	err = ensureProperPermissions(o, paths)
+	if err != nil {
+		level.Info(o.logger).Log(
+			"msg", "unable to ensure proper permissions",
+			"err", err,
+		)
+	}
+
 	// Populate augeas lenses, if requested
 	if o.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
@@ -586,17 +594,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		o.opts.binaryPath,
 		autoupdate.DeleteOldUpdates(),
 	)
-
-	// The extensions file should be owned by the process's UID or by root.
-	// Osquery will refuse to load the extension otherwise. Also ensure osqueryd
-	// is owned by root or current uid.
-	err = ensureProperPermissions(o, []string{paths.extensionPath, currentOsquerydBinaryPath})
-	if err != nil {
-		level.Info(o.logger).Log(
-			"msg", "unable to ensure proper permissions",
-			"err", err,
-		)
-	}
 
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
