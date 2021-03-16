@@ -52,38 +52,27 @@ func flattenCertificate(certpath string, _opts ...dataflatten.FlattenOpts) ([]da
 		return nil, errors.Wrapf(err, "reading %s", certpath)
 	}
 
-	block, _ := pem.Decode(certBytes)
-	if block == nil {
-		return nil, errors.Errorf("Unable to read pem from %s", certpath)
-	}
+	certs := []certExtract{}
 
-	rawCerts, err := x509.ParseCertificates(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrapf(err, "x509 parsing %s", certpath)
-	}
+	// Loop over the bytes, reading pem certs
+	for len(certBytes) > 0 {
+		var block *pem.Block
 
-	certs := make([]certExtract, len(rawCerts))
-	for i, c := range rawCerts {
-		certs[i] = certExtract{
-			CRLDistributionPoints: c.CRLDistributionPoints,
-			DNSNames:              c.DNSNames,
-			EmailAddresses:        c.EmailAddresses,
-			IPAddresses:           c.IPAddresses,
-			IssuerRaw:             c.Issuer,
-			Issuer:                c.Issuer.String(),
-			IssuingCertificateURL: c.IssuingCertificateURL,
-			KeyUsage:              keyUsageToStrings(c.KeyUsage),
-			NotAfter:              c.NotAfter,
-			NotBefore:             c.NotBefore,
-			OCSPServer:            c.OCSPServer,
-			PublicKeyAlgorithm:    c.PublicKeyAlgorithm.String(),
-			SerialNumber:          c.SerialNumber.String(),
-			SignatureAlgorithm:    c.SignatureAlgorithm.String(),
-			SubjectRaw:            c.Subject,
-			Subject:               c.Subject.String(),
-			URIs:                  c.URIs,
-			Version:               c.Version,
+		block, certBytes = pem.Decode(certBytes)
+		if block == nil {
+			break
 		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		rawCert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			// Possible this should just continue?
+			return nil, errors.Wrapf(err, "x509 parsing %s", certpath)
+		}
+
+		certs = append(certs, extractCert(rawCert))
 	}
 
 	// Bounce through json, because it's the simplest way to marshal the deep nested things like Subject
@@ -98,6 +87,30 @@ func flattenCertificate(certpath string, _opts ...dataflatten.FlattenOpts) ([]da
 	}
 
 	return rows, nil
+
+}
+
+func extractCert(c *x509.Certificate) certExtract {
+	return certExtract{
+		CRLDistributionPoints: c.CRLDistributionPoints,
+		DNSNames:              c.DNSNames,
+		EmailAddresses:        c.EmailAddresses,
+		IPAddresses:           c.IPAddresses,
+		IssuerRaw:             c.Issuer,
+		Issuer:                c.Issuer.String(),
+		IssuingCertificateURL: c.IssuingCertificateURL,
+		KeyUsage:              keyUsageToStrings(c.KeyUsage),
+		NotAfter:              c.NotAfter,
+		NotBefore:             c.NotBefore,
+		OCSPServer:            c.OCSPServer,
+		PublicKeyAlgorithm:    c.PublicKeyAlgorithm.String(),
+		SerialNumber:          c.SerialNumber.String(),
+		SignatureAlgorithm:    c.SignatureAlgorithm.String(),
+		SubjectRaw:            c.Subject,
+		Subject:               c.Subject.String(),
+		URIs:                  c.URIs,
+		Version:               c.Version,
+	}
 
 }
 
