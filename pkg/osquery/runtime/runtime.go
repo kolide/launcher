@@ -524,10 +524,12 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	err = ensureProperPermissions(o, paths)
+	// The extensions file should be owned by the process's UID or by root.
+	// Osquery will refuse to load the extension otherwise.
+	err = ensureProperPermissions(o, paths.extensionPath)
 	if err != nil {
 		level.Info(o.logger).Log(
-			"msg", "unable to ensure proper permissions",
+			"msg", "unable to ensure proper permissions on extension path",
 			"err", err,
 		)
 	}

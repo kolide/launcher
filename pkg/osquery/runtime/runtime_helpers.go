@@ -36,13 +36,10 @@ func isExitOk(err error) bool {
 	return false
 }
 
-func ensureProperPermissions(o *OsqueryInstance, paths *osqueryFilePaths) error {
-	// The extensions file should be owned by the process's UID or the file
-	// should be owned by root. Osquery will refuse to load the extension
-	// otherwise
-	fd, err := os.Stat(paths.extensionPath)
+func ensureProperPermissions(o *OsqueryInstance, path string) error {
+	fd, err := os.Stat(path)
 	if err != nil {
-		return errors.Wrap(err, "stat-ing extension path")
+		return errors.Wrap(err, "stat-ing path")
 	}
 	sys := fd.Sys().(*syscall.Stat_t)
 	isRootOwned := (sys.Uid == 0)
@@ -50,16 +47,16 @@ func ensureProperPermissions(o *OsqueryInstance, paths *osqueryFilePaths) error 
 
 	if !(isRootOwned || isProcOwned) {
 		level.Info(o.logger).Log(
-			"msg", "unsafe permissions detected on extension binary",
-			"path", paths.extensionPath)
+			"msg", "unsafe permissions detected on path",
+			"path", path)
 
-		// chown the extension binary. This could potentially be insecure, since
+		// chown the path. This could potentially be insecure, since
 		// we're basically chown-ing whatever is there to root, but a certain
 		// level of privilege is needed to place something in the launcher root
 		// directory.
-		err := os.Chown(paths.extensionPath, os.Getuid(), os.Getgid())
+		err := os.Chown(path, os.Getuid(), os.Getgid())
 		if err != nil {
-			return errors.Wrap(err, "attempting to chown extension binary")
+			return errors.Wrap(err, "attempting to chown path")
 		}
 	}
 	return nil
