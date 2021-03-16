@@ -33,10 +33,6 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.JsonType),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.XmlType),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.IniType),
-		dataflattentable.TablePlugin(client, logger, dataflattentable.PlistType),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
 		dataflattentable.TablePluginExec(client, logger,
@@ -44,6 +40,9 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
 	}
+
+	// Ever growing list of file parsers
+	tables = append(tables, dataflattentable.FileTables(client, logger)...)
 
 	// add in the platform specific ones (as denoted by build tags)
 	tables = append(tables, platformTables(client, logger, currentOsquerydBinaryPath)...)

@@ -23,6 +23,7 @@ const (
 	XmlType
 	IniType
 	KeyValueType
+	CertType
 )
 
 type Table struct {
@@ -36,6 +37,17 @@ type Table struct {
 	execArgs     []string
 
 	keyValueSeparator string
+}
+
+// FileTables is a helper to return the expected file parsers.
+func FileTables(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+	return []*table.Plugin{
+		TablePlugin(client, logger, JsonType),
+		TablePlugin(client, logger, XmlType),
+		TablePlugin(client, logger, IniType),
+		TablePlugin(client, logger, PlistType),
+		TablePlugin(client, logger, CertType),
+	}
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
@@ -60,6 +72,9 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case IniType:
 		t.dataFunc = dataflatten.IniFile
 		t.tableName = "kolide_ini"
+	case CertType:
+		t.dataFunc = flattenCertificate
+		t.tableName = "kolide_cert"
 	default:
 		panic("Unknown data source type")
 	}
