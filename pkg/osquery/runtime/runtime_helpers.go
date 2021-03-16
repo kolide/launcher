@@ -45,19 +45,22 @@ func ensureProperPermissions(o *OsqueryInstance, path string) error {
 	isRootOwned := (sys.Uid == 0)
 	isProcOwned := (sys.Uid == uint32(os.Geteuid()))
 
-	if !(isRootOwned || isProcOwned) {
-		level.Info(o.logger).Log(
-			"msg", "unsafe permissions detected on path",
-			"path", path)
+	if isRootOwned || isProcOwned {
+		return nil
+	}
 
-		// chown the path. This could potentially be insecure, since
-		// we're basically chown-ing whatever is there to root, but a certain
-		// level of privilege is needed to place something in the launcher root
-		// directory.
-		err := os.Chown(path, os.Getuid(), os.Getgid())
-		if err != nil {
-			return errors.Wrap(err, "attempting to chown path")
-		}
+	level.Info(o.logger).Log(
+		"msg", "unsafe permissions detected on path",
+		"path", path,
+	)
+
+	// chown the path. This could potentially be insecure, since
+	// we're basically chown-ing whatever is there to root, but a certain
+	// level of privilege is needed to place something in the launcher root
+	// directory.
+	err = os.Chown(path, os.Getuid(), os.Getgid())
+	if err != nil {
+		return errors.Wrap(err, "attempting to chown path")
 	}
 	return nil
 }
