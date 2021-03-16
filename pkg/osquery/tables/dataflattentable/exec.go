@@ -97,14 +97,9 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 }
 
 func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[string]string {
-	flattenOpts := []dataflatten.FlattenOpts{}
-
-	if dataQuery != "" {
-		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
-	}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithLogger(t.logger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	data, err := t.execDataFunc(execOutput, flattenOpts...)

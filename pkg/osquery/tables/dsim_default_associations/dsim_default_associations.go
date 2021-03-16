@@ -52,13 +52,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
+			dataflatten.WithLogger(t.logger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-		}
-
-		if t.logger != nil {
-			flattenOpts = append(flattenOpts,
-				dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
-			)
 		}
 
 		rows, err := dataflatten.Xml(dismResults, flattenOpts...)

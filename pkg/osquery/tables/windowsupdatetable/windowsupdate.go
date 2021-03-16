@@ -120,16 +120,9 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 }
 
 func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
-	flattenOpts := []dataflatten.FlattenOpts{}
-
-	if dataQuery != "" {
-		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
-	}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts,
-			dataflatten.WithLogger(level.NewFilter(t.logger, level.AllowInfo())),
-		)
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithLogger(t.logger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	// dataflatten won't parse the raw searchResults. As a workaround,

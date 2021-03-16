@@ -159,14 +159,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
 	var results []map[string]string
 
-	flattenOpts := []dataflatten.FlattenOpts{}
-
-	if dataQuery != "" {
-		flattenOpts = append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))
-	}
-
-	if t.logger != nil {
-		flattenOpts = append(flattenOpts, dataflatten.WithLogger(t.logger))
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithLogger(t.logger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	var systemProfilerResults []Result
@@ -198,7 +193,7 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
-	timeout := 30 * time.Second
+	timeout := 45 * time.Second
 	if detailLevel == "full" {
 		timeout = 5 * time.Minute
 	}

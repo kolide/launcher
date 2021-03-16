@@ -46,10 +46,7 @@ func main() {
 	opts := []dataflatten.FlattenOpts{
 		dataflatten.WithLogger(logger),
 		dataflatten.WithNestedPlist(),
-	}
-
-	if *flQuery != "" {
-		opts = append(opts, dataflatten.WithQuery(strings.Split(*flQuery, `/`)))
+		dataflatten.WithQuery(strings.Split(*flQuery, `/`)),
 	}
 
 	rows := []dataflatten.Row{}

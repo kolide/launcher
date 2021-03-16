@@ -61,14 +61,15 @@ import (
 //
 // It can optionally filtering and rewriting.
 type Flattener struct {
-	includeNils       bool
-	rows              []Row
-	logger            log.Logger
-	query             []string
-	queryWildcard     string
-	queryKeyDenoter   string
+	debugLogging      bool
 	expandNestedPlist bool
 	includeNestedRaw  bool
+	includeNils       bool
+	logger            log.Logger
+	query             []string
+	queryKeyDenoter   string
+	queryWildcard     string
+	rows              []Row
 }
 
 type FlattenOpts func(*Flattener)
@@ -90,8 +91,22 @@ func WithNestedPlist() FlattenOpts {
 
 // WithLogger sets the logger to use
 func WithLogger(logger log.Logger) FlattenOpts {
+	if logger == nil {
+		return func(_ *Flattener) {}
+	}
+
 	return func(fl *Flattener) {
 		fl.logger = logger
+	}
+}
+
+// WithDebugLogging enables debug logging. With debug logs,
+// dataflatten is very verbose. This can overwhelm the other launcher
+// logs. As we're not generally debugging this library, the default is
+// to not enable debug logging.
+func WithDebugLogging() FlattenOpts {
+	return func(fl *Flattener) {
+		fl.debugLogging = true
 	}
 }
 
@@ -99,7 +114,7 @@ func WithLogger(logger log.Logger) FlattenOpts {
 // re-writing arrays into maps, and for filtering. See "Query
 // Specification" for docs.
 func WithQuery(q []string) FlattenOpts {
-	if q == nil || len(q) == 0 {
+	if q == nil || len(q) == 0 || (len(q) == 1 && q[0] == "") {
 		return func(_ *Flattener) {}
 	}
 
@@ -119,6 +134,10 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 
 	for _, opt := range opts {
 		opt(fl)
+	}
+
+	if !fl.debugLogging {
+		fl.logger = level.NewFilter(fl.logger, level.AllowInfo())
 	}
 
 	if err := fl.descend([]string{}, data, 0); err != nil {
