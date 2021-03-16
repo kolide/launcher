@@ -526,8 +526,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// The extensions file should be owned by the process's UID or by root.
 	// Osquery will refuse to load the extension otherwise.
-	err = ensureProperPermissions(o, paths.extensionPath)
-	if err != nil {
+	if err := ensureProperPermissions(o, paths.extensionPath); err != nil {
 		level.Info(o.logger).Log(
 			"msg", "unable to ensure proper permissions on extension path",
 			"err", err,

@@ -58,8 +58,7 @@ func ensureProperPermissions(o *OsqueryInstance, path string) error {
 	// we're basically chown-ing whatever is there to root, but a certain
 	// level of privilege is needed to place something in the launcher root
 	// directory.
-	err = os.Chown(path, os.Getuid(), os.Getgid())
-	if err != nil {
+	if err = os.Chown(path, os.Getuid(), os.Getgid()); err != nil {
 		return errors.Wrap(err, "attempting to chown path")
 	}
 	return nil
