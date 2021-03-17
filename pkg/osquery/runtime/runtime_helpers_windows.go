@@ -60,3 +60,7 @@ func isExitOk(err error) bool {
 	}
 	return false
 }
+
+func ensureProperPermissions(o *OsqueryInstance, path string) error {
+	return nil
+}
