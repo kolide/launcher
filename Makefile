@@ -81,10 +81,10 @@ AMD64_OSES=darwin windows linux
 xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(MANUAL_CROSS_OSES), build_$(target)_$(os)))
 
 # Actual release targets. Because of the m1 cgo cross stuff, this requires explicit go paths
-rel-amd64: CROSSGOPATH = /opt/go1.16beta1.darwin-amd64/go/bin/go
+rel-amd64: CROSSGOPATH = /opt/go1.16.2.darwin-amd64/bin/go
 rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), build_$(target)_$(os)_amd64))
 
-rel-arm64: CROSSGOPATH = /opt/go1.16beta1.darwin-arm64/go/bin/go
+rel-arm64: CROSSGOPATH = /opt/go1.16.2.darwin-arm64/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
 rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
