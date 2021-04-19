@@ -8,6 +8,8 @@ package applenotarization
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -44,6 +46,14 @@ func New(
 
 var duplicateSubmitRegexp = regexp.MustCompile(`ERROR ITMS-90732: "The software asset has already been uploaded. The upload ID is ([0-9a-fA-F-]+)"`)
 
+var retryableErrorStrings = []string{
+	"Message:Unable to find requested file(s): metadata.xml",
+}
+
+const (
+	maxSubmitTries = 5
+)
+
 // Submit an file to apple's notarization service. Returns the uuid of
 // the submission
 func (n *Notarizer) Submit(ctx context.Context, filePath string, primaryBundleId string) (string, error) {
@@ -52,29 +62,61 @@ func (n *Notarizer) Submit(ctx context.Context, filePath string, primaryBundleId
 	// TODO check file extension here
 	// zip,pkg,dmg
 
-	response, err := n.runAltool(ctx, []string{
-		"--notarize-app",
-		"--primary-bundle-id", primaryBundleId,
-		"--file", filePath,
-	})
+	// Sometimes submit fails. Retry a couple times.
+	for attempt := 1; attempt <= maxSubmitTries; attempt++ {
 
-	if err != nil {
-		level.Error(logger).Log(
-			"msg", "error getting notarize-app",
-			"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
-		)
-		return "", errors.Wrap(err, "calling notarize")
-	}
+		// According to a support thread on apple, the bundle-id passed to
+		// altool's notarize is unrelated to the actual software. It is only
+		// used to for something in local storage. As such, add a nonce to
+		// ensure nothing is conflicting.
+		// https://developer.apple.com/forums/thread/677739
+		bundleId := primaryBundleId + "." + randomNonce()
 
-	// duplicate submissions
-	if len(response.ProductErrors) == 1 {
-		matches := duplicateSubmitRegexp.FindStringSubmatch(response.ProductErrors[0].Message)
-		if len(matches) == 2 {
-			return matches[1], nil
+		response, err := n.runAltool(ctx, []string{
+			"--notarize-app",
+			"--primary-bundle-id", bundleId,
+			"--file", filePath,
+		})
+
+		if err != nil {
+			level.Error(logger).Log(
+				"msg", "error getting notarize-app. Will retry",
+				"attempt", attempt,
+				"err", err,
+				"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
+			)
+			continue
+		}
+
+		// retryable errors
+		if len(response.ProductErrors) > 0 {
+			for _, e := range retryableErrorStrings {
+				if strings.Contains(response.ProductErrors[0].Message, e) {
+					level.Error(logger).Log(
+						"msg", "error submitting for notarization. Will retry",
+						"attempt", attempt,
+						"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
+					)
+					continue
+				}
+			}
+		}
+
+		// duplicate submission err, treat as success.
+		if len(response.ProductErrors) == 1 {
+			matches := duplicateSubmitRegexp.FindStringSubmatch(response.ProductErrors[0].Message)
+			if len(matches) == 2 {
+				return matches[1], nil
+			}
+		}
+
+		if err == nil {
+			return response.NotarizationUpload.RequestUUID, nil
 		}
 	}
 
-	return response.NotarizationUpload.RequestUUID, nil
+	// Falling out of the for loop means we never succeeded
+	return "", errors.New("Did not successfully submit for notarization")
 }
 
 // Check the notarization status of a uuid
@@ -154,4 +196,12 @@ func (n *Notarizer) runAltool(ctx context.Context, cmdArgs []string) (*notarizat
 	}
 
 	return response, cmdErr
+}
+
+// randomNonce returns a short random hex string.
+func randomNonce() string {
+	buff := make([]byte, 3)
+	rand.Read(buff)
+	str := hex.EncodeToString(buff)
+	return str
 }
