@@ -118,8 +118,9 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 		// success!
 		return stdout.Bytes(), nil
 	}
-	// Shouldn't be possible to get here.
-	return nil, errors.New("Impossible Error: No possible exec")
+
+	// None of the possible execs were found
+	return nil, errors.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
 }
 
 func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[string]string {
