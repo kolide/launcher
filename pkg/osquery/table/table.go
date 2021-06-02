@@ -3,6 +3,7 @@ package table
 import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
@@ -43,6 +44,8 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
+		zfs.ZfsPropertiesPlugin(client, logger),
+		zfs.ZpoolPropertiesPlugin(client, logger),
 	}
 
 	// add in the platform specific ones (as denoted by build tags)
