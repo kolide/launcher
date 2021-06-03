@@ -34,7 +34,13 @@ func parseStatus(rawdata []byte) (map[string]string, error) {
 		}
 
 		kv := strings.SplitN(line, ": ", 2)
-		data[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+
+		// blank lines, or other unexpected input can just be skipped.
+		if len(kv) < 2 {
+			continue
+		}
+
+		data[strings.ReplaceAll(strings.TrimSpace(kv[0]), " ", "_")] = strings.TrimSpace(kv[1])
 	}
 
 	return data, nil
