@@ -10,6 +10,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseStatusErrors(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		input string
+	}{
+		{
+			input: "",
+		},
+		{
+			input: "\n\n\n\n",
+		},
+		{
+			input: "type:    LUKS2",
+		},
+		{
+			input: "Hello world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			data, err := parseStatus([]byte(tt.input))
+			assert.Error(t, err, "parseStatus")
+			assert.Nil(t, data, "data is nil")
+
+		})
+	}
+
+}
 func TestParseStatus(t *testing.T) {
 	t.Parallel()
 

@@ -18,6 +18,10 @@ import (
 func parseStatus(rawdata []byte) (map[string]string, error) {
 	var data map[string]string
 
+	if len(rawdata) == 0 {
+		return nil, errors.New("No data")
+	}
+
 	scanner := bufio.NewScanner(bytes.NewReader(rawdata))
 	firstLine := true
 	for scanner.Scan() {
@@ -46,12 +50,16 @@ func parseStatus(rawdata []byte) (map[string]string, error) {
 	return data, nil
 }
 
-// Device sdc3 not found
+// regexp for the first line of the status output.
 var firstLineRegexp = regexp.MustCompile(`^(?:Device (.*) (not found))|(?:(.*?) is ([a-z]+)(?:\.| and is (in use)))`)
 
+// parseFirstLine parses the first line of the status output. This
+// appears to be a free form string indicating several pieces of
+// information. It is parsed with a single regexp. (See tests for
+// examples)
 func parseFirstLine(line string) (map[string]string, error) {
 	if line == "" {
-		return nil, nil
+		return nil, errors.Errorf("Invalid first line")
 	}
 
 	m := firstLineRegexp.FindAllStringSubmatch(line, -1)
