@@ -3,13 +3,12 @@
 package filevault
 
 import (
-	"bytes"
 	"context"
-	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -36,29 +35,20 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	var results []map[string]string
-
-	// Read the system's fdesetup configuration
-	var stdout bytes.Buffer
-
-	cmd := exec.CommandContext(ctx, fdesetupPath, "status")
-	cmd.Stdout = &stdout
-
-	if err := cmd.Run(); err != nil {
+	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{fdesetupPath}, []string{"status"})
+	if err != nil {
+		level.Info(t.logger).Log("msg", "fdesetup failed", "err", err)
 		return nil, errors.Wrap(err, "calling fdesetup")
 	}
 
-	output := string(stdout.Bytes())
-	status := strings.TrimSuffix(output, "\n")
+	status := strings.TrimSuffix(string(output), "\n")
 
-	result := map[string]string{
-		"status": status,
+	// It's a bit verbose to instatiate this directly, but it
+	// seems better than a needless append.
+	results := []map[string]string{
+		map[string]string{
+			"status": status,
+		},
 	}
-
-	results = append(results, result)
-
 	return results, nil
 }
