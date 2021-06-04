@@ -34,6 +34,7 @@ type Table struct {
 
 	execDataFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	execArgs     []string
+	binDirs      []string
 
 	keyValueSeparator string
 }
