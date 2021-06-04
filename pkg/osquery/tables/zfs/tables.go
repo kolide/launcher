@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -56,13 +57,13 @@ func ZpoolPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Lo
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, t.cmd, t.args)
+	output, err := tablehelpers.Exec(ctx, t.logger, 15, []string{t.cmd}, t.args)
 	if err != nil {
+		level.Info(t.logger).Log("msg", "failed to get zfs info", "err", err)
 		return nil, err
 	}
 
 	return parseColumns(output)
-
 }
 
 // parseColumns parses the zfs property output. It conveniently comes
