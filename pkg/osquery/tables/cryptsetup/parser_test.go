@@ -115,9 +115,15 @@ func TestParseStatus(t *testing.T) {
 
 			assert.Equal(t, tt.status, data["status"], "status")
 			assert.Equal(t, strconv.FormatBool(tt.mounted), data["mounted"], "mounted")
-			assert.Equal(t, tt.ctype, data["type"], "type")
-			assert.Equal(t, tt.keysize, data["keysize"], "keysize")
-			assert.Equal(t, tt.key_location, data["key_location"], "key_location")
+
+			// These values aren't populated in the map,
+			// so only check them if the test case lists
+			// them
+			if tt.ctype != "" {
+				assert.Equal(t, tt.ctype, data["type"], "type")
+				assert.Equal(t, tt.keysize, data["keysize"], "keysize")
+				assert.Equal(t, tt.key_location, data["key_location"], "key_location")
+			}
 		})
 	}
 }
