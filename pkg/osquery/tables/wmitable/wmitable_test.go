@@ -24,7 +24,7 @@ func TestQueries(t *testing.T) {
 		namespace   string
 		whereClause string
 		minRows     int
-		keyValues   []string
+		keyNames    []string
 		noData      bool
 		err         bool
 	}{
