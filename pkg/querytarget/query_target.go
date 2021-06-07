@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gogo/protobuf/proto"
@@ -12,6 +11,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,11 +19,11 @@ import (
 
 type QueryTargetUpdater struct {
 	logger       log.Logger
-	db           *bolt.DB
+	db           *bbolt.DB
 	targetClient qt.QueryTargetClient
 }
 
-func NewQueryTargeter(logger log.Logger, db *bolt.DB, grpcConn *grpc.ClientConn) QueryTargetUpdater {
+func NewQueryTargeter(logger log.Logger, db *bbolt.DB, grpcConn *grpc.ClientConn) QueryTargetUpdater {
 	return QueryTargetUpdater{
 		logger:       logger,
 		db:           db,
@@ -47,7 +47,7 @@ func (qtu *QueryTargetUpdater) updateTargetMemberships(ctx context.Context) erro
 		return errors.Wrap(err, "marshaling targets to bytes")
 	}
 
-	if err := qtu.db.Update(func(tx *bolt.Tx) error {
+	if err := qtu.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osquery.ServerProvidedDataBucket))
 		err := b.Put([]byte(table.TargetMembershipKey), targetRespBytes)
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -22,11 +21,12 @@ import (
 	"github.com/kolide/osquery-go/plugin/distributed"
 	osquerylogger "github.com/kolide/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled
 // here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, db *bolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
+func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
 	run *actor.Actor,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner

@@ -3,19 +3,19 @@ package table
 import (
 	"context"
 
-	"github.com/boltdb/bolt"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/osquery-go/plugin/table"
+	"go.etcd.io/bbolt"
 )
 
-func LauncherIdentifierTable(db *bolt.DB) *table.Plugin {
+func LauncherIdentifierTable(db *bbolt.DB) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("identifier"),
 	}
 	return table.NewPlugin("kolide_launcher_identifier", columns, generateLauncherIdentifier(db))
 }
 
-func generateLauncherIdentifier(db *bolt.DB) table.GenerateFunc {
+func generateLauncherIdentifier(db *bbolt.DB) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		identifier, err := osquery.IdentifierFromDB(db)
 		if err != nil {

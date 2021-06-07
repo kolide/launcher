@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fs"
@@ -26,6 +25,7 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -80,8 +80,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
-	boltOptions := &bolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
 		return errors.Wrap(err, "open launcher db")
 	}
