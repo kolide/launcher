@@ -49,7 +49,7 @@ func TestQueries(t *testing.T) {
 		{
 			name:       "wmi properties with an array",
 			class:      "Win32_SystemEnclosure",
-			properties: "ChassisTypes",
+			properties: []string{"ChassisTypes"},
 			minRows:    1,
 			keyValues:  []string{"0"}, // arrays come back with the position as the key
 		},
