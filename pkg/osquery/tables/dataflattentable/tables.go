@@ -39,6 +39,16 @@ type Table struct {
 	keyValueSeparator string
 }
 
+// AllTablePlugins is a helper to return all the expected flattening tables.
+func AllTablePlugins(client *osquery.ExtensionManagerClient, logger log.Logger) []*table.Plugin {
+	return []*table.Plugin{
+		TablePlugin(client, logger, JsonType),
+		TablePlugin(client, logger, XmlType),
+		TablePlugin(client, logger, IniType),
+		TablePlugin(client, logger, PlistType),
+	}
+}
+
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, dataSourceType DataSourceType) *table.Plugin {
 
 	columns := Columns(table.TextColumn("path"))

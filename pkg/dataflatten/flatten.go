@@ -37,6 +37,7 @@ package dataflatten
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -479,6 +480,8 @@ func stringify(data interface{}) (string, error) {
 		return strconv.FormatInt(v.Unix(), 10), nil
 	case howett.UID:
 		return strconv.FormatUint(uint64(v), 10), nil
+	case fmt.Stringer:
+		return v.String(), nil
 	default:
 		// spew.Dump(data)
 		return "", errors.Errorf("unknown type on %v", data)
