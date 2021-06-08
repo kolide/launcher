@@ -24,6 +24,7 @@ func TestQueries(t *testing.T) {
 		namespace   string
 		whereClause string
 		minRows     int
+		keyNames    []string
 		noData      bool
 		err         bool
 	}{
@@ -45,7 +46,13 @@ func TestQueries(t *testing.T) {
 			properties: []string{"name", "version"},
 			minRows:    1,
 		},
-
+		{
+			name:       "wmi properties with an array",
+			class:      "Win32_SystemEnclosure",
+			properties: []string{"ChassisTypes"},
+			minRows:    1,
+			keyNames:   []string{"0"}, // arrays come back with the position as the key
+		},
 		{
 			name:       "process query",
 			class:      "WIN32_process",
@@ -137,6 +144,10 @@ func TestQueries(t *testing.T) {
 				for _, columnName := range []string{"fullkey", "parent", "key", "value"} {
 					require.Contains(t, row, columnName, "%s column", columnName)
 					assert.NotEmpty(t, tt.class, row[columnName], "%s column not empty", columnName)
+				}
+
+				if tt.keyNames != nil {
+					assert.Contains(t, tt.keyNames, row["key"], "key is in keyNames")
 				}
 			}
 		})
