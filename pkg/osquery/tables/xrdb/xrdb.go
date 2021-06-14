@@ -25,11 +25,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-var potentialPaths = []string{"/usr/bin/xrdb"}
+var xrdbPath = "/usr/bin/xrdb"
 
-const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
+const allowedUsernameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
+const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:"
 
-type execer func(ctx context.Context, username string, buf *bytes.Buffer) error
+type execer func(ctx context.Context, display, username string, buf *bytes.Buffer) error
 
 type XRDBSettings struct {
 	client   *osquery.ExtensionManagerClient
@@ -41,6 +42,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
+		table.TextColumn("display"),
 		table.TextColumn("username"),
 	}
 
@@ -56,33 +58,39 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedCharacters))
+	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedUsernameCharacters))
 	if len(users) < 1 {
-		return results, errors.New("kolide_gsettings requires at least one username to be specified")
+		return results, errors.New("kolide_xrdb requires at least one username to be specified")
 	}
+
+	displays := tablehelpers.GetConstraints(queryContext, "display",
+		tablehelpers.WithAllowedCharacters(allowedDisplayCharacters),
+		tablehelpers.WithDefaults(":0"),
+	)
 	for _, username := range users {
-		var output bytes.Buffer
+		for _, display := range displays {
+			var output bytes.Buffer
 
-		err := t.getBytes(ctx, username, &output)
-		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "error getting bytes for user",
-				"username", username,
-				"err", err,
-			)
-			continue
+			err := t.getBytes(ctx, display, username, &output)
+			if err != nil {
+				level.Info(t.logger).Log(
+					"msg", "error getting bytes for user",
+					"username", username,
+					"err", err,
+				)
+				continue
+			}
+			user_results := t.parse(display, username, &output)
+			results = append(results, user_results...)
 		}
-
-		user_results := t.parse(username, &output)
-		results = append(results, user_results...)
 	}
 
 	return results, nil
 }
 
-// execXRDB writes the output of running 'gsettings' command into the
+// execXRDB writes the output of running 'xrdb' command into the
 // supplied bytes buffer
-func execXRDB(ctx context.Context, username string, buf *bytes.Buffer) error {
+func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffer) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -91,8 +99,7 @@ func execXRDB(ctx context.Context, username string, buf *bytes.Buffer) error {
 		return errors.Wrapf(err, "finding user by username '%s'", username)
 	}
 
-	// TODO: maybe use the helpers to try multiple potential paths
-	cmd := exec.CommandContext(ctx, potentialPaths[0], "-display", ":0", "-global", "-query")
+	cmd := exec.CommandContext(ctx, xrdbPath, "-display", displayNum, "-global", "-query")
 
 	// set the HOME cmd so that xrdb is exec'd properly as the new user.
 	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
@@ -125,14 +132,10 @@ func execXRDB(ctx context.Context, username string, buf *bytes.Buffer) error {
 	}
 	defer os.RemoveAll(dir)
 
-	// if we don't chmod the dir, we get errors like:
-	// fork/exec /usr/bin/gsettings: permission denied'
 	if err := os.Chmod(dir, 0755); err != nil {
 		return errors.Wrap(err, "chmod")
 	}
-
 	cmd.Dir = dir
-
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	cmd.Stdout = buf
@@ -144,7 +147,7 @@ func execXRDB(ctx context.Context, username string, buf *bytes.Buffer) error {
 	return nil
 }
 
-func (t *XRDBSettings) parse(username string, input io.Reader) []map[string]string {
+func (t *XRDBSettings) parse(display, username string, input io.Reader) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)
@@ -166,6 +169,7 @@ func (t *XRDBSettings) parse(username string, input io.Reader) []map[string]stri
 		row := make(map[string]string)
 		row["key"] = parts[0]
 		row["value"] = strings.TrimSpace(parts[1])
+		row["display"] = display
 		row["username"] = username
 
 		results = append(results, row)
