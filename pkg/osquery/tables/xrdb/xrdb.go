@@ -28,7 +28,7 @@ import (
 var xrdbPath = "/usr/bin/xrdb"
 
 const allowedUsernameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
-const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:"
+const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:."
 
 type execer func(ctx context.Context, display, username string, buf *bytes.Buffer) error
 
