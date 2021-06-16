@@ -64,7 +64,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, ioC := range tablehelpers.GetConstraints(queryContext, "c", gcOpts...) {
-		ioregArgs := []string{}
+		// We always need "-a", it's the "archive" output
+		ioregArgs := []string{"-a"}
 
 		if ioC != "" {
 			ioregArgs = append(ioregArgs, "-c", ioC)
