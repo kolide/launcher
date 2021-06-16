@@ -171,7 +171,7 @@ notarize-check-%:
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
 codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
-codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2020.p12
+codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2021-04.p12
 codesign-windows-%:
 	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
 	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
