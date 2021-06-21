@@ -13,19 +13,62 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
 	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
+	"github.com/kolide/launcher/pkg/osquery/tables/osquery_exec_table"
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
-	"github.com/kolide/launcher/pkg/osquery/tables/screenlock"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const (
+	keychainAclsQuery  = "select * from keychain_acls"
+	keychainItemsQuery = "select * from keychain_items"
+	screenlockQuery    = "select enabled, grace_period from screenlock"
+)
+
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	munki := munki.New()
 
+	// This table uses undocumented APIs, There is some discussion at the
+	// PR adding the table. See
+	// https://github.com/osquery/osquery/pull/6243
+	screenlockTable := osquery_exec_table.TablePlugin(
+		client, logger, "kolide_screenlock",
+		currentOsquerydBinaryPath, screenlockQuery,
+		[]table.ColumnDefinition{
+			table.IntegerColumn("enabled"),
+			table.IntegerColumn("grace_period"),
+		})
+
+	keychainAclsTable := osquery_exec_table.TablePlugin(
+		client, logger, "kolide_keychain_acls",
+		currentOsquerydBinaryPath, keychainItemsQuery,
+		[]table.ColumnDefinition{
+			table.TextColumn("keychain_path"),
+			table.TextColumn("authorizations"),
+			table.TextColumn("path"),
+			table.TextColumn("description"),
+			table.TextColumn("label"),
+		})
+
+	keychainItemsTable := osquery_exec_table.TablePlugin(
+		client, logger, "kolide_keychain_items",
+		currentOsquerydBinaryPath, keychainAclsQuery,
+		[]table.ColumnDefinition{
+			table.TextColumn("label"),
+			table.TextColumn("description"),
+			table.TextColumn("comment"),
+			table.TextColumn("created"),
+			table.TextColumn("modified"),
+			table.TextColumn("type"),
+			table.TextColumn("path"),
+		})
+
 	return []*table.Plugin{
+		keychainAclsTable,
+		keychainItemsTable,
 		Airdrop(client),
 		appicons.AppIcons(),
 		ChromeLoginKeychainInfo(client, logger),
@@ -54,7 +97,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, []string{"/usr/bin/tmutil", "destinationinfo", "-X"}),
-		screenlock.TablePlugin(client, logger, currentOsquerydBinaryPath),
+		screenlockTable,
 		pwpolicy.TablePlugin(client, logger),
 		systemprofiler.TablePlugin(client, logger),
 		munki.ManagedInstalls(client, logger),
