@@ -1,3 +1,5 @@
+// build +darwin
+
 package tablehelpers
 
 import (
@@ -15,8 +17,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ExecOsquery runs osquery under launchctl, in a user context.
-func ExecOsquery(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
+// ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
+func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -40,7 +42,7 @@ func ExecOsquery(ctx context.Context, logger log.Logger, timeoutSeconds int, use
 		query,
 	)
 
-	dir, err := ioutil.TempDir("", "osq-runas")
+	dir, err := ioutil.TempDir("", "osq-launchctl")
 	if err != nil {
 		return nil, errors.Wrap(err, "mktemp")
 	}
@@ -63,8 +65,8 @@ func ExecOsquery(ctx context.Context, logger log.Logger, timeoutSeconds int, use
 
 }
 
-func ExecOsqueryParsed(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
-	outBytes, err := ExecOsquery(ctx, logger, timeoutSeconds, username, osqueryPath, query)
+func ExecOsqueryLaunchctlParsed(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
+	outBytes, err := ExecOsqueryLaunchctl(ctx, logger, timeoutSeconds, username, osqueryPath, query)
 	if err != nil {
 		return nil, err
 	}

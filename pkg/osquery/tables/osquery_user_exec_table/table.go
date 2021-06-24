@@ -14,7 +14,7 @@
 // configured these settings, _and_ the user is not logged in, no data
 // is returned.
 
-package osquery_exec_table
+package osquery_user_exec_table
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, user := range users {
-		osqueryResults, err := tablehelpers.ExecOsqueryParsed(ctx, t.logger, 5, user, t.osqueryd, t.query)
+		osqueryResults, err := tablehelpers.ExecOsqueryLaunchctlParsed(ctx, t.logger, 5, user, t.osqueryd, t.query)
 		if err != nil {
 			continue
 		}

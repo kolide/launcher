@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
 	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
-	"github.com/kolide/launcher/pkg/osquery/tables/osquery_exec_table"
+	"github.com/kolide/launcher/pkg/osquery/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
@@ -34,7 +34,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 	// This table uses undocumented APIs, There is some discussion at the
 	// PR adding the table. See
 	// https://github.com/osquery/osquery/pull/6243
-	screenlockTable := osquery_exec_table.TablePlugin(
+	screenlockTable := osquery_user_exec_table.TablePlugin(
 		client, logger, "kolide_screenlock",
 		currentOsquerydBinaryPath, screenlockQuery,
 		[]table.ColumnDefinition{
@@ -42,7 +42,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			table.IntegerColumn("grace_period"),
 		})
 
-	keychainAclsTable := osquery_exec_table.TablePlugin(
+	keychainAclsTable := osquery_user_exec_table.TablePlugin(
 		client, logger, "kolide_keychain_acls",
 		currentOsquerydBinaryPath, keychainItemsQuery,
 		[]table.ColumnDefinition{
@@ -53,7 +53,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			table.TextColumn("label"),
 		})
 
-	keychainItemsTable := osquery_exec_table.TablePlugin(
+	keychainItemsTable := osquery_user_exec_table.TablePlugin(
 		client, logger, "kolide_keychain_items",
 		currentOsquerydBinaryPath, keychainAclsQuery,
 		[]table.ColumnDefinition{
