@@ -232,10 +232,8 @@ lint-misspell: deps-go
 	  | grep -v assets.go$ \
 	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
 
-# go vet should not vet each pkg, since some are platform specific and
-# they'll explode cross platform.
 lint-go-vet:
-	go vet ./cmd/...
+	go vet ./cmd/... ./pkg/...
 
 lint-go-nakedret: deps-go
 	nakedret ./pkg/... ./cmd/...
