@@ -1,4 +1,4 @@
-// build +linux
+// +build linux
 
 package fscrypt_info
 
