@@ -125,8 +125,8 @@ func New(opts ...Option) (*Builder, error) {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
 	// Setup zig as cross compiler
+	// (This is mostly to support fscrypt on linux)
 	if b.os != runtime.GOOS {
-		// This is mostly to support fscrypt on linux, but we can aim for consistency
 		cwd, err := os.Getwd()
 		if err != nil {
 			return nil, errors.Wrap(err, "getting cwd")
