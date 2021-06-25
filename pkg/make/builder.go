@@ -153,8 +153,11 @@ func New(opts ...Option) (*Builder, error) {
 }
 
 func zigTarget(goos, goarch string) string {
-	if goarch == "amd64" {
+	switch goarch {
+	case "amd64":
 		goarch = "x86_64"
+	case "arm64":
+		goarch = "aarch64"
 	}
 
 	if goos == "darwin" {
