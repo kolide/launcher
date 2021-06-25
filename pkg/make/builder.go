@@ -124,9 +124,8 @@ func New(opts ...Option) (*Builder, error) {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOOS=%s", b.os))
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
-	// Setup zig as our compiler for linux. We want to stick with
-	// the native mac one, for the core foundation stuff
-	if b.os == "linux" {
+	// Setup zig as cross compiler
+	if b.os != runtime.GOOS {
 		// This is mostly to support fscrypt on linux, but we can aim for consistency
 		cwd, err := os.Getwd()
 		if err != nil {
