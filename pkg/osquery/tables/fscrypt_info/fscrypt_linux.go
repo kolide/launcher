@@ -38,23 +38,24 @@ func GetInfo(dirpath string) (*Info, error) {
 	pol, err := actions.GetPolicyFromPath(fsctx, dirpath)
 	switch err.(type) {
 	case nil:
-		return &Info{
-			Path:           dirpath,
-			Locked:         policyUnlockedStatus(pol),
-			Encrypted:      true,
-			Mountpoint:     pol.Context.Mount.Path,
-			FilesystemType: pol.Context.Mount.FilesystemType,
-			Device:         pol.Context.Mount.Device,
-			ContentsAlgo:   pol.Options().Contents.String(),
-			FilenameAlgo:   pol.Options().Filenames.String(),
-		}, nil
+		break
 	case *metadata.ErrNotEncrypted:
 		return &Info{Path: dirpath, Encrypted: false}, nil
 	default:
 		return nil, errors.Wrapf(err, "get policy for %s", dirpath)
 	}
 
-	return nil, nil
+	return &Info{
+		Path:           dirpath,
+		Locked:         policyUnlockedStatus(pol),
+		Encrypted:      true,
+		Mountpoint:     pol.Context.Mount.Path,
+		FilesystemType: pol.Context.Mount.FilesystemType,
+		Device:         pol.Context.Mount.Device,
+		ContentsAlgo:   pol.Options().Contents.String(),
+		FilenameAlgo:   pol.Options().Filenames.String(),
+	}, nil
+
 }
 
 // policyUnlockedStatus is from
