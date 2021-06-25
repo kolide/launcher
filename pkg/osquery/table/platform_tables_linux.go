@@ -6,6 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptsetup"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
 	"github.com/kolide/launcher/pkg/osquery/tables/xrdb"
 	osquery "github.com/kolide/osquery-go"
@@ -18,6 +19,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		gsettings.Settings(client, logger),
 		gsettings.Metadata(client, logger),
 		xrdb.TablePlugin(client, logger),
+		fscrypt_info.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
 			[]string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
