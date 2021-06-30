@@ -250,7 +250,7 @@ fmt-fail/%:
 ## Docker Tooling
 ##
 
-CONTAINER_OSES = ubuntu16 ubuntu18 centos6 centos7 distroless
+CONTAINER_OSES = ubuntu16 ubuntu18 ubuntu20 centos6 centos7 distroless
 
 .PHONY: containers
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
