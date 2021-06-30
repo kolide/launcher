@@ -4,6 +4,7 @@ package filevault
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -38,6 +39,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{fdesetupPath}, []string{"status"})
 	if err != nil {
 		level.Info(t.logger).Log("msg", "fdesetup failed", "err", err)
+
+		// Don't error out if the binary isn't found
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		}
 		return nil, errors.Wrap(err, "calling fdesetup")
 	}
 

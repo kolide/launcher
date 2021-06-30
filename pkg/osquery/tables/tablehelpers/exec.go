@@ -53,5 +53,5 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 
 	}
 	// Getting here means no binary was found
-	return nil, errors.Errorf("No binary found is specified paths: %v", possibleBins)
+	return nil, errors.Wrapf(os.ErrNotExist, "No binary found is specified paths: %v", possibleBins)
 }
