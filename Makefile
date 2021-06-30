@@ -256,17 +256,18 @@ CONTAINER_OSES = ubuntu16 ubuntu18 centos6 centos7 distroless
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
 containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerfakepush-$(c))
 
+build-docker: sha = $(shell git describe --always --abbrev=12)
 build-docker:
-	docker build -t launcher-build  .
+	docker build -t launcher-build --build-arg gitver=$(sha) .
 
 build-dockerfake:
-	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
+	docker build -t launcher-fakedata-build --build-arg gitver=v0.11.21 --build-arg FAKE=-fakedata .
 
-dockerfake-%:  #build-dockerfake
+dockerfake-%:  build-dockerfake
 	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
 
-docker-%: #build-docker
+docker-%: build-docker
 	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
 
