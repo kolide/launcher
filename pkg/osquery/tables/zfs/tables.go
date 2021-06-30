@@ -62,6 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	output, err := tablehelpers.Exec(ctx, t.logger, 15, []string{t.cmd}, t.args)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "failed to get zfs info", "err", err)
+
 		// Don't error out if the binary isn't found
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
