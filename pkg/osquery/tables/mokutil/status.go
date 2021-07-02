@@ -3,6 +3,7 @@ package mokutil
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -39,22 +40,27 @@ func StatusTablePlugin(_client *osquery.ExtensionManagerClient, logger log.Logge
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	row := map[string]string{"secureboot": "unknown"}
+
 	output, err := tablehelpers.Exec(ctx, t.logger, 2, mokutilLocations, []string{"--sb-state"})
 	if err != nil {
 		level.Info(t.logger).Log("msg", "mokutil failed", "err", err)
-		row := map[string]string{"_error": err.Error()}
+		row["_error"] = err.Error()
 		return []map[string]string{row}, nil
 	}
 
-	status := "unknown"
-
 	switch {
 	case bytes.HasPrefix(output, enabledBytes):
-		status = "enabled"
+		row["secureboot"] = "enabled"
 	case bytes.HasPrefix(output, disabledBytes):
-		status = "disabled"
+		row["secureboot"] = "disabled"
+	default:
+		level.Info(t.logger).Log(
+			"msg", "Can't parse mokutil output",
+			output, string(output),
+		)
+		row["_error"] = fmt.Sprintf("Can't parse %s", string(output))
 	}
 
-	row := map[string]string{"secureboot": status}
 	return []map[string]string{row}, nil
 }
