@@ -8,7 +8,7 @@
 // https://github.com/rhboot/efivar/
 // https://github.com/rhboot/efivar/blob/master/src/guids.txt
 // https://www.kernel.org/doc/Documentation/ABI/stable/sysfs-firmware-efi-vars
-package main
+package efi
 
 import (
 	"encoding/binary"
@@ -39,15 +39,6 @@ const (
 	EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS            = 0x00000020
 	EFI_VARIABLE_APPEND_WRITE                                     = 0x00000040
 	EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS                    = 0x00000080
-)
-
-// How do we handle this content?
-type contentType int
-
-const (
-	UnknownContentType contentType = iota
-	BoolContentType
-	UTF16ContentType
 )
 
 // ReadVar reads a given uuid, name pair from the efivars filesystem
