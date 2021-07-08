@@ -61,7 +61,7 @@ func (ev *EfiVar) ReadRaw() error {
 
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Errorf("opening %s: %w", filename, err)
+		return fmt.Errorf("opening %s: %w", filename, err)
 	}
 	defer f.Close()
 
