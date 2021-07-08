@@ -123,6 +123,26 @@ func New(opts ...Option) (*Builder, error) {
 	cmdEnv = append(cmdEnv, "GO111MODULE=on")
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOOS=%s", b.os))
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
+
+	// Setup zig as cross compiler
+	// (This is mostly to support fscrypt on linux)
+	if b.os != runtime.GOOS {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, errors.Wrap(err, "getting cwd")
+		}
+
+		cmdEnv = append(
+			cmdEnv,
+			"CGO_ENABLED=1",
+			fmt.Sprintf("ZIGTARGET=%s", zigTarget(b.os, b.arch)),
+			fmt.Sprintf("CC=%s", filepath.Join(cwd, "tools", "zcc")),
+			fmt.Sprintf("CXX=%s", filepath.Join(cwd, "tools", "zxx")),
+		)
+	}
+
+	// I don't remember remember why we do this, but it might
+	// break linux, as we need CGO for fscrypt
 	if b.static {
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=0")
 	}
@@ -130,6 +150,21 @@ func New(opts ...Option) (*Builder, error) {
 	b.cmdEnv = cmdEnv
 
 	return &b, nil
+}
+
+func zigTarget(goos, goarch string) string {
+	switch goarch {
+	case "amd64":
+		goarch = "x86_64"
+	case "arm64":
+		goarch = "aarch64"
+	}
+
+	if goos == "darwin" {
+		goos = "macos"
+	}
+
+	return fmt.Sprintf("%s-%s", goarch, goos)
 }
 
 // PlatformBinaryName is a helper to return the platform specific output path.
