@@ -7,13 +7,16 @@ package table
 import "C"
 import (
 	"fmt"
-	"reflect"
 	"unsafe"
 )
 
 // Functions with "Create" or "Copy" in the name return references that need to
 // be CFReleased. See
 // https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
+
+func SephTest(key, domain, username string) interface{} {
+	return copyPreferenceValue(key, domain, username)
+}
 
 func copyPreferenceValue(key, domain, username string) interface{} {
 	keyCFString := cFStringRef(key)
@@ -61,12 +64,7 @@ func goString(ref C.CFStringRef) string {
 		bytes := make([]byte, usedBufLen)
 		buffer := (*C.UInt8)(unsafe.Pointer(&bytes[0]))
 		if C.CFStringGetBytes(ref, cfRange, enc, 0, C.false, buffer, usedBufLen, nil) > 0 {
-			header := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
-			sh := &reflect.StringHeader{
-				Data: header.Data,
-				Len:  header.Len,
-			}
-			return *(*string)(unsafe.Pointer(sh))
+			return *(*string)(unsafe.Pointer(&bytes))
 		}
 	}
 
