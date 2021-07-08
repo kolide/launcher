@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -454,9 +455,9 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 		PidPath: filepath.Join(p.rootDir, "launcher.pid"),
 	}
 
-	logrotateTemplate, err := assets.ReadFile("logrotate.conf")
+	logrotateTemplate, err := assets.ReadFile("assets/logrotate.conf")
 	if err != nil {
-		return errors.Wrapf(err, "failed to get template named %s", "internal/assets/logrotate.conf")
+		return errors.Wrapf(err, "failed to get template named %s", "assets/logrotate.conf")
 	}
 
 	tmpl, err := template.New("logrotate").Parse(string(logrotateTemplate))
@@ -599,7 +600,7 @@ func (p *PackageOptions) setupPreinst(ctx context.Context) error {
 		return nil
 	}
 
-	preinstallContent, err := assets.ReadFile("preinstall-darwin.sh")
+	preinstallContent, err := assets.ReadFile("assets/preinstall-darwin.sh")
 	if err != nil {
 		return errors.Wrap(err, "getting template for preinstall")
 	}
@@ -633,7 +634,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 		return nil
 	}
 
-	postinstTemplate, err := assets.ReadFile(postinstTemplateName)
+	postinstTemplate, err := assets.ReadFile(path.Join("assets", postinstTemplateName))
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get template named %s", postinstTemplateName)
 	}
