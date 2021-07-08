@@ -14,10 +14,6 @@ import (
 // be CFReleased. See
 // https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html#//apple_ref/doc/uid/20001148-103029
 
-func SephTest(key, domain, username string) interface{} {
-	return copyPreferenceValue(key, domain, username)
-}
-
 func copyPreferenceValue(key, domain, username string) interface{} {
 	keyCFString := cFStringRef(key)
 	defer C.CFRelease((C.CFTypeRef)(keyCFString))
