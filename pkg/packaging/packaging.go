@@ -599,7 +599,7 @@ func (p *PackageOptions) setupPreinst(ctx context.Context) error {
 		return nil
 	}
 
-	preinstallContent, err := internal.Asset("internal/assets/preinstall-darwin.sh")
+	preinstallContent, err := assets.ReadFile("preinstall-darwin.sh")
 	if err != nil {
 		return errors.Wrap(err, "getting template for preinstall")
 	}
