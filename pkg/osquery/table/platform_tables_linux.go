@@ -8,6 +8,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
+	"github.com/kolide/launcher/pkg/osquery/tables/secureboot"
 	"github.com/kolide/launcher/pkg/osquery/tables/xrdb"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -18,6 +19,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		cryptsetup.TablePlugin(client, logger),
 		gsettings.Settings(client, logger),
 		gsettings.Metadata(client, logger),
+		secureboot.TablePlugin(client, logger),
 		xrdb.TablePlugin(client, logger),
 		fscrypt_info.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
