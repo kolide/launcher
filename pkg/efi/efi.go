@@ -71,7 +71,7 @@ func (ev *EfiVar) ReadRaw() error {
 	}
 
 	if err := binary.Read(f, binary.LittleEndian, &ev.Attributes); err != nil {
-		return fmt.Errorf("reading attrinbutes from %s: %w", filename, err)
+		return fmt.Errorf("reading attributes from %s: %w", filename, err)
 	}
 
 	// -4 is for the attribute size
