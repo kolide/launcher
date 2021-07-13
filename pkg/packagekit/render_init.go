@@ -2,23 +2,21 @@ package packagekit
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"strings"
 	"text/template"
 
-	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
+//go:embed assets/init.sh
+var initdTemplate []byte
+
 func RenderInit(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
 	_, span := trace.StartSpan(ctx, "packagekit.RenderInit")
 	defer span.End()
-
-	initdTemplate, err := internal.Asset("internal/assets/init.sh")
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get template named internal/assets/init.sh")
-	}
 
 	var data = struct {
 		Common InitOptions

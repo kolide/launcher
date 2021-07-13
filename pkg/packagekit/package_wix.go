@@ -3,6 +3,7 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"io"
 	"os"
@@ -12,13 +13,28 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
-	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
-//go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
+// We need to use variables to stub various parts of the wix
+// xml. While we could use wix's internal variable system, it's a
+// little more debugable to do it with go's. This way, we can
+// inspect the intermediate xml file.
+//
+// This might all be cleaner moved from a template to a marshalled
+// struct. But enumerating the wix options looks very ugly
+//
+//go:embed assets/main.wxs
+var wixTemplateBytes []byte
+
+// This is used for icons and splash screens and the like. It would be
+// better in pkg/packaging, and passed into packagekit, but that's a
+// deeper refactor.
+//
+//go:embed assets/*
+var assets embed.FS
 
 const (
 	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
@@ -30,18 +46,6 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	if err := isDirectory(po.Root); err != nil {
 		return err
-	}
-
-	// We need to use variables to stub various parts of the wix
-	// xml. While we could use wix's internal variable system, it's a
-	// little more debugable to do it with go's. This way, we can
-	// inspect the intermediate xml file.
-	//
-	// This might all be cleaner moved from a template to a marshalled
-	// struct. But enumerating the wix options looks very ugly
-	wixTemplateBytes, err := internal.Asset("internal/assets/main.wxs")
-	if err != nil {
-		return errors.Wrap(err, "getting go-bindata main.wxs")
 	}
 
 	// We include a random nonce as part of the ProductCode
@@ -104,9 +108,9 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		}
 
 		for _, f := range assetFiles {
-			fileBytes, err := internal.Asset("internal/assets/" + f)
+			fileBytes, err := assets.ReadFile(f)
 			if err != nil {
-				return errors.Wrapf(err, "getting go-bindata %s", f)
+				return errors.Wrapf(err, "getting asset %s", f)
 			}
 
 			wixArgs = append(wixArgs, wix.WithFile(f, fileBytes))

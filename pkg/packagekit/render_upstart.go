@@ -2,14 +2,17 @@ package packagekit
 
 import (
 	"context"
+	_ "embed"
 	"html/template"
 	"io"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/packagekit/internal"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
+
+//go:embed assets/upstart.sh
+var upstartTemplate []byte
 
 // upstartOptions contains upstart specific options that are passed to
 // the rendering template.
@@ -86,11 +89,6 @@ func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, u
 	// Prepend a "" so that the merged output looks a bit cleaner in the rendered templates
 	if len(initOptions.Flags) > 0 {
 		initOptions.Flags = append([]string{""}, initOptions.Flags...)
-	}
-
-	upstartTemplate, err := internal.Asset("internal/assets/upstart.sh")
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get template named %s", "internal/assets/upstart.sh")
 	}
 
 	var data = struct {
