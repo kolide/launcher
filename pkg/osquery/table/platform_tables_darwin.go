@@ -97,6 +97,8 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, []string{"/usr/bin/tmutil", "destinationinfo", "-X"}),
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_powermetrics", dataflattentable.PlistType, []string{"/usr/bin/powermetrics", "-n", "1", "-f", "plist"}),
 		screenlockTable,
 		pwpolicy.TablePlugin(client, logger),
 		systemprofiler.TablePlugin(client, logger),
