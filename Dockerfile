@@ -28,12 +28,6 @@ ARG gitver=master
 RUN git clone https://github.com/kolide/launcher.git
 RUN cd launcher && git checkout "${gitver}"
 
-# copy source into the docker builder. Perhaps this would be cleaner
-# via a volume mount. But, COPY allows the docker container to have
-# zero impact on the host's build directory. This uses .dockerignore
-# to exclude the build directory
-# COPY . ./
-
 # Build!
 RUN cd launcher && make deps
 RUN cd launcher && make all
