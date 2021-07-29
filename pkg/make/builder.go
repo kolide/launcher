@@ -49,6 +49,7 @@ type Builder struct {
 	stampVersion bool
 	fakedata     bool
 	notStripped  bool
+	cgo          bool
 
 	cmdEnv []string
 	execCC func(context.Context, string, ...string) *exec.Cmd
@@ -71,6 +72,12 @@ func WithOS(o string) Option {
 func WithArch(a string) Option {
 	return func(b *Builder) {
 		b.arch = a
+	}
+}
+
+func WithCgo() Option {
+	return func(b *Builder) {
+		b.cgo = true
 	}
 }
 
@@ -104,7 +111,7 @@ func WithFakeData() Option {
 	}
 }
 
-func New(opts ...Option) (*Builder, error) {
+func New(opts ...Option) *Builder {
 	b := Builder{
 		os:     runtime.GOOS,
 		arch:   runtime.GOARCH,
@@ -124,17 +131,24 @@ func New(opts ...Option) (*Builder, error) {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOOS=%s", b.os))
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
+	if b.cgo {
+		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
+	}
+
 	// Setup zig as cross compiler
 	// (This is mostly to support fscrypt on linux)
 	if b.os != runtime.GOOS {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return nil, errors.Wrap(err, "getting cwd")
+			// panic here feels a little uncouth, but the
+			// caller here is a bunch simpler if we can
+			// return *Builder, and this error is
+			// exceedingly unlikely.
+			panic(fmt.Sprintf("Unable to get cwd: %s", err))
 		}
 
 		cmdEnv = append(
 			cmdEnv,
-			"CGO_ENABLED=1",
 			fmt.Sprintf("ZIGTARGET=%s", zigTarget(b.os, b.arch)),
 			fmt.Sprintf("CC=%s", filepath.Join(cwd, "tools", "zcc")),
 			fmt.Sprintf("CXX=%s", filepath.Join(cwd, "tools", "zxx")),
@@ -149,7 +163,7 @@ func New(opts ...Option) (*Builder, error) {
 
 	b.cmdEnv = cmdEnv
 
-	return &b, nil
+	return &b
 }
 
 func zigTarget(goos, goarch string) string {
