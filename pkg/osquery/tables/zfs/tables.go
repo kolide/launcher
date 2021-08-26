@@ -20,11 +20,12 @@ const (
 	zpoolPath = "/usr/sbin/zpool"
 )
 
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.@/"
+
 type Table struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
 	cmd    string
-	args   []string
 }
 
 func columns() []table.ColumnDefinition {
@@ -41,7 +42,6 @@ func ZfsPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Logg
 		client: client,
 		logger: logger,
 		cmd:    zfsPath,
-		args:   []string{"get", "-H", "all"},
 	}
 
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
@@ -52,22 +52,44 @@ func ZpoolPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Lo
 		client: client,
 		logger: logger,
 		cmd:    zpoolPath,
-		args:   []string{"get", "-H", "all"},
 	}
 
 	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 15, []string{t.cmd}, t.args)
-	if err != nil {
-		level.Info(t.logger).Log("msg", "failed to get zfs info", "err", err)
+	// Generate ZFS commands.
+	//
+	// keys are comma seperated. Default to `all` to get everything
+	// names are args. Default to none to get everything
+	//
+	// These commands all work:
+	// zfs get -H encryption
+	// zfs get -H encryption tank-enc/home-sephenc tank-clear/ds-enc
+	// zfs get -H all tank-enc/home-sephenc tank-clear/ds-enc
 
-		// Don't error out if the binary isn't found
+	keys := tablehelpers.GetConstraints(queryContext, "key", tablehelpers.WithDefaults("all"), tablehelpers.WithAllowedCharacters(allowedCharacters))
+	names := tablehelpers.GetConstraints(queryContext, "name", tablehelpers.WithAllowedCharacters(allowedCharacters))
+
+	args := []string{
+		"get",
+		"-H", strings.Join(keys, ","),
+	}
+
+	args = append(args, names...)
+
+	output, err := tablehelpers.Exec(ctx, t.logger, 15, []string{t.cmd}, args)
+	if err != nil {
+		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
-		return nil, err
+
+		// ZFS can fail for weird reasons. I've started seeing fedora
+		// machine that ship a zfs userspace, but no kernel driver. So,
+		// only log, don't return the errors.
+		level.Info(t.logger).Log("msg", "failed to get zfs info", "err", err)
+		return nil, nil
 	}
 
 	return parseColumns(output)
