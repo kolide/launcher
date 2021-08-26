@@ -60,7 +60,7 @@ func ZpoolPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Lo
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Generate ZFS commands.
 	//
-	// keys are comma seperated. Default to `all` to get everything
+	// keys are comma separated. Default to `all` to get everything
 	// names are args. Default to none to get everything
 	//
 	// These commands all work:
