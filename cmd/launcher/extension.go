@@ -61,7 +61,15 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	//
 	// It defaults to 3mb, to support GRPC's hardcoded 4MB
 	// limit. But jsonrpc can be a little higher. Set it to 5MB
-	if opts.Transport == "jsonrpc" {
+	if opts.LogMaxBytesPerBatch != 0 {
+		if opts.Transport == "grpc" && opts.LogMaxBytesPerBatch > 3 {
+			level.Info(logger).Log(
+				"msg", "LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
+				"LogMaxBytesPerBatch", opts.LogMaxBytesPerBatch,
+			)
+		}
+		extOpts.MaxBytesPerBatch = opts.LogMaxBytesPerBatch << 20
+	} else if opts.Transport == "jsonrpc" {
 		extOpts.MaxBytesPerBatch = 5 << 20
 	}
 
