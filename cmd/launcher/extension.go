@@ -59,8 +59,10 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	// not be able to send the data over a low bandwidth
 	// connection before the connection is timed out.
 	//
-	// It defaults to 3mb, to support GRPC's hardcoded 4MB
-	// limit. But jsonrpc can be a little higher. Set it to 5MB
+	// The logic for setting this is spread out. The underlying
+	// extension defaults to 3mb, to support GRPC's hardcoded 4MB
+	// limit. But as we're transport aware here. we can set it to
+	// 5MB for others.
 	if opts.LogMaxBytesPerBatch != 0 {
 		if opts.Transport == "grpc" && opts.LogMaxBytesPerBatch > 3 {
 			level.Info(logger).Log(
@@ -69,7 +71,9 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 			)
 		}
 		extOpts.MaxBytesPerBatch = opts.LogMaxBytesPerBatch << 20
-	} else if opts.Transport == "jsonrpc" {
+	} else if opts.Transport == "grpc" {
+		extOpts.MaxBytesPerBatch = 3 << 20
+	} else if opts.Transport != "grpc" {
 		extOpts.MaxBytesPerBatch = 5 << 20
 	}
 
