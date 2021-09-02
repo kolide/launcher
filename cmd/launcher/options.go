@@ -45,21 +45,22 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 	var (
 		// Primary options
-		flCertPins         = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
-		flControl          = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
-		flControlServerURL = flagset.String("control_hostname", "", "The hostname of the control server")
-		flEnrollSecret     = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
-		flEnrollSecretPath = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
-		flInitialRunner    = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
-		flKolideServerURL  = flagset.String("hostname", "", "The hostname of the gRPC server")
-		flTransport        = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
-		flLoggingInterval  = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
-		flOsquerydPath     = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flRootDirectory    = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
-		flRootPEM          = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
-		flVersion          = flagset.Bool("version", false, "Print Launcher version and exit")
-		flOsqueryFlags     arrayFlags // set below with flagset.Var
-		_                  = flagset.String("config", "", "config file to parse options from (optional)")
+		flCertPins            = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControl             = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
+		flControlServerURL    = flagset.String("control_hostname", "", "The hostname of the control server")
+		flEnrollSecret        = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath    = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flInitialRunner       = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL     = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flTransport           = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flLoggingInterval     = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath        = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flRootDirectory       = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootPEM             = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion             = flagset.Bool("version", false, "Print Launcher version and exit")
+		flLogMaxBytesPerBatch = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
+		flOsqueryFlags        arrayFlags // set below with flagset.Var
+		_                     = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
@@ -163,6 +164,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		InsecureTLS:            *flInsecureTLS,
 		InsecureTransport:      *flInsecureTransport,
 		KolideServerURL:        *flKolideServerURL,
+		LogMaxBytesPerBatch:    *flLogMaxBytesPerBatch,
 		LoggingInterval:        *flLoggingInterval,
 		MirrorServerURL:        *flMirrorURL,
 		NotaryPrefix:           *flNotaryPrefix,
@@ -187,7 +189,7 @@ func shortUsage(flagset *flag.FlagSet) {
 
 	printOpt := func(opt string) {
 		fmt.Fprintf(os.Stderr, "  --%s", opt)
-		for i := 0; i < 22-len(opt); i++ {
+		for i := 0; i < 24-len(opt); i++ {
 			fmt.Fprintf(os.Stderr, " ")
 		}
 		fmt.Fprintf(os.Stderr, "%s\n", launcherFlags[opt])
@@ -202,6 +204,7 @@ func shortUsage(flagset *flag.FlagSet) {
 	printOpt("hostname")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("transport")
+	printOpt("log_max_bytes_per_batch")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("enroll_secret")
 	printOpt("enroll_secret_path")

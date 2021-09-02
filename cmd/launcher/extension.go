@@ -54,11 +54,27 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		RunDifferentialQueriesImmediately: opts.EnableInitialRunner,
 	}
 
-	// We have a MaxBytesPerBatch set low enough to support GRPC's
-	// hardcoded 4mb limit. We don't need that for jsonrpc, so
-	// bump it up to 10 MB
-	if opts.Transport == "jsonrpc" {
-		extOpts.MaxBytesPerBatch = 10 << 20
+	// Setting MaxBytesPerBatch is a tradeoff. If it's too low, we
+	// can never send a large result. But if it's too high, we may
+	// not be able to send the data over a low bandwidth
+	// connection before the connection is timed out.
+	//
+	// The logic for setting this is spread out. The underlying
+	// extension defaults to 3mb, to support GRPC's hardcoded 4MB
+	// limit. But as we're transport aware here. we can set it to
+	// 5MB for others.
+	if opts.LogMaxBytesPerBatch != 0 {
+		if opts.Transport == "grpc" && opts.LogMaxBytesPerBatch > 3 {
+			level.Info(logger).Log(
+				"msg", "LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
+				"LogMaxBytesPerBatch", opts.LogMaxBytesPerBatch,
+			)
+		}
+		extOpts.MaxBytesPerBatch = opts.LogMaxBytesPerBatch << 20
+	} else if opts.Transport == "grpc" {
+		extOpts.MaxBytesPerBatch = 3 << 20
+	} else if opts.Transport != "grpc" {
+		extOpts.MaxBytesPerBatch = 5 << 20
 	}
 
 	// create the extension

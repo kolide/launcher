@@ -35,6 +35,10 @@ type Options struct {
 	// Transport the transport that should be used for remote
 	// communication.
 	Transport string
+	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
+	// of log. When blank, launcher will pick a value
+	// appropriate for the transport.
+	LogMaxBytesPerBatch int
 
 	// Control enables the remote control functionality.
 	Control bool
