@@ -27,7 +27,7 @@ import (
 
 const gsettingsPath = "/usr/bin/gsettings"
 
-const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
+const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. "
 
 type gsettingsExecer func(ctx context.Context, username string, buf *bytes.Buffer) error
 
