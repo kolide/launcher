@@ -14,8 +14,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-18.04
-            #- ubuntu-latest # No support for go 1.13
+          - ubuntu-latest
           - macos-latest
           - windows-latest
     steps:
@@ -55,3 +54,27 @@ jobs:
       with:
         name: ${{ matrix.os }}-coverage.out
         path: coverage.out
+
+
+  package_builder_test:
+    name: Package Builder
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Consider changing this sometime
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - uses: actions/setup-go@v2
+      with:
+        go-version: 1.16 
+      id: go
+
+    - run: make deps
+    - run: make package-builder
