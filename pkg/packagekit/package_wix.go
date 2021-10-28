@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"text/template"
@@ -108,7 +109,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		}
 
 		for _, f := range assetFiles {
-			fileBytes, err := assets.ReadFile(f)
+			fileBytes, err := assets.ReadFile(path.Join("assets", f))
 			if err != nil {
 				return errors.Wrapf(err, "getting asset %s", f)
 			}
