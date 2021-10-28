@@ -26,8 +26,9 @@ jobs:
       - name: restore path
         if: matrix.os == 'ubuntu-18.04'
         run: |
-          cat ${GITHUB_PATH} | grep -v go/bin > ${GITHUB_PATH}.restored
-          mv ${GITHUB_PATH}.restored ${GITHUB_PATH}
+          cat ${GITHUB_PATH}
+          perl -pi -e 's{.*/go/bin}{}'
+          cat ${GITHUB_PATH}
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
