@@ -17,8 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: adjust path for bindata
-        run: echo "${HOME}/go/bin" >> $GITHUB_PATH
+        run: |
+          cp $GITHUB_PATH ${GITHUB_PATH}.orig
+          echo "${HOME}/go/bin" >> $GITHUB_PATH
       - run: make deps
+      - name: restore path
+        run: cp ${GITHUB_PATH}.orig ${GITHUB_PATH}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
