@@ -29,5 +29,4 @@ linters-settings:
   errcheck:
     ignore: github.com/go-kit/kit/log:Log
   gofmt:
-    # simplify code: gofmt with `-s` option, true by default
     simplify: false
