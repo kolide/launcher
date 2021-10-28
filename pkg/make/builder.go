@@ -40,16 +40,17 @@ import (
 )
 
 type Builder struct {
-	os           string
-	arch         string
-	goVer        string
-	goPath       string
-	static       bool
-	race         bool
-	stampVersion bool
-	fakedata     bool
-	notStripped  bool
-	cgo          bool
+	os                 string
+	arch               string
+	goVer              string
+	goPath             string
+	static             bool
+	race               bool
+	stampVersion       bool
+	fakedata           bool
+	notStripped        bool
+	cgo                bool
+	githubActionOutput bool
 
 	cmdEnv []string
 	execCC func(context.Context, string, ...string) *exec.Cmd
@@ -108,6 +109,12 @@ func WithStampVersion() Option {
 func WithFakeData() Option {
 	return func(b *Builder) {
 		b.fakedata = true
+	}
+}
+
+func WithGithubActionOutput() Option {
+	return func(b *Builder) {
+		b.githubActionOutput = true
 	}
 }
 
@@ -536,6 +543,11 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if err := cmd.Run(); err != nil {
 			return err
+		}
+
+		// Tell github where we're at
+		if b.githubActionOutput {
+			fmt.Printf("::set-output name=binary::%s\n", output)
 		}
 
 		// all the builds go to `build/<os>/binary`, but if the build OS is the same as the target OS,

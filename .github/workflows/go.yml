@@ -14,8 +14,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-18.04
-            #- ubuntu-latest # No support for go 1.13
+          - ubuntu-18.04 # latest has a bunch of version/tool issues
           - macos-latest
           - windows-latest
     steps:
@@ -28,7 +27,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16 
+        go-version: 1.16
       id: go
 
     - name: Get dependencies
@@ -55,3 +54,30 @@ jobs:
       with:
         name: ${{ matrix.os }}-coverage.out
         path: coverage.out
+
+
+  package_builder_test:
+    name: Package Builder
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu-18.04 # latest has a bunch of version/tool issues
+          - macos-latest
+          - windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+      id: go
+
+    - run: make deps
+    - id: build
+      run: make package-builder
+    - name: package
+      run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret

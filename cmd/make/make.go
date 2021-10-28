@@ -32,6 +32,7 @@ func main() {
 		flStatic       = fs.Bool("static", false, "Build a static binary.")
 		flStampVersion = fs.Bool("linkstamp", false, "Add version info with ldflags.")
 		flFakeData     = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
+		flGithubOutput = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
 	)
 
 	ffOpts := []ff.Option{
@@ -68,6 +69,10 @@ func main() {
 
 	if *flGoPath != "" {
 		opts = append(opts, make.WithGoPath(*flGoPath))
+	}
+
+	if *flGithubOutput {
+		opts = append(opts, make.WithGithubActionOutput())
 	}
 
 	optsWithCgo := append(opts, make.WithCgo())
