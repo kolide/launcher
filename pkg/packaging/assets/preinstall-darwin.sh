@@ -24,6 +24,12 @@ if [[ -f "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist" ]]; 
     exit 0
 fi
 
+# At some point the oahd plist vanished. Another way to check is to
+# see is oahd is running
+if /usr/bin/pgrep -q oahd; then
+    exit 0
+fi
+
 # report errors
 set -e
 
