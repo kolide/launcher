@@ -1,0 +1,23 @@
+run:
+  skip-dirs:
+    - test-cmds
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - gofmt
+    - gosec
+    - govet
+    - interfacer
+    - maligned
+    - misspell
+    - nakedret
+    - noctx
+    - sqlclosecheck
+    - unconvert
+    - unused
+
+linters-settings:
+  errcheck:
+    ignore: github.com/go-kit/kit/log:Log

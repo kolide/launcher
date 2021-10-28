@@ -214,37 +214,8 @@ test: generate
 ## Lint
 ##
 
-# These are escape newlines, looks super weird. Allows these to run in
-# parallel with `make -j`
-lint: \
-	lint-go-deadcode \
-	lint-misspell \
-	lint-go-vet \
-	lint-go-nakedret \
-	lint-go-fmt
-
-lint-go-deadcode: deps-go
-	deadcode cmd/ pkg/
-
-lint-misspell: deps-go
-	git ls-files \
-	  | grep -v pkg/simulator/testdata/bad_symlink \
-	  | grep -v assets.go$ \
-	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
-
-lint-go-vet:
-	go vet ./cmd/... ./pkg/...
-
-lint-go-nakedret: deps-go
-	nakedret ./pkg/... ./cmd/...
-
-# This is ugly. since go-fmt doesn't have a simple exit code, we use
-# some make trickery to handle failing if there;s output.
-lint-go-fmt: $(foreach c,$(shell gofmt -l ./pkg/ ./cmd/ | grep -vE 'assets.go|bindata.go'),fmt-fail/$(c))
-lint-go-fmt: deps-go
-fmt-fail/%:
-	@echo fmt failure in: $*
-	@false
+lint:
+	golangci-lint -j3 run
 
 ##
 ## Docker Tooling
