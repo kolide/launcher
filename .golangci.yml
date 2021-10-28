@@ -7,17 +7,27 @@ linters:
     - bodyclose
     - deadcode
     - gofmt
-    - gosec
     - govet
-    - interfacer
-    - maligned
     - misspell
     - nakedret
-    - noctx
     - sqlclosecheck
     - unconvert
+  disable:
+    - errcheck
+    - gosec
+    - gosimple
+    - ineffassign
+    - interfacer
+    - maligned
+    - noctx
+    - staticcheck
+    - structcheck
     - unused
+    - varcheck
 
 linters-settings:
   errcheck:
     ignore: github.com/go-kit/kit/log:Log
+  gofmt:
+    # simplify code: gofmt with `-s` option, true by default
+    simplify: false
