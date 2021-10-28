@@ -336,6 +336,7 @@ func reportNotaryPing(
 	} else {
 		keyvals = append(keyvals, "response_code", resp.StatusCode)
 	}
+	defer resp.Body.Close()
 	logger.Log(keyvals...)
 	return nil
 }

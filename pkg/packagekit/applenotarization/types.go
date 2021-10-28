@@ -19,6 +19,8 @@ type notarizationInfo struct {
 	StatusMessage string    `plist:"Status Message"`
 }
 
+// this is eventually used by callers in other repos
+//nolint:deadcode
 type notarizationUpload struct {
 	ProductErrors []productError `plist:"product-errors"`
 }

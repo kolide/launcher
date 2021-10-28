@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_.+"
-	tableName         = "kolide_fscrypt_info"
+	tableName = "kolide_fscrypt_info"
 )
 
 type Table struct {
@@ -30,12 +29,4 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 		logger: logger,
 	}
 	return table.NewPlugin(tableName, columns, t.generate)
-}
-
-func boolToRow(v bool) string {
-	if v {
-		return "1"
-	}
-
-	return "0"
 }

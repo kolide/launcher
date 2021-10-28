@@ -64,10 +64,9 @@ import (
 type UpdateChannel string
 
 const (
-	Stable   UpdateChannel = "stable"
-	Beta                   = "beta"
-	Nightly                = "nightly"
-	localDev               = "development"
+	Stable  UpdateChannel = "stable"
+	Beta                  = "beta"
+	Nightly               = "nightly"
 )
 
 const (

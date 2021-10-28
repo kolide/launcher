@@ -11,6 +11,10 @@ import (
 	"github.com/kolide/osquery-go/plugin/table"
 )
 
+const (
+	allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_.+"
+)
+
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	paths := tablehelpers.GetConstraints(queryContext, "path", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(paths) < 1 {
@@ -42,4 +46,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return results, nil
+}
+
+func boolToRow(v bool) string {
+	if v {
+		return "1"
+	}
+
+	return "0"
 }
