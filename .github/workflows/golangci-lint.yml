@@ -16,13 +16,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: deps
+
+      - name: adjust path for bindata
         if: matrix.os == 'ubuntu-18.04'
         run: |
           cp $GITHUB_PATH ${GITHUB_PATH}.orig
           echo "${HOME}/go/bin" >> $GITHUB_PATH
-          make deps
-          cp ${GITHUB_PATH}.orig ${GITHUB_PATH}
+      - run: make deps
+      - name: restore path
+        if: matrix.os == 'ubuntu-18.04'
+        run: cp ${GITHUB_PATH}.orig ${GITHUB_PATH}.orig
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
