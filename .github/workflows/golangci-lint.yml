@@ -16,6 +16,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+      - name: adjust path for bindata
+        run: echo "${HOME}/go/bin" >> $GITHUB_PATH
+      - run: make deps
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
