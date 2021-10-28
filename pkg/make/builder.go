@@ -547,7 +547,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		// Tell github where we're at
 		if b.githubActionOutput {
-			fmt.Printf(":set-output binary=%s\n", output)
+			fmt.Printf("::set-output name=binary::%s\n", output)
 		}
 
 		// all the builds go to `build/<os>/binary`, but if the build OS is the same as the target OS,

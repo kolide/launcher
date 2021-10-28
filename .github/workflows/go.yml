@@ -60,7 +60,7 @@ jobs:
     name: Package Builder
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Consider changing this sometime
+      fail-fast: true
       matrix:
         os:
           - ubuntu-18.04 # latest has a bunch of version/tool issues
@@ -77,4 +77,7 @@ jobs:
       id: go
 
     - run: make deps
-    - run: make package-builder
+    - id: build
+      run: make package-builder
+    - name: package
+      run: ${{ steps.build.outputs.binary }} make --hostname=localhost --enroll_secret=secret
