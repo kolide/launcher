@@ -8,11 +8,6 @@
 # rosetta2 install, but this does not appear to happen during an MDM
 # install. So, we need to trigger than from a preinstall script.
 
-# If we're not Big Sur (build 20x), exit
-if [[ "$(/usr/bin/sw_vers -buildVersion)" != 20* ]]; then
-    exit 0
-fi
-
 # If we're not arm, exit
 if [ "$(/usr/bin/arch)" != "arm64" ]; then
     exit 0
