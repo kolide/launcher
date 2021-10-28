@@ -25,7 +25,9 @@ jobs:
       - run: make deps
       - name: restore path
         if: matrix.os == 'ubuntu-18.04'
-        run: cp ${GITHUB_PATH}.orig ${GITHUB_PATH}.orig
+        run: |
+          cat ${GITHUB_PATH} | grep -v go/bin > ${GITHUB_PATH}.restored
+          mv ${GITHUB_PATH}.restored ${GITHUB_PATH}
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
