@@ -27,7 +27,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16 
+        go-version: 1.16
       id: go
 
     - name: Get dependencies
@@ -73,11 +73,11 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.16 
+        go-version: 1.16
       id: go
 
     - run: make deps
     - id: build
       run: make package-builder
     - name: package
-      run: ${{ steps.build.outputs.binary }} make --hostname=localhost --enroll_secret=secret
+      run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
