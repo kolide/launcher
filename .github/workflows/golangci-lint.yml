@@ -28,9 +28,6 @@ jobs:
       - run: make deps
 
       # Work around https://github.com/golangci/golangci-lint-action/issues/362
-      - name: don't process annotations
-        run:  echo "::stop-commands::qwerty66"
-
 
       # Getting this to work outside a normal build is quite
       # cumbersome. golangci/golangci-lint-action attempts to install
@@ -44,3 +41,8 @@ jobs:
         with:
           version: v1.42
           skip-pkg-cache: true
+
+      - name: golangci-lint
+        if: ${{ always() }}
+        #uses: golangci/golangci-lint-action@v2
+        run: golangci-lint run
