@@ -20,7 +20,7 @@ jobs:
 
       - name: adjust path for generation
         run: echo "${HOME}/go/bin" >> $GITHUB_PATH
-      - name: make deps
+      - run: make deps
 
       # Getting this to work outside a normal build is quite
       # cumbersome. golangci/golangci-lint-action attempts to install
