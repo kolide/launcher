@@ -18,10 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: deps and generate
-        run: |
-          echo "${HOME}/go/bin" >> $GITHUB_PATH
-          make deps
+      - name: adjust path for generation
+        run: echo "${HOME}/go/bin" >> $GITHUB_PATH
+      - name: make deps
 
       # Getting this to work outside a normal build is quite
       # cumbersome. golangci/golangci-lint-action attempts to install
