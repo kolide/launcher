@@ -15,9 +15,6 @@ type thingy struct {
 	stagedFile string
 }
 
-const serviceName = "upgradetest"
-const serviceDesc = "Launcher Auto Upgrade Testing"
-
 type processNotes struct {
 	Pid     int
 	Path    string

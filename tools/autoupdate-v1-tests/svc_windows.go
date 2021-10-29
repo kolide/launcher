@@ -18,6 +18,11 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
+const (
+	serviceName = "upgradetest"
+	serviceDesc = "Launcher Auto Upgrade Testing"
+)
+
 func runWindowsSvc(args []string) error {
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
 	if err != nil {
