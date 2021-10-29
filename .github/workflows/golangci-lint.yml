@@ -1,11 +1,3 @@
-# Getting this to work outside a normal build is quite
-# cumbersome. golangci/golangci-lint-action attempts to install go,
-# and use the module cache. In a way that _assumes_ no go commands
-# have been run in the workspace. But, this is fundamentally
-# incompatible with our needing to to generate code before
-# linting. Thus the various skip- commands.
-# See https://github.com/golangci/golangci-lint-action/issues/244
-
 name: golangci-lint
 on:
   push:
@@ -31,6 +23,13 @@ jobs:
           echo "${HOME}/go/bin" >> $GITHUB_PATH
           make deps
 
+      # Getting this to work outside a normal build is quite
+      # cumbersome. golangci/golangci-lint-action attempts to install
+      # go, and use the module cache. In a way that _assumes_ no go
+      # commands have been run in the workspace. But, this is
+      # fundamentally incompatible with our needing to to generate
+      # code before linting. Thus the various skip- commands.  See
+      # https://github.com/golangci/golangci-lint-action/issues/244
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         skip-pkg-cache: true
