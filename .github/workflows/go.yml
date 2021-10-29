@@ -37,11 +37,6 @@ jobs:
     - name: Build
       run: make -j launcher extension grpc.ext tables.ext package-builder
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v2
-      with:
-        version: v1.42
-      
     - name: Test
       run: make test
 
