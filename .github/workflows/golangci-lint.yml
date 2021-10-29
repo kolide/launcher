@@ -32,6 +32,6 @@ jobs:
       # https://github.com/golangci/golangci-lint-action/issues/244
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
-        skip-pkg-cache: true
         with:
           version: v1.42
+          skip-pkg-cache: true
