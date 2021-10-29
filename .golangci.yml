@@ -1,7 +1,7 @@
 run:
   skip-dirs:
     - test-cmds
-  timeout: 2m
+  timeout: 5m
   out-format: colored-line-number
 
 linters:
