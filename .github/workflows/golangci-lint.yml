@@ -33,8 +33,6 @@ jobs:
 
       - run: make deps
 
-      # Work around https://github.com/golangci/golangci-lint-action/issues/362
-
       # Getting this to work outside a normal build is quite
       # cumbersome. golangci/golangci-lint-action attempts to install
       # go, and use the module cache. In a way that _assumes_ no go
@@ -49,6 +47,7 @@ jobs:
           skip-pkg-cache: true
           skip-go-installation: true
 
+      # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
       - name: golangci-lint
         if: ${{ always() }}
         #uses: golangci/golangci-lint-action@v2
