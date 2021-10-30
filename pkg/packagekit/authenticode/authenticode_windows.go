@@ -129,5 +129,4 @@ func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args .
 		// Fallthrough to catch errors unrelated to timeouts
 		return errors.Wrap(err, "calling signtool")
 	}
-	return errors.New("How did you get here? Some logic bug")
 }
