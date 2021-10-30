@@ -44,7 +44,7 @@ func runSocket(args []string) error {
 	fmt.Println(*flPath)
 
 	// Wait forever
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
 	<-sig
 
