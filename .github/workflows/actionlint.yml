@@ -1,0 +1,23 @@
+name: actionlint
+
+# See https://github.com/rhysd/actionlint
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - name: install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+      - name: actionlint
+        run: actionlint -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}%0A```%0A{{replace $err.Snippet "\\n" "%0A"}}%0A```\n{{end}}'
