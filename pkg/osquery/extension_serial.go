@@ -1,3 +1,4 @@
+//go:build !fakeserial
 // +build !fakeserial
 
 package osquery

@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 // Package osquery_exec_table provides a table generator that will

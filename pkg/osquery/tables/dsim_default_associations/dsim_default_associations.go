@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package dsim_default_associations

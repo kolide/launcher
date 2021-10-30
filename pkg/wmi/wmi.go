@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 // Package wmi provides a basic interface for querying against

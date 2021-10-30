@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 // Package ioreg provides a table wrapper around the `ioreg` macOS
 // command.

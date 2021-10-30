@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 // Package pwpolicy provides a table wrapper around the `pwpolicy` macOS
 // command.
