@@ -107,7 +107,4 @@ CARD_ID=$(gh api graphql --header 'GraphQL-Features: projects_next_graphql' -f q
 #              }
 #            }' -f project=$PROJECT_ID -f item=$CARD_ID -f status_field=$STATUS_FIELD_ID -f status_value=$TRIAGE_OPTION_ID -f date_field=$DATE_FIELD_ID -f date_value=$DATE --silent
 
-
-
-
 rm -rf "$DIR"
