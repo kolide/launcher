@@ -20,12 +20,12 @@ on:
       - main
       - master
 
-jobs:
-  env:
-    GITHUB_TOKEN: ${{secrets.PROJECT_WORKFLOW_PAT}}
-    ORGANIZATION: kolide
-    PROJECT_NUMBER: 9
+env:
+  GITHUB_TOKEN: ${{secrets.PROJECT_WORKFLOW_PAT}}
+  ORGANIZATION: kolide
+  PROJECT_NUMBER: 9
 
+jobs:
   add_issue:
     if: ${{ github.event.issue.node_id }}
     runs-on: ubuntu-latest
