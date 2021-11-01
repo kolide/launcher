@@ -1,0 +1,284 @@
+Local device
+	UUID: 4D259086-B8CF-4A99-A2FB-BBBBBBBBBBBB
+	Messaging Protocol Version: 2
+	Product Type: iMacPro1,1
+	OS Build: 11.6 (20G165)
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => x86_64h
+		EffectiveProductionStatusSEP => false
+		EthernetMacAddress => d0:81:8b:ae:40:c1
+		HWModel => J137AP
+		HasSEP => true
+		IsUIBuild => true
+		DeviceSupportsLockdown => false
+		EffectiveSecurityModeAp => false
+		SigningFuse => true
+		BuildVersion => 20G165
+		OSVersion => 11.6
+		BridgeVersion => 18.16.14759.0.1,0
+		SensitivePropertiesVisible => true
+		ProductType => iMacPro1,1
+		SerialNumber => C02VT3WGVW89
+		BootSessionUUID => 50566CEC-A72E-410E-92B3-BBBBBBBBBBBB
+		DeviceColor => unknown
+		EffectiveProductionStatusAp => false
+		EffectiveSecurityModeSEP => false
+		UniqueChipID => 1453108505BBBBBB
+		UniqueDeviceID => e664d52b5fbc5a68a0a524cab9779BBBBBBBBBBBB
+		RemoteXPCVersionFlags => 72057594037927942
+		CertificateProductionStatus => false
+		CertificateSecurityMode => false
+		DeviceEnclosureColor => unknown
+		SecurityDomain => 1
+		OSInstallEnvironment => false
+		Image4Supported => false
+	}
+	Services:
+		com.apple.osanalytics.logRelay
+		com.apple.corecaptured.remoteservice
+		com.apple.sysdiagnose.remote
+		com.apple.mobile.storage_mounter_proxy.bridge.macOS
+		com.apple.mobile.storage_mounter_proxy.bridge
+
+Found localbridge (bridge)
+	State: connected (connectable)
+	UUID: 37D16267-478D-4B4D-BAD2-BBBBBBBBBBBB
+	Product Type: iBridge2,1
+	OS Build: 5.5 (18P4759a)
+	Messaging Protocol Version: 2
+	Heartbeat:
+		Last successful heartbeat sent 2.586s ago, received 2.583s ago (took 0.003s)
+		16746 heartbeats sent, 0 received
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => arm64
+		ChipID => 32786
+		EffectiveProductionStatusSEP => true
+		EthernetMacAddress => d0:81:7a:bb:00:b0
+		HWModel => J137AP
+		HasSEP => true
+		LocationID => 2148500000
+		IsUIBuild => true
+		RegionInfo => LL/A
+		DeviceSupportsLockdown => false
+		EffectiveSecurityModeAp => true
+		SigningFuse => true
+		BuildVersion => 18P4759a
+		OSVersion => 5.5
+		BridgeVersion => 18.16.14759.0.1,0
+		SensitivePropertiesVisible => true
+		BoardRevision => 9
+		Image4CryptoHashMethod => sha2-384
+		ProductType => iBridge2,1
+		SerialNumber => C02VT3WGVW89
+		BootSessionUUID => 6696D9BB-C1B0-4FD0-8376-BBBBBBBBBBBB
+		BoardId => 10
+		DeviceColor => unknown
+		EffectiveProductionStatusAp => true
+		EffectiveSecurityModeSEP => true
+		UniqueChipID => 1453108000000000
+		UniqueDeviceID => 00008012-000529BBBBBBBBBB
+		RemoteXPCVersionFlags => 72057594037927942
+		CertificateProductionStatus => true
+		CertificateSecurityMode => true
+		DeviceEnclosureColor => unknown
+		ModelNumber => MQ2Y2
+		RegionCode => LL
+		SecurityDomain => 1
+		OSInstallEnvironment => false
+		InterfaceIndex => 9
+		HardwarePlatform => t8012
+		Image4Supported => true
+	}
+	Services:
+		com.apple.videoprocessingd.encode.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.corespeech.xpc.remote.control
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.powerchime.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.corespeech.xpc.remote.record
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.icloud.findmydeviced.bridge
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.mobile.storage_mounter_proxy.bridge.macOS
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.osanalytics.logTransfer
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.xpc.remote.mobile_obliteration
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.eos.LASecureIO
+		com.apple.mobile.storage_mounter_proxy.bridge
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.bridgeOSUpdated
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.private.avvc.xpc.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.recoverylogd.bridge
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.xpc.remote.multiboot
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.sysdiagnose.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.eos.BiometricKit.ta
+			Properties: {
+				UsesRemoteXPC => false
+			}
+		com.apple.lskdd
+			Properties: {
+				UsesRemoteXPC => 1
+			}
+		com.apple.TrustedAccessoryController
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.CoreKDL.remoteXPC
+		com.apple.mobileactivationd.bridge
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.RestoreRemoteServices.restoreserviced
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.corecaptured.remoteservice
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.multiverse.remote.bridgetime
+		com.apple.internal.xpc.remote.kext_audit
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.aveservice
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.sysdiagnose.stackshot.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+	Local Services:
+		com.apple.mobile.storage_mounter_proxy.bridge
+		com.apple.osanalytics.logRelay
+		com.apple.mobile.storage_mounter_proxy.bridge.macOS
+		com.apple.corecaptured.remoteservice
+		com.apple.sysdiagnose.remote
+
+Found ncm-0 (ncm-device)
+	State: connected (connectable)
+	UUID: 899ECBE0-603F-445C-96BE-BBBBBBBBBBBB
+	Product Type: iPhone13,3
+	OS Build: 15.1 (19B74)
+	Messaging Protocol Version: 3
+	Heartbeat:
+		0 heartbeats sent, 0 received
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => arm64e
+		ChipID => 33025
+		EffectiveProductionStatusSEP => true
+		EthernetMacAddress => a0:fb:c5:0b:00:0b
+		HWModel => D53pAP
+		HasSEP => true
+		LocationID => 336500000
+		IsUIBuild => true
+		RegionInfo => LL/A
+		DeviceSupportsLockdown => true
+		EffectiveSecurityModeAp => true
+		SigningFuse => true
+		BuildVersion => 19B74
+		OSVersion => 15.1
+		SensitivePropertiesVisible => true
+		Image4CryptoHashMethod => sha2-384
+		MobileDeviceMinimumVersion => 1351
+		ProductName => iPhone OS
+		ProductType => iPhone13,3
+		SerialNumber => F17DHBABBBBB
+		BootSessionUUID => B98D950A-E93B-4916-8C7D-BBBBBBBBBBBB
+		BoardId => 14
+		DeviceColor => 1
+		EffectiveProductionStatusAp => true
+		EffectiveSecurityModeSEP => true
+		StoreDemoMode => false
+		UniqueChipID => 6280668900000000
+		UniqueDeviceID => 00008101-001650BBBBBBBBBB
+		RemoteXPCVersionFlags => 72057594037927942
+		CertificateProductionStatus => true
+		CertificateSecurityMode => true
+		DeviceClass => iPhone
+		DeviceEnclosureColor => 1
+		ModelNumber => MGLT3
+		RegionCode => LL
+		SecurityDomain => 1
+		OSInstallEnvironment => false
+		InterfaceIndex => 24
+		HardwarePlatform => t8101
+		Image4Supported => true
+	}
+	Services:
+		com.apple.mobile.lockdown.remote.untrusted
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.sysdiagnose.remote
+			Properties: {
+				UsesRemoteXPC => true
+			}
+		com.apple.fusion.remote.service
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+		com.apple.mobile.insecure_notification_proxy.shim.remote
+		com.apple.mobile.insecure_notification_proxy.remote
+			Version: 1
+			Properties: {
+				ServiceVersion => 1
+				UsesRemoteXPC => true
+			}
+	Local Services:

@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
+	"github.com/kolide/launcher/pkg/osquery/tables/remotectl"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
 	osquery "github.com/kolide/osquery-go"
 	"github.com/kolide/osquery-go/plugin/table"
@@ -88,6 +89,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
+		remotectl.TablePlugin(client, logger),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_diskutil_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "list", "-plist"}),
