@@ -1,16 +1,13 @@
-name: Project Workflow
+name: Add to project board
 
 # Add things into one of the kolide projects.
 
 on:
   issues:
-    types:
-      - opened
-      - reopened
+    types: [opened, reopened]
   pull_request_target:
-    branches:
-      - main
-      - master
+    types: [opened, reopened]
+    branches: [main, master]
 
 jobs:
   add_to_board:
