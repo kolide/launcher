@@ -1,7 +1,7 @@
 // +build !windows
 // (skip building windows, since the newline replacement doesn't work there)
 
-package mdmclient
+package remotectl
 
 import (
 	"io/ioutil"
@@ -20,16 +20,8 @@ func TestTransformOutput(t *testing.T) {
 		expectedRows int
 	}{
 		{
-			in:           "QueryDeviceInformation.output",
+			in:           "imacpro-w-iphone.output",
 			expectedRows: 4900,
-		},
-		{
-			in:           "QueryInstalledProfiles.output",
-			expectedRows: 30,
-		},
-		{
-			in:           "QuerySecurityInfo.output",
-			expectedRows: 219,
 		},
 	}
 
