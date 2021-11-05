@@ -215,6 +215,7 @@ test: generate
 ##
 
 lint:
+	# Requires golangci-lint installed, see https://golangci-lint.run/usage/install#local-installation
 	golangci-lint -j3 run
 
 ##
