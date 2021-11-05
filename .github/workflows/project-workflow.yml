@@ -1,45 +1,20 @@
-name: Project Workflow
+name: Add to project board
 
-# Simple script to automate adding to a project board. I think this is
-# the simplest way to do this with the tools github provides. It needs
-# a PAT to update projects.
-#
-# Note that this needs to run in `pull_request_target` as it needs
-# access to the PAT secret.
-#
-#  References:
-#   * https://docs.github.com/en/issues/trying-out-the-new-projects-experience/automating-projects
+# Add things into one of the kolide projects.
 
 on:
   issues:
-    types:
-      - opened
-      - reopened
+    types: [opened, reopened]
   pull_request_target:
-    branches:
-      - main
-      - master
-
-env:
-  GITHUB_TOKEN: ${{secrets.PROJECT_WORKFLOW_PAT}}
-  ORGANIZATION: kolide
-  PROJECT_NUMBER: 9
+    types: [opened, reopened]
+    branches: [main, master]
 
 jobs:
-  add_issue:
-    if: ${{ github.event.issue.node_id }}
+  add_to_board:
     runs-on: ubuntu-latest
     steps:
-      - name: Add to project
-        run: ./tools/github-add-to-project.sh
-        env:
-          CONTENT_ID: ${{ github.event.issue.node_id }}
-
-  add_pr:
-    if: ${{ github.event.pull_request.node_id }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Add to project
-        run: ./tools/github-add-to-project.sh
-        env:
-          CONTENT_ID: ${{ github.event.pull_request.node_id }}
+      - uses: kolide/add-to-project-action@v1
+        with:
+          token: ${{secrets.PROJECT_WORKFLOW_PAT}}
+          organization: kolide
+          project_number: 9
