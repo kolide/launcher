@@ -33,10 +33,6 @@ jobs:
     - name: Get dependencies
       run: make deps
 
-    - name: Lint
-      run: make -j lint
-      if: runner.os != 'Windows'
-
     - name: Build
       run: make -j launcher extension grpc.ext tables.ext package-builder
 

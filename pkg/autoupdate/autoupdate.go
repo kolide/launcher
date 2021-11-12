@@ -40,6 +40,7 @@
 // While some functions can be unit tested, integration is tightly
 // coupled to TUF. One of the simplest ways to test this, is by
 // attaching to the `nightly` channel, and causing frequent updates.
+//nolint:typecheck // parts of this come from bindata, so lint fails
 package autoupdate
 
 import (
@@ -64,10 +65,9 @@ import (
 type UpdateChannel string
 
 const (
-	Stable   UpdateChannel = "stable"
-	Beta                   = "beta"
-	Nightly                = "nightly"
-	localDev               = "development"
+	Stable  UpdateChannel = "stable"
+	Beta                  = "beta"
+	Nightly               = "nightly"
 )
 
 const (

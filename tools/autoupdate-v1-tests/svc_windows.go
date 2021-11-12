@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package main
@@ -16,6 +17,11 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/mgr"
+)
+
+const (
+	serviceName = "upgradetest"
+	serviceDesc = "Launcher Auto Upgrade Testing"
 )
 
 func runWindowsSvc(args []string) error {

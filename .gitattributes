@@ -1,0 +1,3 @@
+# set line endings got go files. Mostly needed for golang-ci
+*.go text eol=lf
+

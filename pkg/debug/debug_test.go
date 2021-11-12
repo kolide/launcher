@@ -1,5 +1,7 @@
+//go:build !windows
 // +build !windows
 
+//nolint:bodyclose
 package debug
 
 import (
@@ -73,13 +75,13 @@ func TestAttachDebugHandler(t *testing.T) {
 	resp, err := http.Get(url)
 	require.Nil(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	resp.Body.Close()
+	defer resp.Body.Close()
 
 	// Stop server
 	syscall.Kill(syscall.Getpid(), debugSignal)
 	time.Sleep(1 * time.Second)
 
-	resp, err = http.Get(url)
+	_, err = http.Get(url)
 	require.NotNil(t, err)
 
 	// Start server
@@ -89,7 +91,7 @@ func TestAttachDebugHandler(t *testing.T) {
 	newUrl := getDebugURL(t, tokenFile.Name())
 	assert.NotEqual(t, url, newUrl)
 
-	resp, err = http.Get(newUrl)
+	_, err = http.Get(newUrl)
 	require.Nil(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
@@ -98,6 +100,6 @@ func TestAttachDebugHandler(t *testing.T) {
 	syscall.Kill(syscall.Getpid(), debugSignal)
 	time.Sleep(1 * time.Second)
 
-	resp, err = http.Get(url)
+	_, err = http.Get(url)
 	require.NotNil(t, err)
 }

@@ -1,3 +1,4 @@
+//go:build !darwin && !windows && !linux
 // +build !darwin,!windows,!linux
 
 package table

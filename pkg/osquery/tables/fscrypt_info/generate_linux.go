@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package fscrypt_info
@@ -9,6 +10,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/osquery-go/plugin/table"
+)
+
+const (
+	allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_.+"
 )
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -42,4 +47,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return results, nil
+}
+
+func boolToRow(v bool) string {
+	if v {
+		return "1"
+	}
+
+	return "0"
 }

@@ -80,7 +80,7 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 	} else {
 		usernamesString := C.LocalUsers()
 		for _, posixName := range strings.Split(C.GoString(usernamesString), " ") {
-			usernames = append(usernames, string(posixName))
+			usernames = append(usernames, posixName)
 		}
 	}
 

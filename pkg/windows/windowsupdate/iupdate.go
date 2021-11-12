@@ -358,6 +358,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 	return iUpdate, nil
 }
 
+//nolint:deadcode
 func toIUpdateCollection(updates []*IUpdate) (*ole.IDispatch, error) {
 	unknown, err := oleutil.CreateObject("Microsoft.Update.UpdateColl")
 	if err != nil {

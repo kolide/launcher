@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package wifi_networks

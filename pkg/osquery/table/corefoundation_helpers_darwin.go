@@ -1,3 +1,4 @@
+//nolint:unconvert
 package table
 
 /*

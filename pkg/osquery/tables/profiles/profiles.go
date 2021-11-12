@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 // Package profiles provides a table wrapper around the various
 // profiles options.

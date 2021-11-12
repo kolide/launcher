@@ -1,3 +1,4 @@
+//nolint:typecheck // parts of this come from bindata, so lint fails
 package autoupdate
 
 import (

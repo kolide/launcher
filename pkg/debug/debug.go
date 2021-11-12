@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 package debug
 
 import (
@@ -113,7 +116,7 @@ func authHandler(token string, logger log.Logger) http.HandlerFunc {
 }
 
 func registerAuthHandler(token string, mux *http.ServeMux, logger log.Logger) {
-	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, http.HandlerFunc(authHandler(token, logger))))
+	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, authHandler(token, logger)))
 }
 
 var indexTmpl = template.Must(template.New("index").Parse(`<html>

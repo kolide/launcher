@@ -1,4 +1,6 @@
+//go:build !windows
 // +build !windows
+
 // (skip building windows, since the newline replacement doesn't work there)
 
 // Package mdmclient provides a table that parses the mdmclient

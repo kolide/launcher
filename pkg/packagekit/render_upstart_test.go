@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 // These tests fail on windows, due to what looks like line ending

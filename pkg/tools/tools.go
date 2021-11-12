@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 /*
@@ -9,8 +10,5 @@ For additional documentation on the topic:
 package tools
 
 import (
-	_ "github.com/alexkohler/nakedret"
-	_ "github.com/client9/misspell/cmd/misspell"
 	_ "github.com/go-bindata/go-bindata/go-bindata"
-	_ "github.com/tsenart/deadcode"
 )
