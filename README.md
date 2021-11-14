@@ -19,10 +19,10 @@ The documentation for this project is included on GitHub in the
 
 ### Secure Osquery Autoupdater
 
-Osquery is statically linked and that allows for the easy bundling and
-distribution of capabilities. Unfortunately, however, it also implies
-that you have to maintain excellent osquery update hygiene in order to
-take advantage of emerging osquery capabilities.
+Osquery is mostly statically linked and this allows for the easy
+bundling and distribution of capabilities. Unfortunately, however, it
+also implies that you have to maintain excellent osquery update
+hygiene in order to take advantage of emerging osquery capabilities.
 
 The Launcher includes the ability to securely manage and autoupdate
 osquery instances. This is implemented using [The Update Framework
