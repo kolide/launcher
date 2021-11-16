@@ -30,8 +30,8 @@ import (
 	"image/png"
 	"unsafe"
 
-	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/nfnt/resize"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"golang.org/x/image/tiff"
 )

@@ -18,9 +18,9 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
+	_ "github.com/mattn/go-sqlite3"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
