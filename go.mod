@@ -43,9 +43,9 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/jinzhu/now v0.0.0-20181116074157-8ec929ed50c3 // indirect
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
-	github.com/knightsc/system_policy v1.1.1-0.20191030190822-139971392acb
+	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20191023141830-6312ecc11c23
-	github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d
+	github.com/kolide/osquery-go v0.0.0-20190904034940-a74aa860032d // indirect
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
@@ -60,6 +60,7 @@ require (
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/osquery/osquery-go v0.0.0-20210622151333-99b4efa62ec5 // indirect
 	github.com/peterbourgon/ff/v3 v3.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2 // indirect
