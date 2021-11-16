@@ -11,7 +11,7 @@ import (
 
 	"strings"
 
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
 	"golang.org/x/sys/windows/registry"

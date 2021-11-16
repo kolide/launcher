@@ -6,8 +6,8 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
-	osquery "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/kolide/launcher/pkg/osquery"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )

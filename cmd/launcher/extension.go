@@ -17,9 +17,9 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	ktable "github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/osquery-go/plugin/config"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	osquerylogger "github.com/kolide/osquery-go/plugin/logger"
+	"github.com/osquery/osquery-go/plugin/config"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )

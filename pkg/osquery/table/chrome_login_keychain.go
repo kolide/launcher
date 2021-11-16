@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // DEPRECATED use kolide_chrome_login_data_emails

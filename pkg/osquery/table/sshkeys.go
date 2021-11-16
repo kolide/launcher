@@ -13,8 +13,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/launcher/pkg/keyidentifier"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 var sshDirs = map[string][]string{

@@ -10,7 +10,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/osquery/table"
-	osquery "github.com/kolide/osquery-go"
+	osquery "github.com/osquery/osquery-go"
 )
 
 func main() {

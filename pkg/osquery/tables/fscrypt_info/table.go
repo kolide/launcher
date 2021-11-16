@@ -2,7 +2,7 @@ package fscrypt_info
 
 import (
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const (

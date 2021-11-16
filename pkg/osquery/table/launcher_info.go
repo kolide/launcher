@@ -5,7 +5,7 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 func LauncherInfoTable() *table.Plugin {

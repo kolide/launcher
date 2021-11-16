@@ -22,7 +22,7 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/packaging"
-	osquery "github.com/kolide/osquery-go"
+	osquery "github.com/osquery/osquery-go"
 	ps "github.com/mitchellh/go-ps"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
