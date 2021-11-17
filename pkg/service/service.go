@@ -6,8 +6,8 @@ package service
 import (
 	"context"
 
-	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 )
 
 // KolideService is the interface exposed by the Kolide server.

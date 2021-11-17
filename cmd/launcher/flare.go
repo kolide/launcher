@@ -24,7 +24,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
-	osquerygo "github.com/kolide/osquery-go"
+	osquerygo "github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
 )
 

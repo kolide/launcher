@@ -9,7 +9,7 @@ import (
 	"runtime"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

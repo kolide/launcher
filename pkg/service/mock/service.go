@@ -6,8 +6,8 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 )
 
 var _ service.KolideService = (*KolideService)(nil)

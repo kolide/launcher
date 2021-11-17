@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 

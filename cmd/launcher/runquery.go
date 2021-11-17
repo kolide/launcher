@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/env"
-	osquerygo "github.com/kolide/osquery-go"
+	osquerygo "github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
 )
 

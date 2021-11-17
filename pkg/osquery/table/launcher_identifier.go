@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
 

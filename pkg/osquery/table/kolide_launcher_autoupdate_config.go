@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const launcherAutoupdateConfigTableName = "kolide_launcher_autoupdate_config"
