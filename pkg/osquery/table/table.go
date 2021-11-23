@@ -3,6 +3,7 @@ package table
 import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
@@ -11,7 +12,8 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// LauncherTables returns launcher-specific tables
+// LauncherTables returns launcher-specific tables. They're based
+// around _launcher_ things thus do not make sense in tables.ext
 func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(db),
@@ -41,6 +43,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
+		tdebug.LauncherGcInfo(client, logger),
 		zfs.ZfsPropertiesPlugin(client, logger),
 		zfs.ZpoolPropertiesPlugin(client, logger),
 	}
