@@ -75,15 +75,23 @@ func main() {
 		opts = append(opts, make.WithGithubActionOutput())
 	}
 
-	optsWithCgo := append(opts, make.WithCgo())
+	// We need to avoid cgo on windows. See
+	// https://github.com/golang/go/issues/22439 which still
+	// appears current, at least with cgo. But, we need to use cgo
+	// on linux (for fscrypt)
+	optsMaybeCgo := opts
+	if *flBuildOS == "linux" {
+		// overwrite with append, since optsMaybyeCgo was a shallow clone
+		optsMaybeCgo = append(opts, make.WithCgo())
+	}
 
 	targetSet := map[string]func(context.Context) error{
 		"deps-go":               make.New(opts...).DepsGo,
 		"install-tools":         make.New(opts...).InstallTools,
 		"generate-tuf":          make.New(opts...).GenerateTUF,
-		"launcher":              make.New(optsWithCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
+		"launcher":              make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
 		"osquery-extension.ext": make.New(opts...).BuildCmd("./cmd/osquery-extension", "osquery-extension.ext"),
-		"tables.ext":            make.New(optsWithCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
+		"tables.ext":            make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
 		"grpc.ext":              make.New(opts...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
 		"package-builder":       make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
 		"make":                  make.New(opts...).BuildCmd("./cmd/make", "make"),

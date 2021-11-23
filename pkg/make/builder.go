@@ -139,6 +139,10 @@ func New(opts ...Option) *Builder {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
 	if b.cgo {
+		if b.os == "windows" {
+			// See https://github.com/kolide/launcher/pull/776
+			panic("Windows and CGO are not friends")
+		}
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
 	}
 
