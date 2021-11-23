@@ -139,6 +139,9 @@ func New(opts ...Option) *Builder {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
 	if b.cgo {
+		if b.os == "windows" {
+			panic("Windows and CGO are not friends")
+		}
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
 	}
 
