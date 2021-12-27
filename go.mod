@@ -28,7 +28,7 @@ require (
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.8.0
-	github.com/go-ole/go-ole v1.2.4
+	github.com/go-ole/go-ole v1.2.6
 	github.com/gogo/protobuf v1.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
@@ -59,7 +59,7 @@ require (
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
-	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/osquery/osquery-go v0.0.0-20210622151333-99b4efa62ec5 // indirect
 	github.com/peterbourgon/ff/v3 v3.0.0
 	github.com/pkg/errors v0.8.1
