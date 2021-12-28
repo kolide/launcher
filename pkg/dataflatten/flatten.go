@@ -460,6 +460,10 @@ func stringify(data interface{}) (string, error) {
 			return s, nil
 		}
 		return base64.StdEncoding.EncodeToString(v), nil
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint32:
 		return strconv.FormatUint(uint64(v), 10), nil
 	case uint64:
@@ -470,6 +474,10 @@ func stringify(data interface{}) (string, error) {
 		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case int:
 		return strconv.Itoa(v), nil
+	case int8:
+		return strconv.FormatInt(int64(v), 10), nil
+	case int16:
+		return strconv.FormatInt(int64(v), 10), nil
 	case int32:
 		return strconv.FormatInt(int64(v), 10), nil
 	case int64:
