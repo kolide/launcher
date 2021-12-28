@@ -460,6 +460,8 @@ func stringify(data interface{}) (string, error) {
 			return s, nil
 		}
 		return base64.StdEncoding.EncodeToString(v), nil
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint32:
 		return strconv.FormatUint(uint64(v), 10), nil
 	case uint64:
