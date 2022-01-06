@@ -91,8 +91,7 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
-	// Create a rolling logger to handle debug. As this is meant as an internal debugging
-	// tool, options are hardcoded.
+	// Create a local, debug, logger. This logs to a known path
 	if opts.RootDirectory != "" {
 		logger = teelogger.New(logger, debuglogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
