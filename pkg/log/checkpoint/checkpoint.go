@@ -18,6 +18,11 @@ func Run(logger log.Logger, db *bbolt.DB) {
 	}
 
 	go func() {
+		logger.Log(
+			"msg", "log checkpoint started",
+			"hostname", hostname,
+		)
+
 		for range time.Tick(time.Minute * 60) {
 			logger.Log(
 				"msg", "log checkpoint",
