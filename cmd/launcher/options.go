@@ -78,6 +78,9 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+
+		// deprecated options, kept for any kind of config file compatibility
+		_ = flagset.String("debug_log_file", "", "DEPRECATED")
 	)
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
 
