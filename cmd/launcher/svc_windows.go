@@ -17,12 +17,12 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/debuglogger"
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // TODO This should be inherited from some setting
@@ -54,12 +54,7 @@ func runWindowsSvc(args []string) error {
 	// Create a rolling logger to handle debug. As this is meant as an internal debugging
 	// tool, options are hardcoded.
 	if opts.RootDirectory != "" {
-		lj := &lumberjack.Logger{
-			Filename:   filepath.Join(opts.RootDirectory, "debug.log"),
-			MaxSize:    2, // megabytes
-			MaxBackups: 3,
-		}
-		logger = teelogger.New(logger, log.NewJSONLogger(log.NewSyncWriter(lj)))
+		logger = teelogger.New(logger, debuglogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger

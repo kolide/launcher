@@ -10,7 +10,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -18,9 +17,9 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
+	"github.com/kolide/launcher/pkg/log/debuglogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
@@ -95,12 +94,7 @@ func main() {
 	// Create a rolling logger to handle debug. As this is meant as an internal debugging
 	// tool, options are hardcoded.
 	if opts.RootDirectory != "" {
-		lj := &lumberjack.Logger{
-			Filename:   filepath.Join(opts.RootDirectory, "debug.log"),
-			MaxSize:    2, // megabytes
-			MaxBackups: 3,
-		}
-		logger = teelogger.New(logger, log.NewJSONLogger(log.NewSyncWriter(lj)))
+		logger = teelogger.New(logger, debuglogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
 
 	defer func() {
