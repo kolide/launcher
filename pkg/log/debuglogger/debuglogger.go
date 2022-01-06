@@ -24,7 +24,11 @@ func NewKitLogger(logFilePath string) log.Logger {
 	}
 
 	dl := debugLogger{
-		logger: log.NewJSONLogger(log.NewSyncWriter(lj)),
+		logger: log.With(
+			log.NewJSONLogger(log.NewSyncWriter(lj)),
+			"ts", log.DefaultTimestampUTC,
+			"caller", log.DefaultCaller, ///log.Caller(6),
+		),
 	}
 
 	return dl

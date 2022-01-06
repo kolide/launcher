@@ -1,7 +1,6 @@
 package debuglogger
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -48,8 +47,8 @@ func TestKitLogging(t *testing.T) {
 		"one":     "two",
 		"results": truncatedLongString,
 	}
-	expectedJson, err := json.Marshal(expected)
-	require.NoError(t, err, "json marshal expected")
+	//	expectedJson, err := json.Marshal(expected)
+	//require.NoError(t, err, "json marshal expected")
 
 	tmpfile, err := ioutil.TempFile("", "test-debuglogger")
 	require.NoError(t, err, "make temp file")
@@ -62,9 +61,15 @@ func TestKitLogging(t *testing.T) {
 
 	logger.Log(data...)
 
-	contents, err := os.ReadFile(tmpfile.Name())
+	contentsRaw, err := os.ReadFile(tmpfile.Name())
 	require.NoError(t, err, "read temp file")
 
-	assert.Equal(t, expectedJson, bytes.TrimSuffix(contents, []byte("\n")))
+	var contents map[string]string
+	require.NoError(t, json.Unmarshal(contentsRaw, &contents), "unmarshal json")
+
+	// can't compare the whole thing, since we have extra values from timestamp and caller
+	for k, v := range expected {
+		assert.Equal(t, v, contents[k])
+	}
 
 }
