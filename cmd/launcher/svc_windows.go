@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -21,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // TODO This should be inherited from some setting
@@ -49,20 +51,15 @@ func runWindowsSvc(args []string) error {
 		os.Exit(1)
 	}
 
-	if opts.DebugLogFile != "" {
-		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			level.Info(logger).Log("msg", "Failed to create file logger", "err", err)
-			os.Exit(2)
+	// Create a rolling logger to handle debug. As this is meant as an internal debugging
+	// tool, options are hardcoded.
+	if opts.RootDirectory != "" {
+		lj := &lumberjack.Logger{
+			Filename:   filepath.Join(opts.RootDirectory, "debug.log"),
+			MaxSize:    2, // megabytes
+			MaxBackups: 3,
 		}
-		defer logMirror.Close()
-
-		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
-		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-		logger = teelogger.New(logger, fileLogger)
-
-		level.Info(logger).Log("msg", "Mirroring logs to file", "file", logMirror.Name())
+		logger = teelogger.New(logger, log.NewJSONLogger(log.NewSyncWriter(lj)))
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger

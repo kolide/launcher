@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
@@ -90,20 +92,15 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
-	if opts.DebugLogFile != "" {
-		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
-			os.Exit(2)
+	// Create a rolling logger to handle debug. As this is meant as an internal debugging
+	// tool, options are hardcoded.
+	if opts.RootDirectory != "" {
+		lj := &lumberjack.Logger{
+			Filename:   filepath.Join(opts.RootDirectory, "debug.log"),
+			MaxSize:    2, // megabytes
+			MaxBackups: 3,
 		}
-		defer logMirror.Close()
-
-		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
-		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-		logger = teelogger.New(logger, fileLogger)
-
-		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
+		logger = teelogger.New(logger, log.NewJSONLogger(log.NewSyncWriter(lj)))
 	}
 
 	defer func() {

@@ -73,7 +73,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 		// Development options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
-		flDebugLogFile      = flagset.String("debug_log_file", "", "File to mirror debug logs to (optional)")
 		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
 		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
@@ -156,7 +155,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		Control:                *flControl,
 		ControlServerURL:       *flControlServerURL,
 		Debug:                  *flDebug,
-		DebugLogFile:           *flDebugLogFile,
 		DisableControlTLS:      *flDisableControlTLS,
 		EnableInitialRunner:    *flInitialRunner,
 		EnrollSecret:           *flEnrollSecret,
