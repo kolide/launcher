@@ -1,4 +1,4 @@
-package debuglogger
+package locallogger
 
 import (
 	"encoding/json"
@@ -50,7 +50,7 @@ func TestKitLogging(t *testing.T) {
 	//	expectedJson, err := json.Marshal(expected)
 	//require.NoError(t, err, "json marshal expected")
 
-	tmpfile, err := ioutil.TempFile("", "test-debuglogger")
+	tmpfile, err := ioutil.TempFile("", "test-locallogger")
 	require.NoError(t, err, "make temp file")
 	defer os.Remove(tmpfile.Name())
 

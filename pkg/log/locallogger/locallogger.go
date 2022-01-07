@@ -1,4 +1,4 @@
-package debuglogger
+package locallogger
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ const (
 	truncatedFormatString = "%s[TRUNCATED]"
 )
 
-type debugLogger struct {
+type localLogger struct {
 	logger log.Logger
 }
 
@@ -24,7 +24,7 @@ func NewKitLogger(logFilePath string) log.Logger {
 		MaxBackups: 5,
 	}
 
-	dl := debugLogger{
+	ll := localLogger{
 		logger: log.With(
 			log.NewJSONLogger(log.NewSyncWriter(lj)),
 			"ts", log.DefaultTimestampUTC,
@@ -32,12 +32,12 @@ func NewKitLogger(logFilePath string) log.Logger {
 		),
 	}
 
-	return dl
+	return ll
 }
 
-func (dl debugLogger) Log(keyvals ...interface{}) error {
+func (ll localLogger) Log(keyvals ...interface{}) error {
 	filterResults(keyvals...)
-	return dl.logger.Log(keyvals...)
+	return ll.logger.Log(keyvals...)
 }
 
 // filterResults filteres out the osquery results,

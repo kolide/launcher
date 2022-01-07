@@ -17,7 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
-	"github.com/kolide/launcher/pkg/log/debuglogger"
+	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 )
@@ -91,9 +91,9 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
-	// Create a local, debug, logger. This logs to a known path
+	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, debuglogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
 
 	defer func() {
