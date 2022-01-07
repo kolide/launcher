@@ -17,6 +17,12 @@ func Run(logger log.Logger, db *bbolt.DB) {
 		hostname = fmt.Sprintf("ERROR: %s", err)
 	}
 
+	// Things to add:
+	//  * database sizes
+	//  * server ping
+	//  * invoke osquery for better hardware info
+	//  * runtime stats, like memory allocations
+
 	go func() {
 		logger.Log(
 			"msg", "log checkpoint started",
