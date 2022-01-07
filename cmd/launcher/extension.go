@@ -88,13 +88,13 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		logger,
 		kolidelog.WithLevelFunc(level.Info),
 		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("level", "stderr"),
+		kolidelog.WithKeyValue("osqlevel", "stderr"),
 	)
 	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
 		logger,
 		kolidelog.WithLevelFunc(level.Debug),
 		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("level", "stdout"),
+		kolidelog.WithKeyValue("osqlevel", "stdout"),
 	)
 
 	runner := runtime.LaunchUnstartedInstance(
