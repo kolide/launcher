@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
@@ -90,6 +91,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return errors.Wrap(err, "write launcher pid to file")
 	}
+
+	// Try to ensure useful info in the logs
+	checkpoint.Run(logger, db)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -17,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
+	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
@@ -49,20 +51,9 @@ func runWindowsSvc(args []string) error {
 		os.Exit(1)
 	}
 
-	if opts.DebugLogFile != "" {
-		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			level.Info(logger).Log("msg", "Failed to create file logger", "err", err)
-			os.Exit(2)
-		}
-		defer logMirror.Close()
-
-		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
-		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-		logger = teelogger.New(logger, fileLogger)
-
-		level.Info(logger).Log("msg", "Mirroring logs to file", "file", logMirror.Name())
+	// Create a local logger. This logs to a known path, and aims to help diagnostics
+	if opts.RootDirectory != "" {
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger
