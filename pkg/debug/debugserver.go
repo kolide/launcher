@@ -1,6 +1,3 @@
-//go:build !windows
-// +build !windows
-
 package debug
 
 import (
@@ -31,9 +28,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	// Start the debug server
 	r := http.NewServeMux()
 	registerAuthHandler(token.String(), r, logger)
-	serv := http.Server{
-		Handler: r,
-	}
+	serv := http.Server{}
 	// Allow the OS to pick an open port. Not intended to be a security
 	// mechanism, only intended to ensure we don't try to bind to an
 	// already used port.
@@ -100,6 +95,7 @@ func handler(token string, logger log.Logger) http.HandlerFunc {
 			nhpprof.Symbol(w, r)
 		default:
 			// Provides access to all profiles under runtime/pprof
+			name = strings.TrimPrefix(r.URL.Path, "debug/pprof/")
 			nhpprof.Handler(name).ServeHTTP(w, r)
 		}
 	}
