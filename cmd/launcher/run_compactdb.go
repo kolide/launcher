@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/pkg/errors"
