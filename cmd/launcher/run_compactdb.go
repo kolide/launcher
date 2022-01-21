@@ -11,8 +11,6 @@ import (
 )
 
 func runCompactDb(args []string) error {
-	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
-
 	opts, err := parseOptions(args)
 	if err != nil {
 		return err
@@ -23,7 +21,7 @@ func runCompactDb(args []string) error {
 	}
 
 	// relevel
-	logger = logutil.NewServerLogger(opts.Debug)
+	logger := logutil.NewServerLogger(opts.Debug)
 
 	boltPath := filepath.Join(opts.RootDirectory, "launcher.db")
 
