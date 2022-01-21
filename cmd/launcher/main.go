@@ -129,6 +129,8 @@ func runSubcommands() error {
 		run = runWindowsSvcForeground
 	case "version":
 		run = runVersion
+	case "compactdb":
+		run = runCompactDb
 	default:
 		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}
