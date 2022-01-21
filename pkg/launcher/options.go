@@ -76,4 +76,6 @@ type Options struct {
 	InsecureTLS bool
 	// InsecureTransport disables TLS in the transport layer.
 	InsecureTransport bool
+	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
+	CompactDbMaxTx int64
 }

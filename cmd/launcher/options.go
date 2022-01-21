@@ -60,6 +60,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flVersion             = flagset.Bool("version", false, "Print Launcher version and exit")
 		flLogMaxBytesPerBatch = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
 		flOsqueryFlags        arrayFlags // set below with flagset.Var
+		flCompactDbMaxTx      = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		_                     = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// Autoupdate options
@@ -155,6 +156,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		AutoupdateInterval:     *flAutoupdateInterval,
 		AutoupdateInitialDelay: *flAutoupdateInitialDelay,
 		CertPins:               certPins,
+		CompactDbMaxTx:         *flCompactDbMaxTx,
 		Control:                *flControl,
 		ControlServerURL:       *flControlServerURL,
 		Debug:                  *flDebug,
