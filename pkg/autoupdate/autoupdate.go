@@ -66,6 +66,7 @@ type UpdateChannel string
 
 const (
 	Stable  UpdateChannel = "stable"
+	Alpha                 = "alpha"
 	Beta                  = "beta"
 	Nightly               = "nightly"
 )

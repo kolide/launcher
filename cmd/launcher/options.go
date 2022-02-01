@@ -140,6 +140,8 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		updateChannel = autoupdate.Stable
 	case "beta":
 		updateChannel = autoupdate.Beta
+	case "alpha":
+		updateChannel = autoupdate.Alpha
 	case "nightly":
 		updateChannel = autoupdate.Nightly
 	default:
