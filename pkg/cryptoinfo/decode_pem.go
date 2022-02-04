@@ -15,7 +15,7 @@ func decodePem(pemBytes []byte) ([]*KeyInfo, error) {
 		block, pemBytes = pem.Decode(pemBytes)
 		if block == nil {
 			// When pem.Decode finds no pem, it returns a nil block, and the input as rest.
-			// In that case, we stop parsing, as anything else would land in an infinet loop
+			// In that case, we stop parsing, as anything else would land in an infinite loop
 			break
 		}
 
