@@ -74,6 +74,7 @@ func parseCertificate(certBytes []byte) (interface{}, error) {
 }
 
 var keyUsageBits = map[x509.KeyUsage]string{
+        x509.KeyUsageDigitalSignature: "Digital Signature",
 	x509.KeyUsageContentCommitment: "Content Commitment",
 	x509.KeyUsageKeyEncipherment:   "Key Encipherment",
 	x509.KeyUsageDataEncipherment:  "Data Encipherment",
