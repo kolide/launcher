@@ -3,12 +3,10 @@ package cryptoinfo
 import (
 	"encoding/pem"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 )
 
-func decodePem(logger log.Logger, pemBytes []byte) ([]*KeyInfo, error) {
+func decodePem(pemBytes []byte) ([]*KeyInfo, error) {
 	expanded := []*KeyInfo{}
 
 	// Loop over the bytes, reading pem blocks
@@ -18,7 +16,6 @@ func decodePem(logger log.Logger, pemBytes []byte) ([]*KeyInfo, error) {
 		if block == nil {
 			// When pem.Decode finds no pem, it returns a nil block, and the input as rest.
 			// In that case, we stop parsing, as anything else would land in an infinet loop
-			level.Debug(logger).Log("msg", "Partial read in file.")
 			break
 		}
 

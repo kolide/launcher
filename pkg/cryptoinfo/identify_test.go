@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,8 +51,6 @@ func TestIdentify(t *testing.T) {
 		},
 	}
 
-	logger := log.NewNopLogger()
-
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
 			in := []byte{}
@@ -63,7 +60,7 @@ func TestIdentify(t *testing.T) {
 				in = bytes.Join([][]byte{in, fileBytes}, nil)
 			}
 
-			results, err := Identify(logger, in)
+			results, err := Identify(in)
 			if tt.expectedError {
 				require.Error(t, err)
 				return

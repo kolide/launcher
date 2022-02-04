@@ -5,8 +5,6 @@ package cryptoinfo
 
 import (
 	"bytes"
-
-	"github.com/go-kit/kit/log"
 )
 
 var (
@@ -16,15 +14,14 @@ var (
 	//pkcs12LeadingBytes      = nil
 )
 
-
 // Identify examines a []byte and attempts to descern what
 // cryptographic material is contained within.
-func Identify(logger log.Logger, data []byte) ([]*KeyInfo, error) {
+func Identify(data []byte) ([]*KeyInfo, error) {
 	switch {
 	case bytes.HasPrefix(data, certificateLeadingBytes):
 		return []*KeyInfo{expandDer(data)}, nil
 	default:
-		return decodePem(logger, data)
+		return decodePem(data)
 	}
 }
 
