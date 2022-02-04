@@ -38,6 +38,10 @@ func (ki *KeyInfo) SetData(data interface{}, err error) *KeyInfo {
 	return ki
 }
 
+// MarshalJSON is used by the go json marshaller. Using a custom one here
+// allows us a high degree of control over the resulting output. For example,
+// it allows us to use the same struct here to encapsulate both keys and
+// certificate, and still have somewhat differenciated output
 func (ki *KeyInfo) MarshalJSON() ([]byte, error) {
 	// this feels somewhat inefficient WRT to allocations and shoving maps around. But it
 	// also feels the simplest way to get consistent behavior without needing to push
