@@ -16,7 +16,8 @@ func flattenCryptoInfo(filename string, opts ...dataflatten.FlattenOpts) ([]data
 		return nil, errors.Wrapf(err, "reading %s", filename)
 	}
 
-	result, err := cryptoinfo.Identify(filebytes)
+	// As sending a password through a query would expose it all over the place, we pass an empty string in
+	result, err := cryptoinfo.Identify(filebytes, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing with cryptoinfo")
 	}

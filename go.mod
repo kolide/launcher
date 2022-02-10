@@ -74,9 +74,9 @@ require (
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/ini.v1 v1.61.0 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
-	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78 // indirect
+	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
 
 go 1.16
