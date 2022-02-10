@@ -6,5 +6,5 @@ func tryDer(data []byte, _password string) ([]*KeyInfo, error) {
 		return nil, err
 	}
 
-	return []*KeyInfo{NewKICertificate(kiDER).SetData(cert, err)}, nil
+	return []*KeyInfo{NewCertificate(kiDER).SetData(cert, err)}, nil
 }

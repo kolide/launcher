@@ -11,15 +11,15 @@ func tryP12(data []byte, password string) ([]*KeyInfo, error) {
 	results := []*KeyInfo{}
 
 	if privateKey != nil {
-		results = append(results, NewKIKey(kiP12))
+		results = append(results, NewKey(kiP12))
 	}
 
 	if cert != nil {
-		results = append(results, NewKICertificate(kiP12).SetData(extractCert(cert)))
+		results = append(results, NewCertificate(kiP12).SetData(extractCert(cert)))
 	}
 
 	for _, c := range caCerts {
-		results = append(results, NewKICaCertificate(kiP12).SetData(extractCert(c)))
+		results = append(results, NewCaCertificate(kiP12).SetData(extractCert(c)))
 	}
 
 	return results, nil

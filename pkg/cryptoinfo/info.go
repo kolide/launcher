@@ -38,7 +38,7 @@ const (
 	kiP12            = "P12"
 )
 
-func NewKIKey(encoding kiEncoding) *KeyInfo {
+func NewKey(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiKey,
 		Encoding: encoding,
@@ -46,7 +46,7 @@ func NewKIKey(encoding kiEncoding) *KeyInfo {
 	}
 }
 
-func NewKICertificate(encoding kiEncoding) *KeyInfo {
+func NewCertificate(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiCertificate,
 		Encoding: encoding,
@@ -54,7 +54,7 @@ func NewKICertificate(encoding kiEncoding) *KeyInfo {
 	}
 }
 
-func NewKICaCertificate(encoding kiEncoding) *KeyInfo {
+func NewCaCertificate(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiCaCertificate,
 		Encoding: encoding,
@@ -62,7 +62,7 @@ func NewKICaCertificate(encoding kiEncoding) *KeyInfo {
 	}
 }
 
-func NewKIError(encoding kiEncoding, err error) *KeyInfo {
+func NewError(encoding kiEncoding, err error) *KeyInfo {
 	return &KeyInfo{
 		Encoding: encoding,
 		Error:    err,

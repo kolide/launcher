@@ -31,8 +31,8 @@ func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
 func expandPem(block *pem.Block) *KeyInfo {
 	switch block.Type {
 	case "CERTIFICATE":
-		return NewKICertificate(kiPEM).SetHeaders(block.Headers).SetData(parseCertificate(block.Bytes))
+		return NewCertificate(kiPEM).SetHeaders(block.Headers).SetData(parseCertificate(block.Bytes))
 	}
 
-	return NewKIError(kiPEM, fmt.Errorf("Unknown block type: %s", block.Type))
+	return NewError(kiPEM, fmt.Errorf("Unknown block type: %s", block.Type))
 }
