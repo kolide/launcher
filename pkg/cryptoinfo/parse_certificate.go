@@ -49,6 +49,10 @@ func parseCertificate(certBytes []byte) (interface{}, error) {
 		return nil, errors.Wrap(err, "parsing cert")
 	}
 
+	return extractCert(c)
+}
+
+func extractCert(c *x509.Certificate) (interface{}, error) {
 	return &certExtract{
 		CRLDistributionPoints: c.CRLDistributionPoints,
 		DNSNames:              c.DNSNames,
@@ -70,7 +74,6 @@ func parseCertificate(certBytes []byte) (interface{}, error) {
 		URIs:                  c.URIs,
 		Version:               c.Version,
 	}, nil
-
 }
 
 var keyUsageBits = map[x509.KeyUsage]string{

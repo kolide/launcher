@@ -13,18 +13,52 @@ type KeyInfo struct {
 
 // Maybe make these types?
 const (
-	kiPEM         = "PEM"
-	kiDER         = "DER"
-	kiCertificate = "CERTIFICATE"
+	kiPEM = "PEM"
+	kiDER = "DER"
+	kiP12 = "P12"
+
+	kiCACERTIFICATE = "CA-CERTIFICATE" // What is correct here?
+	kiCaCertificate = "certificate"
+	kiCERTIFICATE   = "CERTIFICATE"
+	kiCertificate   = "certificate"
+	kiKEY           = "KEY"
+	kiKey           = "key"
 )
 
-func NewKeyInfo(typ, encoding string, headers map[string]string) *KeyInfo {
+func NewKIKey(encoding string) *KeyInfo {
 	return &KeyInfo{
-		Type:     typ,
+		DataName: kiKey,
 		Encoding: encoding,
-		Headers:  headers,
+		Type:     kiKEY,
 	}
+}
 
+func NewKICertificate(encoding string) *KeyInfo {
+	return &KeyInfo{
+		DataName: kiCertificate,
+		Encoding: encoding,
+		Type:     kiCERTIFICATE,
+	}
+}
+
+func NewKICaCertificate(encoding string) *KeyInfo {
+	return &KeyInfo{
+		DataName: kiCaCertificate,
+		Encoding: encoding,
+		Type:     kiCACERTIFICATE,
+	}
+}
+
+func NewKIError(encoding string, err error) *KeyInfo {
+	return &KeyInfo{
+		Encoding: encoding,
+		Error:    err,
+	}
+}
+
+func (ki *KeyInfo) SetHeaders(headers map[string]string) *KeyInfo {
+	ki.Headers = headers
+	return ki
 }
 
 func (ki *KeyInfo) SetDataName(name string) *KeyInfo {

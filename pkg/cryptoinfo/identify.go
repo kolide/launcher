@@ -4,30 +4,34 @@
 package cryptoinfo
 
 import (
-	"bytes"
+	"errors"
 )
 
-var (
-	certificateLeadingBytes = []byte{0x30} // used to detect raw DER certs
-	//pkcs1LeadingBytes       = nil
-	//pkcs8LeadingBytes       = nil
-	//pkcs12LeadingBytes      = nil
-)
+type identifierSigfunc func(data []byte, password string) (results []*KeyInfo, err error)
+
+var identifiers = []identifierSigfunc{
+	tryP12,
+	tryDer,
+	tryPem,
+}
 
 // Identify examines a []byte and attempts to descern what
 // cryptographic material is contained within.
 func Identify(data []byte) ([]*KeyInfo, error) {
-	switch {
-	case bytes.HasPrefix(data, certificateLeadingBytes):
-		return []*KeyInfo{expandDer(data)}, nil
-	default:
-		return decodePem(data)
+	for _, fn := range identifiers {
+		res, err := fn(data, "")
+		if err == nil {
+			return res, nil
+		}
 	}
+	return nil, errors.New("FIXME")
 }
 
-func expandDer(data []byte) *KeyInfo {
-	ki := NewKeyInfo(kiDER, kiCertificate, nil)
-	ki.SetDataName("certificate")
-	ki.SetData(parseCertificate(data))
-	return ki
+func tryDer(data []byte, _password string) ([]*KeyInfo, error) {
+	cert, err := parseCertificate(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*KeyInfo{NewKICertificate(kiDER).SetData(cert, err)}, nil
 }
