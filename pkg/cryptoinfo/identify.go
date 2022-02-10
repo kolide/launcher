@@ -26,6 +26,6 @@ func Identify(data []byte, password string) ([]*KeyInfo, error) {
 	}
 
 	// If we can't parse anything, return nothing. It's not a fatal error, and it's
-	// somewhart obvious from context that nothing was parsed.
+	// somewhat obvious from context that nothing was parsed.
 	return nil, nil
 }

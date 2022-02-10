@@ -22,7 +22,7 @@ func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
 	}
 
 	if len(expanded) == 0 {
-		return nil, fmt.Errorf("No pem decodes")
+		return nil, fmt.Errorf("No pem decoded")
 	}
 
 	return expanded, nil
