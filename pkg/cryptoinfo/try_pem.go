@@ -2,8 +2,7 @@ package cryptoinfo
 
 import (
 	"encoding/pem"
-
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
@@ -23,7 +22,7 @@ func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
 	}
 
 	if len(expanded) == 0 {
-		return nil, errors.New("No pem decodes")
+		return nil, fmt.Errorf("No pem decodes")
 	}
 
 	return expanded, nil
@@ -35,5 +34,5 @@ func expandPem(block *pem.Block) *KeyInfo {
 		return NewKICertificate(kiPEM).SetHeaders(block.Headers).SetData(parseCertificate(block.Bytes))
 	}
 
-	return NewKIError(kiPEM, errors.Errorf("Unknown block type: %s", block.Type))
+	return NewKIError(kiPEM, fmt.Errorf("Unknown block type: %s", block.Type))
 }

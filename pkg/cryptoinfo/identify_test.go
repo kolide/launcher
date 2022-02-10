@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,60 +16,57 @@ func TestIdentify(t *testing.T) {
 
 	var tests = []struct {
 		in               []string
+		password         string
 		expectedCount    int
 		expectedError    bool
 		expectedSubjects []string
 	}{
-		/*
-			{
-				in:               []string{filepath.Join("testdata", "test_crt.pem")},
-				expectedCount:    1,
-				expectedSubjects: []string{"www.example.com"},
-			},
-			{
-				in:               []string{filepath.Join("testdata", "test_crt.pem"), filepath.Join("testdata", "test_crt.pem")},
-				expectedCount:    2,
-				expectedSubjects: []string{"www.example.com", "www.example.com"},
-			},
-			{
-				in:               []string{filepath.Join("testdata", "test_crt.der")},
-				expectedCount:    1,
-				expectedSubjects: []string{"www.example.com"},
-			},
-			{
-				in:            []string{filepath.Join("testdata", "empty")},
-				expectedCount: 0,
-			},
-			{
-				in:            []string{filepath.Join("testdata", "sslcerts.pem")},
-				expectedCount: 129,
-				expectedSubjects: []string{
-					"Autoridad de Certificacion Firmaprofesional CIF A62634068",
-					"Chambers of Commerce Root - 2008",
-					"Global Chambersign Root - 2008",
-					"ACCVRAIZ1",
-					"Actalis Authentication Root CA",
-				},
-			},
-		*/
-
-		/*
-			{
-				in:               []string{filepath.Join("testdata", "test-unenc.p12")},
-				expectedCount:    1,
-				expectedSubjects: []string{"www.example.com"},
-			},
-		*/
 
 		{
-			in:               []string{filepath.Join("testdata", "test-enc.p12")}, //password is test123
+			in:               []string{filepath.Join("testdata", "test_crt.pem")},
 			expectedCount:    1,
+			expectedSubjects: []string{"www.example.com"},
+		},
+		{
+			in:               []string{filepath.Join("testdata", "test_crt.pem"), filepath.Join("testdata", "test_crt.pem")},
+			expectedCount:    2,
+			expectedSubjects: []string{"www.example.com", "www.example.com"},
+		},
+		{
+			in:               []string{filepath.Join("testdata", "test_crt.der")},
+			expectedCount:    1,
+			expectedSubjects: []string{"www.example.com"},
+		},
+		{
+			in:            []string{filepath.Join("testdata", "empty")},
+			expectedCount: 0,
+		},
+		{
+			in:            []string{filepath.Join("testdata", "sslcerts.pem")},
+			expectedCount: 129,
+			expectedSubjects: []string{
+				"Autoridad de Certificacion Firmaprofesional CIF A62634068",
+				"Chambers of Commerce Root - 2008",
+				"Global Chambersign Root - 2008",
+				"ACCVRAIZ1",
+				"Actalis Authentication Root CA",
+			},
+		},
+		{
+			in:               []string{filepath.Join("testdata", "test-unenc.p12")},
+			expectedCount:    2,
+			expectedSubjects: []string{"www.example.com"},
+		},
+		{
+			in:               []string{filepath.Join("testdata", "test-enc.p12")}, //password is test123
+			password:         "test123",
+			expectedCount:    2,
 			expectedSubjects: []string{"www.example.com"},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(strings.Join(tt.in, ","), func(t *testing.T) {
 			in := []byte{}
 			for _, file := range tt.in {
 				fileBytes, err := os.ReadFile(file)
@@ -76,7 +74,7 @@ func TestIdentify(t *testing.T) {
 				in = bytes.Join([][]byte{in, fileBytes}, nil)
 			}
 
-			results, err := Identify(in)
+			results, err := Identify(in, tt.password)
 			if tt.expectedError {
 				require.Error(t, err)
 				return
@@ -86,8 +84,11 @@ func TestIdentify(t *testing.T) {
 			assert.Len(t, results, tt.expectedCount)
 
 			for i, expectedSubject := range tt.expectedSubjects {
+				// Some things aren't certs, just skep them for the expectedSubject test
 				cert, ok := results[i].Data.(*certExtract)
-				require.True(t, ok, "type assert")
+				if !ok {
+					continue
+				}
 				assert.Equal(t, expectedSubject, cert.Subject.CommonName)
 			}
 		})

@@ -3,10 +3,6 @@
 // with dataflatten, and may eventually it may replace pkg/keyidentifier
 package cryptoinfo
 
-import (
-	"errors"
-)
-
 type identifierSigfunc func(data []byte, password string) (results []*KeyInfo, err error)
 
 var identifiers = []identifierSigfunc{
@@ -17,14 +13,17 @@ var identifiers = []identifierSigfunc{
 
 // Identify examines a []byte and attempts to descern what
 // cryptographic material is contained within.
-func Identify(data []byte) ([]*KeyInfo, error) {
+func Identify(data []byte, password string) ([]*KeyInfo, error) {
 	for _, fn := range identifiers {
-		res, err := fn(data, "")
+		res, err := fn(data, password)
 		if err == nil {
 			return res, nil
 		}
 	}
-	return nil, errors.New("FIXME")
+
+	// If we can't parse anything, return nothing. It's not a fatal error, and it's
+	// somewhart obvious from context that nothing was parsed. q
+	return nil, nil
 }
 
 func tryDer(data []byte, _password string) ([]*KeyInfo, error) {
