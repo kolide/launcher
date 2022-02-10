@@ -3,9 +3,11 @@
 // with dataflatten, and may eventually it may replace pkg/keyidentifier
 package cryptoinfo
 
-type identifierSigfunc func(data []byte, password string) (results []*KeyInfo, err error)
+// identifierSignature is an internal type to denote the identification functions. It's
+// used to add a small amount of clarity to the array of possible identifiers.
+type identifierSignature func(data []byte, password string) (results []*KeyInfo, err error)
 
-var defaultIdentifiers = []identifierSigfunc{
+var defaultIdentifiers = []identifierSignature{
 	tryP12,
 	tryDer,
 	tryPem,
