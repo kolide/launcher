@@ -2,14 +2,9 @@ package cryptoinfo
 
 import p12 "software.sslmate.com/src/go-pkcs12"
 
-func tryTrustStore(data []byte) ([]*KeyInfo, error) {
-	return nil, nil
-}
-
 func tryP12(data []byte, password string) ([]*KeyInfo, error) {
 	privateKey, cert, caCerts, err := p12.DecodeChain(data, password)
 	if err != nil {
-		// TODO: Do some errors indicate that this _is_ a p12, but with some kind of error state?
 		return nil, err
 	}
 

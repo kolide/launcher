@@ -5,7 +5,7 @@ package cryptoinfo
 
 type identifierSigfunc func(data []byte, password string) (results []*KeyInfo, err error)
 
-var identifiers = []identifierSigfunc{
+var defaultIdentifiers = []identifierSigfunc{
 	tryP12,
 	tryDer,
 	tryPem,
@@ -14,7 +14,11 @@ var identifiers = []identifierSigfunc{
 // Identify examines a []byte and attempts to descern what
 // cryptographic material is contained within.
 func Identify(data []byte, password string) ([]*KeyInfo, error) {
-	for _, fn := range identifiers {
+
+	// Try the identifiers. Some future work might be to allow
+	// callers to specify identifier order, or to try to discern
+	// it from the file extension. But meanwhile, just try everything.
+	for _, fn := range defaultIdentifiers {
 		res, err := fn(data, password)
 		if err == nil {
 			return res, nil
@@ -22,15 +26,6 @@ func Identify(data []byte, password string) ([]*KeyInfo, error) {
 	}
 
 	// If we can't parse anything, return nothing. It's not a fatal error, and it's
-	// somewhart obvious from context that nothing was parsed. q
+	// somewhart obvious from context that nothing was parsed.
 	return nil, nil
-}
-
-func tryDer(data []byte, _password string) ([]*KeyInfo, error) {
-	cert, err := parseCertificate(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*KeyInfo{NewKICertificate(kiDER).SetData(cert, err)}, nil
 }

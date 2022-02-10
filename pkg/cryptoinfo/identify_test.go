@@ -83,13 +83,23 @@ func TestIdentify(t *testing.T) {
 			require.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
 
-			for i, expectedSubject := range tt.expectedSubjects {
+			// If we have expected subjects, do they match?
+			count := 0
+			for _, returnedCert := range results {
 				// Some things aren't certs, just skep them for the expectedSubject test
-				cert, ok := results[i].Data.(*certExtract)
+				cert, ok := returnedCert.Data.(*certExtract)
 				if !ok {
 					continue
 				}
-				assert.Equal(t, expectedSubject, cert.Subject.CommonName)
+
+				count++
+
+				// If we don't have any more expected subjects, just break
+				if count > len(tt.expectedSubjects) {
+					break
+				}
+
+				assert.Equal(t, tt.expectedSubjects[count-1], cert.Subject.CommonName)
 			}
 		})
 	}
