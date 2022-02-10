@@ -3,29 +3,42 @@ package cryptoinfo
 import "encoding/json"
 
 type KeyInfo struct {
-	Type     string
-	Encoding string
+	Type     kiType
+	Encoding kiEncoding
 	Data     interface{}
-	DataName string
+	DataName kiDataNames
 	Error    error
 	Headers  map[string]string
 }
 
-// Maybe make these types?
-const (
-	kiPEM = "PEM"
-	kiDER = "DER"
-	kiP12 = "P12"
+// kiDataNames is an internal type. It's used to help provide uniformity in the returned data.
+type kiDataNames string
 
-	kiCACERTIFICATE = "CA-CERTIFICATE" // What is correct here?
-	kiCaCertificate = "certificate"
-	kiCERTIFICATE   = "CERTIFICATE"
-	kiCertificate   = "certificate"
-	kiKEY           = "KEY"
-	kiKey           = "key"
+const (
+	kiCaCertificate kiDataNames = "certificate"
+	kiCertificate               = "certificate"
+	kiKey                       = "key"
 )
 
-func NewKIKey(encoding string) *KeyInfo {
+// kiType is an internal type to denote what an indentified blob is. It is ultimately presented as a string
+type kiType string
+
+const (
+	kiCACERTIFICATE kiType = "CA-CERTIFICATE" // Not totally sure what the correct string is here
+	kiCERTIFICATE          = "CERTIFICATE"
+	kiKEY                  = "KEY"
+)
+
+// kiType is an internal type to denote what encoding was used. It is ultimately presented as a string
+type kiEncoding string
+
+const (
+	kiPEM kiEncoding = "PEM"
+	kiDER            = "DER"
+	kiP12            = "P12"
+)
+
+func NewKIKey(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiKey,
 		Encoding: encoding,
@@ -33,7 +46,7 @@ func NewKIKey(encoding string) *KeyInfo {
 	}
 }
 
-func NewKICertificate(encoding string) *KeyInfo {
+func NewKICertificate(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiCertificate,
 		Encoding: encoding,
@@ -41,7 +54,7 @@ func NewKICertificate(encoding string) *KeyInfo {
 	}
 }
 
-func NewKICaCertificate(encoding string) *KeyInfo {
+func NewKICaCertificate(encoding kiEncoding) *KeyInfo {
 	return &KeyInfo{
 		DataName: kiCaCertificate,
 		Encoding: encoding,
@@ -49,7 +62,7 @@ func NewKICaCertificate(encoding string) *KeyInfo {
 	}
 }
 
-func NewKIError(encoding string, err error) *KeyInfo {
+func NewKIError(encoding kiEncoding, err error) *KeyInfo {
 	return &KeyInfo{
 		Encoding: encoding,
 		Error:    err,
@@ -61,7 +74,7 @@ func (ki *KeyInfo) SetHeaders(headers map[string]string) *KeyInfo {
 	return ki
 }
 
-func (ki *KeyInfo) SetDataName(name string) *KeyInfo {
+func (ki *KeyInfo) SetDataName(name kiDataNames) *KeyInfo {
 	ki.DataName = name
 	return ki
 }
@@ -89,7 +102,7 @@ func (ki *KeyInfo) MarshalJSON() ([]byte, error) {
 		ret["error"] = ki.Error.Error()
 	} else {
 		if ki.DataName != "" {
-			ret[ki.DataName] = ki.Data
+			ret[string(ki.DataName)] = ki.Data
 		} else {
 			ret["error"] = "No data name"
 		}
