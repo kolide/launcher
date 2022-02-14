@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,10 +16,12 @@ func TestIdentify(t *testing.T) {
 
 	var tests = []struct {
 		in               []string
+		password         string
 		expectedCount    int
 		expectedError    bool
 		expectedSubjects []string
 	}{
+
 		{
 			in:               []string{filepath.Join("testdata", "test_crt.pem")},
 			expectedCount:    1,
@@ -49,10 +52,21 @@ func TestIdentify(t *testing.T) {
 				"Actalis Authentication Root CA",
 			},
 		},
+		{
+			in:               []string{filepath.Join("testdata", "test-unenc.p12")},
+			expectedCount:    2,
+			expectedSubjects: []string{"www.example.com"},
+		},
+		{
+			in:               []string{filepath.Join("testdata", "test-enc.p12")}, //password is test123
+			password:         "test123",
+			expectedCount:    2,
+			expectedSubjects: []string{"www.example.com"},
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(strings.Join(tt.in, ","), func(t *testing.T) {
 			in := []byte{}
 			for _, file := range tt.in {
 				fileBytes, err := os.ReadFile(file)
@@ -60,7 +74,7 @@ func TestIdentify(t *testing.T) {
 				in = bytes.Join([][]byte{in, fileBytes}, nil)
 			}
 
-			results, err := Identify(in)
+			results, err := Identify(in, tt.password)
 			if tt.expectedError {
 				require.Error(t, err)
 				return
@@ -69,10 +83,23 @@ func TestIdentify(t *testing.T) {
 			require.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
 
-			for i, expectedSubject := range tt.expectedSubjects {
-				cert, ok := results[i].Data.(*certExtract)
-				require.True(t, ok, "type assert")
-				assert.Equal(t, expectedSubject, cert.Subject.CommonName)
+			// If we have expected subjects, do they match?
+			count := 0
+			for _, returnedCert := range results {
+				// Some things aren't certs, just skep them for the expectedSubject test
+				cert, ok := returnedCert.Data.(*certExtract)
+				if !ok {
+					continue
+				}
+
+				count++
+
+				// If we don't have any more expected subjects, just break
+				if count > len(tt.expectedSubjects) {
+					break
+				}
+
+				assert.Equal(t, tt.expectedSubjects[count-1], cert.Subject.CommonName)
 			}
 		})
 	}

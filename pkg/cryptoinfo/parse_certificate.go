@@ -3,11 +3,10 @@ package cryptoinfo
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"net"
 	"net/url"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type certExtract struct {
@@ -43,12 +42,15 @@ type certExtract struct {
 // parseCertificate parses a certificate from a stream of bytes. We use this, instead of a bare x509.ParseCertificate, to handle some
 // string conversions, and bitfield enumerations.
 func parseCertificate(certBytes []byte) (interface{}, error) {
-
 	c, err := x509.ParseCertificate(certBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing cert")
+		return nil, fmt.Errorf("parsing certificate: %w", err)
 	}
 
+	return extractCert(c)
+}
+
+func extractCert(c *x509.Certificate) (interface{}, error) {
 	return &certExtract{
 		CRLDistributionPoints: c.CRLDistributionPoints,
 		DNSNames:              c.DNSNames,
@@ -70,7 +72,6 @@ func parseCertificate(certBytes []byte) (interface{}, error) {
 		URIs:                  c.URIs,
 		Version:               c.Version,
 	}, nil
-
 }
 
 var keyUsageBits = map[x509.KeyUsage]string{

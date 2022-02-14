@@ -3,31 +3,31 @@
 // with dataflatten, and may eventually it may replace pkg/keyidentifier
 package cryptoinfo
 
-import (
-	"bytes"
-)
+// identifierSignature is an internal type to denote the identification functions. It's
+// used to add a small amount of clarity to the array of possible identifiers.
+type identifierSignature func(data []byte, password string) (results []*KeyInfo, err error)
 
-var (
-	certificateLeadingBytes = []byte{0x30} // used to detect raw DER certs
-	//pkcs1LeadingBytes       = nil
-	//pkcs8LeadingBytes       = nil
-	//pkcs12LeadingBytes      = nil
-)
+var defaultIdentifiers = []identifierSignature{
+	tryP12,
+	tryDer,
+	tryPem,
+}
 
 // Identify examines a []byte and attempts to descern what
 // cryptographic material is contained within.
-func Identify(data []byte) ([]*KeyInfo, error) {
-	switch {
-	case bytes.HasPrefix(data, certificateLeadingBytes):
-		return []*KeyInfo{expandDer(data)}, nil
-	default:
-		return decodePem(data)
-	}
-}
+func Identify(data []byte, password string) ([]*KeyInfo, error) {
 
-func expandDer(data []byte) *KeyInfo {
-	ki := NewKeyInfo(kiDER, kiCertificate, nil)
-	ki.SetDataName("certificate")
-	ki.SetData(parseCertificate(data))
-	return ki
+	// Try the identifiers. Some future work might be to allow
+	// callers to specify identifier order, or to try to discern
+	// it from the file extension. But meanwhile, just try everything.
+	for _, fn := range defaultIdentifiers {
+		res, err := fn(data, password)
+		if err == nil {
+			return res, nil
+		}
+	}
+
+	// If we can't parse anything, return nothing. It's not a fatal error, and it's
+	// somewhat obvious from context that nothing was parsed.
+	return nil, nil
 }
