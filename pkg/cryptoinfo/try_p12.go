@@ -1,6 +1,8 @@
 package cryptoinfo
 
-import p12 "software.sslmate.com/src/go-pkcs12"
+import (
+	p12 "software.sslmate.com/src/go-pkcs12"
+)
 
 func tryP12(data []byte, password string) ([]*KeyInfo, error) {
 	privateKey, cert, caCerts, err := p12.DecodeChain(data, password)

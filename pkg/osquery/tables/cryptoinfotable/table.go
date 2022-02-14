@@ -24,6 +24,7 @@ type Table struct {
 func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("passphrase"),
+		table.TextColumn("path"),
 	)
 
 	t := &Table{
@@ -71,8 +72,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					}
 
 					rowData := map[string]string{
-						"path":      filePath,
-						"passphase": passphrase,
+						"path":       filePath,
+						"passphrase": passphrase,
 					}
 					results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 
