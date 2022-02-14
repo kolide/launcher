@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
@@ -37,6 +38,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
+		cryptoinfotable.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
 		dataflattentable.TablePluginExec(client, logger,

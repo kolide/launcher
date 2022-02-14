@@ -23,7 +23,6 @@ const (
 	XmlType
 	IniType
 	KeyValueType
-	CryptoInfoType
 )
 
 type Table struct {
@@ -47,7 +46,6 @@ func AllTablePlugins(client *osquery.ExtensionManagerClient, logger log.Logger) 
 		TablePlugin(client, logger, XmlType),
 		TablePlugin(client, logger, IniType),
 		TablePlugin(client, logger, PlistType),
-		TablePlugin(client, logger, CryptoInfoType),
 	}
 }
 
@@ -73,10 +71,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case IniType:
 		t.dataFunc = dataflatten.IniFile
 		t.tableName = "kolide_ini"
-	case CryptoInfoType:
-		t.dataFunc = flattenCryptoInfo
-		t.tableName = "kolide_cryptoinfo"
-
 	default:
 		panic("Unknown data source type")
 	}
