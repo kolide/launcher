@@ -173,7 +173,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	}
 
 	// Apply user-provided flags last so that they can override other flags set
-	// by Launcher (besides the six flags below)
+	// by Launcher (besides the flags below)
 	for _, flag := range opts.osqueryFlags {
 		cmd.Args = append(cmd.Args, "--"+flag)
 	}
@@ -186,7 +186,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--database_path=%s", paths.databasePath),
 		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
-		"--extensions_timeout=10",
+		"--disable_extensions=false",
+		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 	)
 
@@ -677,6 +678,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	defer cancel()
 	limiter := rate.NewLimiter(rate.Every(socketOpenInterval), 1)
 	for {
+		level.Debug(o.logger).Log("msg", "Starting server connection attempts to osquery")
+
 		// Create the extension server and register all custom osquery
 		// plugins
 		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
@@ -695,6 +698,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			return errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 		}
 	}
+	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
