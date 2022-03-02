@@ -97,17 +97,9 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		kolidelog.WithKeyValue("osqlevel", "stdout"),
 	)
 
-	runner := runtime.LaunchUnstartedInstance(
+	runnerOptions := []runtime.OsqueryInstanceOption{
 		runtime.WithOsquerydBinary(opts.OsquerydPath),
 		runtime.WithRootDirectory(opts.RootDirectory),
-		runtime.WithConfigPluginFlag("kolide_grpc"),
-		runtime.WithLoggerPluginFlag("kolide_grpc"),
-		runtime.WithDistributedPluginFlag("kolide_grpc"),
-		runtime.WithOsqueryExtensionPlugins(
-			config.NewPlugin("kolide_grpc", ext.GenerateConfigs),
-			distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
-			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
-		),
 		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
 		runtime.WithStdout(osqueryStdoutLogger),
 		runtime.WithStderr(osqueryStderrLogger),
@@ -115,7 +107,41 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
 		runtime.WithOsqueryFlags(opts.OsqueryFlags),
 		runtime.WithAugeasLensFunction(augeas.InstallLenses),
-	)
+	}
+
+	if opts.Transport == "osquery" {
+		runnerOptions = append(runnerOptions, 
+			runtime.WithConfigPluginFlag("tls"),
+			runtime.WithLoggerPluginFlag("tls"),
+			runtime.WithDistributedPluginFlag("tls"),
+			runtime.WithTlsHostname(opts.KolideServerURL),
+
+			// FIXME: We should asset pack this and ship it, akin to the augeas stuff
+			runtime.WithTlsServerCerts(opts.RootPEM),
+
+			// FIXME: We should expose this as config somewhere
+			runtime.WithOsqueryFlags([]string{
+				"config_tls_endpoint=/config",
+				"enroll_tls_endpoint=/enroll",
+				// distributed_tls_read_endpoint
+				// distributed_tls_write_endpoint
+				// logger_tls_endpoint
+			}),
+		)
+	} else {
+		runnerOptions = append(runnerOptions, 
+			runtime.WithConfigPluginFlag("kolide_grpc"),
+			runtime.WithLoggerPluginFlag("kolide_grpc"),
+			runtime.WithDistributedPluginFlag("kolide_grpc"),
+			runtime.WithOsqueryExtensionPlugins(
+				config.NewPlugin("kolide_grpc", ext.GenerateConfigs),
+				distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
+				osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
+			),
+		)
+	}		
+
+	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
 
 	restartFunc := func() error {
 		level.Debug(logger).Log(

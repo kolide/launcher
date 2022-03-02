@@ -50,6 +50,8 @@ type osqueryOptions struct {
 	configPluginFlag      string
 	loggerPluginFlag      string
 	distributedPluginFlag string
+	tlsHostname string
+	tlsServerCerts string
 	extensionPlugins      []osquery.OsqueryPlugin
 	osqueryFlags          []string
 	stdout                io.Writer
@@ -150,6 +152,15 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	if opts.verbose {
 		cmd.Args = append(cmd.Args, "--verbose")
 	}
+
+	if opts.tlsHostname != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", opts.tlsHostname))
+	}
+
+	if opts.tlsServerCerts != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", opts.tlsServerCerts))
+	}
+
 
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
@@ -324,6 +335,19 @@ func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 		i.opts.verbose = v
 	}
 }
+
+	func WithTlsHostname(s string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsHostname = s
+	}
+}
+
+	func WithTlsServerCerts(s string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsServerCerts = s
+	}
+}
+	
 
 // WithOsqueryFlags sets additional flags to pass to osquery
 func WithOsqueryFlags(flags []string) OsqueryInstanceOption {

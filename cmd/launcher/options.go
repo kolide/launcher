@@ -114,6 +114,11 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		os.Exit(0)
 	}
 
+	// If launcher is using a kolide host, we may override many of the settings.
+	if strings.HasPrefix(*flKolideServerURL, ".kolide.com") {
+		*flTransport = "osquery"
+	}
+	
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
 	// osqueryd found in the path

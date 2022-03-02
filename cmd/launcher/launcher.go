@@ -143,6 +143,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
 			client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+		case "osquery":
+			// Skip the error, we'll handle this below.
 		default:
 			return errors.New("invalid transport option selected")
 		}
@@ -154,6 +156,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return errors.Wrap(err, "create extension with runtime")
 	}
 	runGroup.Add(extension.Execute, extension.Interrupt)
+	
 
 	versionInfo := version.Version()
 	level.Info(logger).Log(
