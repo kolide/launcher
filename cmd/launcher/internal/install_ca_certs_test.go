@@ -18,8 +18,6 @@ func TestInstallCaCerts(t *testing.T) {
 	require.NoError(t, err, "mktemp dir")
 	defer os.RemoveAll(tempDir)
 
-	var writtenFiles []string
-
 	installedPath1, err := InstallCaCerts(tempDir)
 	require.NoError(t, err, "install certs one")
 

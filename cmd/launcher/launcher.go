@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -91,6 +92,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return errors.Wrap(err, "write launcher pid to file")
 	}
+
+	// If we have successfully opened the DB, and written a pid,
+	// we expect we're live. Record the version for osquery to
+	// pickup
+	internal.RecordLauncherVersion(rootDirectory)
 
 	// Try to ensure useful info in the logs
 	checkpoint.Run(logger, db)
