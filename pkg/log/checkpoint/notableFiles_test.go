@@ -37,6 +37,12 @@ func TestNotableFilesNotFound(t *testing.T) {
 			// would expect this to be constant or var somewhere in os package, but couldn't find
 			Err: errors.New("no such file or directory"),
 		}
+
+		// not found error is different for windows
+		if runtime.GOOS == "windows" {
+			pathErr.Err = errors.New("The system cannot find the path specified.")
+		}
+
 		expectedOutput = append(expectedOutput, pathErr.Error())
 	}
 
