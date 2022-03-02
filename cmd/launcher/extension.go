@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/kolide/launcher/cmd/launcher/internal"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -110,14 +112,23 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	}
 
 	if opts.Transport == "osquery" {
-		runnerOptions = append(runnerOptions, 
+		// As osquery requires TLS server certs, we'll
+		// use our embedded defaults if not specified
+		caCertFile := opts.RootPEM
+		if caCertFile == "" {
+			var err error
+			caCertFile, err = internal.InstallCaCerts(opts.RootDirectory)
+			if err != nil {
+				return nil, nil, nil, errors.Wrap(err, "Writing CA certs")
+			}
+		}
+
+		runnerOptions = append(runnerOptions,
 			runtime.WithConfigPluginFlag("tls"),
 			runtime.WithLoggerPluginFlag("tls"),
 			runtime.WithDistributedPluginFlag("tls"),
 			runtime.WithTlsHostname(opts.KolideServerURL),
-
-			// FIXME: We should asset pack this and ship it, akin to the augeas stuff
-			runtime.WithTlsServerCerts(opts.RootPEM),
+			runtime.WithTlsServerCerts(caCertFile),
 
 			// FIXME: We should expose this as config somewhere
 			runtime.WithOsqueryFlags([]string{
@@ -129,7 +140,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 			}),
 		)
 	} else {
-		runnerOptions = append(runnerOptions, 
+		runnerOptions = append(runnerOptions,
 			runtime.WithConfigPluginFlag("kolide_grpc"),
 			runtime.WithLoggerPluginFlag("kolide_grpc"),
 			runtime.WithDistributedPluginFlag("kolide_grpc"),
@@ -139,7 +150,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 				osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
 			),
 		)
-	}		
+	}
 
 	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
 
