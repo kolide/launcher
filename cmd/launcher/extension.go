@@ -85,71 +85,16 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		return nil, nil, nil, errors.Wrap(err, "starting grpc extension")
 	}
 
-	// create the logging adapters for osquery
-	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
-		kolidelog.WithLevelFunc(level.Info),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stderr"),
-	)
-	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
-		kolidelog.WithLevelFunc(level.Debug),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stdout"),
-	)
-
-	runnerOptions := []runtime.OsqueryInstanceOption{
-		runtime.WithOsquerydBinary(opts.OsquerydPath),
-		runtime.WithRootDirectory(opts.RootDirectory),
-		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
-		runtime.WithStdout(osqueryStdoutLogger),
-		runtime.WithStderr(osqueryStderrLogger),
-		runtime.WithLogger(logger),
-		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
-		runtime.WithOsqueryFlags(opts.OsqueryFlags),
-		runtime.WithAugeasLensFunction(augeas.InstallLenses),
-	}
+	var runnerOptions []runtime.OsqueryInstanceOption
 
 	if opts.Transport == "osquery" {
-		// As osquery requires TLS server certs, we'll
-		// use our embedded defaults if not specified
-		caCertFile := opts.RootPEM
-		if caCertFile == "" {
-			var err error
-			caCertFile, err = internal.InstallCaCerts(opts.RootDirectory)
-			if err != nil {
-				return nil, nil, nil, errors.Wrap(err, "Writing CA certs")
-			}
+		var err error
+		runnerOptions, err = osqueryRunnerOptions(logger, db, opts)
+		if err != nil {
+			return nil, nil, nil, errors.Wrap(err, "creating osquery runner options")
 		}
-
-		runnerOptions = append(runnerOptions,
-			runtime.WithConfigPluginFlag("tls"),
-			runtime.WithLoggerPluginFlag("tls"),
-			runtime.WithDistributedPluginFlag("tls"),
-			runtime.WithTlsHostname(opts.KolideServerURL),
-			runtime.WithTlsServerCerts(caCertFile),
-
-			// FIXME: We should expose this as config somewhere
-			runtime.WithOsqueryFlags([]string{
-				"config_tls_endpoint=/config",
-				"enroll_tls_endpoint=/enroll",
-				// distributed_tls_read_endpoint
-				// distributed_tls_write_endpoint
-				// logger_tls_endpoint
-			}),
-		)
 	} else {
-		runnerOptions = append(runnerOptions,
-			runtime.WithConfigPluginFlag("kolide_grpc"),
-			runtime.WithLoggerPluginFlag("kolide_grpc"),
-			runtime.WithDistributedPluginFlag("kolide_grpc"),
-			runtime.WithOsqueryExtensionPlugins(
-				config.NewPlugin("kolide_grpc", ext.GenerateConfigs),
-				distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
-				osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
-			),
-		)
+		runnerOptions = grpcRunnerOptions(logger, db, opts, ext)
 	}
 
 	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
@@ -210,4 +155,79 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		restartFunc,
 		runner.Shutdown,
 		nil
+}
+
+// commonRunnerOptions returns osquery runtime options common to all transports
+func commonRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options) []runtime.OsqueryInstanceOption {
+	// create the logging adapters for osquery
+	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
+		logger,
+		kolidelog.WithLevelFunc(level.Info),
+		kolidelog.WithKeyValue("component", "osquery"),
+		kolidelog.WithKeyValue("osqlevel", "stderr"),
+	)
+	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
+		logger,
+		kolidelog.WithLevelFunc(level.Debug),
+		kolidelog.WithKeyValue("component", "osquery"),
+		kolidelog.WithKeyValue("osqlevel", "stdout"),
+	)
+
+	return []runtime.OsqueryInstanceOption{
+		runtime.WithOsquerydBinary(opts.OsquerydPath),
+		runtime.WithRootDirectory(opts.RootDirectory),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
+		runtime.WithStdout(osqueryStdoutLogger),
+		runtime.WithStderr(osqueryStderrLogger),
+		runtime.WithLogger(logger),
+		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
+		runtime.WithOsqueryFlags(opts.OsqueryFlags),
+		runtime.WithAugeasLensFunction(augeas.InstallLenses),
+	}
+}
+
+// osqueryRunnerOptions returns the osquery runtime options when using native osquery transport
+func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options) ([]runtime.OsqueryInstanceOption, error) {
+	// As osquery requires TLS server certs, we'll  use our embedded defaults if not specified
+	caCertFile := opts.RootPEM
+	if caCertFile == "" {
+		var err error
+		caCertFile, err = internal.InstallCaCerts(opts.RootDirectory)
+		if err != nil {
+			return nil, errors.Wrap(err, "writing CA certs")
+		}
+	}
+
+	return append(
+		commonRunnerOptions(logger, db, opts),
+		runtime.WithConfigPluginFlag("tls"),
+		runtime.WithLoggerPluginFlag("tls"),
+		runtime.WithDistributedPluginFlag("tls"),
+		runtime.WithTlsHostname(opts.KolideServerURL),
+		runtime.WithTlsServerCerts(caCertFile),
+
+		// FIXME: We should expose this as config somewhere
+		runtime.WithOsqueryFlags([]string{
+			"config_tls_endpoint=/config",
+			"enroll_tls_endpoint=/enroll",
+			// distributed_tls_read_endpoint
+			// distributed_tls_write_endpoint
+			// logger_tls_endpoint
+		}),
+	), nil
+}
+
+// grpcRunnerOptions returns the osquery runtime options when using launcher transports. (Eg: grpc or jsonrpc)
+func grpcRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options, ext *osquery.Extension) []runtime.OsqueryInstanceOption {
+	return append(
+		commonRunnerOptions(logger, db, opts),
+		runtime.WithConfigPluginFlag("kolide_grpc"),
+		runtime.WithLoggerPluginFlag("kolide_grpc"),
+		runtime.WithDistributedPluginFlag("kolide_grpc"),
+		runtime.WithOsqueryExtensionPlugins(
+			config.NewPlugin("kolide_grpc", ext.GenerateConfigs),
+			distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
+			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
+		),
+	)
 }
