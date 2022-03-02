@@ -12,10 +12,6 @@ import (
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
 func Run(logger log.Logger, db *bbolt.DB) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = fmt.Sprintf("ERROR: %s", err)
-	}
 
 	// Things to add:
 	//  * database sizes
@@ -24,16 +20,27 @@ func Run(logger log.Logger, db *bbolt.DB) {
 	//  * runtime stats, like memory allocations
 
 	go func() {
-		logger.Log(
-			"msg", "log checkpoint started",
-			"hostname", hostname,
-		)
+		logCheckPoint(logger)
 
 		for range time.Tick(time.Minute * 60) {
-			logger.Log(
-				"msg", "log checkpoint",
-				"hostname", hostname,
-			)
+			logCheckPoint(logger)
 		}
 	}()
+}
+
+func logCheckPoint(logger log.Logger) {
+	logger.Log(
+		"msg", "log checkpoint started",
+		"hostname", hostName(),
+		"notableFiles", notableFilePaths(),
+	)
+}
+
+func hostName() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = fmt.Sprintf("ERROR: %s", err)
+	}
+
+	return hostname
 }
