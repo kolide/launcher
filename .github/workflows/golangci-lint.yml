@@ -44,3 +44,14 @@ jobs:
         if: ${{ always() }}
         #uses: golangci/golangci-lint-action@v2
         run: golangci-lint run
+
+  # This job is here as a github status check -- it allows us to move
+  # the merge dependency from being on all the jobs to this single
+  # one.
+  mergeable:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+    needs:
+      - lint
+      - lint
