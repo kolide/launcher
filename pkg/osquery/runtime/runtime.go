@@ -49,6 +49,7 @@ type osqueryOptions struct {
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
 	extensionSocketPath   string
+	enrollSecretPath string
 	loggerPluginFlag      string
 	osqueryFlags          []string
 	retries               uint
@@ -56,6 +57,8 @@ type osqueryOptions struct {
 	stderr                io.Writer
 	stdout                io.Writer
 	tlsConfigEndpoint string
+	tlsDistReadEndpoint string
+	tlsDistWriteEndpoint string
 	tlsEnrollEndpoint string
 	tlsHostname           string
 	tlsLoggerEndpoint string
@@ -173,11 +176,22 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", opts.tlsLoggerEndpoint))
 	}
 
+	if opts.tlsDistReadEndpoint  != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", opts.tlsDistReadEndpoint))
+	}
+
+	if opts.tlsDistWriteEndpoint  != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", opts.tlsDistWriteEndpoint))
+	}
 
 	if opts.tlsServerCerts != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", opts.tlsServerCerts))
 	}
 
+	if opts.enrollSecretPath != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", opts.enrollSecretPath))
+	}
+	
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
 	// promptly. Values in seconds. These settings are CLI flags only.
@@ -349,6 +363,13 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.verbose = v
+	}
+}
+
+
+func WithEnrollSecretPath(secretPath string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.enrollSecretPath = secretPath
 	}
 }
 

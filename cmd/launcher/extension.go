@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
+	"os"
 
 	"github.com/kolide/launcher/cmd/launcher/internal"
-
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -198,7 +199,7 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Option
 		}
 	}
 
-	return append(
+	runtimeOptions := append(
 		commonRunnerOptions(logger, db, opts),
 		runtime.WithConfigPluginFlag("tls"),
 		runtime.WithLoggerPluginFlag("tls"),
@@ -208,7 +209,19 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Option
 		runtime.WithTlsConfigEndpoint(opts.OsqueryTlsConfigEndpoint),
 		runtime.WithTlsEnrollEndpoint(opts.OsqueryTlsEnrollEndpoint),
 		runtime.WithTlsLoggerEndpoint(opts.OsqueryTlsLoggerEndpoint),
-	), nil
+	)
+
+	// Enroll secrets... Either we pass a file, or we write a
+	// secret, and pass _that_ file
+	if opts.EnrollSecretPath != "" {
+		runtimeOptions = append(runtimeOptions, runtime.WithEnrollSecretPath(opts.EnrollSecretPath))
+	} else if opts.EnrollSecret != "" {
+		filename := filepath.Join(opts.RootDirectory, "secret")
+		os.WriteFile(filename, []byte(opts.EnrollSecret), 0400)
+		runtimeOptions = append(runtimeOptions, runtime.WithEnrollSecretPath(filename))
+	}
+
+	return runtimeOptions, nil
 }
 
 // grpcRunnerOptions returns the osquery runtime options when using launcher transports. (Eg: grpc or jsonrpc)
