@@ -87,5 +87,5 @@ jobs:
     steps:
       - run: true
     needs:
-      - package_builder
-      - launcher
+      - build_and_test
+      - package_builder_test

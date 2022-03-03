@@ -53,5 +53,4 @@ jobs:
     steps:
       - run: true
     needs:
-      - lint
-      - lint
+      - golangci
