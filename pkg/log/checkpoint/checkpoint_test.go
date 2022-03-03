@@ -16,6 +16,8 @@ func (m *mockLogger) Log(keyvals ...interface{}) error {
 }
 
 func TestLogCheckPoint(t *testing.T) {
+	t.Parallel()
+
 	mockLogger := new(mockLogger)
 
 	mockLogger.On("Log", "msg", "log checkpoint started",

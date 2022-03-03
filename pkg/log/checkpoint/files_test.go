@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"testing"
@@ -18,28 +19,28 @@ func TestFilesFound(t *testing.T) {
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
 	require.NoError(t, err, "making temp dir")
+	defer os.RemoveAll(tempDir)
 
 	var tests = []struct {
 		dirsToCreate int
 		filesPerDir  int
 	}{
 		{dirsToCreate: 2, filesPerDir: 2},
+		// doesn't search any folders since "dirsToSerach" below will be empty array
 		{dirsToCreate: 0, filesPerDir: 0},
 	}
 
 	for _, tt := range tests {
 		t.Run("testFilesFound", func(t *testing.T) {
-			dirs, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
+			dirsToSearch, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
 			require.NoError(t, err, "creating test files")
 
-			foundPaths := fileNamesInDirs(dirs...)
+			foundPaths := fileNamesInDirs(dirsToSearch...)
 			sort.Strings(foundPaths)
 			require.Equal(t, expectedPaths, foundPaths)
 			require.Equal(t, tt.dirsToCreate*tt.filesPerDir, len(foundPaths))
 		})
 	}
-
-	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
 func TestDirNotFound(t *testing.T) {
@@ -47,11 +48,11 @@ func TestDirNotFound(t *testing.T) {
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
 	require.NoError(t, err, "making temp dir")
+	defer os.RemoveAll(tempDir)
 
-	const pathFmt = "%s/%s"
 	nonExistantDirs := []string{
-		fmt.Sprintf(pathFmt, tempDir, ulid.New()),
-		fmt.Sprintf(pathFmt, tempDir, ulid.New()),
+		filepath.Join(tempDir, ulid.New()),
+		filepath.Join(tempDir, ulid.New()),
 	}
 
 	expectedOutput := []string{}
@@ -76,8 +77,6 @@ func TestDirNotFound(t *testing.T) {
 
 	require.Equal(t, expectedOutput, foundPaths)
 	require.Equal(t, len(nonExistantDirs), len(foundPaths))
-
-	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
 func TestDirEmpty(t *testing.T) {

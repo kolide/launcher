@@ -26,7 +26,7 @@ func fileNamesInDirs(dirnames ...string) []string {
 	return results
 }
 
-// helper method to generate empty dir message, makes testing easier
+// emptyDirMsg is a helper method to generate empty dir message, makes testing easier
 func emptyDirMsg(dirname string) string {
 	return fmt.Sprintf("%s is an empty directory", dirname)
 }
