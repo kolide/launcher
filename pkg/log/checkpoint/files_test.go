@@ -10,50 +10,48 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type FileSuite struct {
-	suite.Suite
-	tempDir string
-}
+func TestFilesFound(t *testing.T) {
+	t.Parallel()
 
-func (s *FileSuite) SetupSuite() {
-	dir, err := os.MkdirTemp("", "notable-files-unit-test")
-	s.Require().NoError(err, "making temp dir")
-	s.tempDir = dir
-}
+	tempDir, err := os.MkdirTemp("", "log-checkpoit-files-test")
+	require.NoError(t, err, "making temp dir")
 
-func (s *FileSuite) TearDownSuite() {
-	s.Require().NoError(os.RemoveAll(s.tempDir), "deleting temp dir")
-}
-
-func (s *FileSuite) TestNotableFilesFound() {
 	var tests = []struct {
 		dirsToCreate int
 		filesPerDir  int
 	}{
 		{dirsToCreate: 2, filesPerDir: 2},
-		{dirsToCreate: 2, filesPerDir: 0},
 		{dirsToCreate: 0, filesPerDir: 0},
 	}
 
 	for _, tt := range tests {
-		dirs, expectedPaths, err := createTestFiles(s.tempDir, tt.dirsToCreate, tt.filesPerDir)
-		s.NoError(err, "creating test files")
+		t.Run("testFilesFound", func(t *testing.T) {
+			dirs, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
+			require.NoError(t, err, "creating test files")
 
-		foundPaths := fileNamesInDirs(dirs...)
-		sort.Strings(foundPaths)
-		s.Require().Equal(expectedPaths, foundPaths)
-		s.Require().Equal(tt.dirsToCreate*tt.filesPerDir, len(foundPaths))
+			foundPaths := fileNamesInDirs(dirs...)
+			sort.Strings(foundPaths)
+			require.Equal(t, expectedPaths, foundPaths)
+			require.Equal(t, tt.dirsToCreate*tt.filesPerDir, len(foundPaths))
+		})
 	}
+
+	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
-func (s *FileSuite) TestDirNotFound() {
+func TestDirNotFound(t *testing.T) {
+	t.Parallel()
+
+	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
+	require.NoError(t, err, "making temp dir")
+
 	const pathFmt = "%s/%s"
 	nonExistantDirs := []string{
-		fmt.Sprintf(pathFmt, s.tempDir, ulid.New()),
-		fmt.Sprintf(pathFmt, s.tempDir, ulid.New()),
+		fmt.Sprintf(pathFmt, tempDir, ulid.New()),
+		fmt.Sprintf(pathFmt, tempDir, ulid.New()),
 	}
 
 	expectedOutput := []string{}
@@ -68,7 +66,7 @@ func (s *FileSuite) TestDirNotFound() {
 
 		// not found error is different for windows
 		if runtime.GOOS == "windows" {
-			pathErr.Err = errors.New("The system cannot find the path specified.")
+			pathErr.Err = errors.New("The system cannot find the file specified.")
 		}
 
 		expectedOutput = append(expectedOutput, pathErr.Error())
@@ -76,13 +74,32 @@ func (s *FileSuite) TestDirNotFound() {
 
 	foundPaths := fileNamesInDirs(nonExistantDirs...)
 
-	s.Require().Equal(expectedOutput, foundPaths)
-	s.Require().Equal(len(nonExistantDirs), len(foundPaths))
+	require.Equal(t, expectedOutput, foundPaths)
+	require.Equal(t, len(nonExistantDirs), len(foundPaths))
+
+	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
-func TestFileSuite(t *testing.T) {
+func TestDirEmpty(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(FileSuite))
+
+	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
+	require.NoError(t, err, "making temp dir")
+
+	dirs, _, err := createTestFiles(tempDir, 2, 0)
+	require.NoError(t, err, "creating test dirs")
+
+	expectedOutput := []string{}
+	for _, dir := range dirs {
+		expectedOutput = append(expectedOutput, emptyDirMsg(dir))
+	}
+
+	foundPaths := fileNamesInDirs(dirs...)
+
+	require.Equal(t, expectedOutput, foundPaths)
+	require.Equal(t, len(dirs), len(foundPaths))
+
+	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
 func createTestFiles(baseDir string, dirCount int, filesPerDir int) (dirs []string, files []string, err error) {
