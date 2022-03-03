@@ -205,15 +205,9 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Option
 		runtime.WithDistributedPluginFlag("tls"),
 		runtime.WithTlsHostname(opts.KolideServerURL),
 		runtime.WithTlsServerCerts(caCertFile),
-
-		// FIXME: We should expose this as config somewhere
-		runtime.WithOsqueryFlags([]string{
-			"config_tls_endpoint=/config",
-			"enroll_tls_endpoint=/enroll",
-			// distributed_tls_read_endpoint
-			// distributed_tls_write_endpoint
-			// logger_tls_endpoint
-		}),
+		runtime.WithTlsConfigEndpoint(opts.OsqueryTlsConfigEndpoint),
+		runtime.WithTlsEnrollEndpoint(opts.OsqueryTlsEnrollEndpoint),
+		runtime.WithTlsLoggerEndpoint(opts.OsqueryTlsLoggerEndpoint),
 	), nil
 }
 

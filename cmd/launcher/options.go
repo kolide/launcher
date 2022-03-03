@@ -63,6 +63,11 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flCompactDbMaxTx      = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		_                     = flagset.String("config", "", "config file to parse options from (optional)")
 
+		// osquery TLS endpoints
+		flOsqTlsConfig = flagset.String("config_tls_endpoint", "/api/osquery/v0/config", "When using osquery transport, what is the config endpoint")
+		flOsqTlsEnroll = flagset.String("enroll_tls_endpoint", "/api/osquery/v0/enroll", "When using osquery transport, what is the enroll endpoint")
+		flOsqTlsLogger = flagset.String("logger_tls_endpoint", "/api/osquery/v0/logger", "When using osquery transport, what is the logger endpoint")
+		
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
@@ -72,7 +77,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flNotaryPrefix           = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
 		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 
-		// Development options
+		// Development & Debugging options
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
 		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
@@ -180,6 +185,9 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		NotaryPrefix:           *flNotaryPrefix,
 		NotaryServerURL:        *flNotaryServerURL,
 		OsqueryFlags:           flOsqueryFlags,
+		OsqueryTlsConfigEndpoint: *flOsqTlsConfig,
+		OsqueryTlsEnrollEndpoint: *flOsqTlsEnroll,
+		OsqueryTlsLoggerEndpoint: *flOsqTlsLogger,
 		OsqueryVerbose:         *flOsqueryVerbose,
 		OsquerydPath:           osquerydPath,
 		RootDirectory:          *flRootDirectory,

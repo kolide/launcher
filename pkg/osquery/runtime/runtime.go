@@ -45,18 +45,21 @@ type osqueryOptions struct {
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc        func(dir string) error
 	binaryPath            string
-	rootDirectory         string
-	extensionSocketPath   string
 	configPluginFlag      string
-	loggerPluginFlag      string
 	distributedPluginFlag string
-	tlsHostname string
-	tlsServerCerts string
 	extensionPlugins      []osquery.OsqueryPlugin
+	extensionSocketPath   string
+	loggerPluginFlag      string
 	osqueryFlags          []string
-	stdout                io.Writer
-	stderr                io.Writer
 	retries               uint
+	rootDirectory         string
+	stderr                io.Writer
+	stdout                io.Writer
+	tlsConfigEndpoint string
+	tlsEnrollEndpoint string
+	tlsHostname           string
+	tlsLoggerEndpoint string
+	tlsServerCerts        string
 	verbose               bool
 }
 
@@ -157,10 +160,23 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", opts.tlsHostname))
 	}
 
+	if opts.tlsConfigEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--config_tls_endpoint=%s", opts.tlsConfigEndpoint))
+
+	}
+
+	if opts.tlsEnrollEndpoint  != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", opts.tlsEnrollEndpoint))
+	}
+
+	if opts.tlsLoggerEndpoint  != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", opts.tlsLoggerEndpoint))
+	}
+
+
 	if opts.tlsServerCerts != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", opts.tlsServerCerts))
 	}
-
 
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
@@ -336,18 +352,35 @@ func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 	}
 }
 
-	func WithTlsHostname(s string) OsqueryInstanceOption {
+func WithTlsHostname(hostname string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.opts.tlsHostname = s
+		i.opts.tlsHostname = hostname
 	}
 }
 
-	func WithTlsServerCerts(s string) OsqueryInstanceOption {
+func WithTlsConfigEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsConfigEndpoint = ep
+	}
+}
+
+func WithTlsEnrollEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsEnrollEndpoint = ep
+	}
+}
+
+func WithTlsLoggerEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsLoggerEndpoint = ep
+	}
+}
+
+func WithTlsServerCerts(s string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.tlsServerCerts = s
 	}
 }
-	
 
 // WithOsqueryFlags sets additional flags to pass to osquery
 func WithOsqueryFlags(flags []string) OsqueryInstanceOption {
