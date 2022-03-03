@@ -2,7 +2,6 @@ package checkpoint
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -111,7 +110,7 @@ func createTestFiles(baseDir string, dirCount int, filesPerDir int) (dirs []stri
 		dirs = append(dirs, dir)
 
 		for j := 0; j < filesPerDir; j++ {
-			filePath := fmt.Sprintf("%s/%s", dir, ulid.New())
+			filePath := filepath.Join(dir, ulid.New())
 			file, err := os.Create(filePath)
 			if err != nil {
 				return nil, nil, err
