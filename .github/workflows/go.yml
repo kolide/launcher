@@ -53,7 +53,7 @@ jobs:
 
 
   package_builder_test:
-    name: Package Builder
+    name: package_builder
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -77,3 +77,15 @@ jobs:
       run: make package-builder
     - name: package
       run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
+
+
+  # This job is here as a github status check -- it allows us to move
+  # the merge dependency from being on all the jobs to this single
+  # one.
+  mergeable:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+    needs:
+      - build_and_test
+      - package_builder_test
