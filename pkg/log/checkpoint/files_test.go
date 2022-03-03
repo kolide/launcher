@@ -84,6 +84,7 @@ func TestDirEmpty(t *testing.T) {
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
 	require.NoError(t, err, "making temp dir")
+	defer os.RemoveAll(tempDir)
 
 	dirs, _, err := createTestFiles(tempDir, 2, 0)
 	require.NoError(t, err, "creating test dirs")
@@ -97,8 +98,6 @@ func TestDirEmpty(t *testing.T) {
 
 	require.Equal(t, expectedOutput, foundPaths)
 	require.Equal(t, len(dirs), len(foundPaths))
-
-	require.NoError(t, os.RemoveAll(tempDir), "deleting temp dir")
 }
 
 func createTestFiles(baseDir string, dirCount int, filesPerDir int) (dirs []string, files []string, err error) {

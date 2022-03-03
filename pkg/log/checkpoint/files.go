@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func fileNamesInDirs(dirnames ...string) []string {
@@ -18,7 +19,7 @@ func fileNamesInDirs(dirnames ...string) []string {
 			results = append(results, emptyDirMsg(dirname))
 		default:
 			for _, file := range files {
-				results = append(results, fmt.Sprintf("%s/%s", dirname, file.Name()))
+				results = append(results, filepath.Join(dirname, file.Name()))
 			}
 		}
 	}
