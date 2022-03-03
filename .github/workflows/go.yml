@@ -82,7 +82,7 @@ jobs:
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
-  mergeable:
+  ci_mergeable:
     runs-on: ubuntu-latest
     steps:
       - run: true
