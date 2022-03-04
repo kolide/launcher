@@ -396,6 +396,18 @@ func WithTlsLoggerEndpoint(ep string) OsqueryInstanceOption {
 	}
 }
 
+func WithTlsDistributedReadEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsDistReadEndpoint = ep
+	}
+}
+
+func WithTlsDistributedWriteEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsDistWriteEndpoint = ep
+	}
+}
+
 func WithTlsServerCerts(s string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.tlsServerCerts = s

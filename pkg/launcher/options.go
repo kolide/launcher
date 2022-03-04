@@ -46,9 +46,11 @@ type Options struct {
 	ControlServerURL string
 
 	// Osquery TLS options
-	OsqueryTlsConfigEndpoint string
-	OsqueryTlsEnrollEndpoint string
-	OsqueryTlsLoggerEndpoint string
+	OsqueryTlsConfigEndpoint           string
+	OsqueryTlsEnrollEndpoint           string
+	OsqueryTlsLoggerEndpoint           string
+	OsqueryTlsDistributedReadEndpoint  string
+	OsqueryTlsDistributedWriteEndpoint string
 
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool

@@ -122,8 +122,12 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		os.Exit(0)
 	}
 
-	// If launcher is using a kolide host, we may override many of the settings.
-	if *flKolideHosted || strings.HasPrefix(*flKolideServerURL, ".kolide.com") {
+	// If launcher is using a kolide host, we may override many of
+	// the settings. When we're ready, we can _additionally_
+	// conditionalize this on the ServerURL to get all the
+	// existing deployments
+	if *flKolideHosted {
+		*flTransport = "osquery"
 		*flOsqTlsConfig = "/api/osquery/v0/config"
 		*flOsqTlsEnroll = "/api/osquery/v0/enroll"
 		*flOsqTlsLogger = "/api/osquery/v0/log"
@@ -171,36 +175,38 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	opts := &launcher.Options{
-		Autoupdate:               *flAutoupdate,
-		AutoupdateInterval:       *flAutoupdateInterval,
-		AutoupdateInitialDelay:   *flAutoupdateInitialDelay,
-		CertPins:                 certPins,
-		CompactDbMaxTx:           *flCompactDbMaxTx,
-		Control:                  *flControl,
-		ControlServerURL:         *flControlServerURL,
-		Debug:                    *flDebug,
-		DisableControlTLS:        *flDisableControlTLS,
-		EnableInitialRunner:      *flInitialRunner,
-		EnrollSecret:             *flEnrollSecret,
-		EnrollSecretPath:         *flEnrollSecretPath,
-		InsecureTLS:              *flInsecureTLS,
-		InsecureTransport:        *flInsecureTransport,
-		KolideServerURL:          *flKolideServerURL,
-		LogMaxBytesPerBatch:      *flLogMaxBytesPerBatch,
-		LoggingInterval:          *flLoggingInterval,
-		MirrorServerURL:          *flMirrorURL,
-		NotaryPrefix:             *flNotaryPrefix,
-		NotaryServerURL:          *flNotaryServerURL,
-		OsqueryFlags:             flOsqueryFlags,
-		OsqueryTlsConfigEndpoint: *flOsqTlsConfig,
-		OsqueryTlsEnrollEndpoint: *flOsqTlsEnroll,
-		OsqueryTlsLoggerEndpoint: *flOsqTlsLogger,
-		OsqueryVerbose:           *flOsqueryVerbose,
-		OsquerydPath:             osquerydPath,
-		RootDirectory:            *flRootDirectory,
-		RootPEM:                  *flRootPEM,
-		Transport:                *flTransport,
-		UpdateChannel:            updateChannel,
+		Autoupdate:                         *flAutoupdate,
+		AutoupdateInterval:                 *flAutoupdateInterval,
+		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
+		CertPins:                           certPins,
+		CompactDbMaxTx:                     *flCompactDbMaxTx,
+		Control:                            *flControl,
+		ControlServerURL:                   *flControlServerURL,
+		Debug:                              *flDebug,
+		DisableControlTLS:                  *flDisableControlTLS,
+		EnableInitialRunner:                *flInitialRunner,
+		EnrollSecret:                       *flEnrollSecret,
+		EnrollSecretPath:                   *flEnrollSecretPath,
+		InsecureTLS:                        *flInsecureTLS,
+		InsecureTransport:                  *flInsecureTransport,
+		KolideServerURL:                    *flKolideServerURL,
+		LogMaxBytesPerBatch:                *flLogMaxBytesPerBatch,
+		LoggingInterval:                    *flLoggingInterval,
+		MirrorServerURL:                    *flMirrorURL,
+		NotaryPrefix:                       *flNotaryPrefix,
+		NotaryServerURL:                    *flNotaryServerURL,
+		OsqueryFlags:                       flOsqueryFlags,
+		OsqueryTlsConfigEndpoint:           *flOsqTlsConfig,
+		OsqueryTlsDistributedReadEndpoint:  *flOsqTlsDistRead,
+		OsqueryTlsDistributedWriteEndpoint: *flOsqTlsDistWrite,
+		OsqueryTlsEnrollEndpoint:           *flOsqTlsEnroll,
+		OsqueryTlsLoggerEndpoint:           *flOsqTlsLogger,
+		OsqueryVerbose:                     *flOsqueryVerbose,
+		OsquerydPath:                       osquerydPath,
+		RootDirectory:                      *flRootDirectory,
+		RootPEM:                            *flRootPEM,
+		Transport:                          *flTransport,
+		UpdateChannel:                      updateChannel,
 	}
 	return opts, nil
 }
