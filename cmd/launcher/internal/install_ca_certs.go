@@ -23,12 +23,12 @@ func InstallCaCerts(directory string) (string, error) {
 
 	_, err := os.Stat(caFile)
 
-        switch {
-        case os.IsNotExist(err):
-          return caFile, os.WriteFile(caFile, defaultCaCerts, 0444)
-        case err != nil:
-           return "", err
-        }        
-        return caFile, nil       
+	switch {
+	case os.IsNotExist(err):
+		return caFile, os.WriteFile(caFile, defaultCaCerts, 0444)
+	case err != nil:
+		return "", err
+	}
+	return caFile, nil
 
 }

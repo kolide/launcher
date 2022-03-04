@@ -202,13 +202,15 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Option
 	runtimeOptions := append(
 		commonRunnerOptions(logger, db, opts),
 		runtime.WithConfigPluginFlag("tls"),
-		runtime.WithLoggerPluginFlag("tls"),
 		runtime.WithDistributedPluginFlag("tls"),
-		runtime.WithTlsHostname(opts.KolideServerURL),
-		runtime.WithTlsServerCerts(caCertFile),
+		runtime.WithLoggerPluginFlag("tls"),
 		runtime.WithTlsConfigEndpoint(opts.OsqueryTlsConfigEndpoint),
+		runtime.WithTlsDistributedReadEndpoint(opts.OsqueryTlsDistributedReadEndpoint),
+		runtime.WithTlsDistributedWriteEndpoint(opts.OsqueryTlsDistributedWriteEndpoint),
 		runtime.WithTlsEnrollEndpoint(opts.OsqueryTlsEnrollEndpoint),
+		runtime.WithTlsHostname(opts.KolideServerURL),
 		runtime.WithTlsLoggerEndpoint(opts.OsqueryTlsLoggerEndpoint),
+		runtime.WithTlsServerCerts(caCertFile),
 	)
 
 	// Enroll secrets... Either we pass a file, or we write a
