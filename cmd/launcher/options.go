@@ -52,7 +52,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flEnrollSecretPath    = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
 		flInitialRunner       = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL     = flagset.String("hostname", "", "The hostname of the gRPC server")
-		flKolideHosted = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
+		flKolideHosted        = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
 		flTransport           = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
 		flLoggingInterval     = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath        = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
@@ -65,10 +65,10 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		_                     = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// osquery TLS endpoints
-		flOsqTlsConfig = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
-		flOsqTlsEnroll = flagset.String("enroll_tls_endpoint", "", "Enroll endpoint for the osquery tls transport")
-		flOsqTlsLogger = flagset.String("logger_tls_endpoint", "", "Logger endpoint for the osquery tls transport")
-		flOsqTlsDistRead = flagset.String("distributed_tls_read_endpoint", "", "Distributed read endpoint for the osquery tls transport")
+		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
+		flOsqTlsEnroll    = flagset.String("enroll_tls_endpoint", "", "Enroll endpoint for the osquery tls transport")
+		flOsqTlsLogger    = flagset.String("logger_tls_endpoint", "", "Logger endpoint for the osquery tls transport")
+		flOsqTlsDistRead  = flagset.String("distributed_tls_read_endpoint", "", "Distributed read endpoint for the osquery tls transport")
 		flOsqTlsDistWrite = flagset.String("distributed_tls_write_endpoint", "", "Distributed write endpoint for the osquery tls transport")
 
 		// Autoupdate options
@@ -123,14 +123,14 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	// If launcher is using a kolide host, we may override many of the settings.
-	if *flKolideHosted || strings.HasPrefix(*flKolideServerURL, ".kolide.com")  {
+	if *flKolideHosted || strings.HasPrefix(*flKolideServerURL, ".kolide.com") {
 		*flOsqTlsConfig = "/api/osquery/v0/config"
 		*flOsqTlsEnroll = "/api/osquery/v0/enroll"
 		*flOsqTlsLogger = "/api/osquery/v0/log"
 		*flOsqTlsDistRead = "/api/osquery/v0/distributed/read"
 		*flOsqTlsDistWrite = "/api/osquery/v0/distributed/write"
 	}
-	
+
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
 	// osqueryd found in the path
@@ -171,36 +171,36 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	opts := &launcher.Options{
-		Autoupdate:             *flAutoupdate,
-		AutoupdateInterval:     *flAutoupdateInterval,
-		AutoupdateInitialDelay: *flAutoupdateInitialDelay,
-		CertPins:               certPins,
-		CompactDbMaxTx:         *flCompactDbMaxTx,
-		Control:                *flControl,
-		ControlServerURL:       *flControlServerURL,
-		Debug:                  *flDebug,
-		DisableControlTLS:      *flDisableControlTLS,
-		EnableInitialRunner:    *flInitialRunner,
-		EnrollSecret:           *flEnrollSecret,
-		EnrollSecretPath:       *flEnrollSecretPath,
-		InsecureTLS:            *flInsecureTLS,
-		InsecureTransport:      *flInsecureTransport,
-		KolideServerURL:        *flKolideServerURL,
-		LogMaxBytesPerBatch:    *flLogMaxBytesPerBatch,
-		LoggingInterval:        *flLoggingInterval,
-		MirrorServerURL:        *flMirrorURL,
-		NotaryPrefix:           *flNotaryPrefix,
-		NotaryServerURL:        *flNotaryServerURL,
-		OsqueryFlags:           flOsqueryFlags,
+		Autoupdate:               *flAutoupdate,
+		AutoupdateInterval:       *flAutoupdateInterval,
+		AutoupdateInitialDelay:   *flAutoupdateInitialDelay,
+		CertPins:                 certPins,
+		CompactDbMaxTx:           *flCompactDbMaxTx,
+		Control:                  *flControl,
+		ControlServerURL:         *flControlServerURL,
+		Debug:                    *flDebug,
+		DisableControlTLS:        *flDisableControlTLS,
+		EnableInitialRunner:      *flInitialRunner,
+		EnrollSecret:             *flEnrollSecret,
+		EnrollSecretPath:         *flEnrollSecretPath,
+		InsecureTLS:              *flInsecureTLS,
+		InsecureTransport:        *flInsecureTransport,
+		KolideServerURL:          *flKolideServerURL,
+		LogMaxBytesPerBatch:      *flLogMaxBytesPerBatch,
+		LoggingInterval:          *flLoggingInterval,
+		MirrorServerURL:          *flMirrorURL,
+		NotaryPrefix:             *flNotaryPrefix,
+		NotaryServerURL:          *flNotaryServerURL,
+		OsqueryFlags:             flOsqueryFlags,
 		OsqueryTlsConfigEndpoint: *flOsqTlsConfig,
 		OsqueryTlsEnrollEndpoint: *flOsqTlsEnroll,
 		OsqueryTlsLoggerEndpoint: *flOsqTlsLogger,
-		OsqueryVerbose:         *flOsqueryVerbose,
-		OsquerydPath:           osquerydPath,
-		RootDirectory:          *flRootDirectory,
-		RootPEM:                *flRootPEM,
-		Transport:              *flTransport,
-		UpdateChannel:          updateChannel,
+		OsqueryVerbose:           *flOsqueryVerbose,
+		OsquerydPath:             osquerydPath,
+		RootDirectory:            *flRootDirectory,
+		RootPEM:                  *flRootPEM,
+		Transport:                *flTransport,
+		UpdateChannel:            updateChannel,
 	}
 	return opts, nil
 }

@@ -49,19 +49,19 @@ type osqueryOptions struct {
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
 	extensionSocketPath   string
-	enrollSecretPath string
+	enrollSecretPath      string
 	loggerPluginFlag      string
 	osqueryFlags          []string
 	retries               uint
 	rootDirectory         string
 	stderr                io.Writer
 	stdout                io.Writer
-	tlsConfigEndpoint string
-	tlsDistReadEndpoint string
-	tlsDistWriteEndpoint string
-	tlsEnrollEndpoint string
+	tlsConfigEndpoint     string
+	tlsDistReadEndpoint   string
+	tlsDistWriteEndpoint  string
+	tlsEnrollEndpoint     string
 	tlsHostname           string
-	tlsLoggerEndpoint string
+	tlsLoggerEndpoint     string
 	tlsServerCerts        string
 	verbose               bool
 }
@@ -168,19 +168,19 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 
 	}
 
-	if opts.tlsEnrollEndpoint  != "" {
+	if opts.tlsEnrollEndpoint != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", opts.tlsEnrollEndpoint))
 	}
 
-	if opts.tlsLoggerEndpoint  != "" {
+	if opts.tlsLoggerEndpoint != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", opts.tlsLoggerEndpoint))
 	}
 
-	if opts.tlsDistReadEndpoint  != "" {
+	if opts.tlsDistReadEndpoint != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", opts.tlsDistReadEndpoint))
 	}
 
-	if opts.tlsDistWriteEndpoint  != "" {
+	if opts.tlsDistWriteEndpoint != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", opts.tlsDistWriteEndpoint))
 	}
 
@@ -191,7 +191,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	if opts.enrollSecretPath != "" {
 		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", opts.enrollSecretPath))
 	}
-	
+
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
 	// promptly. Values in seconds. These settings are CLI flags only.
@@ -365,7 +365,6 @@ func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 		i.opts.verbose = v
 	}
 }
-
 
 func WithEnrollSecretPath(secretPath string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
