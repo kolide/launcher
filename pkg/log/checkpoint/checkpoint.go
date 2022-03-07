@@ -2,6 +2,8 @@ package checkpoint
 
 import (
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"time"
 
@@ -12,9 +14,20 @@ import (
 // if we find any files in these directories, log them to check point
 var notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
 
+// log these hosts' IPs to check point
+var hostsToCheckConnectivity = []string{"k2device.kolide.com", "k2control.kolide.com", "notary.kolide.co", "dl.kolide.co"}
+
+// log get data from these urls
+var fetchUrls = []string{"https://k2.kolide.com/version"}
+
+// logger is an interface that allows mocking of logger
+type logger interface {
+	Log(keyvals ...interface{}) error
+}
+
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
-func Run(logger log.Logger, db *bbolt.DB) {
+func Run(logger logger, db *bbolt.DB) {
 
 	// Things to add:
 	//  * database sizes
@@ -36,6 +49,10 @@ func logCheckPoint(logger log.Logger) {
 		"msg", "log checkpoint started",
 		"hostname", hostName(),
 		"notableFiles", fileNamesInDirs(notableFileDirs...),
+		"IPs", lookupHostsIpv4s(net.DefaultResolver, hostsToCheckConnectivity...),
+		"connectivity", testConnections(&net.Dialer{Timeout: 5 * time.Second}, hostsToCheckConnectivity...),
+		"fetches", fetchFromUrls(&http.Client{Timeout: 5 * time.Second}, fetchUrls),
+		"fetch-notary-version", fetchNotaryVersion(&http.Client{Timeout: 5 * time.Second}, "https://notary.kolide.com/v2/kolide/launcher/_trust/tuf/targets/releases.json"),
 	)
 }
 
