@@ -83,7 +83,7 @@ func Test_fetchFromUrls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i, url := range tt.args.urls {
-				tt.args.client.On("Get", url).Return(tt.onGetReturns[i]())
+				tt.args.client.On("Get", url).Return(tt.onGetReturns[i]()) //nolint:bodyclose
 			}
 			if got := fetchFromUrls(tt.args.client, tt.args.urls); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchFromUrls() = %v, want %v", got, tt.want)
@@ -134,7 +134,7 @@ func Test_fetchFromUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn())
+			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn()) //nolint:bodyclose
 
 			got, err := fetchFromUrl(tt.args.client, tt.args.url)
 			if (err != nil) != tt.wantErr {
@@ -197,7 +197,7 @@ func Test_fetchNotaryVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn())
+			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn()) //nolint:bodyclose
 			if got := fetchNotaryVersion(tt.args.client, tt.args.url); got != tt.want {
 				t.Errorf("fetchNotaryVersion() = %v, want %v", got, tt.want)
 			}
