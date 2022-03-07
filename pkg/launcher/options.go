@@ -45,6 +45,13 @@ type Options struct {
 	// ControlServerURL URL for control server.
 	ControlServerURL string
 
+	// Osquery TLS options
+	OsqueryTlsConfigEndpoint           string
+	OsqueryTlsEnrollEndpoint           string
+	OsqueryTlsLoggerEndpoint           string
+	OsqueryTlsDistributedReadEndpoint  string
+	OsqueryTlsDistributedWriteEndpoint string
+
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
 	// NotaryServerURL is the URL for the Notary server.
