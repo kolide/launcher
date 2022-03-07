@@ -45,16 +45,24 @@ type osqueryOptions struct {
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc        func(dir string) error
 	binaryPath            string
-	rootDirectory         string
-	extensionSocketPath   string
 	configPluginFlag      string
-	loggerPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
+	extensionSocketPath   string
+	enrollSecretPath      string
+	loggerPluginFlag      string
 	osqueryFlags          []string
-	stdout                io.Writer
-	stderr                io.Writer
 	retries               uint
+	rootDirectory         string
+	stderr                io.Writer
+	stdout                io.Writer
+	tlsConfigEndpoint     string
+	tlsDistReadEndpoint   string
+	tlsDistWriteEndpoint  string
+	tlsEnrollEndpoint     string
+	tlsHostname           string
+	tlsLoggerEndpoint     string
+	tlsServerCerts        string
 	verbose               bool
 }
 
@@ -151,6 +159,39 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		cmd.Args = append(cmd.Args, "--verbose")
 	}
 
+	if opts.tlsHostname != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", opts.tlsHostname))
+	}
+
+	if opts.tlsConfigEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--config_tls_endpoint=%s", opts.tlsConfigEndpoint))
+
+	}
+
+	if opts.tlsEnrollEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", opts.tlsEnrollEndpoint))
+	}
+
+	if opts.tlsLoggerEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", opts.tlsLoggerEndpoint))
+	}
+
+	if opts.tlsDistReadEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", opts.tlsDistReadEndpoint))
+	}
+
+	if opts.tlsDistWriteEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", opts.tlsDistWriteEndpoint))
+	}
+
+	if opts.tlsServerCerts != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", opts.tlsServerCerts))
+	}
+
+	if opts.enrollSecretPath != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", opts.enrollSecretPath))
+	}
+
 	// Configs aren't expected to change often, so refresh configs
 	// every couple minutes. if there's a failure, try again more
 	// promptly. Values in seconds. These settings are CLI flags only.
@@ -173,7 +214,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	}
 
 	// Apply user-provided flags last so that they can override other flags set
-	// by Launcher (besides the six flags below)
+	// by Launcher (besides the flags below)
 	for _, flag := range opts.osqueryFlags {
 		cmd.Args = append(cmd.Args, "--"+flag)
 	}
@@ -186,7 +227,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--database_path=%s", paths.databasePath),
 		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
-		"--extensions_timeout=10",
+		"--disable_extensions=false",
+		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 	)
 
@@ -321,6 +363,54 @@ func WithLogger(logger log.Logger) OsqueryInstanceOption {
 func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.verbose = v
+	}
+}
+
+func WithEnrollSecretPath(secretPath string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.enrollSecretPath = secretPath
+	}
+}
+
+func WithTlsHostname(hostname string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsHostname = hostname
+	}
+}
+
+func WithTlsConfigEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsConfigEndpoint = ep
+	}
+}
+
+func WithTlsEnrollEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsEnrollEndpoint = ep
+	}
+}
+
+func WithTlsLoggerEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsLoggerEndpoint = ep
+	}
+}
+
+func WithTlsDistributedReadEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsDistReadEndpoint = ep
+	}
+}
+
+func WithTlsDistributedWriteEndpoint(ep string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsDistWriteEndpoint = ep
+	}
+}
+
+func WithTlsServerCerts(s string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.tlsServerCerts = s
 	}
 }
 
@@ -677,6 +767,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	defer cancel()
 	limiter := rate.NewLimiter(rate.Every(socketOpenInterval), 1)
 	for {
+		level.Debug(o.logger).Log("msg", "Starting server connection attempts to osquery")
+
 		// Create the extension server and register all custom osquery
 		// plugins
 		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
@@ -695,6 +787,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			return errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
 		}
 	}
+	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
