@@ -11,6 +11,9 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// defines time out for all http, dns, connectivity requests
+const requestTimeout = time.Second * 5
+
 // if we find any files in these directories, log them to check point
 var notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
 
@@ -49,10 +52,10 @@ func logCheckPoint(logger log.Logger) {
 		"msg", "log checkpoint started",
 		"hostname", hostName(),
 		"notableFiles", fileNamesInDirs(notableFileDirs...),
-		"IPs", lookupHostsIpv4s(net.DefaultResolver, hostsToCheckConnectivity...),
-		"connectivity", testConnections(&net.Dialer{Timeout: 5 * time.Second}, hostsToCheckConnectivity...),
-		"fetches", fetchFromUrls(&http.Client{Timeout: 5 * time.Second}, fetchUrls),
-		"fetch-notary-version", fetchNotaryVersion(&http.Client{Timeout: 5 * time.Second}, "https://notary.kolide.com/v2/kolide/launcher/_trust/tuf/targets/releases.json"),
+		"IPs", lookupHostsIpv4s(&net.Resolver{}, hostsToCheckConnectivity...),
+		"connectivity", testConnections(&net.Dialer{Timeout: requestTimeout}, hostsToCheckConnectivity...),
+		"fetches", fetchFromUrls(&http.Client{Timeout: requestTimeout}, fetchUrls),
+		"fetch-notary-version", fetchNotaryVersion(&http.Client{Timeout: requestTimeout}, "https://notary.kolide.com/v2/kolide/launcher/_trust/tuf/targets/releases.json"),
 	)
 }
 

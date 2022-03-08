@@ -34,7 +34,10 @@ func lookupHostsIpv4s(ipLookuper ipLookuper, hosts ...string) []string {
 }
 
 func lookupIpv4(ipLookuper ipLookuper, host string) ([]string, error) {
-	ips, err := ipLookuper.LookupIP(context.Background(), "ip", host)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	ips, err := ipLookuper.LookupIP(ctx, "ip", host)
 
 	if err != nil {
 		return nil, err

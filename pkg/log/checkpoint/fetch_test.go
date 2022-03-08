@@ -94,64 +94,6 @@ func Test_fetchFromUrls(t *testing.T) {
 	}
 }
 
-func Test_fetchFromUrl(t *testing.T) {
-	t.Parallel()
-
-	type args struct {
-		client *mocks.HttpClient
-		url    string
-	}
-	tests := []struct {
-		name        string
-		args        args
-		onGetReturn func() (*http.Response, error)
-		want        string
-		wantErr     bool
-	}{
-		{
-			name: "happy_path",
-			args: args{
-				client: &mocks.HttpClient{},
-				url:    "https://happy_path.com",
-			},
-			onGetReturn: func() (*http.Response, error) {
-				return &http.Response{
-					Status: "200 OK",
-					Body:   io.NopCloser(bytes.NewBufferString("happy_path_response")),
-				}, nil
-			},
-			want:    "[200 OK] happy_path_response",
-			wantErr: false,
-		},
-		{
-			name: "error",
-			args: args{
-				client: &mocks.HttpClient{},
-				url:    "https://error.com",
-			},
-			onGetReturn: func() (*http.Response, error) {
-				return nil, errors.New("some error")
-			},
-			want:    "",
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn()) //nolint:bodyclose
-
-			got, err := fetchFromUrl(tt.args.client, tt.args.url)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("fetchFromUrl() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("fetchFromUrl() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_fetchNotaryVersion(t *testing.T) {
 	type args struct {
 		client *mocks.HttpClient
