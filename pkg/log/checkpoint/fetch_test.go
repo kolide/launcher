@@ -148,6 +148,7 @@ func Test_fetchNotaryVersion(t *testing.T) {
 			if got := fetchNotaryVersion(tt.args.client, tt.args.url); got != tt.want {
 				t.Errorf("fetchNotaryVersion() = %v, want %v", got, tt.want)
 			}
+			tt.args.client.AssertExpectations(t)
 		})
 	}
 }
