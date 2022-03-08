@@ -107,6 +107,8 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 			if got := lookupHostsIpv4s(tt.args.ipLookuper, tt.args.hosts...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("lookupIpv4Log() = %v, want %v", got, tt.want)
 			}
+
+			tt.args.ipLookuper.AssertExpectations(t)
 		})
 	}
 }

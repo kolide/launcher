@@ -76,6 +76,8 @@ func Test_testConnections(t *testing.T) {
 			if got := testConnections(tt.args.dialer, tt.args.hosts...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("testConnections() = %v, want %v", got, tt.want)
 			}
+
+			tt.args.dialer.AssertExpectations(t)
 		})
 	}
 }

@@ -90,6 +90,7 @@ func Test_fetchFromUrls(t *testing.T) {
 			if got := fetchFromUrls(tt.args.client, tt.args.urls); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchFromUrls() = %v, want %v", got, tt.want)
 			}
+			tt.args.client.AssertExpectations(t)
 		})
 	}
 }
