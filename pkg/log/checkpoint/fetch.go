@@ -34,7 +34,7 @@ func fetchFromUrls(client httpClient, urls []string) []string {
 	return results
 }
 
-type NotaryRelease struct {
+type notaryRelease struct {
 	Signed struct {
 		Version int `json:"version"`
 	} `json:"signed"`
@@ -63,7 +63,7 @@ func fetchNotaryVersion(client httpClient, url string) string {
 	}
 	defer response.Body.Close()
 
-	var notaryRelease NotaryRelease
+	var notaryRelease notaryRelease
 	if err := json.NewDecoder(response.Body).Decode(&notaryRelease); err != nil {
 		return fmt.Sprintf(strFmt, url, err.Error())
 	}

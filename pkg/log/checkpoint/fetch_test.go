@@ -12,6 +12,8 @@ import (
 )
 
 func Test_fetchFromUrls(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		client *mocks.HttpClient
 		urls   []string
@@ -93,6 +95,8 @@ func Test_fetchFromUrls(t *testing.T) {
 }
 
 func Test_fetchFromUrl(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		client *mocks.HttpClient
 		url    string

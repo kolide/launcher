@@ -18,7 +18,7 @@ var notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
 var hostsToCheckConnectivity = []string{"k2device.kolide.com", "k2control.kolide.com", "notary.kolide.co", "dl.kolide.co"}
 
 // log get data from these urls
-var fetchUrls = []string{"https://k2.kolide.com/version"}
+var fetchUrls = []string{"https://k2device.kolide.com/version"}
 
 // logger is an interface that allows mocking of logger
 type logger interface {

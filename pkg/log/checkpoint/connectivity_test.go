@@ -10,6 +10,8 @@ import (
 )
 
 func Test_testConnections(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		dialer *mocks.Dialer
 		hosts  []string
@@ -79,6 +81,8 @@ func Test_testConnections(t *testing.T) {
 }
 
 func Test_testConnection(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		dialer *mocks.Dialer
 		host   string
