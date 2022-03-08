@@ -537,7 +537,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
 	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
 
-	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+	testutil.FatalAfterFunc(t, 2*time.Second, func() {
 		err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	})
 	assert.Nil(t, err)
@@ -756,7 +756,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
-	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+	testutil.FatalAfterFunc(t, 2*time.Second, func() {
 		e.Shutdown()
 	})
 }
