@@ -30,3 +30,6 @@ tools/notary/config/tuf
 # Generated assets
 pkg/packagekit/internal/assets.go
 pkg/packagekit/wix/internal/assets.go
+
+# VS Code Files
+.vscode/

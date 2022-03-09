@@ -22,7 +22,7 @@ func Test_fetchFromUrls(t *testing.T) {
 		name         string
 		args         args
 		onGetReturns []func() (*http.Response, error)
-		want         []string
+		want         map[string]interface{}
 	}{
 		{
 			name: "happy_path_single",
@@ -38,13 +38,18 @@ func Test_fetchFromUrls(t *testing.T) {
 					}, nil
 				},
 			},
-			want: []string{"https://happy_path_single.com: [200 OK] happy_path_response_single"},
+			want: map[string]interface{}{
+				"https://happy_path_single.com": "[200 OK] happy_path_response_single",
+			},
 		},
 		{
 			name: "happy_path_multiple",
 			args: args{
 				client: &mocks.HttpClient{},
-				urls:   []string{"https://happy_path_multiple_1.com", "https://happy_path_multiple_2.com"},
+				urls: []string{
+					"https://happy_path_multiple_1.com",
+					"https://happy_path_multiple_2.com",
+				},
 			},
 			onGetReturns: []func() (*http.Response, error){
 				func() (*http.Response, error) {
@@ -60,7 +65,10 @@ func Test_fetchFromUrls(t *testing.T) {
 					}, nil
 				},
 			},
-			want: []string{"https://happy_path_multiple_1.com: [200 OK] happy_path_response_multiple_1", "https://happy_path_multiple_2.com: [200 OK] happy_path_response_multiple_2"},
+			want: map[string]interface{}{
+				"https://happy_path_multiple_1.com": "[200 OK] happy_path_response_multiple_1",
+				"https://happy_path_multiple_2.com": "[200 OK] happy_path_response_multiple_2",
+			},
 		},
 		{
 			name: "error",
@@ -79,7 +87,10 @@ func Test_fetchFromUrls(t *testing.T) {
 					}, nil
 				},
 			},
-			want: []string{"https://error.com: some error", "https://happy_path_multiple_2.com: [200 OK] happy_path_response_multiple_2"},
+			want: map[string]interface{}{
+				"https://error.com":                 "some error",
+				"https://happy_path_multiple_2.com": "[200 OK] happy_path_response_multiple_2",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -87,7 +98,7 @@ func Test_fetchFromUrls(t *testing.T) {
 			for i, url := range tt.args.urls {
 				tt.args.client.On("Get", url).Return(tt.onGetReturns[i]()) //nolint:bodyclose
 			}
-			if got := fetchFromUrls(tt.args.client, tt.args.urls); !reflect.DeepEqual(got, tt.want) {
+			if got := fetchFromUrls(tt.args.client, tt.args.urls...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchFromUrls() = %v, want %v", got, tt.want)
 			}
 			tt.args.client.AssertExpectations(t)
@@ -104,7 +115,7 @@ func Test_fetchNotaryVersion(t *testing.T) {
 		name        string
 		args        args
 		onGetReturn func() (*http.Response, error)
-		want        string
+		want        map[string]interface{}
 	}{
 		{
 			name: "happy_path",
@@ -128,7 +139,7 @@ func Test_fetchNotaryVersion(t *testing.T) {
 					}`)),
 				}, nil
 			},
-			want: "https://happy_path.com: 1516",
+			want: map[string]interface{}{"https://happy_path.com": 1516},
 		},
 		{
 			name: "error",
@@ -139,15 +150,17 @@ func Test_fetchNotaryVersion(t *testing.T) {
 			onGetReturn: func() (*http.Response, error) {
 				return nil, errors.New("some error")
 			},
-			want: "https://error.com: some error",
+			want: map[string]interface{}{"https://error.com": "some error"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.args.client.On("Get", tt.args.url).Return(tt.onGetReturn()) //nolint:bodyclose
-			if got := fetchNotaryVersion(tt.args.client, tt.args.url); got != tt.want {
+
+			if got := fetchNotaryVersion(tt.args.client, tt.args.url); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchNotaryVersion() = %v, want %v", got, tt.want)
 			}
+
 			tt.args.client.AssertExpectations(t)
 		})
 	}

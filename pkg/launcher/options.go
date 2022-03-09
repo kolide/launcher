@@ -10,6 +10,8 @@ import (
 type Options struct {
 	// KolideServerURL is the URL of the management server to connect to.
 	KolideServerURL string
+	// KolideHosted true if using Kolide SaaS settings
+	KolideHosted bool
 	// EnrollSecret contains the raw enroll secret.
 	EnrollSecret string
 	// EnrollSecretPath contains the path to a file containing the enroll

@@ -20,7 +20,7 @@ func Test_testConnections(t *testing.T) {
 		name          string
 		args          args
 		onDialReturns []func() (net.Conn, error)
-		want          []string
+		want          map[string]interface{}
 	}{
 		{
 			name: "happy_path",
@@ -39,9 +39,9 @@ func Test_testConnections(t *testing.T) {
 					return &net.TCPConn{}, nil
 				},
 			},
-			want: []string{
-				"happy_path_1: success",
-				"happy_path_2: success",
+			want: map[string]interface{}{
+				"happy_path_1": "successful tcp connection over 443",
+				"happy_path_2": "successful tcp connection over 443",
 			},
 		},
 		{
@@ -61,9 +61,9 @@ func Test_testConnections(t *testing.T) {
 					return nil, errors.New("some error")
 				},
 			},
-			want: []string{
-				"error_1: some error",
-				"error_2: some error",
+			want: map[string]interface{}{
+				"error_1": "some error",
+				"error_2": "some error",
 			},
 		},
 	}

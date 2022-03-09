@@ -23,7 +23,7 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 		name              string
 		args              args
 		onLookupIPReturns []func() ([]net.IP, error)
-		want              []string
+		want              map[string]interface{}
 	}{
 		{
 			name: "happy_path_single",
@@ -39,7 +39,7 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 					}, nil
 				},
 			},
-			want: []string{"happy_path_single.com: 192.0.0.0"},
+			want: map[string]interface{}{"happy_path_single.com": []string{"192.0.0.0"}},
 		},
 		{
 			name: "happy_path_multiple",
@@ -64,9 +64,9 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 					}, nil
 				},
 			},
-			want: []string{
-				"happy_path_multiple_1.com: 192.0.0.0, 192.0.0.1",
-				"happy_path_multiple_2.com: 192.0.1.0",
+			want: map[string]interface{}{
+				"happy_path_multiple_1.com": []string{"192.0.0.0", "192.0.0.1"},
+				"happy_path_multiple_2.com": []string{"192.0.1.0"},
 			},
 		},
 		{
@@ -90,9 +90,9 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 					return nil, errors.New("some error")
 				},
 			},
-			want: []string{
-				"happy_path_multiple_1.com: 192.0.0.0, 192.0.0.1",
-				"error.com: some error",
+			want: map[string]interface{}{
+				"happy_path_multiple_1.com": []string{"192.0.0.0", "192.0.0.1"},
+				"error.com":                 "some error",
 			},
 		},
 	}

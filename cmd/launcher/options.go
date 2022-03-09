@@ -189,6 +189,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		InsecureTLS:                        *flInsecureTLS,
 		InsecureTransport:                  *flInsecureTransport,
+		KolideHosted:                       *flKolideHosted,
 		KolideServerURL:                    *flKolideServerURL,
 		LogMaxBytesPerBatch:                *flLogMaxBytesPerBatch,
 		LoggingInterval:                    *flLoggingInterval,
