@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	gcTableName = "launcher_gc_info"
+	gcTableName = "launcher_gc_stats"
 )
 
 type gcTable struct {
@@ -26,7 +26,7 @@ type gcTable struct {
 	stats  debug.GCStats
 }
 
-func LauncherGcInfo(_client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func LauncherGcStats(_client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &gcTable{

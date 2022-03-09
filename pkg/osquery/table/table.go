@@ -43,7 +43,8 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
-		tdebug.LauncherGcInfo(client, logger),
+		tdebug.LauncherGcStats(client, logger),
+		tdebug.LauncherMemStats(client, logger),
 		zfs.ZfsPropertiesPlugin(client, logger),
 		zfs.ZpoolPropertiesPlugin(client, logger),
 	}
