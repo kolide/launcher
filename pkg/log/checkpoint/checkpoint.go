@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
@@ -37,17 +38,25 @@ func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
 	//  * runtime stats, like memory allocations
 
 	go func() {
-		logCheckPoint(logger, opts)
+		logCheckPoint(logger, db, opts)
 
 		for range time.Tick(time.Minute * 60) {
-			logCheckPoint(logger, opts)
+			logCheckPoint(logger, db, opts)
 		}
 	}()
 }
 
-func logCheckPoint(logger log.Logger, opts launcher.Options) {
+func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
 
 	logger.Log("msg", "log checkpoint started")
+
+	boltStats, err := agent.GetStats(db)
+	if err != nil {
+		logger.Log("bbolt db size", err.Error())
+	} else {
+		logger.Log("bbolt db size", boltStats.DB.Size)
+	}
+
 	logger.Log("hostname", hostName())
 	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
 
