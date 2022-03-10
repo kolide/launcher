@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -17,7 +18,7 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 
 	type args struct {
 		ipLookuper *mocks.IpLookuper
-		hosts      []string
+		urls       []*url.URL
 	}
 	tests := []struct {
 		name              string
@@ -29,7 +30,12 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 			name: "happy_path_single",
 			args: args{
 				ipLookuper: &mocks.IpLookuper{},
-				hosts:      []string{"happy_path_single.com"},
+				urls: []*url.URL{
+					{
+						Host:   "happy_path_single.example.com",
+						Scheme: "https",
+					},
+				},
 			},
 			onLookupIPReturns: []func() ([]net.IP, error){
 				func() ([]net.IP, error) {
@@ -39,15 +45,21 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 					}, nil
 				},
 			},
-			want: map[string]interface{}{"happy_path_single.com": []string{"192.0.0.0"}},
+			want: map[string]interface{}{
+				"happy_path_single.example.com": []string{"192.0.0.0"},
+			},
 		},
 		{
 			name: "happy_path_multiple",
 			args: args{
 				ipLookuper: &mocks.IpLookuper{},
-				hosts: []string{
-					"happy_path_multiple_1.com",
-					"happy_path_multiple_2.com",
+				urls: []*url.URL{
+					{
+						Host: "happy_path_multiple_1.example.com",
+					},
+					{
+						Host: "happy_path_multiple_2.example.com",
+					},
 				},
 			},
 			onLookupIPReturns: []func() ([]net.IP, error){
@@ -65,17 +77,21 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"happy_path_multiple_1.com": []string{"192.0.0.0", "192.0.0.1"},
-				"happy_path_multiple_2.com": []string{"192.0.1.0"},
+				"happy_path_multiple_1.example.com": []string{"192.0.0.0", "192.0.0.1"},
+				"happy_path_multiple_2.example.com": []string{"192.0.1.0"},
 			},
 		},
 		{
 			name: "error",
 			args: args{
 				ipLookuper: &mocks.IpLookuper{},
-				hosts: []string{
-					"happy_path_multiple_1.com",
-					"error.com",
+				urls: []*url.URL{
+					{
+						Host: "happy_path_multiple_1.example.com",
+					},
+					{
+						Host: "error.example.com",
+					},
 				},
 			},
 			onLookupIPReturns: []func() ([]net.IP, error){
@@ -91,20 +107,20 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"happy_path_multiple_1.com": []string{"192.0.0.0", "192.0.0.1"},
-				"error.com":                 "some error",
+				"happy_path_multiple_1.example.com": []string{"192.0.0.0", "192.0.0.1"},
+				"error.example.com":                 "some error",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for i, host := range tt.args.hosts {
+			for i, url := range tt.args.urls {
 				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 				defer cancel()
-				tt.args.ipLookuper.On("LookupIP", mock.AnythingOfType(fmt.Sprintf("%T", ctx)), "ip", host).Return(tt.onLookupIPReturns[i]())
+				tt.args.ipLookuper.On("LookupIP", mock.AnythingOfType(fmt.Sprintf("%T", ctx)), "ip", url.Host).Return(tt.onLookupIPReturns[i]())
 			}
 
-			if got := lookupHostsIpv4s(tt.args.ipLookuper, tt.args.hosts...); !reflect.DeepEqual(got, tt.want) {
+			if got := lookupHostsIpv4s(tt.args.ipLookuper, tt.args.urls...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("lookupIpv4Log() = %v, want %v", got, tt.want)
 			}
 

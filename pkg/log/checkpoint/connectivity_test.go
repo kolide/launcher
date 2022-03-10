@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"errors"
 	"net"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -14,21 +15,25 @@ func Test_testConnections(t *testing.T) {
 
 	type args struct {
 		dialer *mocks.Dialer
-		hosts  []string
+		urls   []*url.URL
 	}
 	tests := []struct {
 		name          string
 		args          args
 		onDialReturns []func() (net.Conn, error)
-		want          map[string]interface{}
+		want          map[string]string
 	}{
 		{
 			name: "happy_path",
 			args: args{
 				dialer: &mocks.Dialer{},
-				hosts: []string{
-					"happy_path_1",
-					"happy_path_2",
+				urls: []*url.URL{
+					{
+						Host: "happy_path_1.example.com",
+					},
+					{
+						Host: "happy_path_2.example.com",
+					},
 				},
 			},
 			onDialReturns: []func() (net.Conn, error){
@@ -39,18 +44,22 @@ func Test_testConnections(t *testing.T) {
 					return &net.TCPConn{}, nil
 				},
 			},
-			want: map[string]interface{}{
-				"happy_path_1": "successful tcp connection over 443",
-				"happy_path_2": "successful tcp connection over 443",
+			want: map[string]string{
+				"happy_path_1.example.com": "successful tcp connection",
+				"happy_path_2.example.com": "successful tcp connection",
 			},
 		},
 		{
 			name: "error",
 			args: args{
 				dialer: &mocks.Dialer{},
-				hosts: []string{
-					"error_1",
-					"error_2",
+				urls: []*url.URL{
+					{
+						Host: "error_1.example.com",
+					},
+					{
+						Host: "error_2.example.com",
+					},
 				},
 			},
 			onDialReturns: []func() (net.Conn, error){
@@ -61,19 +70,19 @@ func Test_testConnections(t *testing.T) {
 					return nil, errors.New("some error")
 				},
 			},
-			want: map[string]interface{}{
-				"error_1": "some error",
-				"error_2": "some error",
+			want: map[string]string{
+				"error_1.example.com": "some error",
+				"error_2.example.com": "some error",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for i, host := range tt.args.hosts {
-				tt.args.dialer.On("Dial", "tcp", net.JoinHostPort(host, "443")).Return(tt.onDialReturns[i]())
+			for i, url := range tt.args.urls {
+				tt.args.dialer.On("Dial", "tcp", url.Host).Return(tt.onDialReturns[i]())
 			}
 
-			if got := testConnections(tt.args.dialer, tt.args.hosts...); !reflect.DeepEqual(got, tt.want) {
+			if got := testConnections(tt.args.dialer, tt.args.urls...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("testConnections() = %v, want %v", got, tt.want)
 			}
 

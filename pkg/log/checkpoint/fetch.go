@@ -5,22 +5,24 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 type httpClient interface {
 	Get(url string) (resp *http.Response, err error)
 }
 
-func fetchFromUrls(client httpClient, urls ...string) map[string]interface{} {
+func fetchFromUrls(client httpClient, urls ...*url.URL) map[string]string {
 
-	results := make(map[string]interface{})
+	results := make(map[string]string)
 
 	for _, url := range urls {
 		response, err := fetchFromUrl(client, url)
 		if err != nil {
-			results[url] = err.Error()
+			results[url.String()] = err.Error()
 		} else {
-			results[url] = response
+			results[url.String()] = response
 		}
 	}
 
@@ -33,8 +35,8 @@ type notaryRelease struct {
 	} `json:"signed"`
 }
 
-func fetchFromUrl(client httpClient, url string) (string, error) {
-	response, err := client.Get(url)
+func fetchFromUrl(client httpClient, url *url.URL) (string, error) {
+	response, err := client.Get(url.String())
 	if err != nil {
 		return "", err
 	}
@@ -45,24 +47,35 @@ func fetchFromUrl(client httpClient, url string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("[%s] %s", response.Status, string(bytes)), nil
+	return fmt.Sprintf("%s %s", response.Status, string(bytes)), nil
 }
 
-func fetchNotaryVersion(client httpClient, url string) map[string]interface{} {
-	results := make(map[string]interface{})
-	response, err := client.Get(url)
+func fetchNotaryVersions(client httpClient, urls ...*url.URL) map[string]string {
+	results := make(map[string]string)
+
+	for _, url := range urls {
+		response, err := fetchNotaryVersion(client, url)
+		if err != nil {
+			results[url.String()] = err.Error()
+		} else {
+			results[url.String()] = response
+		}
+	}
+
+	return results
+}
+
+func fetchNotaryVersion(client httpClient, url *url.URL) (string, error) {
+	response, err := client.Get(url.String())
 	if err != nil {
-		results[url] = err.Error()
-		return results
+		return "", err
 	}
 	defer response.Body.Close()
 
 	var notaryRelease notaryRelease
 	if err := json.NewDecoder(response.Body).Decode(&notaryRelease); err != nil {
-		results[url] = err.Error()
-		return results
+		return "", err
 	}
 
-	results[url] = notaryRelease.Signed.Version
-	return results
+	return strconv.Itoa(notaryRelease.Signed.Version), nil
 }

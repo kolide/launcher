@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -32,8 +31,6 @@ type logger interface {
 func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
 
 	// Things to add:
-	//  * database sizes
-	//  * server ping ... see what IP the urls resolve to
 	//  * invoke osquery for better hardware info
 	//  * runtime stats, like memory allocations
 
@@ -48,7 +45,7 @@ func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
 
 func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
 
-	logger.Log("msg", "log checkpoint started")
+	logger = log.With(logger, "msg", "log checkpoint")
 
 	boltStats, err := agent.GetStats(db)
 	if err != nil {
@@ -60,61 +57,97 @@ func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
 	logger.Log("hostname", hostName())
 	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
 
-	dialer := &net.Dialer{Timeout: requestTimeout}
-	ipLookuper := &net.Resolver{}
+	logConnections(logger, opts)
+	logIpLookups(logger, opts)
+	logKolideServerVersion(logger, opts)
+	logNotaryVersions(logger, opts)
+}
+
+func logKolideServerVersion(logger logger, opts launcher.Options) {
+	if !opts.KolideHosted {
+		return
+	}
+
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	kolideServerUrl, err := parseUrl(opts.KolideServerURL)
+	kolideServerUrl, err := url.Parse(fmt.Sprintf("https://%s/version", opts.KolideServerURL))
 	if err != nil {
-		logCheckPointError(logger, errors.Wrap(err, "parsing URL"))
+		logger.Log("url parse error", err)
+	} else {
+		logger.Log("kolide server version fetch", fetchFromUrls(httpClient, kolideServerUrl))
+	}
+}
+
+func logNotaryVersions(logger logger, opts launcher.Options) {
+	if !opts.KolideHosted || !opts.Autoupdate {
+		return
 	}
 
-	logMap(logger, testConnections(dialer, kolideServerUrl.Host))
-	logMap(logger, lookupHostsIpv4s(ipLookuper, kolideServerUrl.Host))
+	httpClient := &http.Client{Timeout: requestTimeout}
 
-	if opts.KolideHosted {
-		logMap(logger, fetchFromUrls(httpClient, kolideServerUrl.String()+"/version"))
-		logMap(logger, testConnections(dialer, "dl.kolide.co"))
-		logMap(logger, lookupHostsIpv4s(ipLookuper, "dl.kolide.co"))
+	notaryUrl, err := url.Parse(fmt.Sprintf("https://%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", opts.NotaryServerURL))
+	if err != nil {
+		logger.Log("url parse error", err)
+	} else {
+		logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
 	}
+}
+
+func logConnections(logger logger, opts launcher.Options) {
+	urls, err := urlsToTest(opts)
+
+	if err != nil {
+		logger.Log("url parse errors", err)
+	}
+
+	dialer := &net.Dialer{Timeout: requestTimeout}
+	logger.Log("connections", testConnections(dialer, urls...))
+}
+
+func logIpLookups(logger logger, opts launcher.Options) {
+	urls, err := urlsToTest(opts)
+
+	if err != nil {
+		logger.Log("url parse errors", err)
+	}
+
+	ipLookuper := &net.Resolver{}
+	logger.Log("ip loook ups", lookupHostsIpv4s(ipLookuper, urls...))
+}
+
+func urlsToTest(opts launcher.Options) ([]*url.URL, error) {
+	addrsToTest := []string{opts.KolideServerURL}
 
 	if opts.Autoupdate {
-		notaryServerURL, err := parseUrl(opts.NotaryServerURL)
-		if err != nil {
-			logCheckPointError(logger, errors.Wrap(err, "parsing URL"))
-		}
-
-		logMap(logger, testConnections(dialer, notaryServerURL.Host))
-		logMap(logger, lookupHostsIpv4s(ipLookuper, notaryServerURL.Host))
-
-		if opts.KolideHosted {
-			logMap(logger, fetchNotaryVersion(httpClient, notaryServerURL.String()+"/v2/kolide/launcher/_trust/tuf/targets/releases.json"))
-		}
-	}
-
-	if opts.Autoupdate {
-		notaryMirrorServerURL, err := parseUrl(opts.MirrorServerURL)
-		if err != nil {
-			logCheckPointError(logger, errors.Wrap(err, "parsing URL"))
-		}
-
-		logMap(logger, testConnections(dialer, notaryMirrorServerURL.Host))
-		logMap(logger, lookupHostsIpv4s(ipLookuper, notaryMirrorServerURL.Host))
-
-		if opts.KolideHosted {
-			logMap(logger, fetchNotaryVersion(httpClient, notaryMirrorServerURL.String()+"/v2/kolide/launcher/_trust/tuf/targets/releases.json"))
-		}
+		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL)
 	}
 
 	if opts.Control {
-		controlServerUrl, err := parseUrl(opts.ControlServerURL)
-		if err != nil {
-			logCheckPointError(logger, errors.Wrap(err, "parsing URL"))
-		}
-
-		logMap(logger, testConnections(dialer, controlServerUrl.Host))
-		logMap(logger, lookupHostsIpv4s(ipLookuper, controlServerUrl.Host))
+		addrsToTest = append(addrsToTest, opts.ControlServerURL)
 	}
+
+	urls := []*url.URL{}
+	var err error
+
+	for _, addr := range addrsToTest {
+		url, urlErr := url.Parse(fmt.Sprintf("https://%s", addr))
+
+		switch {
+		// first error
+		case urlErr != nil && err == nil:
+			err = urlErr
+
+		// not first error
+		case urlErr != nil && err != nil:
+			err = errors.Wrap(err, urlErr.Error())
+
+		// no error
+		default:
+			urls = append(urls, url)
+		}
+	}
+
+	return urls, err
 }
 
 func hostName() string {
@@ -124,18 +157,4 @@ func hostName() string {
 	}
 
 	return hostname
-}
-
-func logCheckPointError(logger log.Logger, err error) {
-	logger.Log("checkpoint error", err)
-}
-
-func parseUrl(addr string) (*url.URL, error) {
-	return url.Parse(fmt.Sprintf("https://%s", strings.Split(addr, ":")[0]))
-}
-
-func logMap(logger log.Logger, entry map[string]interface{}) {
-	for k, v := range entry {
-		logger.Log(k, v)
-	}
 }

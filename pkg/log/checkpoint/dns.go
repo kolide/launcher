@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"context"
 	"net"
+	"net/url"
 )
 
 // ipLookeruper is an interface to allow mocking of ip look ups
@@ -10,27 +11,27 @@ type ipLookuper interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
-func lookupHostsIpv4s(ipLookuper ipLookuper, hosts ...string) map[string]interface{} {
+func lookupHostsIpv4s(ipLookuper ipLookuper, urls ...*url.URL) map[string]interface{} {
 	results := make(map[string]interface{})
 
-	for _, host := range hosts {
-		ips, err := lookupIpv4(ipLookuper, host)
+	for _, url := range urls {
+		ips, err := lookupIpv4(ipLookuper, url)
 
 		if err != nil {
-			results[host] = err.Error()
+			results[url.Hostname()] = err.Error()
 		} else {
-			results[host] = ips
+			results[url.Hostname()] = ips
 		}
 	}
 
 	return results
 }
 
-func lookupIpv4(ipLookuper ipLookuper, host string) ([]string, error) {
+func lookupIpv4(ipLookuper ipLookuper, url *url.URL) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	ips, err := ipLookuper.LookupIP(ctx, "ip", host)
+	ips, err := ipLookuper.LookupIP(ctx, "ip", url.Hostname())
 
 	if err != nil {
 		return nil, err
