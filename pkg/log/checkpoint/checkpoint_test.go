@@ -9,6 +9,8 @@ import (
 )
 
 func Test_urlsToTest(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		opts launcher.Options
 	}
