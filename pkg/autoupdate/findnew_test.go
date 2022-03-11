@@ -373,11 +373,9 @@ func TestCheckExecutable(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
 			err := checkExecutable(context.TODO(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)

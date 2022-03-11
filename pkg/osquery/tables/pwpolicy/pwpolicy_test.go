@@ -42,8 +42,7 @@ func TestQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Parallel()
-
+		tt := tt
 		testTable := &Table{
 			logger: log.NewNopLogger(),
 			execCC: execFaker(tt.file),
