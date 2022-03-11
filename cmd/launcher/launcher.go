@@ -99,7 +99,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	internal.RecordLauncherVersion(rootDirectory)
 
 	// Try to ensure useful info in the logs
-	checkpoint.Run(logger, db)
+	checkpoint.Run(logger, db, *opts)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
