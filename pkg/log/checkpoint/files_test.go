@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilesFound(t *testing.T) { //nolint:paralleltest
+func TestFilesFound(t *testing.T) {
 	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")

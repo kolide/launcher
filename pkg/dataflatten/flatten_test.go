@@ -18,7 +18,9 @@ type flattenTestCase struct {
 	err     bool
 }
 
-func TestFlatten_Complex2(t *testing.T) { // nolint:paralleltest
+func TestFlatten_Complex2(t *testing.T) {
+	t.Parallel()
+
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "complex2.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
@@ -66,7 +68,9 @@ func TestFlatten_Complex2(t *testing.T) { // nolint:paralleltest
 
 }
 
-func TestFlatten_NestingBug(t *testing.T) { // nolint:paralleltest
+func TestFlatten_NestingBug(t *testing.T) {
+	t.Parallel()
+
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nested.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
@@ -107,7 +111,9 @@ func TestFlatten_NestingBug(t *testing.T) { // nolint:paralleltest
 
 }
 
-func TestFlatten_Complex(t *testing.T) { // nolint:paralleltest
+func TestFlatten_Complex(t *testing.T) {
+	t.Parallel()
+
 	// Do the unmarshaling here, so we don't keep doing it again and again
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "animals.json"))
 	require.NoError(t, err, "reading file")
@@ -222,7 +228,9 @@ func TestFlatten_Complex(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestFlatten_ArrayMaps(t *testing.T) { // nolint:paralleltest
+func TestFlatten_ArrayMaps(t *testing.T) {
+	t.Parallel()
+
 	var tests = []flattenTestCase{
 		{
 			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
@@ -265,7 +273,8 @@ func TestFlatten_ArrayMaps(t *testing.T) { // nolint:paralleltest
 
 }
 
-func TestFlatten(t *testing.T) { // nolint:paralleltest
+func TestFlatten(t *testing.T) {
+	t.Parallel()
 
 	var tests = []flattenTestCase{
 		{

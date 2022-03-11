@@ -6,7 +6,8 @@ import (
 )
 
 // TestPlist is testing a very simple plist case. Most of the more complex testing is in the spec files.
-func TestPlist(t *testing.T) { // nolint:paralleltest
+func TestPlist(t *testing.T) {
+	t.Parallel()
 
 	var tests = []flattenTestCase{
 		{
@@ -27,7 +28,6 @@ func TestPlist(t *testing.T) { // nolint:paralleltest
 	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
-
 			actual, err := Plist([]byte(tt.in))
 			testFlattenCase(t, tt, actual, err)
 		})
@@ -35,6 +35,7 @@ func TestPlist(t *testing.T) { // nolint:paralleltest
 }
 
 func TestNestedPlists(t *testing.T) { // nolint:paralleltest
+	t.Parallel()
 
 	var tests = []flattenTestCase{
 		{
@@ -71,7 +72,6 @@ func TestNestedPlists(t *testing.T) { // nolint:paralleltest
 		for _, f := range []string{"nested.xml", "nested.plist"} {
 			f := f
 			t.Run(tt.comment, func(t *testing.T) {
-
 				actual, err := PlistFile(filepath.Join("testdata", "nested", f), tt.options...)
 				testFlattenCase(t, tt, actual, err)
 			})
