@@ -11,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -44,23 +43,24 @@ func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
 }
 
 func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
-
 	logger = log.With(logger, "msg", "log checkpoint")
 
+	logger.Log("hostname", hostName())
+	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
+	logDbSize(logger, db)
+	logConnections(logger, opts)
+	logIpLookups(logger, opts)
+	logKolideServerVersion(logger, opts)
+	logNotaryVersions(logger, opts)
+}
+
+func logDbSize(logger log.Logger, db *bbolt.DB) {
 	boltStats, err := agent.GetStats(db)
 	if err != nil {
 		logger.Log("bbolt db size", err.Error())
 	} else {
 		logger.Log("bbolt db size", boltStats.DB.Size)
 	}
-
-	logger.Log("hostname", hostName())
-	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
-
-	logConnections(logger, opts)
-	logIpLookups(logger, opts)
-	logKolideServerVersion(logger, opts)
-	logNotaryVersions(logger, opts)
 }
 
 func logKolideServerVersion(logger logger, opts launcher.Options) {
@@ -70,9 +70,9 @@ func logKolideServerVersion(logger logger, opts launcher.Options) {
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	kolideServerUrl, err := url.Parse(fmt.Sprintf("https://%s/version", opts.KolideServerURL))
+	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", opts.KolideServerURL), opts)
 	if err != nil {
-		logger.Log("url parse error", err)
+		logger.Log("kolide server version fetch", err)
 	} else {
 		logger.Log("kolide server version fetch", fetchFromUrls(httpClient, kolideServerUrl))
 	}
@@ -85,37 +85,25 @@ func logNotaryVersions(logger logger, opts launcher.Options) {
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	notaryUrl, err := url.Parse(fmt.Sprintf("https://%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", opts.NotaryServerURL))
+	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", opts.NotaryServerURL), opts)
 	if err != nil {
-		logger.Log("url parse error", err)
+		logger.Log("notary versions", err)
 	} else {
 		logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
 	}
 }
 
 func logConnections(logger logger, opts launcher.Options) {
-	urls, err := urlsToTest(opts)
-
-	if err != nil {
-		logger.Log("url parse errors", err)
-	}
-
 	dialer := &net.Dialer{Timeout: requestTimeout}
-	logger.Log("connections", testConnections(dialer, urls...))
+	logger.Log("connections", testConnections(dialer, urlsToTest(opts)...))
 }
 
 func logIpLookups(logger logger, opts launcher.Options) {
-	urls, err := urlsToTest(opts)
-
-	if err != nil {
-		logger.Log("url parse errors", err)
-	}
-
 	ipLookuper := &net.Resolver{}
-	logger.Log("ip loook ups", lookupHostsIpv4s(ipLookuper, urls...))
+	logger.Log("ip loook ups", lookupHostsIpv4s(ipLookuper, urlsToTest(opts)...))
 }
 
-func urlsToTest(opts launcher.Options) ([]*url.URL, error) {
+func urlsToTest(opts launcher.Options) []*url.URL {
 	addrsToTest := []string{opts.KolideServerURL}
 
 	if opts.Autoupdate {
@@ -127,27 +115,43 @@ func urlsToTest(opts launcher.Options) ([]*url.URL, error) {
 	}
 
 	urls := []*url.URL{}
-	var err error
 
 	for _, addr := range addrsToTest {
-		url, urlErr := url.Parse(fmt.Sprintf("https://%s", addr))
 
-		switch {
-		// first error
-		case urlErr != nil && err == nil:
-			err = urlErr
+		url, urlErr := parseUrl(addr, opts)
 
-		// not first error
-		case urlErr != nil && err != nil:
-			err = errors.Wrap(err, urlErr.Error())
-
-		// no error
-		default:
-			urls = append(urls, url)
+		if urlErr != nil {
+			continue
 		}
+
+		urls = append(urls, url)
 	}
 
-	return urls, err
+	return urls
+}
+
+func parseUrl(addr string, opts launcher.Options) (*url.URL, error) {
+
+	scheme := "https"
+	if opts.InsecureTransport {
+		scheme = "http"
+	}
+
+	u, err := url.Parse(fmt.Sprintf("%s://%s", scheme, addr))
+
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Port() == "" {
+		port := "443"
+		if opts.InsecureTransport {
+			port = "80"
+		}
+		u.Host = net.JoinHostPort(u.Host, port)
+	}
+
+	return u, nil
 }
 
 func hostName() string {

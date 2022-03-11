@@ -15,10 +15,9 @@ func Test_urlsToTest(t *testing.T) {
 		opts launcher.Options
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []*url.URL
-		wantErr bool
+		name string
+		args args
+		want []*url.URL
 	}{
 		{
 			name: "kolide_saas",
@@ -101,13 +100,84 @@ func Test_urlsToTest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := urlsToTest(tt.args.opts)
+			got := urlsToTest(tt.args.opts)
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("urlsToTest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_parseUrl(t *testing.T) {
+	type args struct {
+		addr string
+		opts launcher.Options
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *url.URL
+		wantErr bool
+	}{
+		{
+			name: "secure_with_port_input",
+			args: args{
+				addr: "example.com:443",
+				opts: launcher.Options{},
+			},
+			want: &url.URL{
+				Host:   "example.com:443",
+				Scheme: "https",
+			},
+		},
+		{
+			name: "secure_no_port_input",
+			args: args{
+				addr: "example.com",
+				opts: launcher.Options{},
+			},
+			want: &url.URL{
+				Host:   "example.com:443",
+				Scheme: "https",
+			},
+		},
+		{
+			name: "insecure_with_port_input",
+			args: args{
+				addr: "example.com:80",
+				opts: launcher.Options{
+					InsecureTransport: true,
+				},
+			},
+			want: &url.URL{
+				Host:   "example.com:80",
+				Scheme: "http",
+			},
+		},
+		{
+			name: "insecure_no_port_input",
+			args: args{
+				addr: "example.com",
+				opts: launcher.Options{
+					InsecureTransport: true,
+				},
+			},
+			want: &url.URL{
+				Host:   "example.com:80",
+				Scheme: "http",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseUrl(tt.args.addr, tt.args.opts)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("urlsToTest() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("parseUrl() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("urlsToTest() = %v, want %v", got, tt.want)
+				t.Errorf("parseUrl() = %v, want %v", got, tt.want)
 			}
 		})
 	}
