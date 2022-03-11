@@ -4,8 +4,6 @@ on:
     tags:
       - v*
     branches:
-      - main
-      - master
       - '**'
   pull_request:
 jobs:
