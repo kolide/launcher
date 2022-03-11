@@ -18,9 +18,7 @@ type flattenTestCase struct {
 	err     bool
 }
 
-func TestFlatten_Complex2(t *testing.T) {
-	t.Parallel()
-
+func TestFlatten_Complex2(t *testing.T) { // nolint:paralleltest
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "complex2.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
@@ -58,11 +56,9 @@ func TestFlatten_Complex2(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
-			t.Parallel()
-
 			actual, err := Flatten(dataIn, tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
@@ -70,9 +66,7 @@ func TestFlatten_Complex2(t *testing.T) {
 
 }
 
-func TestFlatten_NestingBug(t *testing.T) {
-	t.Parallel()
-
+func TestFlatten_NestingBug(t *testing.T) { // nolint:paralleltest
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nested.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
@@ -103,11 +97,9 @@ func TestFlatten_NestingBug(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
-			t.Parallel()
-
 			actual, err := Flatten(dataIn, tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
@@ -115,9 +107,7 @@ func TestFlatten_NestingBug(t *testing.T) {
 
 }
 
-func TestFlatten_Complex(t *testing.T) {
-	t.Parallel()
-
+func TestFlatten_Complex(t *testing.T) { // nolint:paralleltest
 	// Do the unmarshaling here, so we don't keep doing it again and again
 	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "animals.json"))
 	require.NoError(t, err, "reading file")
@@ -223,20 +213,16 @@ func TestFlatten_Complex(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
-		t.Run(tt.comment, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.comment, func(t *testing.T) { // nolint:paralleltest
 			actual, err := Flatten(dataIn, tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
 	}
 }
 
-func TestFlatten_ArrayMaps(t *testing.T) {
-	t.Parallel()
-
+func TestFlatten_ArrayMaps(t *testing.T) { // nolint:paralleltest
 	var tests = []flattenTestCase{
 		{
 			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
@@ -269,11 +255,9 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
-		t.Run(tt.comment, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.comment, func(t *testing.T) { // nolint:paralleltest
 			actual, err := Json([]byte(tt.in), tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
@@ -281,8 +265,7 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 
 }
 
-func TestFlatten(t *testing.T) {
-	t.Parallel()
+func TestFlatten(t *testing.T) { // nolint:paralleltest
 
 	var tests = []flattenTestCase{
 		{
@@ -339,11 +322,9 @@ func TestFlatten(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
-			t.Parallel()
-
 			actual, err := Json([]byte(tt.in), tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
