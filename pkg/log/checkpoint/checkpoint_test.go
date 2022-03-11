@@ -168,6 +168,28 @@ func Test_parseUrl(t *testing.T) {
 				Scheme: "http",
 			},
 		},
+		{
+			name: "addr_with_scheme",
+			args: args{
+				addr: "https://example.com",
+				opts: launcher.Options{},
+			},
+			want: &url.URL{
+				Host:   "example.com:443",
+				Scheme: "https",
+			},
+		},
+		{
+			name: "addr_with_scheme_and_port",
+			args: args{
+				addr: "https://example.com:443",
+				opts: launcher.Options{},
+			},
+			want: &url.URL{
+				Host:   "example.com:443",
+				Scheme: "https",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
