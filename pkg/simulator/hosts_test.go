@@ -10,6 +10,8 @@ import (
 )
 
 func TestLoadHostsErrors(t *testing.T) {
+	t.Parallel()
+
 	t.Skip("TODO: Windows tests")
 	testCases := []struct {
 		dir      string
@@ -43,7 +45,10 @@ func TestLoadHostsErrors(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run(tt.matchErr, func(t *testing.T) {
+			t.Parallel()
+
 			hosts, err := LoadHosts(tt.dir, log.NewNopLogger())
 			require.Nil(t, hosts)
 			require.Error(t, err)
@@ -53,6 +58,8 @@ func TestLoadHostsErrors(t *testing.T) {
 }
 
 func TestLoadHosts(t *testing.T) {
+	t.Parallel()
+
 	hosts, err := LoadHosts("testdata/valid1", log.NewNopLogger())
 	require.Nil(t, err)
 
@@ -90,6 +97,8 @@ func TestLoadHosts(t *testing.T) {
 }
 
 func TestRunQuery(t *testing.T) {
+	t.Parallel()
+
 	h1 := &queryRunner{
 		Queries: []matcher{
 			{regexp.MustCompile(".*time.*"), []map[string]string{{"foo": "bar"}}},
@@ -164,6 +173,8 @@ func TestRunQuery(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			res, err := tt.Host.RunQuery(tt.Query)
 			if tt.Result != nil {
 				assert.Equal(t, tt.Result, res)

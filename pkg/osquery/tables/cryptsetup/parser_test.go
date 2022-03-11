@@ -31,7 +31,10 @@ func TestParseStatusErrors(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			data, err := parseStatus([]byte(tt.input))
 			assert.Error(t, err, "parseStatus")
 			assert.Nil(t, data, "data is nil")
@@ -106,7 +109,10 @@ func TestParseStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.infile, func(t *testing.T) {
+			t.Parallel()
+
 			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.infile))
 			require.NoError(t, err, "read input file")
 

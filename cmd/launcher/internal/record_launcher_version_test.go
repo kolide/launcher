@@ -31,7 +31,10 @@ func TestRecordLauncherVersion(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			tempDir, err := os.MkdirTemp("", "record-launcher-version")
 			require.NoError(t, err, "making temp dir")
 			defer os.RemoveAll(tempDir)

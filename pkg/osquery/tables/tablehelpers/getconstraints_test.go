@@ -112,7 +112,10 @@ func TestGetConstraints(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			actual := GetConstraints(mockQC, tt.name, tt.opts...)
 			sort.Strings(actual)
 			require.Equal(t, tt.expected, actual)

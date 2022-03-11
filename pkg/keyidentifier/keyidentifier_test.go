@@ -19,6 +19,8 @@ type spec struct {
 // TestIdentifyFiles walks the testdata directory, and tests each
 // file.
 func TestIdentifyFiles(t *testing.T) {
+	t.Parallel()
+
 	kIdentifier, err := New(WithLogger(logutil.NewCLILogger(true)))
 	require.NoError(t, err)
 

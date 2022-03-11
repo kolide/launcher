@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilesFound(t *testing.T) {
+func TestFilesFound(t *testing.T) { //nolint:paralleltest
 	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
@@ -31,6 +31,8 @@ func TestFilesFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("testFilesFound", func(t *testing.T) {
+			t.Parallel()
+
 			dirsToSearch, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
 			require.NoError(t, err, "creating test files")
 

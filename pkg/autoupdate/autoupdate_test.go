@@ -120,7 +120,10 @@ func TestValidLocalFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
 			require.NoError(t, err)
 			defer os.Remove(testFile.Name())
@@ -182,7 +185,10 @@ func TestNewUpdater(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
 			u, err := NewUpdater("/tmp/app", "/tmp/tuf", tt.opts...)

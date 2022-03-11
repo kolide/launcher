@@ -113,7 +113,10 @@ func Test_lookupHostsIpv4s(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for i, url := range tt.args.urls {
 				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 				defer cancel()

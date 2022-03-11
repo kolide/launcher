@@ -53,6 +53,8 @@ func TestNamingHelpers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("platform="+tt.platform, func(t *testing.T) {
+			t.Parallel()
+
 			b := Builder{os: tt.platform, arch: "amd64"}
 			require.Equal(t, filepath.Clean(tt.binaryOut), b.PlatformBinaryName("test"))
 			require.Equal(t, filepath.Clean(tt.extensionOut), b.PlatformBinaryName("test.ext"))
@@ -199,7 +201,7 @@ func TestGetVersion(t *testing.T) {
 // for TestParameterRun. It's comes from both
 // https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
 // and https://npf.io/2015/06/testing-exec-command/
-func TestHelperProcess(t *testing.T) {
+func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}

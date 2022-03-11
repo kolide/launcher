@@ -38,7 +38,10 @@ func TestTransformOutput(t *testing.T) {
 	table := Table{logger: log.NewNopLogger()}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+
 			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.in))
 			require.NoError(t, err, "read input file")
 

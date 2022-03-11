@@ -89,6 +89,8 @@ func calcCertFingerprint(t *testing.T, certpath string) string {
 }
 
 func TestSwappingCert(t *testing.T) {
+	t.Parallel()
+
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -130,6 +132,8 @@ func TestSwappingCert(t *testing.T) {
 }
 
 func TestCertRemainsBad(t *testing.T) {
+	t.Parallel()
+
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -172,6 +176,8 @@ func TestCertRemainsBad(t *testing.T) {
 }
 
 func TestCertPinning(t *testing.T) {
+	t.Parallel()
+
 	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -212,6 +218,8 @@ func TestCertPinning(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			certPins, err := parseCertPins(tt.pins)
 			require.NoError(t, err)
 
@@ -237,6 +245,8 @@ func TestCertPinning(t *testing.T) {
 }
 
 func TestRootCAs(t *testing.T) {
+	t.Parallel()
+
 	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
 	require.NoError(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -279,6 +289,8 @@ func TestRootCAs(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			conn, err := DialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
 			require.NoError(t, err)
 			defer conn.Close()

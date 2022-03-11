@@ -77,7 +77,10 @@ func Test_testConnections(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for i, url := range tt.args.urls {
 				tt.args.dialer.On("Dial", "tcp", url.Host).Return(tt.onDialReturns[i]())
 			}

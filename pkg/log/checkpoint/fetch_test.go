@@ -115,7 +115,10 @@ func Test_fetchFromUrls(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for i, url := range tt.args.urls {
 				tt.args.client.On("Get", url.String()).Return(tt.onGetReturns[i]()) //nolint:bodyclose
 			}
@@ -128,6 +131,8 @@ func Test_fetchFromUrls(t *testing.T) {
 }
 
 func Test_fetchNotaryVersions(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		client *mocks.HttpClient
 		urls   []*url.URL
@@ -238,7 +243,10 @@ func Test_fetchNotaryVersions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for i, url := range tt.args.urls {
 				tt.args.client.On("Get", url.String()).Return(tt.onGetReturns[i]()) //nolint:bodyclose
 			}

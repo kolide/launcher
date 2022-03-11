@@ -46,6 +46,8 @@ func TestGenerateMunkiReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			m := New()
 			m.reportPath = tt.reportPath
 			mockQC := tablehelpers.MockQueryContext(nil)

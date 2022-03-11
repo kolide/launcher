@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMDMProfileStatus(t *testing.T) {
+func TestMDMProfileStatus(t *testing.T) { // nolint:paralleltest
 	if env.Bool("SKIP_TEST_MDM", true) {
 		t.Skip("Skipping MDM Test")
 	}
