@@ -72,6 +72,7 @@ func TestNestedPlists(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		for _, f := range []string{"nested.xml", "nested.plist"} {
+			f := f
 			t.Run(tt.comment, func(t *testing.T) {
 				t.Parallel()
 
