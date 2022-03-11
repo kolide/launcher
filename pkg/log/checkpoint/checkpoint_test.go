@@ -110,6 +110,8 @@ func Test_urlsToTest(t *testing.T) {
 }
 
 func Test_parseUrl(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		addr string
 		opts launcher.Options
