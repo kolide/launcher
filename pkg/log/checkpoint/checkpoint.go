@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -132,12 +133,15 @@ func urlsToTest(opts launcher.Options) []*url.URL {
 
 func parseUrl(addr string, opts launcher.Options) (*url.URL, error) {
 
-	scheme := "https"
-	if opts.InsecureTransport {
-		scheme = "http"
+	if !strings.HasPrefix(addr, "http") {
+		scheme := "https"
+		if opts.InsecureTransport {
+			scheme = "http"
+		}
+		addr = fmt.Sprintf("%s://%s", scheme, addr)
 	}
 
-	u, err := url.Parse(fmt.Sprintf("%s://%s", scheme, addr))
+	u, err := url.Parse(addr)
 
 	if err != nil {
 		return nil, err
