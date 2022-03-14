@@ -25,16 +25,18 @@ func TestPlist(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
+			t.Parallel()
+
 			actual, err := Plist([]byte(tt.in))
 			testFlattenCase(t, tt, actual, err)
 		})
 	}
 }
 
-func TestNestedPlists(t *testing.T) { // nolint:paralleltest
+func TestNestedPlists(t *testing.T) {
 	t.Parallel()
 
 	var tests = []flattenTestCase{
@@ -67,15 +69,15 @@ func TestNestedPlists(t *testing.T) { // nolint:paralleltest
 		},
 	}
 
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
-		for _, f := range []string{"nested.xml", "nested.plist"} {
-			f := f
-			t.Run(tt.comment, func(t *testing.T) {
+		t.Run(tt.comment, func(t *testing.T) {
+			t.Parallel()
+
+			for _, f := range []string{"nested.xml", "nested.plist"} {
 				actual, err := PlistFile(filepath.Join("testdata", "nested", f), tt.options...)
 				testFlattenCase(t, tt, actual, err)
-			})
-		}
+			}
+		})
 	}
-
 }
