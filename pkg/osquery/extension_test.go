@@ -802,7 +802,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
-	testutil.FatalAfterFunc(t, 2*time.Second, func() {
+	testutil.FatalAfterFunc(t, 3*time.Second, func() {
 		e.Shutdown()
 	})
 }
