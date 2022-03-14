@@ -172,6 +172,7 @@ func TestRunQuery(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 

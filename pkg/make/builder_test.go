@@ -52,6 +52,7 @@ func TestNamingHelpers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run("platform="+tt.platform, func(t *testing.T) {
 			t.Parallel()
 
