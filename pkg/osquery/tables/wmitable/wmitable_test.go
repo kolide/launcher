@@ -111,7 +111,10 @@ func TestQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
 				"class":       []string{tt.class},
 				"properties":  tt.properties,
