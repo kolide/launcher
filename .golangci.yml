@@ -13,6 +13,7 @@ linters:
     - nakedret
     - sqlclosecheck
     - unconvert
+    - paralleltest
   disable:
     - errcheck
     - gosec
@@ -31,3 +32,10 @@ linters-settings:
     ignore: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
+
+issues:
+  exclude-rules:
+    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
+    - linters:
+      - paralleltest
+      text: "does not use range value in test Run"

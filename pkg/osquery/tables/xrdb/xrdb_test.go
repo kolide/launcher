@@ -84,6 +84,7 @@ func TestXrdbParse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		table := XRDBSettings{
 			logger: log.NewNopLogger(),
 			getBytes: func(ctx context.Context, display, username string, buf *bytes.Buffer) error {
@@ -96,6 +97,7 @@ func TestXrdbParse(t *testing.T) {
 			},
 		}
 		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
 				"username": {"tester"},

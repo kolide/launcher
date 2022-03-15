@@ -15,6 +15,8 @@ import (
 )
 
 func TestBestPractices(t *testing.T) {
+	t.Parallel()
+
 	mock := &mock.ExtensionManager{}
 	client := &osquery_client.ExtensionManagerClient{Client: mock}
 

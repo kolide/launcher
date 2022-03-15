@@ -14,6 +14,8 @@ func (h *mockQueryRunner) RunQuery(sql string) (results []map[string]string, err
 }
 
 func TestFunctionalOptions(t *testing.T) {
+	t.Parallel()
+
 	simulation := createSimulationRuntime(
 		log.NewNopLogger(),
 		nil, "", "",

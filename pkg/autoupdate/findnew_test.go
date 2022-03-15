@@ -373,7 +373,8 @@ func TestCheckExecutable(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
+		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			err := checkExecutable(context.TODO(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
@@ -443,7 +444,10 @@ func TestBuildTimestamp(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run("buildTimestamp="+tt.buildTimestamp, func(t *testing.T) {
+			t.Parallel()
+
 			tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
 			defer cleanupFunc()
 			ctx := context.TODO()

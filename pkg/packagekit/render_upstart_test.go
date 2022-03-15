@@ -114,7 +114,10 @@ func TestRenderUpstartOptions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			var output bytes.Buffer
 			err := RenderUpstart(context.TODO(), &output, emptyInitOptions(), tt.uOpts...)
 			require.NoError(t, err)

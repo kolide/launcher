@@ -134,8 +134,13 @@ func TestDataFlattenTables(t *testing.T) {
 	}
 
 	for testN, tt := range tests {
+		tt := tt
 		for tableName, testTable := range tt.testTables {
+			tableName, testTable := tableName, testTable
+
 			t.Run(fmt.Sprintf("%d/%s", testN, tableName), func(t *testing.T) {
+				t.Parallel()
+
 				mockQC := tablehelpers.MockQueryContext(map[string][]string{
 					"path":  []string{tt.testFile},
 					"query": tt.queries,

@@ -18,19 +18,26 @@ func TestFilesFound(t *testing.T) {
 
 	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
 	require.NoError(t, err, "making temp dir")
-	defer os.RemoveAll(tempDir)
+
+	t.Cleanup(func() {
+		os.RemoveAll(tempDir)
+	})
 
 	var tests = []struct {
+		name         string
 		dirsToCreate int
 		filesPerDir  int
 	}{
-		{dirsToCreate: 2, filesPerDir: 2},
+		{name: "2_dirs_2_files", dirsToCreate: 2, filesPerDir: 2},
 		// doesn't search any folders since "dirsToSerach" below will be empty array
-		{dirsToCreate: 0, filesPerDir: 0},
+		{name: "0_dirs_0_files", dirsToCreate: 0, filesPerDir: 0},
 	}
 
 	for _, tt := range tests {
-		t.Run("testFilesFound", func(t *testing.T) {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dirsToSearch, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
 			require.NoError(t, err, "creating test files")
 
@@ -40,6 +47,7 @@ func TestFilesFound(t *testing.T) {
 			require.Equal(t, tt.dirsToCreate*tt.filesPerDir, len(foundPaths))
 		})
 	}
+
 }
 
 func TestDirNotFound(t *testing.T) {

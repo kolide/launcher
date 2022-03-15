@@ -99,7 +99,10 @@ func Test_urlsToTest(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := urlsToTest(tt.args.opts)
 
 			if !reflect.DeepEqual(got, tt.want) {
@@ -194,7 +197,10 @@ func Test_parseUrl(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := parseUrl(tt.args.addr, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUrl() error = %v, wantErr %v", err, tt.wantErr)

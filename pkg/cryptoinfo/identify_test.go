@@ -66,7 +66,11 @@ func TestIdentify(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
+
 		t.Run(strings.Join(tt.in, ","), func(t *testing.T) {
+			t.Parallel()
+
 			in := []byte{}
 			for _, file := range tt.in {
 				fileBytes, err := os.ReadFile(file)

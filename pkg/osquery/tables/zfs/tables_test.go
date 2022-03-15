@@ -27,7 +27,10 @@ func TestParseColumns(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.infile, func(t *testing.T) {
+			t.Parallel()
+
 			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.infile))
 			require.NoError(t, err, "read input file")
 

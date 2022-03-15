@@ -46,6 +46,7 @@ func TestGsettingsValues(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		table := GsettingsValues{
 			logger: log.NewNopLogger(),
 			getBytes: func(ctx context.Context, username string, buf *bytes.Buffer) error {
@@ -58,6 +59,8 @@ func TestGsettingsValues(t *testing.T) {
 			},
 		}
 		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.TODO()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
 				"username": {"tester"},
@@ -166,6 +169,7 @@ func TestListKeys(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		table := GsettingsMetadata{
 			logger: log.NewNopLogger(),
 			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
@@ -178,6 +182,8 @@ func TestListKeys(t *testing.T) {
 			},
 		}
 		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.TODO()
 
 			results, err := table.listKeys(ctx, "org.gnome.Mines", "faketmpdir")
@@ -217,6 +223,7 @@ func TestGetType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		table := GsettingsMetadata{
 			logger: log.NewNopLogger(),
 			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
@@ -227,6 +234,8 @@ func TestGetType(t *testing.T) {
 			},
 		}
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			ctx := context.TODO()
 
 			result, err := table.getType(ctx, "key", "schema", "fake-tmp-dir")
@@ -294,7 +303,10 @@ func TestConvertType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			result := convertType(tt.input)
 			require.Equal(t, tt.expected, result)
 		})

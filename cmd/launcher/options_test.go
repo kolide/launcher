@@ -16,7 +16,7 @@ import (
 )
 
 // TestOptionsFromFlags isn't parallel to ensure that we don't pollute the environment
-func TestOptionsFromFlags(t *testing.T) {
+func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 	os.Clearenv()
 
 	testArgs, expectedOpts := getArgsAndResponse()
@@ -34,7 +34,7 @@ func TestOptionsFromFlags(t *testing.T) {
 	require.Equal(t, expectedOpts, opts)
 }
 
-func TestOptionsFromEnv(t *testing.T) {
+func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 
 	if runtime.GOOS == "windows" {
 		t.Skip("TODO: Windows Testing")
@@ -56,7 +56,7 @@ func TestOptionsFromEnv(t *testing.T) {
 	require.Equal(t, expectedOpts, opts)
 }
 
-func TestOptionsFromFile(t *testing.T) {
+func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	os.Clearenv()
 
 	testArgs, expectedOpts := getArgsAndResponse()

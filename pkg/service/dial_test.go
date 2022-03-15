@@ -88,7 +88,7 @@ func calcCertFingerprint(t *testing.T, certpath string) string {
 	return fmt.Sprintf("%x", digest)
 }
 
-func TestSwappingCert(t *testing.T) {
+func TestSwappingCert(t *testing.T) { // nolint:paralleltest
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -129,7 +129,7 @@ func TestSwappingCert(t *testing.T) {
 	stop()
 }
 
-func TestCertRemainsBad(t *testing.T) {
+func TestCertRemainsBad(t *testing.T) { // nolint:paralleltest
 	cert, err := tls.LoadX509KeyPair(badCert, badKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -171,7 +171,7 @@ func TestCertRemainsBad(t *testing.T) {
 	stop()
 }
 
-func TestCertPinning(t *testing.T) {
+func TestCertPinning(t *testing.T) { // nolint:paralleltest
 	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
 	require.Nil(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -210,7 +210,7 @@ func TestCertPinning(t *testing.T) {
 		{[]string{"5dc4d2318f1ffabb80d94ad67a6f05ab9f77591ffc131498ed03eef3b5075281"}, false},
 	}
 
-	for _, tt := range testCases {
+	for _, tt := range testCases { // nolint:paralleltest
 		t.Run("", func(t *testing.T) {
 			certPins, err := parseCertPins(tt.pins)
 			require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestCertPinning(t *testing.T) {
 	}
 }
 
-func TestRootCAs(t *testing.T) {
+func TestRootCAs(t *testing.T) { // nolint:paralleltest
 	cert, err := tls.LoadX509KeyPair(chainPem, leafKey)
 	require.NoError(t, err)
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
@@ -277,7 +277,7 @@ func TestRootCAs(t *testing.T) {
 		{otherPool, false},
 	}
 
-	for _, tt := range testCases {
+	for _, tt := range testCases { // nolint:paralleltest
 		t.Run("", func(t *testing.T) {
 			conn, err := DialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
 			require.NoError(t, err)

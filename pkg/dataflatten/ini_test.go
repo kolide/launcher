@@ -37,7 +37,10 @@ func TestIniToBool(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+
 			asBool, ok := iniToBool(tt.in)
 			if tt.isBool {
 				require.True(t, ok)
@@ -95,7 +98,10 @@ func TestIniSecedit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require.Contains(t, rows, tt.expected)
 		})
 	}

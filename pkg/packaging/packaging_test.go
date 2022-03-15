@@ -84,6 +84,8 @@ func TestInitStuff(t *testing.T) {
 // https://github.com/golang/go/blob/master/src/os/exec/exec_test.go#L724
 // and https://npf.io/2015/06/testing-exec-command/
 func TestHelperProcess(t *testing.T) {
+	t.Parallel()
+
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
