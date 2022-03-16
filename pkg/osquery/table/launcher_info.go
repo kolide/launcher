@@ -5,10 +5,12 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
+	"go.etcd.io/bbolt"
 )
 
-func LauncherInfoTable() *table.Plugin {
+func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -18,14 +20,22 @@ func LauncherInfoTable() *table.Plugin {
 		table.TextColumn("goos"),
 		table.TextColumn("revision"),
 		table.TextColumn("version"),
+		table.TextColumn("identifier"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable())
+	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(db))
 }
 
-func generateLauncherInfoTable() table.GenerateFunc {
+func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
+
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		identifier, err := osquery.IdentifierFromDB(db)
+
+		if err != nil {
+			return nil, err
+		}
+
 		results := []map[string]string{
-			map[string]string{
+			{
 				"branch":     version.Version().Branch,
 				"build_date": version.Version().BuildDate,
 				"build_user": version.Version().BuildUser,
@@ -34,6 +44,7 @@ func generateLauncherInfoTable() table.GenerateFunc {
 				"goos":       runtime.GOOS,
 				"revision":   version.Version().Revision,
 				"version":    version.Version().Version,
+				"identifier": identifier,
 			},
 		}
 

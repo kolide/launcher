@@ -19,7 +19,7 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(db),
 		LauncherDbInfo(db),
-		LauncherIdentifierTable(db),
+		LauncherInfoTable(db),
 		TargetMembershipTable(db),
 		LauncherAutoupdateConfigTable(opts),
 	}
@@ -34,7 +34,6 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		ChromeUserProfiles(client, logger),
 		EmailAddresses(client, logger),
 		KeyInfo(client, logger),
-		LauncherInfoTable(),
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
