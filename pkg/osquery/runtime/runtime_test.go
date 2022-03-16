@@ -372,7 +372,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	resp, err := client.Query("select * from kolide_ssh_keys")
+	resp, err := client.Query("select * from launcher_gc_info")
 	require.NoError(t, err)
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
