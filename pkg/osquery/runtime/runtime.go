@@ -838,22 +838,22 @@ func (r *Runner) launchOsqueryInstance() error {
 				// down. This is pretty simple, it
 				// hardcodes the timing. Might be
 				// better for a Limiter
-				failed := false
-				for i := 0; i <= 5; i++ {
+				maxHealthChecks := 5
+				for i := 1; i <= maxHealthChecks; i++ {
 					if err := o.Healthy(); err != nil {
 						level.Info(o.logger).Log("msg", "Health check failed", "attempt", i, "err", err)
-						failed = true
+
+						if i == maxHealthChecks {
+							return errors.Wrap(err, "health check failed")
+						}
+
+						time.Sleep(1 * time.Second)
 
 					} else {
 						// err was nil, clear failed
-						failed = false
 						break
 					}
 
-					time.Sleep(1 * time.Second)
-				}
-				if failed {
-					return errors.Wrap(err, "health check failed")
 				}
 			}
 		}
