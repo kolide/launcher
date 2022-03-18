@@ -26,7 +26,7 @@ import (
 func main() {
 	var (
 		flSocketPath = flag.String("socket", "", "")
-		flTimeout    = flag.Int("timeout", 0, "")
+		flTimeout    = flag.Int("timeout", 2, "")
 		flVerbose    = flag.Bool("verbose", false, "")
 		flVersion    = flag.Bool("version", false, "Print Launcher version and exit")
 

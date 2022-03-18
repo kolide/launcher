@@ -14,9 +14,9 @@ func main() {
 	var (
 		_         = flag.Bool("verbose", false, "")
 		_         = flag.Int("interval", 0, "")
-		_         = flag.Int("timeout", 0, "")
+		_         = flag.Int("timeout", 2, "")
 		_         = flag.String("socket", "", "")
-		flVersion = flag.Bool("version", false, "Print  version and exit")
+		flVersion = flag.Bool("version", false, "Print version and exit")
 	)
 	flag.Parse()
 
