@@ -815,7 +815,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		<-o.doneCtx.Done()
 		if err := o.extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			level.Info(o.logger).Log(
-				"msg", "shutting down extension server",
+				"msg", "Got error while shutting down extension server",
 				"err", err,
 			)
 		}
