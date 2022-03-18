@@ -545,7 +545,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
-				osquery_instance_history.Exited(nil)
+				osquery_instance_history.InstanceExited(nil)
 				return
 			default:
 				// Don't block
@@ -557,7 +557,7 @@ func (r *Runner) Start() error {
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
-			osquery_instance_history.Exited(err)
+			osquery_instance_history.InstanceExited(err)
 
 			r.instanceLock.Lock()
 			opts := r.instance.opts
@@ -723,7 +723,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
 	// TODO: something with the error
-	osquery_instance_history.Started()
+	osquery_instance_history.InstanceStarted()
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -801,7 +801,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// TODO: something with the error
-	osquery_instance_history.Connected(o)
+	osquery_instance_history.InstanceConnected(o)
 
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/osquery/runtime/osquery_instance_history"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
@@ -21,6 +22,7 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("revision"),
 		table.TextColumn("version"),
 		table.TextColumn("identifier"),
+		table.TextColumn("instance_id"),
 	}
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(db))
 }
@@ -36,15 +38,16 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 
 		results := []map[string]string{
 			{
-				"branch":     version.Version().Branch,
-				"build_date": version.Version().BuildDate,
-				"build_user": version.Version().BuildUser,
-				"go_version": runtime.Version(),
-				"goarch":     runtime.GOARCH,
-				"goos":       runtime.GOOS,
-				"revision":   version.Version().Revision,
-				"version":    version.Version().Version,
-				"identifier": identifier,
+				"branch":      version.Version().Branch,
+				"build_date":  version.Version().BuildDate,
+				"build_user":  version.Version().BuildUser,
+				"go_version":  runtime.Version(),
+				"goarch":      runtime.GOARCH,
+				"goos":        runtime.GOOS,
+				"revision":    version.Version().Revision,
+				"version":     version.Version().Version,
+				"identifier":  identifier,
+				"instance_id": osquery_instance_history.CurrentInstance().InstanceId,
 			},
 		}
 

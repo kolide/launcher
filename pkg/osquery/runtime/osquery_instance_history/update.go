@@ -5,16 +5,16 @@ import "sync"
 var mutex sync.Mutex
 var currentHistory = &History{}
 
-// Started adds a new instance to the osquery instance history
-func Started() error {
+// InstanceStarted adds a new instance to the osquery instance history
+func InstanceStarted() error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	return currentHistory.nextInstance()
 }
 
-// Connected sets the start time and instance id of the current osquery instance
-func Connected(querier Querier) error {
+// InstanceConnected sets the connect time and instance id of the current osquery instance
+func InstanceConnected(querier Querier) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -26,8 +26,8 @@ func Connected(querier Querier) error {
 	return err
 }
 
-// Exited sets the exit time and appends provided error (if any) to current osquery instance
-func Exited(err error) {
+// InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
+func InstanceExited(err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
