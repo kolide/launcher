@@ -844,11 +844,11 @@ func (r *Runner) launchOsqueryInstance() error {
 						level.Info(o.logger).Log("msg", "Health check failed", "attempt", i, "err", err)
 						failed = true
 
+					} else {
+						// err was nil, clear failed
+						failed = false
+						break
 					}
-
-					// err was nil, clear failed
-					failed = false
-					break
 				}
 				if failed {
 					return errors.Wrap(err, "health check failed")
