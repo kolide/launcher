@@ -849,6 +849,8 @@ func (r *Runner) launchOsqueryInstance() error {
 						failed = false
 						break
 					}
+
+					time.Sleep(1 * time.Second)
 				}
 				if failed {
 					return errors.Wrap(err, "health check failed")
