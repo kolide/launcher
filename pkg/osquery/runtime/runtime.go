@@ -833,8 +833,24 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
 			case <-ticker.C:
-				if err := o.Healthy(); err != nil {
-					level.Info(o.logger).Log("msg", "Health check failed", "err", err)
+				// Health check! Allow a couple
+				// failures before we tear everything
+				// down. This is pretty simple, it
+				// hardcodes the timing. Might be
+				// better for a Limiter
+				failed := false
+				for i := 0; i <= 5; i++ {
+					if err := o.Healthy(); err != nil {
+						level.Info(o.logger).Log("msg", "Health check failed", "attempt", i, "err", err)
+						failed = true
+
+					}
+
+					// err was nil, clear failed
+					failed = false
+					break
+				}
+				if failed {
 					return errors.Wrap(err, "health check failed")
 				}
 			}
