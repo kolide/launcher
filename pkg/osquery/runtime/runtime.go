@@ -28,6 +28,8 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/table"
+
+	"github.com/kolide/launcher/pkg/osquery/runtime/osquery_instance_history"
 )
 
 type Runner struct {
@@ -543,6 +545,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
+				osquery_instance_history.Exited(nil)
 				return
 			default:
 				// Don't block
@@ -554,6 +557,7 @@ func (r *Runner) Start() error {
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
+			osquery_instance_history.Exited(err)
 
 			r.instanceLock.Lock()
 			opts := r.instance.opts
@@ -718,6 +722,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		level.Info(o.logger).Log(msgPairs...)
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
+	// TODO: something with the error
+	osquery_instance_history.Started()
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -793,6 +799,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
 	}
+
+	// TODO: something with the error
+	osquery_instance_history.Connected(o)
 
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
