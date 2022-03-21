@@ -846,7 +846,7 @@ func (r *Runner) launchOsqueryInstance() error {
 							return errors.Wrap(err, "health check failed")
 						}
 
-						level.Info(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
+						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
 						time.Sleep(1 * time.Second)
 
 					} else {
