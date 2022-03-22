@@ -31,23 +31,27 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		identifier, err := osquery.IdentifierFromDB(db)
+		if err != nil {
+			return nil, err
+		}
 
+		osqueryInstance, err := osquery_instance_history.CurrentInstance()
 		if err != nil {
 			return nil, err
 		}
 
 		results := []map[string]string{
 			{
-				"branch":      version.Version().Branch,
-				"build_date":  version.Version().BuildDate,
-				"build_user":  version.Version().BuildUser,
-				"go_version":  runtime.Version(),
-				"goarch":      runtime.GOARCH,
-				"goos":        runtime.GOOS,
-				"revision":    version.Version().Revision,
-				"version":     version.Version().Version,
-				"identifier":  identifier,
-				"instance_id": osquery_instance_history.CurrentInstance().InstanceId,
+				"branch":              version.Version().Branch,
+				"build_date":          version.Version().BuildDate,
+				"build_user":          version.Version().BuildUser,
+				"go_version":          runtime.Version(),
+				"goarch":              runtime.GOARCH,
+				"goos":                runtime.GOOS,
+				"revision":            version.Version().Revision,
+				"version":             version.Version().Version,
+				"identifier":          identifier,
+				"osquery_instance_id": osqueryInstance.InstanceId,
 			},
 		}
 

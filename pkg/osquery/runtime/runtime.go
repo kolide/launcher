@@ -545,7 +545,11 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
-				osquery_instance_history.InstanceExited(nil)
+				err := osquery_instance_history.InstanceExited(nil)
+				if err != nil {
+					level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+				}
+
 				return
 			default:
 				// Don't block
@@ -557,7 +561,11 @@ func (r *Runner) Start() error {
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
-			osquery_instance_history.InstanceExited(err)
+
+			err = osquery_instance_history.InstanceExited(err)
+			if err != nil {
+				level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+			}
 
 			r.instanceLock.Lock()
 			opts := r.instance.opts
@@ -722,8 +730,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		level.Info(o.logger).Log(msgPairs...)
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
-	// TODO: something with the error
-	osquery_instance_history.InstanceStarted()
+
+	err = osquery_instance_history.InstanceStarted()
+	if err != nil {
+		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+	}
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -800,8 +811,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	// TODO: something with the error
-	osquery_instance_history.InstanceConnected(o)
+	err = osquery_instance_history.InstanceConnected(o)
+	if err != nil {
+		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+	}
 
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
