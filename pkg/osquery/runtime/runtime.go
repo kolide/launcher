@@ -761,11 +761,12 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Kill osquery process on shutdown
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
+		level.Debug(o.logger).Log("msg", "Starting osquery shutdown")
 		if o.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(o.cmd); err != nil {
 				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-					level.Debug(o.logger).Log("process already gone")
+					level.Debug(o.logger).Log("msg", "tried to stop osquery, but process already gone")
 				} else {
 					level.Info(o.logger).Log("msg", "killing osquery process", "err", err)
 				}
@@ -835,9 +836,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Cleanup extension manager server on shutdown
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
+		level.Debug(o.logger).Log("msg", "Starting extension shutdown")
 		if err := o.extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			level.Info(o.logger).Log(
-				"msg", "shutting down extension server",
+				"msg", "Got error while shutting down extension server",
 				"err", err,
 			)
 		}
@@ -853,8 +855,31 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
 			case <-ticker.C:
-				if err := o.Healthy(); err != nil {
-					return errors.Wrap(err, "health check failed")
+				// Health check! Allow a couple
+				// failures before we tear everything
+				// down. This is pretty simple, it
+				// hardcodes the timing. Might be
+				// better for a Limiter
+				maxHealthChecks := 5
+				for i := 1; i <= maxHealthChecks; i++ {
+					if err := o.Healthy(); err != nil {
+						if i == maxHealthChecks {
+							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
+							return errors.Wrap(err, "health check failed")
+						}
+
+						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
+						time.Sleep(1 * time.Second)
+
+					} else {
+						// err was nil, clear failed
+						if i > 1 {
+							level.Debug(o.logger).Log("msg", "Health check passed. Clearing error", "attempt", i)
+						}
+
+						break
+					}
+
 				}
 			}
 		}
