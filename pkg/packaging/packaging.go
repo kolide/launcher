@@ -59,6 +59,12 @@ type PackageOptions struct {
 	WixSkipCleanup    bool
 	DisableService    bool
 
+	// Normally we'd download the same version we bake into the
+	// autoupdate. But occasionally, it's handy to make a package
+	// with a different version.
+	LauncherDownloadVersionOverride string
+	OsqueryDownloadVersionOverride  string
+
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
 	AppleNotarizeUserId      string   // User id to authenticate to the notarization service with
@@ -223,11 +229,19 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization, osquery-extension.ext
 	// TODO windows file extensions
-	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
+
+	if p.OsqueryDownloadVersionOverride == "" {
+		p.OsqueryDownloadVersionOverride = p.OsqueryVersion
+	}
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryDownloadVersionOverride); err != nil {
 		return errors.Wrapf(err, "fetching binary osqueryd")
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
+	if p.LauncherDownloadVersionOverride == "" {
+		p.LauncherDownloadVersionOverride = p.LauncherVersion
+	}
+
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherDownloadVersionOverride); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 
