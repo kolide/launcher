@@ -77,7 +77,6 @@ func (h *History) CurrentInstanceExited(exitError error) error {
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
 func GetHistory() ([]Instance, error) {
-
 	if currentHistory == nil {
 		return nil, NoCurrentHistoryError{}
 	}
@@ -95,7 +94,6 @@ func GetHistory() ([]Instance, error) {
 
 // CurrentInstance returns the current osquery instance
 func CurrentInstance() (Instance, error) {
-
 	if currentHistory == nil {
 		return Instance{}, NoCurrentHistoryError{}
 	}

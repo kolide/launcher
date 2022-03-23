@@ -22,7 +22,7 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("revision"),
 		table.TextColumn("version"),
 		table.TextColumn("identifier"),
-		table.TextColumn("instance_id"),
+		table.TextColumn("osquery_instance_id"),
 	}
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(db))
 }

@@ -394,7 +394,6 @@ func TestCurrentInstance(t *testing.T) { // nolint:paralleltest
 }
 
 func TestNewHistory(t *testing.T) { // nolint:paralleltest
-
 	t.Run("success", func(t *testing.T) { // nolint:paralleltest
 		_, err := NewHistory()
 		assert.NoError(t, err)
