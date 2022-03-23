@@ -29,13 +29,14 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/table"
 
-	"github.com/kolide/launcher/pkg/osquery/runtime/osquery_instance_history"
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 )
 
 type Runner struct {
-	instance     *OsqueryInstance
-	instanceLock sync.RWMutex
-	shutdown     chan struct{}
+	instance        *OsqueryInstance
+	instanceHistory *history.History
+	instanceLock    sync.RWMutex
+	shutdown        chan struct{}
 }
 
 func (r *Runner) Query(query string) ([]map[string]string, error) {
@@ -512,9 +513,13 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 		opt(i)
 	}
 
+	// what should we do with this error?
+	history, _ := history.NewHistory()
+
 	return &Runner{
-		instance: i,
-		shutdown: make(chan struct{}),
+		instance:        i,
+		shutdown:        make(chan struct{}),
+		instanceHistory: history,
 	}
 }
 
@@ -545,7 +550,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
-				err := osquery_instance_history.InstanceExited(nil)
+				err := r.instanceHistory.CurrentInstanceExited(nil)
 				if err != nil {
 					level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 				}
@@ -562,7 +567,7 @@ func (r *Runner) Start() error {
 				"err", err,
 			)
 
-			err = osquery_instance_history.InstanceExited(err)
+			err = r.instanceHistory.CurrentInstanceExited(err)
 			if err != nil {
 				level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 			}
@@ -731,7 +736,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
 
-	err = osquery_instance_history.InstanceStarted()
+	err = r.instanceHistory.NewInstanceStarted()
 	if err != nil {
 		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 	}
@@ -812,7 +817,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	err = osquery_instance_history.InstanceConnected(o)
+	err = r.instanceHistory.CurrentInstanceConnected(o)
 	if err != nil {
 		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 	}

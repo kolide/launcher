@@ -6,7 +6,7 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/runtime/osquery_instance_history"
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
@@ -35,7 +35,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 
-		osqueryInstance, err := osquery_instance_history.CurrentInstance()
+		osqueryInstance, err := history.CurrentInstance()
 		if err != nil {
 			return nil, err
 		}
