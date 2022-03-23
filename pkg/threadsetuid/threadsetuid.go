@@ -8,11 +8,10 @@ import(
 )
 
 
-func Runas(fn func() ([]map[string]interface{}, error), timeout time.Duration, uid uint32, gid uint32) ([]map[string]interface{}, error) {
-	// Only support getting one batch of data, so we can just
-	// buffer a single size. Makes it a bit easier to sequence
-	// starting the child, and handling the data
-	dataChan := make(chan []map[string]interface{}, 1)
+func Runas(fn func()  error, timeout time.Duration, uid uint32, gid uint32)  error {
+	// As we only support calling the function once, so we can
+	// buffer a single size. Makes it a bit easier to
+	// sequence starting the child, and handling the data
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -27,22 +26,14 @@ func Runas(fn func() ([]map[string]interface{}, error), timeout time.Duration, u
 			return
 		}
 
-		data, err := fn()
-		if err != nil {
-			errChan <- err
-			return
-		}
-
-		dataChan <- data
+		errChan <- fn()
 	}()
 
 	select {
-	case data := <- dataChan:
-		return data, nil
 	case err := <- errChan:
-		return nil, err
+		return err
 	case <- time.After(timeout):
-		return nil, fmt.Errorf("Timeout after %s", timeout)
+		return fmt.Errorf("Timeout after %s", timeout)
 	}
 }
 
