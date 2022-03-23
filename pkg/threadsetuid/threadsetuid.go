@@ -38,6 +38,13 @@ func ThreadAs(fn func()  error, timeout time.Duration, uid uint32, gid uint32)  
 		// will cause the thread to terminate when the
 		// goroutine does. This seems simpler than resetting
 		// the thread permissions.
+		//
+		// An alternate implementation, for darwin, would be
+		// to use `pthread_setugid_np(KAUTH_UID_NONE,
+		// KAUTH_GID_NONE)` to reset permissions
+		// afterwards. See the manpage, or
+		// https://github.com/rfjakob/gocryptfs/blob/master/internal/syscallcompat/sys_darwin.go
+		// for an example.
 		runtime.LockOSThread()
 
 		if err := pthread_setugid_np(uid, gid); err != nil {
