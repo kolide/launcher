@@ -10,6 +10,7 @@ import (
 const maxInstances = 10
 
 var currentHistory *History
+var currentHistoryMutext sync.Mutex
 
 type History struct {
 	mutex     sync.Mutex
@@ -43,6 +44,9 @@ func (c HistoryAlreadyCreatedError) Error() string {
 // NewHistory creates a new history and sets it as the current history.
 // If the current history already been set, gives an error.
 func NewHistory() (*History, error) {
+	currentHistoryMutext.Lock()
+	defer currentHistoryMutext.Unlock()
+
 	if currentHistory != nil {
 		return nil, HistoryAlreadyCreatedError{}
 	}
