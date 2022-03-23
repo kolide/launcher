@@ -8,16 +8,18 @@ import(
 )
 
 
-func Runas(fn func() ([]map[string]string, error), timeout time.Duration, uid uint32, gid uint32) ([]map[string]string, error) {
+func Runas(fn func() ([]map[string]interface{}, error), timeout time.Duration, uid uint32, gid uint32) ([]map[string]interface{}, error) {
 	// Only support getting one batch of data, so we can just
 	// buffer a single size. Makes it a bit easier to sequence
 	// starting the child, and handling the data
-	dataChan := make(chan []map[string]string, 1)
+	dataChan := make(chan []map[string]interface{}, 1)
 	errChan := make(chan error, 1)
 
 	go func() {
-		// Calling LockOSThread, without a subsequent Unlock, will
-		// cause the thread to terminate when the goroutine does.
+		// Calling LockOSThread, without a subsequent Unlock,
+		// will cause the thread to terminate when the
+		// goroutine does. This seems simpler than resetting
+		// the thread permissions.
 		runtime.LockOSThread()
 
 		if err := pthread_setugid_np(uid, gid); err != nil {
