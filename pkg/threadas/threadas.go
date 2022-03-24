@@ -28,7 +28,9 @@ import (
 )
 
 const (
-	// KAUTH_UID_NONE and KAUTH_GID_NONE are special values. See the man page
+	// KAUTH_UID_NONE and KAUTH_GID_NONE are special values. When
+	// pthread_setugid_np is called with them, it will revert to
+	// the process credentials.
 	KAUTH_UID_NONE = ^uint32(0) - 100
 	KAUTH_GID_NONE = ^uint32(0) - 100
 )
@@ -77,8 +79,9 @@ func ThreadAs(fn func() error, timeout time.Duration, uid uint32, gid uint32) er
 // which sets the per-thread userid and groupid. We use this, and not
 // syscall.Setuid, because the latter will impact _all_ threads.
 //
-// There is some discussion in the man page that this is not suitable
-// for security isolation. It's recommended you read and understand that.
+// This is not suitable for security isolation. Something in thread
+// can return to parent permissions be either calling with
+// KAUTH_UID_NONE, or simply spawning a new thread.
 func pthread_setugid_np(uid uint32, gid uint32) error {
 	// syscall.RawSyscall blocks, while Syscall does not. Since we
 	// don't think this blocks, we can use the _slightly_ more

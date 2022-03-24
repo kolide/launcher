@@ -13,7 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const timeout = 100 * time.Millisecond
+const (
+	timeout = 100 * time.Millisecond
+
+	// Hardcode the default macOS uid and gid for testing.
+	targetUid = 501
+	targetGid = 20
+)
 
 func TestThreadAsNotRoot(t *testing.T) {
 	t.Parallel()
@@ -34,9 +40,6 @@ func TestThreadAs(t *testing.T) {
 		t.Skip("Skipping -- test requires root")
 	}
 
-	targetUid := 501
-	targetGid := 20
-
 	targetUids := uidData{Uid: targetUid, Euid: targetUid, Gid: targetGid, Egid: targetGid}
 	fnTargetUidsEqual := targetUids.GenerateTestFunc(t, "matches target user", assert.Equal)
 	fnTargetUidsNotEqual := targetUids.GenerateTestFunc(t, "does not matches target user", assert.NotEqual)
@@ -45,11 +48,13 @@ func TestThreadAs(t *testing.T) {
 	fnMyUidsEqual := myUids.GenerateTestFunc(t, "matches my user", assert.Equal)
 	fnMyUidsNotEqual := myUids.GenerateTestFunc(t, "does not matches my user", assert.NotEqual)
 
-	// Be somewhat thoughtful in how parallel works here -- using
-	// t.Parallel will spawn a new thread, which potentially
-	// undermines some of what we're testing. But we do want the
-	// top level to be parallel, so that we have more thread
-	// churn.
+	// This runs a bunch of tests in parallel. This shows that the
+	// spawn thread, drop permissions, and return to normal
+	// behaves as espected. Be somewhat thoughtful in how parallel
+	// works here -- using t.Parallel will spawn a new thread,
+	// which potentially undermines some of what we're
+	// testing. But we do want the top level to be parallel, so
+	// that we have more thread churn.
 	for i := 1; i < 100; i++ {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
