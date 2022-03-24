@@ -27,6 +27,12 @@ import (
 	"time"
 )
 
+const (
+	// KAUTH_UID_NONE and KAUTH_GID_NONE are special values. See the man page
+	KAUTH_UID_NONE = ^uint32(0) - 100
+	KAUTH_GID_NONE = ^uint32(0) - 100
+)
+
 // ThreadAs will run a function, in a "thread", after using setuid to
 // change permissions on that thread. It uses `LockOSThread` so the
 // thread terminates after with the function, this is to clean up from

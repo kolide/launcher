@@ -50,6 +50,8 @@ func TestThreadAs(t *testing.T) {
 	// undermines some of what we're testing
 	for i := 1; i < 100; i++ {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			t.Run("baseline", func(t *testing.T) {
 				require.NoError(t, fnMyUidsEqual(), "no thread, matches my uid")
 				require.NoError(t, fnTargetUidsNotEqual(), "no thread, does not match target")
@@ -76,27 +78,18 @@ func TestThreadAs(t *testing.T) {
 func TestTimeout(t *testing.T) {
 	t.Parallel()
 
-	if syscall.Getuid() != 0 {
-		t.Skip("Skipping -- test requires root")
-	}
-
 	fn := func() error {
 		time.Sleep(10 * time.Second)
 		return nil
 	}
 
-	require.Error(t, ThreadAs(fn, timeout, uint32(syscall.Getuid()), uint32(syscall.Getgid())))
+	require.Error(t, ThreadAs(fn, timeout, KAUTH_UID_NONE, KAUTH_GID_NONE))
 }
 
 func TestGoroutineLeaks(t *testing.T) { // nolint:paralleltest
 	// Don't parallize this -- it's using the global count of
 	// goroutines, which is going to vary based on what other
 	// tests are running.
-
-	if syscall.Getuid() != 0 {
-		t.Skip("Skipping -- test requires root")
-	}
-
 	startCount := runtime.NumGoroutine()
 
 	fn := func() error {
@@ -105,7 +98,7 @@ func TestGoroutineLeaks(t *testing.T) { // nolint:paralleltest
 		return nil
 	}
 
-	require.NoError(t, ThreadAs(fn, timeout, uint32(syscall.Getuid()), uint32(syscall.Getgid())))
+	require.Error(t, ThreadAs(fn, timeout, KAUTH_UID_NONE, KAUTH_GID_NONE))
 
 	require.Equal(t, startCount, runtime.NumGoroutine(), "go routines should return to normal")
 
