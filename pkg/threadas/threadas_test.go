@@ -4,13 +4,13 @@
 package threadas
 
 import (
-	"testing"
-	"syscall"
-	"time"
 	"runtime"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 )
 
 const timeout = 100 * time.Millisecond
@@ -37,21 +37,21 @@ func TestThreadAs(t *testing.T) {
 	targetUid := 501
 	targetGid := 20
 
-	targetUids := uidData{ Uid: targetUid, Euid: targetUid, Gid: targetGid, Egid: targetGid}
+	targetUids := uidData{Uid: targetUid, Euid: targetUid, Gid: targetGid, Egid: targetGid}
 	fnTargetUidsEqual := targetUids.GenerateTestFunc(t, "matches target user", assert.Equal)
 	fnTargetUidsNotEqual := targetUids.GenerateTestFunc(t, "does not matches target user", assert.NotEqual)
 
 	myUids := getUidData()
 	fnMyUidsEqual := myUids.GenerateTestFunc(t, "matches my user", assert.Equal)
 	fnMyUidsNotEqual := myUids.GenerateTestFunc(t, "does not matches my user", assert.NotEqual)
-	
+
 	// Be somewhat thoughtful in how parallel works here -- using
 	// t.Parallel will spawn a new thread, which potentially
 	// undermines some of what we're testing
 	for i := 1; i < 100; i++ {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			
+
 			t.Run("baseline", func(t *testing.T) {
 				require.NoError(t, fnMyUidsEqual(), "no thread, matches my uid")
 				require.NoError(t, fnTargetUidsNotEqual(), "no thread, does not match target")
@@ -66,7 +66,7 @@ func TestThreadAs(t *testing.T) {
 				require.NoError(t, ThreadAs(fnTargetUidsNotEqual, timeout, uint32(0), uint32(0)), "not match target")
 				require.NoError(t, ThreadAs(fnMyUidsEqual, timeout, uint32(0), uint32(0)), "matches mine")
 			})
-			
+
 			t.Run("baseline after setuids", func(t *testing.T) {
 				require.NoError(t, fnMyUidsEqual(), "no thread, matches my uid")
 				require.NoError(t, fnTargetUidsNotEqual(), "no thread, does not match target")
@@ -103,7 +103,7 @@ func TestGoroutineLeaks(t *testing.T) {
 
 	fn := func() error {
 		c := runtime.NumGoroutine()
-		require.Equal(t, startCount + 1, c, "go routines should be one more than starting")
+		require.Equal(t, startCount+1, c, "go routines should be one more than starting")
 		return nil
 	}
 
@@ -125,14 +125,14 @@ func TestTestUids(t *testing.T) {
 }
 
 type uidData struct {
-	Uid int
+	Uid  int
 	Euid int
-	Gid int
+	Gid  int
 	Egid int
 }
 
 // GenerateTestFunc generates a function suitable for handing to ThreadAs
-func (ud uidData) GenerateTestFunc(t *testing.T, name string, assertion assert.ComparisonAssertionFunc) func() error{
+func (ud uidData) GenerateTestFunc(t *testing.T, name string, assertion assert.ComparisonAssertionFunc) func() error {
 	return func() error {
 		ud.TestUids(t, name, assertion)
 		return nil
@@ -151,9 +151,9 @@ func (ud uidData) TestUids(t *testing.T, name string, assertion assert.Compariso
 
 func getUidData() uidData {
 	return uidData{
-		Uid: syscall.Getuid(),
+		Uid:  syscall.Getuid(),
 		Euid: syscall.Geteuid(),
-		Gid: syscall.Getgid(),
+		Gid:  syscall.Getgid(),
 		Egid: syscall.Getegid(),
 	}
 }
