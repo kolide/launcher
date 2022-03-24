@@ -50,8 +50,6 @@ func TestThreadAs(t *testing.T) {
 	// undermines some of what we're testing
 	for i := 1; i < 100; i++ {
 		t.Run("", func(t *testing.T) {
-			t.Parallel()
-
 			t.Run("baseline", func(t *testing.T) {
 				require.NoError(t, fnMyUidsEqual(), "no thread, matches my uid")
 				require.NoError(t, fnTargetUidsNotEqual(), "no thread, does not match target")
@@ -90,7 +88,7 @@ func TestTimeout(t *testing.T) {
 	require.Error(t, ThreadAs(fn, timeout, uint32(syscall.Getuid()), uint32(syscall.Getgid())))
 }
 
-func TestGoroutineLeaks(t *testing.T) {
+func TestGoroutineLeaks(t *testing.T) { // nolint:paralleltest
 	// Don't parallize this -- it's using the global count of
 	// goroutines, which is going to vary based on what other
 	// tests are running.
