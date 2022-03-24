@@ -47,7 +47,9 @@ func TestThreadAs(t *testing.T) {
 
 	// Be somewhat thoughtful in how parallel works here -- using
 	// t.Parallel will spawn a new thread, which potentially
-	// undermines some of what we're testing
+	// undermines some of what we're testing. But we do want the
+	// top level to be parallel, so that we have more thread
+	// churn.
 	for i := 1; i < 100; i++ {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
