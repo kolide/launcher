@@ -117,7 +117,14 @@ func pthread_setugid_np(uid uint32, gid uint32) error {
 	// don't think this blocks, we can use the _slightly_ more
 	// performant RawSyscall
 	if _, _, errno := syscall.RawSyscall(syscall.SYS_SETTID, uintptr(uid), uintptr(gid), 0); errno != 0 {
-		return &NoPermissionsError{Errno: errno}
+		if errno == 1 {
+			return &NoPermissionsError{Errno: errno}
+		}
+
+		// It's not clear when this can happen. It's probably
+		// not indicative of a permissions error. But it's
+		// unclear what it means.
+		return fmt.Errorf("calling pthread_setugid_np: %w", errno)
 	}
 
 	return nil
