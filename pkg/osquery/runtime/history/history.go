@@ -9,84 +9,27 @@ import (
 
 const maxInstances = 10
 
-var currentHistory *History
-var currentHistoryMutext sync.Mutex
+var currentHistory *History = &History{}
 
 type History struct {
-	mutex     sync.Mutex
+	sync.Mutex
 	instances []*Instance
 }
 
-type NoCurrentHistoryError struct{}
+type NoInstancesError struct{}
 
-func (c NoCurrentHistoryError) Error() string {
-	return "no history has been created"
-}
-
-type NoCurrentInstanceError struct{}
-
-func (c NoCurrentInstanceError) Error() string {
+func (c NoInstancesError) Error() string {
 	return "no osquery instance is currently set"
-}
-
-type CurrentInstanceNotExitedError struct{}
-
-func (c CurrentInstanceNotExitedError) Error() string {
-	return "cannot create new instance of osquery history while current instance does not have exit time"
-}
-
-type HistoryAlreadyCreatedError struct{}
-
-func (c HistoryAlreadyCreatedError) Error() string {
-	return "history has already been created, access readonly data via package functions"
-}
-
-// NewHistory creates a new history and sets it as the current history.
-// If the current history already been set, gives an error.
-func NewHistory() (*History, error) {
-	currentHistoryMutext.Lock()
-	defer currentHistoryMutext.Unlock()
-
-	if currentHistory != nil {
-		return nil, HistoryAlreadyCreatedError{}
-	}
-
-	currentHistory = &History{}
-	return currentHistory, nil
-}
-
-// NewInstanceStarted adds a new instance to the osquery instance history
-func (h *History) NewInstanceStarted() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	return h.newInstanceStarted()
-}
-
-// CurrentInstanceConnected sets the connect time and instance id of the current osquery instance
-func (h *History) CurrentInstanceConnected(querier Querier) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	return h.currentInstanceConnected(querier)
-}
-
-// CurrentInstanceExited sets the exit time and appends provided error (if any) to current osquery instance
-func (h *History) CurrentInstanceExited(exitError error) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	return h.currentInstanceExited(exitError)
 }
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
 func GetHistory() ([]Instance, error) {
-	if currentHistory == nil {
-		return nil, NoCurrentHistoryError{}
+	if currentHistory.instances == nil {
+		return nil, NoInstancesError{}
 	}
 
-	currentHistory.mutex.Lock()
-	defer currentHistory.mutex.Unlock()
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
 
 	results := make([]Instance, len(currentHistory.instances))
 	for i, v := range currentHistory.instances {
@@ -96,16 +39,12 @@ func GetHistory() ([]Instance, error) {
 	return results, nil
 }
 
-// CurrentInstance returns the current osquery instance
-func CurrentInstance() (Instance, error) {
-	if currentHistory == nil {
-		return Instance{}, NoCurrentHistoryError{}
-	}
+// LatestInstance returns the latest osquery instance
+func LatestInstance() (Instance, error) {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
 
-	currentHistory.mutex.Lock()
-	defer currentHistory.mutex.Unlock()
-
-	instance, err := currentHistory.currentInstance()
+	instance, err := currentHistory.latestInstance()
 	if err != nil {
 		return Instance{}, err
 	}
@@ -113,26 +52,30 @@ func CurrentInstance() (Instance, error) {
 	return *instance, nil
 }
 
-func (h *History) currentInstance() (*Instance, error) {
+func (h *History) latestInstance() (*Instance, error) {
 	if h.instances != nil && len(h.instances) > 0 {
 		return h.instances[len(h.instances)-1], nil
 	}
-	return nil, NoCurrentInstanceError{}
+	return nil, NoInstancesError{}
 }
 
-func (h *History) newInstanceStarted() error {
-	currentInstance, err := h.currentInstance()
-	if err != nil && !errors.Is(err, NoCurrentInstanceError{}) {
-		return err
-	}
+// NewInstance adds a new instance to the osquery instance history and returns it
+func NewInstance() (*Instance, error) {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
 
-	if currentInstance != nil && currentInstance.ExitTime == "" {
-		return CurrentInstanceNotExitedError{}
+	return currentHistory.newInstance()
+}
+
+func (h *History) newInstance() (*Instance, error) {
+	_, err := h.latestInstance()
+	if err != nil && !errors.Is(err, NoInstancesError{}) {
+		return nil, err
 	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	newInstance := &Instance{
@@ -140,12 +83,12 @@ func (h *History) newInstanceStarted() error {
 		Hostname:  hostname,
 	}
 
-	h.addCurrentInstance(newInstance)
+	h.addNewInstance(newInstance)
 
-	return nil
+	return newInstance, nil
 }
 
-func (h *History) addCurrentInstance(instance *Instance) {
+func (h *History) addNewInstance(instance *Instance) {
 	if h.instances == nil {
 		h.instances = []*Instance{instance}
 		return
@@ -156,31 +99,6 @@ func (h *History) addCurrentInstance(instance *Instance) {
 	if len(h.instances) >= maxInstances {
 		h.instances = h.instances[len(h.instances)-maxInstances:]
 	}
-}
-
-func (h *History) currentInstanceConnected(querier Querier) error {
-	currentInstance, err := h.currentInstance()
-	if err != nil {
-		return err
-	}
-
-	err = currentInstance.connected(querier)
-	if err != nil {
-		currentInstance.addError(err)
-	}
-
-	return err
-}
-
-// InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
-func (h *History) currentInstanceExited(exitError error) error {
-	currentInstance, err := h.currentInstance()
-	if err != nil {
-		return err
-	}
-
-	currentInstance.exited(exitError)
-	return nil
 }
 
 func timeNow() string {

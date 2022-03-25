@@ -237,7 +237,13 @@ func TestSimplePath(t *testing.T) {
 
 	waitHealthy(t, runner)
 
+	assert.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
+	assert.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
+
 	require.NoError(t, runner.Shutdown())
+
+	require.NotEmpty(t, runner.instance.stats.ExitTime, "exit time should be added to instance stats when shutdown")
+	require.Empty(t, runner.instance.stats.Error, "should be no error on expected shut down")
 }
 
 func TestRestart(t *testing.T) {
@@ -245,11 +251,27 @@ func TestRestart(t *testing.T) {
 	runner, _, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
+	previousStats := runner.instance.stats
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "should be no error on unexpected restart")
+
+	previousStats = runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "should be no error on unexpected restart")
 }
 
 func TestOsqueryDies(t *testing.T) {
@@ -266,6 +288,8 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner)
 
+	previousStats := runner.instance.stats
+
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instance.cmd))
@@ -273,8 +297,13 @@ func TestOsqueryDies(t *testing.T) {
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner)
+	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpedted shutdown")
 
 	require.NoError(t, runner.Shutdown())
+
+	require.NotEmpty(t, runner.instance.stats.ExitTime, "exit time should be added to instance stats when shutdown")
+	require.Empty(t, runner.instance.stats.Error, "should be no error on expected shut down")
 }
 
 func TestNotStarted(t *testing.T) {

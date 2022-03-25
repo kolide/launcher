@@ -86,6 +86,12 @@ type OsqueryInstance struct {
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()
 	usingTempDir           bool
+	stats                  *history.Instance
+
+	// instanceStats *history.Instance
+
+	// history should be global (effecitvly a array of instances)
+	// hang a pointer here on the instance
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -514,16 +520,18 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 	}
 
 	// what should we do with this error?
-	history, _ := history.NewHistory()
+	// history, _ := history.NewHistory()
 
 	return &Runner{
-		instance:        i,
-		shutdown:        make(chan struct{}),
-		instanceHistory: history,
+		instance: i,
+		shutdown: make(chan struct{}),
+		//instanceHistory: history,
 	}
 }
 
 func newInstance() *OsqueryInstance {
+	// add a new instance of stats
+	// history.NewInstance() // handle adding it the array
 	i := &OsqueryInstance{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -550,11 +558,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
-				err := r.instanceHistory.CurrentInstanceExited(nil)
-				if err != nil {
-					level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
-				}
-
+				r.instance.stats.Exited(nil)
 				return
 			default:
 				// Don't block
@@ -567,10 +571,7 @@ func (r *Runner) Start() error {
 				"err", err,
 			)
 
-			err = r.instanceHistory.CurrentInstanceExited(err)
-			if err != nil {
-				level.Info(r.instance.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
-			}
+			r.instance.stats.Exited(err)
 
 			r.instanceLock.Lock()
 			opts := r.instance.opts
@@ -722,6 +723,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch osquery process (async)
 	err = o.cmd.Start()
+	// o.runtime stats set start time
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -736,10 +738,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
 
-	err = r.instanceHistory.NewInstanceStarted()
+	stats, err := history.NewInstance()
 	if err != nil {
 		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 	}
+	o.stats = stats
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -817,7 +820,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	err = r.instanceHistory.CurrentInstanceConnected(o)
+	o.stats.Connected(o)
 	if err != nil {
 		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 	}

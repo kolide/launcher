@@ -35,7 +35,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 
-		osqueryInstance, err := history.CurrentInstance()
+		osqueryInstance, err := history.LatestInstance()
 		if err != nil {
 			return nil, err
 		}

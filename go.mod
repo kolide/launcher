@@ -58,7 +58,8 @@ require (
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/objx v0.3.0 // indirect
+	github.com/stretchr/testify v1.7.1
 	github.com/theupdateframework/notary v0.6.1
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.22.1
@@ -75,6 +76,7 @@ require (
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/ini.v1 v1.61.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )

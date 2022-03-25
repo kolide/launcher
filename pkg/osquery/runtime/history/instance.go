@@ -1,8 +1,6 @@
 package history
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 )
 
@@ -26,7 +24,8 @@ func (e ExpectedAtLeastOneRowError) Error() string {
 	return "expected at least one row from osquery_info table"
 }
 
-func (i *Instance) connected(querier Querier) error {
+// Connected sets the connect time and instance id of the current osquery instance
+func (i *Instance) Connected(querier Querier) error {
 	results, err := querier.Query("select instance_id, version from osquery_info order by start_time limit 1")
 	if err != nil {
 		return err
@@ -53,19 +52,8 @@ func (i *Instance) connected(querier Querier) error {
 	return nil
 }
 
-func (i *Instance) exited(err error) {
-	if err != nil {
-		i.addError(err)
-	}
-
+// InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
+func (i *Instance) Exited(exitError error) {
+	i.Error = exitError
 	i.ExitTime = timeNow()
-}
-
-func (i *Instance) addError(err error) {
-	if i.Error != nil {
-		i.Error = fmt.Errorf("%v: %v", i.Error, err)
-		return
-	}
-
-	i.Error = err
 }
