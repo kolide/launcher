@@ -19,7 +19,7 @@ type History struct {
 type NoInstancesError struct{}
 
 func (c NoInstancesError) Error() string {
-	return "no osquery instance is currently set"
+	return "no osquery instances have been added to history"
 }
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry

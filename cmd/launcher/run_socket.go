@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
-	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/pkg/errors"
 )
 
@@ -37,8 +36,9 @@ func runSocket(args []string) error {
 
 	runner, err := runtime.LaunchInstance(
 		runtime.WithExtensionSocketPath(*flPath),
-		// load up the LauncherTables
-		runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil)...),
+		// load up the LauncherTables ... comment below to debug launcher tables
+		// TODO: make this a flag
+		// runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil)...),
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating osquery instance")
