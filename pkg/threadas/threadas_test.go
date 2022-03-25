@@ -21,7 +21,7 @@ const (
 	targetGid = 20
 )
 
-func TestThreadAsNotRoot(t *testing.T) {
+func TestThreadNoPermission(t *testing.T) {
 	t.Parallel()
 
 	if syscall.Getuid() == 0 {
@@ -30,7 +30,7 @@ func TestThreadAsNotRoot(t *testing.T) {
 
 	uids := getUidData()
 	fn := uids.GenerateTestFunc(t, "expected failure", assert.Equal)
-	require.Error(t, ThreadAs(fn, timeout, uint32(uids.Uid), uint32(uids.Gid)), "Fails when run as non-root")
+	require.ErrorIs(t, ThreadAs(fn, timeout, uint32(uids.Uid), uint32(uids.Gid)), &NoPermissionsError{}, "Fails when run as non-root")
 }
 
 func TestThreadAs(t *testing.T) {
@@ -82,21 +82,56 @@ func TestThreadAs(t *testing.T) {
 	}
 }
 
+func TestReturnPerms(t *testing.T) {
+	t.Parallel()
+
+	if syscall.Getuid() != 0 {
+		t.Skip("Skipping -- test requires root")
+	}
+
+	targetUids := uidData{Uid: targetUid, Euid: targetUid, Gid: targetGid, Egid: targetGid}
+	myUids := getUidData()
+
+	fn := func() error {
+		// ThreadAs starts with a setuid, so assume that's been called for us
+		targetUids.TestUids(t, "target", assert.Equal)
+
+		// reset permissions
+		require.NoError(t, pthread_setugid_np(KAUTH_UID_NONE, KAUTH_GID_NONE), "reset permissions")
+
+		myUids.TestUids(t, "returned", assert.Equal)
+
+		return nil
+	}
+
+	require.NoError(t, ThreadAs(fn, timeout, uint32(targetUid), uint32(targetGid)))
+
+}
+
 func TestTimeout(t *testing.T) {
 	t.Parallel()
+
+	if syscall.Getuid() != 0 {
+		t.Skip("Skipping -- test requires root")
+	}
 
 	fn := func() error {
 		time.Sleep(10 * time.Second)
 		return nil
 	}
 
-	require.Error(t, ThreadAs(fn, timeout, KAUTH_UID_NONE, KAUTH_GID_NONE))
+	require.ErrorIs(t, ThreadAs(fn, timeout, uint32(0), uint32(0)), &TimeoutError{})
 }
 
 func TestGoroutineLeaks(t *testing.T) { // nolint:paralleltest
 	// Don't parallize this -- it's using the global count of
 	// goroutines, which is going to vary based on what other
 	// tests are running.
+
+	if syscall.Getuid() != 0 {
+		t.Skip("Skipping -- test requires root")
+	}
+
 	startCount := runtime.NumGoroutine()
 
 	fn := func() error {
@@ -105,7 +140,7 @@ func TestGoroutineLeaks(t *testing.T) { // nolint:paralleltest
 		return nil
 	}
 
-	require.Error(t, ThreadAs(fn, timeout, KAUTH_UID_NONE, KAUTH_GID_NONE))
+	require.NoError(t, ThreadAs(fn, timeout, 0, 0))
 
 	require.Equal(t, startCount, runtime.NumGoroutine(), "go routines should return to normal")
 

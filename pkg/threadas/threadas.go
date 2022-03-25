@@ -35,6 +35,36 @@ const (
 	KAUTH_GID_NONE = ^uint32(0) - 100
 )
 
+type NoPermissionsError struct {
+	Errno syscall.Errno
+}
+
+func (e *NoPermissionsError) Error() string {
+	return fmt.Sprintf("error changing permission: %v", e.Errno)
+}
+
+func (e *NoPermissionsError) Is(target error) bool {
+	_, ok := target.(*NoPermissionsError)
+	return ok
+}
+
+func (e *NoPermissionsError) Unwrap() error {
+	return e.Errno
+}
+
+type TimeoutError struct {
+	t time.Duration
+}
+
+func (e *TimeoutError) Error() string {
+	return fmt.Sprintf("timeout after %s", e.t)
+}
+
+func (e *TimeoutError) Is(target error) bool {
+	_, ok := target.(*TimeoutError)
+	return ok
+}
+
 // ThreadAs will run a function, in a "thread", after using setuid to
 // change permissions on that thread. It uses `LockOSThread` so the
 // thread terminates after with the function, this is to clean up from
@@ -71,7 +101,7 @@ func ThreadAs(fn func() error, timeout time.Duration, uid uint32, gid uint32) er
 	case err := <-errChan:
 		return err
 	case <-time.After(timeout):
-		return fmt.Errorf("Timeout after %s", timeout)
+		return &TimeoutError{t: timeout}
 	}
 }
 
@@ -86,9 +116,8 @@ func pthread_setugid_np(uid uint32, gid uint32) error {
 	// syscall.RawSyscall blocks, while Syscall does not. Since we
 	// don't think this blocks, we can use the _slightly_ more
 	// performant RawSyscall
-	_, _, errNo := syscall.RawSyscall(syscall.SYS_SETTID, uintptr(uid), uintptr(gid), 0)
-	if errNo != 0 {
-		return errNo
+	if _, _, errno := syscall.RawSyscall(syscall.SYS_SETTID, uintptr(uid), uintptr(gid), 0); errno != 0 {
+		return &NoPermissionsError{Errno: errno}
 	}
 
 	return nil
