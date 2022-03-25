@@ -241,9 +241,6 @@ func TestSimplePath(t *testing.T) {
 	assert.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
 
 	require.NoError(t, runner.Shutdown())
-
-	require.NotEmpty(t, runner.instance.stats.ExitTime, "exit time should be added to instance stats when shutdown")
-	require.Empty(t, runner.instance.stats.Error, "should be no error on expected shut down")
 }
 
 func TestRestart(t *testing.T) {
@@ -301,9 +298,6 @@ func TestOsqueryDies(t *testing.T) {
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpedted shutdown")
 
 	require.NoError(t, runner.Shutdown())
-
-	require.NotEmpty(t, runner.instance.stats.ExitTime, "exit time should be added to instance stats when shutdown")
-	require.Empty(t, runner.instance.stats.Error, "should be no error on expected shut down")
 }
 
 func TestNotStarted(t *testing.T) {
