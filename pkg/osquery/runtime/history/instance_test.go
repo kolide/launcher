@@ -61,7 +61,7 @@ func TestInstance_Connected(t *testing.T) {
 
 			err := i.Connected(querier)
 			assert.Equal(t, tt.wantInstanceId, i.InstanceId)
-			assert.Equal(t, tt.wantInstanceId, i.InstanceId)
+			assert.Equal(t, tt.wantVersion, i.Version)
 			assert.ErrorIs(t, tt.wantErrReturn, err)
 
 			if tt.wantErrReturn == nil {

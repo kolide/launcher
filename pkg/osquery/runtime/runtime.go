@@ -87,11 +87,6 @@ type OsqueryInstance struct {
 	rmRootDirectory        func()
 	usingTempDir           bool
 	stats                  *history.Instance
-
-	// instanceStats *history.Instance
-
-	// history should be global (effecitvly a array of instances)
-	// hang a pointer here on the instance
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -519,19 +514,13 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 		opt(i)
 	}
 
-	// what should we do with this error?
-	// history, _ := history.NewHistory()
-
 	return &Runner{
 		instance: i,
 		shutdown: make(chan struct{}),
-		//instanceHistory: history,
 	}
 }
 
 func newInstance() *OsqueryInstance {
-	// add a new instance of stats
-	// history.NewInstance() // handle adding it the array
 	i := &OsqueryInstance{}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -820,7 +809,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	o.stats.Connected(o)
+	err = o.stats.Connected(o)
 	if err != nil {
 		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
 	}
