@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/launcher"
 	"go.etcd.io/bbolt"
@@ -18,8 +20,20 @@ import (
 // defines time out for all http, dns, connectivity requests
 const requestTimeout = time.Second * 5
 
-// if we find any files in these directories, log them to check point
-var notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
+var (
+	// if we find any files in these directories, log them to check point
+	notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
+
+	runtimeInfo = map[string]string{
+		"GOARCH": runtime.GOARCH,
+		"GOOS":   runtime.GOOS,
+	}
+
+	launcherInfo = map[string]string{
+		"revision": version.Version().Revision,
+		"version":  version.Version().Version,
+	}
+)
 
 // logger is an interface that allows mocking of logger
 type logger interface {
@@ -47,6 +61,8 @@ func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
 	logger = log.With(logger, "msg", "log checkpoint")
 
 	logger.Log("hostname", hostName())
+	logger.Log("runtime", runtimeInfo)
+	logger.Log("launcher", launcherInfo)
 	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
 	logDbSize(logger, db)
 	logConnections(logger, opts)
