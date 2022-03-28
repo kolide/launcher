@@ -11,7 +11,7 @@ type Instance struct {
 	Hostname    string
 	InstanceId  string
 	Version     string
-	Error       error
+	Error       string
 }
 
 type Querier interface {
@@ -54,6 +54,9 @@ func (i *Instance) Connected(querier Querier) error {
 
 // InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
 func (i *Instance) Exited(exitError error) {
-	i.Error = exitError
+	if exitError != nil {
+		i.Error = exitError.Error()
+	}
+
 	i.ExitTime = timeNow()
 }

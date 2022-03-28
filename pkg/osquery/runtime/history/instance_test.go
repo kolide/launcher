@@ -76,15 +76,13 @@ func TestInstance_Connected(t *testing.T) {
 func TestInstance_Exited(t *testing.T) {
 	t.Parallel()
 
-	exitError := errors.New("some error")
-
 	type args struct {
 		exitError error
 	}
 	tests := []struct {
 		name    string
 		args    args
-		wantErr error
+		wantErr string
 	}{
 		{
 			name: "success",
@@ -92,9 +90,9 @@ func TestInstance_Exited(t *testing.T) {
 		{
 			name: "success_with_arg",
 			args: args{
-				exitError: exitError,
+				exitError: errors.New("some error"),
 			},
-			wantErr: exitError,
+			wantErr: "some error",
 		},
 	}
 	for _, tt := range tests {
@@ -105,7 +103,7 @@ func TestInstance_Exited(t *testing.T) {
 			i := &Instance{}
 			i.Exited(tt.args.exitError)
 
-			assert.ErrorIs(t, tt.wantErr, i.Error)
+			assert.Equal(t, tt.wantErr, i.Error)
 
 			// make sure exit time was set
 			_, err := time.Parse(time.RFC3339, i.ExitTime)

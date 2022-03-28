@@ -31,11 +31,6 @@ func generate() table.GenerateFunc {
 
 		for _, v := range history {
 
-			errStr := ""
-			if v.Error != nil {
-				errStr = v.Error.Error()
-			}
-
 			results = append(results, map[string]string{
 				"start_time":   v.StartTime,
 				"connect_time": v.ConnectTime,
@@ -43,7 +38,7 @@ func generate() table.GenerateFunc {
 				"instance_id":  v.InstanceId,
 				"version":      v.Version,
 				"hostname":     v.Hostname,
-				"errors":       errStr,
+				"errors":       v.Error,
 			})
 		}
 
