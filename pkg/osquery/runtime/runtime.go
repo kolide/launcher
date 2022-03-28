@@ -33,10 +33,9 @@ import (
 )
 
 type Runner struct {
-	instance        *OsqueryInstance
-	instanceHistory *history.History
-	instanceLock    sync.RWMutex
-	shutdown        chan struct{}
+	instance     *OsqueryInstance
+	instanceLock sync.RWMutex
+	shutdown     chan struct{}
 }
 
 func (r *Runner) Query(query string) ([]map[string]string, error) {
@@ -809,9 +808,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	err = o.stats.Connected(o)
-	if err != nil {
-		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 	}
 
 	plugins := o.opts.extensionPlugins

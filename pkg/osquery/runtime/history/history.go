@@ -1,7 +1,6 @@
 package history
 
 import (
-	"errors"
 	"os"
 	"sync"
 	"time"
@@ -68,11 +67,6 @@ func NewInstance() (*Instance, error) {
 }
 
 func (h *History) newInstance() (*Instance, error) {
-	_, err := h.latestInstance()
-	if err != nil && !errors.Is(err, NoInstancesError{}) {
-		return nil, err
-	}
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err

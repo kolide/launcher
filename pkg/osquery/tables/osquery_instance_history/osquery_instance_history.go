@@ -25,7 +25,6 @@ func generate() table.GenerateFunc {
 		results := []map[string]string{}
 
 		history, err := history.GetHistory()
-
 		if err != nil {
 			return nil, err
 		}
