@@ -58,7 +58,6 @@ require (
 	github.com/sirupsen/logrus v1.4.0 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.2.1 // indirect
-	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.1
 	github.com/theupdateframework/notary v0.6.1
 	go.etcd.io/bbolt v1.3.6
