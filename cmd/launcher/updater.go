@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -63,17 +64,10 @@ func createUpdater(
 	var stop func()
 	stopChan := make(chan bool)
 
+	binaryName := path.Base(binaryPath)
+
 	return &actor.Actor{
 		Execute: func() error {
-			// When launcher first starts, we'd like the
-			// server to start receiving data
-			// immediately. But, if updater is trying to
-			// run, this creates an awkward pause for restart.
-			// So, delay starting updates by an hour or two.
-			if config.InitialDelay != 0 {
-				time.Sleep(config.InitialDelay)
-			}
-
 			// Failing to start the updater is not a fatal launcher
 			// error. If there's a problem, sleep and try
 			// again. Implementing this is a bit gnarly. In the event of a
@@ -81,7 +75,23 @@ func createUpdater(
 			// see a simple way to ensure the updater is still running in
 			// the background.
 			for {
-				level.Info(config.Logger).Log("msg", "updater started")
+				// When launcher first starts, we'd like the
+				// server to start receiving data
+				// immediately. But, if updater is trying to
+				// run, this creates an awkward pause for restart.
+				// So, delay starting updates by an hour or two.
+				level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater entering initial delay of %s", binaryName, config.InitialDelay))
+
+				select {
+				case <-stopChan:
+					level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater stopped requested during initial delay, Breaking loop", binaryName))
+					return nil
+				case <-time.After(config.InitialDelay):
+					level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater initial delay complete", binaryName))
+					break
+				}
+
+				level.Info(config.Logger).Log("msg", fmt.Sprintf("%s updater starting", binaryName))
 
 				// run the updater and set the stop function so that the interrupt has access to it
 				stop, err = updater.Run(tuf.WithFrequency(config.AutoupdateInterval), tuf.WithLogger(config.Logger))
@@ -90,10 +100,10 @@ func createUpdater(
 				}
 
 				// err != nil, log it and loop again
-				level.Error(config.Logger).Log("msg", "Error running updater. Will retry", "err", err)
+				level.Error(config.Logger).Log("msg", fmt.Sprintf("error running %s updater", binaryName), "err", err)
 				select {
 				case <-stopChan:
-					level.Debug(config.Logger).Log("msg", "stop requested. Breaking loop")
+					level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater stop requested, Breaking loop", binaryName))
 					return nil
 				case <-time.After(30 * time.Minute):
 					break
@@ -103,20 +113,21 @@ func createUpdater(
 			// Don't exit unless there's a done signal TODO: remove when
 			// underlying libs are refactored, everything exits right now,
 			// so block this actor on the context finishing
-			level.Debug(config.Logger).Log("msg", "waiting")
+			level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater waiting ... just sitting until done signal (see TODO)", binaryName))
 			<-ctx.Done()
 
 			return nil
 		},
+
 		Interrupt: func(err error) {
-			level.Info(config.Logger).Log("msg", "updater interrupted", "err", err)
-			level.Debug(config.Logger).Log("msg", "updater interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+			level.Info(config.Logger).Log("msg", fmt.Sprintf("%s updater interrupted", binaryName), "err", err)
+			level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater interrupted", binaryName), "err", err, "stack", fmt.Sprintf("%+v", err))
 
 			// non-blocking channel send
 			select {
 			case stopChan <- true:
 			default:
-				level.Debug(config.Logger).Log("msg", "failed to send stop signal")
+				level.Debug(config.Logger).Log("msg", fmt.Sprintf("%s updater failed to send stop signal", binaryName))
 			}
 
 			if stop != nil {
