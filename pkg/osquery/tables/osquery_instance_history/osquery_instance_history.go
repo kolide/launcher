@@ -29,16 +29,16 @@ func generate() table.GenerateFunc {
 			return nil, err
 		}
 
-		for _, v := range history {
+		for _, instance := range history {
 
 			results = append(results, map[string]string{
-				"start_time":   v.StartTime,
-				"connect_time": v.ConnectTime,
-				"exit_time":    v.ExitTime,
-				"instance_id":  v.InstanceId,
-				"version":      v.Version,
-				"hostname":     v.Hostname,
-				"errors":       v.Error,
+				"start_time":   instance.StartTime,
+				"connect_time": instance.ConnectTime,
+				"exit_time":    instance.ExitTime,
+				"instance_id":  instance.InstanceId,
+				"version":      instance.Version,
+				"hostname":     instance.Hostname,
+				"errors":       instance.Error,
 			})
 		}
 

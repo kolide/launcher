@@ -43,19 +43,11 @@ func LatestInstance() (Instance, error) {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
-	instance, err := currentHistory.latestInstance()
-	if err != nil {
-		return Instance{}, err
+	if currentHistory.instances == nil || len(currentHistory.instances) == 0 {
+		return Instance{}, NoInstancesError{}
 	}
 
-	return *instance, nil
-}
-
-func (h *History) latestInstance() (*Instance, error) {
-	if h.instances != nil && len(h.instances) > 0 {
-		return h.instances[len(h.instances)-1], nil
-	}
-	return nil, NoInstancesError{}
+	return *currentHistory.instances[len(currentHistory.instances)-1], nil
 }
 
 // NewInstance adds a new instance to the osquery instance history and returns it
@@ -63,10 +55,6 @@ func NewInstance() (*Instance, error) {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
-	return currentHistory.newInstance()
-}
-
-func (h *History) newInstance() (*Instance, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -77,12 +65,12 @@ func (h *History) newInstance() (*Instance, error) {
 		Hostname:  hostname,
 	}
 
-	h.addNewInstance(newInstance)
+	currentHistory.addInstanceToHistory(newInstance)
 
 	return newInstance, nil
 }
 
-func (h *History) addNewInstance(instance *Instance) {
+func (h *History) addInstanceToHistory(instance *Instance) {
 	if h.instances == nil {
 		h.instances = []*Instance{instance}
 		return
