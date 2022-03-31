@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package main
+package updater
 
 import (
 	"context"
@@ -13,12 +13,12 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
-// updateFinalizer finalizes a launcher update. As windows does not
+// UpdateFinalizer finalizes a launcher update. As windows does not
 // support an exec, we exit so the service manager will restart
 // us. Exit(0) might be more correct, but that's harder to plumb
 // through this stack. So, return an error here to trigger an exit
 // higher in the stack.
-func updateFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
+func UpdateFinalizer(logger log.Logger, shutdownOsquery func() error) func() error {
 	return func() error {
 		if err := shutdownOsquery(); err != nil {
 			level.Info(logger).Log("msg", "calling shutdownOsquery", "method", "updateFinalizer", "err", err)
