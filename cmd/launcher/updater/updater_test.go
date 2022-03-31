@@ -3,6 +3,7 @@ package updater
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -191,9 +192,14 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 				config:   tt.fields.config,
 			}
 
+			// using this wait group to ensure that something gets received on u.StopChan
+			// wonder if there is a more elegant way
+			var wg sync.WaitGroup
 			if tt.expectStopChannelReceive {
+				wg.Add(1)
 				go func() {
 					<-u.stopChan
+					wg.Done()
 				}()
 				time.Sleep(5 * time.Millisecond)
 			}
@@ -212,6 +218,9 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 
 			u.interrupt(tt.args.err)
 			assert.Equal(t, tt.expectedCallsToStop, stopCalledCount)
+
+			// test will time out if we don't get something on u.stopChan when expecting channel receive
+			wg.Wait()
 		})
 	}
 }
