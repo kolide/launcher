@@ -4,6 +4,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
@@ -22,6 +23,7 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 		LauncherInfoTable(db),
 		TargetMembershipTable(db),
 		LauncherAutoupdateConfigTable(opts),
+		osquery_instance_history.TablePlugin(),
 	}
 }
 

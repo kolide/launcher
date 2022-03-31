@@ -237,6 +237,9 @@ func TestSimplePath(t *testing.T) {
 
 	waitHealthy(t, runner)
 
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
+
 	require.NoError(t, runner.Shutdown())
 }
 
@@ -245,11 +248,27 @@ func TestRestart(t *testing.T) {
 	runner, _, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
+	previousStats := runner.instance.stats
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	previousStats = runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
 }
 
 func TestOsqueryDies(t *testing.T) {
@@ -266,6 +285,8 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner)
 
+	previousStats := runner.instance.stats
+
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instance.cmd))
@@ -273,6 +294,8 @@ func TestOsqueryDies(t *testing.T) {
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner)
+	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpedted shutdown")
 
 	require.NoError(t, runner.Shutdown())
 }

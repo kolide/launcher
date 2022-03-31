@@ -36,6 +36,9 @@ func runSocket(args []string) error {
 
 	runner, err := runtime.LaunchInstance(
 		runtime.WithExtensionSocketPath(*flPath),
+		// load up the LauncherTables ... comment below to debug launcher tables
+		// TODO: make this a flag
+		// runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil)...),
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating osquery instance")
