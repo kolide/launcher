@@ -118,10 +118,13 @@ func Test_updaterCmd_execute(t *testing.T) {
 				runUpdaterRetryInterval: tt.fields.runUpdaterRetryInterval,
 			}
 
+			var wg sync.WaitGroup
 			if tt.callStopChanAfter > 0 {
+				wg.Add(1)
 				go func() {
 					time.Sleep(tt.callStopChanAfter)
 					tt.fields.stopChan <- true
+					wg.Done()
 				}()
 			}
 
@@ -133,6 +136,9 @@ func Test_updaterCmd_execute(t *testing.T) {
 
 			tt.assertion(t, u.execute())
 			tt.fields.updater.AssertExpectations(t)
+
+			// test will time out if we don't get to send something on u.stopChan when expecting channel receive
+			wg.Wait()
 		})
 	}
 }
@@ -202,12 +208,6 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 					wg.Done()
 				}()
 				time.Sleep(5 * time.Millisecond)
-			}
-
-			if tt.expectStopChannelReceive {
-				go func() {
-					<-u.stopChan
-				}()
 			}
 
 			stopCalledCount := 0
