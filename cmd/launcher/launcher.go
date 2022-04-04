@@ -200,7 +200,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := updater.CreateUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
+		osqueryUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
 		if err != nil {
 			return errors.Wrap(err, "create osquery updater")
 		}
@@ -224,7 +224,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			logutil.Fatal(logger, "err", err)
 		}
-		launcherUpdater, err := updater.CreateUpdater(
+		launcherUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
 			updater.UpdateFinalizer(logger, runnerShutdown),

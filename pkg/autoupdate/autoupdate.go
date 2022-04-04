@@ -95,10 +95,6 @@ type Updater struct {
 	logger             log.Logger
 }
 
-func (u Updater) BinaryName() string {
-	return u.binaryName
-}
-
 // UpdateFinalizer is executed after the Updater updates a destination.
 // The UpdateFinalizer is usually a function which will handle restarting the updated binary.
 type UpdateFinalizer func() error

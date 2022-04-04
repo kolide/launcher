@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -28,6 +29,53 @@ type UpdaterConfig struct {
 	SigChannel         chan os.Signal
 }
 
+// NewUpdater returns an Actor suitable for an oklog/run group. It
+// is a light wrapper around autoupdate.NewUpdater to simplify having
+// multiple ones in launcher.
+func NewUpdater(
+	ctx context.Context,
+	binaryPath string,
+	finalizer autoupdate.UpdateFinalizer,
+	config *UpdaterConfig,
+) (*actor.Actor, error) {
+
+	if config.Logger == nil {
+		config.Logger = log.NewNopLogger()
+	}
+
+	config.Logger = log.With(config.Logger, "updater", filepath.Base(binaryPath))
+
+	// create the updater
+	updater, err := autoupdate.NewUpdater(
+		binaryPath,
+		config.RootDirectory,
+		autoupdate.WithLogger(config.Logger),
+		autoupdate.WithHTTPClient(config.HTTPClient),
+		autoupdate.WithNotaryURL(config.NotaryURL),
+		autoupdate.WithMirrorURL(config.MirrorURL),
+		autoupdate.WithNotaryPrefix(config.NotaryPrefix),
+		autoupdate.WithFinalizer(finalizer),
+		autoupdate.WithUpdateChannel(config.UpdateChannel),
+		autoupdate.WithSigChannel(config.SigChannel),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	updateCmd := &updaterCmd{
+		updater:                 updater,
+		ctx:                     ctx,
+		stopChan:                make(chan bool),
+		config:                  config,
+		runUpdaterRetryInterval: 30 * time.Minute,
+	}
+
+	return &actor.Actor{
+		Execute:   updateCmd.execute,
+		Interrupt: updateCmd.interrupt,
+	}, nil
+}
+
 // updater allows us to mock *autoupdate.Updater during testing
 type updater interface {
 	Run(opts ...tuf.Option) (stop func(), err error)
@@ -43,13 +91,6 @@ type updaterCmd struct {
 }
 
 func (u *updaterCmd) execute() error {
-	// Failing to start the updater is not a fatal launcher
-	// error. If there's a problem, sleep and try
-	// again. Implementing this is a bit gnarly. In the event of a
-	// success, we get a nil error, and a stop function. But I don't
-	// see a simple way to ensure the updater is still running in
-	// the background.
-
 	// When launcher first starts, we'd like the
 	// server to start receiving data
 	// immediately. But, if updater is trying to
@@ -66,6 +107,12 @@ func (u *updaterCmd) execute() error {
 		break
 	}
 
+	// Failing to start the updater is not a fatal launcher
+	// error. If there's a problem, sleep and try
+	// again. Implementing this is a bit gnarly. In the event of a
+	// success, we get a nil error, and a stop function. But I don't
+	// see a simple way to ensure the updater is still running in
+	// the background.
 	for {
 		level.Debug(u.config.Logger).Log("msg", "updater starting")
 
@@ -108,46 +155,4 @@ func (u *updaterCmd) interrupt(err error) {
 	if u.stopExecution != nil {
 		u.stopExecution()
 	}
-}
-
-// CreateUpdater returns an Actor suitable for an oklog/run group. It
-// is a light wrapper around autoupdate.NewUpdater to simplify having
-// multiple ones in launcher.
-func CreateUpdater(
-	ctx context.Context,
-	binaryPath string,
-	finalizer autoupdate.UpdateFinalizer,
-	config *UpdaterConfig,
-) (*actor.Actor, error) {
-	// create the updater
-	updater, err := autoupdate.NewUpdater(
-		binaryPath,
-		config.RootDirectory,
-		autoupdate.WithLogger(config.Logger),
-		autoupdate.WithHTTPClient(config.HTTPClient),
-		autoupdate.WithNotaryURL(config.NotaryURL),
-		autoupdate.WithMirrorURL(config.MirrorURL),
-		autoupdate.WithNotaryPrefix(config.NotaryPrefix),
-		autoupdate.WithFinalizer(finalizer),
-		autoupdate.WithUpdateChannel(config.UpdateChannel),
-		autoupdate.WithSigChannel(config.SigChannel),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	config.Logger = log.With(config.Logger, "updater", updater.BinaryName())
-
-	updateCmd := &updaterCmd{
-		updater:                 updater,
-		ctx:                     ctx,
-		stopChan:                make(chan bool),
-		config:                  config,
-		runUpdaterRetryInterval: 30 * time.Minute,
-	}
-
-	return &actor.Actor{
-		Execute:   updateCmd.execute,
-		Interrupt: updateCmd.interrupt,
-	}, nil
 }
