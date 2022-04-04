@@ -19,7 +19,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
-	"github.com/kolide/launcher/cmd/launcher/updater"
+	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
