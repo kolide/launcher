@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/cmd/launcher/updater/mocks"
+	"github.com/kolide/launcher/cmd/launcher/internal/updater/mocks"
 	"github.com/kolide/updater/tuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
