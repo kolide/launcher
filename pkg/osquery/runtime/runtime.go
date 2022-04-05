@@ -28,6 +28,8 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/table"
+
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 )
 
 type Runner struct {
@@ -83,6 +85,7 @@ type OsqueryInstance struct {
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()
 	usingTempDir           bool
+	stats                  *history.Instance
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -543,6 +546,7 @@ func (r *Runner) Start() error {
 			select {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
+				r.instance.stats.Exited(nil)
 				return
 			default:
 				// Don't block
@@ -554,6 +558,8 @@ func (r *Runner) Start() error {
 				"msg", "unexpected restart of instance",
 				"err", err,
 			)
+
+			r.instance.stats.Exited(err)
 
 			r.instanceLock.Lock()
 			opts := r.instance.opts
@@ -705,6 +711,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch osquery process (async)
 	err = o.cmd.Start()
+	// o.runtime stats set start time
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -718,6 +725,12 @@ func (r *Runner) launchOsqueryInstance() error {
 		level.Info(o.logger).Log(msgPairs...)
 		return errors.Wrap(err, "fatal error starting osqueryd process")
 	}
+
+	stats, err := history.NewInstance()
+	if err != nil {
+		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+	}
+	o.stats = stats
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -793,6 +806,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
+	}
+
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 	}
 
 	plugins := o.opts.extensionPlugins
