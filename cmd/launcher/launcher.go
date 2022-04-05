@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
+	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -185,7 +186,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.Autoupdate {
-		osqueryUpdaterconfig := &updaterConfig{
+		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
 			AutoupdateInterval: opts.AutoupdateInterval,
@@ -199,13 +200,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := createUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
+		osqueryUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
 		if err != nil {
 			return errors.Wrap(err, "create osquery updater")
 		}
 		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
 
-		launcherUpdaterconfig := &updaterConfig{
+		launcherUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
 			AutoupdateInterval: opts.AutoupdateInterval,
@@ -223,10 +224,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			logutil.Fatal(logger, "err", err)
 		}
-		launcherUpdater, err := createUpdater(
+		launcherUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
-			updateFinalizer(logger, runnerShutdown),
+			updater.UpdateFinalizer(logger, runnerShutdown),
 			launcherUpdaterconfig,
 		)
 		if err != nil {

@@ -108,6 +108,14 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	// we add the extension. The suffix is inconistent. package-builder
 	// has a lot of gnarly code around that. We may need to import it.
 	binaryName := filepath.Base(binaryPath)
+
+	// this lets us run auto updater in vscode debug mode with dlv
+	// not really sure why the app can't handle __debug_bin as the executable name
+	// maybe look into it later if there is time
+	if binaryName == "__debug_bin" {
+		binaryName = "launcher"
+	}
+
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 
