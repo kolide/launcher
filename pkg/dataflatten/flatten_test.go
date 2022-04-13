@@ -7,6 +7,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -369,4 +370,89 @@ func testFlattenCase(t *testing.T, tt flattenTestCase, actual []Row, actualErr e
 	sort.SliceStable(tt.out, func(i, j int) bool { return tt.out[i].StringPath("/") < tt.out[j].StringPath("/") })
 	sort.SliceStable(actual, func(i, j int) bool { return actual[i].StringPath("/") < actual[j].StringPath("/") })
 	require.EqualValues(t, tt.out, actual, "test %s %s", tt.in, tt.comment)
+}
+
+func TestFlattenSliceOfMaps(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		data interface{}
+		opts []FlattenOpts
+	}
+	tests := []struct {
+		name      string
+		args      args
+		want      []Row
+		assertion assert.ErrorAssertionFunc
+	}{
+		{
+			name: "single",
+			args: args{
+				data: []map[string]interface{}{
+					{
+						"id": "a",
+						"v":  1,
+					},
+				},
+				opts: []FlattenOpts{},
+			},
+			want: []Row{
+				{Path: []string{"0", "id"}, Value: "a"},
+				{Path: []string{"0", "v"}, Value: "1"},
+			},
+			assertion: assert.NoError,
+		},
+		{
+			name: "multiple",
+			args: args{
+				data: []map[string]interface{}{
+					{
+						"id": "a",
+						"v":  1,
+					},
+					{
+						"id": "b",
+						"v":  2,
+					},
+					{
+						"id": "c",
+						"v":  3,
+					},
+				},
+				opts: []FlattenOpts{},
+			},
+			want: []Row{
+				{Path: []string{"0", "id"}, Value: "a"},
+				{Path: []string{"0", "v"}, Value: "1"},
+				{Path: []string{"1", "id"}, Value: "b"},
+				{Path: []string{"1", "v"}, Value: "2"},
+				{Path: []string{"2", "id"}, Value: "c"},
+				{Path: []string{"2", "v"}, Value: "3"},
+			},
+			assertion: assert.NoError,
+		},
+		{
+			name: "error",
+			args: args{
+				data: []map[string]interface{}{
+					{
+						"id": []string{"this should cause an error"},
+					},
+				},
+				opts: []FlattenOpts{},
+			},
+			want:      nil,
+			assertion: assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Flatten(tt.args.data, tt.args.opts...)
+			tt.assertion(t, err)
+			assert.ElementsMatch(t, tt.want, got)
+		})
+	}
 }

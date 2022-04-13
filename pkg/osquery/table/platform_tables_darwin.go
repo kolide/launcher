@@ -7,6 +7,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
+	"github.com/kolide/launcher/pkg/osquery/tables/airport"
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
@@ -86,6 +87,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		UserAvatar(logger),
 		ioreg.TablePlugin(client, logger),
 		profiles.TablePlugin(client, logger),
+		airport.TablePlugin(client, logger),
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
