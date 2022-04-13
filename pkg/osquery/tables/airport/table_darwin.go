@@ -96,7 +96,18 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 	return results, nil
 }
 
+// unmarshallScanOuput parses the output of the airport scan command
 func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
+	/* example output:
+
+	    agrCtlRSSI: -55
+	    agrExtRSSI: 0
+	   agrCtlNoise: -94
+	   agrExtNoise: 0
+	         state: running
+	       op mode: station
+	       ...
+	*/
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 
@@ -132,7 +143,14 @@ func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 	return result
 }
 
+// unmarshallScanOuput parses the output of the airport scan command
 func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
+	/* example output:
+
+	            SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)
+	   i got spaces! a0:a0:a0:a0:a0:a0 -92  108     Y  US WPA(PSK/AES,TKIP/TKIP) RSN(PSK/AES,TKIP/TKIP)
+	       no-spaces b1:b1:b1:b1:b1:b1 -91  116     N  EU RSN(PSK/AES/AES)
+	*/
 
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
