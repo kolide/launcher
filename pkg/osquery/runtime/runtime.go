@@ -34,11 +34,13 @@ import (
 
 type Runner struct {
 	instance     *OsqueryInstance
-	instanceLock sync.RWMutex
+	instanceLock sync.Mutex
 	shutdown     chan struct{}
 }
 
 func (r *Runner) Query(query string) ([]map[string]string, error) {
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
 	return r.instance.Query(query)
 }
 
@@ -462,8 +464,8 @@ func (r *Runner) Restart() error {
 // Healthy checks the health of the instance and returns an error describing
 // any problem.
 func (r *Runner) Healthy() error {
-	r.instanceLock.RLock()
-	defer r.instanceLock.RUnlock()
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
 	return r.instance.Healthy()
 }
 
@@ -900,6 +902,9 @@ func (o *OsqueryInstance) Healthy() error {
 		return errors.New("instance not started")
 	}
 
+	o.clientLock.Lock()
+	defer o.clientLock.Unlock()
+
 	serverStatus, err := o.extensionManagerServer.Ping(context.TODO())
 	if err != nil {
 		return errors.Wrap(err, "could not ping extension server")
@@ -911,8 +916,6 @@ func (o *OsqueryInstance) Healthy() error {
 		)
 	}
 
-	o.clientLock.Lock()
-	defer o.clientLock.Unlock()
 	clientStatus, err := o.extensionManagerClient.Ping()
 	if err != nil {
 		return errors.Wrap(err, "could not ping osquery extension client")
