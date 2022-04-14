@@ -126,13 +126,5 @@
         "parent": "0",
         "query": "*",
         "value": "216"
-    },
-    {
-        "fullkey": "0/maxRate",
-        "key": "maxRate",
-        "option": "getinfo",
-        "parent": "0",
-        "query": "*",
-        "value": ""
     }
 ]

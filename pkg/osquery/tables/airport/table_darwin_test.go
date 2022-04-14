@@ -111,7 +111,7 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 				option:       "scan",
 				queryContext: table.QueryContext{},
 			},
-			want:      []map[string]string{{"fullkey": "0/column", "key": "column", "option": "scan", "parent": "0", "query": "*", "value": "row"}},
+			want:      []map[string]string(nil),
 			assertion: assert.NoError,
 		},
 		{
@@ -131,7 +131,7 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 				option:       "getinfo",
 				queryContext: table.QueryContext{},
 			},
-			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
+			want:      []map[string]string(nil),
 			assertion: assert.NoError,
 		},
 		{

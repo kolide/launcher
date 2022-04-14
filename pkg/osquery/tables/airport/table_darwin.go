@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"strings"
 
@@ -131,7 +130,7 @@ func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 			// if there is not value the key will retain the : at the end
 			// so remove it if that is the case
 			key = key[:len(key)-1]
-			result[key] = ""
+			result[key] = nil
 			continue
 		}
 
@@ -155,54 +154,35 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 
-	// use this to store the cells of the header row inclucing whitespaces
-	// we can use the length of these to determine the column widths
-	// we need this so we can handle whitespaces in SSID and Security column
-	var rawHeaders []string
+	var headers []string
+	var headerSeparatorIndexes []int
 	var results []map[string]interface{}
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if len(line) == 0 || strings.Trim(line, " ") == "" {
+		if len(line) == 0 || strings.TrimSpace(line) == "" {
 			continue
 		}
 
-		// first popoulate the headers including spaces
-		// this also determines the column widths
-		if rawHeaders == nil {
-			rawHeaders = rawSpaceSeparatedWords(line)
+		if headerSeparatorIndexes == nil {
+			headerSeparatorIndexes = columnSeparatorIndexes(line)
 
-			if len(rawHeaders) < 2 {
-				continue
+			if len(headerSeparatorIndexes) > 1 {
+				headerSeparatorIndexes[len(headerSeparatorIndexes)-1] = headerSeparatorIndexes[len(headerSeparatorIndexes)-1] + headerSeparatorIndexes[len(headerSeparatorIndexes)-2]
+				headerSeparatorIndexes = headerSeparatorIndexes[:len(headerSeparatorIndexes)-1]
 			}
 
-			// the last header: "SECURITY (auth/unicast/group)" has a space in it, so combine them
-			rawHeaders[len(rawHeaders)-2] = fmt.Sprintf("%s %s", rawHeaders[len(rawHeaders)-2], rawHeaders[len(rawHeaders)-1])
-			rawHeaders = rawHeaders[:len(rawHeaders)-1]
+			headers = trimSpaces(splitAtIndexes(line, headerSeparatorIndexes))
+
 			continue
 		}
 
-		rowData := make(map[string]interface{})
+		rowData := make(map[string]interface{}, len(headers))
+		rowValues := trimSpaces(splitAtIndexes(line, headerSeparatorIndexes))
 
-		startRuneIndex := 0
-		for headerIndex, header := range rawHeaders {
-
-			key := strings.Trim(header, " ")
-
-			endRuneIndex := startRuneIndex + len(header)
-
-			// if last header or runes left are less than what column should be, use remainder of line
-			// for example: WPA(PSK/AES,TKIP/TKIP) RSN(PSK/AES,TKIP/TKIP)
-			if headerIndex == len(rawHeaders)-1 || len(line) < endRuneIndex {
-				rowData[key] = strings.Trim(line[startRuneIndex:], " ")
-				break
-			}
-
-			value := strings.Trim(line[startRuneIndex:endRuneIndex], " ")
-			// trim whitespaces from header value
-			rowData[key] = value
-			startRuneIndex = endRuneIndex + 1
+		for i, v := range rowValues {
+			rowData[headers[i]] = v
 		}
 
 		results = append(results, rowData)
@@ -211,20 +191,26 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 	return results
 }
 
-func rawSpaceSeparatedWords(line string) []string {
-	separatorIndexes := columnSeparatorIndexes(line)
+func trimSpaces(strs []string) []string {
+	var trimmed []string
+	for _, str := range strs {
+		trimmed = append(trimmed, strings.TrimSpace(str))
+	}
+	return trimmed
+}
 
-	var words []string
-	lastSeparatorIndex := 0
+func splitAtIndexes(str string, indexes []int) []string {
+	var result []string
 
-	for _, separatorIndex := range separatorIndexes {
-		words = append(words, line[lastSeparatorIndex:separatorIndex])
-		lastSeparatorIndex = separatorIndex + 1
+	startIndex := 0
+	for _, index := range indexes {
+		result = append(result, str[startIndex:index])
+		startIndex = index
 	}
 
-	words = append(words, line[lastSeparatorIndex:])
+	result = append(result, str[startIndex:])
 
-	return words
+	return result
 }
 
 func columnSeparatorIndexes(line string) []int {
@@ -236,48 +222,22 @@ func columnSeparatorIndexes(line string) []int {
 	the leading spaces that are tricky
 	the first column "SSID" is right aligned
 	then the next column "BSSID" is left aligned
-
-	so to figure out the column separators we:
-	trim the line left and we can compare to the original line length to see how many leading spaces there are,
-	iterate over the runes of the trimmed left string until we hit a space that is not followed by another space,
-	this plus our leading spaces is the index of the column separator of the trimmed left line
-	add that to the last separator index to get the index of the column separator of the original line
-
-	this would not work if we had a left aligned then right aligned colunn like:
-	SSID                  BSSID RSSI CHANNEL ...
-	because we could not know where SSID ends and BSSID begins
-
 	*/
 
 	var indexes []int
+	foundFirstWord := false
 
-	lastSeperatorIndex := 0
+	for i := 0; i < len(line)-1; i++ {
+		if line[i] == ' ' && line[i+1] != ' ' {
 
-	for {
-		trimmedLeft := strings.TrimLeft(line, " ")
-
-		endIndex := indexOfLastSpaceBeforeNonSpace(trimmedLeft)
-		if endIndex == -1 {
-			return indexes
-		}
-
-		leadingSpacesCount := len(line) - len(trimmedLeft)
-
-		separatorIndex := lastSeperatorIndex + leadingSpacesCount + endIndex
-		indexes = append(indexes, separatorIndex)
-
-		lastSeperatorIndex = separatorIndex
-
-		line = trimmedLeft[endIndex:]
-	}
-}
-
-func indexOfLastSpaceBeforeNonSpace(str string) int {
-	for i := 0; i < len(str)-1; i++ {
-		if str[i] == ' ' && str[i+1] != ' ' {
-			return i
+			// due to leading spaces, don't record the index until the second time we meed the condition
+			if !foundFirstWord {
+				foundFirstWord = true
+				continue
+			}
+			indexes = append(indexes, i)
 		}
 	}
 
-	return -1
+	return indexes
 }
