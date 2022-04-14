@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_parseAirportOutput_HappyPath(t *testing.T) {
@@ -52,26 +52,18 @@ func Test_parseAirportOutput_HappyPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			inputFile, err := os.Open(fmt.Sprintf("testdata/%s.input.txt", tt.name))
-			assert.NoError(t, err)
-			defer inputFile.Close()
+			inputBytes, err := os.ReadFile(fmt.Sprintf("testdata/%s.input.txt", tt.name))
+			require.NoError(t, err)
 
-			input, err := ioutil.ReadAll(inputFile)
-			assert.NoError(t, err)
-
-			got, err := processAirportOutput(bytes.NewReader(input), tt.args.option, tt.args.queryContext, log.NewNopLogger())
+			got, err := processAirportOutput(bytes.NewReader(inputBytes), tt.args.option, tt.args.queryContext, log.NewNopLogger())
 			tt.assertion(t, err)
 
-			wantFile, err := os.Open(fmt.Sprintf("testdata/%s.output.json", tt.name))
-			assert.NoError(t, err)
-			defer wantFile.Close()
-
-			wantBytes, err := ioutil.ReadAll(wantFile)
-			assert.NoError(t, err)
+			wantBytes, err := os.ReadFile(fmt.Sprintf("testdata/%s.output.json", tt.name))
+			require.NoError(t, err)
 
 			var want []map[string]string
 			err = json.Unmarshal(wantBytes, &want)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.ElementsMatch(t, want, got)
 		})
@@ -82,10 +74,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		output       io.Reader
+		input        io.Reader
 		option       string
 		queryContext table.QueryContext
-		logger       log.Logger
 	}
 	tests := []struct {
 		name      string
@@ -96,10 +87,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "invalid_option",
 			args: args{
-				output:       strings.NewReader(""),
+				input:        strings.NewReader(""),
 				option:       "invalid_option",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      nil,
 			assertion: assert.Error,
@@ -107,10 +97,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "only_whitespace_scan",
 			args: args{
-				output:       strings.NewReader("   "),
+				input:        strings.NewReader("   "),
 				option:       "scan",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      nil,
 			assertion: assert.NoError,
@@ -118,10 +107,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "short_column_data_scan",
 			args: args{
-				output:       strings.NewReader("column\nrow"),
+				input:        strings.NewReader("column\nrow"),
 				option:       "scan",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      []map[string]string{{"fullkey": "0/column", "key": "column", "option": "scan", "parent": "0", "query": "*", "value": "row"}},
 			assertion: assert.NoError,
@@ -129,10 +117,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "only_column_scan",
 			args: args{
-				output:       strings.NewReader("column1 column2\n"),
+				input:        strings.NewReader("column1 column2\n"),
 				option:       "scan",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      nil,
 			assertion: assert.NoError,
@@ -140,10 +127,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "whitespace_value_scan",
 			args: args{
-				output:       strings.NewReader("key:\n   "),
+				input:        strings.NewReader("key:\n   "),
 				option:       "getinfo",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
 			assertion: assert.NoError,
@@ -151,10 +137,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "only_whitespace_getinfo",
 			args: args{
-				output:       strings.NewReader("   "),
+				input:        strings.NewReader("   "),
 				option:       "getinfo",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      nil,
 			assertion: assert.NoError,
@@ -162,10 +147,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "only_key_getinfo",
 			args: args{
-				output:       strings.NewReader("key: \n"),
+				input:        strings.NewReader("key: \n"),
 				option:       "getinfo",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
 			assertion: assert.NoError,
@@ -173,10 +157,9 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		{
 			name: "whitespace_row_getinfo",
 			args: args{
-				output:       strings.NewReader("key: \n   "),
+				input:        strings.NewReader("key: \n   "),
 				option:       "getinfo",
 				queryContext: table.QueryContext{},
-				logger:       log.NewNopLogger(),
 			},
 			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
 			assertion: assert.NoError,
@@ -187,7 +170,7 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := processAirportOutput(tt.args.output, tt.args.option, tt.args.queryContext, tt.args.logger)
+			got, err := processAirportOutput(tt.args.input, tt.args.option, tt.args.queryContext, log.NewNopLogger())
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
 		})

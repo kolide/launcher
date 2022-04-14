@@ -96,7 +96,7 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 	return results, nil
 }
 
-// unmarshallScanOuput parses the output of the airport scan command
+// unmarshallScanOuput parses the output of the airport getinfo command
 func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 	/* example output:
 
@@ -228,6 +228,27 @@ func rawSpaceSeparatedWords(line string) []string {
 }
 
 func columnSeparatorIndexes(line string) []int {
+
+	/* example header row of airport scan:
+
+	        SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)
+
+	the leading spaces that are tricky
+	the first column "SSID" is right aligned
+	then the next column "BSSID" is left aligned
+
+	so to figure out the column separators we:
+	trim the line left and we can compare to the original line length to see how many leading spaces there are,
+	iterate over the runes of the trimmed left string until we hit a space that is not followed by another space,
+	this plus our leading spaces is the index of the column separator of the trimmed left line
+	add that to the last separator index to get the index of the column separator of the original line
+
+	this would not work if we had a left aligned then right aligned colunn like:
+	SSID                  BSSID RSSI CHANNEL ...
+	because we could not know where SSID ends and BSSID begins
+
+	*/
+
 	var indexes []int
 
 	lastSeperatorIndex := 0
