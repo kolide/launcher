@@ -110,36 +110,23 @@ func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 
-	result := make(map[string]interface{})
+	results := make(map[string]interface{})
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if len(line) == 0 {
+		// since BSSID (a1:a1:a1...) contains ":", we need to split on ": "
+		parts := trimSpaces(strings.Split(line, ": "))
+
+		// if we only have a key, move on
+		if len(parts) < 2 {
 			continue
 		}
 
-		parts := strings.Split(line, ": ")
-		key := strings.TrimSpace(parts[0])
-
-		if key == "" {
-			continue
-		}
-
-		if len(parts) == 1 {
-			// if there is not value the key will retain the : at the end
-			// so remove it if that is the case
-			key = key[:len(key)-1]
-			result[key] = nil
-			continue
-		}
-
-		value := strings.TrimSpace(parts[1])
-
-		result[key] = value
+		results[parts[0]] = parts[1]
 	}
 
-	return result
+	return results
 }
 
 // unmarshallScanOuput parses the output of the airport scan command
@@ -161,10 +148,6 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if len(line) == 0 || strings.TrimSpace(line) == "" {
-			continue
-		}
-
 		if headerSeparatorIndexes == nil {
 			headerSeparatorIndexes = columnSeparatorIndexes(line)
 
@@ -173,30 +156,26 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 				headerSeparatorIndexes = headerSeparatorIndexes[:len(headerSeparatorIndexes)-1]
 			}
 
-			headers = trimSpaces(splitAtIndexes(line, headerSeparatorIndexes))
+			headers = splitAtIndexes(line, headerSeparatorIndexes)
 
 			continue
 		}
 
 		rowData := make(map[string]interface{}, len(headers))
-		rowValues := trimSpaces(splitAtIndexes(line, headerSeparatorIndexes))
 
-		for i, v := range rowValues {
-			rowData[headers[i]] = v
+		for i, value := range splitAtIndexes(line, headerSeparatorIndexes) {
+
+			if i >= len(headers) {
+				break
+			}
+
+			rowData[headers[i]] = value
 		}
 
 		results = append(results, rowData)
 	}
 
 	return results
-}
-
-func trimSpaces(strs []string) []string {
-	var trimmed []string
-	for _, str := range strs {
-		trimmed = append(trimmed, strings.TrimSpace(str))
-	}
-	return trimmed
 }
 
 func splitAtIndexes(str string, indexes []int) []string {
@@ -210,7 +189,15 @@ func splitAtIndexes(str string, indexes []int) []string {
 
 	result = append(result, str[startIndex:])
 
-	return result
+	return trimSpaces(result)
+}
+
+func trimSpaces(strs []string) []string {
+	var trimmed []string
+	for _, str := range strs {
+		trimmed = append(trimmed, strings.TrimSpace(str))
+	}
+	return trimmed
 }
 
 func columnSeparatorIndexes(line string) []int {
