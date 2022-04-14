@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQueries(t *testing.T) { //nolint:paralleltest
+func TestQueries(t *testing.T) {
 	t.Parallel()
 
 	wmiTable := Table{logger: log.NewNopLogger()}
@@ -110,9 +110,9 @@ func TestQueries(t *testing.T) { //nolint:paralleltest
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
 			// making this parallel causing the unit test to occasionally fail
 
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
