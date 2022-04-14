@@ -91,7 +91,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
-				runUpdaterRetryInterval: 10 * time.Millisecond,
+				runUpdaterRetryInterval: 1 * time.Second,
 			},
 			updaterRunReturns: []func(opts ...tuf.Option) (stop func(), err error){
 				func(opts ...tuf.Option) (stop func(), err error) {
