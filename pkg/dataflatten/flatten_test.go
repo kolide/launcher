@@ -7,7 +7,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -375,53 +374,46 @@ func testFlattenCase(t *testing.T, tt flattenTestCase, actual []Row, actualErr e
 func TestFlattenSliceOfMaps(t *testing.T) {
 	t.Parallel()
 
-	type args struct {
-		data interface{}
-		opts []FlattenOpts
-	}
 	tests := []struct {
-		name      string
-		args      args
-		want      []Row
-		assertion assert.ErrorAssertionFunc
+		name    string
+		in      interface{}
+		opts    []FlattenOpts
+		out     []Row
+		wantErr bool
 	}{
 		{
 			name: "single",
-			args: args{
-				data: []map[string]interface{}{
-					{
-						"id": "a",
-						"v":  1,
-					},
+			in: []map[string]interface{}{
+				{
+					"id": "a",
+					"v":  1,
 				},
-				opts: []FlattenOpts{},
 			},
-			want: []Row{
+			opts: []FlattenOpts{},
+			out: []Row{
 				{Path: []string{"0", "id"}, Value: "a"},
 				{Path: []string{"0", "v"}, Value: "1"},
 			},
-			assertion: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "multiple",
-			args: args{
-				data: []map[string]interface{}{
-					{
-						"id": "a",
-						"v":  1,
-					},
-					{
-						"id": "b",
-						"v":  2,
-					},
-					{
-						"id": "c",
-						"v":  3,
-					},
+			in: []map[string]interface{}{
+				{
+					"id": "a",
+					"v":  1,
 				},
-				opts: []FlattenOpts{},
+				{
+					"id": "b",
+					"v":  2,
+				},
+				{
+					"id": "c",
+					"v":  3,
+				},
 			},
-			want: []Row{
+			opts: []FlattenOpts{},
+			out: []Row{
 				{Path: []string{"0", "id"}, Value: "a"},
 				{Path: []string{"0", "v"}, Value: "1"},
 				{Path: []string{"1", "id"}, Value: "b"},
@@ -429,20 +421,18 @@ func TestFlattenSliceOfMaps(t *testing.T) {
 				{Path: []string{"2", "id"}, Value: "c"},
 				{Path: []string{"2", "v"}, Value: "3"},
 			},
-			assertion: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "error",
-			args: args{
-				data: []map[string]interface{}{
-					{
-						"id": []string{"this should cause an error"},
-					},
+			in: []map[string]interface{}{
+				{
+					"id": []string{"this should cause an error"},
 				},
-				opts: []FlattenOpts{},
 			},
-			want:      nil,
-			assertion: assert.Error,
+			opts:    []FlattenOpts{},
+			out:     nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -450,9 +440,15 @@ func TestFlattenSliceOfMaps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := Flatten(tt.args.data, tt.args.opts...)
-			tt.assertion(t, err)
-			assert.ElementsMatch(t, tt.want, got)
+			got, err := Flatten(tt.in, tt.opts...)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.ElementsMatch(t, tt.out, got)
 		})
 	}
 }
