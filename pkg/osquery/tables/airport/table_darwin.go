@@ -51,27 +51,30 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return nil, errors.Errorf("The %s table requires that you specify a constraint for option", t.name)
 	}
 
-	if len(options) > 1 {
-		return nil, errors.Errorf("The %s table only supports one constraint for option", t.name)
+	var results []map[string]string
+	for _, option := range options {
+		airportOutput, err := tablehelpers.Exec(ctx, t.logger, 30, airportPaths, []string{"--" + option})
+		if err != nil {
+			level.Debug(t.logger).Log("msg", "Error execing airport", "option", option, "err", err)
+			return nil, err
+		}
+
+		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, t.logger)
+		if err != nil {
+			level.Debug(t.logger).Log("msg", "Error processing airport output", "option", option, "err", err)
+			return nil, err
+		}
+		results = append(results, optionResult...)
 	}
 
-	option := options[0]
-
-	airportOutput, err := tablehelpers.Exec(ctx, t.logger, 30, airportPaths, []string{"--" + option})
-	if err != nil {
-		level.Debug(t.logger).Log("msg", "Error execing airport", "option", option, "err", err)
-		return nil, err
-	}
-
-	outputReader := bytes.NewReader(airportOutput)
-
-	return processAirportOutput(outputReader, option, queryContext, t.logger)
+	return results, nil
 }
 
 func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
 	var results []map[string]string
 
 	var unmarshalledOutput []map[string]interface{}
+
 	rowData := map[string]string{"option": option}
 
 	switch option {
