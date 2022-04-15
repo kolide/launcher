@@ -30,38 +30,68 @@ type Table struct {
 	logger log.Logger
 }
 
+const tableName = "kolide_airport_util"
+
 func TablePlugin(_ *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("option"),
 	)
 
 	t := &Table{
-		name:   "kolide_airport_util",
+		name:   tableName,
 		logger: logger,
 	}
 
 	return table.NewPlugin(t.name, columns, t.generate)
 }
 
+type airportExecutor struct {
+	ctx    context.Context
+	logger log.Logger
+	paths  []string
+}
+
+func (a *airportExecutor) Exec(option string) ([]byte, error) {
+	result, err := tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option})
+	if err != nil {
+		level.Debug(a.logger).Log("msg", "Error execing airport", "option", option, "err", err)
+		return nil, err
+	}
+	return result, nil
+}
+
+type executor interface {
+	Exec(string) ([]byte, error)
+}
+
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 
+	airportExecutor := &airportExecutor{
+		ctx:    ctx,
+		logger: t.logger,
+		paths:  airportPaths,
+	}
+
+	return generateAirportData(queryContext, airportExecutor, t.logger)
+}
+
+func generateAirportData(queryContext table.QueryContext, airportExecutor executor, logger log.Logger) ([]map[string]string, error) {
 	options := tablehelpers.GetConstraints(queryContext, "option", tablehelpers.WithAllowedValues(allowedOptions))
 
 	if len(options) == 0 {
-		return nil, errors.Errorf("The %s table requires that you specify a constraint for option", t.name)
+		return nil, errors.Errorf("The %s table requires that you specify a constraint for option", tableName)
 	}
 
 	var results []map[string]string
 	for _, option := range options {
-		airportOutput, err := tablehelpers.Exec(ctx, t.logger, 30, airportPaths, []string{"--" + option})
+		airportOutput, err := airportExecutor.Exec(option)
 		if err != nil {
-			level.Debug(t.logger).Log("msg", "Error execing airport", "option", option, "err", err)
 			return nil, err
 		}
 
-		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, t.logger)
+		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, logger)
 		if err != nil {
-			level.Debug(t.logger).Log("msg", "Error processing airport output", "option", option, "err", err)
+			level.Debug(logger).Log("msg", "Error processing airport output", "option", option, "err", err)
 			return nil, err
 		}
 		results = append(results, optionResult...)

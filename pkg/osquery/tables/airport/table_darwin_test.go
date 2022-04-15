@@ -4,61 +4,129 @@
 package airport
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/osquery/tables/airport/mocks"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_parseAirportOutput_HappyPath(t *testing.T) {
+func Test_generateAirportData_HappyPath(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		option       string
 		queryContext table.QueryContext
 	}
 	tests := []struct {
-		name      string
-		args      args
-		assertion assert.ErrorAssertionFunc
+		name             string
+		args             args
+		execOptionInputs []string
+		inputFiles       []string
+		outputFile       string
+		assertion        assert.ErrorAssertionFunc
 	}{
 		{
 			name: "scan",
 			args: args{
-				option:       "scan",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "scan"}}},
+					},
+				},
 			},
-			assertion: assert.NoError,
+			execOptionInputs: []string{"scan"},
+			inputFiles:       []string{"testdata/scan.input.txt"},
+			outputFile:       "testdata/scan.output.json",
+		},
+		{
+			name: "scan_with_query",
+			args: args{
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "scan"}}},
+						"query":  {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "/SSID"}}},
+					},
+				},
+			},
+			execOptionInputs: []string{"scan"},
+			inputFiles:       []string{"testdata/scan.input.txt"},
+			outputFile:       "testdata/scan_with_query.output.json",
 		},
 		{
 			name: "getinfo",
 			args: args{
-				option:       "getinfo",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "getinfo"}}},
+					},
+				},
 			},
-			assertion: assert.NoError,
+			execOptionInputs: []string{"getinfo"},
+			inputFiles:       []string{"testdata/getinfo.input.txt"},
+			outputFile:       "testdata/getinfo.output.json",
+		},
+		{
+			name: "getinfo_and_scan",
+			args: args{
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{
+							{Operator: table.OperatorEquals, Expression: "getinfo"},
+							{Operator: table.OperatorEquals, Expression: "scan"},
+						}},
+					},
+				},
+			},
+			execOptionInputs: []string{"getinfo", "scan"},
+			inputFiles:       []string{"testdata/getinfo.input.txt", "testdata/scan.input.txt"},
+			outputFile:       "testdata/getinfo_and_scan.output.json",
+		},
+		{
+			name: "getinfo_and_scan_with_query",
+			args: args{
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{
+							{Operator: table.OperatorEquals, Expression: "getinfo"},
+							{Operator: table.OperatorEquals, Expression: "scan"},
+						}},
+						"query": {Affinity: "TEXT", Constraints: []table.Constraint{
+							{Operator: table.OperatorEquals, Expression: "/SSID"},
+						}},
+					},
+				},
+			},
+			execOptionInputs: []string{"getinfo", "scan"},
+			inputFiles:       []string{"testdata/getinfo.input.txt", "testdata/scan.input.txt"},
+			outputFile:       "testdata/getinfo_and_scan_with_query.output.json",
 		},
 	}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			inputBytes, err := os.ReadFile(fmt.Sprintf("testdata/%s.input.txt", tt.name))
+			executor := &mocks.Executor{}
+
+			for index, inputFile := range tt.inputFiles {
+				inputBytes, err := os.ReadFile(inputFile)
+				require.NoError(t, err)
+				executor.On("Exec", tt.execOptionInputs[index]).Return(inputBytes, nil).Once()
+			}
+
+			got, err := generateAirportData(tt.args.queryContext, executor, log.NewNopLogger())
 			require.NoError(t, err)
 
-			got, err := processAirportOutput(bytes.NewReader(inputBytes), tt.args.option, tt.args.queryContext, log.NewNopLogger())
-			tt.assertion(t, err)
+			executor.AssertExpectations(t)
 
-			wantBytes, err := os.ReadFile(fmt.Sprintf("testdata/%s.output.json", tt.name))
+			wantBytes, err := os.ReadFile(tt.outputFile)
 			require.NoError(t, err)
 
 			var want []map[string]string
@@ -70,99 +138,96 @@ func Test_parseAirportOutput_HappyPath(t *testing.T) {
 	}
 }
 
-func Test_parseAirportOutput_EdgeCases(t *testing.T) {
+func Test_generateAirportData_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		input        io.Reader
-		option       string
 		queryContext table.QueryContext
 	}
 	tests := []struct {
-		name      string
-		args      args
-		want      []map[string]string
-		assertion assert.ErrorAssertionFunc
+		name       string
+		args       args
+		execReturn func() ([]byte, error)
+		want       []map[string]string
+		assertion  assert.ErrorAssertionFunc
 	}{
 		{
-			name: "invalid_option",
+			name: "exec_error",
 			args: args{
-				input:        strings.NewReader(""),
-				option:       "invalid_option",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "getinfo"}}},
+					},
+				},
 			},
-			want:      nil,
+			execReturn: func() ([]byte, error) {
+				return nil, errors.New("exec error")
+			},
 			assertion: assert.Error,
 		},
 		{
-			name: "only_whitespace_scan",
+			name: "no_data",
 			args: args{
-				input:        strings.NewReader("   "),
-				option:       "scan",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "getinfo"}}},
+					},
+				},
 			},
-			want:      nil,
+			execReturn: func() ([]byte, error) {
+				return nil, nil
+			},
 			assertion: assert.NoError,
 		},
 		{
-			name: "short_column_data_scan",
+			name: "blank_data",
 			args: args{
-				input:        strings.NewReader("column\nrow"),
-				option:       "scan",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "getinfo"}}},
+					},
+				},
 			},
-			want:      []map[string]string(nil),
+			execReturn: func() ([]byte, error) {
+				return []byte("   "), nil
+			},
 			assertion: assert.NoError,
 		},
 		{
-			name: "only_column_scan",
+			name: "partial_data",
 			args: args{
-				input:        strings.NewReader("column1 column2\n"),
-				option:       "scan",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "getinfo"}}},
+					},
+				},
 			},
-			want:      nil,
+			execReturn: func() ([]byte, error) {
+				return []byte("some data:"), nil
+			},
 			assertion: assert.NoError,
 		},
 		{
-			name: "whitespace_value_scan",
+			name: "unsupported_option",
 			args: args{
-				input:        strings.NewReader("key:\n   "),
-				option:       "getinfo",
-				queryContext: table.QueryContext{},
+				queryContext: table.QueryContext{
+					Constraints: map[string]table.ConstraintList{
+						"option": {Affinity: "TEXT", Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "unsupported"}}},
+					},
+				},
 			},
-			want:      []map[string]string(nil),
-			assertion: assert.NoError,
+			execReturn: func() ([]byte, error) {
+				return nil, nil
+			},
+			assertion: assert.Error,
 		},
 		{
-			name: "only_whitespace_getinfo",
-			args: args{
-				input:        strings.NewReader("   "),
-				option:       "getinfo",
-				queryContext: table.QueryContext{},
+			name: "no_options",
+			args: args{},
+			execReturn: func() ([]byte, error) {
+				return nil, nil
 			},
-			want:      nil,
-			assertion: assert.NoError,
-		},
-		{
-			name: "only_key_getinfo",
-			args: args{
-				input:        strings.NewReader("key: \n"),
-				option:       "getinfo",
-				queryContext: table.QueryContext{},
-			},
-			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
-			assertion: assert.NoError,
-		},
-		{
-			name: "whitespace_row_getinfo",
-			args: args{
-				input:        strings.NewReader("key: \n   "),
-				option:       "getinfo",
-				queryContext: table.QueryContext{},
-			},
-			want:      []map[string]string{{"fullkey": "0/key", "key": "key", "option": "getinfo", "parent": "0", "query": "*", "value": ""}},
-			assertion: assert.NoError,
+			assertion: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -170,7 +235,11 @@ func Test_parseAirportOutput_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := processAirportOutput(tt.args.input, tt.args.option, tt.args.queryContext, log.NewNopLogger())
+			executor := &mocks.Executor{}
+
+			executor.On("Exec", mock.Anything).Return(tt.execReturn()).Once()
+
+			got, err := generateAirportData(tt.args.queryContext, executor, log.NewNopLogger())
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
 		})
