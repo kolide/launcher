@@ -143,7 +143,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 
 					// Did we timeout? If so, send the error from the healthcheck
 					if limiter.Wait(deadlineCtx) != nil {
-						level.Debug(logger).Log("msg", "Exiting because runner not healthy")
+						level.Debug(logger).Log("msg", "Exiting because runner not healthy", "err", err)
 						return errors.Wrapf(runnerErr, "timeout waiting for runner to be healthy")
 					}
 				}
