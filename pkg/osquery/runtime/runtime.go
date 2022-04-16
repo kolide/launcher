@@ -803,11 +803,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
-	if err != nil {
-		return errors.Wrap(err, "could not create an extension client")
-	}
-
 	if err := o.stats.Connected(o); err != nil {
 		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 	}
@@ -816,9 +811,14 @@ func (r *Runner) launchOsqueryInstance() error {
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
 	}
-	o.extensionManagerServer.RegisterPlugin(plugins...)
+	o.extensionManagerServer.RegisterPlugin(plugins...)	
+	
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return errors.Wrap(err, "could not create an extension client")
+	}
 
-	// Launch the extension manager server asynchronously.
+	// Launch the extension manager server asynchronously. Because this is async...
 	o.errgroup.Go(func() error {
 		// We see the extension manager being slow to start. Implement a simple re-try routine
 		backoff := backoff.New()
@@ -931,9 +931,9 @@ func (o *OsqueryInstance) Healthy() error {
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
-	resp, err := o.extensionManagerClient.QueryContext(context.Background(), query)
+	
+	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
-		// seph here.
 		return nil, errors.Wrap(err, "could not query the extension manager client")
 	}
 	if resp.Status.Code != int32(0) {

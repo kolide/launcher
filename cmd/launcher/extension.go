@@ -7,7 +7,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
+		"golang.org/x/time/rate"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -25,6 +27,12 @@ import (
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
+)
+
+
+const (
+	runnerStartTimeout = 5 * time.Minute // Total time to wait opening the osquery socket
+	runnerStartInterval = 20 * time.Second // how long to wait between attempts to open osquery socket
 )
 
 // TODO: the extension, runtime, and client are all kind of entangled
@@ -117,6 +125,30 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 				if err := runner.Start(); err != nil {
 					return errors.Wrap(err, "launching osquery instance")
 				}
+
+				// Because the runner starts a bunch
+				// of async threads, we need to make
+				// sure it's healthy before we
+				// continue with startup.
+				deadlineCtx, cancel := context.WithTimeout(context.Background(), runnerStartTimeout)
+				defer cancel()
+				limiter := rate.NewLimiter(rate.Every(runnerStartInterval), 1)
+				for {
+					level.Debug(logger).Log("msg", "Health checks on runner")
+
+					runnerErr := runner.Healthy()
+					
+					if runnerErr == nil {
+						break
+					}
+
+					// Did we timeout? If so, send the error from the healthcheck
+					if limiter.Wait(deadlineCtx) != nil {
+						level.Debug(logger).Log("msg", "Exiting because runner not healthy")
+						return errors.Wrapf(runnerErr, "timeout waiting for runner to be healthy")
+					}
+				}
+				level.Debug(logger).Log("msg", "Runner healthy. Moving on")
 
 				// The runner allows querying the osqueryd instance from the extension.
 				// Used by the Enroll method below to get initial enrollment details.
