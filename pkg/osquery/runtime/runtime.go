@@ -818,7 +818,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
-	// Launch the extension manager server asynchronously. Because this is async...
+	// Launch the extension manager server asynchronously. Note
+	// that this is async, which can cause subtle ordering issues
+	// FIXME: before merge -- does this need to lock the thrift socket
 	o.errgroup.Go(func() error {
 		// We see the extension manager being slow to start. Implement a simple re-try routine
 		backoff := backoff.New()
