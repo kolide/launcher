@@ -807,6 +807,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
+		// seph, here.
 		return details, errors.Wrap(err, "query enrollment details")
 	}
 

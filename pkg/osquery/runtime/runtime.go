@@ -469,12 +469,10 @@ func (r *Runner) Healthy() error {
 	return r.instance.Healthy()
 }
 
-// How long to wait before erroring because we cannot open the osquery
-// extension socket.
-const socketOpenTimeout = 10 * time.Second
-
-// How often to try to open the osquery extension socket
-const socketOpenInterval = 200 * time.Millisecond
+const (
+	socketOpenTimeout = 5 * time.Minute // Total time to wait opening the osquery socket
+	socketOpenInterval = 10 * time.Second // how long to wait between attempts to open osquery socket
+)
 
 // LaunchInstance will launch an instance of osqueryd via a very configurable
 // API as defined by the various OsqueryInstanceOption functional options. The
@@ -790,7 +788,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
 			"kolide",
 			paths.extensionSocketPath,
-			osquery.ServerTimeout(2*time.Second),
+			osquery.ServerTimeout(30*time.Second),
 		)
 		if err == nil {
 			break
@@ -933,8 +931,9 @@ func (o *OsqueryInstance) Healthy() error {
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
-	resp, err := o.extensionManagerClient.Query(query)
+	resp, err := o.extensionManagerClient.QueryContext(context.Background(), query)
 	if err != nil {
+		// seph here.
 		return nil, errors.Wrap(err, "could not query the extension manager client")
 	}
 	if resp.Status.Code != int32(0) {
