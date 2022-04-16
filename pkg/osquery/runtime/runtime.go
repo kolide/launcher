@@ -470,7 +470,7 @@ func (r *Runner) Healthy() error {
 }
 
 const (
-	socketOpenTimeout = 5 * time.Minute // Total time to wait opening the osquery socket
+	socketOpenTimeout  = 5 * time.Minute  // Total time to wait opening the osquery socket
 	socketOpenInterval = 10 * time.Second // how long to wait between attempts to open osquery socket
 )
 
@@ -811,8 +811,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
 	}
-	o.extensionManagerServer.RegisterPlugin(plugins...)	
-	
+	o.extensionManagerServer.RegisterPlugin(plugins...)
+
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
@@ -931,7 +931,7 @@ func (o *OsqueryInstance) Healthy() error {
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
-	
+
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not query the extension manager client")

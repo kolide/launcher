@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-		"golang.org/x/time/rate"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
@@ -27,11 +26,11 @@ import (
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
+	"golang.org/x/time/rate"
 )
 
-
 const (
-	runnerStartTimeout = 5 * time.Minute // Total time to wait opening the osquery socket
+	runnerStartTimeout  = 5 * time.Minute  // Total time to wait opening the osquery socket
 	runnerStartInterval = 20 * time.Second // how long to wait between attempts to open osquery socket
 )
 
@@ -137,7 +136,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 					level.Debug(logger).Log("msg", "Health checks on runner")
 
 					runnerErr := runner.Healthy()
-					
+
 					if runnerErr == nil {
 						break
 					}
