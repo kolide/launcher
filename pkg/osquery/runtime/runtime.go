@@ -803,17 +803,21 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
-	plugins := o.opts.extensionPlugins
-	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
-		plugins = append(plugins, t)
-	}
-	o.extensionManagerServer.RegisterPlugin(plugins...)
-
+	// Various followup things use the client for queries, so register it first
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
+	plugins := o.opts.extensionPlugins
+	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
+		plugins = append(plugins, t)
+	}
+
+	// As several plugins require the client query interface, it needs to be registered first
+	o.extensionManagerServer.RegisterPlugin(plugins...)
+
+	// getting stats requires the Client already be instantiated
 	if err := o.stats.Connected(o); err != nil {
 		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 	}
