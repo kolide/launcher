@@ -803,10 +803,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
-	if err := o.stats.Connected(o); err != nil {
-		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
-	}
-
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
@@ -816,6 +812,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
 		return errors.Wrap(err, "could not create an extension client")
+	}
+
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 	}
 
 	// Launch the extension manager server asynchronously. Note
