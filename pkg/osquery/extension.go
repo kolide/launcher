@@ -296,7 +296,7 @@ func isNodeInvalidErr(err error) bool {
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	level.Debug(e.logger).Log("msg", "Beginning enrollment")
-	
+
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {

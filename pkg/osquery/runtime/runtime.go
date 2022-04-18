@@ -75,17 +75,17 @@ type OsqueryInstance struct {
 	logger log.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
-	errgroup               *errgroup.Group
-	doneCtx                context.Context
-	cancel                 context.CancelFunc
-	cmd                    *exec.Cmd
+	errgroup                *errgroup.Group
+	doneCtx                 context.Context
+	cancel                  context.CancelFunc
+	cmd                     *exec.Cmd
 	extensionManagerServers []*osquery.ExtensionManagerServer
-	extensionManagerClient *osquery.ExtensionManagerClient
-	clientLock             sync.Mutex
-	paths                  *osqueryFilePaths
-	rmRootDirectory        func()
-	usingTempDir           bool
-	stats                  *history.Instance
+	extensionManagerClient  *osquery.ExtensionManagerClient
+	clientLock              sync.Mutex
+	paths                   *osqueryFilePaths
+	rmRootDirectory         func()
+	usingTempDir            bool
+	stats                   *history.Instance
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -470,12 +470,10 @@ func (r *Runner) Healthy() error {
 
 // timeout and interval values for the various limiters
 const (
-	healthyInterval     = 5 * time.Second
-	healthyTimeout      = 5 * time.Minute // Should be longer than any query that might be running
-	serverStartInterval = 10 * time.Second
-	serverStartTimeout  = 5 * time.Minute
-	socketOpenInterval  = 10 * time.Second
-	socketOpenTimeout   = 5 * time.Minute
+	healthyInterval    = 5 * time.Second
+	healthyTimeout     = 5 * time.Minute // Should be longer than any query that might be running
+	socketOpenInterval = 10 * time.Second
+	socketOpenTimeout  = 5 * time.Minute
 )
 
 // LaunchInstance will launch an instance of osqueryd via a very configurable
@@ -794,7 +792,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// enrollment. *But* there's been a lot of racy behaviors,
 	// likely due to time spent registering tables, and subtle
 	// ordering issues.
-	
+
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc
 	if len(o.opts.extensionPlugins) > 0 {
@@ -805,7 +803,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 	}
 
-	
 	// Now spawn an extension manage to for the tables. We need to
 	// start this one in the background, because the runner.Start
 	// function needs to return promptly enough for osquery to use
@@ -819,21 +816,19 @@ func (r *Runner) launchOsqueryInstance() error {
 			plugins = append(plugins, t)
 		}
 
-		if err := r.startOsqueryExtensionManagerServer(		"kolide",		paths.extensionSocketPath,		plugins	); err != nil {
+		if err := r.startOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, plugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create tables extension server. Stopping", "err", err)
 			return errors.Wrap(err, "could not create a table extension server")
 		}
 		return nil
 	})
 
-	
 	// getting stats requires the Client already be instantiated
 	go func() {
 		if err := o.stats.Connected(o); err != nil {
 			level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
 		}
 	}()
-		
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
@@ -865,7 +860,7 @@ func (r *Runner) launchOsqueryInstance() error {
 }
 
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
-// an osquery.NewExtensionManagerServer for them, and then starts it. 
+// an osquery.NewExtensionManagerServer for them, and then starts it.
 func (r *Runner) startOsqueryExtensionManagerServer(name string, socketPath string, plugins []osquery.OsqueryPlugin) error {
 	o := r.instance
 
@@ -888,7 +883,7 @@ func (r *Runner) startOsqueryExtensionManagerServer(name string, socketPath stri
 	}
 
 	extensionManagerServer.RegisterPlugin(plugins...)
-	
+
 	o.extensionManagerServers = append(o.extensionManagerServers, extensionManagerServer)
 
 	// Start!
@@ -899,7 +894,6 @@ func (r *Runner) startOsqueryExtensionManagerServer(name string, socketPath stri
 		}
 		return errors.New("extension manager server exited")
 	})
-
 
 	// register a shutdown routine
 	o.errgroup.Go(func() error {
@@ -927,7 +921,7 @@ func (o *OsqueryInstance) Healthy() error {
 		return errors.New("instance not started")
 	}
 
-	for _, srv := range( o.extensionManagerServers) {
+	for _, srv := range o.extensionManagerServers {
 		serverStatus, err := srv.Ping(context.TODO())
 		if err != nil {
 			return errors.Wrap(err, "could not ping extension server")
