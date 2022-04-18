@@ -470,8 +470,8 @@ func (r *Runner) Healthy() error {
 
 // timeout and interval values for the various limiters
 const (
-	healthyInterval     = 1 * time.Second
-	healthyTimeout      = 30 * time.Second
+	healthyInterval     = 5 * time.Second
+	healthyTimeout      = 5 * time.Minute // Should be longer than any query that might be running
 	serverStartInterval = 10 * time.Second
 	serverStartTimeout  = 5 * time.Minute
 	socketOpenInterval  = 10 * time.Second
