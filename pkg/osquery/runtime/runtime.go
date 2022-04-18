@@ -22,7 +22,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
 
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -473,7 +472,7 @@ func (r *Runner) Healthy() error {
 const (
 	healthyInterval     = 1 * time.Second
 	healthyTimeout      = 30 * time.Second
-	serverStartInterval = 30 * time.Second
+	serverStartInterval = 10 * time.Second
 	serverStartTimeout  = 5 * time.Minute
 	socketOpenInterval  = 10 * time.Second
 	socketOpenTimeout   = 5 * time.Minute
@@ -782,28 +781,19 @@ func (r *Runner) launchOsqueryInstance() error {
 	// when osquery will have the extension socket open. Because of this,
 	// we want to try opening the socket until we are successful (with a
 	// timeout if something goes wrong).
-	deadlineCtx, cancel := context.WithTimeout(context.Background(), socketOpenTimeout)
-	defer cancel()
-	limiter := rate.NewLimiter(rate.Every(socketOpenInterval), 1)
-	for {
-		level.Debug(o.logger).Log("msg", "Starting server connection attempts to osquery")
-
+	//
+	// It would make sense to put a Healthy() check, but that
+	// doesn't work -- because osquery is looking for
+	// `kolide_grpc` for varius config/logging/etc plugins.
+	level.Debug(o.logger).Log("msg", "Starting server connection attempts to osquery")
+	WaitFor(func() error {
 		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
 			"kolide",
 			paths.extensionSocketPath,
 			osquery.ServerTimeout(30*time.Second),
 		)
-		if err == nil {
-			break
-		}
-
-		if limiter.Wait(deadlineCtx) != nil {
-			// This means that our timeout expired. Return the
-			// error from creating the server, not the error from
-			// the timeout expiration.
-			return errors.Wrapf(err, "could not create extension manager server at %s", paths.extensionSocketPath)
-		}
-	}
+		return err
+	}, socketOpenTimeout, socketOpenInterval)
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
 	// Various followup things use the client for queries, so register it first
@@ -813,33 +803,34 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
+	// Register plugins/tables. There's a lurking gotcha here --
+	// when using grpc, osquery startup is (somewhat) blocked on
+	// the `kolide_grpc` plugin being registered. But, if we have
+	// enough tables, the act of registering them all slows down
+	// startup. Perhaps future work could be using two
+	// extensionManagerServer, or dropping grpc
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
 	}
-
-	// As several plugins require the client query interface, it needs to be registered first
-	level.Debug(o.logger).Log("msg", "Starting to register plugins")
 	o.extensionManagerServer.RegisterPlugin(plugins...)
-	level.Debug(o.logger).Log("msg", "Finished to registering plugins")
-
-	// getting stats requires the Client already be instantiated
-	if err := o.stats.Connected(o); err != nil {
-		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
-	}
 
 	// Launch the extension manager server asynchronously. Note
 	// that this is async, which can cause subtle ordering
-	// issues. (This doesn't need a mutex, and it's on the server
+	// issues. (This doesn't need a mutex, it's on the server
 	// side, and osquery-go handles that)
 	o.errgroup.Go(func() error {
+		level.Debug(o.logger).Log("msg", "Starting extension manager server")
+
 		if err := WaitFor(o.extensionManagerServer.Start, serverStartTimeout, serverStartInterval); err != nil {
+			level.Info(o.logger).Log("msg", "Extension manager server startup got error", "err", err)
 			return errors.Wrap(err, "running extension server")
 		}
 		return errors.New("extension manager server exited")
 	})
 
-	// Cleanup extension manager server on shutdown
+	// Cleanup extension manager server on shutdown. This pairs
+	// with the o.extensionManagerServer.Start above
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
 		level.Debug(o.logger).Log("msg", "Starting extension shutdown")
@@ -851,6 +842,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return o.doneCtx.Err()
 	})
+
+	// getting stats requires the Client already be instantiated
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
+	}
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
