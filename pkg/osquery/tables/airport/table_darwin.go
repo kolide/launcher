@@ -52,12 +52,7 @@ type airportExecutor struct {
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
-	result, err := tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option})
-	if err != nil {
-		level.Debug(a.logger).Log("msg", "Error execing airport", "option", option, "err", err)
-		return nil, err
-	}
-	return result, nil
+	return tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option})
 }
 
 type executor interface {
@@ -86,7 +81,8 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 	for _, option := range options {
 		airportOutput, err := airportExecutor.Exec(option)
 		if err != nil {
-			return nil, err
+			level.Debug(logger).Log("msg", "Error execing airport", "option", option, "err", err)
+			continue
 		}
 
 		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, logger)
