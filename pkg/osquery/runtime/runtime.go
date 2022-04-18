@@ -25,7 +25,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/table"
 
@@ -466,12 +465,18 @@ func (r *Runner) Restart() error {
 func (r *Runner) Healthy() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
+
 	return r.instance.Healthy()
 }
 
+// timeout and interval values for the various limiters
 const (
-	socketOpenTimeout  = 5 * time.Minute  // Total time to wait opening the osquery socket
-	socketOpenInterval = 10 * time.Second // how long to wait between attempts to open osquery socket
+	healthyInterval     = 1 * time.Second
+	healthyTimeout      = 30 * time.Second
+	serverStartInterval = 30 * time.Second
+	serverStartTimeout  = 5 * time.Minute
+	socketOpenInterval  = 10 * time.Second
+	socketOpenTimeout   = 5 * time.Minute
 )
 
 // LaunchInstance will launch an instance of osqueryd via a very configurable
@@ -783,8 +788,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	for {
 		level.Debug(o.logger).Log("msg", "Starting server connection attempts to osquery")
 
-		// Create the extension server and register all custom osquery
-		// plugins
 		o.extensionManagerServer, err = osquery.NewExtensionManagerServer(
 			"kolide",
 			paths.extensionSocketPath,
@@ -804,8 +807,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
 	// Various followup things use the client for queries, so register it first
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 30*time.Second)
 	if err != nil {
+		level.Info(o.logger).Log("msg", "Unable to create extension client. Stopping", "err", err)
 		return errors.Wrap(err, "could not create an extension client")
 	}
 
@@ -815,7 +819,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// As several plugins require the client query interface, it needs to be registered first
+	level.Debug(o.logger).Log("msg", "Starting to register plugins")
 	o.extensionManagerServer.RegisterPlugin(plugins...)
+	level.Debug(o.logger).Log("msg", "Finished to registering plugins")
 
 	// getting stats requires the Client already be instantiated
 	if err := o.stats.Connected(o); err != nil {
@@ -823,12 +829,11 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// Launch the extension manager server asynchronously. Note
-	// that this is async, which can cause subtle ordering issues
-	// FIXME: before merge -- does this need to lock the thrift socket
+	// that this is async, which can cause subtle ordering
+	// issues. (This doesn't need a mutex, and it's on the server
+	// side, and osquery-go handles that)
 	o.errgroup.Go(func() error {
-		// We see the extension manager being slow to start. Implement a simple re-try routine
-		backoff := backoff.New()
-		if err := backoff.Run(o.extensionManagerServer.Start); err != nil {
+		if err := WaitFor(o.extensionManagerServer.Start, serverStartTimeout, serverStartInterval); err != nil {
 			return errors.Wrap(err, "running extension server")
 		}
 		return errors.New("extension manager server exited")
@@ -856,31 +861,9 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
 			case <-ticker.C:
-				// Health check! Allow a couple
-				// failures before we tear everything
-				// down. This is pretty simple, it
-				// hardcodes the timing. Might be
-				// better for a Limiter
-				maxHealthChecks := 5
-				for i := 1; i <= maxHealthChecks; i++ {
-					if err := o.Healthy(); err != nil {
-						if i == maxHealthChecks {
-							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
-							return errors.Wrap(err, "health check failed")
-						}
-
-						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
-						time.Sleep(1 * time.Second)
-
-					} else {
-						// err was nil, clear failed
-						if i > 1 {
-							level.Debug(o.logger).Log("msg", "Health check passed. Clearing error", "attempt", i)
-						}
-
-						break
-					}
-
+				if err := WaitFor(o.Healthy, healthyTimeout, healthyInterval); err != nil {
+					level.Info(o.logger).Log("msg", "Health check failed. Giving up", "err", err)
+					return errors.Wrap(err, "health check failed")
 				}
 			}
 		}
@@ -938,6 +921,15 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
 
+	// Note to future self -- The thrift libraries here will
+	// occasionally return a hard to debug i/o timeout
+	// error. Because osquery is single threaded, this can happen
+	// if multiple things try to happen at the same time. The
+	// thrift library claims to support some timeout/retry
+	// functionality, as implemented by passing a context with
+	// deadline along, but testing with it, I can't make it
+	// work. Same i/o timeout errors. (Note that you'd need to
+	// patch it to osquery-go)
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not query the extension manager client")
