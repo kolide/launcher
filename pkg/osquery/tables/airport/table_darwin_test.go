@@ -163,7 +163,7 @@ func Test_generateAirportData_EdgeCases(t *testing.T) {
 			execReturn: func() ([]byte, error) {
 				return nil, errors.New("exec error")
 			},
-			assertion: assert.Error,
+			assertion: assert.NoError,
 		},
 		{
 			name: "no_data",

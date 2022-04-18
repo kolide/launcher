@@ -88,7 +88,7 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, logger)
 		if err != nil {
 			level.Debug(logger).Log("msg", "Error processing airport output", "option", option, "err", err)
-			return nil, err
+			continue
 		}
 		results = append(results, optionResult...)
 	}
