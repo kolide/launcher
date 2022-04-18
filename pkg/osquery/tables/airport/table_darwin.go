@@ -124,7 +124,7 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 	return results, nil
 }
 
-// unmarshallScanOuput parses the output of the airport getinfo command
+// unmarshallGetInfoOutput parses the output of the airport getinfo command
 func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 	/* example output:
 
@@ -178,25 +178,14 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 		line := scanner.Text()
 
 		if headerSeparatorIndexes == nil {
-			headerSeparatorIndexes = columnSeparatorIndexes(line)
-
-			if len(headerSeparatorIndexes) > 1 {
-				headerSeparatorIndexes = headerSeparatorIndexes[:len(headerSeparatorIndexes)-1]
-			}
-
+			headerSeparatorIndexes = scanColumnSeparatorIndexes(line)
 			headers = splitAtIndexes(line, headerSeparatorIndexes)
-
 			continue
 		}
 
 		rowData := make(map[string]interface{}, len(headers))
 
 		for i, value := range splitAtIndexes(line, headerSeparatorIndexes) {
-
-			if i >= len(headers) {
-				break
-			}
-
 			rowData[headers[i]] = value
 		}
 
@@ -211,6 +200,13 @@ func splitAtIndexes(str string, indexes []int) []string {
 
 	startIndex := 0
 	for _, index := range indexes {
+
+		// if the index is out of bounds, return the rest of the string
+		if index >= len(str) {
+			result = append(result, str[startIndex:])
+			return result
+		}
+
 		result = append(result, str[startIndex:index])
 		startIndex = index
 	}
@@ -221,14 +217,13 @@ func splitAtIndexes(str string, indexes []int) []string {
 }
 
 func trimSpaces(strs []string) []string {
-	var trimmed []string
-	for _, str := range strs {
-		trimmed = append(trimmed, strings.TrimSpace(str))
+	for i, str := range strs {
+		strs[i] = strings.TrimSpace(str)
 	}
-	return trimmed
+	return strs
 }
 
-func columnSeparatorIndexes(line string) []int {
+func scanColumnSeparatorIndexes(line string) []int {
 
 	/* example header row of airport scan:
 
@@ -252,6 +247,11 @@ func columnSeparatorIndexes(line string) []int {
 			}
 			indexes = append(indexes, i)
 		}
+	}
+
+	// since the last column has a space in it, just remove the last index
+	if len(indexes) > 0 {
+		indexes = indexes[:len(indexes)-1]
 	}
 
 	return indexes
