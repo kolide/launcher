@@ -295,6 +295,8 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
+	level.Debug(e.logger).Log("msg", "Beginning enrollment")
+	
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
@@ -786,6 +788,9 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	if client == nil {
+		panic("SEPH")
+	}
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,

@@ -125,9 +125,13 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 					return errors.Wrap(err, "launching osquery instance")
 				}
 
+				// The runner allows querying the osqueryd instance from the extension.
+				// Used by the Enroll method below to get initial enrollment details.
+				ext.SetQuerier(runner)
+
 				// Because the runner starts a bunch
-				// of async threads, we need to make
-				// sure it's healthy before we
+				// of async threads, we need to
+				// make sure it's healthy before we
 				// continue with startup.
 				deadlineCtx, cancel := context.WithTimeout(context.Background(), runnerStartTimeout)
 				defer cancel()
@@ -148,10 +152,6 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 					}
 				}
 				level.Debug(logger).Log("msg", "Runner healthy. Moving on")
-
-				// The runner allows querying the osqueryd instance from the extension.
-				// Used by the Enroll method below to get initial enrollment details.
-				ext.SetQuerier(runner)
 
 				// enroll this launcher with the server
 				_, invalid, err := ext.Enroll(ctx)

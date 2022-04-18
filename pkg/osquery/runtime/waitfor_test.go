@@ -66,7 +66,7 @@ func TestWaitFor(t *testing.T) {
 			// Construct a test function, and a suitable
 			// comparison function for require.Never / require.Eventually
 			fn := func() bool {
-				err := WaitFor(tt.innerFn, tt.timeout, tt.interval)
+				err := waitFor(tt.innerFn, tt.timeout, tt.interval)
 				tt.errorAssertion(t, err)
 
 				for _, s := range tt.errorContains {
