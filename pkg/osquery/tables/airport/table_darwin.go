@@ -185,7 +185,6 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 			headerSeparatorIndexes = columnSeparatorIndexes(line)
 
 			if len(headerSeparatorIndexes) > 1 {
-				headerSeparatorIndexes[len(headerSeparatorIndexes)-1] = headerSeparatorIndexes[len(headerSeparatorIndexes)-1] + headerSeparatorIndexes[len(headerSeparatorIndexes)-2]
 				headerSeparatorIndexes = headerSeparatorIndexes[:len(headerSeparatorIndexes)-1]
 			}
 
