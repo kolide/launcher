@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestWaitFor(t *testing.T) {
 		innerFn            func() error
 		errorAssertion     require.ErrorAssertionFunc
 		testifyExpectation func(require.TestingT, func() bool, time.Duration, time.Duration, ...interface{})
-		errorContains      []string
+		errorRegexps       []*regexp.Regexp
 
 		interval time.Duration
 		timeout  time.Duration
@@ -43,18 +44,26 @@ func TestWaitFor(t *testing.T) {
 			innerFn:            innerFuncGenerator(1*time.Millisecond, errors.New("sentinal")),
 			errorAssertion:     require.Error,
 			testifyExpectation: require.Eventually,
-			errorContains:      []string{"sentinal", "timeout", "3 attempts"},
-			interval:           2 * time.Millisecond,
-			timeout:            5 * time.Millisecond,
+			errorRegexps: []*regexp.Regexp{
+				regexp.MustCompile("sentinal"),
+				regexp.MustCompile("timeout"),
+				regexp.MustCompile("[34] attempts"),
+			},
+			interval: 2 * time.Millisecond,
+			timeout:  5 * time.Millisecond,
 		},
 		{
 			name:               "slow errors",
 			innerFn:            innerFuncGenerator(9*time.Millisecond, errors.New("sentinal")),
 			errorAssertion:     require.Error,
 			testifyExpectation: require.Eventually,
-			errorContains:      []string{"sentinal", "timeout", "2 attempts"},
-			interval:           4 * time.Millisecond,
-			timeout:            10 * time.Millisecond,
+			errorRegexps: []*regexp.Regexp{
+				regexp.MustCompile("sentinal"),
+				regexp.MustCompile("timeout"),
+				regexp.MustCompile("[23] attempts"),
+			},
+			interval: 4 * time.Millisecond,
+			timeout:  10 * time.Millisecond,
 		},
 	}
 
@@ -69,8 +78,8 @@ func TestWaitFor(t *testing.T) {
 				err := waitFor(tt.innerFn, tt.timeout, tt.interval)
 				tt.errorAssertion(t, err)
 
-				for _, s := range tt.errorContains {
-					assert.ErrorContains(t, err, s)
+				for _, rx := range tt.errorRegexps {
+					assert.Regexp(t, rx, err)
 				}
 
 				// This return is what causes Never or Eventual to Succeed or Fail.
