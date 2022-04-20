@@ -1,11 +1,11 @@
 name: golangci-lint
+
 on:
   push:
-    tags:
-      - v*
-    branches:
-      - '**'
+    branches: [main, master]
   pull_request:
+    branches: '**'
+
 jobs:
   golangci:
     strategy:
