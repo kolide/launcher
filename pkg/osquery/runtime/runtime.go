@@ -711,7 +711,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	)
 
 	// Launch osquery process (async)
-	if err := o.cmd.Start(); err != nil {
+	err = o.cmd.Start()
+	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
 		// update system and falling back to an earlier version.
@@ -770,16 +771,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		return o.doneCtx.Err()
 	})
 
-	// Various things use the client. Define it early in the startup flow.
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
-	if err != nil {
-		return errors.Wrap(err, "could not create an extension client")
-	}
-
-	if err := o.stats.Connected(o); err != nil {
-		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
-	}
-
 	// Because we "invert" the control of the osquery process and the
 	// extension (we are running the extension from the process that starts
 	// osquery, rather than the other way around), we don't know exactly
@@ -811,6 +802,15 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 	}
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
+
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return errors.Wrap(err, "could not create an extension client")
+	}
+
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
+	}
 
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
