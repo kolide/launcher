@@ -56,7 +56,6 @@ func (e *Extension) SetQuerier(client Querier) {
 // Querier allows querying osquery.
 type Querier interface {
 	Query(sql string) ([]map[string]string, error)
-	Ready() bool
 }
 
 const (
@@ -307,14 +306,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if e.NodeKey != "" {
 		level.Debug(logger).Log("msg", "node key exists, skipping")
 		return e.NodeKey, false, nil
-	}
-
-	// If the underlying runner return invalid. This will cause
-	// osquery to retry in a few moments. Note that it plays very
-	// poorly with the code gated behind `LAUNCHER_DEBUG_ENROLL_FIRST`
-	if !e.osqueryClient.Ready() {
-		level.Debug(logger).Log("msg", "Runtime not ready. Deferring enrollment")
-		return "", true, nil
 	}
 
 	// Only one thread should ever be allowed to attempt enrollment at the

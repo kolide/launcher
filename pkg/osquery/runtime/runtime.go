@@ -44,10 +44,6 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	return r.instance.Query(query)
 }
 
-func (r *Runner) Ready() bool {
-	return r.instance.ready
-}
-
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
@@ -87,7 +83,6 @@ type OsqueryInstance struct {
 	cmd                    *exec.Cmd
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
-	ready                  bool
 	clientLock             sync.Mutex
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()
@@ -481,11 +476,6 @@ const socketOpenTimeout = 10 * time.Second
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
 
-const (
-	initialReadyTimeout  = 5 * time.Minute
-	initialReadyInterval = 1 * time.Second
-)
-
 // LaunchInstance will launch an instance of osqueryd via a very configurable
 // API as defined by the various OsqueryInstanceOption functional options. The
 // returned instance should be shut down via the Shutdown() method.
@@ -839,9 +829,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		return errors.New("extension manager server exited")
 	})
 
-	// Spawn a poller to notice when this instance is ready
-	o.errgroup.Go(o.PollForReady)
-
 	// Cleanup extension manager server on shutdown
 	o.errgroup.Go(func() error {
 		<-o.doneCtx.Done()
@@ -903,19 +890,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		return o.doneCtx.Err()
 	})
 
-	return nil
-}
-
-// PollForReady spawns a background thread that will check health
-// until we're ready, and then denote that in the ready state
-func (o *OsqueryInstance) PollForReady() error {
-	if err := waitFor(o.Healthy, initialReadyTimeout, initialReadyInterval); err != nil {
-		level.Debug(o.logger).Log("msg", "Initial readiness check failed. Giving up", "err", err)
-		return errors.Wrap(err, "readiness check failed")
-	}
-
-	level.Debug(o.logger).Log("msg", "Initial ready check passed")
-	o.ready = true
 	return nil
 }
 
