@@ -27,9 +27,8 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/osquery/table"
-
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
 type Runner struct {
@@ -713,7 +712,6 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch osquery process (async)
 	err = o.cmd.Start()
-	// o.runtime stats set start time
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -822,9 +820,8 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Launch the extension manager server asynchronously.
 	o.errgroup.Go(func() error {
-		// We see the extension manager being slow to start. Implement a simple re-try routine
-		backoff := backoff.New()
-		if err := backoff.Run(o.extensionManagerServer.Start); err != nil {
+		// We see the extension manager being slow to start. Retry a few times
+		if err := backoff.WaitFor(o.extensionManagerServer.Start, 2*time.Minute, 10*time.Second); err != nil {
 			return errors.Wrap(err, "running extension server")
 		}
 		return errors.New("extension manager server exited")

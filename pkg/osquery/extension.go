@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -26,8 +27,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Extension is the implementation of the osquery extension methods. It handles
-// both the communication with the osquery daemon and the Kolide server.
+// Extension is the implementation of the osquery extension
+// methods. It acts as a communication intermediary between osquery
+// and servers -- It provides a grpc and jsonrpc interface for
+// osquery. It does not provide any tables.
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
@@ -295,16 +298,21 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	// Only one thread should ever be allowed to attempt enrollment at the
-	// same time.
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
+	logger := log.With(e.logger, "method", "enroll")
+
+	level.Debug(logger).Log("msg", "starting enrollment")
 
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
+		level.Debug(logger).Log("msg", "node key exists, skipping")
 		return e.NodeKey, false, nil
 	}
+
+	// Only one thread should ever be allowed to attempt enrollment at the
+	// same time.
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
 
 	// Look up a node key cached in the local store
 	key, err := NodeKeyFromDB(e.db)
@@ -324,12 +332,15 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-	backoff := backoff.New(backoff.MaxAttempts(10))
-	if err := backoff.Run(func() error {
+	if err := backoff.WaitFor(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	}); err != nil {
-		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+	}, 2*time.Minute, 10*time.Second); err != nil {
+		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
+			return "", true, errors.Wrap(err, "query enrollment details")
+		}
+
+		level.Info(e.logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 	}
 
 	// If no cached node key, enroll for new node key
@@ -786,6 +797,21 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	var details service.EnrollmentDetails
+
+	// To facilitate manual testing around missing enrollment details,
+	// there is a environmental variable to trigger the failure condition
+	if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_ERROR") == "true" {
+		return details, errors.New("Skipping enrollment details")
+	}
+
+	// This condition is indicative of a misordering (or race) in
+	// startup. Enrollment has started before `SetQuerier` has
+	// been called.
+	if client == nil {
+		return details, errors.New("no querier")
+	}
+
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,
@@ -804,7 +830,6 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		system_info,
 		osquery_info;
 `
-	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
 		return details, errors.Wrap(err, "query enrollment details")
