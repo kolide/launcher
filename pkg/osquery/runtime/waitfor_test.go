@@ -47,7 +47,7 @@ func TestWaitFor(t *testing.T) {
 			errorRegexps: []*regexp.Regexp{
 				regexp.MustCompile("sentinal"),
 				regexp.MustCompile("timeout"),
-				regexp.MustCompile("[34] attempts"),
+				regexp.MustCompile("[23] attempts"),
 			},
 			interval: 2 * time.Millisecond,
 			timeout:  5 * time.Millisecond,
@@ -60,10 +60,10 @@ func TestWaitFor(t *testing.T) {
 			errorRegexps: []*regexp.Regexp{
 				regexp.MustCompile("sentinal"),
 				regexp.MustCompile("timeout"),
-				regexp.MustCompile("[23] attempts"),
+				regexp.MustCompile("[12] attempts"),
 			},
 			interval: 4 * time.Millisecond,
-			timeout:  10 * time.Millisecond,
+			timeout:  9 * time.Millisecond,
 		},
 	}
 
