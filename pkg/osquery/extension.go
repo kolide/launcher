@@ -332,13 +332,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-	backoff := backoff.New(backoff.MaxAttempts(10))
-	if err := backoff.Run(func() error {
+	if err := backoff.WaitFor(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	}); err != nil {
+	}, 2 * time.Minute, 10 * time.Second); err != nil {
 		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-			return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+			return "", true, errors.Wrap(err, "query enrollment details")
 		}
 
 		level.Info(e.logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)

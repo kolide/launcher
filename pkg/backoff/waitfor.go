@@ -1,4 +1,4 @@
-package runtime
+package backoff
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 //
 // Contrary to documentation, it appears go will always retry
 // once. Even if the interval exceeds the timeout.
-func waitFor(fn func() error, timeout, interval time.Duration) error {
+func WaitFor(fn func() error, timeout, interval time.Duration) error {
 	deadlineCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

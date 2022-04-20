@@ -1,4 +1,4 @@
-package runtime
+package backoff
 
 import (
 	"errors"
@@ -75,7 +75,7 @@ func TestWaitFor(t *testing.T) {
 			// Construct a test function, and a suitable
 			// comparison function for require.Never / require.Eventually
 			fn := func() bool {
-				err := waitFor(tt.innerFn, tt.timeout, tt.interval)
+				err := WaitFor(tt.innerFn, tt.timeout, tt.interval)
 				tt.errorAssertion(t, err)
 
 				for _, rx := range tt.errorRegexps {
