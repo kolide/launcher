@@ -309,6 +309,14 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return e.NodeKey, false, nil
 	}
 
+	// If the underlying runner return invalid. This will cause
+	// osquery to retry in a few moments. Note that it plays very
+	// poorly with the code gated behind `LAUNCHER_DEBUG_ENROLL_FIRST`
+	if !e.osqueryClient.EnrollReady() {
+		level.Debug(logger).Log("msg", "Runtime not ready. Deferring enrollment")
+		return "", true, nil
+	}
+
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
 	e.enrollMutex.Lock()
