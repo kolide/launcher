@@ -51,6 +51,18 @@ func TestWaitFor(t *testing.T) {
 			interval: 1 * time.Millisecond,
 			timeout:  5 * time.Millisecond,
 		},
+		{
+			name:               "slow errors",
+			innerFn:            innerFuncGenerator(9*time.Millisecond, errors.New("sentinal")),
+			errorAssertion:     require.Error,
+			testifyExpectation: require.Eventually,
+			errorRegexps: []*regexp.Regexp{
+				regexp.MustCompile("sentinal"),
+				regexp.MustCompile("timeout"),
+			},
+			interval: 4 * time.Millisecond,
+			timeout:  9 * time.Millisecond,
+		},
 	}
 
 	for _, tt := range tests {
