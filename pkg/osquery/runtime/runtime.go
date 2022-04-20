@@ -87,7 +87,7 @@ type OsqueryInstance struct {
 	cmd                    *exec.Cmd
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
-	ready            bool
+	ready                  bool
 	clientLock             sync.Mutex
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()
@@ -482,10 +482,9 @@ const socketOpenTimeout = 10 * time.Second
 const socketOpenInterval = 200 * time.Millisecond
 
 const (
-	initialReadyTimeout = 5 * time.Minute
+	initialReadyTimeout  = 5 * time.Minute
 	initialReadyInterval = 1 * time.Second
 )
-
 
 // LaunchInstance will launch an instance of osqueryd via a very configurable
 // API as defined by the various OsqueryInstanceOption functional options. The
@@ -723,7 +722,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	)
 
 	// Launch osquery process (async)
-	if 	err := o.cmd.Start(); err != nil {
+	if err := o.cmd.Start(); err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
 		// update system and falling back to an earlier version.
