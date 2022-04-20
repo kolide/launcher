@@ -3,6 +3,7 @@ package backoff
 import (
 	"errors"
 	"regexp"
+	"runtime"
 	"testing"
 	"time"
 
