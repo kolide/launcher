@@ -335,7 +335,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if err := backoff.WaitFor(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	}, 2 * time.Minute, 10 * time.Second); err != nil {
+	}, 2*time.Minute, 10*time.Second); err != nil {
 		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
 			return "", true, errors.Wrap(err, "query enrollment details")
 		}
