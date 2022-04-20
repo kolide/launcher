@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/airport/mocks"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -23,96 +24,82 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		sqlEquivalent string
+		name string
 
-		// this is the query that would be written as part of the sql cmd
+		// key = option to use in exec ex: "airport --option scan", value = path to data to return ex "testdata/scan.input.txt"
+		optionsToReturnFilePath map[string]string
+
+		// this is the dataflatten query that would be written as part of the sql cmd
 		query string
-
-		// these are options that would written as a part of the sql cmd
-		// it's required that the options and the executorReturnFilePaths have the same index
-		// for example: the index of "scan" in options needs to the the same as the index of "testdata/scan.output.json" in executorReturnFilePaths
-		options []string
-
-		// paths to files whose contents are used as the output of the exec call to airport
-		executorReturnFilePaths []string
 
 		// path to to the file that is a json of the expected output
 		expectedResultsFilePath string
 	}{
 		{
-			sqlEquivalent:           "select * from kolide_airport_util where option = 'scan'",
-			options:                 []string{"scan"},
-			executorReturnFilePaths: []string{"testdata/scan.input.txt"},
+			name: "scan",
+			optionsToReturnFilePath: map[string]string{
+				"scan": "testdata/scan.input.txt",
+			},
 			expectedResultsFilePath: "testdata/scan.output.json",
 		},
 		{
-			sqlEquivalent:           "select * from kolide_airport_util where option = 'scan' and query = '/SSID'",
-			options:                 []string{"scan"},
+			name: "scan_with_query",
+			optionsToReturnFilePath: map[string]string{
+				"scan": "testdata/scan.input.txt",
+			},
 			query:                   "/SSID",
-			executorReturnFilePaths: []string{"testdata/scan.input.txt"},
 			expectedResultsFilePath: "testdata/scan_with_query.output.json",
 		},
 		{
-			sqlEquivalent:           "select * from kolide_airport_util where option = 'getinfo'",
-			options:                 []string{"getinfo"},
-			executorReturnFilePaths: []string{"testdata/getinfo.input.txt"},
+			name: "getinfo",
+			optionsToReturnFilePath: map[string]string{
+				"getinfo": "testdata/getinfo.input.txt",
+			},
 			expectedResultsFilePath: "testdata/getinfo.output.json",
 		},
 		{
-			sqlEquivalent:           "select * from kolide_airport_util where option in ('getinfo', 'scan')",
-			options:                 []string{"getinfo", "scan"},
-			executorReturnFilePaths: []string{"testdata/getinfo.input.txt", "testdata/scan.input.txt"},
+			name: "getinfo_and_scan",
+			optionsToReturnFilePath: map[string]string{
+				"scan":    "testdata/scan.input.txt",
+				"getinfo": "testdata/getinfo.input.txt",
+			},
 			expectedResultsFilePath: "testdata/getinfo_and_scan.output.json",
 		},
 		{
-			sqlEquivalent:           "select * from kolide_airport_util where option in ('getinfo', 'scan') and query = '/SSID'",
-			options:                 []string{"getinfo", "scan"},
+			name: "getinfo_and_scan_with_query",
+			optionsToReturnFilePath: map[string]string{
+				"scan":    "testdata/scan.input.txt",
+				"getinfo": "testdata/getinfo.input.txt",
+			},
 			query:                   "/SSID",
-			executorReturnFilePaths: []string{"testdata/getinfo.input.txt", "testdata/scan.input.txt"},
 			expectedResultsFilePath: "testdata/getinfo_and_scan_with_query.output.json",
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.sqlEquivalent, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			queryContext := table.QueryContext{
-				Constraints: map[string]table.ConstraintList{},
-			}
-
-			// add the options constraints
-			if tt.options != nil {
-				optionConstraints := []table.Constraint{}
-
-				for _, option := range tt.options {
-					optionConstraints = append(optionConstraints, table.Constraint{Operator: table.OperatorEquals, Expression: option})
-				}
-
-				queryContext.Constraints["option"] = table.ConstraintList{
-					Affinity:    "TEXT",
-					Constraints: optionConstraints,
-				}
-			}
-
-			// add the query constraints
-			if tt.query != "" {
-				queryContext.Constraints["query"] = table.ConstraintList{
-					Affinity:    "TEXT",
-					Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: tt.query}},
-				}
-			}
+			constraints := make(map[string][]string)
 
 			executor := &mocks.Executor{}
 
-			for index, inputFile := range tt.executorReturnFilePaths {
-				inputBytes, err := os.ReadFile(inputFile)
+			for option, filePath := range tt.optionsToReturnFilePath {
+				// add option (key) to constraints
+				constraints["option"] = append(constraints["option"], option)
+
+				// get data from file
+				inputBytes, err := os.ReadFile(filePath)
 				require.NoError(t, err)
-				executor.On("Exec", tt.options[index]).Return(inputBytes, nil).Once()
+				executor.On("Exec", option).Return(inputBytes, nil).Once()
 			}
 
-			got, err := generateAirportData(queryContext, executor, log.NewNopLogger())
+			if tt.query != "" {
+				constraints["query"] = []string{tt.query}
+			}
+
+			got, err := generateAirportData(tablehelpers.MockQueryContext(constraints), executor, log.NewNopLogger())
 			require.NoError(t, err)
 
 			executor.AssertExpectations(t)
