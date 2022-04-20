@@ -167,6 +167,10 @@ func (mockClient) Query(sql string) ([]map[string]string, error) {
 	}, nil
 }
 
+func (mockClient) Ready() bool {
+	return true
+}
+
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	t.Parallel()
 

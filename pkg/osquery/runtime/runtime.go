@@ -44,8 +44,8 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	return r.instance.Query(query)
 }
 
-func (r *Runner) EnrollReady() bool {
-	return r.instance.enrollReady
+func (r *Runner) Ready() bool {
+	return r.instance.ready
 }
 
 type osqueryOptions struct {
@@ -87,7 +87,7 @@ type OsqueryInstance struct {
 	cmd                    *exec.Cmd
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
-	enrollReady            bool
+	ready            bool
 	clientLock             sync.Mutex
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()
@@ -481,6 +481,12 @@ const socketOpenTimeout = 10 * time.Second
 // How often to try to open the osquery extension socket
 const socketOpenInterval = 200 * time.Millisecond
 
+const (
+	initialReadyTimeout = 5 * time.Minute
+	initialReadyInterval = 1 * time.Second
+)
+
+
 // LaunchInstance will launch an instance of osqueryd via a very configurable
 // API as defined by the various OsqueryInstanceOption functional options. The
 // returned instance should be shut down via the Shutdown() method.
@@ -717,9 +723,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	)
 
 	// Launch osquery process (async)
-	err = o.cmd.Start()
-	// o.runtime stats set start time
-	if err != nil {
+	if 	err := o.cmd.Start(); err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
 		// update system and falling back to an earlier version.
@@ -778,6 +782,16 @@ func (r *Runner) launchOsqueryInstance() error {
 		return o.doneCtx.Err()
 	})
 
+	// Various things use the client. Define it early in the startup flow.
+	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	if err != nil {
+		return errors.Wrap(err, "could not create an extension client")
+	}
+
+	if err := o.stats.Connected(o); err != nil {
+		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
+	}
+
 	// Because we "invert" the control of the osquery process and the
 	// extension (we are running the extension from the process that starts
 	// osquery, rather than the other way around), we don't know exactly
@@ -810,15 +824,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 	level.Debug(o.logger).Log("msg", "Successfully connected server to osquery")
 
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
-	if err != nil {
-		return errors.Wrap(err, "could not create an extension client")
-	}
-
-	if err := o.stats.Connected(o); err != nil {
-		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
-	}
-
 	plugins := o.opts.extensionPlugins
 	for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 		plugins = append(plugins, t)
@@ -834,6 +839,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return errors.New("extension manager server exited")
 	})
+
+	// Spawn a poller to notice when this instance is ready
+	o.errgroup.Go(o.PollForReady)
 
 	// Cleanup extension manager server on shutdown
 	o.errgroup.Go(func() error {
@@ -896,6 +904,19 @@ func (r *Runner) launchOsqueryInstance() error {
 		return o.doneCtx.Err()
 	})
 
+	return nil
+}
+
+// PollForReady spawns a background thread that will check health
+// until we're ready, and then denote that in the ready state
+func (o *OsqueryInstance) PollForReady() error {
+	if err := waitFor(o.Healthy, initialReadyTimeout, initialReadyInterval); err != nil {
+		level.Debug(o.logger).Log("msg", "Initial readiness check failed. Giving up", "err", err)
+		return errors.Wrap(err, "readiness check failed")
+	}
+
+	level.Debug(o.logger).Log("msg", "Initial ready check passed")
+	o.ready = true
 	return nil
 }
 
