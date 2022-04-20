@@ -145,3 +145,7 @@ func (q *queryier) Query(query string) ([]map[string]string, error) {
 	}
 	return resp.Response, nil
 }
+
+func (q *queryier) EnrollReady() bool {
+	return true
+}

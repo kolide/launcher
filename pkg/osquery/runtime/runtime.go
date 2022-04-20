@@ -44,6 +44,10 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	return r.instance.Query(query)
 }
 
+func (r *Runner) EnrollReady() bool {
+	return r.instance.enrollReady
+}
+
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
@@ -83,6 +87,7 @@ type OsqueryInstance struct {
 	cmd                    *exec.Cmd
 	extensionManagerServer *osquery.ExtensionManagerServer
 	extensionManagerClient *osquery.ExtensionManagerClient
+	enrollReady            bool
 	clientLock             sync.Mutex
 	paths                  *osqueryFilePaths
 	rmRootDirectory        func()

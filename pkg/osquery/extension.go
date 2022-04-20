@@ -56,6 +56,7 @@ func (e *Extension) SetQuerier(client Querier) {
 // Querier allows querying osquery.
 type Querier interface {
 	Query(sql string) ([]map[string]string, error)
+	EnrollReady() bool
 }
 
 const (
