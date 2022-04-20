@@ -26,8 +26,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Extension is the implementation of the osquery extension methods. It handles
-// both the communication with the osquery daemon and the Kolide server.
+// Extension is the implementation of the osquery extension
+// methods. It acts as a communication intermediary between osquery
+// and servers -- It provides a grpc and jsonrpc interface for
+// osquery. It does not provide any tables.
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
@@ -295,16 +297,21 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	// Only one thread should ever be allowed to attempt enrollment at the
-	// same time.
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
+	logger := log.With(e.logger, "method", "enroll")
+
+	level.Debug(logger).Log("msg", "starting enrollment")
 
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
+		level.Debug(logger).Log("msg", "node key exists, skipping")
 		return e.NodeKey, false, nil
 	}
+
+	// Only one thread should ever be allowed to attempt enrollment at the
+	// same time.
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
 
 	// Look up a node key cached in the local store
 	key, err := NodeKeyFromDB(e.db)
