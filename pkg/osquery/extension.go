@@ -799,6 +799,8 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 
+	// To facilitate manual testing around missing enrollment details,
+	// there is a environmental variable to trigger the failure condition
 	if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_ERROR") == "true" {
 		return details, errors.New("Skipping enrollment details")
 	}
