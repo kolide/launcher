@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -336,7 +337,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
 	}); err != nil {
-		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
+			return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+		}
+
+		level.Info(e.logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 	}
 
 	// If no cached node key, enroll for new node key
@@ -793,6 +798,19 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	var details service.EnrollmentDetails
+
+	if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_ERROR") == "true" {
+		return details, errors.New("Skipping enrollment details")
+	}
+
+	// This condition is indicative of a misordering (or race) in
+	// startup. Enrollment has started before `SetQuerier` has
+	// been called.
+	if client == nil {
+		return details, errors.New("no querier")
+	}
+
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,
@@ -811,7 +829,6 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		system_info,
 		osquery_info;
 `
-	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
 		return details, errors.Wrap(err, "query enrollment details")
