@@ -370,3 +370,85 @@ func testFlattenCase(t *testing.T, tt flattenTestCase, actual []Row, actualErr e
 	sort.SliceStable(actual, func(i, j int) bool { return actual[i].StringPath("/") < actual[j].StringPath("/") })
 	require.EqualValues(t, tt.out, actual, "test %s %s", tt.in, tt.comment)
 }
+
+func TestFlattenSliceOfMaps(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		in      interface{}
+		opts    []FlattenOpts
+		out     []Row
+		wantErr bool
+	}{
+		{
+			name: "single",
+			in: []map[string]interface{}{
+				{
+					"id": "a",
+					"v":  1,
+				},
+			},
+			opts: []FlattenOpts{},
+			out: []Row{
+				{Path: []string{"0", "id"}, Value: "a"},
+				{Path: []string{"0", "v"}, Value: "1"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple",
+			in: []map[string]interface{}{
+				{
+					"id": "a",
+					"v":  1,
+				},
+				{
+					"id": "b",
+					"v":  2,
+				},
+				{
+					"id": "c",
+					"v":  3,
+				},
+			},
+			opts: []FlattenOpts{},
+			out: []Row{
+				{Path: []string{"0", "id"}, Value: "a"},
+				{Path: []string{"0", "v"}, Value: "1"},
+				{Path: []string{"1", "id"}, Value: "b"},
+				{Path: []string{"1", "v"}, Value: "2"},
+				{Path: []string{"2", "id"}, Value: "c"},
+				{Path: []string{"2", "v"}, Value: "3"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "error",
+			in: []map[string]interface{}{
+				{
+					"id": []string{"this should cause an error"},
+				},
+			},
+			opts:    []FlattenOpts{},
+			out:     nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Flatten(tt.in, tt.opts...)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.ElementsMatch(t, tt.out, got)
+		})
+	}
+}
