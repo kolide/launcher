@@ -118,17 +118,40 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 					return errors.Wrap(err, "launching osquery instance")
 				}
 
+				// If we're using osquery transport, we don't need the extension
+				if opts.Transport == "osquery" {
+					level.Debug(logger).Log("msg", "Using osquery transport, skipping extension startup")
+
+					// TODO: remove when underlying libs are refactored
+					// everything exits right now, so block this actor on the context finishing
+					<-ctx.Done()
+					return nil
+				}
+
 				// The runner allows querying the osqueryd instance from the extension.
 				// Used by the Enroll method below to get initial enrollment details.
 				ext.SetQuerier(runner)
 
-				// enroll this launcher with the server
-				_, invalid, err := ext.Enroll(ctx)
-				if err != nil {
-					return errors.Wrap(err, "enrolling host")
-				}
-				if invalid {
-					return errors.Wrap(err, "invalid enroll secret")
+				// It's not clear to me _why_ the extension
+				// ever called Enroll here. From what
+				// I can tell, this would cause the
+				// launcher extension to do a bunch of
+				// initial setup (create node key,
+				// etc). But, this is also done by
+				// osquery. And having them both
+				// attempt it is a bit racey.  I'm not
+				// so confident to outright remove it,
+				// so it's gated behind this debugging
+				// environment.
+				if os.Getenv("LAUNCHER_DEBUG_ENROLL_FIRST") == "true" {
+					// enroll this launcher with the server
+					_, invalid, err := ext.Enroll(ctx)
+					if err != nil {
+						return errors.Wrap(err, "enrolling host")
+					}
+					if invalid {
+						return errors.Wrap(err, "invalid enroll secret")
+					}
 				}
 
 				// start the extension

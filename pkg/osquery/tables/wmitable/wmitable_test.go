@@ -110,10 +110,10 @@ func TestQueries(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			// making this parallel causing the unit test to occasionally fail
 
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
 				"class":       []string{tt.class},

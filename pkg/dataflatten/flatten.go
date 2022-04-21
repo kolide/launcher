@@ -227,6 +227,13 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				return errors.Wrap(err, "flattening map")
 			}
 		}
+	case []map[string]interface{}:
+		level.Debug(logger).Log("msg", "checking an array of maps")
+		for i, e := range v {
+			if err := fl.descend(append(path, strconv.Itoa(i)), e, depth+1); err != nil {
+				return errors.Wrap(err, "flattening array of maps")
+			}
+		}
 	case nil:
 		// Because we want to filter nils out, we do _not_ examine isQueryMatched here
 		if !(fl.queryMatchNil(queryTerm)) {
