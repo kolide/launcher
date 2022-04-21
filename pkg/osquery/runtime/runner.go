@@ -361,7 +361,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc
 	if len(o.opts.extensionPlugins) > 0 {
-		// time.Sleep(2 * time.Second)
 		if err := o.StartOsqueryExtensionManagerServer("kolide_initial", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
 			return errors.Wrap(err, "could not create an extension server")
@@ -388,6 +387,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		var plugins []osquery.OsqueryPlugin
 		for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
 			plugins = append(plugins, t)
+		}
+
+		if len(plugins) == 0 {
+			return nil
 		}
 
 		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, plugins); err != nil {
