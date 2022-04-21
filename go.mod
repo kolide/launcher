@@ -20,7 +20,7 @@ require (
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.8.0
 	github.com/go-ole/go-ole v1.2.6
-	github.com/gogo/protobuf v1.2.0
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.3.2
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/fscrypt v0.3.3
@@ -64,10 +64,10 @@ require (
 	go.opencensus.io v0.22.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
-	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
-	golang.org/x/text v0.3.2
+	golang.org/x/text v0.3.3
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	google.golang.org/grpc v1.23.0
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
