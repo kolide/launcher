@@ -11,9 +11,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
@@ -202,40 +205,46 @@ type OsqueryInstance struct {
 	logger log.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
-	errgroup               *errgroup.Group
-	doneCtx                context.Context
-	cancel                 context.CancelFunc
-	cmd                    *exec.Cmd
-	extensionManagerServer *osquery.ExtensionManagerServer
-	extensionManagerClient *osquery.ExtensionManagerClient
-	clientLock             sync.Mutex
-	paths                  *osqueryFilePaths
-	rmRootDirectory        func()
-	usingTempDir           bool
-	stats                  *history.Instance
+	errgroup                *errgroup.Group
+	doneCtx                 context.Context
+	cancel                  context.CancelFunc
+	cmd                     *exec.Cmd
+	emsLock                 sync.RWMutex
+	extensionManagerServers []*osquery.ExtensionManagerServer
+	extensionManagerClient  *osquery.ExtensionManagerClient
+	clientLock              sync.Mutex
+	paths                   *osqueryFilePaths
+	rmRootDirectory         func()
+	usingTempDir            bool
+	stats                   *history.Instance
 }
 
 // Healthy will check to determine whether or not the osquery process that is
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (o *OsqueryInstance) Healthy() error {
-	if o.extensionManagerServer == nil || o.extensionManagerClient == nil {
+	o.emsLock.RLock()
+	defer o.emsLock.RUnlock()
+
+	if len(o.extensionManagerServers) == 0 || o.extensionManagerClient == nil {
 		return errors.New("instance not started")
+	}
+
+	for _, srv := range o.extensionManagerServers {
+		serverStatus, err := srv.Ping(context.TODO())
+		if err != nil {
+			return errors.Wrap(err, "could not ping extension server")
+		}
+		if serverStatus.Code != 0 {
+			return errors.Errorf("ping extension server returned %d: %s",
+				serverStatus.Code,
+				serverStatus.Message,
+			)
+		}
 	}
 
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
-
-	serverStatus, err := o.extensionManagerServer.Ping(context.TODO())
-	if err != nil {
-		return errors.Wrap(err, "could not ping extension server")
-	}
-	if serverStatus.Code != 0 {
-		return errors.Errorf("ping extension server returned %d: %s",
-			serverStatus.Code,
-			serverStatus.Message,
-		)
-	}
 
 	clientStatus, err := o.extensionManagerClient.Ping()
 	if err != nil {
@@ -243,8 +252,8 @@ func (o *OsqueryInstance) Healthy() error {
 	}
 	if clientStatus.Code != 0 {
 		return errors.Errorf("ping extension client returned %d: %s",
-			serverStatus.Code,
-			serverStatus.Message,
+			clientStatus.Code,
+			clientStatus.Message,
 		)
 	}
 
@@ -459,6 +468,61 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
 
 	return cmd, nil
+}
+
+// startOsqueryExtensionManagerServer takes a set of plugins, creates
+// an osquery.NewExtensionManagerServer for them, and then starts it.
+func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, plugins []osquery.OsqueryPlugin) error {
+	logger := log.With(o.logger, "extensionMangerServer", name)
+
+	level.Debug(logger).Log("msg", "Starting startOsqueryExtensionManagerServer")
+
+	var extensionManagerServer *osquery.ExtensionManagerServer
+	if err := backoff.WaitFor(func() error {
+		var newErr error
+		extensionManagerServer, newErr = osquery.NewExtensionManagerServer(
+			name,
+			socketPath,
+			osquery.ServerTimeout(1*time.Minute),
+		)
+		return newErr
+	}, socketOpenTimeout, socketOpenInterval); err != nil {
+		level.Debug(logger).Log("msg", "could not create an extension server", "err", err)
+		return errors.Wrap(err, "could not create an extension server")
+	}
+
+	extensionManagerServer.RegisterPlugin(plugins...)
+
+	o.emsLock.Lock()
+	defer o.emsLock.Unlock()
+
+	o.extensionManagerServers = append(o.extensionManagerServers, extensionManagerServer)
+
+	// Start!
+	o.errgroup.Go(func() error {
+		if err := extensionManagerServer.Start(); err != nil {
+			level.Info(logger).Log("msg", "Extension manager server startup got error", "err", err)
+			return errors.Wrap(err, "running extension server")
+		}
+		return errors.New("extension manager server exited")
+	})
+
+	// register a shutdown routine
+	o.errgroup.Go(func() error {
+		<-o.doneCtx.Done()
+		level.Debug(logger).Log("msg", "Starting extension shutdown")
+		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
+			level.Info(o.logger).Log(
+				"msg", "Got error while shutting down extension server",
+				"err", err,
+			)
+		}
+		return o.doneCtx.Err()
+	})
+
+	level.Debug(logger).Log("msg", "Clean finish startOsqueryExtensionManagerServer")
+
+	return nil
 }
 
 func osqueryTempDir() (string, func(), error) {
