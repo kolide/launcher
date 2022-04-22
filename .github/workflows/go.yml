@@ -28,7 +28,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{env.GOVER}}
       id: go
@@ -84,6 +84,12 @@ jobs:
       with:
         go-version: ${{env.GOVER}}
       id: go
+
+    - name: Setup Zig
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      uses: goto-bus-stop/setup-zig@0cee191d0784787b27367e56fb83cde121658bbc
+      with:
+        version: 0.9.1
 
     - run: make deps
     - id: build
