@@ -46,5 +46,3 @@
         },
     ]
 }
-
-// ln -s /Users/jamespickett/Documents/repos/k2/tmp/localhost.crt ./localhost.crt
