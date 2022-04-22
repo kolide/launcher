@@ -36,7 +36,7 @@ endif
 
 build_%: TARGET =  $(word 2, $(subst _, ,$@))
 build_%: OS = $(word 3, $(subst _, ,$@))
-build_%: OSARG = $(if $(OS), --os $(OS))
+build_%: OSARG = $(if $(filter-out noop, $(OS)), --os $(OS))
 build_%: ARCH = $(word 4, $(subst _, ,$@))
 build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))

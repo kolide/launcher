@@ -38,10 +38,10 @@ jobs:
       run: make deps
 
     - name: Build
-      run: make -j2 build_{${{env.RELEASE_TARGETS}}}_${{ matrix.os }}_{amd64,arm64}
+      run: make -j2 build_{${{env.RELEASE_TARGETS}}}_noop_{amd64,arm64}
 
     - name: Lipo
-      run: make lipo_{${{env.RELEASE_TARGETS}}}_${{ matrix.os }}
+      run: make lipo_{${{env.RELEASE_TARGETS}}}
       if: ${{ matrix.os == 'macos-latest' }}
 
     - name: Test
