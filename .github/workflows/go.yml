@@ -42,7 +42,7 @@ jobs:
 
     - name: Lipo
       run: make lipo_{${{env.RELEASE_TARGETS}}}_${{ matrix.os }}
-      if: matrix.os == "darwin"
+      if: ${{ matrix.os == 'macos-latest' }}
 
     - name: Test
       run: make test
@@ -86,7 +86,6 @@ jobs:
     - name: package
       run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
 
-      	       				  
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
