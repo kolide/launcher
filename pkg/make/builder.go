@@ -158,7 +158,7 @@ func New(opts ...Option) *Builder {
 
 	// Setup zig as cross compiler for linux
 	// (This is mostly to support fscrypt on linux)
-	if runtime.GOOS == "linux" && (b.os != runtime.GOOS || b.arch != runtime.GOARCH) {
+	if b.os == "linux" && (b.os != runtime.GOOS || b.arch != runtime.GOARCH) {
 		cwd, err := os.Getwd()
 		if err != nil {
 			// panic here feels a little uncouth, but the
