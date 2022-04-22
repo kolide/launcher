@@ -138,17 +138,27 @@ func New(opts ...Option) *Builder {
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOOS=%s", b.os))
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
 
-	if b.cgo {
-		if b.os == "windows" {
-			// See https://github.com/kolide/launcher/pull/776
-			panic("Windows and CGO are not friends")
-		}
+	// CGO...
+	switch {
+
+	// https://github.com/kolide/launcher/pull/776 has a theory
+	// that windows and cgo aren't friends. This might be wrong,
+	// but I don't want to change it yet.
+	case b.cgo && b.os == "windows":
+		panic("Windows and CGO are not friends")
+
+	// cgo is intentionally enabled
+	case b.cgo:
+		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
+
+	// When cross compiling for ARCH, cgo is not automatically detected. So we force it here.
+	case b.arch != runtime.GOARCH:
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
 	}
 
-	// Setup zig as cross compiler
+	// Setup zig as cross compiler for linux
 	// (This is mostly to support fscrypt on linux)
-	if b.os != runtime.GOOS {
+	if b.os == "linux" && (b.os != runtime.GOOS || b.arch != runtime.GOARCH) {
 		cwd, err := os.Getwd()
 		if err != nil {
 			// panic here feels a little uncouth, but the
