@@ -15,8 +15,8 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
-	return []*table.Plugin{
+func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+	return []osquery.OsqueryPlugin{
 		ProgramIcons(),
 		dsim_default_associations.TablePlugin(client, logger),
 		secedit.TablePlugin(client, logger),

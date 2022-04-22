@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
-	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
 
@@ -28,9 +27,9 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
+func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
-	tables := []*table.Plugin{
+	tables := []osquery.OsqueryPlugin{
 		BestPractices(client),
 		ChromeLoginDataEmails(client, logger),
 		ChromeUserProfiles(client, logger),

@@ -384,10 +384,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// TODO: Consider chunking, if we find we can only have so
 	// many tables per extension manager
 	o.errgroup.Go(func() error {
-		var plugins []osquery.OsqueryPlugin
-		for _, t := range table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath) {
-			plugins = append(plugins, t)
-		}
+		plugins := table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath)
 
 		if len(plugins) == 0 {
 			return nil

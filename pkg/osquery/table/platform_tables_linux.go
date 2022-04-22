@@ -15,8 +15,8 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
-	return []*table.Plugin{
+func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+	return []osquery.OsqueryPlugin{
 		cryptsetup.TablePlugin(client, logger),
 		gsettings.Settings(client, logger),
 		gsettings.Metadata(client, logger),

@@ -30,7 +30,7 @@ const (
 	screenlockQuery    = "select enabled, grace_period from screenlock"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
+func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	munki := munki.New()
 
 	// This table uses undocumented APIs, There is some discussion at the
@@ -68,7 +68,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			table.TextColumn("path"),
 		})
 
-	return []*table.Plugin{
+	return []osquery.OsqueryPlugin{
 		keychainAclsTable,
 		keychainItemsTable,
 		Airdrop(client),
