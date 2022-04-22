@@ -75,6 +75,7 @@ Using `svc-fg` is the recommended approach
 1. [Install VS Code](https://code.visualstudio.com/download)
 1. [Install VS Code Go Extension](https://code.visualstudio.com/docs/languages/go)
 1. Osqueryd is available in your path
+1. Open launcher repo with VS Code
 * if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
 ### Debugging over socket
