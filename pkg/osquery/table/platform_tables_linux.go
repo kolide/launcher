@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/secureboot"
 	"github.com/kolide/launcher/pkg/osquery/tables/xrdb"
 	osquery "github.com/osquery/osquery-go"
-	"github.com/osquery/osquery-go/plugin/table"
 )
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
