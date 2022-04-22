@@ -27,11 +27,17 @@ jobs:
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Set up Go 1.x
+    - name: Setup Go
       uses: actions/setup-go@v2
       with:
         go-version: ${{env.GOVER}}
       id: go
+
+    - name: Setup Zig
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      uses: goto-bus-stop/setup-zig@0cee191d0784787b27367e56fb83cde121658bbc
+        with:
+          version: 0.10.0
 
     - name: Get dependencies
       run: make deps
@@ -41,7 +47,7 @@ jobs:
 
     - name: Lipo
       run: make github-lipo
-      if: ${{ contains(matrix.os, 'macos-latest') }}
+      if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test
       run: make test
