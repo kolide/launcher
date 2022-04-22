@@ -11,14 +11,17 @@ you may need to enable debug level logs.
 1. [Install VS Code](https://code.visualstudio.com/download)
 1. [Install VS Code Go Extension](https://code.visualstudio.com/docs/languages/go)
 1. Osqueryd is available in your path
+* if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
 ### Debugging over socket
 
 1. Press cmd+p on macOS
 1. Type `debug socket`
 1. Press enter
+1. Lauch osquery with `osqueryd --connect /tmp/osq.sock -S`
 
-* if this is your first time using the VS Code go extension, you'll be prompted to install various go packages
+Now you should be able to set break points in VS Code and hit them by executing queries.
+
 
 ### Debugging against local K2 server (only available to Kolide employees)
 
