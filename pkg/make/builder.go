@@ -156,9 +156,9 @@ func New(opts ...Option) *Builder {
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
 	}
 
-	// Setup zig as cross compiler
+	// Setup zig as cross compiler for linux
 	// (This is mostly to support fscrypt on linux)
-	if b.os != runtime.GOOS {
+	if runtime.GOOS == "linux" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			// panic here feels a little uncouth, but the
