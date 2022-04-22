@@ -99,6 +99,7 @@ Now you should be able to set break points in VS Code and hit them by executing 
    ln -s <k2-repo>/tmp/localhost.crt <launcher-repo>/localhost.crt
    ```
 #### After first time setup
+
 1. Start K2 locally
 1. Open launcher repo with VS Code
 1. Press cmd+p on macOS
