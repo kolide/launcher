@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: '**'
 
+env:
+  GOVER: 1.17
+  RELEASE_TARGETS: launcher,osquery-extension.ext,grpc.ext,tables.ext,package-builder
+
 jobs:
   build_and_test:
     name: launcher
@@ -27,14 +31,18 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: ${{env.GOVER}}
       id: go
 
     - name: Get dependencies
       run: make deps
 
     - name: Build
-      run: make -j launcher extension grpc.ext tables.ext package-builder
+      run: make -j2 build_{${{env.RELEASE_TARGETS}}}_${{ matrix.os }}_{amd64,arm64}
+
+    - name: Lipo
+      run: make lipo_{${{env.RELEASE_TARGETS}}}_${{ matrix.os }}
+      if: matrix.os == "darwin"
 
     - name: Test
       run: make test
@@ -69,7 +77,7 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: ${{env.GOVER}}
       id: go
 
     - run: make deps
@@ -78,7 +86,7 @@ jobs:
     - name: package
       run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
 
-
+      	       				  
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
