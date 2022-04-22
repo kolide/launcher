@@ -66,6 +66,13 @@ extension: build_osquery-extension.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 
+##
+## GitHub Action Helpers
+##
+GITHUB_TARGETS=launcher osquery-extension.ext grpc.ext tables.ext package-builder
+GITHUB_ARCHS=amd64 arm64
+github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
+github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 
 ##
 ## Cross Build targets
