@@ -31,8 +31,10 @@ tools/notary/config/tuf
 pkg/packagekit/internal/assets.go
 pkg/packagekit/wix/internal/assets.go
 
-# VS Code Files
-.vscode/
+# live debugging files
+osquery-extension.ext
+k2_enroll_secret
+localhost.crt
 
 # scratch pad (notes used during development)
 scratch.*

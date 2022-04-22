@@ -1,7 +1,37 @@
 # Debugging Launcher
 
+## Reading Logs
 To debug launcher, look at the logs. Depending on what's happening,
 you may need to enable debug level logs.
+
+## Live Debugging with VS Code
+
+### Prerequisites
+
+1. [Install VS Code](https://code.visualstudio.com/download)
+1. [Install VS Code Go Extension](https://code.visualstudio.com/docs/languages/go)
+1. Osqueryd is available in your path
+
+### Debugging over socket
+
+1. Press cmd+p on macOS
+1. Type `debug socket`
+1. Press enter
+
+* if this is your first time using the VS Code go extension, you'll be prompted to install various go packages
+
+### Debugging against local K2 server (only available to Kolide employees)
+
+1. Log into your local instance of K2 > Inventory > Add Device, the enroll_secret will be displayed in the launcher command
+1. Save your enroll_secret to a file named `k2_enroll_secret` at the root of your launcher repository
+1. Either copy the {k2-repo}/tmp/localhost.crt to the root of your launcher repository or create a sym like from {k2-repo}/tmp/localhost.crt localhost.crt at the root of your launcher repository
+     ```sh
+      # symlink cmd
+      ln -s <k2-repo>/tmp/localhost.crt <launcher-repo>/localhost.crt
+      ```
+1. Press cmd+p on macOS
+1. Type `debug k2`
+1. Press enter
 
 ## Logs
 
