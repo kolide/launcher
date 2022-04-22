@@ -78,7 +78,7 @@ Using `svc-fg` is the recommended approach
 1. Open launcher repo with VS Code
 * if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
-### Debugging over socket
+### Debugging Over Socket
 
 1. Press cmd+p on macOS
 1. Type `debug socket`
@@ -87,15 +87,20 @@ Using `svc-fg` is the recommended approach
 
 Now you should be able to set break points in VS Code and hit them by executing queries.
 
-### Debugging against local K2 server (only available to Kolide employees)
+### Debugging Against Local K2 Server (only available to Kolide employees)
+
+#### First time setup
 
 1. Log into your local instance of K2 > Inventory > Add Device, the enroll_secret will be displayed in the launcher command
 1. Save your enroll_secret to a file named `k2_enroll_secret` at the root of your launcher repository
 1. Either copy the {k2-repo}/tmp/localhost.crt to the root of your launcher repository or create a sym like from {k2-repo}/tmp/localhost.crt localhost.crt at the root of your launcher repository
-     ```sh
-      # symlink cmd
-      ln -s <k2-repo>/tmp/localhost.crt <launcher-repo>/localhost.crt
-      ```
+   ```sh
+   # symlink cmd
+   ln -s <k2-repo>/tmp/localhost.crt <launcher-repo>/localhost.crt
+   ```
+#### After first time setup
+1. Start K2 locally
+1. Open launcher repo with VS Code
 1. Press cmd+p on macOS
 1. Type `debug k2`
 1. Press enter
