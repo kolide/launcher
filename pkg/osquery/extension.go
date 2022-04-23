@@ -172,6 +172,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	nodekey, err := NodeKeyFromDB(db)
 	if err != nil {
 		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
+		return nil, errors.Wrap(err, "reading nodekey from db")
 	} else if nodekey == "" {
 		level.Debug(opts.Logger).Log("msg", "NewExtension did not find a nodekey. Likely first enroll")
 	} else {
