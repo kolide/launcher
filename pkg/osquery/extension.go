@@ -168,6 +168,17 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
+
+	nodekey, err := NodeKeyFromDB(db)
+	if err != nil {
+		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
+		return nil, errors.Wrap(err, "reading nodekey from db")
+	} else if nodekey == "" {
+		level.Debug(opts.Logger).Log("msg", "NewExtension did not find a nodekey. Likely first enroll")
+	} else {
+		level.Debug(opts.Logger).Log("msg", "NewExtension found existing nodekey")
+	}
+
 	initialRunner := &initialRunner{
 		logger:     opts.Logger,
 		identifier: identifier,
@@ -179,6 +190,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		logger:        opts.Logger,
 		serviceClient: client,
 		db:            db,
+		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
 		initialRunner: initialRunner,
@@ -309,11 +321,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return e.NodeKey, false, nil
 	}
 
-	// Only one thread should ever be allowed to attempt enrollment at the
-	// same time.
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
-
 	// Look up a node key cached in the local store
 	key, err := NodeKeyFromDB(e.db)
 	if err != nil {
@@ -324,6 +331,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
+
+	// Only one thread should ever be allowed to attempt enrollment at the
+	// same time.
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
@@ -340,7 +352,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			return "", true, errors.Wrap(err, "query enrollment details")
 		}
 
-		level.Info(e.logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
+		level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 	}
 
 	// If no cached node key, enroll for new node key
