@@ -314,6 +314,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	level.Debug(logger).Log("msg", "starting enrollment")
 
+	// Only one thread should ever be allowed to attempt enrollment at the
+	// same time.
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
+
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
@@ -331,11 +336,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
-
-	// Only one thread should ever be allowed to attempt enrollment at the
-	// same time.
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
