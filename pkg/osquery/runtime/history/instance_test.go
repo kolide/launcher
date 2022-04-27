@@ -7,6 +7,7 @@ import (
 
 	"github.com/kolide/launcher/pkg/osquery/runtime/history/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInstance_Connected(t *testing.T) {
@@ -55,6 +56,8 @@ func TestInstance_Connected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			require.NoError(t, InitHistory(newTestBoltDb(t)))
+
 			i := &Instance{}
 			querier := &mocks.Querier{}
 			querier.On("Query", "select instance_id, version from osquery_info order by start_time limit 1").Return(tt.querierReturn())
@@ -99,6 +102,8 @@ func TestInstance_Exited(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			require.NoError(t, InitHistory(newTestBoltDb(t)))
 
 			i := &Instance{}
 			i.Exited(tt.args.exitError)

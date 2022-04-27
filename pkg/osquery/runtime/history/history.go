@@ -4,6 +4,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"go.etcd.io/bbolt"
 )
 
 const maxInstances = 10
@@ -13,12 +15,29 @@ var currentHistory *History = &History{}
 type History struct {
 	sync.Mutex
 	instances []*Instance
+	db        *bbolt.DB
 }
 
 type NoInstancesError struct{}
 
 func (c NoInstancesError) Error() string {
 	return "no osquery instances have been added to history"
+}
+
+// InitHistory loads the osquery instance history from bbolt DB if exists, sets up bucket if it does not
+func InitHistory(db *bbolt.DB) error {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
+
+	err := createBboltBucket(db)
+	if err != nil {
+		return err
+	}
+
+	currentHistory.db = db
+	currentHistory.load()
+
+	return err
 }
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
@@ -66,6 +85,8 @@ func NewInstance() (*Instance, error) {
 	}
 
 	currentHistory.addInstanceToHistory(newInstance)
+
+	currentHistory.save()
 
 	return newInstance, nil
 }

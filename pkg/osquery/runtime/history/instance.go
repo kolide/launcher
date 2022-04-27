@@ -49,7 +49,7 @@ func (i *Instance) Connected(querier Querier) error {
 	i.InstanceId = instanceId
 	i.Version = version
 
-	return nil
+	return currentHistory.save()
 }
 
 // InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
@@ -59,4 +59,6 @@ func (i *Instance) Exited(exitError error) {
 	}
 
 	i.ExitTime = timeNow()
+
+	currentHistory.save()
 }
