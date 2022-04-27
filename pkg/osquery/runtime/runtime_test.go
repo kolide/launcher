@@ -21,12 +21,14 @@ import (
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	ps "github.com/mitchellh/go-ps"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 var testOsqueryBinaryDirectory string
@@ -200,6 +202,9 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
+
+	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
+
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -225,6 +230,9 @@ func waitHealthy(t *testing.T, runner *Runner) {
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
+
+	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
+
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -245,6 +253,9 @@ func TestSimplePath(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	t.Parallel()
+
+	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
+
 	runner, _, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
@@ -273,6 +284,9 @@ func TestRestart(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
+
+	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
+
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -295,7 +309,7 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner)
 	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpedted shutdown")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
 
 	require.NoError(t, runner.Shutdown())
 }
@@ -373,6 +387,8 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
+
+	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
 
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
@@ -459,4 +475,10 @@ func getExtensionPid(t *testing.T, rootDirectory string, pgid int) int {
 
 	require.NotZero(t, extensionPid)
 	return extensionPid
+}
+
+func newTestHistoryBoltDb(t *testing.T) *bbolt.DB {
+	db, err := bbolt.Open(fmt.Sprintf("%s/%s", t.TempDir(), "osquery_instance_history_test.db"), 0600, nil)
+	require.NoError(t, err, "expect no error opening bolt db")
+	return db
 }

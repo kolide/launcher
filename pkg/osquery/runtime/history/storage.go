@@ -46,7 +46,6 @@ func (h *History) save() error {
 	}
 
 	err = h.db.Update(func(tx *bbolt.Tx) error {
-
 		b := tx.Bucket([]byte(osqueryHistoryInstanceKey))
 		err = b.Put([]byte(osqueryHistoryInstanceKey), instancesBytes)
 		if err != nil {
@@ -62,12 +61,20 @@ func (h *History) save() error {
 	return nil
 }
 
-func createBboltBucket(db *bbolt.DB) error {
-	return db.Update(func(tx *bbolt.Tx) error {
+func createBboltBucketIfNotExists(db *bbolt.DB) error {
+
+	// Create Bolt buckets as necessary
+	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(osqueryHistoryInstanceKey))
 		if err != nil {
-			return errors.Wrap(err, "error creating osquery_instance_history bucket")
+			return err
 		}
 		return nil
 	})
+
+	if err != nil {
+		return errors.Wrap(err, "error creating osquery_instance_history bucket")
+	}
+
+	return nil
 }

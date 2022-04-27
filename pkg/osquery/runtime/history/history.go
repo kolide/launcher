@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -29,15 +30,20 @@ func InitHistory(db *bbolt.DB) error {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
-	err := createBboltBucket(db)
+	err := createBboltBucketIfNotExists(db)
 	if err != nil {
 		return err
 	}
 
 	currentHistory.db = db
-	currentHistory.load()
 
-	return err
+	err = currentHistory.load()
+
+	if err != nil {
+		return errors.Wrap(err, "error loading osquery_instance_history")
+	}
+
+	return nil
 }
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
@@ -86,7 +92,11 @@ func NewInstance() (*Instance, error) {
 
 	currentHistory.addInstanceToHistory(newInstance)
 
-	currentHistory.save()
+	err = currentHistory.save()
+
+	if err != nil {
+		return newInstance, errors.Wrap(err, "error saving osquery_instance_history")
+	}
 
 	return newInstance, nil
 }
