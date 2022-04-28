@@ -41,6 +41,19 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	defer rmBinDirectory()
+
+	db, err := bbolt.Open(fmt.Sprintf("%s/%s", binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+		Timeout: 1 * time.Second,
+	})
+	if err != nil {
+		fmt.Println("Falied to create bolt db")
+		os.Exit(1)
+	}
+	if err := history.InitHistory(db); err != nil {
+		fmt.Println("Failed to init history")
+		os.Exit(1)
+	}
+
 	testOsqueryBinaryDirectory = filepath.Join(binDirectory, "osqueryd")
 
 	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
@@ -203,8 +216,6 @@ func TestBadBinaryPath(t *testing.T) {
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
 
-	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -231,8 +242,6 @@ func waitHealthy(t *testing.T, runner *Runner) {
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
 
-	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -253,8 +262,6 @@ func TestSimplePath(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	t.Parallel()
-
-	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
 
 	runner, _, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
@@ -284,8 +291,6 @@ func TestRestart(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
-
-	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
 
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
@@ -388,8 +393,6 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
 
-	require.NoError(t, history.InitHistory(newTestHistoryBoltDb(t)))
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -475,10 +478,4 @@ func getExtensionPid(t *testing.T, rootDirectory string, pgid int) int {
 
 	require.NotZero(t, extensionPid)
 	return extensionPid
-}
-
-func newTestHistoryBoltDb(t *testing.T) *bbolt.DB {
-	db, err := bbolt.Open(fmt.Sprintf("%s/%s", t.TempDir(), "osquery_instance_history_test.db"), 0600, nil)
-	require.NoError(t, err, "expect no error opening bolt db")
-	return db
 }

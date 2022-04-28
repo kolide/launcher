@@ -60,12 +60,13 @@ func TestInstance_Connected(t *testing.T) {
 
 			i := &Instance{}
 			querier := &mocks.Querier{}
-			querier.On("Query", "select instance_id, version from osquery_info order by start_time limit 1").Return(tt.querierReturn())
+			querier.On("Query", "select instance_id, version from osquery_info order by start_time limit 1").Return(tt.querierReturn()).Once()
 
 			err := i.Connected(querier)
 			assert.Equal(t, tt.wantInstanceId, i.InstanceId)
 			assert.Equal(t, tt.wantVersion, i.Version)
 			assert.ErrorIs(t, tt.wantErrReturn, err)
+			querier.AssertExpectations(t)
 
 			if tt.wantErrReturn == nil {
 				// make sure connect time was set

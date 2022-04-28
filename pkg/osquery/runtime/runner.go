@@ -83,7 +83,7 @@ func (r *Runner) Start() error {
 			case <-r.shutdown:
 				// Intentional shutdown, this loop can exit
 				if err := r.instance.stats.Exited(nil); err != nil {
-					level.Error(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
+					level.Info(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
 				}
 				return
 			default:
@@ -98,7 +98,7 @@ func (r *Runner) Start() error {
 			)
 
 			if err := r.instance.stats.Exited(err); err != nil {
-				level.Error(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
+				level.Info(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
 			}
 
 			r.instanceLock.Lock()

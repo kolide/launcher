@@ -174,7 +174,10 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 }
 
 func newTestBoltDb(t *testing.T, instancesToAddToDb ...*Instance) *bbolt.DB {
-	db, err := bbolt.Open(fmt.Sprintf("%s/%s", t.TempDir(), "osquery_instance_history_test.db"), 0600, nil)
+	db, err := bbolt.Open(fmt.Sprintf("%s/%s", t.TempDir(), "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+		Timeout: 1 * time.Second,
+	})
+
 	require.NoError(t, err, "expect no error opening bolt db")
 
 	json, err := json.Marshal(instancesToAddToDb)
