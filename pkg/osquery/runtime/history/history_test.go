@@ -3,6 +3,7 @@ package history
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -175,7 +176,12 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 
 // newTestBoltDb creates a new boltdb instance and seeds it with the given instances.
 func newTestBoltDb(t *testing.T, seedInstances ...*Instance) *bbolt.DB {
-	db, err := bbolt.Open(fmt.Sprintf("%s/%s", t.TempDir(), "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+
+	dir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	db, err := bbolt.Open(fmt.Sprintf("%s/%s", dir, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
 
