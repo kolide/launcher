@@ -215,7 +215,6 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -241,7 +240,6 @@ func waitHealthy(t *testing.T, runner *Runner) {
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()
@@ -262,7 +260,6 @@ func TestSimplePath(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	t.Parallel()
-
 	runner, _, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
@@ -291,7 +288,6 @@ func TestRestart(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
-
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 	defer rmRootDirectory()

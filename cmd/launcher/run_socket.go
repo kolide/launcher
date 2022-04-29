@@ -26,7 +26,7 @@ func runSocket(args []string) error {
 		flLauncherTables = flagset.Bool(
 			"launcher-tables",
 			false,
-			"Run with laucher specific tables",
+			"Run with launcher specific tables",
 		)
 	)
 	flagset.Usage = commandUsage(flagset, "launcher socket")
