@@ -11,7 +11,18 @@ const (
 	osqueryHistoryInstanceKey = "osquery_instance_history"
 )
 
+type NoDbError struct{}
+
+func (e NoDbError) Error() string {
+	return "database is nil for osquery instance history, not persisting"
+}
+
 func (h *History) load() error {
+
+	if h.db == nil {
+		return NoDbError{}
+	}
+
 	var instancesBytes []byte
 
 	err := h.db.View(func(tx *bbolt.Tx) error {
@@ -40,6 +51,11 @@ func (h *History) load() error {
 }
 
 func (h *History) save() error {
+
+	if h.db == nil {
+		return NoDbError{}
+	}
+
 	instancesBytes, err := json.Marshal(h.instances)
 	if err != nil {
 		return errors.Wrap(err, "error marshalling osquery_instance_history")
@@ -62,6 +78,10 @@ func (h *History) save() error {
 }
 
 func createBboltBucketIfNotExists(db *bbolt.DB) error {
+
+	if db == nil {
+		return NoDbError{}
+	}
 
 	// Create Bolt buckets as necessary
 	err := db.Update(func(tx *bbolt.Tx) error {

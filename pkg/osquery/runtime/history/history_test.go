@@ -174,6 +174,19 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
+func TestNoDbError(t *testing.T) {
+	t.Parallel()
+
+	err := InitHistory(nil)
+	assert.ErrorIs(t, err, NoDbError{})
+
+	err = currentHistory.load()
+	assert.ErrorIs(t, err, NoDbError{})
+
+	err = currentHistory.save()
+	assert.ErrorIs(t, err, NoDbError{})
+}
+
 // newTestBoltDb creates a new boltdb instance and seeds it with the given instances.
 func newTestBoltDb(t *testing.T, seedInstances ...*Instance) *bbolt.DB {
 
