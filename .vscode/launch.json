@@ -13,7 +13,7 @@
             "program": "${workspaceFolder}/cmd/launcher",
             "args": [
                 "socket",
-                "--path=/tmp/osq.sock",    
+                "--path=/tmp/osq.sock",
             ],
             // uncomment below if you need root
             // "asRoot": true,
@@ -33,8 +33,8 @@
                 "--control_hostname=localhost:3443",
                 "--enroll_secret_path=${workspaceFolder}/k2_enroll_secret",
                 "--transport=jsonrpc",
-                "--osqueryd_path=/tmp/launcher-root-dev/bin/osqueryd",
-                "--root_directory=/tmp/launcher-root-dev",
+                "--osqueryd_path=${workspaceFolder}/debug/bin/osqueryd",
+                "--root_directory=${workspaceFolder}/debug",
                 "--root_pem=${workspaceFolder}/localhost.crt",
                 "--autoupdate",
                 "--autoupdater_initial_delay=0s",

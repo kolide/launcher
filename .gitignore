@@ -35,6 +35,8 @@ pkg/packagekit/wix/internal/assets.go
 osquery-extension.ext
 k2_enroll_secret
 localhost.crt
+debug/
+__debug_bin
 
 # scratch pad (notes used during development)
 scratch.*
