@@ -24,21 +24,18 @@ func (h *History) load() error {
 
 	var instancesBytes []byte
 
-	err := h.db.View(func(tx *bbolt.Tx) error {
+	if err := h.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osqueryHistoryInstanceKey))
 		instancesBytes = b.Get([]byte(osqueryHistoryInstanceKey))
 		return nil
-	})
-
-	if err != nil {
+	}); err != nil {
 		return errors.Wrap(err, "error reading osquery_instance_history from db")
 	}
 
 	var instances []*Instance
 
 	if instancesBytes != nil {
-		err = json.Unmarshal(instancesBytes, &instances)
-		if err != nil {
+		if err := json.Unmarshal(instancesBytes, &instances); err != nil {
 			return errors.Wrap(err, "error unmarshalling osquery_instance_history")
 		}
 	} else {
@@ -60,16 +57,13 @@ func (h *History) save() error {
 		return errors.Wrap(err, "error marshalling osquery_instance_history")
 	}
 
-	err = h.db.Update(func(tx *bbolt.Tx) error {
+	if err := h.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osqueryHistoryInstanceKey))
-		err = b.Put([]byte(osqueryHistoryInstanceKey), instancesBytes)
-		if err != nil {
+		if err := b.Put([]byte(osqueryHistoryInstanceKey), instancesBytes); err != nil {
 			return errors.Wrap(err, "error writing osquery_instance_history to db")
 		}
 		return nil
-	})
-
-	if err != nil {
+	}); err != nil {
 		return errors.Wrap(err, "error writing osquery_instance_history to db")
 	}
 
@@ -77,21 +71,17 @@ func (h *History) save() error {
 }
 
 func createBboltBucketIfNotExists(db *bbolt.DB) error {
-
 	if db == nil {
 		return NoDbError{}
 	}
 
 	// Create Bolt buckets as necessary
-	err := db.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(osqueryHistoryInstanceKey))
-		if err != nil {
+	if err := db.Update(func(tx *bbolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte(osqueryHistoryInstanceKey)); err != nil {
 			return err
 		}
 		return nil
-	})
-
-	if err != nil {
+	}); err != nil {
 		return errors.Wrap(err, "error creating osquery_instance_history bucket")
 	}
 

@@ -37,9 +37,7 @@ func InitHistory(db *bbolt.DB) error {
 
 	currentHistory.db = db
 
-	err = currentHistory.load()
-
-	if err != nil {
+	if err := currentHistory.load(); err != nil {
 		return errors.Wrap(err, "error loading osquery_instance_history")
 	}
 
@@ -92,9 +90,7 @@ func NewInstance() (*Instance, error) {
 
 	currentHistory.addInstanceToHistory(newInstance)
 
-	err = currentHistory.save()
-
-	if err != nil {
+	if err := currentHistory.save(); err != nil {
 		return newInstance, errors.Wrap(err, "error saving osquery_instance_history")
 	}
 
