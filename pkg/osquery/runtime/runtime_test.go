@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	db, err := bbolt.Open(fmt.Sprintf("%s/%s", binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+	db, err := bbolt.Open(filepath.Join(binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
 	if err != nil {

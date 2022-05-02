@@ -2,9 +2,9 @@ package history
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -194,7 +194,7 @@ func newTestBoltDb(t *testing.T, seedInstances ...*Instance) *bbolt.DB {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	db, err := bbolt.Open(fmt.Sprintf("%s/%s", dir, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+	db, err := bbolt.Open(filepath.Join(dir, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
 

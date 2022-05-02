@@ -18,7 +18,6 @@ func (e NoDbError) Error() string {
 }
 
 func (h *History) load() error {
-
 	if h.db == nil {
 		return NoDbError{}
 	}

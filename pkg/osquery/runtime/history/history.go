@@ -48,12 +48,12 @@ func InitHistory(db *bbolt.DB) error {
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
 func GetHistory() ([]Instance, error) {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
+
 	if currentHistory.instances == nil {
 		return nil, NoInstancesError{}
 	}
-
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
 
 	results := make([]Instance, len(currentHistory.instances))
 	for i, v := range currentHistory.instances {

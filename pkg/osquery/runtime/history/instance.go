@@ -70,9 +70,7 @@ func (i *Instance) Exited(exitError error) error {
 
 	i.ExitTime = timeNow()
 
-	err := currentHistory.save()
-
-	if err != nil {
+	if err := currentHistory.save(); err != nil {
 		return errors.Wrap(err, "error saving osquery_instance_history")
 	}
 
