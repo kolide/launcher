@@ -21,12 +21,14 @@ import (
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	ps "github.com/mitchellh/go-ps"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 var testOsqueryBinaryDirectory string
@@ -39,6 +41,19 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	defer rmBinDirectory()
+
+	db, err := bbolt.Open(filepath.Join(binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
+		Timeout: 1 * time.Second,
+	})
+	if err != nil {
+		fmt.Println("Falied to create bolt db")
+		os.Exit(1)
+	}
+	if err := history.InitHistory(db); err != nil {
+		fmt.Println("Failed to init history")
+		os.Exit(1)
+	}
+
 	testOsqueryBinaryDirectory = filepath.Join(binDirectory, "osqueryd")
 
 	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
@@ -295,7 +310,7 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner)
 	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpedted shutdown")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
 
 	require.NoError(t, runner.Shutdown())
 }

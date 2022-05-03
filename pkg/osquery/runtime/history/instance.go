@@ -26,6 +26,9 @@ func (e ExpectedAtLeastOneRowError) Error() string {
 
 // Connected sets the connect time and instance id of the current osquery instance
 func (i *Instance) Connected(querier Querier) error {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
+
 	results, err := querier.Query("select instance_id, version from osquery_info order by start_time limit 1")
 	if err != nil {
 		return err
@@ -49,14 +52,27 @@ func (i *Instance) Connected(querier Querier) error {
 	i.InstanceId = instanceId
 	i.Version = version
 
+	if err := currentHistory.save(); err != nil {
+		return errors.Wrap(err, "error saving osquery_instance_history")
+	}
+
 	return nil
 }
 
 // InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
-func (i *Instance) Exited(exitError error) {
+func (i *Instance) Exited(exitError error) error {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
+
 	if exitError != nil {
 		i.Error = exitError.Error()
 	}
 
 	i.ExitTime = timeNow()
+
+	if err := currentHistory.save(); err != nil {
+		return errors.Wrap(err, "error saving osquery_instance_history")
+	}
+
+	return nil
 }

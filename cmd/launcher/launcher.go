@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/osquery"
+	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
@@ -155,6 +156,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		default:
 			return errors.New("invalid transport option selected")
 		}
+	}
+
+	// init osquery instance history
+	err = osqueryInstanceHistory.InitHistory(db)
+	if err != nil {
+		return errors.Wrap(err, "error initializing osquery instance history")
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
