@@ -33,11 +33,9 @@ func TestWixPackage(t *testing.T) {
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
-	packageRoot, err := ioutil.TempDir("", "packaging-root")
-	require.NoError(t, err)
-	defer os.RemoveAll(packageRoot)
+	packageRoot := t.TempDir()
 
-	err = setupPackageRoot(packageRoot)
+	err := setupPackageRoot(packageRoot)
 	require.NoError(t, err)
 
 	mainWxsContent, err := testdata.ReadFile("product.wxs")

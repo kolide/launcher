@@ -106,8 +106,7 @@ func TestFindBaseDir(t *testing.T) {
 func TestFindNewestEmpty(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, emptySetup)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, emptySetup)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 
@@ -120,8 +119,7 @@ func TestFindNewestEmpty(t *testing.T) {
 func TestFindNewestEmptyUpdateDirs(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, emptyUpdateDirs)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, emptyUpdateDirs)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 
@@ -135,8 +133,7 @@ func TestFindNewestNonExecutable(t *testing.T) {
 		t.Skip("Windows doesn't use executable bit")
 	}
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, nonExecutableUpdates)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, nonExecutableUpdates)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
@@ -154,8 +151,7 @@ func TestFindNewestNonExecutable(t *testing.T) {
 func TestFindNewestExecutableUpdates(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, executableUpdates)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
@@ -180,8 +176,7 @@ func TestFindNewestCleanup(t *testing.T) {
 		t.Skip("TODO: Windows deletion test is broken")
 	}
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, executableUpdates)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
@@ -211,8 +206,7 @@ func TestFindNewestCleanup(t *testing.T) {
 func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, truncatedUpdates)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, truncatedUpdates)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
 	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
@@ -252,13 +246,8 @@ const (
 // up in stages, allowing test functions to tap into various
 // points. This is setup this way to allow simpler isolation on test
 // failures.
-func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
-	tmpDir, err := ioutil.TempDir("", "test-autoupdate-find-newest")
-	require.NoError(t, err)
-
-	cleanupFunc := func() {
-		os.RemoveAll(tmpDir)
-	}
+func setupTestDir(t *testing.T, stage setupState) (string, string) {
+	tmpDir := t.TempDir()
 
 	// Create a test binary
 	binaryName := windowsAddExe("binary")
@@ -269,7 +258,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
 
 	if stage <= emptySetup {
-		return tmpDir, binaryName, cleanupFunc
+		return tmpDir, binaryName
 	}
 
 	// make some update directories
@@ -279,7 +268,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	if stage <= emptyUpdateDirs {
-		return tmpDir, binaryName, cleanupFunc
+		return tmpDir, binaryName
 	}
 
 	for _, n := range []string{"2", "5", "3", "1"} {
@@ -288,7 +277,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	if stage <= nonExecutableUpdates {
-		return tmpDir, binaryName, cleanupFunc
+		return tmpDir, binaryName
 	}
 
 	for _, n := range []string{"2", "5", "3", "1"} {
@@ -296,7 +285,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 	}
 
 	if stage <= executableUpdates {
-		return tmpDir, binaryName, cleanupFunc
+		return tmpDir, binaryName
 	}
 
 	for _, n := range []string{"5", "1"} {
@@ -304,7 +293,7 @@ func setupTestDir(t *testing.T, stage setupState) (string, string, func()) {
 		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, true), "copy & truncate executable")
 	}
 
-	return tmpDir, binaryName, cleanupFunc
+	return tmpDir, binaryName
 
 }
 
@@ -347,8 +336,7 @@ func TestCheckExecutable(t *testing.T) {
 
 	// We need to run this from a temp dir, else the early return
 	// from matching os.Executable bypasses the point of this.
-	tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-	defer cleanupFunc()
+	tmpDir, binaryName := setupTestDir(t, executableUpdates)
 	targetExe := filepath.Join(tmpDir, binaryName)
 
 	var tests = []struct {
@@ -448,8 +436,7 @@ func TestBuildTimestamp(t *testing.T) {
 		t.Run("buildTimestamp="+tt.buildTimestamp, func(t *testing.T) {
 			t.Parallel()
 
-			tmpDir, binaryName, cleanupFunc := setupTestDir(t, executableUpdates)
-			defer cleanupFunc()
+			tmpDir, binaryName := setupTestDir(t, executableUpdates)
 			ctx := context.TODO()
 
 			binaryPath := filepath.Join(tmpDir, binaryName)

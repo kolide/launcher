@@ -6,7 +6,6 @@ package authenticode
 import (
 	"context"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -36,9 +35,7 @@ func TestSign(t *testing.T) {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer ctxCancel()
 
-	tmpDir, err := ioutil.TempDir("", "packagekit-authenticode-signing")
-	defer os.RemoveAll(tmpDir)
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 
 	testExe := filepath.Join(tmpDir, "test.exe")
 

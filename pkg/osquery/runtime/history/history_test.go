@@ -2,7 +2,6 @@ package history
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -189,13 +188,14 @@ func TestNoDbError(t *testing.T) {
 
 // newTestBoltDb creates a new boltdb instance and seeds it with the given instances.
 func newTestBoltDb(t *testing.T, seedInstances ...*Instance) *bbolt.DB {
-
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	db, err := bbolt.Open(filepath.Join(dir, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
+	})
+
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
 	})
 
 	require.NoError(t, err, "expect no error opening bolt db")

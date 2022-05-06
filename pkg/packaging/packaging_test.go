@@ -3,7 +3,6 @@ package packaging
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -57,25 +56,28 @@ func TestInitStuff(t *testing.T) {
 	}
 
 	for _, target := range testedTargets() {
-		testPackageRoot, err := ioutil.TempDir("", fmt.Sprintf("test-packaging-root-%s", target.String()))
-		require.NoError(t, err)
+		target := target
 
-		testScriptDir, err := ioutil.TempDir("", fmt.Sprintf("test-packaging-script-%s", target.String()))
-		require.NoError(t, err)
+		t.Run(target.String(), func(t *testing.T) {
+			t.Parallel()
 
-		p := &PackageOptions{
-			target:      target,
-			Identifier:  "test",
-			initFile:    "/usr/bin/true",
-			scriptRoot:  testScriptDir,
-			packageRoot: testPackageRoot,
-			initOptions: initOptions,
-		}
+			testPackageRoot := t.TempDir()
+			testScriptDir := t.TempDir()
 
-		// TODO we're creating here, but we should check the output
-		require.NoError(t, p.setupInit(ctx))
-		require.NoError(t, p.setupPostinst(ctx))
-		require.NoError(t, p.setupPrerm(ctx))
+			p := &PackageOptions{
+				target:      target,
+				Identifier:  "test",
+				initFile:    "/usr/bin/true",
+				scriptRoot:  testScriptDir,
+				packageRoot: testPackageRoot,
+				initOptions: initOptions,
+			}
+
+			// TODO we're creating here, but we should check the output
+			require.NoError(t, p.setupInit(ctx))
+			require.NoError(t, p.setupPostinst(ctx))
+			require.NoError(t, p.setupPrerm(ctx))
+		})
 	}
 }
 

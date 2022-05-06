@@ -1,7 +1,6 @@
 package autoupdate
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,9 +16,7 @@ func TestCheckExecutablePermissions(t *testing.T) {
 	require.Error(t, checkExecutablePermissions("/random/path/should/not/exist"), "passing non-existent file path")
 
 	// Setup the tests
-	tmpDir, err := ioutil.TempDir("", "test-autoupdate-check-executable")
-	defer os.RemoveAll(tmpDir)
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 
 	require.Error(t, checkExecutablePermissions(tmpDir), "directory should not be executable")
 

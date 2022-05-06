@@ -35,9 +35,7 @@ func TestRecordLauncherVersion(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
-			tempDir, err := os.MkdirTemp("", "record-launcher-version")
-			require.NoError(t, err, "making temp dir")
-			defer os.RemoveAll(tempDir)
+			tempDir := t.TempDir()
 
 			// Make additional files
 			for i := 0; i < tt.additionalVerFiles; i++ {

@@ -12,9 +12,7 @@ import (
 func TestInstallLenses(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", "TestInstallLenses")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	require.NoError(t, InstallLenses(tmpDir), "install lenses")
 
