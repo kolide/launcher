@@ -10,9 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInstance_Connected(t *testing.T) {
-	t.Parallel()
-
+func TestInstance_Connected(t *testing.T) { // nolint:paralleltest
 	// have to declare this up here to use later in comparison
 	queryError := errors.New("some query error")
 
@@ -51,11 +49,9 @@ func TestInstance_Connected(t *testing.T) {
 			wantErrReturn: ExpectedAtLeastOneRowError{},
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			require.NoError(t, InitHistory(newTestBoltDb(t)))
 
 			i := &Instance{}
@@ -77,9 +73,7 @@ func TestInstance_Connected(t *testing.T) {
 	}
 }
 
-func TestInstance_Exited(t *testing.T) {
-	t.Parallel()
-
+func TestInstance_Exited(t *testing.T) { // nolint:paralleltest
 	type args struct {
 		exitError error
 	}
@@ -99,11 +93,9 @@ func TestInstance_Exited(t *testing.T) {
 			wantErr: "some error",
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			require.NoError(t, InitHistory(newTestBoltDb(t)))
 
 			i := &Instance{}

@@ -173,9 +173,7 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestNoDbError(t *testing.T) {
-	t.Parallel()
-
+func TestNoDbError(t *testing.T) { // nolint:paralleltest
 	err := InitHistory(nil)
 	assert.ErrorIs(t, err, NoDbError{})
 
