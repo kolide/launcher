@@ -1,11 +1,8 @@
 package checkpoint
 
 import (
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"testing"
 
@@ -29,8 +26,6 @@ func TestFilesFound(t *testing.T) {
 		filesPerDir  int
 	}{
 		{name: "2_dirs_2_files", dirsToCreate: 2, filesPerDir: 2},
-		// doesn't search any folders since "dirsToSerach" below will be empty array
-		{name: "0_dirs_0_files", dirsToCreate: 0, filesPerDir: 0},
 	}
 
 	for _, tt := range tests {
@@ -53,58 +48,30 @@ func TestFilesFound(t *testing.T) {
 func TestDirNotFound(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
-	require.NoError(t, err, "making temp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	nonExistantDirs := []string{
 		filepath.Join(tempDir, ulid.New()),
 		filepath.Join(tempDir, ulid.New()),
 	}
 
-	expectedOutput := []string{}
-
-	for _, dir := range nonExistantDirs {
-		pathErr := fs.PathError{
-			Op:   "open",
-			Path: dir,
-			// would expect this to be constant or var somewhere in os package, but couldn't find
-			Err: errors.New("no such file or directory"),
-		}
-
-		// not found error is different for windows
-		if runtime.GOOS == "windows" {
-			pathErr.Err = errors.New("The system cannot find the file specified.")
-		}
-
-		expectedOutput = append(expectedOutput, pathErr.Error())
-	}
-
+	expectedOutput := []string{"No extra osquery files detected"}
 	foundPaths := fileNamesInDirs(nonExistantDirs...)
-
 	require.Equal(t, expectedOutput, foundPaths)
-	require.Equal(t, len(nonExistantDirs), len(foundPaths))
 }
 
 func TestDirEmpty(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
-	require.NoError(t, err, "making temp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	dirs, _, err := createTestFiles(tempDir, 2, 0)
 	require.NoError(t, err, "creating test dirs")
 
-	expectedOutput := []string{}
-	for _, dir := range dirs {
-		expectedOutput = append(expectedOutput, emptyDirMsg(dir))
-	}
-
+	expectedOutput := []string{"No extra osquery files detected"}
 	foundPaths := fileNamesInDirs(dirs...)
 
 	require.Equal(t, expectedOutput, foundPaths)
-	require.Equal(t, len(dirs), len(foundPaths))
 }
 
 func createTestFiles(baseDir string, dirCount int, filesPerDir int) (dirs []string, files []string, err error) {

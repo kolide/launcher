@@ -9,6 +9,8 @@ import (
 func fileNamesInDirs(dirnames ...string) []string {
 	results := []string{}
 
+	isFilesFound := false
+
 	for _, dirname := range dirnames {
 		files, err := os.ReadDir(dirname)
 
@@ -18,10 +20,15 @@ func fileNamesInDirs(dirnames ...string) []string {
 		case len(files) == 0:
 			results = append(results, emptyDirMsg(dirname))
 		default:
+			isFilesFound = true
 			for _, file := range files {
 				results = append(results, filepath.Join(dirname, file.Name()))
 			}
 		}
+	}
+
+	if !isFilesFound {
+		return []string{"No extra osquery files detected"}
 	}
 
 	return results
