@@ -225,6 +225,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
+		WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
@@ -249,6 +250,7 @@ func TestSimplePath(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 	require.NoError(t, err)
 
@@ -297,6 +299,7 @@ func TestOsqueryDies(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 	require.NoError(t, err)
 
@@ -400,6 +403,7 @@ func TestExtensionSocketPath(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 	require.NoError(t, err)
 
@@ -426,6 +430,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	runner, err = LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 	require.NoError(t, err)
 	waitHealthy(t, runner)
