@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -198,6 +199,14 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 	}
 }
 
+// WithAutoloadedExtensions defines a list of extensions to load
+// via the osquery autoloading.
+func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.autoloadedExtensions = append(i.opts.autoloadedExtensions, extensions...)
+	}
+}
+
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
@@ -282,6 +291,7 @@ type osqueryOptions struct {
 	configPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
+	autoloadedExtensions  []string
 	extensionSocketPath   string
 	enrollSecretPath      string
 	loggerPluginFlag      string
@@ -318,8 +328,8 @@ type osqueryFilePaths struct {
 	augeasPath            string
 	databasePath          string
 	extensionAutoloadPath string
-	extensionPath         string
 	extensionSocketPath   string
+	extensionPaths        []string
 	pidfilePath           string
 }
 
@@ -328,41 +338,66 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDir, extensionSocketPath string) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
+
+	// Determine the path to the extension socket
+	extensionSocketPath := opts.extensionSocketPath
+	if extensionSocketPath == "" {
+		extensionSocketPath = socketPath(opts.rootDirectory)
+	}
+
+	extensionAutoloadPath := filepath.Join(opts.rootDirectory, "osquery.autoload")
+
+	osqueryFilePaths := &osqueryFilePaths{
+		pidfilePath:           filepath.Join(opts.rootDirectory, "osquery.pid"),
+		databasePath:          filepath.Join(opts.rootDirectory, "osquery.db"),
+		augeasPath:            filepath.Join(opts.rootDirectory, "augeas-lenses"),
+		extensionSocketPath:   extensionSocketPath,
+		extensionAutoloadPath: extensionAutoloadPath,
+		extensionPaths:        make([]string, len(opts.autoloadedExtensions)),
+	}
+
+	if len(opts.autoloadedExtensions) == 0 {
+		return osqueryFilePaths, nil
+	}
+
 	// Determine the path to the extension
 	exPath, err := os.Executable()
 	if err != nil {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
 
-	extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extensionName)
-	if _, err := os.Stat(extensionPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, errors.Wrapf(err, "extension path does not exist: %s", extensionPath)
-		} else {
-			return nil, errors.Wrapf(err, "could not stat extension path")
+	file, err := os.Create(extensionAutoloadPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating autoload file")
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+
+	for index, extension := range opts.autoloadedExtensions {
+		if _, err := os.Stat(extension); err != nil {
+			if os.IsNotExist(err) {
+				return nil, errors.Wrapf(err, "extension path does not exist: %s", extension)
+			} else {
+				return nil, errors.Wrapf(err, "could not stat extension path")
+			}
+		}
+
+		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
+		osqueryFilePaths.extensionPaths[index] = extensionPath
+
+		_, err := writer.WriteString(fmt.Sprintf("%s\n", extensionPath))
+		if err != nil {
+			return nil, errors.Wrapf(err, "writing to autoload file")
 		}
 	}
 
-	// Determine the path to the extension socket
-	if extensionSocketPath == "" {
-		extensionSocketPath = socketPath(rootDir)
+	if err := writer.Flush(); err != nil {
+		return nil, errors.Wrapf(err, "flushing autoload file")
 	}
 
-	// Write the autoload file
-	extensionAutoloadPath := filepath.Join(rootDir, "osquery.autoload")
-	if err := ioutil.WriteFile(extensionAutoloadPath, []byte(extensionPath), 0644); err != nil {
-		return nil, errors.Wrap(err, "could not write osquery extension autoload file")
-	}
-
-	return &osqueryFilePaths{
-		pidfilePath:           filepath.Join(rootDir, "osquery.pid"),
-		databasePath:          filepath.Join(rootDir, "osquery.db"),
-		augeasPath:            filepath.Join(rootDir, "augeas-lenses"),
-		extensionPath:         extensionPath,
-		extensionAutoloadPath: extensionAutoloadPath,
-		extensionSocketPath:   extensionSocketPath,
-	}, nil
+	return osqueryFilePaths, nil
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd

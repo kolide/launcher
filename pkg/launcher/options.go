@@ -8,6 +8,9 @@ import (
 
 // Options is the set of options that may be configured for Launcher.
 type Options struct {
+	// AutoloadedExtensions to load with osquery, expected to be in same
+	// directory as launcher binary.
+	AutoloadedExtensions []string
 	// KolideServerURL is the URL of the management server to connect to.
 	KolideServerURL string
 	// KolideHosted true if using Kolide SaaS settings

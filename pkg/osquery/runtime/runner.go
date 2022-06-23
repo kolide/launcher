@@ -194,18 +194,21 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(o.opts.rootDirectory, o.opts.extensionSocketPath)
+	paths, err := calculateOsqueryPaths(o.opts)
 	if err != nil {
 		return errors.Wrap(err, "could not calculate osquery file paths")
 	}
 
-	// The extensions file should be owned by the process's UID or by root.
-	// Osquery will refuse to load the extension otherwise.
-	if err := ensureProperPermissions(o, paths.extensionPath); err != nil {
-		level.Info(o.logger).Log(
-			"msg", "unable to ensure proper permissions on extension path",
-			"err", err,
-		)
+	for _, path := range paths.extensionPaths {
+		// The extensions files should be owned by the process's UID or by root.
+		// Osquery will refuse to load the extension otherwise.
+		if err := ensureProperPermissions(o, path); err != nil {
+			level.Info(o.logger).Log(
+				"msg", "unable to ensure proper permissions on extension path",
+				"path", path,
+				"err", err,
+			)
+		}
 	}
 
 	// Populate augeas lenses, if requested

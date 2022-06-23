@@ -94,14 +94,16 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	binDir, err := getBinDir()
 	require.NoError(t, err)
 
-	paths, err := calculateOsqueryPaths(binDir, "")
+	paths, err := calculateOsqueryPaths(osqueryOptions{
+		rootDirectory: binDir,
+	})
+
 	require.NoError(t, err)
 
 	// ensure that all of our resulting artifact files are in the rootDir that we
 	// dictated
 	require.Equal(t, binDir, filepath.Dir(paths.pidfilePath))
 	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
-	require.Equal(t, binDir, filepath.Dir(paths.extensionPath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
 }
