@@ -227,7 +227,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
-		WithAutoloadedExtensions("osquery-extension.ext"),
+		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
@@ -301,7 +301,7 @@ func TestOsqueryDies(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions("osquery-extension.ext"),
+		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
