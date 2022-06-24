@@ -93,13 +93,13 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	// includes both `-` and `--` for variety.
 	args := map[string]string{
-		"-control":               "", // This is a bool, it's special cased in the test routines
-		"--hostname":             randomHostname,
-		"-autoupdate_interval":   "48h",
-		"-logging_interval":      fmt.Sprintf("%ds", randomInt),
-		"-osqueryd_path":         windowsAddExe("/dev/null"),
-		"-transport":             "grpc",
-		"-autoloaded_extensions": "osquery-extension.ext,some-other-extension.ext",
+		"-control":              "", // This is a bool, it's special cased in the test routines
+		"--hostname":            randomHostname,
+		"-autoupdate_interval":  "48h",
+		"-logging_interval":     fmt.Sprintf("%ds", randomInt),
+		"-osqueryd_path":        windowsAddExe("/dev/null"),
+		"-transport":            "grpc",
+		"-autoloaded_extension": "osquery-extension.ext",
 	}
 
 	opts := &launcher.Options{
@@ -115,7 +115,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		OsquerydPath:           windowsAddExe("/dev/null"),
 		Transport:              "grpc",
 		UpdateChannel:          "stable",
-		AutoloadedExtensions:   []string{"osquery-extension.ext", "some-other-extension.ext"},
+		AutoloadedExtensions:   []string{"osquery-extension.ext"},
 	}
 
 	return args, opts

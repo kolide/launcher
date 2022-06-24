@@ -45,7 +45,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 	var (
 		// Primary options
-		flAutoloadedExtensions = flagset.String("autoloaded_extensions", "", "Comma separated filenames of extensions to load, must be in same directory as luncher")
+		flAutoloadedExtensions arrayFlags
 		flCertPins             = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
 		flControl              = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
 		flControlServerURL     = flagset.String("control_hostname", "", "The hostname of the control server")
@@ -92,7 +92,9 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
 	)
+
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
+	flagset.Var(&flAutoloadedExtensions, "autoloaded_extension", "Filenames of extensions to autoload, must be in same directory as launcher")
 
 	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
@@ -188,7 +190,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
-		AutoloadedExtensions:               strings.Split(*flAutoloadedExtensions, ","),
+		AutoloadedExtensions:               flAutoloadedExtensions,
 		InsecureTLS:                        *flInsecureTLS,
 		InsecureTransport:                  *flInsecureTransport,
 		KolideHosted:                       *flKolideHosted,
@@ -210,11 +212,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		RootPEM:                            *flRootPEM,
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
-	}
-
-	// if it's the default empty, set it as an empty string array
-	if *flAutoloadedExtensions == "" {
-		opts.AutoloadedExtensions = []string{}
 	}
 
 	return opts, nil

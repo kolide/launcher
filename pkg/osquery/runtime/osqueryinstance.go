@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"bufio"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -358,6 +357,13 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 	}
 
 	if len(opts.autoloadedExtensions) == 0 {
+
+		// delete the autoload file if there were no provided autoloaded extensions
+		// to ensure a previous run did not leave a stale file
+		if err := os.RemoveAll(extensionAutoloadPath); err != nil {
+			return nil, err
+		}
+
 		return osqueryFilePaths, nil
 	}
 
@@ -367,16 +373,16 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
 
-	file, err := os.Create(extensionAutoloadPath)
+	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating autoload file")
 	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
+	defer osqueryAutoloadFile.Close()
 
 	for index, extension := range opts.autoloadedExtensions {
-		if _, err := os.Stat(extension); err != nil {
+		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
+
+		if _, err := os.Stat(extensionPath); err != nil {
 			if os.IsNotExist(err) {
 				return nil, errors.Wrapf(err, "extension path does not exist: %s", extension)
 			} else {
@@ -384,17 +390,12 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 			}
 		}
 
-		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
 		osqueryFilePaths.extensionPaths[index] = extensionPath
 
-		_, err := writer.WriteString(fmt.Sprintf("%s\n", extensionPath))
+		_, err := osqueryAutoloadFile.WriteString(fmt.Sprintf("%s\n", extensionPath))
 		if err != nil {
 			return nil, errors.Wrapf(err, "writing to autoload file")
 		}
-	}
-
-	if err := writer.Flush(); err != nil {
-		return nil, errors.Wrapf(err, "flushing autoload file")
 	}
 
 	return osqueryFilePaths, nil
