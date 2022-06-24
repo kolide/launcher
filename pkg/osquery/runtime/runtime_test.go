@@ -193,7 +193,7 @@ func buildOsqueryExtensionInBinDir(rootDirectory string) error {
 		goBinary,
 		"build",
 		"-o",
-		filepath.Join(rootDirectory, "osquery-extension.ext"),
+		filepath.Join(rootDirectory, osqueryExtensionName),
 		filepath.Join(launcherSrcDir, "cmd/osquery-extension/osquery-extension.go"),
 	)
 	cmd.Stdout = os.Stdout
@@ -250,7 +250,7 @@ func TestSimplePath(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions("osquery-extension.ext"),
+		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
@@ -403,7 +403,7 @@ func TestExtensionSocketPath(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions("osquery-extension.ext"),
+		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
@@ -430,7 +430,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	runner, err = LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions("osquery-extension.ext"),
+		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 	waitHealthy(t, runner)
