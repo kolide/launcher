@@ -262,5 +262,10 @@ func grpcRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options, 
 			distributed.NewPlugin("kolide_grpc", ext.GetQueries, ext.WriteResults),
 			osquerylogger.NewPlugin("kolide_grpc", ext.LogString),
 		),
+		// this ensures osquery-extension.ext is present in the autoloaded extensions
+		// when distributed plugin flag is kolide_grpc, this is a dependency to run kolide_grpc,
+		// this is due to an odd behavior of osquery where we need at least one extension to be autoloaded
+		// inorder for osquery to wait for others to be loaded
+		runtime.WithAutoloadedExtensions("osquery-extension.ext"),
 	)
 }

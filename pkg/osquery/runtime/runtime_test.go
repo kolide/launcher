@@ -33,6 +33,8 @@ import (
 
 var testOsqueryBinaryDirectory string
 
+const osqueryExtensionName = "osquery-extension.ext"
+
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
 	binDirectory, rmBinDirectory, err := osqueryTempDir()

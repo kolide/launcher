@@ -464,30 +464,8 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 		opt(i)
 	}
 
-	checkOsqueryExtensionAutoload(&i.opts)
-
 	return &Runner{
 		instance: i,
 		shutdown: make(chan struct{}),
 	}
-}
-
-const osqueryExtensionName = "osquery-extension.ext"
-
-// checkOsqueryExtensionAutoload ensures osquery-extension.ext is present in the autoloaded extensions
-// when distributed plugin flag is kolide_grpc, this is a dependency to run kolide_grpc,
-// this is due to an odd behavior of osquery where we need at least one extension to be autoloaded
-// inorder for osquery to wait for others to be loaded
-func checkOsqueryExtensionAutoload(opts *osqueryOptions) {
-	if opts.distributedPluginFlag != "kolide_grpc" {
-		return
-	}
-
-	for _, extension := range opts.autoloadedExtensions {
-		if extension == osqueryExtensionName {
-			return
-		}
-	}
-
-	opts.autoloadedExtensions = append(opts.autoloadedExtensions, osqueryExtensionName)
 }
