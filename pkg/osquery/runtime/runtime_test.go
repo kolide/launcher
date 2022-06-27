@@ -4,17 +4,11 @@
 package runtime
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -23,7 +17,6 @@ import (
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
-	ps "github.com/mitchellh/go-ps"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -130,12 +123,15 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 		&osqueryFilePaths{},
 	)
 	require.NoError(t, err)
+
+	// count of flags that cannot be overridden with this option
+	const nonOverridableFlagsCount = 8
+
 	// Ensure that the provided flags were placed last (so that they can override)
 	assert.Equal(
 		t,
 		[]string{"--verbose=false", "--windows_event_channels=foo,bar"},
-		// 7 is for the 7 flags that cannot be overridden with this option.
-		cmd.Args[len(cmd.Args)-2-7:len(cmd.Args)-7],
+		cmd.Args[len(cmd.Args)-2-nonOverridableFlagsCount:len(cmd.Args)-nonOverridableFlagsCount],
 	)
 }
 
@@ -223,7 +219,7 @@ func TestSimplePath(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	t.Parallel()
-	runner, _, teardown := setupOsqueryInstanceForTests(t)
+	runner, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
 	previousStats := runner.instance.stats
@@ -298,7 +294,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
 
-	runner, extensionPid, teardown := setupOsqueryInstanceForTests(t)
+	runner, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
 	osqueryPID := runner.instance.cmd.Process.Pid
@@ -307,10 +303,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pgid, osqueryPID, "pgid must be set")
 
-	extensionProcess, err := ps.FindProcess(extensionPid)
 	require.NoError(t, err)
-	// process name seems truncated
-	require.True(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"))
 
 	// kill the current osquery process but not the extension
 	err = syscall.Kill(osqueryPID, syscall.SIGKILL)
@@ -329,24 +322,6 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 	// Ensure we've waited at least 32s
 	<-timer1.C
-
-	// check that the extension process is no longer running. Because
-	// this may be subject to PID reuse as a false positive, we have two
-	// test patterns.  If we got an err, then the process is probably
-	// gone, and we test one way. If err==nil, check for PID
-	// reuse. go-ps will panic if you look for a missing process, so
-	// there is still some window for errors.
-	extpgid, err := syscall.Getpgid(extensionPid)
-	if err != nil {
-		require.EqualError(t, err, "no such process")
-		require.Equal(t, extpgid, -1)
-	} else {
-		extensionProcess, err := ps.FindProcess(extensionPid)
-		require.NoError(t, err)
-		require.False(t, strings.HasPrefix(extensionProcess.Executable(), "osquery-ext"), "old extension pid, still running. And named like osquery-extension")
-		require.NotEqual(t, osqueryPID, extpgid)
-	}
-
 }
 
 func TestExtensionSocketPath(t *testing.T) {
@@ -380,7 +355,7 @@ func TestExtensionSocketPath(t *testing.T) {
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid int, teardown func()) {
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()) {
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 
@@ -397,44 +372,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	require.NoError(t, err)
 	require.Equal(t, pgid, osqueryPID)
 
-	extensionPid = getExtensionPid(t, rootDirectory, pgid)
-
 	teardown = func() {
 		defer rmRootDirectory()
 		require.NoError(t, runner.Shutdown())
 	}
-	return runner, extensionPid, teardown
-}
-
-// get the osquery-extension.ext process' PID
-func getExtensionPid(t *testing.T, rootDirectory string, pgid int) int {
-	out, err := exec.Command("ps", "xao", "pid,ppid,pgid,comm").CombinedOutput()
-	require.NoError(t, err)
-
-	var extensionPid int
-	r := bufio.NewReader(bytes.NewReader(out))
-	for {
-		line, _, err := r.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-
-		// some versions of the ps command truncate the comm field, using osquery-extensi
-		// instead of the full command name.
-		if bytes.Contains(line, []byte(`osquery-extensi`)) &&
-			bytes.Contains(line, []byte(fmt.Sprintf("%d", pgid))) {
-			line = bytes.TrimSpace(line)
-
-			cols := bytes.Split(line, []byte(" "))
-			require.NotEqual(t, len(cols), 0)
-
-			pid, err := strconv.Atoi(string(cols[0]))
-			require.NoError(t, err)
-			extensionPid = pid
-		}
-	}
-
-	require.NotZero(t, extensionPid)
-	return extensionPid
+	return runner, teardown
 }
