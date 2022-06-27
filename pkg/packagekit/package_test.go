@@ -18,8 +18,7 @@ func TestPackageTrivial(t *testing.T) {
 		t.Skip("No packaging tools")
 	}
 
-	inputDir, err := ioutil.TempDir("", "packaging-input")
-	require.NoError(t, err)
+	inputDir := t.TempDir()
 
 	po := &PackageOptions{
 		Name:            "test-empty",
@@ -28,7 +27,7 @@ func TestPackageTrivial(t *testing.T) {
 		AppleSigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
 	}
 
-	err = PackageFPM(context.TODO(), ioutil.Discard, po, AsTar())
+	err := PackageFPM(context.TODO(), ioutil.Discard, po, AsTar())
 	require.NoError(t, err)
 
 	err = PackageFPM(context.TODO(), ioutil.Discard, po, AsDeb())
