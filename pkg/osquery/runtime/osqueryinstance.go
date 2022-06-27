@@ -492,6 +492,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
+		"--extensions_require",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 	)
 

@@ -33,8 +33,6 @@ import (
 
 var testOsqueryBinaryDirectory string
 
-const osqueryExtensionName = "osquery-extension.ext"
-
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
 	binDirectory, rmBinDirectory, err := osqueryTempDir()
@@ -60,18 +58,6 @@ func TestMain(m *testing.M) {
 
 	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
 		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Build the osquerty extension once
-	binDir, err := getBinDir()
-	if err != nil {
-		fmt.Printf("Failed to get binDir: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := buildOsqueryExtensionInBinDir(binDir); err != nil {
-		fmt.Printf("Failed to build osquery extension: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -176,33 +162,6 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	return nil
 }
 
-// buildOsqueryExtensionInBinDir compiles the osquery extension and places it
-// on disk in the same directory as the currently running executable (as
-// expected when running an osquery process)
-func buildOsqueryExtensionInBinDir(rootDirectory string) error {
-	goBinary, err := exec.LookPath("go")
-	if err != nil {
-		return err
-	}
-
-	_, myFilename, _, _ := runtime.Caller(1)
-	launcherSrcDir := filepath.Join(filepath.Dir(myFilename), "..", "..", "..")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(
-		ctx,
-		goBinary,
-		"build",
-		"-o",
-		filepath.Join(rootDirectory, osqueryExtensionName),
-		filepath.Join(launcherSrcDir, "cmd/osquery-extension/osquery-extension.go"),
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
@@ -227,7 +186,6 @@ func TestWithOsqueryFlags(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
-		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
@@ -252,7 +210,6 @@ func TestSimplePath(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
@@ -301,7 +258,6 @@ func TestOsqueryDies(t *testing.T) {
 	runner, err := LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
@@ -405,7 +361,6 @@ func TestExtensionSocketPath(t *testing.T) {
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 
@@ -432,7 +387,6 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, extensionPid in
 	runner, err = LaunchInstance(
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithAutoloadedExtensions(osqueryExtensionName),
 	)
 	require.NoError(t, err)
 	waitHealthy(t, runner)

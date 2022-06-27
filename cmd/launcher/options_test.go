@@ -99,7 +99,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		"-logging_interval":     fmt.Sprintf("%ds", randomInt),
 		"-osqueryd_path":        windowsAddExe("/dev/null"),
 		"-transport":            "grpc",
-		"-autoloaded_extension": "osquery-extension.ext",
+		"-autoloaded_extension": "some-extension.ext",
 	}
 
 	opts := &launcher.Options{
@@ -115,7 +115,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		OsquerydPath:           windowsAddExe("/dev/null"),
 		Transport:              "grpc",
 		UpdateChannel:          "stable",
-		AutoloadedExtensions:   []string{"osquery-extension.ext"},
+		AutoloadedExtensions:   []string{"some-extension.ext"},
 	}
 
 	return args, opts

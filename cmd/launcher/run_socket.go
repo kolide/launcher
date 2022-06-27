@@ -42,7 +42,6 @@ func runSocket(args []string) error {
 
 	opts := []runtime.OsqueryInstanceOption{
 		runtime.WithExtensionSocketPath(*flPath),
-		runtime.WithAutoloadedExtensions("osquery-extension.ext"),
 	}
 
 	if *flLauncherTables {
