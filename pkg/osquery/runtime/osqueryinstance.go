@@ -356,14 +356,13 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		extensionPaths:        make([]string, len(opts.autoloadedExtensions)),
 	}
 
+	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating autoload file")
+	}
+	defer osqueryAutoloadFile.Close()
+
 	if len(opts.autoloadedExtensions) == 0 {
-
-		// delete the autoload file if there were no provided autoloaded extensions
-		// to ensure a previous run did not leave a stale file
-		if err := os.RemoveAll(extensionAutoloadPath); err != nil {
-			return nil, err
-		}
-
 		return osqueryFilePaths, nil
 	}
 
@@ -373,20 +372,20 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		return nil, errors.Wrap(err, "finding path of launcher executable")
 	}
 
-	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "creating autoload file")
-	}
-	defer osqueryAutoloadFile.Close()
-
 	for index, extension := range opts.autoloadedExtensions {
+		// first see if we just got a file name and check to see if it exists in the executable directory
 		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
 
 		if _, err := os.Stat(extensionPath); err != nil {
-			if os.IsNotExist(err) {
-				return nil, errors.Wrapf(err, "extension path does not exist: %s", extension)
-			} else {
-				return nil, errors.Wrapf(err, "could not stat extension path")
+			// if we got an error, try the raw flag
+			extensionPath = extension
+
+			if _, err := os.Stat(extensionPath); err != nil {
+				if os.IsNotExist(err) {
+					return nil, errors.Wrapf(err, "extension path does not exist: %s", extension)
+				} else {
+					return nil, errors.Wrapf(err, "could not stat extension path")
+				}
 			}
 		}
 

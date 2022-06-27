@@ -86,15 +86,14 @@ func main() {
 	}
 
 	targetSet := map[string]func(context.Context) error{
-		"deps-go":               make.New(opts...).DepsGo,
-		"install-tools":         make.New(opts...).InstallTools,
-		"generate-tuf":          make.New(opts...).GenerateTUF,
-		"launcher":              make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
-		"osquery-extension.ext": make.New(opts...).BuildCmd("./cmd/osquery-extension", "osquery-extension.ext"),
-		"tables.ext":            make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
-		"grpc.ext":              make.New(opts...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
-		"package-builder":       make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
-		"make":                  make.New(opts...).BuildCmd("./cmd/make", "make"),
+		"deps-go":         make.New(opts...).DepsGo,
+		"install-tools":   make.New(opts...).InstallTools,
+		"generate-tuf":    make.New(opts...).GenerateTUF,
+		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
+		"tables.ext":      make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
+		"grpc.ext":        make.New(opts...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
+		"package-builder": make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
+		"make":            make.New(opts...).BuildCmd("./cmd/make", "make"),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {

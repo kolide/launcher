@@ -227,7 +227,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	// Install binaries into packageRoot
-	// TODO parallization, osquery-extension.ext
+	// TODO parallization
 	// TODO windows file extensions
 
 	if p.OsqueryDownloadVersionOverride == "" {
@@ -242,10 +242,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherDownloadVersionOverride); err != nil {
-		return errors.Wrapf(err, "fetching binary launcher")
-	}
-
-	if err := p.getBinary(ctx, "osquery-extension", p.target.PlatformExtensionName("osquery-extension"), p.ExtensionVersion); err != nil {
 		return errors.Wrapf(err, "fetching binary launcher")
 	}
 

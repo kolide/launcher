@@ -94,7 +94,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
-	flagset.Var(&flAutoloadedExtensions, "autoloaded_extension", "Filenames of extensions to autoload, must be in same directory as launcher")
+	flagset.Var(&flAutoloadedExtensions, "autoloaded_extension", "extension paths to autoload, filename without path may be used in same directory as launcher")
 
 	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),

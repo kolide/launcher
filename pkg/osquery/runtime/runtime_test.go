@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -87,6 +88,52 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
+}
+
+func TestCalculateOsqueryPathsWithAutoloadedExtensions(t *testing.T) {
+	t.Parallel()
+	binDir, err := getBinDir()
+	require.NoError(t, err)
+
+	extensionPaths := make([]string, 0)
+
+	for _, extension := range []string{"extensionInExecDir1", "extensionInExecDir2"} {
+		// create file at each extension path
+		extensionPath := filepath.Join(binDir, extension)
+		require.NoError(t, os.WriteFile(extensionPath, []byte("{}"), 0644))
+		extensionPaths = append(extensionPaths, extensionPath)
+	}
+
+	nonExecDir := t.TempDir()
+	for _, extension := range []string{"extensionNotInExecDir1", "extensionNotInExecDir2"} {
+		// create file at each extension path
+		extensionPath := filepath.Join(nonExecDir, extension)
+		require.NoError(t, os.WriteFile(extensionPath, []byte("{}"), 0644))
+		extensionPaths = append(extensionPaths, extensionPath)
+	}
+
+	paths, err := calculateOsqueryPaths(osqueryOptions{
+		rootDirectory:        binDir,
+		autoloadedExtensions: []string{"extensionInExecDir1", "extensionInExecDir2", filepath.Join(nonExecDir, "extensionNotInExecDir1"), filepath.Join(nonExecDir, "extensionNotInExecDir2")},
+	})
+
+	require.NoError(t, err)
+
+	// ensure that all of our resulting artifact files are in the rootDir that we
+	// dictated
+	require.Equal(t, binDir, filepath.Dir(paths.pidfilePath))
+	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
+	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
+	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
+
+	osqueryAutoloadFilePath := filepath.Join(binDir, "osquery.autoload")
+	// read each line of the autoload file into a string array
+	bytes, err := os.ReadFile(osqueryAutoloadFilePath)
+	require.NoError(t, err)
+	autoloadFileLines := strings.Split(string(bytes), "\n")
+
+	// add empty string to extensions path array so it matches the last line of autoloaded file
+	assert.ElementsMatch(t, append(extensionPaths, ""), autoloadFileLines)
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
