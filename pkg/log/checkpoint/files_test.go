@@ -13,12 +13,7 @@ import (
 func TestFilesFound(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := os.MkdirTemp("", "log-checkpoint-files-test")
-	require.NoError(t, err, "making temp dir")
-
-	t.Cleanup(func() {
-		os.RemoveAll(tempDir)
-	})
+	tempDir := t.TempDir()
 
 	var tests = []struct {
 		name         string

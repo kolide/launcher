@@ -14,9 +14,7 @@ import (
 func TestInstallCaCerts(t *testing.T) {
 	t.Parallel()
 
-	tempDir, err := os.MkdirTemp("", "test-install-certs")
-	require.NoError(t, err, "mktemp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	installedPath1, err := InstallCaCerts(tempDir)
 	require.NoError(t, err, "install certs one")

@@ -19,8 +19,7 @@ import (
 func TestCreateTUFRepoDirectory(t *testing.T) {
 	t.Parallel()
 
-	localTUFRepoPath, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
+	localTUFRepoPath := t.TempDir()
 
 	u := &Updater{logger: log.NewNopLogger()}
 	require.NoError(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
@@ -40,7 +39,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 
 	for _, knownFilePath := range knownFilePaths {
 		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
-		_, err = os.Stat(fullFilePath)
+		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
 		jsonBytes, err := ioutil.ReadFile(fullFilePath)
@@ -63,7 +62,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	// And retest
 	for _, knownFilePath := range knownFilePaths {
 		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
-		_, err = os.Stat(fullFilePath)
+		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
 		jsonBytes, err := ioutil.ReadFile(fullFilePath)
@@ -230,9 +229,7 @@ func TestFindCurrentUpdate(t *testing.T) {
 	}
 
 	// Setup the tests
-	tmpDir, err := ioutil.TempDir("", "test-autoupdate-findCurrentUpdate")
-	defer os.RemoveAll(tmpDir)
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 
 	updater := Updater{
 		binaryName:       "binary",
