@@ -131,6 +131,8 @@ func runSubcommands() error {
 		run = runVersion
 	case "compactdb":
 		run = runCompactDb
+	case "interactive":
+		run = interactive
 	default:
 		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}
