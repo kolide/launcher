@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -491,9 +492,12 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
-		"--extensions_require",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
 	)
+
+	// aggregate all required extensions and pass to osquery extensions_require flag
+	extensions := append([]string{opts.loggerPluginFlag, opts.configPluginFlag, opts.distributedPluginFlag}, opts.autoloadedExtensions...)
+	cmd.Args = append(cmd.Args, fmt.Sprintf("--extensions_require=%s", strings.Join(extensions, ",")))
 
 	// On darwin, run osquery using a magic macOS variable to ensure we
 	// get proper versions strings back. I'm not totally sure why apple
