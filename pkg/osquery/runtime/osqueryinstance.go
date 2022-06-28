@@ -310,6 +310,22 @@ type osqueryOptions struct {
 	verbose               bool
 }
 
+func (o osqueryOptions) uniqueExtensions() []string {
+	extensionsMap := make(map[string]bool)
+	uniqueExtensions := make([]string, 0)
+
+	for _, extension := range append([]string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag}, o.autoloadedExtensions...) {
+		if _, ok := extensionsMap[extension]; ok {
+			continue
+		}
+
+		extensionsMap[extension] = true
+		uniqueExtensions = append(uniqueExtensions, extension)
+	}
+
+	return uniqueExtensions
+}
+
 func newInstance() *OsqueryInstance {
 	i := &OsqueryInstance{}
 
@@ -493,11 +509,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
+		fmt.Sprintf("--extensions_require=%s", strings.Join(opts.uniqueExtensions(), ",")),
 	)
-
-	// aggregate all required extensions and pass to osquery extensions_require flag
-	extensions := append([]string{opts.loggerPluginFlag, opts.configPluginFlag, opts.distributedPluginFlag}, opts.autoloadedExtensions...)
-	cmd.Args = append(cmd.Args, fmt.Sprintf("--extensions_require=%s", strings.Join(extensions, ",")))
 
 	// On darwin, run osquery using a magic macOS variable to ensure we
 	// get proper versions strings back. I'm not totally sure why apple
