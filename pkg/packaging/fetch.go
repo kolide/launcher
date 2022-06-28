@@ -96,7 +96,6 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 		return "", errors.Wrap(err, "couldn't untar download")
 	}
 
-	// TODO / FIXME this fails for osquery-extension, since the binary name is inconsistent.
 	if _, err := os.Stat(localBinaryPath); err != nil {
 		level.Debug(logger).Log(
 			"msg", "Missing local binary",

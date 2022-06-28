@@ -13,8 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const extensionName = `osquery-extension.ext`
-
 func setpgid() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setpgid: true}
 }

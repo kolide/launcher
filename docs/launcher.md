@@ -207,10 +207,8 @@ Each zip will contain the following files:
 ```
 |-- darwin
 |   |-- launcher
-|   |-- osquery-extension.ext
 |   `-- osqueryd
 `-- linux
     |-- launcher
-    |-- osquery-extension.ext
     `-- osqueryd
 ```

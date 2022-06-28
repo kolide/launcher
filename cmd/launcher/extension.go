@@ -207,6 +207,7 @@ func commonRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options
 		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
 		runtime.WithOsqueryFlags(opts.OsqueryFlags),
 		runtime.WithAugeasLensFunction(augeas.InstallLenses),
+		runtime.WithAutoloadedExtensions(opts.AutoloadedExtensions...),
 	}
 }
 
