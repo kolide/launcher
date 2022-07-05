@@ -290,10 +290,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return errors.Wrapf(err, "setup init script for %s", p.target.String())
 	}
 
-	if err := p.setupPreinst(ctx); err != nil {
-		return errors.Wrapf(err, "setup preinst for %s", p.target.String())
-	}
-
 	if err := p.setupPostinst(ctx); err != nil {
 		return errors.Wrapf(err, "setup postInst for %s", p.target.String())
 	}
@@ -603,22 +599,6 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (p *PackageOptions) setupPreinst(ctx context.Context) error {
-	if p.target.Platform != Darwin {
-		return nil
-	}
-
-	preinstallContent, err := assets.ReadFile("assets/preinstall-darwin.sh")
-	if err != nil {
-		return errors.Wrap(err, "getting template for preinstall")
-	}
-
-	return errors.Wrap(
-		ioutil.WriteFile(filepath.Join(p.scriptRoot, "preinstall"), preinstallContent, 0755),
-		"writing preinstall file",
-	)
 }
 
 func (p *PackageOptions) setupPostinst(ctx context.Context) error {
