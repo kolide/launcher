@@ -10,7 +10,6 @@ import (
 
 	"github.com/kolide/kit/fs"
 	"github.com/kolide/launcher/pkg/packaging"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +45,7 @@ func TestStartProcess(t *testing.T) {
 		{
 			name: "socket path too long",
 			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "this_is_a_really_reallyz-really_really_really_really_really_really_really_really_really_really_long_socket")),
+				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "this_is_a_really_really_really_really_really_really_really_really_really_really_really_really_long_socket")),
 			},
 			wantProc:       false,
 			errContainsStr: "socket path is too long",
@@ -78,7 +77,6 @@ func TestStartProcess(t *testing.T) {
 				if err != nil {
 					require.NoError(t, err)
 				}
-
 			} else {
 				require.Nil(t, proc)
 			}
@@ -89,19 +87,23 @@ func TestStartProcess(t *testing.T) {
 func downloadOsquery(dir string) error {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return errors.Wrapf(err, "Error parsing platform: %s", runtime.GOOS)
+		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
 	}
 
 	outputFile := filepath.Join(dir, "osqueryd")
-	cacheDir := os.TempDir()
+	cacheDir := filepath.Join(os.TempDir(), "launcher_interactive_tests")
+
+	if err := os.MkdirAll(cacheDir, fs.DirMode); err != nil {
+		return fmt.Errorf("error creating cache dir: %w", err)
+	}
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
-		return errors.Wrap(err, "An error occurred fetching the osqueryd binary")
+		return fmt.Errorf("error fetching binary osqueryd binary: %w", err)
 	}
 
 	if err := fs.CopyFile(path, outputFile); err != nil {
-		return errors.Wrapf(err, "Couldn't copy file to %s", outputFile)
+		return fmt.Errorf("error copying binary osqueryd binary: %w", err)
 	}
 
 	return nil
