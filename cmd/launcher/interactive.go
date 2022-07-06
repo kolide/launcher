@@ -39,7 +39,7 @@ func runInteractive(args []string) error {
 
 	rootDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		return errors.Wrap(err, "creating root dir for interactive mode")
+		return errors.Wrap(err, "creating temp dir for interactive mode")
 	}
 
 	defer func() {

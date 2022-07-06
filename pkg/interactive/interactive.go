@@ -90,7 +90,7 @@ func socketPath(rootDir string, osqueryFlags []string) (string, error) {
 		}
 	}
 
-	// the total lenght of the socket path cannot be greater than 97
+	// the total length of the socket path cannot be greater than 97
 	// testing with t.TempDir() for this function usually creates a directory 86-88 characters long, the length is variable
 	// if the socket path is >= 104 characters, you'll get error emitted form osquery: "Unix Domain socket path too long"
 	// if the socket path is 98 - 103 characters, you'll get error (from thrift?): "bind: invalid argument"
