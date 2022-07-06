@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -47,7 +46,7 @@ func TestStartProcess(t *testing.T) {
 		{
 			name: "socket path too long",
 			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "this_is_a_really_really_long_socket")),
+				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "this_is_a_really_reallyz-really_really_really_really_really_really_really_really_really_really_long_socket")),
 			},
 			wantProc:       false,
 			errContainsStr: "socket path is too long",
@@ -106,52 +105,4 @@ func downloadOsquery(dir string) error {
 	}
 
 	return nil
-}
-
-// findOsquery will attempt to find osquery. We don't much care about
-// errors here, either we find it, or we don't.
-func findOsquery() string {
-	osqBinaryName := "osqueryd"
-	if runtime.GOOS == "windows" {
-		osqBinaryName = osqBinaryName + ".exe"
-	}
-
-	var likelyDirectories []string
-
-	if exPath, err := os.Executable(); err == nil {
-		likelyDirectories = append(likelyDirectories, filepath.Dir(exPath))
-	}
-
-	// Places to check. We could conditionalize on GOOS, but it doesn't
-	// seem important.
-	likelyDirectories = append(
-		likelyDirectories,
-		"/usr/local/kolide/bin",
-		"/usr/local/kolide-k2/bin",
-		"/usr/local/bin",
-		`C:\Program Files\osquery`,
-	)
-
-	for _, dir := range likelyDirectories {
-		maybeOsq := filepath.Join(filepath.Clean(dir), osqBinaryName)
-
-		info, err := os.Stat(maybeOsq)
-		if err != nil {
-			continue
-		}
-
-		if info.IsDir() {
-			continue
-		}
-
-		// I guess it's good enough...
-		return maybeOsq
-	}
-
-	// last ditch, check for osquery on the PATH
-	if osqPath, err := exec.LookPath(osqBinaryName); err == nil {
-		return osqPath
-	}
-
-	return ""
 }
