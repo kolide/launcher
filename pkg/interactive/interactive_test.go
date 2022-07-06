@@ -67,6 +67,8 @@ func TestStartProcess(t *testing.T) {
 			if tt.errContainsStr != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errContainsStr)
+			} else {
+				require.NoError(t, err)
 			}
 
 			if tt.wantProc {
@@ -92,7 +94,7 @@ func downloadOsquery(dir string) error {
 	}
 
 	outputFile := filepath.Join(dir, "osqueryd")
-	cacheDir := "/tmp"
+	cacheDir := os.TempDir()
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
