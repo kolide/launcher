@@ -49,6 +49,9 @@ func runInteractive(args []string) error {
 	}()
 
 	osqueryProc, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
+	if err != nil {
+		return fmt.Errorf("error starting osqueryd: %s", err)
+	}
 
 	// Wait until user exits the shell
 	state, err := osqueryProc.Wait()
