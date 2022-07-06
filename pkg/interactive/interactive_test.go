@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/kolide/kit/fs"
@@ -46,12 +47,19 @@ func TestStartProcess(t *testing.T) {
 			errContainsStr: "extensions_socket flag is missing a value",
 		},
 		{
+			name: "socket path max length",
+			osqueryFlags: []string{
+				fmt.Sprintf("extensions_socket=%s", createMaxLengthSocket(t)),
+			},
+			wantProc: true,
+		},
+		{
 			name: "socket path too long",
 			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "this_is_a_really_really_really_really_really_really_really_really_really_really_really_really_long_socket")),
+				fmt.Sprintf("extensions_socket=%s", strings.Repeat("a", MaxSocketPathCharacters+1)),
 			},
 			wantProc:       false,
-			errContainsStr: "socket path is too long",
+			errContainsStr: "exceeded the maximum socket path character length",
 		},
 	}
 	for _, tt := range tests {
@@ -85,6 +93,11 @@ func TestStartProcess(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createMaxLengthSocket(t *testing.T) string {
+	dir := t.TempDir()
+	return filepath.Join(dir, strings.Repeat("a", MaxSocketPathCharacters-len(dir)-1))
 }
 
 func downloadOsquery(dir string) error {

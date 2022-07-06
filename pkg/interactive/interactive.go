@@ -75,6 +75,11 @@ func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
 	return flags
 }
 
+// MaxSocketPathCharacters is set to 97 because a ".12345" uuid is added to the socket down stream
+// if the provided socket is greater than 97 we may exceed the limit of 103
+// why 103 limit? https://unix.stackexchange.com/questions/367008/why-is-socket-path-length-limited-to-a-hundred-chars
+const MaxSocketPathCharacters = 97
+
 func socketPath(rootDir string, osqueryFlags []string) (string, error) {
 
 	path := ""
@@ -90,23 +95,15 @@ func socketPath(rootDir string, osqueryFlags []string) (string, error) {
 		}
 	}
 
-	// the total length of the socket path cannot be greater than 97
-	// testing with t.TempDir() for this function usually creates a directory 86-88 characters long, the length is variable
-	// if the socket path is >= 104 characters, you'll get error emitted form osquery: "Unix Domain socket path too long"
-	// if the socket path is 98 - 103 characters, you'll get error (from thrift?): "bind: invalid argument"
-
-	const maxSocketLength = 97
-
 	if path == "" {
 		path = filepath.Join(rootDir, "sock")
 	}
 
-	if len(path) > maxSocketLength {
-		return "", fmt.Errorf("socket path is too long, it cannot be greater than %d, but was %d", maxSocketLength, len(path))
+	if len(path) > MaxSocketPathCharacters {
+		return "", fmt.Errorf("socket path %s (%d characters) exceeded the maximum socket path character length of %d", path, len(path), MaxSocketPathCharacters)
 	}
 
 	return path, nil
-
 }
 
 func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
