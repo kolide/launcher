@@ -1,22 +1,15 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/env"
-	"github.com/kolide/kit/fs"
-	"github.com/kolide/launcher/pkg/osquery/table"
-	osquery "github.com/osquery/osquery-go"
+	"github.com/kolide/launcher/pkg/interactive"
 	"github.com/pkg/errors"
 )
 
-func interactive(args []string) error {
+func runInteractive(args []string) error {
 	flagset := flag.NewFlagSet("interactive", flag.ExitOnError)
 	var (
 		flOsquerydPath = flagset.String(
@@ -24,12 +17,10 @@ func interactive(args []string) error {
 			"",
 			"The path to the oqueryd binary",
 		)
-		flSocketPath = flagset.String(
-			"socket_path",
-			env.String("SOCKET_PATH", filepath.Join(os.TempDir(), "osquery.sock")),
-			"The path to the socket",
-		)
+		flOsqueryFlags arrayFlags
 	)
+
+	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
 
 	flagset.Usage = commandUsage(flagset, "interactive")
 	if err := flagset.Parse(args); err != nil {
@@ -44,35 +35,20 @@ func interactive(args []string) error {
 		}
 	}
 
-	if _, err := os.Stat(filepath.Dir(*flSocketPath)); os.IsNotExist(err) {
-		if err := os.Mkdir(filepath.Dir(*flSocketPath), fs.DirMode); err != nil {
-			return errors.Wrap(err, "creating socket path base directory")
-		}
-	}
-
-	// Transfer stdin, stdout, and stderr to the new process
-	// and also set target directory for the shell to start in.
-	pa := os.ProcAttr{
-		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
-	}
-
-	// Start up a new shell.
 	fmt.Println(">> Starting osquery interactive with launcher tables")
 
-	osqueryProc, err := os.StartProcess(osquerydPath, []string{
-		"-S",
-		fmt.Sprintf("--extensions_socket=%s", *flSocketPath),
-	}, &pa)
-
+	rootDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		return fmt.Errorf("error starting osqueryd: %s", err)
+		return errors.Wrap(err, "creating root dir for interactive mode")
 	}
 
-	extensionManagerServer, err := loadExtensions(*flSocketPath, osquerydPath)
-	if err != nil {
-		extensionManagerServer.Shutdown(context.Background())
-		return fmt.Errorf("error loading extensions: %s", err)
-	}
+	defer func() {
+		if err := os.RemoveAll(rootDir); err != nil {
+			fmt.Printf("error removing launcher interactive temp dir: %s\n", err)
+		}
+	}()
+
+	osqueryProc, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
 
 	// Wait until user exits the shell
 	state, err := osqueryProc.Wait()
@@ -80,39 +56,7 @@ func interactive(args []string) error {
 		return fmt.Errorf("error waiting for osqueryd: %s", err)
 	}
 
-	// Keep on keepin' on.
 	fmt.Printf("<< Exited osquery interactive with launcher tables: %s\n", state.String())
 
-	if err := extensionManagerServer.Shutdown(context.Background()); err != nil {
-		return fmt.Errorf("error shutting down extension manager: %s", err)
-	}
-
 	return nil
-}
-
-func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
-
-	extensionManagerServer, err := osquery.NewExtensionManagerServer(
-		"interactive",
-		socketPath,
-		osquery.ServerTimeout(10*time.Second),
-	)
-
-	if err != nil {
-		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %s", err)
-	}
-
-	client, err := osquery.NewClient(socketPath, 10*time.Second)
-	if err != nil {
-		return extensionManagerServer, fmt.Errorf("error creating osquery client: %s", err)
-	}
-
-	extensionManagerServer.RegisterPlugin(table.PlatformTables(client, log.NewNopLogger(), osquerydPath)...)
-	extensionManagerServer.RegisterPlugin(table.LauncherTables(nil, nil)...)
-
-	if err := extensionManagerServer.Start(); err != nil {
-		return extensionManagerServer, errors.Wrap(err, "running extension server")
-	}
-
-	return extensionManagerServer, nil
 }
