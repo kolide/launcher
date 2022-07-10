@@ -322,7 +322,7 @@ func (o osqueryOptions) requiredExtensions() []string {
 		if extension == "tls" {
 			continue
 		}
-		
+
 		if _, ok := extensionsMap[extension]; ok {
 			continue
 		}
