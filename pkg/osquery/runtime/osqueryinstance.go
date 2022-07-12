@@ -310,20 +310,28 @@ type osqueryOptions struct {
 	verbose               bool
 }
 
-func (o osqueryOptions) uniqueExtensions() []string {
+// requiredExtensions returns a unique list of external
+// extensions. These are extensions we expect osquery to pause start
+// for.
+func (o osqueryOptions) requiredExtensions() []string {
 	extensionsMap := make(map[string]bool)
-	uniqueExtensions := make([]string, 0)
+	requiredExtensions := make([]string, 0)
 
 	for _, extension := range append([]string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag}, o.autoloadedExtensions...) {
+		// skip the osquery build-ins, since requiring them will cause osquery to needlessly wait.
+		if extension == "tls" {
+			continue
+		}
+
 		if _, ok := extensionsMap[extension]; ok {
 			continue
 		}
 
 		extensionsMap[extension] = true
-		uniqueExtensions = append(uniqueExtensions, extension)
+		requiredExtensions = append(requiredExtensions, extension)
 	}
 
-	return uniqueExtensions
+	return requiredExtensions
 }
 
 func newInstance() *OsqueryInstance {
@@ -509,7 +517,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
-		fmt.Sprintf("--extensions_require=%s", strings.Join(opts.uniqueExtensions(), ",")),
+		fmt.Sprintf("--extensions_require=%s", strings.Join(opts.requiredExtensions(), ",")),
 	)
 
 	// On darwin, run osquery using a magic macOS variable to ensure we
