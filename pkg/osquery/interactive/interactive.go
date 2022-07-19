@@ -1,11 +1,9 @@
 package interactive
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -22,11 +20,6 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		return nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath, err := socketPath(rootDir, osqueryFlags)
-	if err != nil {
-		return nil, fmt.Errorf("creating socket path: %w", err)
-	}
-
 	// Get the current working directory.
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -39,6 +32,8 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 		Dir:   cwd,
 	}
+
+	socketPath := filepath.Join(rootDir, "osq.sock")
 
 	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, osqueryFlags), &pa)
 	if err != nil {
@@ -73,37 +68,6 @@ func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
 	}...)
 
 	return flags
-}
-
-// MaxSocketPathCharacters is set to 97 because a ".12345" uuid is added to the socket down stream
-// if the provided socket is greater than 97 we may exceed the limit of 103
-// why 103 limit? https://unix.stackexchange.com/questions/367008/why-is-socket-path-length-limited-to-a-hundred-chars
-const MaxSocketPathCharacters = 97
-
-func socketPath(rootDir string, osqueryFlags []string) (string, error) {
-
-	path := ""
-
-	for _, flag := range osqueryFlags {
-		if strings.HasPrefix(flag, "extensions_socket=") {
-			split := strings.Split(flag, "=")
-			if len(split) > 1 && split[1] != "" {
-				path = split[1]
-			} else {
-				return "", errors.New("extensions_socket flag is missing a value")
-			}
-		}
-	}
-
-	if path == "" {
-		path = filepath.Join(rootDir, "sock")
-	}
-
-	if len(path) > MaxSocketPathCharacters {
-		return "", fmt.Errorf("socket path %s (%d characters) exceeded the maximum socket path character length of %d", path, len(path), MaxSocketPathCharacters)
-	}
-
-	return path, nil
 }
 
 func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {

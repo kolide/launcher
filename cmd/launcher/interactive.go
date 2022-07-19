@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kolide/launcher/pkg/interactive"
+	"github.com/kolide/launcher/pkg/osquery/interactive"
 	"github.com/pkg/errors"
 )
 
@@ -35,9 +35,7 @@ func runInteractive(args []string) error {
 		}
 	}
 
-	fmt.Println(">> Starting osquery interactive with launcher tables")
-
-	rootDir, err := os.MkdirTemp("", "")
+	rootDir, err := os.MkdirTemp("", "launcher-osquery-interactive")
 	if err != nil {
 		return errors.Wrap(err, "creating temp dir for interactive mode")
 	}
@@ -54,12 +52,10 @@ func runInteractive(args []string) error {
 	}
 
 	// Wait until user exits the shell
-	state, err := osqueryProc.Wait()
+	_, err = osqueryProc.Wait()
 	if err != nil {
 		return fmt.Errorf("error waiting for osqueryd: %s", err)
 	}
-
-	fmt.Printf("<< Exited osquery interactive with launcher tables: %s\n", state.String())
 
 	return nil
 }

@@ -32,31 +32,9 @@ func TestStartProcess(t *testing.T) {
 			wantProc:     true,
 		},
 		{
-			name: "extension socket flag",
-			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", filepath.Join(t.TempDir(), "test.sock")),
-			},
-			wantProc: true,
-		},
-		{
-			name: "no socket val",
-			osqueryFlags: []string{
-				"extensions_socket=",
-			},
-			wantProc:       false,
-			errContainsStr: "extensions_socket flag is missing a value",
-		},
-		{
-			name: "socket path max length",
-			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", createMaxLengthSocket(t)),
-			},
-			wantProc: true,
-		},
-		{
 			name: "socket path too long",
 			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", strings.Repeat("a", MaxSocketPathCharacters+1)),
+				fmt.Sprintf("extensions_socket=%s", strings.Repeat("a", 100)),
 			},
 			wantProc:       false,
 			errContainsStr: "exceeded the maximum socket path character length",
@@ -93,11 +71,6 @@ func TestStartProcess(t *testing.T) {
 			}
 		})
 	}
-}
-
-func createMaxLengthSocket(t *testing.T) string {
-	dir := t.TempDir()
-	return filepath.Join(dir, strings.Repeat("a", MaxSocketPathCharacters-len(dir)-1))
 }
 
 func downloadOsquery(dir string) error {
