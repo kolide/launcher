@@ -42,7 +42,7 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 
 	_, err = loadExtensions(socketPath, osquerydPath)
 	if err != nil {
-		return nil, fmt.Errorf("error loading extensions: %s", err)
+		return nil, fmt.Errorf("error loading extensions: %w", err)
 	}
 
 	return proc, nil
@@ -79,19 +79,19 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 	)
 
 	if err != nil {
-		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %s", err)
+		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
 	client, err := osquery.NewClient(socketPath, 10*time.Second)
 	if err != nil {
-		return extensionManagerServer, fmt.Errorf("error creating osquery client: %s", err)
+		return extensionManagerServer, fmt.Errorf("error creating osquery client: %w", err)
 	}
 
 	extensionManagerServer.RegisterPlugin(table.PlatformTables(client, log.NewNopLogger(), osquerydPath)...)
 	extensionManagerServer.RegisterPlugin(table.LauncherTables(nil, nil)...)
 
 	if err := extensionManagerServer.Start(); err != nil {
-		return nil, fmt.Errorf("error starting extension manager server: %s", err)
+		return nil, fmt.Errorf("error starting extension manager server: %w", err)
 	}
 
 	return extensionManagerServer, nil
