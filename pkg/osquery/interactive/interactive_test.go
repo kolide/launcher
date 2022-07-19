@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/kolide/kit/fs"
@@ -27,15 +26,19 @@ func TestStartProcess(t *testing.T) {
 		errContainsStr string
 	}{
 		{
-			name:         "no flags",
-			osqueryFlags: []string{},
-			wantProc:     true,
+			name:     "no flags",
+			wantProc: true,
 		},
 		{
-			name: "socket path too long",
+			name: "flags",
 			osqueryFlags: []string{
-				fmt.Sprintf("extensions_socket=%s", strings.Repeat("a", 100)),
+				"verbose",
+				"force=false",
 			},
+			wantProc: true,
+		},
+		{
+			name:           "make socket path to long to test our error handling, making this really long causes the socket path to be long",
 			wantProc:       false,
 			errContainsStr: "exceeded the maximum socket path character length",
 		},
