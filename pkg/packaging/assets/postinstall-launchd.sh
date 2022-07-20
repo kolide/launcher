@@ -17,4 +17,4 @@ fi
 sleep 5
 
 /bin/launchctl unload {{.Path}}
-/bin/launchctl load {{.Path}}
+/bin/launchctl load -w {{.Path}}
