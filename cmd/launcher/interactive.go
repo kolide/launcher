@@ -1,15 +1,22 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 	"github.com/pkg/errors"
 )
 
 func runInteractive(args []string) error {
+
+	if runtime.GOOS == "windows" {
+		return errors.New("interactive mode is not supported on Windows")
+	}
+
 	flagset := flag.NewFlagSet("interactive", flag.ExitOnError)
 	var (
 		flOsquerydPath = flagset.String(
@@ -46,10 +53,11 @@ func runInteractive(args []string) error {
 		}
 	}()
 
-	osqueryProc, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}
+	defer extensionsServer.Shutdown(context.Background())
 
 	// Wait until user exits the shell
 	_, err = osqueryProc.Wait()

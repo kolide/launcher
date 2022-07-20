@@ -14,38 +14,38 @@ import (
 
 const extensionName = "com.kolide.launcher_interactive"
 
-func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, error) {
+func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
 
 	if err := os.MkdirAll(rootDir, fs.DirMode); err != nil {
-		return nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
-	}
-
-	// Get the current working directory.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("error getting current working directory: %w", err)
+		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
 	// Transfer stdin, stdout, and stderr to the new process
 	// and also set target directory for the shell to start in.
 	pa := os.ProcAttr{
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
-		Dir:   cwd,
 	}
 
 	socketPath := filepath.Join(rootDir, "osq.sock")
 
 	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, osqueryFlags), &pa)
 	if err != nil {
-		return nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
+		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
 
-	_, err = loadExtensions(socketPath, osquerydPath)
+	extensionServer, err := loadExtensions(socketPath, osquerydPath)
 	if err != nil {
-		return nil, fmt.Errorf("error loading extensions: %w", err)
+		err = fmt.Errorf("error loading extensions: %w", err)
+
+		procKillErr := proc.Kill()
+		if procKillErr != nil {
+			err = fmt.Errorf("error killing osqueryd interactive: %s: %w", procKillErr, err)
+		}
+
+		return nil, nil, err
 	}
 
-	return proc, nil
+	return proc, extensionServer, nil
 }
 
 func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
