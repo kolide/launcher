@@ -16,11 +16,11 @@ func TestWaitFor(t *testing.T) {
 
 	// The github action runners seem very sensitive to timing
 	// wobbles, and I've been unable to get these tests to work
-	// there. As I think it's an issue specific to GitHub's
-	// windows runners, and trying to test timeout values, I'm
+	// consistently there. As I think it's an issue specific to GitHub's
+	// windows and drawin runners, and trying to test timeout values, I'm
 	// going to disable them.
-	if runtime.GOOS == "windows" {
-		t.Skip("Test broken on GitHub's windows runners")
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		t.Skip("Test flakey on windows and darwin github runners")
 	}
 
 	var tests = []struct {
