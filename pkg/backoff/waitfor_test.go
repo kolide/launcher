@@ -16,7 +16,7 @@ func TestWaitFor(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv("GITHUB_ACTIONS") == "true" && (runtime.GOOS == "windows" || runtime.GOOS == "darwin") {
-		t.Skip("Skipping test on GitHub Actions for windows and darwin because they it's flakey there")
+		t.Skip("Skipping test on GitHub Actions for windows and darwin because it's flakey there")
 	}
 
 	var tests = []struct {
