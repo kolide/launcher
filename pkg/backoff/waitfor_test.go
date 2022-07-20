@@ -2,6 +2,7 @@ package backoff
 
 import (
 	"errors"
+	"os"
 	"regexp"
 	"runtime"
 	"testing"
@@ -14,13 +15,8 @@ import (
 func TestWaitFor(t *testing.T) {
 	t.Parallel()
 
-	// The github action runners seem very sensitive to timing
-	// wobbles, and I've been unable to get these tests to work
-	// there. As I think it's an issue specific to GitHub's
-	// windows runners, and trying to test timeout values, I'm
-	// going to disable them.
-	if runtime.GOOS == "windows" {
-		t.Skip("Test broken on GitHub's windows runners")
+	if os.Getenv("GITHUB_ACTIONS") == "true" && (runtime.GOOS == "windows" || runtime.GOOS == "darwin") {
+		t.Skip("Skipping test on GitHub Actions for windows and darwin because it's flakey there")
 	}
 
 	var tests = []struct {
