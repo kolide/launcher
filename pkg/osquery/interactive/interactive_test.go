@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStartProcess(t *testing.T) {
+// TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough
+// to not exceed the max number of charcters for the socket path.
+func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
