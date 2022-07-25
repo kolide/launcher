@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,7 @@ import (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	level.Debug(logger).Log("msg", "runLauncher starting")
@@ -243,6 +245,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
+	err = runSystray()
+	if err != nil {
+		return fmt.Errorf("error running systray: %w", err)
+	}
+
 	err = runGroup.Run()
 	return errors.Wrap(err, "run service")
 }
@@ -250,4 +257,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 func writePidFile(path string) error {
 	err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600)
 	return errors.Wrap(err, "writing pidfile")
+}
+
+func runSystray() error {
+	executable, err := os.Executable()
+
+	if err != nil {
+		return fmt.Errorf("error getting executable path: %w", err)
+	}
+
+	err = exec.Command(executable, "systray").Run()
+	if err != nil {
+		return fmt.Errorf("error running systray: %w", err)
+	}
+
+	return nil
 }
