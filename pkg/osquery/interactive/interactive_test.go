@@ -1,3 +1,7 @@
+// disabled on windows because go tests doesn't get access to used named pipes
+//go:build !windows
+// +build !windows
+
 package interactive
 
 import (
