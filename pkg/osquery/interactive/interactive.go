@@ -33,9 +33,11 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
 
+	time.Sleep(20 * time.Second)
+
 	// while developing for windows it was found that it will sometimes take osquey a while
 	// to create the socket, so we wait for it to exist before continuing
-	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
+	if err := waitForFile(socketPath, time.Second/4, time.Second*60); err != nil {
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
