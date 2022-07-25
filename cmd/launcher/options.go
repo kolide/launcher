@@ -354,6 +354,7 @@ func findOsquery() string {
 		"/usr/local/kolide-k2/bin",
 		"/usr/local/bin",
 		`C:\Program Files\osquery`,
+		`C:\Program Files\Kolide\Launcher-kolide-k2\bin`,
 	)
 
 	for _, dir := range likelyDirectories {

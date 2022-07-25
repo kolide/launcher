@@ -5,17 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 	"github.com/pkg/errors"
 )
 
 func runInteractive(args []string) error {
-
-	if runtime.GOOS == "windows" {
-		return errors.New("interactive mode is not supported on Windows")
-	}
 
 	flagset := flag.NewFlagSet("interactive", flag.ExitOnError)
 	var (
