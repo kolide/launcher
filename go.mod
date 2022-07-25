@@ -15,6 +15,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
+	github.com/getlantern/systray v1.2.1 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
