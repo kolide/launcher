@@ -33,7 +33,7 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
 
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// while developing for windows it was found that it will sometimes take osquey a while
 	// to create the socket, so we wait for it to exist before continuing
@@ -70,7 +70,7 @@ func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
 	// required flags for interactive mode to function
 	flags = append(flags, []string{
 		"--disable_extensions=false",
-		"--extensions_timeout=10",
+		"--extensions_timeout=20",
 		fmt.Sprintf("--extensions_require=%s", extensionName),
 		fmt.Sprintf("--extensions_socket=%s", socketPath),
 	}...)
