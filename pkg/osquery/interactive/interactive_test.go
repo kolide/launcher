@@ -33,6 +33,10 @@ func TestMain(m *testing.M) {
 		fmt.Printf("error fetching binary osqueryd binary: %s", err)
 		os.Exit(1)
 	}
+
+	// Run the tests!
+	retCode := m.Run()
+	os.Exit(retCode)
 }
 
 // TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough
