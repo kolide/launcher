@@ -3,11 +3,14 @@ package interactive
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fs"
-	"github.com/kolide/launcher/pkg/osquery/runtime"
+	"github.com/kolide/launcher/pkg/augeas"
+	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
 )
@@ -26,9 +29,21 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 	}
 
-	socketPath := runtime.SocketPath(rootDir)
+	socketPath := osqueryRuntime.SocketPath(rootDir)
+	augeasLensesPath := filepath.Join(rootDir, "augeas-lenses")
 
-	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, osqueryFlags), &pa)
+	// only install augeas lenses on non-windows platforms
+	if runtime.GOOS != "windows" {
+		if err := os.MkdirAll(augeasLensesPath, fs.DirMode); err != nil {
+			return nil, nil, fmt.Errorf("creating augeas lens dir: %w", err)
+		}
+
+		if err := augeas.InstallLenses(augeasLensesPath); err != nil {
+			return nil, nil, fmt.Errorf("error installing augeas lenses: %w", err)
+		}
+	}
+
+	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &pa)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
@@ -54,7 +69,7 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 	return proc, extensionServer, nil
 }
 
-func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
+func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []string) []string {
 
 	// putting "-S" (the interactive flag) first because the behavior is inconsistent
 	// when it's in the middle, found this during development on M1 macOS monterey 12.4
@@ -72,6 +87,11 @@ func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
 		fmt.Sprintf("--extensions_require=%s", extensionName),
 		fmt.Sprintf("--extensions_socket=%s", socketPath),
 	}...)
+
+	// only install augeas lenses on non-windows platforms
+	if runtime.GOOS != "windows" {
+		flags = append(flags, fmt.Sprintf("--augeas_lenses=%s", augeasLensesPath))
+	}
 
 	return flags
 }

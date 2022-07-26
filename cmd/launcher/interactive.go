@@ -37,7 +37,8 @@ func runInteractive(args []string) error {
 		}
 	}
 
-	rootDir, err := os.MkdirTemp("", "launcher-osquery-interactive")
+	// have to keep tempdir name short so we don't exceed socket length
+	rootDir, err := os.MkdirTemp("", "launcher-interactive")
 	if err != nil {
 		return errors.Wrap(err, "creating temp dir for interactive mode")
 	}
