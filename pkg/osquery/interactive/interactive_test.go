@@ -45,10 +45,11 @@ func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		osqueryFlags   []string
-		wantProc       bool
-		errContainsStr string
+		name                 string
+		osqueryFlags         []string
+		wantProc             bool
+		errContainsStr       string
+		skipWindowsRationale string
 	}{
 		{
 			name:     "no flags",
@@ -63,15 +64,20 @@ func TestProc(t *testing.T) {
 			wantProc: true,
 		},
 		{
-			name:           "make socket path to long to test our error handling, making this really long causes the socket path to be long",
-			wantProc:       false,
-			errContainsStr: "exceeded the maximum socket path character length",
+			name:                 "make socket path to long to test our error handling, making this really long causes the socket path to be long",
+			wantProc:             false,
+			errContainsStr:       "exceeded the maximum socket path character length",
+			skipWindowsRationale: "socket path is always the same on windows, so error can't be tested",
 		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			if tt.skipWindowsRationale != "" && runtime.GOOS == "windows" {
+				t.Skip(tt.skipWindowsRationale)
+			}
 
 			rootDir := t.TempDir()
 			require.NoError(t, downloadOsquery(rootDir))
