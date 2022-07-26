@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-// disabling on windows becuase for some reason the test cannot get access to the windows pipe it fails with:
+// disabling on windows because for some reason the test cannot get access to the windows pipe it fails with:
 // however it's just the test, works when using interactive mode on windows
 // open \\.\pipe\kolide-osquery-.....: The system cannot find the file specified.
 package interactive
