@@ -3,11 +3,11 @@ package interactive
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fs"
+	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
 )
@@ -26,11 +26,17 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 	}
 
-	socketPath := filepath.Join(rootDir, "osq.sock")
+	socketPath := runtime.SocketPath(rootDir)
 
 	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, osqueryFlags), &pa)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
+	}
+
+	// while developing for windows it was found that it will sometimes take osquey a while
+	// to create the socket, so we wait for it to exist before continuing
+	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
+		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
 	extensionServer, err := loadExtensions(socketPath, osquerydPath)
@@ -62,7 +68,7 @@ func buildOsqueryFlags(socketPath string, osqueryFlags []string) []string {
 	// required flags for interactive mode to function
 	flags = append(flags, []string{
 		"--disable_extensions=false",
-		"--extensions_timeout=10",
+		"--extensions_timeout=20",
 		fmt.Sprintf("--extensions_require=%s", extensionName),
 		fmt.Sprintf("--extensions_socket=%s", socketPath),
 	}...)
@@ -95,4 +101,32 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 	}
 
 	return extensionManagerServer, nil
+}
+
+// wait until file is present or timeout
+func waitForFile(path string, interval, timeout time.Duration) error {
+	intervalTimer := time.NewTimer(interval)
+	defer intervalTimer.Stop()
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+
+	f := func() bool {
+		_, err := os.Stat(path)
+		return err == nil
+	}
+
+	if f() {
+		return nil
+	}
+
+	select {
+	case <-intervalTimer.C:
+		if f() {
+			return nil
+		}
+	case <-timeoutTimer.C:
+		return fmt.Errorf("timeout waiting for file: %s", path)
+	}
+
+	return nil
 }

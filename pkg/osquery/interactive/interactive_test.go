@@ -1,6 +1,9 @@
 //go:build !windows
 // +build !windows
 
+// disabling on windows because for some reason the test cannot get access to the windows pipe it fails with:
+// however it's just the test, works when using interactive mode on windows
+// open \\.\pipe\kolide-osquery-.....: The system cannot find the file specified.
 package interactive
 
 import (
@@ -16,7 +19,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStartProcess(t *testing.T) {
+var osquerydCacheDir = filepath.Join(os.TempDir(), "launcher_interactive_tests")
+
+func TestMain(m *testing.M) {
+	// download and cache the osquerd binary before tests run
+	target := packaging.Target{}
+	if err := target.PlatformFromString(runtime.GOOS); err != nil {
+		fmt.Printf("error parsing platform: %s, %s", err, runtime.GOOS)
+		os.Exit(1)
+	}
+
+	if err := os.MkdirAll(osquerydCacheDir, fs.DirMode); err != nil {
+		fmt.Printf("error creating cache dir: %s", err)
+		os.Exit(1)
+	}
+
+	_, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
+	if err != nil {
+		fmt.Printf("error fetching binary osqueryd binary: %s", err)
+		os.Exit(1)
+	}
+
+	// Run the tests!
+	retCode := m.Run()
+	os.Exit(retCode)
+}
+
+// TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough
+// to not exceed the max number of charcters for the socket path.
+func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -83,13 +114,8 @@ func downloadOsquery(dir string) error {
 	}
 
 	outputFile := filepath.Join(dir, "osqueryd")
-	cacheDir := filepath.Join(os.TempDir(), "launcher_interactive_tests")
 
-	if err := os.MkdirAll(cacheDir, fs.DirMode); err != nil {
-		return fmt.Errorf("error creating cache dir: %w", err)
-	}
-
-	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
+	path, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
 		return fmt.Errorf("error fetching binary osqueryd binary: %w", err)
 	}

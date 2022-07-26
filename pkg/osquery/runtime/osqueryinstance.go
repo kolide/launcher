@@ -367,7 +367,7 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
 	if extensionSocketPath == "" {
-		extensionSocketPath = socketPath(opts.rootDirectory)
+		extensionSocketPath = SocketPath(opts.rootDirectory)
 	}
 
 	extensionAutoloadPath := filepath.Join(opts.rootDirectory, "osquery.autoload")
