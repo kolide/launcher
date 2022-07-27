@@ -69,9 +69,9 @@ func TestProc(t *testing.T) {
 			wantProc: true,
 		},
 		{
-			name:           "make socket path to long to test our error handling, making this really long causes the socket path to be long",
+			name:           "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			wantProc:       false,
-			errContainsStr: "exceeded the maximum socket path character length",
+			errContainsStr: "error waiting for osquery to create socket",
 		},
 	}
 	for _, tt := range tests {

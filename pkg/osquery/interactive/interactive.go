@@ -23,12 +23,6 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	// Transfer stdin, stdout, and stderr to the new process
-	// and also set target directory for the shell to start in.
-	pa := os.ProcAttr{
-		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
-	}
-
 	socketPath := osqueryRuntime.SocketPath(rootDir)
 	augeasLensesPath := filepath.Join(rootDir, "augeas-lenses")
 
@@ -43,7 +37,11 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		}
 	}
 
-	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &pa)
+	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
+		// Transfer stdin, stdout, and stderr to the new process
+		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+	})
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
@@ -51,6 +49,12 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 	// while developing for windows it was found that it will sometimes take osquey a while
 	// to create the socket, so we wait for it to exist before continuing
 	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
+
+		procKillErr := proc.Kill()
+		if procKillErr != nil {
+			err = fmt.Errorf("error killing osqueryd interactive: %s: %w", procKillErr, err)
+		}
+
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
@@ -125,8 +129,8 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 
 // wait until file is present or timeout
 func waitForFile(path string, interval, timeout time.Duration) error {
-	intervalTimer := time.NewTimer(interval)
-	defer intervalTimer.Stop()
+	intervalTicker := time.NewTicker(interval)
+	defer intervalTicker.Stop()
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 
@@ -139,14 +143,14 @@ func waitForFile(path string, interval, timeout time.Duration) error {
 		return nil
 	}
 
-	select {
-	case <-intervalTimer.C:
-		if f() {
-			return nil
+	for {
+		select {
+		case <-timeoutTimer.C:
+			return fmt.Errorf("timeout waiting for file: %s", path)
+		case <-intervalTicker.C:
+			if f() {
+				return nil
+			}
 		}
-	case <-timeoutTimer.C:
-		return fmt.Errorf("timeout waiting for file: %s", path)
 	}
-
-	return nil
 }
