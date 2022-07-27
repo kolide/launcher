@@ -566,29 +566,37 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		c := b.Cursor()
 		k, v := c.First()
 		for totalBytes := 0; k != nil; {
+			if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+				// Buffer is filled. Break the loop and come back later.
+				break
+			}
+
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
 				level.Info(e.Opts.Logger).Log(
 					"msg", "dropped log",
+					"logID", k,
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled
-				break
 			} else {
 				logs = append(logs, string(v))
 				totalBytes += len(v)
-
-				// create a copy of k. It is retained in logIDs after the transaction is closed,
-				// when the goroutine ticks it zeroes out some of the IDs to delete below, causing logs
-				// to remain in the buffer and be sent again to the server.
-				logID := make([]byte, len(k))
-				copy(logID, k)
-				logIDs = append(logIDs, logID)
 			}
+
+			// Note the logID for deletion. We do this by
+			// making a copy of k. It is retained in
+			// logIDs after the transaction is closed,
+			// when the goroutine ticks it zeroes out some
+			// of the IDs to delete below, causing logs to
+			// remain in the buffer and be sent again to
+			// the server.
+			logID := make([]byte, len(k))
+			copy(logID, k)
+			logIDs = append(logIDs, logID)
+
 			k, v = c.Next()
 		}
 		return nil
