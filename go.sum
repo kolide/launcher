@@ -156,8 +156,6 @@ github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f h1:8MAK/u+dE11/n8VIHQRfXX6VElJl6gD60VzbE8Qxggg=
 github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f/go.mod h1:WCBAbTOdfhHhz7YXujeZMF7owC4tPb1naKFsgfUISjo=
-github.com/mitchellh/go-ps v0.0.0-20170309133038-4fdf99ab2936 h1:kw1v0NlnN+GZcU8Ma8CLF2Zzgjfx95gs3/GN3vYAPpo=
-github.com/mitchellh/go-ps v0.0.0-20170309133038-4fdf99ab2936/go.mod h1:r1VsdOzOPt1ZSrGZWFoNhsAedKnEd6r9Np1+5blZCWk=
 github.com/mitchellh/mapstructure v1.0.0 h1:vVpGvMXJPqSDh2VYHF7gsfQj8Ncx+Xw5Y1KHeTRY+7I=
 github.com/mitchellh/mapstructure v1.0.0/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea h1:eWwD4TJbXXLj8Ay2KQ1F3lh1YtgpcWZL3ZZN2sKvSDg=
@@ -179,8 +177,6 @@ github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQ
 github.com/opencontainers/image-spec v1.0.2 h1:9yCKha/T5XdGtO0q9Q9a6T5NUCsTn/DrBg0D7ufOcFM=
 github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/osquery/osquery-go v0.0.0-20210622151333-99b4efa62ec5/go.mod h1:JKR5QhjsYdnIPY7hakgas5sxf8qlA/9wQnLqaMfWdcg=
-github.com/osquery/osquery-go v0.0.0-20220317165851-954ac78f381f h1:FrIbNt88ZvH8RoqEXCJF0mWylKrojqhJVOs6CqAzODw=
-github.com/osquery/osquery-go v0.0.0-20220317165851-954ac78f381f/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
 github.com/osquery/osquery-go v0.0.0-20220706183148-4e1f83012b42 h1:Epwxipb+y/e8ss/SJ7947F8J6dwjv3RHRCz2g0OkCII=
 github.com/osquery/osquery-go v0.0.0-20220706183148-4e1f83012b42/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
 github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c h1:rp5dCmg/yLR3mgFuSOe4oEnDDmGLROTvMragMUXpTQw=
