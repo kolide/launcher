@@ -566,11 +566,13 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		c := b.Cursor()
 		k, v := c.First()
 		for totalBytes := 0; k != nil; {
-			if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled. Break the loop and come back later.
-				break
-			}
-
+			// A somewhat cumbersome if block...
+			//
+			// 1. If the log is too big, skip it and mark for deletion.
+			// 2. If the buffer would be too big with the log, break for
+			// 3. Else append it
+			//
+			// Note that (1) must come first, otherwise (2) will always trigger.
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
@@ -581,6 +583,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
+			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+				// Buffer is filled. Break the loop and come back later.
+				break
 			} else {
 				logs = append(logs, string(v))
 				totalBytes += len(v)
