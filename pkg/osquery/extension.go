@@ -548,6 +548,26 @@ func (e *Extension) writeLogsLoopRunner() {
 	}
 }
 
+// numberOfBufferedLogs returns the number of logs buffered for a given type.
+func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = e.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		count = b.Stats().KeyN
+		return nil
+	})
+	if err != nil {
+		return 0, errors.Wrap(err, "counting buffered logs")
+	}
+
+	return count, nil
+}
+
 // writeBufferedLogs flushes the log buffers, writing up to
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.

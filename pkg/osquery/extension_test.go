@@ -676,6 +676,10 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	})
 	require.Nil(t, err)
 
+	startLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 0, startLogCount, "start with no buffered logs")
+
 	expectedResultLogs := []string{"res1", "res2", "res3", "res4"}
 	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! oh noes")
 	e.LogString(context.Background(), logger.LogTypeString, "res1")
@@ -685,6 +689,10 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeString, "res3")
 	e.LogString(context.Background(), logger.LogTypeString, "res4")
 	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
+
+	queuedLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 8, queuedLogCount, "correct number of enqueued logs")
 
 	// Should write first 3 logs
 	e.writeBufferedLogsForType(logger.LogTypeString)
@@ -706,6 +714,10 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	assert.False(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, gotResultLogs)
 	assert.Nil(t, gotStatusLogs)
+
+	finalLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 0, finalLogCount, "no more queued logs")
 }
 
 func TestExtensionWriteLogsLoop(t *testing.T) {
