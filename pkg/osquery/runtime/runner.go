@@ -366,9 +366,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	// ordering issues.
 
 	// Start an extension manager for the extensions that osquery
-	// needs for config/log/etc
+	// needs for config/log/etc. It's called `kolide_grpc` for mostly historic reasons
 	if len(o.opts.extensionPlugins) > 0 {
-		if err := o.StartOsqueryExtensionManagerServer("kolide_initial", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
+		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
 			return errors.Wrap(err, "could not create an extension server")
 		}
