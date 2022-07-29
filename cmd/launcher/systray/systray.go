@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 	"github.com/kolide/kit/version"
 )
 

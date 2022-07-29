@@ -1,6 +1,7 @@
 module github.com/kolide/launcher
 
 require (
+	fyne.io/systray v1.10.0
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
@@ -15,7 +16,6 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
-	github.com/getlantern/systray v1.2.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
