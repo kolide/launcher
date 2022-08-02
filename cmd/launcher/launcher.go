@@ -245,11 +245,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	// only run systray for kolide tenant or while in debug mode
-	if opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.Debug {
-		if err := runSystray(); err != nil {
-			return fmt.Errorf("running systray: %w", err)
-		}
+	if err := addSystrayToRunGroup(&runGroup); err != nil {
+		return fmt.Errorf("adding systray to run group: %w", err)
 	}
 
 	err = runGroup.Run()
@@ -261,17 +258,23 @@ func writePidFile(path string) error {
 	return errors.Wrap(err, "writing pidfile")
 }
 
-func runSystray() error {
-
+func addSystrayToRunGroup(group *run.Group) error {
 	executable, err := os.Executable()
 
 	if err != nil {
 		return fmt.Errorf("getting executable path: %w", err)
 	}
 
-	if err := exec.Command(executable, "systray").Run(); err != nil {
-		return fmt.Errorf("running systray: %w", err)
-	}
+	cmd := exec.Command(executable, "systray")
+
+	group.Add(func() error {
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("running systray: %w", err)
+		}
+		return nil
+	}, func(err error) {
+		cmd.Process.Kill()
+	})
 
 	return nil
 }

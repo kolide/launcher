@@ -10,15 +10,12 @@ import (
 	"github.com/kolide/kit/version"
 )
 
-//go:embed kolide-mark-only-black-32x.ico
-var kolideSystrayIcon []byte
-
 func RunSystray(args []string) error {
 
 	go exitWhenParentGone()
 
 	onReady := func() {
-		systray.SetIcon(kolideSystrayIcon)
+		systray.SetTemplateIcon(kolideSystrayIcon, kolideSystrayIcon)
 		systray.SetTooltip("Kolide")
 
 		versionItem := systray.AddMenuItem(fmt.Sprintf("Version %s", version.Version().Version), "")
