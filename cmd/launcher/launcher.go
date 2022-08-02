@@ -245,8 +245,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	if err := addSystrayToRunGroup(&runGroup); err != nil {
-		return fmt.Errorf("adding systray to run group: %w", err)
+	if opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.Debug {
+		if err := addSystrayToRunGroup(&runGroup); err != nil {
+			return fmt.Errorf("adding systray to run group: %w", err)
+		}
 	}
 
 	err = runGroup.Run()
