@@ -1,7 +1,6 @@
 package systray
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 	"time"
