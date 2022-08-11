@@ -38,7 +38,6 @@ import (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
-
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
