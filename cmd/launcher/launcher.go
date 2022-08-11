@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -28,6 +28,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	systrayruntime "github.com/kolide/launcher/pkg/systray/runtime"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
@@ -39,7 +40,6 @@ import (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
 	// determine the root directory, create one if it's not provided
@@ -245,10 +245,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	if opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.Debug {
-		if err := addSystrayToRunGroup(&runGroup); err != nil {
-			return fmt.Errorf("adding systray to run group: %w", err)
-		}
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.Debug) && (runtime.GOOS == "darwin" || runtime.GOOS == "linux") {
+		systrayProcessRunner := systrayruntime.NewSystrayUserProcessRunner(logger)
+		runGroup.Add(systrayProcessRunner.Execute, systrayProcessRunner.Interrupt)
 	}
 
 	err = runGroup.Run()
@@ -258,25 +257,4 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 func writePidFile(path string) error {
 	err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600)
 	return errors.Wrap(err, "writing pidfile")
-}
-
-func addSystrayToRunGroup(group *run.Group) error {
-	executable, err := os.Executable()
-
-	if err != nil {
-		return fmt.Errorf("getting executable path: %w", err)
-	}
-
-	cmd := exec.Command(executable, "systray")
-
-	group.Add(func() error {
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("running systray: %w", err)
-		}
-		return nil
-	}, func(err error) {
-		cmd.Process.Kill()
-	})
-
-	return nil
 }
