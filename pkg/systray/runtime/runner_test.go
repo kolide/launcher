@@ -19,14 +19,14 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string
-		setup        func(*testing.T, *SystrayUserProcessRunner)
-		assertion    func(*testing.T, *SystrayUserProcessRunner)
+		setup        func(*testing.T, *SystrayUsersProcessesRunner)
+		assertion    func(*testing.T, *SystrayUsersProcessesRunner)
 		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
 			name:         "happy path",
 			errAssertion: assert.NoError,
-			assertion: func(t *testing.T, r *SystrayUserProcessRunner) {
+			assertion: func(t *testing.T, r *SystrayUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				// make sure we have a new process
@@ -36,12 +36,12 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 		},
 		{
 			name: "new process started if old one gone",
-			setup: func(t *testing.T, r *SystrayUserProcessRunner) {
+			setup: func(t *testing.T, r *SystrayUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1}
 			},
-			assertion: func(t *testing.T, r *SystrayUserProcessRunner) {
+			assertion: func(t *testing.T, r *SystrayUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				// make sure we have a new process that doesnt match the
@@ -56,10 +56,7 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := NewSystrayUserProcessRunner(log.NewNopLogger())
-
-			// speed up execution interval for tests
-			r.executionInterval = time.Millisecond * 100
+			r := New(log.NewNopLogger(), time.Millisecond*100)
 
 			if tt.setup != nil {
 				tt.setup(t, r)

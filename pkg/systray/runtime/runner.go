@@ -14,11 +14,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// SystrayUserProcessRunner creates a launcher systray process each time it detects
+// SystrayUsersProcessesRunner creates a launcher systray process each time it detects
 // a new console (GUI) user. If the current console user's systray process dies, it
 // will create a new one.
-// Initalize with NewSystrayUserProcessRunner().
-type SystrayUserProcessRunner struct {
+// Initalize with New().
+type SystrayUsersProcessesRunner struct {
 	logger            log.Logger
 	executionInterval time.Duration
 	interrupt         chan struct{}
@@ -26,18 +26,19 @@ type SystrayUserProcessRunner struct {
 	uidProcs map[string]*os.Process
 }
 
-// NewSystrayUserProcessRunner creates and returns a new SystrayUserProcess runner and initializes all required fields
-func NewSystrayUserProcessRunner(logger log.Logger) *SystrayUserProcessRunner {
-	return &SystrayUserProcessRunner{
+// New creates and returns a new SystrayUsersProcessesRunner runner and initializes all required fields
+func New(logger log.Logger, executionInterval time.Duration) *SystrayUsersProcessesRunner {
+	return &SystrayUsersProcessesRunner{
 		logger:            logger,
 		interrupt:         make(chan struct{}),
 		uidProcs:          make(map[string]*os.Process),
-		executionInterval: time.Second * 5,
+		executionInterval: executionInterval,
 	}
 }
 
-// Execute checks if the current console user has a systray process running. If not, it will start a new one.
-func (r *SystrayUserProcessRunner) Execute() error {
+// Execute immediatly checks if the current console user has a systray process running. If not, it will start a new one.
+// Then repeats based on the executionInterval.
+func (r *SystrayUsersProcessesRunner) Execute() error {
 	f := func() {
 		if err := r.runConsoleUserSystray(); err != nil {
 			level.Error(r.logger).Log(
@@ -60,22 +61,24 @@ func (r *SystrayUserProcessRunner) Execute() error {
 	}
 }
 
-// Interrupt stops creating launcher systray processes and kils the existing ones.
-func (r *SystrayUserProcessRunner) Interrupt(err error) {
+// Interrupt stops creating launcher systray processes and kills any existing ones.
+func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 	r.interrupt <- struct{}{}
 	for _, proc := range r.uidProcs {
-		if isExists, _ := processExists(proc.Pid); isExists {
-			if err := proc.Kill(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "error killing systray",
-					"err", err,
-				)
-			}
+		if !processExists(proc.Pid) {
+			continue
+		}
+
+		if err := proc.Kill(); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error killing systray process after interrupt",
+				"err", err,
+			)
 		}
 	}
 }
 
-func (r *SystrayUserProcessRunner) runConsoleUserSystray() error {
+func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
@@ -96,9 +99,9 @@ func (r *SystrayUserProcessRunner) runConsoleUserSystray() error {
 	uid := fmt.Sprintf("%d", consoleOwnerUid)
 
 	// already have a systray for the console owner
-	if _, ok := r.uidProcs[uid]; ok {
+	if proc, ok := r.uidProcs[uid]; ok {
 		// if the process is still running, return
-		if isExists, _ := processExists(r.uidProcs[uid].Pid); isExists {
+		if processExists(proc.Pid) {
 			return nil
 		}
 
@@ -119,14 +122,14 @@ func (r *SystrayUserProcessRunner) runConsoleUserSystray() error {
 	if err != nil {
 		return fmt.Errorf("running systray: %w", err)
 	}
+	r.uidProcs[uid] = proc
 
-	level.Info(r.logger).Log(
+	level.Debug(r.logger).Log(
 		"msg", "systray started",
 		"uid", uid,
 		"pid", proc.Pid,
 	)
 
-	r.uidProcs[uid] = proc
 	return nil
 }
 
@@ -197,38 +200,43 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 	return cmd.Process, nil
 }
 
-func processExists(pid int) (bool, error) {
+func processExists(pid int) bool {
 	// this code was adapted from https://github.com/shirou/gopsutil/blob/ed37dc27a286a25cbe76adf405176c69191a1f37/process/process_posix.go#L102
 	// thank you shirou!
 	if pid <= 0 {
-		return false, fmt.Errorf("invalid pid %v", pid)
+		return false
 	}
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return false, err
+		return false
 	}
 
+	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
+	// bash equivalent of: kill -n 0 <pid>
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
-		return true, nil
+		return true
 	}
 
 	if err.Error() == "os: process already finished" {
-		return false, nil
+		return false
 	}
 
 	var errno syscall.Errno
 	if !errors.As(err, &errno) {
-		return false, err
+		return false
 	}
 
 	switch errno {
+	// No process or process group can be found corresponding to that specified by pid.
 	case syscall.ESRCH:
-		return false, nil
+		return false
+	// The sending process is not the super-user and its effective user id does not match the effective user-id of the receiving process.
+	// When signaling a process group, this error is returned if any members of the group could not be signaled.
 	case syscall.EPERM:
-		return true, nil
+		return true
 	}
 
-	return false, err
+	return false
 }
