@@ -55,7 +55,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		return fmt.Errorf("getting executable path: %w", err)
 	}
 
-	proc, err := runAsUser(fmt.Sprint(consoleOwnerUid), executable, "systray")
+	proc, err := runAsUser(uid, executable, "systray")
 	if err != nil {
 		return fmt.Errorf("running systray: %w", err)
 	}
@@ -95,7 +95,6 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 
 	// current user not root
 	if currentUser.Uid != "0" {
-
 		// if the user is running for itself, just run without setting credentials
 		if currentUser.Uid == uid {
 			err := cmd.Start()
@@ -129,6 +128,7 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 			Gid: uint32(gid),
 		},
 	}
+
 	err = cmd.Start()
 	if err != nil {
 		return nil, fmt.Errorf("starting command: %w", err)
