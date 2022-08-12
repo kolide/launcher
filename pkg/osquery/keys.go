@@ -48,7 +48,7 @@ func rsaFingerprint(keyRaw interface{}) (string, error) {
 	return out, nil
 }
 
-func RsaPublicKeyToPem(key *rsa.PrivateKey, out io.Writer) error {
+func RsaPrivateKeyToPem(key *rsa.PrivateKey, out io.Writer) error {
 	pubASN1, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
 	if err != nil {
 		return fmt.Errorf("pkix marshalling: %w", err)
@@ -58,4 +58,21 @@ func RsaPublicKeyToPem(key *rsa.PrivateKey, out io.Writer) error {
 		Type:  "PUBLIC KEY",
 		Bytes: pubASN1,
 	})
+}
+
+func KeyFromPem(pemRaw []byte) (interface{}, error) {
+	// pem.Decode returns pem, and rest. No error here
+	block, _ := pem.Decode(pemRaw)
+	if block == nil || block.Type == "" {
+		return nil, errors.New("got blank data from pem")
+	}
+
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
+	case "PUBLIC KEY":
+		return x509.ParsePKIXPublicKey(block.Bytes)
+	}
+
+	return nil, fmt.Errorf("Unknown block type: %s", block.Type)
 }

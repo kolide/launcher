@@ -3,6 +3,7 @@ package osquery
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
@@ -252,7 +253,7 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 		}
 
 		var pub bytes.Buffer
-		if err := RsaPublicKeyToPem(key, &pub); err != nil {
+		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
 			return errors.Wrap(err, "marshalling pub")
 		}
 
@@ -278,6 +279,30 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 
 	return err
 
+}
+
+func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
+	var privateKey []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		privateKey = b.Get([]byte(privateKeyKey))
+		return nil
+	}); err != nil {
+		return nil, errors.Wrap(err, "error reading private key info from db")
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing private key")
+	}
+
+	rsakey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("Private key is not an rsa key")
+	}
+
+	return rsakey, nil
 }
 
 func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
