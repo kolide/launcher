@@ -171,7 +171,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	}
 
 	if err := SetupLauncherKeys(db); err != nil {
-		return nil, errors.Wrap(err, "setting up initial launcher keys")
+		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
 	identifier, err := IdentifierFromDB(db)
@@ -232,46 +232,47 @@ func (e *Extension) getHostIdentifier() (string, error) {
 func SetupLauncherKeys(db *bbolt.DB) error {
 	err := db.Update(func(tx *bbolt.Tx) error {
 
-		b, err := tx.CreateBucketIfNotExists([]byte(configBucket))
+		bucket, err := tx.CreateBucketIfNotExists([]byte(configBucket))
 		if err != nil {
 			return errors.Wrap(err, "creating bucket")
 		}
 
 		// This only checks the private key, but it should possibly check all the values we're setting.
-		if b.Get([]byte(privateKeyKey)) != nil {
+		if bucket.Get([]byte(privateKeyKey)) != nil {
 			return nil
 		}
 
 		key, err := rsaRandomKey()
 		if err != nil {
-			return errors.Wrap(err, "generating key")
+			return fmt.Errorf("generating key: %w", err)
 		}
 
 		fingerprint, err := rsaFingerprint(key)
 		if err != nil {
-			return errors.Wrap(err, "generating fingerprint")
+			return fmt.Errorf("generating fingerprint: %w", err)
 		}
 
 		var pub bytes.Buffer
 		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
-			return errors.Wrap(err, "marshalling pub")
+			return fmt.Errorf("marshalling pub: %w", err)
 		}
 
 		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
 		if err != nil {
-			return errors.Wrap(err, "marshalling key")
+			return fmt.Errorf("marshalling key: %w", err)
 		}
 
-		if err := b.Put([]byte(privateKeyKey), keyDer); err != nil {
-			return errors.Wrap(err, "storing key")
+		if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
+			return fmt.Errorf("storing key: %w", err)
 		}
 
-		if err := b.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
-			return errors.Wrap(err, "storing public key")
+		if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
+			return fmt.Errorf("storing public key: %w", err)
+
 		}
 
-		if err := b.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
-			return errors.Wrap(err, "storing fingerprint")
+		if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
+			return fmt.Errorf("storing fingerprint: %w", err)
 		}
 
 		return nil
@@ -281,6 +282,7 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 
 }
 
+// PrivateKeyFromDB returns the private launcher key. This is used to authenticate various launcher communications.
 func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	var privateKey []byte
 
@@ -289,12 +291,12 @@ func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 		privateKey = b.Get([]byte(privateKeyKey))
 		return nil
 	}); err != nil {
-		return nil, errors.Wrap(err, "error reading private key info from db")
+		return nil, fmt.Errorf("error reading private key info from db: %w", err)
 	}
 
 	key, err := x509.ParsePKCS8PrivateKey(privateKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing private key")
+		return nil, fmt.Errorf("error parsing private key: %w", err)
 	}
 
 	rsakey, ok := key.(*rsa.PrivateKey)
@@ -305,6 +307,7 @@ func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	return rsakey, nil
 }
 
+// PublicKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
 func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
 	var publicKey []byte
 	var fingerprint []byte
@@ -315,7 +318,7 @@ func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
 		fingerprint = b.Get([]byte(keyFingerprintKey))
 		return nil
 	}); err != nil {
-		return "", "", errors.Wrap(err, "error reading public key info from db")
+		return "", "", fmt.Errorf("error reading public key info from db: %w", err)
 	}
 
 	return string(publicKey), string(fingerprint), nil
