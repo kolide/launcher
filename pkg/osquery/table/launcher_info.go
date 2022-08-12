@@ -44,7 +44,9 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 
 		publicKey, fingerprint, err := osquery.PublicKeyFromDB(db)
 		if err != nil {
-			// TODO log something
+			// No logger here, so we can't easily log. Move on with blank values
+			publicKey = ""
+			fingerprint = ""
 		}
 
 		results := []map[string]string{

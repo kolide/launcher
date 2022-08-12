@@ -237,7 +237,7 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 			return errors.Wrap(err, "creating bucket")
 		}
 
-		// This only checks the private key, but it should possible check all the values we're setting.
+		// This only checks the private key, but it should possibly check all the values we're setting.
 		if b.Get([]byte(privateKeyKey)) != nil {
 			return nil
 		}
