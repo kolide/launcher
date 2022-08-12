@@ -88,7 +88,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	// if we spin up the process for root after the user gets the console it will
 	// add another systray icon, so don't spin it up for root
 	if consoleOwnerUid == 0 {
-		level.Info(r.logger).Log(
+		level.Debug(r.logger).Log(
 			"msg", "skipping systray for root user",
 			"uid", consoleOwnerUid,
 		)
