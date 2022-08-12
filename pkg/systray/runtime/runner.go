@@ -11,7 +11,7 @@ import (
 // SystrayUsersProcessesRunner creates a launcher systray process each time it detects
 // a new console (GUI) user. If the current console user's systray process dies, it
 // will create a new one.
-// Initalize with New().
+// Initialize with New().
 type SystrayUsersProcessesRunner struct {
 	logger            log.Logger
 	executionInterval time.Duration
@@ -30,7 +30,7 @@ func New(logger log.Logger, executionInterval time.Duration) *SystrayUsersProces
 	}
 }
 
-// Execute immediatly checks if the current console user has a systray process running. If not, it will start a new one.
+// Execute immediately checks if the current console user has a systray process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *SystrayUsersProcessesRunner) Execute() error {
 	f := func() {
