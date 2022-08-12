@@ -21,12 +21,12 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		return fmt.Errorf("getting console owner uid: %w", err)
 	}
 
-	// there seems to be a brief moment during start up where root has the console
-	// if we spin up the process for root after the user gets the console it will
-	// add another systray icon, so don't spin it up for root
-	if consoleOwnerUid == 0 {
+	// there seems to be a brief moment during start up where root or system (non-human)
+	// users own the console, if we spin up the process for them it will add an
+	// unnecessary process. On macOS human users start at 501
+	if consoleOwnerUid < 500 {
 		level.Debug(r.logger).Log(
-			"msg", "skipping systray for root user",
+			"msg", "skipping systray for root or system user",
 			"uid", consoleOwnerUid,
 		)
 
