@@ -69,7 +69,15 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 
 	execBytes, err := t.exec(ctx)
 	if err != nil {
-		return results, errors.Wrap(err, "exec")
+		// exec will error if there's no binary, so we never want to record that
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		}
+
+		// If th exec failed for some reason, it's probably better to return no results, and log the,
+		//  error. Returning an error here will cause a table failure, and thus break joins
+		level.Info(t.logger).Log("msg", "failed to exec", "err", err)
+		return nil, nil
 	}
 
 	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
