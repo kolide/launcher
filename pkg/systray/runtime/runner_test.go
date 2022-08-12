@@ -1,5 +1,5 @@
-//go:build darwin || linux
-// +build darwin linux
+//go:build darwin
+// +build darwin
 
 package runtime
 
@@ -39,12 +39,16 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 			setup: func(t *testing.T, r *SystrayUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
+				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
+				// nolint: typecheck
 				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1}
 			},
 			assertion: func(t *testing.T, r *SystrayUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
-				// make sure we have a new process that doesnt match the
+				// make sure we have a new process that doesnt match the old one
+				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
+				// nolint: typecheck
 				assert.NotEqual(t, r.uidProcs[user.Uid].Pid, math.MaxInt-1)
 				assert.Len(t, r.uidProcs, 1)
 			},
@@ -62,13 +66,17 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 				tt.setup(t, r)
 			}
 
+			executeDone := make(chan struct{})
 			go func() {
 				tt.errAssertion(t, r.Execute())
+				executeDone <- struct{}{}
 			}()
 
 			// let is run a few interval
 			time.Sleep(r.executionInterval * 3)
 			r.Interrupt(nil)
+
+			<-executeDone
 
 			if tt.assertion != nil {
 				tt.assertion(t, r)

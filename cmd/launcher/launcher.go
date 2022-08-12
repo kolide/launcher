@@ -244,7 +244,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && (runtime.GOOS == "darwin" || runtime.GOOS == "linux") {
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
 		systrayRunner := systrayruntime.New(logger, time.Second*5)
 		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
 	}
