@@ -23,6 +23,8 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
+		table.TextColumn("fingerprint"),
+		table.TextColumn("public_key"),
 	}
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(db))
 }
@@ -40,6 +42,11 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 
+		publicKey, fingerprint, err := osquery.PublicKeyFromDB(db)
+		if err != nil {
+			// TODO log something
+		}
+
 		results := []map[string]string{
 			{
 				"branch":              version.Version().Branch,
@@ -52,6 +59,8 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 				"version":             version.Version().Version,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
+				"fingerprint":         fingerprint,
+				"public_key":          publicKey,
 			},
 		}
 

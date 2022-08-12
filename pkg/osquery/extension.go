@@ -3,6 +3,7 @@ package osquery
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -77,6 +78,10 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
+	// DB keys for the rsa keys
+	privateKeyKey     = "privateKey"
+	publicKeyKey      = "publicKey"
+	keyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -164,6 +169,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, errors.Wrap(err, "creating DB buckets")
 	}
 
+	if err := SetupLauncherKeys(db); err != nil {
+		return nil, errors.Wrap(err, "setting up initial launcher keys")
+	}
+
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
@@ -219,8 +228,76 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.db)
 }
 
+func SetupLauncherKeys(db *bbolt.DB) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
+
+		b, err := tx.CreateBucketIfNotExists([]byte(configBucket))
+		if err != nil {
+			return errors.Wrap(err, "creating bucket")
+		}
+
+		// This only checks the private key, but it should possible check all the values we're setting.
+		if b.Get([]byte(privateKeyKey)) != nil {
+			return nil
+		}
+
+		key, err := rsaRandomKey()
+		if err != nil {
+			return errors.Wrap(err, "generating key")
+		}
+
+		fingerprint, err := rsaFingerprint(key)
+		if err != nil {
+			return errors.Wrap(err, "generating fingerprint")
+		}
+
+		var pub bytes.Buffer
+		if err := RsaPublicKeyToPem(key, &pub); err != nil {
+			return errors.Wrap(err, "marshalling pub")
+		}
+
+		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			return errors.Wrap(err, "marshalling key")
+		}
+
+		if err := b.Put([]byte(privateKeyKey), keyDer); err != nil {
+			return errors.Wrap(err, "storing key")
+		}
+
+		if err := b.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
+			return errors.Wrap(err, "storing public key")
+		}
+
+		if err := b.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
+			return errors.Wrap(err, "storing fingerprint")
+		}
+
+		return nil
+	})
+
+	return err
+
+}
+
+func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
+	var publicKey []byte
+	var fingerprint []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		publicKey = b.Get([]byte(publicKeyKey))
+		fingerprint = b.Get([]byte(keyFingerprintKey))
+		return nil
+	}); err != nil {
+		return "", "", errors.Wrap(err, "error reading public key info from db")
+	}
+
+	return string(publicKey), string(fingerprint), nil
+}
+
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
-// The function is exported to allow for building the kolide_launcher_identifier table.
+// The function is exported to allow for building the kolide_launcher_info table.
 func IdentifierFromDB(db *bbolt.DB) (string, error) {
 	var identifier string
 	err := db.Update(func(tx *bbolt.Tx) error {
