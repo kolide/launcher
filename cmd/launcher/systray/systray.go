@@ -33,6 +33,7 @@ func exitWhenParentGone() {
 	f := func() {
 		if os.Getppid() <= 1 {
 			fmt.Println("parent process is gone, exiting")
+			systray.Quit()
 			os.Exit(1)
 		}
 	}
