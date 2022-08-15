@@ -105,7 +105,7 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 		}
 
 		// if the user is running for another user, we have an error because we can't set credentials
-		return nil, fmt.Errorf("current user %s is not root and cant start process for other user %s", currentUser.Uid, uid)
+		return nil, fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
 	}
 
 	// the remaining code in this function is not covered by unit test since it requires root privileges
