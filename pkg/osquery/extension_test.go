@@ -1014,3 +1014,29 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, expectedResults, gotResults)
 }
+
+func TestLauncherKeys(t *testing.T) {
+	t.Parallel()
+
+	m := &mock.KolideService{}
+
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	_, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.NoError(t, err)
+
+	key, err := PrivateKeyFromDB(db)
+	require.NoError(t, err)
+
+	pubkeyPem, fingerprintStored, err := PublicKeyFromDB(db)
+	require.NoError(t, err)
+
+	fingerprint, err := rsaFingerprint(key)
+	require.NoError(t, err)
+	require.Equal(t, fingerprint, fingerprintStored)
+
+	pubkey, err := KeyFromPem([]byte(pubkeyPem))
+	require.NoError(t, err)
+
+	require.Equal(t, &key.PublicKey, pubkey)
+}

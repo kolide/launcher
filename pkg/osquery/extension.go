@@ -3,6 +3,8 @@ package osquery
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -77,6 +79,10 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
+	// DB keys for the rsa keys
+	privateKeyKey     = "privateKey"
+	publicKeyKey      = "publicKey"
+	keyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -164,6 +170,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, errors.Wrap(err, "creating DB buckets")
 	}
 
+	if err := SetupLauncherKeys(db); err != nil {
+		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
+	}
+
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
@@ -219,8 +229,103 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.db)
 }
 
+func SetupLauncherKeys(db *bbolt.DB) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
+
+		bucket, err := tx.CreateBucketIfNotExists([]byte(configBucket))
+		if err != nil {
+			return errors.Wrap(err, "creating bucket")
+		}
+
+		// This only checks the private key, but it should possibly check all the values we're setting.
+		if bucket.Get([]byte(privateKeyKey)) != nil {
+			return nil
+		}
+
+		key, err := rsaRandomKey()
+		if err != nil {
+			return fmt.Errorf("generating key: %w", err)
+		}
+
+		fingerprint, err := rsaFingerprint(key)
+		if err != nil {
+			return fmt.Errorf("generating fingerprint: %w", err)
+		}
+
+		var pub bytes.Buffer
+		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
+			return fmt.Errorf("marshalling pub: %w", err)
+		}
+
+		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			return fmt.Errorf("marshalling key: %w", err)
+		}
+
+		if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
+			return fmt.Errorf("storing key: %w", err)
+		}
+
+		if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
+			return fmt.Errorf("storing public key: %w", err)
+
+		}
+
+		if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
+			return fmt.Errorf("storing fingerprint: %w", err)
+		}
+
+		return nil
+	})
+
+	return err
+
+}
+
+// PrivateKeyFromDB returns the private launcher key. This is used to authenticate various launcher communications.
+func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
+	var privateKey []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		privateKey = b.Get([]byte(privateKeyKey))
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("error reading private key info from db: %w", err)
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private key: %w", err)
+	}
+
+	rsakey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("Private key is not an rsa key")
+	}
+
+	return rsakey, nil
+}
+
+// PublicKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
+func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
+	var publicKey []byte
+	var fingerprint []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		publicKey = b.Get([]byte(publicKeyKey))
+		fingerprint = b.Get([]byte(keyFingerprintKey))
+		return nil
+	}); err != nil {
+		return "", "", fmt.Errorf("error reading public key info from db: %w", err)
+	}
+
+	return string(publicKey), string(fingerprint), nil
+}
+
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
-// The function is exported to allow for building the kolide_launcher_identifier table.
+// The function is exported to allow for building the kolide_launcher_info table.
 func IdentifierFromDB(db *bbolt.DB) (string, error) {
 	var identifier string
 	err := db.Update(func(tx *bbolt.Tx) error {
