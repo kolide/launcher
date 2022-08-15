@@ -147,7 +147,6 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 	}
 
 	err = cmd.Start()
-
 	if err != nil {
 		return nil, fmt.Errorf("starting command: %w", err)
 	}
