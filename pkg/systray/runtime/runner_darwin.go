@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 )
 
@@ -69,7 +68,21 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		"pid", proc.Pid,
 	)
 
-	go waitForProcess(r.logger, uid, proc)
+	r.procsWg.Add(1)
+	go func(uid string, proc *os.Process) {
+		defer r.procsWg.Done()
+		// if the systray proccess dies, the parent must clean up otherwise we get a zombie process
+		// waiting here gives the parent a chance to clean up
+		_, err := proc.Wait()
+		if err != nil {
+			level.Error(r.logger).Log(
+				"msg", "systray process died",
+				"uid", uid,
+				"pid", proc.Pid,
+				"err", err,
+			)
+		}
+	}(uid, proc)
 
 	return nil
 }
@@ -156,6 +169,7 @@ func processExists(pid int) bool {
 
 	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
 	// bash equivalent of: kill -n 0 <pid>
+	// this will return true for zombie processes
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
 		return true
@@ -181,20 +195,4 @@ func processExists(pid int) bool {
 	}
 
 	return false
-}
-
-// waitForProcess waits for the process to exit and logs any errors
-// this allows parent processes to clean up children
-func waitForProcess(logger log.Logger, ownerUid string, proc *os.Process) {
-	// if the systray proccess dies, the parent must clean up otherwise we get a zombie process
-	// waiting here gives the parent a chance to clean up
-	_, err := proc.Wait()
-	if err != nil {
-		level.Error(logger).Log(
-			"msg", "systray process died",
-			"uid", ownerUid,
-			"pid", proc.Pid,
-			"err", err,
-		)
-	}
 }

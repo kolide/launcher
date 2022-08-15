@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -18,6 +19,7 @@ type SystrayUsersProcessesRunner struct {
 	interrupt         chan struct{}
 	// uidProcs is a map of uid to systray process
 	uidProcs map[string]*os.Process
+	procsWg  *sync.WaitGroup
 }
 
 // New creates and returns a new SystrayUsersProcessesRunner runner and initializes all required fields
@@ -27,6 +29,7 @@ func New(logger log.Logger, executionInterval time.Duration) *SystrayUsersProces
 		interrupt:         make(chan struct{}),
 		uidProcs:          make(map[string]*os.Process),
 		executionInterval: executionInterval,
+		procsWg:           &sync.WaitGroup{},
 	}
 }
 
@@ -70,4 +73,6 @@ func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 			)
 		}
 	}
+
+	r.procsWg.Wait()
 }
