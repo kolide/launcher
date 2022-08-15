@@ -97,7 +97,7 @@ func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 		return
 	case <-time.NewTimer(time.Second * 5).C:
 		level.Error(r.logger).Log(
-			"msg", "timout waiting for systray processes to finish",
+			"msg", "timeout waiting for systray processes to finish",
 		)
 	}
 }
