@@ -3,6 +3,7 @@ package runtime
 import (
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -61,8 +62,18 @@ func (r *SystrayUsersProcessesRunner) Execute() error {
 // Interrupt stops creating launcher systray processes and kills any existing ones.
 func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 	r.interrupt <- struct{}{}
+
 	for _, proc := range r.uidProcs {
 		if !processExists(proc.Pid) {
+			continue
+		}
+
+		if err := proc.Signal(syscall.SIGTERM); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending SIGTERM to systray process",
+				"err", err,
+			)
+		} else {
 			continue
 		}
 
@@ -74,5 +85,19 @@ func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 		}
 	}
 
-	r.procsWg.Wait()
+	wgDone := make(chan struct{})
+
+	go func() {
+		defer close(wgDone)
+		r.procsWg.Wait()
+	}()
+
+	select {
+	case <-wgDone:
+		return
+	case <-time.NewTimer(time.Second * 5).C:
+		level.Error(r.logger).Log(
+			"msg", "timout waiting for systray processes to finish",
+		)
+	}
 }
