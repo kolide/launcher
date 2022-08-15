@@ -95,6 +95,8 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_diskutil_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "list", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,
+			"kolide_falconctl_stats", dataflattentable.PlistType, []string{"/Applications/Falcon.app/Contents/Resources/falconctl", "stats", "-p"}),
+		dataflattentable.TablePluginExec(client, logger,
 			"kolide_apfs_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "list", "-plist"}),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
