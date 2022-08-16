@@ -16,8 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSystrayUserProcessRunner_Execute(t *testing.T) {
-	t.Parallel()
+func TestSystrayUserProcessRunner_Execute(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		name  string
 		setup func(*testing.T, *SystrayUsersProcessesRunner)
@@ -46,26 +45,20 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.name, func(t *testing.T) { //nolint:paralleltest
 			r := New(log.NewNopLogger(), time.Second*1)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
 			}
 
-			executeDone := make(chan struct{})
 			go func() {
 				assert.NoError(t, r.Execute())
-				executeDone <- struct{}{}
 			}()
 
 			// let is run a few interval
 			time.Sleep(r.executionInterval * 3)
 			r.Interrupt(nil)
-
-			<-executeDone
 
 			user, err := user.Current()
 			require.NoError(t, err)

@@ -3,6 +3,8 @@ package systray
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"fyne.io/systray"
@@ -12,6 +14,7 @@ import (
 func RunSystray(args []string) error {
 
 	go exitWhenParentGone()
+	go handleSignals()
 
 	onReady := func() {
 		systray.SetTemplateIcon(kolideSystrayIcon, kolideSystrayIcon)
@@ -23,6 +26,15 @@ func RunSystray(args []string) error {
 
 	systray.Run(onReady, func() {})
 	return nil
+}
+
+func handleSignals() {
+	signalsToHandle := []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+	signals := make(chan os.Signal, len(signalsToHandle))
+	signal.Notify(signals, signalsToHandle...)
+	sig := <-signals
+	fmt.Println(fmt.Sprintf("\nreceived %s signal, exiting", sig))
+	systray.Quit()
 }
 
 // continuously monitor for ppid and exit if parent process terminates
