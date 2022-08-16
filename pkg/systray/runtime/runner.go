@@ -22,7 +22,7 @@ type SystrayUsersProcessesRunner struct {
 	uidProcs map[string]*os.Process
 	// procsWg is a WaitGroup to wait for all systray processes to finish during an interrupt
 	procsWg *sync.WaitGroup
-	// procsWgTimeout how long to wait for systray proces to finish on interrupt
+	// procsWgTimeout how long to wait for systray proccesses to finish on interrupt
 	procsWgTimeout time.Duration
 }
 
