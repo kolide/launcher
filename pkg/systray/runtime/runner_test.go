@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/user"
+	"syscall"
 	"testing"
 	"time"
 
@@ -18,21 +19,11 @@ import (
 func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name         string
-		setup        func(*testing.T, *SystrayUsersProcessesRunner)
-		assertion    func(*testing.T, *SystrayUsersProcessesRunner)
-		errAssertion assert.ErrorAssertionFunc
+		name  string
+		setup func(*testing.T, *SystrayUsersProcessesRunner)
 	}{
 		{
-			name:         "happy path",
-			errAssertion: assert.NoError,
-			assertion: func(t *testing.T, r *SystrayUsersProcessesRunner) {
-				user, err := user.Current()
-				require.NoError(t, err)
-				// make sure we have a new process
-				assert.NotEmpty(t, r.uidProcs[user.Uid])
-				assert.Len(t, r.uidProcs, 1)
-			},
+			name: "happy path",
 		},
 		{
 			name: "new process started if old one gone",
@@ -43,16 +34,14 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 				// nolint: typecheck
 				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1}
 			},
-			assertion: func(t *testing.T, r *SystrayUsersProcessesRunner) {
-				user, err := user.Current()
-				require.NoError(t, err)
-				// make sure we have a new process that doesnt match the old one
-				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
-				// nolint: typecheck
-				assert.NotEqual(t, r.uidProcs[user.Uid].Pid, math.MaxInt-1)
-				assert.Len(t, r.uidProcs, 1)
+		},
+		{
+			name: "procs waitgroup times out",
+			setup: func(t *testing.T, r *SystrayUsersProcessesRunner) {
+				r.procsWgTimeout = time.Millisecond
+				// wg will never be done, so we should time out
+				r.procsWg.Add(1)
 			},
-			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -60,7 +49,7 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := New(log.NewNopLogger(), time.Millisecond*100)
+			r := New(log.NewNopLogger(), time.Second*1)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -68,7 +57,7 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 
 			executeDone := make(chan struct{})
 			go func() {
-				tt.errAssertion(t, r.Execute())
+				assert.NoError(t, r.Execute())
 				executeDone <- struct{}{}
 			}()
 
@@ -78,9 +67,24 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 
 			<-executeDone
 
-			if tt.assertion != nil {
-				tt.assertion(t, r)
-			}
+			user, err := user.Current()
+			require.NoError(t, err)
+			assert.Contains(t, r.uidProcs, user.Uid)
+			assert.Len(t, r.uidProcs, 1)
+
+			t.Cleanup(func() {
+				for _, proc := range r.uidProcs {
+					proc.Signal(syscall.SIGTERM)
+				}
+
+				<-time.After(time.Second)
+
+				// make sure we clean up an remaining processes
+				for _, proc := range r.uidProcs {
+					proc.Kill()
+					proc.Wait()
+				}
+			})
 		})
 	}
 }

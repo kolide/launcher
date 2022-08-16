@@ -168,7 +168,7 @@ func processExists(pid int) bool {
 
 	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
 	// bash equivalent of: kill -n 0 <pid>
-	// this will return true for zombie processes
+	// this will return true for zombie processes, because it's still alive or at least undead
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
 		return true
