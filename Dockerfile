@@ -12,7 +12,7 @@ LABEL maintainer="engineering@kolide.co"
 ARG FAKE
 
 # Default version to build
-ARG gitver=master
+ARG gitver=main
 
 # The launcher build is generally not GOPATH, however, we do assume
 # that the notary files are there. Eg, we hardcode paths.
