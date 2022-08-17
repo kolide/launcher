@@ -21,7 +21,7 @@ You *could* run `go get github.com/kolide/launcher/cmd/...` to install the binar
 
 ## General Usage
 
-To use The Launcher to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto), invoke the binary with just a few flags:
+To use The Launcher to easily connect osquery to a server that is compliant with the [gRPC specification](https://github.com/kolide/agent-api/blob/main/agent_api.proto), invoke the binary with just a few flags:
 
 - `--hostname`: the hostname of the gRPC server for your environment
 - `--root_directory`: the location of the local database, pidfiles, etc.
