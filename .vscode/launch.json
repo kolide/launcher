@@ -5,19 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "socket",
+            "name": "interactive",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "preLaunchTask": "pre-debug",
             "program": "${workspaceFolder}/cmd/launcher",
             "args": [
-                "socket",
-                "--path=/tmp/osq.sock",
+                "interactive",
+                "--osqueryd_path=${workspaceFolder}/debug/bin/osqueryd",
+                "--osquery_flag=allow-unsafe",
+                "--osquery_flag=verbose",
+                // add atc config to the path below to load atc config
+                "--osquery_flag=config_path=${workspaceFolder}/debug/kolide-atc-config.json",
             ],
-            // uncomment below if you need root
-            // "asRoot": true,
-            // "console": "integratedTerminal",
+            "console": "integratedTerminal",
+            "asRoot": true,
         },
         {
             "name": "k2",
@@ -32,16 +35,18 @@
                 "--control",
                 "--control_hostname=localhost:3443",
                 "--enroll_secret_path=${workspaceFolder}/k2_enroll_secret",
-                "--transport=jsonrpc",
+                "--transport=osquery",
+                "--kolide_hosted",
                 "--osqueryd_path=${workspaceFolder}/debug/bin/osqueryd",
                 "--root_directory=${workspaceFolder}/debug",
                 "--root_pem=${workspaceFolder}/localhost.crt",
                 "--autoupdate",
-                "--autoupdater_initial_delay=0s",
-                "--autoupdate_interval=1s"
+                "--autoupdater_initial_delay=10m",
+                "--autoupdate_interval=10m"
             ],
             // uncomment below if you need root
             // "asRoot": true,
+            // uncomment to send debug log to terminal
             // "console": "integratedTerminal",
         },
     ]

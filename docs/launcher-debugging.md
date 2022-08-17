@@ -78,12 +78,11 @@ Using `svc-fg` is the recommended approach
 1. Open launcher repo with VS Code
 * if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
-### Debugging Over Socket
+### Debugging With Osquery Interactive
 
 1. Press cmd+p on macOS
-1. Type `debug socket`
+1. Type `debug interactive`
 1. Press enter
-1. Lauch osquery with `osqueryd --connect /tmp/osq.sock -S`
 
 Now you should be able to set break points in VS Code and hit them by executing queries.
 
