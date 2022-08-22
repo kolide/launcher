@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	systrayruntime "github.com/kolide/launcher/pkg/systray/runtime"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
@@ -37,7 +39,6 @@ import (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
 	// determine the root directory, create one if it's not provided
@@ -241,6 +242,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return errors.Wrap(err, "create launcher updater")
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
+	}
+
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
+		systrayRunner := systrayruntime.New(logger, time.Second*5)
+		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
 	}
 
 	err = runGroup.Run()

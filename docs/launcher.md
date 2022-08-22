@@ -30,7 +30,7 @@ provided with this repository.
 
 To use The Launcher to easily connect osquery to a server that is
 compliant with the [gRPC
-specification](https://github.com/kolide/agent-api/blob/master/agent_api.proto),
+specification](https://github.com/kolide/agent-api/blob/main/agent_api.proto),
 invoke the binary with just a few flags:
 
 - `--hostname`: the hostname of the gRPC server for your environment
