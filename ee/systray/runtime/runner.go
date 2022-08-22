@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"os"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -18,6 +20,14 @@ type SystrayUsersProcessesRunner struct {
 	interrupt         chan struct{}
 	// uidProcs is a map of uid to systray process
 	uidProcs map[string]*os.Process
+	// procsWg is a WaitGroup to wait for all systray processes to finish during an interrupt
+	procsWg *sync.WaitGroup
+	// procsWgTimeout how long to wait for systray proccesses to finish on interrupt
+	procsWgTimeout time.Duration
+	// executablePath is the path to the launcher executable. Currently this is only set during testing
+	// due to needing to build the binary to test as a result of some test harness weirdness.
+	// See runner_test.go for more details.
+	executablePath string
 }
 
 // New creates and returns a new SystrayUsersProcessesRunner runner and initializes all required fields
@@ -27,6 +37,8 @@ func New(logger log.Logger, executionInterval time.Duration) *SystrayUsersProces
 		interrupt:         make(chan struct{}),
 		uidProcs:          make(map[string]*os.Process),
 		executionInterval: executionInterval,
+		procsWg:           &sync.WaitGroup{},
+		procsWgTimeout:    time.Second * 5,
 	}
 }
 
@@ -58,16 +70,34 @@ func (r *SystrayUsersProcessesRunner) Execute() error {
 // Interrupt stops creating launcher systray processes and kills any existing ones.
 func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 	r.interrupt <- struct{}{}
-	for _, proc := range r.uidProcs {
-		if !processExists(proc.Pid) {
-			continue
-		}
 
-		if err := proc.Kill(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error killing systray process after interrupt",
-				"err", err,
-			)
+	wgDone := make(chan struct{})
+	go func() {
+		defer close(wgDone)
+		r.procsWg.Wait()
+	}()
+
+	for _, proc := range r.uidProcs {
+		proc.Signal(syscall.SIGTERM)
+	}
+
+	select {
+	case <-wgDone:
+		return
+	case <-time.After(r.procsWgTimeout):
+		level.Error(r.logger).Log("msg", "timeout waiting for systray processes to exit with SIGTERM, now killing")
+
+		for _, proc := range r.uidProcs {
+			if !processExists(proc.Pid) {
+				continue
+			}
+			if err := proc.Kill(); err != nil {
+				level.Error(r.logger).Log(
+					"msg", "error killing systray process",
+					"err", err,
+					"pid", proc.Pid,
+				)
+			}
 		}
 	}
 }

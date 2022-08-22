@@ -24,7 +24,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	// there seems to be a brief moment during start up where root or system (non-human)
 	// users own the console, if we spin up the process for them it will add an
 	// unnecessary process. On macOS human users start at 501
-	if consoleOwnerUid < 500 {
+	if consoleOwnerUid < 501 {
 		level.Debug(r.logger).Log(
 			"msg", "skipping systray for root or system user",
 			"uid", consoleOwnerUid,
@@ -33,6 +33,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		return nil
 	}
 
+	// consoleOwnerUid is a uint32, convert to string
 	uid := fmt.Sprint(consoleOwnerUid)
 
 	// already have a systray for the console owner
@@ -50,12 +51,16 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		)
 	}
 
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("getting executable path: %w", err)
+	executablePath := r.executablePath
+	if r.executablePath == "" {
+		executable, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("getting executable path: %w", err)
+		}
+		executablePath = executable
 	}
 
-	proc, err := runAsUser(uid, executable, "systray")
+	proc, err := runAsUser(uid, executablePath, "systray")
 	if err != nil {
 		return fmt.Errorf("running systray: %w", err)
 	}
@@ -66,6 +71,22 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		"uid", consoleOwnerUid,
 		"pid", proc.Pid,
 	)
+
+	r.procsWg.Add(1)
+	go func(uid string, proc *os.Process) {
+		defer r.procsWg.Done()
+		// if the systray proccess dies, the parent must clean up otherwise we get a zombie process
+		// waiting here gives the parent a chance to clean up
+		_, err := proc.Wait()
+		if err != nil {
+			level.Error(r.logger).Log(
+				"msg", "systray process died",
+				"uid", uid,
+				"pid", proc.Pid,
+				"err", err,
+			)
+		}
+	}(uid, proc)
 
 	return nil
 }
@@ -151,6 +172,7 @@ func processExists(pid int) bool {
 
 	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
 	// bash equivalent of: kill -n 0 <pid>
+	// this will return true for zombie processes, because it's still alive or at least undead
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
 		return true
