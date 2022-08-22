@@ -51,12 +51,16 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		)
 	}
 
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("getting executable path: %w", err)
+	executablePath := r.executablePath
+	if r.executablePath == "" {
+		executable, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("getting executable path: %w", err)
+		}
+		executablePath = executable
 	}
 
-	proc, err := runAsUser(uid, executable, "systray")
+	proc, err := runAsUser(uid, executablePath, "systray")
 	if err != nil {
 		return fmt.Errorf("running systray: %w", err)
 	}

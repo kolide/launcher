@@ -24,6 +24,10 @@ type SystrayUsersProcessesRunner struct {
 	procsWg *sync.WaitGroup
 	// procsWgTimeout how long to wait for systray proccesses to finish on interrupt
 	procsWgTimeout time.Duration
+	// executablePath is the path to the launcher executable. Currently this is only set during testing
+	// due to needing to build the binary to test as a result of some test harness weirdness.
+	// See runner_test.go for more details.
+	executablePath string
 }
 
 // New creates and returns a new SystrayUsersProcessesRunner runner and initializes all required fields

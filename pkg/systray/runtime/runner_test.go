@@ -6,8 +6,9 @@ package runtime
 import (
 	"math"
 	"os"
+	"os/exec"
 	"os/user"
-	"syscall"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,7 +17,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSystrayUserProcessRunner_Execute(t *testing.T) { //nolint:paralleltest
+func TestSystrayUserProcessRunner_Execute(t *testing.T) {
+	t.Parallel()
+
+	// When running this using the golang test harness, it will leave behind proccess if you do not build the binary first.
+	// On mac os you can find these by setting the executable path to an empty string before running the tests, then search
+	// the processes in a terminal using: ps aux -o ppid | runtime.test after the tests have completed, you'll also see the
+	// CPU consumtion go way up.
+
+	// To get around the issue mentioned above, build the binary first and set it's path as the executable path on the runner.
+	executablePath := filepath.Join(t.TempDir(), "systray")
+	err := exec.Command("go", "build", "-o", executablePath, "../../../cmd/launcher").Run()
+	require.NoError(t, err)
+
 	tests := []struct {
 		name  string
 		setup func(*testing.T, *SystrayUsersProcessesRunner)
@@ -45,8 +58,11 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) { //nolint:paralleltest
 	}
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			r := New(log.NewNopLogger(), time.Second*1)
+			r.executablePath = executablePath
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -64,20 +80,6 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) { //nolint:paralleltest
 			require.NoError(t, err)
 			assert.Contains(t, r.uidProcs, user.Uid)
 			assert.Len(t, r.uidProcs, 1)
-
-			t.Cleanup(func() {
-				for _, proc := range r.uidProcs {
-					proc.Signal(syscall.SIGTERM)
-				}
-
-				<-time.After(time.Second)
-
-				// make sure we clean up an remaining processes
-				for _, proc := range r.uidProcs {
-					proc.Kill()
-					proc.Wait()
-				}
-			})
 		})
 	}
 }
