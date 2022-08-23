@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"syscall"
@@ -62,13 +63,19 @@ func (r *SystrayUsersProcessesRunner) Execute() error {
 		case <-ticker.C:
 			f()
 		case <-r.interrupt:
+			level.Debug(r.logger).Log("msg", "interrupt received, exiting systray execute loop")
 			return nil
 		}
 	}
 }
 
 // Interrupt stops creating launcher systray processes and kills any existing ones.
-func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
+func (r *SystrayUsersProcessesRunner) Interrupt(interruptError error) {
+	level.Debug(r.logger).Log(
+		"msg", "sending interrupt to systray users processes runner",
+		"err", interruptError,
+	)
+
 	r.interrupt <- struct{}{}
 
 	wgDone := make(chan struct{})
@@ -77,16 +84,17 @@ func (r *SystrayUsersProcessesRunner) Interrupt(err error) {
 		r.procsWg.Wait()
 	}()
 
+	signal := syscall.SIGTERM
 	for _, proc := range r.uidProcs {
-		proc.Signal(syscall.SIGTERM)
+		proc.Signal(signal)
 	}
 
 	select {
 	case <-wgDone:
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("all systray processes shutdown successfully with %s", signal))
 		return
 	case <-time.After(r.procsWgTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for systray processes to exit with SIGTERM, now killing")
-
 		for _, proc := range r.uidProcs {
 			if !processExists(proc.Pid) {
 				continue
