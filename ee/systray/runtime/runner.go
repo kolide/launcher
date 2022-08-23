@@ -91,9 +91,7 @@ func (r *SystrayUsersProcessesRunner) Interrupt(interruptError error) {
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log(
-			"msg", fmt.Sprintf("all systray processes shutdown successfully with %s", signal),
-		)
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("all systray processes shutdown successfully with %s", signal))
 		return
 	case <-time.After(r.procsWgTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for systray processes to exit with SIGTERM, now killing")
