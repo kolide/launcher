@@ -48,7 +48,6 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 	}
 
 	file, err := os.Open(paths[0])
-
 	if err != nil {
 		// TODO: Investigate what error message looks like. Add filepath possibly
 		return nil, err
@@ -59,15 +58,17 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 	rowData := map[string]string{"path": paths[0]}
 	rawKeyVals := make(map[string]interface{})
 
+	re := regexp.MustCompile(`user_pref\((.*)\)`)
 	for scanner.Scan() {
 		line := scanner.Text()
-		re := regexp.MustCompile(`user_pref\((.*)\)`)
 		match := re.FindStringSubmatch(line)
 
-		if len(match) > 1 {
-			parts := strings.Split(match[1], ", ")
-			rawKeyVals[parts[0]] = parts[1]
+		if len(match) <= 1 {
+			continue
 		}
+
+		parts := strings.Split(match[1], ", ")
+		rawKeyVals[parts[0]] = parts[1]
 	}
 
 	var results []map[string]string
