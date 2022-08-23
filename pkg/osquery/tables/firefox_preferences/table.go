@@ -1,11 +1,9 @@
-package firefox_prefs
+package firefox_preferences
 
 import (
 	"bufio"
 	"context"
 	"os"
-	"os/user"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
+	"github.com/pkg/errors"
 )
 
 type Table struct {
@@ -22,10 +21,12 @@ type Table struct {
 	logger log.Logger
 }
 
-const tableName = "kolide_firefox_prefs"
+const tableName = "kolide_firefox_preferences"
 
 func TablePlugin(_ *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := dataflattentable.Columns()
+	columns := dataflattentable.Columns(
+		table.TextColumn("path"),
+	)
 
 	t := &Table{
 		name:		tableName,
@@ -36,22 +37,27 @@ func TablePlugin(_ *osquery.ExtensionManagerClient, logger log.Logger) *table.Pl
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	usr, _ := user.Current()
-	return output(filepath.Join(usr.HomeDir, "github/launcher/prefs.js"), queryContext, t.logger)
+	return generateData(queryContext, t.logger)
 }
 
-func output(path string, queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error)  {
-	file, err := os.Open(path)
+func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error)  {
+	paths := tablehelpers.GetConstraints(queryContext, "path")
+
+	if len(paths) != 1 {
+		return nil, errors.Errorf("The %s table requires that you specify a constraint for path", tableName)
+	}
+
+	file, err := os.Open(paths[0])
 
 	if err != nil {
+		// TODO: Investigate what error message looks like. Add filepath possibly
 		return nil, err
 	}
 
 	scanner := bufio.NewScanner(file)
 
-	rowData := make(map[string]string)
-	var results []map[string]string
-	m := make(map[string]interface{})
+	rowData := map[string]string{"path": paths[0]}
+	rawKeyVals := make(map[string]interface{})
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -60,13 +66,14 @@ func output(path string, queryContext table.QueryContext, logger log.Logger) ([]
 
 		if len(match) > 1 {
 			parts := strings.Split(match[1], ", ")
-			m[parts[0]] = parts[1]
+			rawKeyVals[parts[0]] = parts[1]
 		}
 	}
 
+	var results []map[string]string
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-		flattened, err := dataflatten.Flatten(m, dataflatten.WithLogger(logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(rawKeyVals, dataflatten.WithLogger(logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
 			return nil, err
 		}
