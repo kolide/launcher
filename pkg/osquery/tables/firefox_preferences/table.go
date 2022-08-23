@@ -17,7 +17,7 @@ import (
 )
 
 type Table struct {
-	name	 string
+	name   string
 	logger log.Logger
 }
 
@@ -29,7 +29,7 @@ func TablePlugin(_ *osquery.ExtensionManagerClient, logger log.Logger) *table.Pl
 	)
 
 	t := &Table{
-		name:		tableName,
+		name:   tableName,
 		logger: logger,
 	}
 
@@ -40,7 +40,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return generateData(queryContext, t.logger)
 }
 
-func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error)  {
+func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
 	paths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(paths) != 1 {

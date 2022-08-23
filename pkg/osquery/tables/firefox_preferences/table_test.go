@@ -13,17 +13,17 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		filepath string
-		want []map[string]string
+		name        string
+		filepath    string
+		want        []map[string]string
 		errContains string
 	}{
 		{
-			name: "happy path",
+			name:     "happy path",
 			filepath: "testdata/prefs.js",
 			want: []map[string]string{
-				{ "app.normandy.first_run": "false" },
-				{ "app.normandy.migrationsApplied": "12" },
+				{"app.normandy.first_run": "false"},
+				{"app.normandy.migrationsApplied": "12"},
 			},
 		},
 	}
