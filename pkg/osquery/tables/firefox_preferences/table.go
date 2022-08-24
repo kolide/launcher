@@ -42,6 +42,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return generateData(queryContext, t.logger)
 }
 
+// For the first iteration of this table, we decided to do our own parsing with regex,
+// leaving the JSON strings as-is. In the future, we may want to use go-mozpref:
+// https://github.com/hansmi/go-mozpref
 func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
 	var results []map[string]string
 
@@ -75,10 +78,16 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 				line := scanner.Text()
 				match := re.FindStringSubmatch(line)
 
+				// Given this line format: user_pref("app.normandy.first_run", false);
+				// The return value should a three element array, where the second and
+				// third elements are the key and value respectively.
 				if len(match) != 3 {
 					continue
 				}
 
+				// The regex already stripped out the surrounding quotes, so now we're
+				// left with escaped quotes that no longer make sense.
+				// Replace those with regular quotes.
 				rawKeyVals[match[1]] = strings.ReplaceAll(match[2], "\\\"", "\"")
 			}
 
