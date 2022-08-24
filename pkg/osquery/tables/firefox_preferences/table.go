@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -42,43 +43,57 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
-	paths := tablehelpers.GetConstraints(queryContext, "path")
+	var results []map[string]string
 
-	if len(paths) == 0 {
+	filePaths := tablehelpers.GetConstraints(queryContext, "path")
+
+	if len(filePaths) == 0 {
 		return nil, errors.Errorf("The %s table requires that you specify a constraint for path", tableName)
 	}
 
-	rowData := map[string]string{"path": paths[0]}
 	rawKeyVals := make(map[string]interface{})
 
-	for _, path := range paths {
-		file, err := os.Open(path)
-		if err != nil {
-			// TODO: Investigate what error message looks like. Add filepath possibly
-			return nil, err
-		}
+	for _, filePath := range filePaths {
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			match := re.FindStringSubmatch(line)
+			flattenOpts := []dataflatten.FlattenOpts{
+				dataflatten.WithLogger(logger),
+				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+			}
 
-			if len(match) <= 1 {
+			file, err := os.Open(filePath)
+			if err != nil {
+				level.Info(logger).Log(
+					"msg", "failed to get data for path",
+					"path", filePath,
+					"err", err,
+				)
 				continue
 			}
 
-			parts := strings.Split(match[1], ", ")
-			rawKeyVals[parts[0]] = parts[1]
-		}
-	}
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := scanner.Text()
+				match := re.FindStringSubmatch(line)
 
-	var results []map[string]string
-	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(rawKeyVals, dataflatten.WithLogger(logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
-		if err != nil {
-			return nil, err
+				if len(match) != 2 {
+					continue
+				}
+
+				parts := strings.Split(match[1], ", ")
+				if len(parts) == 2 {
+					rawKeyVals[parts[0]] = parts[1]
+				}
+			}
+
+			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
+			if err != nil {
+				return nil, err
+			}
+
+			rowData := map[string]string{"path": filePath}
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
 		}
-		results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
 	}
 
 	return results, nil
