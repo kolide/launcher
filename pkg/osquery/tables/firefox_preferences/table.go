@@ -64,7 +64,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 			file, err := os.Open(filePath)
 			if err != nil {
 				level.Info(logger).Log(
-					"msg", "failed to get data for path",
+					"msg", "failed to open file",
 					"path", filePath,
 					"err", err,
 				)
@@ -88,7 +88,12 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
 			if err != nil {
-				return nil, err
+				level.Info(logger).Log(
+					"msg", "failed to get data for path",
+					"path", filePath,
+					"err", err,
+				)
+				continue
 			}
 
 			rowData := map[string]string{"path": filePath}
