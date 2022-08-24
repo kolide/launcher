@@ -17,5 +17,3 @@ user_pref("browser.contextual-services.contextId", "{97961fa4-2a6a-470f-a916-45a
 user_pref("browser.newtabpage.activity-stream.discoverystream.rec.impressions", "{\"138341\":1660860020223,\"138361\":1660860020223,\"257394347\":1660860020221}");
 user_pref("browser.newtabpage.activity-stream.discoverystream.spoc.impressions", "{\"249024122\":[1660860020218]}");
 user_pref("browser.newtabpage.pinned", "[{\"url\":\"https://amazon.com\",\"label\":\"@amazon\",\"searchTopSite\":true}]");
-user_pref("browser.newtabpage.storageVersion", 1);
-user_pref("browser.pageActions.persistedActions", "{\"ids\":[\"bookmark\"],\"idsInUrlbar\":[\"bookmark\"],\"idsInUrlbarPreProton\":[],\"version\":1}");
