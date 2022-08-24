@@ -79,7 +79,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// Try to ensure useful info in the logs
 	checkpoint.Run(logger, db, *opts)
 
-	rootPool, err := createCertificatePool(opts)
+	rootCertPool, err := createCertificatePool(opts)
 	if err != nil {
 		return fmt.Errorf("creating certificate pool: %w", err)
 	}
@@ -92,7 +92,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	var client service.KolideService
 	switch opts.Transport {
 	case "grpc":
-		grpcConn, err := service.DialGRPC(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+		grpcConn, err := service.DialGRPC(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootCertPool, logger)
 		if err != nil {
 			return fmt.Errorf("dialing grpc server: %w", err)
 		}
@@ -101,7 +101,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
 		runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 	case "jsonrpc":
-		client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+		client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootCertPool, logger)
 	case "osquery":
 		client = service.NewNoopClient(logger)
 	default:
@@ -109,8 +109,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	err = osqueryInstanceHistory.InitHistory(db)
-	if err != nil {
+	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
 		return fmt.Errorf("init osquery instance history: %w", err)
 	}
 
@@ -128,24 +127,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	// If the control server has been opted-in to, run it
-	if opts.Control {
-		control, err := createControl(ctx, db, logger, opts)
-		if err != nil {
-			return fmt.Errorf("creating control actor: %w", err)
-		}
-		if control != nil {
-			runGroup.Add(control.Execute, control.Interrupt)
-		} else {
-			level.Info(logger).Log("msg", "got nil control actor. Ignoring")
-		}
+	if err := setupControlServer(ctx, logger, db, &runGroup, opts); err != nil {
+		return fmt.Errorf("setting up control server: %w", err)
 	}
 
-	var systrayRunner *systrayruntime.SystrayUsersProcessesRunner
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
-		systrayRunner = systrayruntime.New(logger, time.Second*5)
-		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
-	}
+	systrayRunner := createSystrayRunner(logger, &runGroup, opts)
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.Autoupdate {
@@ -301,4 +287,32 @@ func handleSignals(logger log.Logger, cancel func(), runGroup *run.Group) chan o
 	})
 
 	return sigChannel
+}
+
+func createSystrayRunner(logger log.Logger, runGroup *run.Group, opts *launcher.Options) *systrayruntime.SystrayUsersProcessesRunner {
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
+		systrayRunner := systrayruntime.New(logger, time.Second*5)
+		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
+		return systrayRunner
+	}
+
+	return nil
+}
+
+func setupControlServer(ctx context.Context, logger log.Logger, db *bbolt.DB, runGroup *run.Group, opts *launcher.Options) error {
+	if !opts.Control {
+		return nil
+	}
+
+	// If the control server has been opted-in to, run it
+	control, err := createControl(ctx, db, logger, opts)
+	if err != nil {
+		return fmt.Errorf("creating control actor: %w", err)
+	}
+	if control != nil {
+		runGroup.Add(control.Execute, control.Interrupt)
+	} else {
+		level.Info(logger).Log("msg", "got nil control actor. Ignoring")
+	}
+	return nil
 }
