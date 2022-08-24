@@ -11,7 +11,6 @@ import (
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
-	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
 	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
@@ -89,7 +88,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		ioreg.TablePlugin(client, logger),
 		profiles.TablePlugin(client, logger),
 		airport.TablePlugin(client, logger),
-		firefox_preferences.TablePlugin(logger),
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
