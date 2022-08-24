@@ -38,7 +38,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20210803163830-e689ca24537d
-	github.com/kolide/krypto v0.0.0-00010101000000-000000000000 // indirect
+	github.com/kolide/krypto v0.0.0-00010101000000-000000000000
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
@@ -63,7 +63,6 @@ require (
 	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.8.0
 	github.com/theupdateframework/notary v0.6.1
-	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.22.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83

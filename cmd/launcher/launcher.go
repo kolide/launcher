@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -160,8 +161,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	err = osqueryInstanceHistory.InitHistory(db)
-	if err != nil {
+	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
 		return errors.Wrap(err, "error initializing osquery instance history")
 	}
 
@@ -254,6 +254,22 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return errors.Wrap(err, "create launcher updater")
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
+	}
+
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
+		systrayRunner := systrayruntime.New(logger, time.Second*5)
+		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
+	}
+
+	if opts.KolideServerURL == "k2device.kolide.com" || opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" {
+		ls, err := localserver.New(logger, db)
+		if err != nil {
+			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
+			os.Exit(1)
+		}
+
+		//ls.UpdateIdFields(testData{})
+		runGroup.Add(ls.Start, ls.Interrupt)
 	}
 
 	err = runGroup.Run()
