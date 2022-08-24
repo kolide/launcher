@@ -42,37 +42,37 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
 	paths := tablehelpers.GetConstraints(queryContext, "path")
 
-	if len(paths) != 1 {
+	if len(paths) == 0 {
 		return nil, errors.Errorf("The %s table requires that you specify a constraint for path", tableName)
 	}
 
-	file, err := os.Open(paths[0])
-	if err != nil {
-		// TODO: Investigate what error message looks like. Add filepath possibly
-		return nil, err
-	}
-
-	scanner := bufio.NewScanner(file)
-
 	rowData := map[string]string{"path": paths[0]}
 	rawKeyVals := make(map[string]interface{})
-
 	re := regexp.MustCompile(`user_pref\((.*)\)`)
-	for scanner.Scan() {
-		line := scanner.Text()
-		match := re.FindStringSubmatch(line)
 
-		if len(match) <= 1 {
-			continue
+	for _, path := range paths {
+		file, err := os.Open(path)
+		if err != nil {
+			// TODO: Investigate what error message looks like. Add filepath possibly
+			return nil, err
 		}
 
-		parts := strings.Split(match[1], ", ")
-		rawKeyVals[parts[0]] = parts[1]
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			match := re.FindStringSubmatch(line)
+
+			if len(match) <= 1 {
+				continue
+			}
+
+			parts := strings.Split(match[1], ", ")
+			rawKeyVals[parts[0]] = parts[1]
+		}
 	}
 
 	var results []map[string]string
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-
 		flattened, err := dataflatten.Flatten(rawKeyVals, dataflatten.WithLogger(logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
 			return nil, err
