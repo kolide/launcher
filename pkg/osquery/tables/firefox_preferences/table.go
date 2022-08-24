@@ -51,8 +51,6 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 		return nil, errors.Errorf("The %s table requires that you specify a constraint WHERE path IN", tableName)
 	}
 
-	rawKeyVals := make(map[string]interface{})
-
 	for _, filePath := range filePaths {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
@@ -71,6 +69,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 				continue
 			}
 
+			rawKeyVals := make(map[string]interface{})
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
 				line := scanner.Text()
