@@ -21,6 +21,7 @@ type Table struct {
 }
 
 const tableName = "kolide_firefox_preferences"
+var re = regexp.MustCompile(`user_pref\((.*)\)`)
 
 func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
@@ -48,7 +49,6 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 
 	rowData := map[string]string{"path": paths[0]}
 	rawKeyVals := make(map[string]interface{})
-	re := regexp.MustCompile(`user_pref\((.*)\)`)
 
 	for _, path := range paths {
 		file, err := os.Open(path)
