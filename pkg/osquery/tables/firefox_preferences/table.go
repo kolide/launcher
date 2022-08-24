@@ -3,6 +3,7 @@ package firefox_preferences
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -45,13 +46,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 // For the first iteration of this table, we decided to do our own parsing with regex,
 // leaving the JSON strings as-is. In the future, we may want to use go-mozpref:
 // https://github.com/hansmi/go-mozpref
-func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
+func generateData(queryContext table.QueryContext, logger log.Logger) []map[string]string {
 	var results []map[string]string
 
 	filePaths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(filePaths) == 0 {
-		return nil, errors.Errorf("The %s table requires that you specify a constraint WHERE path IN", tableName)
+		level.Info(logger).Log(
+			"msg", fmt.Sprintf("no path provided to %s", tableName),
+		)
+		return results
 	}
 
 	for _, filePath := range filePaths {
@@ -106,5 +110,5 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 		}
 	}
 
-	return results, nil
+	return results
 }
