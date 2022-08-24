@@ -40,18 +40,12 @@ msGeD7hPhtdB/h0O8eBWIiOQ6fH7exl71UfGTR6pYQmJMK1ZZeT7FeWVSGkswxkV
 -----END PUBLIC KEY-----
 `
 
-//go:embed ltest202208.kolideint.net.crt
-var tlsCert []byte
-
-//go:embed ltest202208.kolideint.net.key
-var tlsKey []byte
-
 type localServer struct {
 	logger      log.Logger
 	srv         http.Server
 	identifiers identifiers
 	limiter     *rate.Limiter
-	tlsEnabled  bool
+	tlsCerts    []tls.Certificate
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -62,11 +56,10 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(logger log.Logger, db *bbolt.DB, tlsEnabled bool) (*localServer, error) {
+func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 	ls := &localServer{
-		logger:     log.With(logger, "component", "localserver"),
-		limiter:    rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		tlsEnabled: tlsEnabled,
+		logger:  log.With(logger, "component", "localserver"),
+		limiter: rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -92,10 +85,11 @@ func New(logger log.Logger, db *bbolt.DB, tlsEnabled bool) (*localServer, error)
 	mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
 	mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
 
+	// Still testing this
 	mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
 
 	srv := http.Server{
-		Handler:           ls.whompCors(ls.rateLimitHandler(mux)),
+		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		WriteTimeout:      50 * time.Millisecond,
@@ -133,20 +127,14 @@ func (ls *localServer) Start() error {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	// Test TLS
-	if ls.tlsEnabled {
-		level.Info(ls.logger).Log("message", "Using TLS")
+	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
+		level.Debug(ls.logger).Log("message", "Using TLS")
 
-		cert, err := tls.X509KeyPair(tlsCert, tlsKey)
-		if err != nil {
-			return fmt.Errorf("failed to read test tls certs: %w", err)
-		}
-
-		tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		tlsConfig := &tls.Config{Certificates: ls.tlsCerts, InsecureSkipVerify: true}
 
 		l = tls.NewListener(l, tlsConfig)
 	} else {
-		level.Info(ls.logger).Log("message", "No TLS")
+		level.Debug(ls.logger).Log("message", "No TLS")
 	}
 
 	return ls.srv.Serve(l)
@@ -175,7 +163,7 @@ func (ls *localServer) startListener() (net.Listener, error) {
 	for _, p := range portList {
 		level.Debug(ls.logger).Log("msg", "Trying port", "port", p)
 
-		l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", p))
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
 		if err != nil {
 			level.Debug(ls.logger).Log(
 				"message", "Unable to bind to port. Moving on",
@@ -200,19 +188,8 @@ func pongHandler(res http.ResponseWriter, req *http.Request) {
 
 }
 
-func (ls *localServer) whompCors(next http.Handler) http.Handler {
+func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		fmt.Println("Whomp cors")
-
-		/*
-								testy?
-
-			fetch("http://localhost:10356/id")
-			  .then(response => response.blob())
-			  .then(blob=> console.log(blob));
-
-		*/
 		// Think harder, maybe?
 		// https://stackoverflow.com/questions/12830095/setting-http-headers
 		if origin := r.Header.Get("Origin"); origin != "" {
@@ -236,6 +213,7 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if ls.limiter.Allow() == false {
 			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+			level.Error(ls.logger).Log("msg", "Over rate limit")
 			return
 		}
 
@@ -245,6 +223,5 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) kryptoBoxOutboundHandler(http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 	})
 }
