@@ -18,7 +18,7 @@ func Test_generateData(t *testing.T) {
 		name                    string
 		filepaths               []string
 		expectedResultsFilePath string
-		query string
+		query                   string
 	}{
 		{
 			name: "no path",
@@ -32,7 +32,7 @@ func Test_generateData(t *testing.T) {
 			name:                    "single path with query",
 			filepaths:               []string{"testdata/prefs.js"},
 			expectedResultsFilePath: "testdata/output.single_path_with_query.json",
-			query: "app.normandy.first_run",
+			query:                   "app.normandy.first_run",
 		},
 		{
 			name:                    "multiple paths",
