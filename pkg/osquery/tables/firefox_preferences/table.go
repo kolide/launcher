@@ -23,7 +23,7 @@ type Table struct {
 
 const tableName = "kolide_firefox_preferences"
 
-var re = regexp.MustCompile(`^user_pref\((.*)\)`)
+var re = regexp.MustCompile(`^user_pref\("([^,]+)",\s*(.*)"?\);$`)
 
 func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
@@ -76,14 +76,11 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 				line := scanner.Text()
 				match := re.FindStringSubmatch(line)
 
-				if len(match) != 2 {
+				if len(match) != 3 {
 					continue
 				}
 
-				parts := strings.Split(match[1], ", ")
-				if len(parts) == 2 {
-					rawKeyVals[parts[0]] = parts[1]
-				}
+				rawKeyVals[match[1]] = match[2]
 			}
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
