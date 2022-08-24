@@ -89,7 +89,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		ioreg.TablePlugin(client, logger),
 		profiles.TablePlugin(client, logger),
 		airport.TablePlugin(client, logger),
-		firefox_preferences.TablePlugin(client, logger),
+		firefox_preferences.TablePlugin(logger),
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
