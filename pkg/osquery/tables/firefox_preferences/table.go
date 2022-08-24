@@ -48,7 +48,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) ([]map[str
 	filePaths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(filePaths) == 0 {
-		return nil, errors.Errorf("The %s table requires that you specify a constraint for path", tableName)
+		return nil, errors.Errorf("The %s table requires that you specify a constraint WHERE path IN", tableName)
 	}
 
 	rawKeyVals := make(map[string]interface{})
