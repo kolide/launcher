@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type Table struct {
@@ -40,7 +39,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	return generateData(queryContext, t.logger)
+	return generateData(queryContext, t.logger), nil
 }
 
 // For the first iteration of this table, we decided to do our own parsing with regex,
