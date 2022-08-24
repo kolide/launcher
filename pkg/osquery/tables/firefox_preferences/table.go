@@ -21,7 +21,7 @@ type Table struct {
 }
 
 const tableName = "kolide_firefox_preferences"
-var re = regexp.MustCompile(`user_pref\((.*)\)`)
+var re = regexp.MustCompile(`^user_pref\((.*)\)`)
 
 func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
