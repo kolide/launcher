@@ -61,7 +61,7 @@ func Test_generate(t *testing.T) {
 				constraints["query"] = append(constraints["query"], tt.query)
 			}
 
-			got, _ := table.generate(context.TODO(), tablehelpers.MockQueryContext(constraints))
+			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
 
 			var want []map[string]string
 
