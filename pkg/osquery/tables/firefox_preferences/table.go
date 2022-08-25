@@ -23,6 +23,20 @@ type Table struct {
 
 const tableName = "kolide_firefox_preferences"
 
+/*
+For the first iteration of this table, we decided to do our own parsing with regex,
+leaving the JSON strings as-is.
+
+user_pref("app.normandy.foo", "{\"abc\":123}");
+
+					 ───────┬────────	   ──────┬──────
+	       			  Group 1           Group 2
+
+Note that we do not capture the surrounding quotes for either groups.
+
+In the future, we may want to use go-mozpref:
+https://github.com/hansmi/go-mozpref
+*/
 var re = regexp.MustCompile(`^user_pref\("([^,]+)",\s*"?(.*?)"?\);$`)
 
 func TablePlugin(logger log.Logger) *table.Plugin {
@@ -42,9 +56,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return generateData(queryContext, t.logger), nil
 }
 
-// For the first iteration of this table, we decided to do our own parsing with regex,
-// leaving the JSON strings as-is. In the future, we may want to use go-mozpref:
-// https://github.com/hansmi/go-mozpref
 func generateData(queryContext table.QueryContext, logger log.Logger) []map[string]string {
 	var results []map[string]string
 
@@ -53,6 +64,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 	if len(filePaths) == 0 {
 		level.Info(logger).Log(
 			"msg", fmt.Sprintf("no path provided to %s", tableName),
+			"table", tableName,
 		)
 		return results
 	}
@@ -60,7 +72,6 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 	for _, filePath := range filePaths {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithLogger(logger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
@@ -68,6 +79,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 			if err != nil {
 				level.Info(logger).Log(
 					"msg", "failed to open file",
+					"table", tableName,
 					"path", filePath,
 					"err", err,
 				)
@@ -99,8 +111,9 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
 			if err != nil {
-				level.Info(logger).Log(
-					"msg", "failed to get data for path",
+				level.Debug(logger).Log(
+					"msg", "failed to flatten data for path",
+					"table", tableName,
 					"path", filePath,
 					"err", err,
 				)
