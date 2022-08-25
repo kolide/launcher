@@ -82,14 +82,15 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 				match := re.FindStringSubmatch(line)
 
 				// Given this line format: user_pref("app.normandy.first_run", false);
-				// The return value should a three element array, where the second and
-				// third elements are the key and value respectively.
+				// The return value should be a three element array, where the second
+				// and third elements are the key and value, respectively.
 				if len(match) != 3 {
 					continue
 				}
 
 				// The regex already stripped out the surrounding quotes, so now we're
 				// left with escaped quotes that no longer make sense.
+				// i.e. {\"249024122\":[1660860020218]}
 				// Replace those with regular quotes.
 				rawKeyVals[match[1]] = strings.ReplaceAll(match[2], "\\\"", "\"")
 			}
