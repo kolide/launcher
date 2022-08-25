@@ -59,7 +59,6 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 
 	for _, filePath := range filePaths {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-
 			flattenOpts := []dataflatten.FlattenOpts{
 				dataflatten.WithLogger(logger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
@@ -79,11 +78,14 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
 				line := scanner.Text()
+
+				// Given the line format: user_pref("app.normandy.first_run", false);
+				// the return value should be a three element array, where the second
+				// and third elements are the key and value, respectively.
 				match := re.FindStringSubmatch(line)
 
-				// Given this line format: user_pref("app.normandy.first_run", false);
-				// The return value should be a three element array, where the second
-				// and third elements are the key and value, respectively.
+				// If the match doesn't have a length of 3, the line is malformed in some way.
+				// Skip it.
 				if len(match) != 3 {
 					continue
 				}
@@ -91,7 +93,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 				// The regex already stripped out the surrounding quotes, so now we're
 				// left with escaped quotes that no longer make sense.
 				// i.e. {\"249024122\":[1660860020218]}
-				// Replace those with regular quotes.
+				// Replace those with unescaped quotes.
 				rawKeyVals[match[1]] = strings.ReplaceAll(match[2], "\\\"", "\"")
 			}
 
