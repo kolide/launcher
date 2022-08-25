@@ -1,6 +1,7 @@
 package firefox_preferences
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path"
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_generateData(t *testing.T) {
+func Test_generate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -47,6 +48,8 @@ func Test_generateData(t *testing.T) {
 		},
 	}
 
+	table := Table{logger: log.NewNopLogger()}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -58,7 +61,7 @@ func Test_generateData(t *testing.T) {
 				constraints["query"] = append(constraints["query"], tt.query)
 			}
 
-			got := generateData(tablehelpers.MockQueryContext(constraints), log.NewNopLogger())
+			got, _ := table.generate(context.TODO(), tablehelpers.MockQueryContext(constraints))
 
 			var want []map[string]string
 

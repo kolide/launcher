@@ -29,8 +29,8 @@ leaving the JSON strings as-is.
 
 user_pref("app.normandy.foo", "{\"abc\":123}");
 
-					 ───────┬────────	   ──────┬──────
-	       			  Group 1           Group 2
+					 ───────┬────────    ──────┬──────
+	             Group 1            Group 2
 
 Note that we do not capture the surrounding quotes for either groups.
 
@@ -53,20 +53,16 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	return generateData(queryContext, t.logger), nil
-}
-
-func generateData(queryContext table.QueryContext, logger log.Logger) []map[string]string {
 	var results []map[string]string
 
 	filePaths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(filePaths) == 0 {
-		level.Info(logger).Log(
+		level.Info(t.logger).Log(
 			"msg", fmt.Sprintf("no path provided to %s", tableName),
 			"table", tableName,
 		)
-		return results
+		return results, nil
 	}
 
 	for _, filePath := range filePaths {
@@ -77,7 +73,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 
 			file, err := os.Open(filePath)
 			if err != nil {
-				level.Info(logger).Log(
+				level.Info(t.logger).Log(
 					"msg", "failed to open file",
 					"table", tableName,
 					"path", filePath,
@@ -111,7 +107,7 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
 			if err != nil {
-				level.Debug(logger).Log(
+				level.Debug(t.logger).Log(
 					"msg", "failed to flatten data for path",
 					"table", tableName,
 					"path", filePath,
@@ -125,5 +121,5 @@ func generateData(queryContext table.QueryContext, logger log.Logger) []map[stri
 		}
 	}
 
-	return results
+	return results, nil
 }
