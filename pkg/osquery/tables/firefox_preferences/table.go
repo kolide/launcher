@@ -23,20 +23,16 @@ type Table struct {
 
 const tableName = "kolide_firefox_preferences"
 
-/*
-For the first iteration of this table, we decided to do our own parsing with regex,
-leaving the JSON strings as-is.
-
-user_pref("app.normandy.foo", "{\"abc\":123}");
-
-					 ───────┬────────    ──────┬──────
-	             Group 1            Group 2
-
-Note that we do not capture the surrounding quotes for either groups.
-
-In the future, we may want to use go-mozpref:
-https://github.com/hansmi/go-mozpref
-*/
+// For the first iteration of this table, we decided to do our own parsing with regex,
+// leaving the JSON strings as-is.
+//
+// input  -> user_pref("app.normandy.foo", "{\"abc\":123}");
+// output -> [user_pref("app.normandy.foo", "{"abc":123}"); app.normandy.foo {"abc":123}]
+//
+// Note that we do not capture the surrounding quotes for either groups.
+//
+// In the future, we may want to use go-mozpref:
+// https://github.com/hansmi/go-mozpref
 var re = regexp.MustCompile(`^user_pref\("([^,]+)",\s*"?(.*?)"?\);$`)
 
 func TablePlugin(logger log.Logger) *table.Plugin {
