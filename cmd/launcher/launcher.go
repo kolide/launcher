@@ -192,6 +192,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
+	var systrayRunner *systrayruntime.SystrayUsersProcessesRunner
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
+		systrayRunner = systrayruntime.New(logger, time.Second*5)
+		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
+	}
+
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.Autoupdate {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
@@ -235,18 +241,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		launcherUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
-			updater.UpdateFinalizer(logger, runnerShutdown),
+			updater.UpdateFinalizer(logger, func() error {
+				// stop systray on auto updates
+				if systrayRunner != nil {
+					systrayRunner.Interrupt(nil)
+				}
+				return runnerShutdown()
+			}),
 			launcherUpdaterconfig,
 		)
 		if err != nil {
 			return errors.Wrap(err, "create launcher updater")
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
-	}
-
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
-		systrayRunner := systrayruntime.New(logger, time.Second*5)
-		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
 	}
 
 	err = runGroup.Run()
