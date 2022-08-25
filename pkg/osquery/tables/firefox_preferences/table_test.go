@@ -3,6 +3,7 @@ package firefox_preferences
 import (
 	"encoding/json"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -25,23 +26,23 @@ func Test_generateData(t *testing.T) {
 		},
 		{
 			name:                    "single path",
-			filePaths:               []string{"testdata/prefs.js"},
+			filePaths:               []string{path.Join("testdata", "prefs.js")},
 			expectedResultsFilePath: "testdata/output.single_path.json",
 		},
 		{
 			name:                    "single path with query",
-			filePaths:               []string{"testdata/prefs.js"},
+			filePaths:               []string{path.Join("testdata", "prefs.js")},
 			expectedResultsFilePath: "testdata/output.single_path_with_query.json",
 			query:                   "app.normandy.first_run",
 		},
 		{
 			name:                    "multiple paths",
-			filePaths:               []string{"testdata/prefs.js", "testdata/prefs2.js"},
+			filePaths:               []string{path.Join("testdata", "prefs.js"), path.Join("testdata", "prefs2.js")},
 			expectedResultsFilePath: "testdata/output.multiple_paths.json",
 		},
 		{
 			name:                    "file with bad data",
-			filePaths:               []string{"testdata/prefs3.js"},
+			filePaths:               []string{path.Join("testdata", "prefs3.js")},
 			expectedResultsFilePath: "testdata/output.file_with_bad_data.json",
 		},
 	}
@@ -52,7 +53,7 @@ func Test_generateData(t *testing.T) {
 			t.Parallel()
 
 			constraints := make(map[string][]string)
-			constraints["path"] = append(constraints["path"], tt.filePaths...)
+			constraints["path"] = tt.filePaths
 			if tt.query != "" {
 				constraints["query"] = append(constraints["query"], tt.query)
 			}
@@ -61,7 +62,7 @@ func Test_generateData(t *testing.T) {
 
 			var want []map[string]string
 
-			if len(tt.filePaths) != 0 {
+			if tt.expectedResultsFilePath != "" {
 				wantBytes, err := os.ReadFile(tt.expectedResultsFilePath)
 				require.NoError(t, err)
 
