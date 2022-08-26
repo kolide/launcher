@@ -44,9 +44,6 @@ type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
-// Querier is a type used for querier. It would be a lot cleaner as an
-// interface, but that's a pretty deep change.
-// type Querier
 type localServer struct {
 	logger      log.Logger
 	srv         *http.Server
@@ -166,7 +163,7 @@ func (ls *localServer) Start() error {
 	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
 		level.Debug(ls.logger).Log("message", "Using TLS")
 
-		tlsConfig := &tls.Config{Certificates: ls.tlsCerts, InsecureSkipVerify: true}
+		tlsConfig := &tls.Config{Certificates: ls.tlsCerts, InsecureSkipVerify: true} // lgtm[go/disabled-certificate-check]
 
 		l = tls.NewListener(l, tlsConfig)
 	} else {
