@@ -8,4 +8,4 @@ import (
 )
 
 //go:embed kolide-mark-only-purple-16x-32x.ico
-var kolideDekstopIcon []byte
+var kolideDesktopIcon []byte
