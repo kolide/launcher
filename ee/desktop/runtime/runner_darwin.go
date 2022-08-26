@@ -15,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
@@ -26,7 +26,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	// unnecessary process. On macOS human users start at 501
 	if consoleOwnerUid < 501 {
 		level.Debug(r.logger).Log(
-			"msg", "skipping systray for root or system user",
+			"msg", "skipping desktop for root or system user",
 			"uid", consoleOwnerUid,
 		)
 
@@ -36,7 +36,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	// consoleOwnerUid is a uint32, convert to string
 	uid := fmt.Sprint(consoleOwnerUid)
 
-	// already have a systray for the console owner
+	// already have a desktop for the console owner
 	if proc, ok := r.uidProcs[uid]; ok {
 		// if the process is still running, return
 		if processExists(proc.Pid) {
@@ -45,7 +45,7 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 
 		// proc is dead
 		level.Info(r.logger).Log(
-			"msg", "existing systray process dead for console user, starting new systray process",
+			"msg", "existing desktop process dead for console user, starting new desktop process",
 			"dead_pid", r.uidProcs[uid].Pid,
 			"uid", consoleOwnerUid,
 		)
@@ -60,14 +60,14 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 		executablePath = executable
 	}
 
-	proc, err := runAsUser(uid, executablePath, "systray")
+	proc, err := runAsUser(uid, executablePath, "desktop")
 	if err != nil {
-		return fmt.Errorf("running systray: %w", err)
+		return fmt.Errorf("running desktop: %w", err)
 	}
 	r.uidProcs[uid] = proc
 
 	level.Debug(r.logger).Log(
-		"msg", "systray started",
+		"msg", "desktop started",
 		"uid", consoleOwnerUid,
 		"pid", proc.Pid,
 	)
@@ -75,12 +75,12 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	r.procsWg.Add(1)
 	go func(uid string, proc *os.Process) {
 		defer r.procsWg.Done()
-		// if the systray proccess dies, the parent must clean up otherwise we get a zombie process
+		// if the desktop proccess dies, the parent must clean up otherwise we get a zombie process
 		// waiting here gives the parent a chance to clean up
 		_, err := proc.Wait()
 		if err != nil {
 			level.Error(r.logger).Log(
-				"msg", "systray process died",
+				"msg", "desktop process died",
 				"uid", uid,
 				"pid", proc.Pid,
 				"err", err,

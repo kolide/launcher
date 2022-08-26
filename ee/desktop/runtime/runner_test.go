@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSystrayUserProcessRunner_Execute(t *testing.T) {
+func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
 
 	// When running this using the golang test harness, it will leave behind proccess if you do not build the binary first.
@@ -26,20 +26,20 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 	// CPU consumtion go way up.
 
 	// To get around the issue mentioned above, build the binary first and set it's path as the executable path on the runner.
-	executablePath := filepath.Join(t.TempDir(), "systray")
+	executablePath := filepath.Join(t.TempDir(), "desktop")
 	err := exec.Command("go", "build", "-o", executablePath, "../../../cmd/launcher").Run()
 	require.NoError(t, err)
 
 	tests := []struct {
 		name  string
-		setup func(*testing.T, *SystrayUsersProcessesRunner)
+		setup func(*testing.T, *DesktopUsersProcessesRunner)
 	}{
 		{
 			name: "happy path",
 		},
 		{
 			name: "new process started if old one gone",
-			setup: func(t *testing.T, r *SystrayUsersProcessesRunner) {
+			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
@@ -49,7 +49,7 @@ func TestSystrayUserProcessRunner_Execute(t *testing.T) {
 		},
 		{
 			name: "procs waitgroup times out",
-			setup: func(t *testing.T, r *SystrayUsersProcessesRunner) {
+			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
 				r.procsWgTimeout = time.Millisecond
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)

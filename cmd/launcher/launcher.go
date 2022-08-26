@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	systrayruntime "github.com/kolide/launcher/ee/systray/runtime"
+	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -192,10 +192,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	var systrayRunner *systrayruntime.SystrayUsersProcessesRunner
+	var desktopRunner *desktopRuntime.DesktopUsersProcessesRunner
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
-		systrayRunner = systrayruntime.New(logger, time.Second*5)
-		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
+		desktopRunner = desktopRuntime.New(logger, time.Second*5)
+		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
@@ -242,9 +242,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			ctx,
 			launcherPath,
 			updater.UpdateFinalizer(logger, func() error {
-				// stop systray on auto updates
-				if systrayRunner != nil {
-					systrayRunner.Interrupt(nil)
+				// stop desktop on auto updates
+				if desktopRunner != nil {
+					desktopRunner.Interrupt(nil)
 				}
 				return runnerShutdown()
 			}),

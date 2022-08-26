@@ -1,4 +1,4 @@
-package systray
+package desktop
 
 import (
 	"fmt"
@@ -11,13 +11,13 @@ import (
 	"github.com/kolide/kit/version"
 )
 
-func RunSystray(args []string) error {
+func RunDesktop(args []string) error {
 
 	go exitWhenParentGone()
 	go handleSignals()
 
 	onReady := func() {
-		systray.SetTemplateIcon(kolideSystrayIcon, kolideSystrayIcon)
+		systray.SetTemplateIcon(kolideDesktopIcon, kolideDesktopIcon)
 		systray.SetTooltip("Kolide")
 
 		versionItem := systray.AddMenuItem(fmt.Sprintf("Version %s", version.Version().Version), "")
