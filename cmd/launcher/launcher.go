@@ -271,28 +271,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
-		systrayRunner := systrayruntime.New(logger, time.Second*5)
-		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
-	}
-
-	if opts.KolideServerURL == "k2device.kolide.com" || opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" {
-		ls, err := localserver.New(logger, db)
-		if err != nil {
-			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
-			os.Exit(1)
-		}
-
-		// Untangling this might be tricky. localserver wants a Querier. But we don't have that exposed
-		// here. It's buried deep in the extension creation routines. AND I wonder if there's a race
-		// condition around what order a rungroup starts -- can't use the querier until osquery is started. Etc.
-		// We could bridge it with soemthing that writes into the db. But that feels wrong.
-		//
-		//ls.UpdateIdFields(testData{})
-		runGroup.Add(ls.Start, ls.Interrupt)
-	}
-
-
 	err = runGroup.Run()
 	return errors.Wrap(err, "run service")
 }
