@@ -27,24 +27,20 @@ type requestIdsResponse struct {
 	Timestamp time.Time
 }
 
-type Querier interface {
-	Query(query string) ([]map[string]string, error)
-}
 
-type ExpectedAtLeastOneRowError struct{}
-
-func (e ExpectedAtLeastOneRowError) Error() string {
-	return "expected at least one row from osquery_info table"
-}
-
-func (ls *localServer) UpdateIdFields(querier Querier) error {
-	results, err := querier.Query("select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info")
+func (ls *localServer) updateIdFields() {
+	results, err := ls.querier.Query("select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info")
 	if err != nil {
-		return err
+		level.Info(ls.logger).Log(
+			"msg", "Failed to query for id fields",
+			"err", err,
+		)
+		return
 	}
 
 	if results == nil || len(results) < 1 {
-		return ExpectedAtLeastOneRowError{}
+		level.Info(ls.logger).Log(			"msg", "id fquery didn't return data"		)
+		return
 	}
 
 	if id, ok := results[0]["instance_id"]; ok {
@@ -58,7 +54,7 @@ func (ls *localServer) UpdateIdFields(querier Querier) error {
 		ls.identifiers.HardwareSerial = hs
 	}
 
-	return nil
+	return
 }
 
 func (ls *localServer) requestIdHandler() http.Handler {

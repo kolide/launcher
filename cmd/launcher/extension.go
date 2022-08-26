@@ -27,10 +27,22 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// actorQuerier is a type wrapper over kolide/kit/actor. This should
+// probably all be refactored into reasonable interfaces. But that's
+// going to be pretty extensive work.
+type actorQuerier struct {
+	actor.Actor
+	querier func(query string) ([]map[string]string, error)
+}
+func (aq actorQuerier) Query(query string) ([]map[string]string, error) {
+	return aq.querier(query)
+}
+
+
 // TODO: the extension, runtime, and client are all kind of entangled
 // here. Untangle the underlying libraries and separate into units
 func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
-	run *actor.Actor,
+	run *actorQuerier,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
 	err error,
@@ -109,7 +121,10 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		return runner.Restart()
 	}
 
-	return &actor.Actor{
+
+	
+	return &actorQuerier{
+		Actor: actor.Actor{
 			// and the methods for starting and stopping the extension
 			Execute: func() error {
 
@@ -176,6 +191,9 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 				}
 			},
 		},
+		querier: runner.Query,
+	
+	},
 		restartFunc,
 		runner.Shutdown,
 		nil

@@ -40,12 +40,20 @@ msGeD7hPhtdB/h0O8eBWIiOQ6fH7exl71UfGTR6pYQmJMK1ZZeT7FeWVSGkswxkV
 -----END PUBLIC KEY-----
 `
 
+type Querier interface {
+	Query(query string) ([]map[string]string, error)
+}
+
+// Querier is a type used for querier. It would be a lot cleaner as an
+// interface, but that's a pretty deep change.
+//type Querier
 type localServer struct {
 	logger      log.Logger
 	srv         http.Server
 	identifiers identifiers
 	limiter     *rate.Limiter
 	tlsCerts    []tls.Certificate
+	querier Querier
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -101,6 +109,10 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 	return ls, nil
 }
 
+func (ls *localServer) SetQuerier(querier Querier) {
+	ls.querier = querier
+}
+
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	if ls.serverKey != nil {
 		return nil
@@ -121,7 +133,25 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	return nil
 }
 
+func (ls *localServer) runAsyncdWorkers() time.Time{
+
+	return time.Now()
+}
+
 func (ls *localServer) Start() error {
+	// Spawn background workers
+	go func() {		
+		lastRun := ls.runAsyncdWorkers()
+
+		// to account for laptop sleep, we check each hour to
+		// see if we've elapsed enough wall clock time
+		for range time.Tick(time.Hour * 1) {
+			if time.Now().Sub(lastRun) > (24 * time.Hour) {
+				lastRun = ls.runAsyncdWorkers()
+			}
+		}
+	}()	
+	
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
