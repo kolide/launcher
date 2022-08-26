@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	return fmt.Errorf("not implemented")
 }
 
