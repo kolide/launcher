@@ -134,6 +134,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 }
 
 func (ls *localServer) runAsyncdWorkers() time.Time {
+	if err := ls.updateIdFields(); err != nil {
+		level.Info(ls.logger).Log(
+			"msg", "Got error updating id fields",
+			"err", err,
+		)
+	}
 
 	return time.Now()
 }

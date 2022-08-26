@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -27,19 +28,18 @@ type requestIdsResponse struct {
 	Timestamp time.Time
 }
 
-func (ls *localServer) updateIdFields() {
+func (ls *localServer) updateIdFields() error {
+	if ls.querier == nil {
+		return errors.New("no querier set")
+	}
+
 	results, err := ls.querier.Query("select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info")
 	if err != nil {
-		level.Info(ls.logger).Log(
-			"msg", "Failed to query for id fields",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("id query failed: %w", err)
 	}
 
 	if results == nil || len(results) < 1 {
-		level.Info(ls.logger).Log("msg", "id fquery didn't return data")
-		return
+		return errors.New("id query didn't return data")
 	}
 
 	if id, ok := results[0]["instance_id"]; ok {
@@ -53,7 +53,7 @@ func (ls *localServer) updateIdFields() {
 		ls.identifiers.HardwareSerial = hs
 	}
 
-	return
+	return nil
 }
 
 func (ls *localServer) requestIdHandler() http.Handler {
