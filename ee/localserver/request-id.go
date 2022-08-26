@@ -27,7 +27,6 @@ type requestIdsResponse struct {
 	Timestamp time.Time
 }
 
-
 func (ls *localServer) updateIdFields() {
 	results, err := ls.querier.Query("select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info")
 	if err != nil {
@@ -39,7 +38,7 @@ func (ls *localServer) updateIdFields() {
 	}
 
 	if results == nil || len(results) < 1 {
-		level.Info(ls.logger).Log(			"msg", "id fquery didn't return data"		)
+		level.Info(ls.logger).Log("msg", "id fquery didn't return data")
 		return
 	}
 
@@ -72,7 +71,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
-		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %w", err))
+		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
 	}
 
 	res.Write(jsonBytes)

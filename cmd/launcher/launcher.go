@@ -139,7 +139,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		close(sigChannel)
 	})
 
-	
 	var client service.KolideService
 	{
 		switch opts.Transport {
@@ -203,13 +202,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		ls, err := localserver.New(logger, db)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
-			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)	
+			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
 		}
 
 		ls.SetQuerier(extension)
 		runGroup.Add(ls.Start, ls.Interrupt)
 	}
-
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.Autoupdate {
@@ -289,6 +287,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		//ls.UpdateIdFields(testData{})
 		runGroup.Add(ls.Start, ls.Interrupt)
 	}
+
 
 	err = runGroup.Run()
 	return errors.Wrap(err, "run service")

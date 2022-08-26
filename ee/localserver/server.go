@@ -46,14 +46,14 @@ type Querier interface {
 
 // Querier is a type used for querier. It would be a lot cleaner as an
 // interface, but that's a pretty deep change.
-//type Querier
+// type Querier
 type localServer struct {
 	logger      log.Logger
-	srv         http.Server
+	srv         *http.Server
 	identifiers identifiers
 	limiter     *rate.Limiter
 	tlsCerts    []tls.Certificate
-	querier Querier
+	querier     Querier
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -96,7 +96,7 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 	// Still testing this
 	mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
 
-	srv := http.Server{
+	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
@@ -133,14 +133,14 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	return nil
 }
 
-func (ls *localServer) runAsyncdWorkers() time.Time{
+func (ls *localServer) runAsyncdWorkers() time.Time {
 
 	return time.Now()
 }
 
 func (ls *localServer) Start() error {
 	// Spawn background workers
-	go func() {		
+	go func() {
 		lastRun := ls.runAsyncdWorkers()
 
 		// to account for laptop sleep, we check each hour to
@@ -150,8 +150,8 @@ func (ls *localServer) Start() error {
 				lastRun = ls.runAsyncdWorkers()
 			}
 		}
-	}()	
-	
+	}()
+
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
@@ -172,7 +172,7 @@ func (ls *localServer) Start() error {
 
 func (ls *localServer) Stop() error {
 	level.Debug(ls.logger).Log("msg", "Stopping")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Millisecond))
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
 	if err := ls.srv.Shutdown(ctx); err != nil {
