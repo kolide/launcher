@@ -11,10 +11,6 @@ import (
 	"github.com/kolide/kit/ulid"
 )
 
-type requestIdRequest struct {
-	RequestID string
-}
-
 type identifiers struct {
 	UUID           string
 	InstanceId     string
@@ -62,7 +58,6 @@ func (ls *localServer) requestIdHandler() http.Handler {
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
 	response := requestIdsResponse{
-		RequestId: ulid.New(), //FIXME
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
 	}

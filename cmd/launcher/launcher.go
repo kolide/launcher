@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -198,7 +199,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
 	}
 
-	if opts.KolideServerURL == "k2device.kolide.com" || opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" {
+	if opts.KolideServerURL == "k2device.kolide.com" ||
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+		opts.KolideServerURL == "localhost:3443" ||
+		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
 		ls, err := localserver.New(logger, db)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
