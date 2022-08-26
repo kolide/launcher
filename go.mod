@@ -1,7 +1,5 @@
 module github.com/kolide/launcher
 
-replace github.com/kolide/krypto => ../krypto
-
 require (
 	fyne.io/systray v1.10.0
 	github.com/Masterminds/semver v1.4.2
@@ -38,7 +36,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20210803163830-e689ca24537d
-	github.com/kolide/krypto v0.0.0-00010101000000-000000000000
+	github.com/kolide/krypto v0.0.0-20220825200954-4dd58822b2a6
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
