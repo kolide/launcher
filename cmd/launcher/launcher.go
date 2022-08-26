@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -22,6 +23,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -160,8 +162,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	err = osqueryInstanceHistory.InitHistory(db)
-	if err != nil {
+	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
 		return errors.Wrap(err, "error initializing osquery instance history")
 	}
 
@@ -196,6 +197,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
 		desktopRunner = desktopRuntime.New(logger, time.Second*5)
 		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
+	}
+
+	if opts.KolideServerURL == "k2device.kolide.com" ||
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+		opts.KolideServerURL == "localhost:3443" ||
+		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
+		ls, err := localserver.New(logger, db)
+		if err != nil {
+			// For now, log this and move on. It might be a fatal error
+			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
+		}
+
+		ls.SetQuerier(extension)
+		runGroup.Add(ls.Start, ls.Interrupt)
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher

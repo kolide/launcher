@@ -27,10 +27,22 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// actorQuerier is a type wrapper over kolide/kit/actor. This should
+// probably all be refactored into reasonable interfaces. But that's
+// going to be pretty extensive work.
+type actorQuerier struct {
+	actor.Actor
+	querier func(query string) ([]map[string]string, error)
+}
+
+func (aq actorQuerier) Query(query string) ([]map[string]string, error) {
+	return aq.querier(query)
+}
+
 // TODO: the extension, runtime, and client are all kind of entangled
 // here. Untangle the underlying libraries and separate into units
 func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient service.KolideService, opts *launcher.Options) (
-	run *actor.Actor,
+	run *actorQuerier,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
 	err error,
@@ -109,72 +121,75 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		return runner.Restart()
 	}
 
-	return &actor.Actor{
-			// and the methods for starting and stopping the extension
-			Execute: func() error {
+	return &actorQuerier{
+			Actor: actor.Actor{
+				// and the methods for starting and stopping the extension
+				Execute: func() error {
 
-				// Start the osqueryd instance
-				if err := runner.Start(); err != nil {
-					return errors.Wrap(err, "launching osquery instance")
-				}
+					// Start the osqueryd instance
+					if err := runner.Start(); err != nil {
+						return errors.Wrap(err, "launching osquery instance")
+					}
 
-				// If we're using osquery transport, we don't need the extension
-				if opts.Transport == "osquery" {
-					level.Debug(logger).Log("msg", "Using osquery transport, skipping extension startup")
+					// If we're using osquery transport, we don't need the extension
+					if opts.Transport == "osquery" {
+						level.Debug(logger).Log("msg", "Using osquery transport, skipping extension startup")
+
+						// TODO: remove when underlying libs are refactored
+						// everything exits right now, so block this actor on the context finishing
+						<-ctx.Done()
+						return nil
+					}
+
+					// The runner allows querying the osqueryd instance from the extension.
+					// Used by the Enroll method below to get initial enrollment details.
+					ext.SetQuerier(runner)
+
+					// It's not clear to me _why_ the extension
+					// ever called Enroll here. From what
+					// I can tell, this would cause the
+					// launcher extension to do a bunch of
+					// initial setup (create node key,
+					// etc). But, this is also done by
+					// osquery. And having them both
+					// attempt it is a bit racey.  I'm not
+					// so confident to outright remove it,
+					// so it's gated behind this debugging
+					// environment.
+					if os.Getenv("LAUNCHER_DEBUG_ENROLL_FIRST") == "true" {
+						// enroll this launcher with the server
+						_, invalid, err := ext.Enroll(ctx)
+						if err != nil {
+							return errors.Wrap(err, "enrolling host")
+						}
+						if invalid {
+							return errors.Wrap(err, "invalid enroll secret")
+						}
+					}
+
+					// start the extension
+					ext.Start()
+
+					level.Info(logger).Log("msg", "extension started")
 
 					// TODO: remove when underlying libs are refactored
 					// everything exits right now, so block this actor on the context finishing
 					<-ctx.Done()
 					return nil
-				}
-
-				// The runner allows querying the osqueryd instance from the extension.
-				// Used by the Enroll method below to get initial enrollment details.
-				ext.SetQuerier(runner)
-
-				// It's not clear to me _why_ the extension
-				// ever called Enroll here. From what
-				// I can tell, this would cause the
-				// launcher extension to do a bunch of
-				// initial setup (create node key,
-				// etc). But, this is also done by
-				// osquery. And having them both
-				// attempt it is a bit racey.  I'm not
-				// so confident to outright remove it,
-				// so it's gated behind this debugging
-				// environment.
-				if os.Getenv("LAUNCHER_DEBUG_ENROLL_FIRST") == "true" {
-					// enroll this launcher with the server
-					_, invalid, err := ext.Enroll(ctx)
-					if err != nil {
-						return errors.Wrap(err, "enrolling host")
+				},
+				Interrupt: func(err error) {
+					level.Info(logger).Log("msg", "extension interrupted", "err", err)
+					level.Debug(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
+					ext.Shutdown()
+					if runner != nil {
+						if err := runner.Shutdown(); err != nil {
+							level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
+							level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
+						}
 					}
-					if invalid {
-						return errors.Wrap(err, "invalid enroll secret")
-					}
-				}
-
-				// start the extension
-				ext.Start()
-
-				level.Info(logger).Log("msg", "extension started")
-
-				// TODO: remove when underlying libs are refactored
-				// everything exits right now, so block this actor on the context finishing
-				<-ctx.Done()
-				return nil
+				},
 			},
-			Interrupt: func(err error) {
-				level.Info(logger).Log("msg", "extension interrupted", "err", err)
-				level.Debug(logger).Log("msg", "extension interrupted", "err", err, "stack", fmt.Sprintf("%+v", err))
-				ext.Shutdown()
-				if runner != nil {
-					if err := runner.Shutdown(); err != nil {
-						level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
-						level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
-					}
-				}
-			},
+			querier: runner.Query,
 		},
 		restartFunc,
 		runner.Shutdown,
