@@ -94,7 +94,7 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 	mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
 
 	// Still testing this
-	mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
+	//mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
