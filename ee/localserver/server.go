@@ -156,7 +156,9 @@ func (ls *localServer) Stop() error {
 
 func (ls *localServer) Interrupt(err error) {
 	level.Debug(ls.logger).Log("message", "Stopping due to interrupt", "reason", err)
-	_ = ls.Stop()
+	if err := ls.Stop(); err != nil {
+		level.Info(ls.logger).Log("message", "got error interrupting", "error", err)
+	}
 }
 
 func (ls *localServer) startListener() (net.Listener, error) {
