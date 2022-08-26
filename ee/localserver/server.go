@@ -131,25 +131,32 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 }
 
 func (ls *localServer) runAsyncdWorkers() time.Time {
+	success := true
+
+	level.Debug(ls.logger).Log("msg", "Starting an async run")
+
 	if err := ls.updateIdFields(); err != nil {
+		success = false
 		level.Info(ls.logger).Log(
 			"msg", "Got error updating id fields",
 			"err", err,
 		)
 	}
 
+	if !success {
+		return time.Time{}
+	}
 	return time.Now()
 }
 
 func (ls *localServer) Start() error {
-	// Spawn background workers
+	// Spawn background workers. This loop is a bit weird on startup. Because the underlying launcher run group isn't ordered, localserver is likely to
+	// start before the querier is ready. As we check for stale data every minute, we just ignore this knowing the next minute will come online. The action
+	// of checking is quite cheap, we should be able to run it frequently.
 	go func() {
 		lastRun := ls.runAsyncdWorkers()
-
-		// to account for laptop sleep, we check each hour to
-		// see if we've elapsed enough wall clock time
-		for range time.Tick(time.Hour * 1) {
-			if time.Now().Sub(lastRun) > (24 * time.Hour) {
+		for range time.Tick(time.Minute * 1) {
+			if time.Since(lastRun) > (24 * time.Hour) {
 				lastRun = ls.runAsyncdWorkers()
 			}
 		}
