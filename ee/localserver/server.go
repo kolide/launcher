@@ -143,6 +143,11 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 		)
 	}
 
+	level.Debug(ls.logger).Log(
+		"msg", "Completed async worker",
+		"success", success,
+	)
+
 	if !success {
 		return time.Time{}
 	}
@@ -151,11 +156,11 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 
 func (ls *localServer) Start() error {
 	// Spawn background workers. This loop is a bit weird on startup. Because the underlying launcher run group isn't ordered, localserver is likely to
-	// start before the querier is ready. As we check for stale data every minute, we just ignore this knowing the next minute will come online. The action
-	// of checking is quite cheap, we should be able to run it frequently.
+	// start before the querier is ready. So we delay the initial run 10 seconds, then we check if it's update time every 5 minutes
 	go func() {
+		<-time.After(10 * time.Second)
 		lastRun := ls.runAsyncdWorkers()
-		for range time.Tick(time.Minute * 1) {
+		for range time.Tick(time.Minute * 5) {
 			if time.Since(lastRun) > (24 * time.Hour) {
 				lastRun = ls.runAsyncdWorkers()
 			}
