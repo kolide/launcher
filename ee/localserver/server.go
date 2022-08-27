@@ -14,6 +14,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.etcd.io/bbolt"
 	"golang.org/x/time/rate"
@@ -133,7 +134,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 func (ls *localServer) runAsyncdWorkers() time.Time {
 	success := true
 
-	level.Debug(ls.logger).Log("msg", "Starting an async run")
+	level.Debug(ls.logger).Log("msg", "Starting an async worker run")
 
 	if err := ls.updateIdFields(); err != nil {
 		success = false
@@ -144,7 +145,7 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 	}
 
 	level.Debug(ls.logger).Log(
-		"msg", "Completed async worker",
+		"msg", "Completed async worker run",
 		"success", success,
 	)
 
@@ -155,13 +156,35 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 }
 
 func (ls *localServer) Start() error {
-	// Spawn background workers. This loop is a bit weird on startup. Because the underlying launcher run group isn't ordered, localserver is likely to
-	// start before the querier is ready. So we delay the initial run 10 seconds, then we check if it's update time every 5 minutes
+	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can, but because the underlying launcher
+	// run group isn't ordered, this is likely to happen before querier is ready. So we retry at a frequent interval for a couple of minutes, then we drop
+	// back to a slower poll interval. Note that this polling is mearly a check against time, we don't repopulate this data nearly so often. (But we poll
+	// frequently to account for the difference between wall clock time, and sleep time)
+	const (
+		initialPollInterval = 10 * time.Second
+		initialPollTimeout  = 2 * time.Minute
+		pollInterval        = 15 * time.Minute
+		recalculateInterval = 24 * time.Hour
+	)
 	go func() {
-		<-time.After(10 * time.Second)
-		lastRun := ls.runAsyncdWorkers()
-		for range time.Tick(time.Minute * 5) {
-			if time.Since(lastRun) > (24 * time.Hour) {
+		// Initial load, run pretty often, at least for the first chunk of time.
+		var lastRun time.Time
+		if err := backoff.WaitFor(func() error {
+			lastRun = ls.runAsyncdWorkers()
+			if (lastRun == time.Time{}) {
+				return errors.New("async tasks not success on initial boot (no surprise)")
+			}
+			return nil
+		},
+			initialPollTimeout,
+			initialPollInterval,
+		); err != nil {
+			level.Info(ls.logger).Log("message", "Initial async runs unsuccessful. Will retry in the future.", "err", err)
+		}
+
+		// Now that we're done with the initial population, fall back to a periodic polling
+		for range time.Tick(pollInterval) {
+			if time.Since(lastRun) > (recalculateInterval) {
 				lastRun = ls.runAsyncdWorkers()
 			}
 		}
