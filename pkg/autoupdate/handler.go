@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/updater/tuf"
 )
 

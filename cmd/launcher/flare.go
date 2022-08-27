@@ -18,7 +18,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"

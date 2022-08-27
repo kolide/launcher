@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
 )

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packagekit"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"

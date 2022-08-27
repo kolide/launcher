@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/kolide/kit/env"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/pkg/errors"
