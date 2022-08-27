@@ -41,7 +41,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(path, dst); err != nil {
+	if err := fsutil.CopyFile(path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
 	}
 

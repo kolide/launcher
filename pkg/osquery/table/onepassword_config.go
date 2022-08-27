@@ -60,7 +60,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(fileInfo.path, dst); err != nil {
+	if err := fsutil.CopyFile(fileInfo.path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
 	}
 

@@ -35,7 +35,7 @@ func runSocket(args []string) error {
 	}
 
 	if _, err := os.Stat(filepath.Dir(*flPath)); os.IsNotExist(err) {
-		if err := os.Mkdir(filepath.Dir(*flPath), fs.DirMode); err != nil {
+		if err := os.Mkdir(filepath.Dir(*flPath), fsutil.DirMode); err != nil {
 			return errors.Wrap(err, "creating socket path base directory")
 		}
 	}

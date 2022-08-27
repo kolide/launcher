@@ -198,7 +198,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 		return errors.Wrap(err, "An error occurred fetching the osqueryd binary")
 	}
 
-	if err := fs.CopyFile(path, outputFile); err != nil {
+	if err := fsutil.CopyFile(path, outputFile); err != nil {
 		return errors.Wrapf(err, "Couldn't copy file to %s", outputFile)
 	}
 

@@ -458,7 +458,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := fs.CopyDir(source, localRepo); err != nil {
+	if err := fsutil.CopyDir(source, localRepo); err != nil {
 		return errors.Wrap(err, "copying TUF repo metadata")
 	}
 

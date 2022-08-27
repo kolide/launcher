@@ -73,7 +73,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		// enough. But destination is a string that's passed
 		// through filepath.Dir. Which means it strips off the
 		// last component.
-		if err := fs.UntarBundle(outputBinary, stagingPath); err != nil {
+		if err := fsutil.UntarBundle(outputBinary, stagingPath); err != nil {
 			level.Error(u.logger).Log(
 				"msg", "untar downloaded target",
 				"binary", outputBinary,

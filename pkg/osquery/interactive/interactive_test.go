@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(osquerydCacheDir, fs.DirMode); err != nil {
+	if err := os.MkdirAll(osquerydCacheDir, fsutil.DirMode); err != nil {
 		fmt.Printf("error creating cache dir: %s", err)
 		os.Exit(1)
 	}
@@ -120,7 +120,7 @@ func downloadOsquery(dir string) error {
 		return fmt.Errorf("error fetching binary osqueryd binary: %w", err)
 	}
 
-	if err := fs.CopyFile(path, outputFile); err != nil {
+	if err := fsutil.CopyFile(path, outputFile); err != nil {
 		return fmt.Errorf("error copying binary osqueryd binary: %w", err)
 	}
 

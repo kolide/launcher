@@ -174,7 +174,7 @@ func reportOsqueryProcessInfo(
 	)
 	// create the osquery runtime socket directory
 	if _, err := os.Stat(filepath.Dir(socketPath)); os.IsNotExist(err) {
-		if err := os.Mkdir(filepath.Dir(socketPath), fs.DirMode); err != nil {
+		if err := os.Mkdir(filepath.Dir(socketPath), fsutil.DirMode); err != nil {
 			return errors.Wrap(err, "creating socket path base directory")
 		}
 	}

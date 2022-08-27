@@ -50,7 +50,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(file.path, dst); err != nil {
+	if err := fsutil.CopyFile(file.path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite file to tmp dir")
 	}
 

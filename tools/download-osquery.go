@@ -54,7 +54,7 @@ func main() {
 
 	if *flOutput != "" {
 		platformOutput := target.PlatformBinaryName(*flOutput)
-		if err := fs.CopyFile(path, platformOutput); err != nil {
+		if err := fsutil.CopyFile(path, platformOutput); err != nil {
 			fmt.Printf("Couldn't copy file to %s: %s", platformOutput, err)
 			os.Exit(1)
 		}
