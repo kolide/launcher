@@ -16,6 +16,8 @@ import (
 
 func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
+		dataflattentable.TablePluginExec(client, logger,
+			"kolide_bitlocker_volumes", dataflattentable.JsonType, []string{"Get-BitlockerVolume", "|", "ConvertTo-Json"}),
 		ProgramIcons(),
 		dsim_default_associations.TablePlugin(client, logger),
 		secedit.TablePlugin(client, logger),
