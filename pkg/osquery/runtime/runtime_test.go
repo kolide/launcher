@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
@@ -198,7 +198,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 		return errors.Wrap(err, "An error occurred fetching the osqueryd binary")
 	}
 
-	if err := fs.CopyFile(path, outputFile); err != nil {
+	if err := fsutil.CopyFile(path, outputFile); err != nil {
 		return errors.Wrapf(err, "Couldn't copy file to %s", outputFile)
 	}
 

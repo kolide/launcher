@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/updater/tuf"
 )
 
@@ -73,7 +73,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		// enough. But destination is a string that's passed
 		// through filepath.Dir. Which means it strips off the
 		// last component.
-		if err := fs.UntarBundle(outputBinary, stagingPath); err != nil {
+		if err := fsutil.UntarBundle(outputBinary, stagingPath); err != nil {
 			level.Error(u.logger).Log(
 				"msg", "untar downloaded target",
 				"binary", outputBinary,

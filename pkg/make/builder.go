@@ -29,7 +29,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/theupdateframework/notary/client"
@@ -458,7 +458,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := fs.CopyDir(source, localRepo); err != nil {
+	if err := fsutil.CopyDir(source, localRepo); err != nil {
 		return errors.Wrap(err, "copying TUF repo metadata")
 	}
 

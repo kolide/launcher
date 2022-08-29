@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/pkg/errors"
 )
 
@@ -23,9 +23,9 @@ func triggerUpgrade(ctx context.Context, cancel func(), logger log.Logger) error
 	stagedFile := fmt.Sprintf("%s-staged", ProcessNotes.Path)
 
 	// To emulate a new version, just copy the current binary to the staged location
-	level.Debug(logger).Log("msg", "fs.CopyFile")
-	if err := fs.CopyFile(ProcessNotes.Path, stagedFile); err != nil {
-		return (errors.Wrap(err, "fs.CopyFile"))
+	level.Debug(logger).Log("msg", "fsutil.CopyFile")
+	if err := fsutil.CopyFile(ProcessNotes.Path, stagedFile); err != nil {
+		return (errors.Wrap(err, "fsutil.CopyFile"))
 	}
 
 	oldFile := fmt.Sprintf("%s-old", ProcessNotes.Path)

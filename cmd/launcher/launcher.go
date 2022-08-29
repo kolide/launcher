@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
@@ -48,7 +48,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
+			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
 				return errors.Wrap(err, "creating temporary root directory")
 			}
 		}
