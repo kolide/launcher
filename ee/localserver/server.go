@@ -158,7 +158,7 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 func (ls *localServer) Start() error {
 	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can, but because the underlying launcher
 	// run group isn't ordered, this is likely to happen before querier is ready. So we retry at a frequent interval for a couple of minutes, then we drop
-	// back to a slower poll interval. Note that this polling is mearly a check against time, we don't repopulate this data nearly so often. (But we poll
+	// back to a slower poll interval. Note that this polling is merely a check against time, we don't repopulate this data nearly so often. (But we poll
 	// frequently to account for the difference between wall clock time, and sleep time)
 	const (
 		initialPollInterval = 10 * time.Second
