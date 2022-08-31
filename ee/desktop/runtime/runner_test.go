@@ -89,7 +89,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			assert.Len(t, r.uidProcs, 1)
 
 			t.Cleanup(func() {
-				// the cleanup of the t.TempDir() will happen before the build file is closed
+				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
 					p.Wait()

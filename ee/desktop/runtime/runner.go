@@ -111,8 +111,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}
 }
 
-// waitForProcess adds 1 to DesktopUserProcessRunner.procsWg and runs a go routine to wait on the process to exit.
-// the go routine will decrement DesktopUserProcessRunner.procsWg when it exits.
+// waitForProcess adds 1 to DesktopUserProcessRunner.procsWg and runs a goroutine to wait on the process to exit.
+// The go routine will decrement DesktopUserProcessRunner.procsWg when it exits
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
 	go func(username string, proc *os.Process) {
