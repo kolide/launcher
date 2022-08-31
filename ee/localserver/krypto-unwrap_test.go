@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -27,29 +30,65 @@ func TestUnwrapV0(t *testing.T) {
 	counterpartyPub, ok := counterpartyKey.Public().(*rsa.PublicKey)
 	require.True(t, ok)
 
+	malloryKey, err := krypto.RsaRandomKey()
+	require.NoError(t, err)
+
+	counterpartyBoxer := krypto.NewBoxer(counterpartyKey, nil)
+
+	malloryBoxer := krypto.NewBoxer(malloryKey, nil)
+
+	// Make some signed boxes
+	signedIncorrectBox, err := counterpartyBoxer.Sign("", []byte("incorrect"))
+	require.NoError(t, err)
+
+	expectedCmd := ulid.New()
+	expectedId := ulid.New()
+
+	cmdReq := mustMarshal(t, cmdRequestType{Cmd: expectedCmd, Id: expectedId})
+
+	signedBox, err := counterpartyBoxer.Sign("", cmdReq)
+	require.NoError(t, err)
+
+	mallorySigned, err := malloryBoxer.Sign("", cmdReq)
+	require.NoError(t, err)
+
 	var tests = []struct {
 		name      string
-		req       *http.Request
+		boxParam  string
 		loggedErr string
 	}{
 		{
 			name:      "no command",
-			req:       makeUnSignedRequest(t, bytes.NewBufferString("/id")),
-			loggedErr: "No command",
+			boxParam:  "",
+			loggedErr: "no data in box query parameter",
 		},
+		{
+			name:      "bad base64",
+			boxParam:  "This is not base64",
+			loggedErr: "unable to base64 decode box",
+		},
+
 		{
 			name:      "no signature",
-			req:       addCmdHeaderToRequest(makeUnSignedRequest(t, bytes.NewBufferString("/id")), "/id"),
-			loggedErr: "No signature",
+			boxParam:  "aGVsbG8gd29ybGQK",
+			loggedErr: "unable to verify box",
 		},
+
 		{
-			name:      "mismatched signature",
-			req:       addCmdHeaderToRequest(signRequest(t, addCmdHeaderToRequest(makeUnSignedRequest(t, bytes.NewBufferString("/id")), "/id"), counterpartyKey), "/different"),
-			loggedErr: "signature mismatch",
+			name:      "malformed cmd",
+			boxParam:  base64.StdEncoding.EncodeToString(signedIncorrectBox),
+			loggedErr: "unable to unmarshal cmd request",
 		},
+
 		{
-			name: "signed",
-			req:  signRequest(t, addCmdHeaderToRequest(makeUnSignedRequest(t, bytes.NewBufferString("/id")), "/id"), counterpartyKey),
+			name:      "wrong signature",
+			boxParam:  base64.StdEncoding.EncodeToString(mallorySigned),
+			loggedErr: "unable to verify box",
+		},
+
+		{
+			name:     "works",
+			boxParam: base64.StdEncoding.EncodeToString(signedBox),
 		},
 	}
 
@@ -66,11 +105,15 @@ func TestUnwrapV0(t *testing.T) {
 				serverKey: counterpartyPub,
 			}
 
-			answer := ulid.New()
-			h := ls.UnwrapV0Handler(makeTestHandler(t, answer))
+			kbrw := &kryptoBoxResponseWriter{
+				boxer: krypto.NewBoxer(ls.myKey, ls.serverKey),
+			}
+
+			h := ls.UnwrapV1Hander(kbrw, makeTestHandler(t))
+			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
-			h.ServeHTTP(rr, tt.req)
+			h.ServeHTTP(rr, req)
 
 			if tt.loggedErr != "" {
 				assert.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -79,7 +122,8 @@ func TestUnwrapV0(t *testing.T) {
 			}
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, answer, rr.Body.String())
+			assert.NotEmpty(t, rr.Body.String())
+			assert.Equal(t, fmt.Sprintf("https://127.0.0.1:8080/%s?id=%s", expectedCmd, expectedId), rr.Body.String())
 		})
 	}
 
@@ -88,8 +132,7 @@ func TestUnwrapV0(t *testing.T) {
 func TestMakeTestHander(t *testing.T) {
 	t.Parallel()
 
-	answer := ulid.New()
-	h := makeTestHandler(t, answer)
+	h := makeTestHandler(t)
 
 	req, err := http.NewRequest("GET", "http://localhost:8080", nil)
 	require.NoError(t, err)
@@ -97,30 +140,33 @@ func TestMakeTestHander(t *testing.T) {
 	h.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, answer, rr.Body.String())
+	assert.Equal(t, "http://localhost:8080", rr.Body.String())
 }
 
-func makeTestHandler(t *testing.T, answer string) http.Handler {
+func makeTestHandler(t *testing.T) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(answer))
+		w.Write([]byte(r.URL.String()))
 	})
 }
 
-func makeUnSignedRequest(t *testing.T, body *bytes.Buffer) *http.Request {
-	req, err := http.NewRequest("GET", "http://localhost:8080", body)
+func makeRequest(t *testing.T, boxParameter string) *http.Request {
+
+	v := url.Values{}
+
+	if boxParameter != "" {
+		v.Set("box", boxParameter)
+	}
+
+	urlString := "https://127.0.0.1:8080?" + v.Encode()
+
+	req, err := http.NewRequest("GET", urlString, nil)
 	require.NoError(t, err)
+
 	return req
 }
 
-func addCmdHeaderToRequest(req *http.Request, cmd string) *http.Request {
-	req.Header.Set(v0CmdHeader, cmd)
-	return req
-}
-
-func signRequest(t *testing.T, req *http.Request, counterparty *rsa.PrivateKey) *http.Request {
-	sig, err := krypto.RsaSign(counterparty, []byte(req.Header.Get(v0CmdHeader)))
+func mustMarshal(t *testing.T, v interface{}) []byte {
+	b, err := json.Marshal(v)
 	require.NoError(t, err)
-
-	req.Header.Set(v0CmdSignature, base64.StdEncoding.EncodeToString(sig))
-	return req
+	return b
 }
