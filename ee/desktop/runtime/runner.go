@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/shirou/gopsutil/process"
 )
 
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
@@ -47,7 +48,7 @@ func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProces
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
 	f := func() {
-		if err := r.runConsoleUserDesktop(); err != nil {
+		if err := r.runDesktops(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error running desktop",
 				"err", err,
@@ -108,4 +109,65 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 			}
 		}
 	}
+}
+
+func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
+	r.procsWg.Add(1)
+	go func(username string, proc *os.Process) {
+		defer r.procsWg.Done()
+		// if the desktop proccess dies, the parent must clean up otherwise we get a zombie process
+		// waiting here gives the parent a chance to clean up
+		_, err := proc.Wait()
+		if err != nil {
+			level.Error(r.logger).Log(
+				"msg", "desktop process died",
+				"uid", uid,
+				"pid", proc.Pid,
+				"err", err,
+			)
+		}
+	}(uid, proc)
+}
+
+func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) {
+	if r.executablePath != "" {
+		return r.executablePath, nil
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("error getting executable path: %w", err)
+	}
+
+	return executable, nil
+}
+
+func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
+	// have no record of process
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return false
+	}
+
+	// have a record of process, but it died for some reason, log it
+	if !processExists(proc.Pid) {
+		level.Info(r.logger).Log(
+			"msg", "found existing desktop process dead for console user",
+			"dead_pid", r.uidProcs[uid].Pid,
+			"uid", uid,
+		)
+
+		return false
+	}
+
+	// have running process
+	return true
+}
+
+func processExists(pid int) bool {
+	isExists, err := process.PidExists(int32(pid))
+	if err != nil {
+		return false
+	}
+	return isExists
 }

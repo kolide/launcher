@@ -2,7 +2,7 @@ all: build
 
 .PHONY: build
 
-ifndef ($(GOPATH))
+ifndef $GOPATH
 	GOPATH = $(HOME)/go
 endif
 

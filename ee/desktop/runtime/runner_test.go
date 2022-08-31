@@ -1,14 +1,16 @@
-//go:build darwin
-// +build darwin
+//go:build darwin || windows
+// +build darwin windows
 
 package runtime
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -26,7 +28,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	// CPU consumtion go way up.
 
 	// To get around the issue mentioned above, build the binary first and set it's path as the executable path on the runner.
-	executablePath := filepath.Join(t.TempDir(), "desktop")
+	executablePath := filepath.Join(t.TempDir(), "desktop-test")
+
+	if runtime.GOOS == "windows" {
+		executablePath = fmt.Sprintf("%s.exe", executablePath)
+	}
+
 	err := exec.Command("go", "build", "-o", executablePath, "../../../cmd/launcher").Run()
 	require.NoError(t, err)
 
@@ -80,6 +87,14 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, r.uidProcs, user.Uid)
 			assert.Len(t, r.uidProcs, 1)
+
+			t.Cleanup(func() {
+				// the cleanup of the t.TempDir() will happen before the build file is closed
+				// on windows this will cause an error, so just wait for all the processes to finish
+				for _, p := range r.uidProcs {
+					p.Wait()
+				}
+			})
 		})
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/systray"
 	"github.com/kolide/kit/version"
+	"github.com/shirou/gopsutil/process"
 )
 
 func RunDesktop(args []string) error {
@@ -39,23 +40,12 @@ func handleSignals() {
 
 // continuously monitor for ppid and exit if parent process terminates
 func exitWhenParentGone() {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	f := func() {
-		if os.Getppid() <= 1 {
+	for ; true; <-time.NewTicker(2 * time.Second).C {
+		exists, err := process.PidExists(int32(os.Getppid()))
+		if err != nil || !exists {
 			fmt.Println("parent process is gone, exiting")
 			systray.Quit()
 			os.Exit(1)
-		}
-	}
-
-	f()
-
-	for {
-		select {
-		case <-ticker.C:
-			f()
 		}
 	}
 }
