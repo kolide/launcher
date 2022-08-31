@@ -22,7 +22,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		t.Skip("skipping linux test because it's not implemented")
 	}
 
-	// When running this using the golang test harness, it will leave behind proccess if you do not build the binary first.
+	// When running this using the golang test harness, it will leave behind process if you do not build the binary first.
 	// On mac os you can find these by setting the executable path to an empty string before running the tests, then search
 	// the processes in a terminal using: ps aux -o ppid | runtime.test after the tests have completed, you'll also see the
 	// CPU consumtion go way up.
