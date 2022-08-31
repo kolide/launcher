@@ -1,6 +1,3 @@
-//go:build darwin || windows
-// +build darwin windows
-
 package runtime
 
 import (
@@ -21,6 +18,10 @@ import (
 
 func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS == "linux" {
+		t.Skip("skipping linux test because it's not implemented")
+	}
 
 	// When running this using the golang test harness, it will leave behind proccess if you do not build the binary first.
 	// On mac os you can find these by setting the executable path to an empty string before running the tests, then search

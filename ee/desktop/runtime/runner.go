@@ -117,7 +117,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 	r.procsWg.Add(1)
 	go func(username string, proc *os.Process) {
 		defer r.procsWg.Done()
-		// if the desktop proccess dies, the parent must clean up otherwise we get a zombie process
+		// if the desktop process dies, the parent must clean up otherwise we get a zombie process
 		// waiting here gives the parent a chance to clean up
 		_, err := proc.Wait()
 		if err != nil {
