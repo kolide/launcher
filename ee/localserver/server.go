@@ -85,14 +85,18 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 		boxer: krypto.NewBoxer(ls.myKey, ls.serverKey),
 	}
 
+	authedMux := http.NewServeMux()
+	authedMux.HandleFunc("/", http.NotFound)
+	authedMux.HandleFunc("/ping", pongHandler)
+	authedMux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
+	authedMux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
 	mux.HandleFunc("/ping", pongHandler)
 	mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
 	mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
-
-	// Still testing this
-	//mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
+	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw, authedMux))
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
