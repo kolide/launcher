@@ -10,7 +10,3 @@ import (
 func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	return fmt.Errorf("not implemented")
 }
-
-func processExists(pid int) bool {
-	return false
-}
