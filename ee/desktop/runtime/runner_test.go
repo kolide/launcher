@@ -51,7 +51,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
-				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1} //nolint:typecheck
+				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1} //nolint:all
 			},
 		},
 		{
