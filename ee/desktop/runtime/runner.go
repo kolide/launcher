@@ -111,6 +111,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}
 }
 
+// waitForProcess adds 1 to DesktopUserProcessRunner.procsWg and runs a go routine to wait on the process to exit.
+// the go routine will decrement DesktopUserProcessRunner.procsWg when it exits.
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
 	go func(username string, proc *os.Process) {
@@ -129,6 +131,8 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 	}(uid, proc)
 }
 
+// determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,
+// otherwise it returns the path to the current binary.
 func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) {
 	if r.executablePath != "" {
 		return r.executablePath, nil

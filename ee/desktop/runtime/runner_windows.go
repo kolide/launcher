@@ -15,6 +15,9 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
+// runDesktopNative iterates over all the current explorer processes
+// and runs the desktop process as the owner of the explorer process
+// if none currently exists for that user
 func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	explorerProcs, err := explorerProcesses()
 	if err != nil {
@@ -37,6 +40,8 @@ func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 			return fmt.Errorf("determining executable path: %w", err)
 		}
 
+		// get the access token of the user that owns the explorer process
+		// and use it to spawn a new process as that user
 		accessToken, err := processAccessToken(explorerProc.Pid)
 		if err != nil {
 			return fmt.Errorf("getting explorer process token: %w", err)
@@ -59,9 +64,10 @@ func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	}
 
 	return nil
-
 }
 
+// explorerProcesses returns a list of explorer processes whose
+// filepath base is "explorer.exe".
 func explorerProcesses() ([]*process.Process, error) {
 	var explorerProcs []*process.Process
 
@@ -103,6 +109,7 @@ Original code from https://blog.davidvassallo.me/2022/06/17/golang-in-windows-ex
 Thank you David Vassallo!
 */
 
+// processAccessToken returns the access token of the process with the given pid
 func processAccessToken(pid int32) (syscall.Token, error) {
 	var token syscall.Token
 
@@ -120,6 +127,7 @@ func processAccessToken(pid int32) (syscall.Token, error) {
 	return token, err
 }
 
+// runWithAccessToken runs the given executable with the given arguments using the given access token
 func runWithAccessToken(accessToken syscall.Token, path string, args ...string) (*os.Process, error) {
 	cmd := exec.Command(path, args...)
 
