@@ -18,8 +18,9 @@ jobs:
         with:
           go-version: 1.16
       - name: install actionlint
-        # latest version [https://github.com/rhysd/actionlint/releases/tag/v1.6.16] causing:
+        # latest version [https://github.com/rhysd/actionlint/releases/tag/v1.6.17] causing:
         # Error: ../../../go/pkg/mod/github.com/mattn/go-runewidth@v0.0.13/runewidth.go:6:2: //go:build comment without // +build comment
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@ v1.6.16
+        # going back one version until fixed
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.6.16
       - name: actionlint
         run: actionlint -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}%0A```%0A{{replace $err.Snippet "\\n" "%0A"}}%0A```\n{{end}}' -ignore 'SC2016:'
