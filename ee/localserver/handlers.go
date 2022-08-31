@@ -24,8 +24,10 @@ func (krw *kryptoBoxResponseWriter) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, r)
 
+		requestId := r.URL.Query().Get("id")
+
 		// process the response into a krypto box
-		enc, err := krw.boxer.Encode("", bhr.Bytes())
+		enc, err := krw.boxer.Encode(requestId, bhr.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -39,8 +41,10 @@ func (krw *kryptoBoxResponseWriter) WrapPng(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, r)
 
+		requestId := r.URL.Query().Get("id")
+
 		// process the response into a krypto box
-		err := krw.boxer.EncodePng("", bhr.Bytes(), w)
+		err := krw.boxer.EncodePng(requestId, bhr.Bytes(), w)
 		if err != nil {
 			panic(err)
 		}
