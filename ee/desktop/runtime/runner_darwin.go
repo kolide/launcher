@@ -4,7 +4,6 @@
 package runtime
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,7 +14,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+func (r *DesktopUsersProcessesRunner) runDesktops() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
@@ -36,28 +35,14 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	// consoleOwnerUid is a uint32, convert to string
 	uid := fmt.Sprint(consoleOwnerUid)
 
-	// already have a desktop for the console owner
-	if proc, ok := r.uidProcs[uid]; ok {
-		// if the process is still running, return
-		if processExists(proc.Pid) {
-			return nil
-		}
-
-		// proc is dead
-		level.Info(r.logger).Log(
-			"msg", "existing desktop process dead for console user, starting new desktop process",
-			"dead_pid", r.uidProcs[uid].Pid,
-			"uid", consoleOwnerUid,
-		)
+	// already have a process, move on
+	if r.userHasDesktopProcess(uid) {
+		return nil
 	}
 
-	executablePath := r.executablePath
-	if r.executablePath == "" {
-		executable, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("getting executable path: %w", err)
-		}
-		executablePath = executable
+	executablePath, err := r.determineExecutablePath()
+	if err != nil {
+		return fmt.Errorf("determining executable path: %w", err)
 	}
 
 	proc, err := runAsUser(uid, executablePath, "desktop")
@@ -72,21 +57,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		"pid", proc.Pid,
 	)
 
-	r.procsWg.Add(1)
-	go func(uid string, proc *os.Process) {
-		defer r.procsWg.Done()
-		// if the desktop proccess dies, the parent must clean up otherwise we get a zombie process
-		// waiting here gives the parent a chance to clean up
-		_, err := proc.Wait()
-		if err != nil {
-			level.Error(r.logger).Log(
-				"msg", "desktop process died",
-				"uid", uid,
-				"pid", proc.Pid,
-				"err", err,
-			)
-		}
-	}(uid, proc)
+	r.waitOnProcessAsync(uid, proc)
 
 	return nil
 }
@@ -156,46 +127,4 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 	}
 
 	return cmd.Process, nil
-}
-
-func processExists(pid int) bool {
-	// this code was adapted from https://github.com/shirou/gopsutil/blob/ed37dc27a286a25cbe76adf405176c69191a1f37/process/process_posix.go#L102
-	// thank you shirou!
-	if pid <= 0 {
-		return false
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
-	// bash equivalent of: kill -n 0 <pid>
-	// this will return true for zombie processes, because it's still alive or at least undead
-	err = proc.Signal(syscall.Signal(0))
-	if err == nil {
-		return true
-	}
-
-	if err.Error() == "os: process already finished" {
-		return false
-	}
-
-	var errno syscall.Errno
-	if !errors.As(err, &errno) {
-		return false
-	}
-
-	switch errno {
-	// No process or process group can be found corresponding to that specified by pid.
-	case syscall.ESRCH:
-		return false
-	// The sending process is not the super-user and its effective user id does not match the effective user-id of the receiving process.
-	// When signaling a process group, this error is returned if any members of the group could not be signaled.
-	case syscall.EPERM:
-		return true
-	}
-
-	return false
 }
