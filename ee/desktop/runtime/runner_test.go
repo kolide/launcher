@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"os/user"
@@ -50,8 +49,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
-				// linter complains about math.MaxInt, but it's wrong, math.MaxInt exists
-				r.uidProcs[user.Uid] = &os.Process{Pid: math.MaxInt - 1} //nolint:all
+				r.uidProcs[user.Uid] = &os.Process{Pid: -2000}
 			},
 		},
 		{
