@@ -48,7 +48,7 @@ func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProces
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
 	f := func() {
-		if err := r.runDesktops(); err != nil {
+		if err := r.runDesktopNative(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error running desktop",
 				"err", err,

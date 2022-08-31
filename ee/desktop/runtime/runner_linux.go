@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	return fmt.Errorf("not implemented")
 }
 

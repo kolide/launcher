@@ -15,7 +15,7 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-func (r *DesktopUsersProcessesRunner) runDesktops() error {
+func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	explorerProcs, err := explorerProcesses()
 	if err != nil {
 		return fmt.Errorf("getting explorer processes: %w", err)

@@ -14,7 +14,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-func (r *DesktopUsersProcessesRunner) runDesktops() error {
+func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
