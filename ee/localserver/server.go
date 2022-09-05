@@ -86,7 +86,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw, ls.requestLoggingHandler(authedMux)))
+	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw.boxer, ls.requestLoggingHandler(authedMux)))
 
 	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
 	if ls.allowNoAuth {

@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/krypto"
 )
 
 type cmdRequestType struct {
@@ -14,11 +15,15 @@ type cmdRequestType struct {
 	Id  string
 }
 
+type boxerDecoder interface {
+	DecodeRaw(data []byte) (*krypto.Box, error)
+}
+
 // Unwrapv1 is middleware that ingests a krypto.Box from the GET requests, and after verifying the signature, converts
 // it to a new http request and passes it to the next handler. (This is all coming in via the URL, because that's a
 //
 //	limitation we have from js)
-func (ls *localServer) UnwrapV1Hander(krw *kryptoBoxResponseWriter, next http.Handler) http.Handler {
+func (ls *localServer) UnwrapV1Hander(boxer boxerDecoder, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
@@ -39,7 +44,7 @@ func (ls *localServer) UnwrapV1Hander(krw *kryptoBoxResponseWriter, next http.Ha
 			return
 		}
 
-		decoded, err := krw.boxer.DecodeRaw(box)
+		decoded, err := boxer.DecodeRaw(box)
 		if err != nil {
 			level.Debug(ls.logger).Log("msg", "unable to verify box", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
