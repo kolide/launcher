@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -30,29 +31,19 @@ var portList = []int{
 	22322,
 }
 
-const defaultServerKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkeNJgRkJOow7LovGmrlW
-1UzHkifTKQV1/8kX+p2MPLptGgPKlqpLnhZsGOhpHpswlUalgSZPyhBfM9Btdmps
-QZ2PkZkgEiy62PleVSBeBtpGcwHibHTGamzmKVrji9GudAvU+qapfPGnr//275/1
-E+mTriB5XBrHic11YmtCG6yg0Vw383n428pNF8QD/Bx8pzgkie2xKi/cHkc9B0S2
-B2rdYyWP17o+blgEM+EgjukLouX6VYkbMYhkDcy6bcUYfknII/T84kuChHkuWyO5
-msGeD7hPhtdB/h0O8eBWIiOQ6fH7exl71UfGTR6pYQmJMK1ZZeT7FeWVSGkswxkV
-4QIDAQAB
------END PUBLIC KEY-----
-`
-
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
 type localServer struct {
-	logger      log.Logger
-	srv         *http.Server
-	identifiers identifiers
-	limiter     *rate.Limiter
-	tlsCerts    []tls.Certificate
-	querier     Querier
-	allowNoAuth bool
+	logger       log.Logger
+	srv          *http.Server
+	identifiers  identifiers
+	limiter      *rate.Limiter
+	tlsCerts     []tls.Certificate
+	querier      Querier
+	allowNoAuth  bool
+	kolideServer string
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -63,10 +54,11 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
+func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, error) {
 	ls := &localServer{
-		logger:  log.With(logger, "component", "localserver"),
-		limiter: rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		logger:       log.With(logger, "component", "localserver"),
+		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer: kolideServer,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -125,7 +117,15 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(defaultServerKey))
+	serverCertPem := k2ServerCert
+	switch {
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"):
+		serverCertPem = localhostServerCert
+	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
+		serverCertPem = reviewServerCert
+	}
+
+	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default public key: %w", err)
 	}
