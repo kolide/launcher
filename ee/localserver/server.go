@@ -52,6 +52,7 @@ type localServer struct {
 	limiter     *rate.Limiter
 	tlsCerts    []tls.Certificate
 	querier     Querier
+	allowNoAuth bool
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -93,10 +94,14 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.HandleFunc("/ping", pongHandler)
-	mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
-	mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
-	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw, authedMux))
+	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw, ls.requestLoggingHandler(authedMux)))
+
+	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
+	if ls.allowNoAuth {
+		mux.HandleFunc("/ping", pongHandler)
+		mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
+		mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
+	}
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
