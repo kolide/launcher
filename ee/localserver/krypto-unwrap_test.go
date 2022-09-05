@@ -99,17 +99,10 @@ func TestUnwrapV0(t *testing.T) {
 
 			var logBytes bytes.Buffer
 
-			ls := &localServer{
-				logger:    log.NewLogfmtLogger(&logBytes),
-				myKey:     myKey,
-				serverKey: counterpartyPub,
-			}
+			kbm, err := NewKryptoBoxerMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyPub)
+			require.NoError(t, err)
 
-			kbrw := &kryptoBoxResponseWriter{
-				boxer: krypto.NewBoxer(ls.myKey, ls.serverKey),
-			}
-
-			h := ls.UnwrapV1Hander(kbrw, makeTestHandler(t))
+			h := kbm.UnwrapV1Hander(makeTestHandler(t))
 			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()

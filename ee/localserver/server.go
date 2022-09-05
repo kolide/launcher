@@ -74,25 +74,27 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 	ls.myKey = privateKey
 
-	kbrw := &kryptoBoxResponseWriter{
-		boxer: krypto.NewBoxer(ls.myKey, ls.serverKey),
+	// Setup the krypto boxer middleware. This will be used for the http auth
+	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)
+	if err != nil {
+		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
 
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/", http.NotFound)
 	authedMux.HandleFunc("/ping", pongHandler)
-	authedMux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
-	authedMux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
+	authedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+	authedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ls.UnwrapV1Hander(kbrw.boxer, ls.requestLoggingHandler(authedMux)))
+	mux.Handle("/v0/cmd", kbm.UnwrapV1Hander(ls.requestLoggingHandler(authedMux)))
 
 	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
 	if ls.allowNoAuth {
 		mux.HandleFunc("/ping", pongHandler)
-		mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
-		mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
+		mux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+		mux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 	}
 
 	srv := &http.Server{
@@ -132,7 +134,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 
 	serverKey, ok := serverKeyRaw.(*rsa.PublicKey)
 	if !ok {
-		return errors.New("Public key not an rsa public key")
+		return errors.New("public key not an rsa public key")
 	}
 
 	ls.serverKey = serverKey
@@ -256,7 +258,7 @@ func (ls *localServer) startListener() (net.Listener, error) {
 		return l, nil
 	}
 
-	return nil, errors.New("Unable to bind to a local port")
+	return nil, errors.New("unable to bind to a local port")
 }
 
 func pongHandler(res http.ResponseWriter, req *http.Request) {

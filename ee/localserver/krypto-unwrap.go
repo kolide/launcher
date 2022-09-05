@@ -23,7 +23,7 @@ type boxerDecoder interface {
 // it to a new http request and passes it to the next handler. (This is all coming in via the URL, because that's a
 //
 //	limitation we have from js)
-func (ls *localServer) UnwrapV1Hander(boxer boxerDecoder, next http.Handler) http.Handler {
+func (kbm *kryptoBoxerMiddleware) UnwrapV1Hander(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
@@ -32,34 +32,34 @@ func (ls *localServer) UnwrapV1Hander(boxer boxerDecoder, next http.Handler) htt
 		// Extract the box from the URL query parameters
 		boxRaw := r.URL.Query().Get("box")
 		if boxRaw == "" {
-			level.Debug(ls.logger).Log("msg", "no data in box query parameter")
+			level.Debug(kbm.logger).Log("msg", "no data in box query parameter")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		box, err := base64.StdEncoding.DecodeString(boxRaw)
 		if err != nil {
-			level.Debug(ls.logger).Log("msg", "unable to base64 decode box", "err", err)
+			level.Debug(kbm.logger).Log("msg", "unable to base64 decode box", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		decoded, err := boxer.DecodeRaw(box)
+		decoded, err := kbm.boxer.DecodeRaw(box)
 		if err != nil {
-			level.Debug(ls.logger).Log("msg", "unable to verify box", "err", err)
+			level.Debug(kbm.logger).Log("msg", "unable to verify box", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if decoded == nil {
-			level.Debug(ls.logger).Log("msg", "nil box", "err", err)
+			level.Debug(kbm.logger).Log("msg", "nil box", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		var cmdReq cmdRequestType
 		if err := json.Unmarshal(decoded.Signedtext, &cmdReq); err != nil {
-			level.Debug(ls.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
+			level.Debug(kbm.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

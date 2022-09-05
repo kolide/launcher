@@ -2,23 +2,39 @@ package localserver
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"io"
 	"net/http"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto"
 )
 
-type encoderInt interface {
+type kryptoInt interface {
 	Encode(inResponseTo string, data []byte) (string, error)
 	EncodePng(inResponseTo string, data []byte, w io.Writer) error
 	DecodeRaw(data []byte) (*krypto.Box, error)
 }
 
-type kryptoBoxResponseWriter struct {
-	boxer encoderInt
+// kryptoBoxerMiddleware provides http middleware wrappers over the kryto pkg.
+type kryptoBoxerMiddleware struct {
+	boxer  kryptoInt
+	logger log.Logger
 }
 
-func (krw *kryptoBoxResponseWriter) Wrap(next http.Handler) http.Handler {
+// NewKryptoBoxerMiddleware returns a new kryptoBoxerMiddleware
+func NewKryptoBoxerMiddleware(logger log.Logger, myKey *rsa.PrivateKey, serverKey *rsa.PublicKey) (*kryptoBoxerMiddleware, error) {
+
+	kbrw := &kryptoBoxerMiddleware{
+		boxer:  krypto.NewBoxer(myKey, serverKey),
+		logger: logger,
+	}
+
+	return kbrw, nil
+
+}
+
+func (kbm *kryptoBoxerMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the response
 		bhr := &bufferedHttpResponse{}
@@ -27,7 +43,7 @@ func (krw *kryptoBoxResponseWriter) Wrap(next http.Handler) http.Handler {
 		requestId := r.URL.Query().Get("id")
 
 		// process the response into a krypto box
-		enc, err := krw.boxer.Encode(requestId, bhr.Bytes())
+		enc, err := kbm.boxer.Encode(requestId, bhr.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -35,7 +51,7 @@ func (krw *kryptoBoxResponseWriter) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-func (krw *kryptoBoxResponseWriter) WrapPng(next http.Handler) http.Handler {
+func (kbm *kryptoBoxerMiddleware) WrapPng(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the response
 		bhr := &bufferedHttpResponse{}
@@ -44,7 +60,7 @@ func (krw *kryptoBoxResponseWriter) WrapPng(next http.Handler) http.Handler {
 		requestId := r.URL.Query().Get("id")
 
 		// process the response into a krypto box
-		err := krw.boxer.EncodePng(requestId, bhr.Bytes(), w)
+		err := kbm.boxer.EncodePng(requestId, bhr.Bytes(), w)
 		if err != nil {
 			panic(err)
 		}
