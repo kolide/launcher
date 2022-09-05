@@ -49,6 +49,7 @@ func (ls *localServer) updateIdFields() error {
 	if uuid, ok := results[0]["uuid"]; ok {
 		ls.identifiers.UUID = uuid
 	}
+
 	if hs, ok := results[0]["hardware_serial"]; ok {
 		ls.identifiers.HardwareSerial = hs
 	}
