@@ -7,16 +7,11 @@ import (
 	"net/url"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/krypto"
 )
 
 type cmdRequestType struct {
 	Cmd string
 	Id  string
-}
-
-type boxerDecoder interface {
-	DecodeRaw(data []byte) (*krypto.Box, error)
 }
 
 // Unwrapv1 is middleware that ingests a krypto.Box from the GET requests, and after verifying the signature, converts
