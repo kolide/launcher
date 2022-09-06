@@ -48,7 +48,7 @@ func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProces
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
 	f := func() {
-		if err := r.runDesktopNative(); err != nil {
+		if err := r.runConsoleUserDesktop(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error running desktop",
 				"err", err,
@@ -58,10 +58,9 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 
 	f()
 
-	ticker := time.NewTicker(r.executionInterval)
 	for {
 		select {
-		case <-ticker.C:
+		case <-time.NewTicker(r.executionInterval).C:
 			f()
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
@@ -112,12 +111,13 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 }
 
 // waitForProcess adds 1 to DesktopUserProcessRunner.procsWg and runs a goroutine to wait on the process to exit.
-// The go routine will decrement DesktopUserProcessRunner.procsWg when it exits
+// The go routine will decrement DesktopUserProcessRunner.procsWg when it exits. This is necessary because if
+// the process dies and we do not wait for it, it will not get cleaned up by the parent. The wait group is
+// needed to prevent races.
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
 	go func(username string, proc *os.Process) {
 		defer r.procsWg.Done()
-		// if the desktop process dies, the parent must clean up otherwise we get a zombie process
 		// waiting here gives the parent a chance to clean up
 		_, err := proc.Wait()
 		if err != nil {

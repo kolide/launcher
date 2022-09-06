@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -41,11 +42,21 @@ func handleSignals() {
 // continuously monitor for ppid and exit if parent process terminates
 func exitWhenParentGone() {
 	for ; true; <-time.NewTicker(2 * time.Second).C {
-		exists, err := process.PidExists(int32(os.Getppid()))
+		ppid := os.Getppid()
+
+		if ppid <= 1 {
+			break
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
+		cancel()
 		if err != nil || !exists {
-			fmt.Println("parent process is gone, exiting")
-			systray.Quit()
-			os.Exit(1)
+			break
 		}
 	}
+
+	fmt.Println("parent process is gone, exiting")
+	systray.Quit()
+	os.Exit(1)
 }

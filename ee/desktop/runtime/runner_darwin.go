@@ -14,9 +14,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// runDesktopNative determines the owner of /dev/console and runs the desktop process as that user
+// runConsoleUserDesktop determines the owner of /dev/console and runs the desktop process as that user
 // if no desktop process exists for that user
-func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)

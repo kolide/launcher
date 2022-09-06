@@ -17,7 +17,7 @@ import (
 
 // runDesktopNative iterates over all the current explorer processes and
 // runs the desktop process for the owner if none currently exists
-func (r *DesktopUsersProcessesRunner) runDesktopNative() error {
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	explorerProcs, err := explorerProcesses()
 	if err != nil {
 		return fmt.Errorf("getting explorer processes: %w", err)
