@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -21,7 +22,7 @@ type DesktopUsersProcessesRunner struct {
 	executionInterval time.Duration
 	interrupt         chan struct{}
 	// uidProcs is a map of uid to desktop process
-	uidProcs map[string]*os.Process
+	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
 	// procsWgTimeout how long to wait for desktop proccesses to finish on interrupt
@@ -32,12 +33,41 @@ type DesktopUsersProcessesRunner struct {
 	executablePath string
 }
 
+func (r *DesktopUsersProcessesRunner) addProcessForUser(uid string, osProcess *os.Process) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	psutilProc, err := process.NewProcessWithContext(ctx, int32(osProcess.Pid))
+	if err != nil {
+		return fmt.Errorf("creating process record: %w", err)
+	}
+
+	path, err := psutilProc.ExeWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting process path: %w", err)
+	}
+
+	r.uidProcs[uid] = processRecord{
+		process: osProcess,
+		path:    path,
+	}
+
+	return nil
+}
+
+// processRecord is a struct to hold an *os.process and its path.
+// The path is used to ensure another process has not taken the same pid.
+type processRecord struct {
+	process *os.Process
+	path    string
+}
+
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
 func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProcessesRunner {
 	return &DesktopUsersProcessesRunner{
 		logger:            logger,
 		interrupt:         make(chan struct{}),
-		uidProcs:          make(map[string]*os.Process),
+		uidProcs:          make(map[string]processRecord),
 		executionInterval: executionInterval,
 		procsWg:           &sync.WaitGroup{},
 		procsWgTimeout:    time.Second * 5,
@@ -85,8 +115,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}()
 
 	signal := syscall.SIGTERM
-	for _, proc := range r.uidProcs {
-		proc.Signal(signal)
+	for _, procRecord := range r.uidProcs {
+		procRecord.process.Signal(signal)
 	}
 
 	select {
@@ -95,15 +125,15 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 		return
 	case <-time.After(r.procsWgTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit with SIGTERM, now killing")
-		for _, proc := range r.uidProcs {
-			if !processExists(proc) {
+		for _, processRecord := range r.uidProcs {
+			if !processExists(processRecord) {
 				continue
 			}
-			if err := proc.Kill(); err != nil {
+			if err := processRecord.process.Kill(); err != nil {
 				level.Error(r.logger).Log(
 					"msg", "error killing desktop process",
 					"err", err,
-					"pid", proc.Pid,
+					"pid", processRecord.process.Pid,
 				)
 			}
 		}
@@ -157,7 +187,8 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	if !processExists(proc) {
 		level.Info(r.logger).Log(
 			"msg", "found existing desktop process dead for console user",
-			"dead_pid", r.uidProcs[uid].Pid,
+			"pid", r.uidProcs[uid].process.Pid,
+			"process_path", r.uidProcs[uid].path,
 			"uid", uid,
 		)
 
@@ -168,10 +199,20 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	return true
 }
 
-func processExists(proc *os.Process) bool {
-	isExists, err := process.PidExists(int32(proc.Pid))
+func processExists(processRecord processRecord) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	// the call to process.NewProcessWithContext ensures process exists
+	proc, err := process.NewProcessWithContext(ctx, int32(processRecord.process.Pid))
 	if err != nil {
 		return false
 	}
-	return isExists
+
+	path, err := proc.ExeWithContext(ctx)
+	if err != nil || path != processRecord.path {
+		return false
+	}
+
+	return true
 }

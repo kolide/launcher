@@ -48,7 +48,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
 				user, err := user.Current()
 				require.NoError(t, err)
-				r.uidProcs[user.Uid] = &os.Process{Pid: -2000}
+				r.uidProcs[user.Uid] = processRecord{
+					process: &os.Process{},
+					path:    "test",
+				}
 			},
 		},
 		{
@@ -89,7 +92,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
-					p.Wait()
+					p.process.Wait()
 				}
 			})
 		})
