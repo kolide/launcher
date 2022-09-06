@@ -73,13 +73,16 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 func explorerProcesses() ([]*process.Process, error) {
 	var explorerProcs []*process.Process
 
-	procs, err := process.Processes()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	procs, err := ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting processes: %w", err)
 	}
 
 	for _, proc := range procs {
-		exe, err := proc.Exe()
+		exe, err := proc.ExeWithContext(ctx)
 		if err != nil {
 			continue
 		}
