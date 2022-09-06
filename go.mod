@@ -36,7 +36,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20220822193427-0680b087f9bd
-	github.com/kolide/krypto v0.0.0-20220825200954-4dd58822b2a6
+	github.com/kolide/krypto v0.0.0-20220830180245-7cb3a3940071
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.2
