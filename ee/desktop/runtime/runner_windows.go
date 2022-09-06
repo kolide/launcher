@@ -4,12 +4,14 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/shirou/gopsutil/process"
@@ -76,7 +78,7 @@ func explorerProcesses() ([]*process.Process, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	procs, err := ProcessesWithContext(ctx)
+	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting processes: %w", err)
 	}
