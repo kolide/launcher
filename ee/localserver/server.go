@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -30,28 +31,19 @@ var portList = []int{
 	22322,
 }
 
-const defaultServerKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkeNJgRkJOow7LovGmrlW
-1UzHkifTKQV1/8kX+p2MPLptGgPKlqpLnhZsGOhpHpswlUalgSZPyhBfM9Btdmps
-QZ2PkZkgEiy62PleVSBeBtpGcwHibHTGamzmKVrji9GudAvU+qapfPGnr//275/1
-E+mTriB5XBrHic11YmtCG6yg0Vw383n428pNF8QD/Bx8pzgkie2xKi/cHkc9B0S2
-B2rdYyWP17o+blgEM+EgjukLouX6VYkbMYhkDcy6bcUYfknII/T84kuChHkuWyO5
-msGeD7hPhtdB/h0O8eBWIiOQ6fH7exl71UfGTR6pYQmJMK1ZZeT7FeWVSGkswxkV
-4QIDAQAB
------END PUBLIC KEY-----
-`
-
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
 type localServer struct {
-	logger      log.Logger
-	srv         *http.Server
-	identifiers identifiers
-	limiter     *rate.Limiter
-	tlsCerts    []tls.Certificate
-	querier     Querier
+	logger       log.Logger
+	srv          *http.Server
+	identifiers  identifiers
+	limiter      *rate.Limiter
+	tlsCerts     []tls.Certificate
+	querier      Querier
+	allowNoAuth  bool
+	kolideServer string
 
 	myKey     *rsa.PrivateKey
 	serverKey *rsa.PublicKey
@@ -62,10 +54,11 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
+func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, error) {
 	ls := &localServer{
-		logger:  log.With(logger, "component", "localserver"),
-		limiter: rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		logger:       log.With(logger, "component", "localserver"),
+		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer: kolideServer,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -81,18 +74,28 @@ func New(logger log.Logger, db *bbolt.DB) (*localServer, error) {
 	}
 	ls.myKey = privateKey
 
-	kbrw := &kryptoBoxResponseWriter{
-		boxer: krypto.NewBoxer(ls.myKey, ls.serverKey),
+	// Setup the krypto boxer middleware. This will be used for the http auth
+	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)
+	if err != nil {
+		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
+
+	authedMux := http.NewServeMux()
+	authedMux.HandleFunc("/", http.NotFound)
+	authedMux.HandleFunc("/ping", pongHandler)
+	authedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+	authedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.HandleFunc("/ping", pongHandler)
-	mux.Handle("/id", kbrw.Wrap(ls.requestIdHandler()))
-	mux.Handle("/id.png", kbrw.WrapPng(ls.requestIdHandler()))
+	mux.Handle("/v0/cmd", kbm.UnwrapV1Hander(ls.requestLoggingHandler(authedMux)))
 
-	// Still testing this
-	//mux.Handle("/in", kbrw.Unwrap(http.HandlerFunc(pongHandler)))
+	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
+	if ls.allowNoAuth {
+		mux.HandleFunc("/ping", pongHandler)
+		mux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+		mux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
+	}
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
@@ -116,14 +119,22 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(defaultServerKey))
+	serverCertPem := k2ServerCert
+	switch {
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"):
+		serverCertPem = localhostServerCert
+	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
+		serverCertPem = reviewServerCert
+	}
+
+	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default public key: %w", err)
 	}
 
 	serverKey, ok := serverKeyRaw.(*rsa.PublicKey)
 	if !ok {
-		return errors.New("Public key not an rsa public key")
+		return errors.New("public key not an rsa public key")
 	}
 
 	ls.serverKey = serverKey
@@ -247,7 +258,7 @@ func (ls *localServer) startListener() (net.Listener, error) {
 		return l, nil
 	}
 
-	return nil, errors.New("Unable to bind to a local port")
+	return nil, errors.New("unable to bind to a local port")
 }
 
 func pongHandler(res http.ResponseWriter, req *http.Request) {
@@ -255,7 +266,6 @@ func pongHandler(res http.ResponseWriter, req *http.Request) {
 
 	data := []byte(`{"ping": "Kolide"}` + "\n")
 	res.Write(data)
-
 }
 
 func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
@@ -294,4 +304,8 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) kryptoBoxOutboundHandler(http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	})
+}
+
+func (ls *localServer) verify(message []byte, sig []byte) error {
+	return krypto.RsaVerify(ls.serverKey, message, sig)
 }
