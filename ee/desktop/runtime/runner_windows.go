@@ -52,8 +52,8 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("running desktop: %w", err)
 		}
 
-		if err := r.addDesktopProcess(uid, proc); err != nil {
-			return fmt.Errorf("adding desktop process: %w", err)
+		if err := r.addProcessForUser(uid, proc); err != nil {
+			return fmt.Errorf("adding process for user: %w", err)
 		}
 
 		level.Debug(r.logger).Log(
