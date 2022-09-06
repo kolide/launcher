@@ -36,7 +36,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher")
