@@ -1,12 +1,15 @@
 package runtime
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,15 +36,25 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)
 	}
 
-	err := exec.Command("go", "build", "-o", executablePath, "../../../cmd/launcher").Run()
-	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher")
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
 
 	tests := []struct {
-		name  string
-		setup func(*testing.T, *DesktopUsersProcessesRunner)
+		name        string
+		setup       func(*testing.T, *DesktopUsersProcessesRunner)
+		logContains []string
 	}{
 		{
 			name: "happy path",
+			logContains: []string{
+				"desktop started",
+				"interrupt received, exiting desktop execute loop",
+				"all desktop processes shutdown successfully",
+			},
 		},
 		{
 			name: "new process started if old one gone",
@@ -53,6 +66,11 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 					path:    "test",
 				}
 			},
+			logContains: []string{
+				"found existing desktop process dead for console user",
+				"interrupt received, exiting desktop execute loop",
+				"all desktop processes shutdown successfully",
+			},
 		},
 		{
 			name: "procs waitgroup times out",
@@ -61,6 +79,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)
 			},
+			logContains: []string{
+				"timeout waiting for desktop processes to exit",
+				"interrupt received, exiting desktop execute loop",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -68,7 +90,9 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := New(log.NewNopLogger(), time.Second*1)
+			var logBytes threadSafeBuffer
+
+			r := New(log.NewLogfmtLogger(&logBytes), time.Second*1)
 			r.executablePath = executablePath
 
 			if tt.setup != nil {
@@ -88,6 +112,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			assert.Contains(t, r.uidProcs, user.Uid)
 			assert.Len(t, r.uidProcs, 1)
 
+			if len(tt.logContains) > 0 {
+				for _, s := range tt.logContains {
+					assert.Contains(t, logBytes.String(), s)
+				}
+			}
+
 			t.Cleanup(func() {
 				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
@@ -97,4 +127,28 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			})
 		})
 	}
+}
+
+// thank you zupa https://stackoverflow.com/a/36226525
+type threadSafeBuffer struct {
+	b bytes.Buffer
+	m sync.Mutex
+}
+
+func (b *threadSafeBuffer) Read(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.Read(p)
+}
+
+func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *threadSafeBuffer) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.String()
 }
