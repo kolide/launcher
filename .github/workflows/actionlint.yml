@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.18
       - name: install actionlint
         # latest version [https://github.com/rhysd/actionlint/releases/tag/v1.6.17] causing:
         # Error: ../../../go/pkg/mod/github.com/mattn/go-runewidth@v0.0.13/runewidth.go:6:2: //go:build comment without // +build comment

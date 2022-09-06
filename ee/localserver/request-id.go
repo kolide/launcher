@@ -24,12 +24,16 @@ type requestIdsResponse struct {
 	Timestamp time.Time
 }
 
+const (
+	idSQL = "select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info"
+)
+
 func (ls *localServer) updateIdFields() error {
 	if ls.querier == nil {
 		return errors.New("no querier set")
 	}
 
-	results, err := ls.querier.Query("select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info")
+	results, err := ls.querier.Query(idSQL)
 	if err != nil {
 		return fmt.Errorf("id query failed: %w", err)
 	}
