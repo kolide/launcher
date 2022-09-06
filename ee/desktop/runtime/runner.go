@@ -96,7 +96,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	case <-time.After(r.procsWgTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit with SIGTERM, now killing")
 		for _, proc := range r.uidProcs {
-			if !processExists(proc.Pid) {
+			if !processExists(proc) {
 				continue
 			}
 			if err := proc.Kill(); err != nil {
@@ -154,7 +154,7 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	}
 
 	// have a record of process, but it died for some reason, log it
-	if !processExists(proc.Pid) {
+	if !processExists(proc) {
 		level.Info(r.logger).Log(
 			"msg", "found existing desktop process dead for console user",
 			"dead_pid", r.uidProcs[uid].Pid,
@@ -168,8 +168,8 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	return true
 }
 
-func processExists(pid int) bool {
-	isExists, err := process.PidExists(int32(pid))
+func processExists(proc *os.Process) bool {
+	isExists, err := process.PidExists(int32(proc.Pid))
 	if err != nil {
 		return false
 	}
