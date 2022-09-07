@@ -10,7 +10,3 @@ import (
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	return fmt.Errorf("not implemented")
 }
-
-func (r *DesktopUsersProcessesRunner) shutdownDesktopProcesses() {
-	// not implemented
-}

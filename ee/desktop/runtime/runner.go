@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -113,23 +114,41 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 		r.procsWg.Wait()
 	}()
 
-	r.shutdownDesktopProcesses()
+	signal := os.Interrupt
+	// os.Interrupt is not supported on windows, so use os.Kill instead
+	if runtime.GOOS == "windows" {
+		signal = os.Kill
+	}
+
+	for uid, proc := range r.uidProcs {
+		if err := proc.process.Signal(signal); err != nil {
+			level.Error(r.logger).Log(
+				"msg", fmt.Sprintf("error sending signal %s to desktop process", signal),
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
+		}
+	}
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log("msg", fmt.Sprintf("all desktop processes shutdown successfully"))
+		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
 		return
 	case <-time.After(r.procsWgTimeout):
-		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit with SIGTERM, now killing")
-		for _, processRecord := range r.uidProcs {
+		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
+		for uid, processRecord := range r.uidProcs {
 			if !processExists(processRecord) {
 				continue
 			}
 			if err := processRecord.process.Kill(); err != nil {
 				level.Error(r.logger).Log(
 					"msg", "error killing desktop process",
-					"err", err,
+					"uid", uid,
 					"pid", processRecord.process.Pid,
+					"path", processRecord.path,
+					"err", err,
 				)
 			}
 		}
