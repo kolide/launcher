@@ -22,7 +22,7 @@ func generateLauncherConfig(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 		results := []map[string]string{
-			map[string]string{
+			{
 				"config": config,
 			},
 		}

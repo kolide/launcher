@@ -46,7 +46,7 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 		discover = val
 	}
 	return []map[string]string{
-		map[string]string{
+		{
 			"username":    username,
 			"discover_by": discover,
 		},
