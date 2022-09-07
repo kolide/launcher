@@ -29,6 +29,11 @@ jobs:
         with:
           skip-pkg-cache: true
 
+      # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
+      - name: golangci-lint
+        if: ${{ always() }}
+        run: golangci-lint run
+
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
