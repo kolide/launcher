@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -114,14 +113,11 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 		r.procsWg.Wait()
 	}()
 
-	signal := syscall.SIGTERM
-	for _, procRecord := range r.uidProcs {
-		procRecord.process.Signal(signal)
-	}
+	r.shutdownDesktopProcesses()
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log("msg", fmt.Sprintf("all desktop processes shutdown successfully with %s", signal))
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("all desktop processes shutdown successfully"))
 		return
 	case <-time.After(r.procsWgTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit with SIGTERM, now killing")

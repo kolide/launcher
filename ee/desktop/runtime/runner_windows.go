@@ -148,3 +148,7 @@ func runWithAccessToken(accessToken syscall.Token, path string, args ...string) 
 
 	return cmd.Process, nil
 }
+
+func (r *DesktopUsersProcessesRunner) shutdownDesktopProcesses() {
+	// TODO: implement
+}

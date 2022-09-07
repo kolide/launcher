@@ -133,3 +133,9 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 
 	return cmd.Process, nil
 }
+
+func (r *DesktopUsersProcessesRunner) shutdownDesktopProcesses() {
+	for _, procRecord := range r.uidProcs {
+		procRecord.process.Signal(syscall.SIGTERM)
+	}
+}
