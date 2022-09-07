@@ -9,7 +9,7 @@ on:
     branches: '**'
 
 env:
-  GOVER: 1.17
+  GOVER: 1.19
 
 jobs:
   build_and_test:
