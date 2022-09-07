@@ -14,6 +14,7 @@ import (
 /*
 Spotlight returns a macOS spotlight table
 Example Query:
+
 	SELECT uid, f.path FROM file
 	AS f JOIN spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";

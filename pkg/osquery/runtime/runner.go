@@ -42,16 +42,16 @@ type Runner struct {
 // returned instance should be shut down via the Shutdown() method.
 // For example, a more customized caller might do something like the following:
 //
-//   instance, err := LaunchInstance(
-//     WithOsquerydBinary("/usr/local/bin/osqueryd"),
-//     WithRootDirectory("/var/foobar"),
-//     WithConfigPluginFlag("custom"),
-// 		 WithOsqueryExtensionPlugins(
-//		 	 config.NewPlugin("custom", custom.GenerateConfigs),
-//		   logger.NewPlugin("custom", custom.LogString),
-//		 	 tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate),
-//     ),
-//   )
+//	  instance, err := LaunchInstance(
+//	    WithOsquerydBinary("/usr/local/bin/osqueryd"),
+//	    WithRootDirectory("/var/foobar"),
+//	    WithConfigPluginFlag("custom"),
+//			 WithOsqueryExtensionPlugins(
+//			 	 config.NewPlugin("custom", custom.GenerateConfigs),
+//			   logger.NewPlugin("custom", custom.LogString),
+//			 	 tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate),
+//	    ),
+//	  )
 func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
 	runner := newRunner(opts...)
 	if err := runner.Start(); err != nil {

@@ -20,6 +20,7 @@ type notarizationInfo struct {
 }
 
 // this is eventually used by callers in other repos
+//
 //nolint:deadcode
 type notarizationUpload struct {
 	ProductErrors []productError `plist:"product-errors"`

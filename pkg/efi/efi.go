@@ -2,7 +2,6 @@
 // https://github.com/u-root/u-root/blob/master/pkg/uefivars
 // https://github.com/Foxboron/go-uefi
 //
-//
 // Also useful references
 // https://www.kernel.org/doc/html/latest/filesystems/efivarfs.html
 // https://github.com/rhboot/efivar/

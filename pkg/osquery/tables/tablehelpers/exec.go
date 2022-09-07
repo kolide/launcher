@@ -14,10 +14,10 @@ import (
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
 // additional things to help with table usage:
-// 1. It enforces a timeout.
-// 2. Second, it accepts an array of possible binaries locations, and if something is not
-//    found, it will go down the list.
-// 3. It moves the stderr into the return error, if needed.
+//  1. It enforces a timeout.
+//  2. Second, it accepts an array of possible binaries locations, and if something is not
+//     found, it will go down the list.
+//  3. It moves the stderr into the return error, if needed.
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string) ([]byte, error) {
