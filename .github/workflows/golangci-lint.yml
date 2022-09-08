@@ -20,28 +20,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.19
 
       - run: make deps
 
-      # Getting this to work outside a normal build is quite
-      # cumbersome. golangci/golangci-lint-action attempts to install
-      # go, and use the module cache. In a way that _assumes_ no go
-      # commands have been run in the workspace. But, this is
-      # fundamentally incompatible with our needing to to generate
-      # code before linting. Thus the various skip- commands.  See
-      # https://github.com/golangci/golangci-lint-action/issues/244
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42
           skip-pkg-cache: true
-          skip-go-installation: true
 
       # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
       - name: golangci-lint
         if: ${{ always() }}
-        #uses: golangci/golangci-lint-action@v2
         run: golangci-lint run
 
   # This job is here as a github status check -- it allows us to move

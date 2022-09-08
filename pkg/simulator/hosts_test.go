@@ -70,11 +70,11 @@ func TestLoadHosts(t *testing.T) {
 	assert.Equal(t, "foo", foo.Name)
 	assert.Equal(t,
 		[]matcher{
-			matcher{
+			{
 				regexp.MustCompile("select hour, minutes from time"),
 				[]map[string]string{{"hour": "19", "minutes": "34"}},
 			},
-			matcher{
+			{
 				regexp.MustCompile("select platform from osquery_info"),
 				[]map[string]string{{"platform": "darwin"}},
 			},

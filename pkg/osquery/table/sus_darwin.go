@@ -124,7 +124,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	)
 
 	resp := []map[string]string{
-		map[string]string{
+		{
 			"autoupdate_managed":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
 			"autoupdate_enabled":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
 			"download":                        fmt.Sprintf("%d", doesBackgroundDownload),

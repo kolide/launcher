@@ -201,8 +201,8 @@ func (wo *wixTool) Package(ctx context.Context) (string, error) {
 // post-process the wxs files. I've opted to post-process them.
 //
 // References:
-//  * http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Windows-Service-installation-td7601050.html
-//  * https://helgeklein.com/blog/2014/09/real-world-example-wix-msi-application-installer/
+//   - http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Windows-Service-installation-td7601050.html
+//   - https://helgeklein.com/blog/2014/09/real-world-example-wix-msi-application-installer/
 func (wo *wixTool) addServices(ctx context.Context) error {
 	if len(wo.services) == 0 {
 		return nil

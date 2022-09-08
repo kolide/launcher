@@ -9,27 +9,30 @@
 // This tool works primarily through string interfaces, so type
 // information may be lost.
 //
-// Query Syntax
+// # Query Syntax
 //
 // The query syntax handles both filtering and basic rewriting. It is
 // not perfect. The idea behind it, is that we descend through an data
 // structure, specifying what matches at each level.
 //
 // Each level of query can do:
-//  * specify a filter, this is a simple string match with wildcard support. (prefix and/or postfix, but not infix)
-//  * If the data is an array, specify an index
-//  * For array-of-maps, specify a key to rewrite as a nested map
+//   - specify a filter, this is a simple string match with wildcard support. (prefix and/or postfix, but not infix)
+//   - If the data is an array, specify an index
+//   - For array-of-maps, specify a key to rewrite as a nested map
 //
 // Each query term has 3 parts: [#]string[=>kvmatch]
-//   1. An optional `#` This denotes a key to rewrite an array-of-maps with
-//   2. A search term. If this is an integer, it is interpreted as an array index.
-//   3. a key/value match string. For a map, this is to match the value of a key.
 //
-//  Some examples:
-//  *  data/users            Return everything under { data: { users: { ... } } }
-//  *  data/users/0          Return the first item in the users array
-//  *  data/users/name=>A*   Return users whose name starts with "A"
-//  *  data/users/#id        Return the users, and rewrite the users array to be a map with the id as the key
+//  1. An optional `#` This denotes a key to rewrite an array-of-maps with
+//
+//  2. A search term. If this is an integer, it is interpreted as an array index.
+//
+//  3. a key/value match string. For a map, this is to match the value of a key.
+//
+//     Some examples:
+//     *  data/users            Return everything under { data: { users: { ... } } }
+//     *  data/users/0          Return the first item in the users array
+//     *  data/users/name=>A*   Return users whose name starts with "A"
+//     *  data/users/#id        Return the users, and rewrite the users array to be a map with the id as the key
 //
 // See the test suite for extensive examples.
 package dataflatten
@@ -54,11 +57,11 @@ import (
 // structures. It recurses through them, and returns a simplified
 // form. At the simplest level, this rewrites:
 //
-//   { foo: { bar: { baz: 1 } } }
+//	{ foo: { bar: { baz: 1 } } }
 //
 // To:
 //
-//   [ { path: foo/bar/baz, value: 1 } ]
+//	[ { path: foo/bar/baz, value: 1 } ]
 //
 // It can optionally filtering and rewriting.
 type Flattener struct {
@@ -327,8 +330,9 @@ func (fl *Flattener) queryMatchNil(queryTerm string) bool {
 // queryMatchArrayElement matches arrays. This one is magic.
 //
 // Syntax:
-//   #i -- Match index i. For example `#0`
-//   k=>queryTerm -- If this is a map, it should have key k, that matches queryTerm
+//
+//	#i -- Match index i. For example `#0`
+//	k=>queryTerm -- If this is a map, it should have key k, that matches queryTerm
 //
 // We use `=>` as something that is reasonably intuitive, and not very
 // likely to occur on it's own. Unfortunately, `==` shows up in base64

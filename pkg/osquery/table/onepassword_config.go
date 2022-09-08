@@ -18,8 +18,8 @@ import (
 )
 
 var onepasswordDataFiles = map[string][]string{
-	"windows": []string{"AppData/Local/1password/data/1Password10.sqlite"},
-	"darwin": []string{
+	"windows": {"AppData/Local/1password/data/1Password10.sqlite"},
+	"darwin": {
 		"Library/Application Support/1Password 4/Data/B5.sqlite",
 		"Library/Group Containers/2BUA8C4S2C.com.agilebits/Library/Application Support/1Password/Data/B5.sqlite",
 		"Library/Containers/2BUA8C4S2C.com.agilebits.onepassword-osx-helper/Data/Library/Data/B5.sqlite",

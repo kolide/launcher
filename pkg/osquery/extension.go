@@ -1053,7 +1053,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 
 		// Run all the queries, snapshot and differential
-		for query, _ := range pack.Queries {
+		for query := range pack.Queries {
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			allQueries = append(allQueries, queryName)
 		}

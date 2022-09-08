@@ -16,8 +16,8 @@ import (
 )
 
 var chromeLocalStateDirs = map[string][]string{
-	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
-	"darwin":  []string{"Library/Application Support/Google/Chrome"},
+	"windows": {"Appdata/Local/Google/Chrome/User Data"},
+	"darwin":  {"Library/Application Support/Google/Chrome"},
 }
 
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'

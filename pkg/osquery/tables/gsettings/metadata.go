@@ -256,8 +256,9 @@ var gvariantMapping = map[string]string{
 // https://developer.gnome.org/glib/unstable/glib-GVariantType.html for
 // documentation. Note that not all types listed in the documentation above are
 // supported, for example:
-//  - tuples (e.g. tuple of 2 strings `(ss)`)
-//  - nested types (e.g.// array of tuples: `a(ss)`)
+//   - tuples (e.g. tuple of 2 strings `(ss)`)
+//   - nested types (e.g.// array of tuples: `a(ss)`)
+//
 // and other complex types are not supported.
 func convertType(typ string) string {
 	typ = strings.TrimPrefix(typ, "type ") // remove any leading 'type ', eg in 'type b'

@@ -116,10 +116,10 @@ func TestQueries(t *testing.T) {
 			// making this parallel causing the unit test to occasionally fail
 
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
-				"class":       []string{tt.class},
+				"class":       {tt.class},
 				"properties":  tt.properties,
-				"namespace":   []string{tt.namespace},
-				"whereclause": []string{tt.whereClause},
+				"namespace":   {tt.namespace},
+				"whereclause": {tt.whereClause},
 			})
 
 			rows, err := wmiTable.generate(context.TODO(), mockQC)

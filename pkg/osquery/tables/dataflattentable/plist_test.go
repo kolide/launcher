@@ -29,7 +29,7 @@ func TestPlist(t *testing.T) {
 			paths:   []string{filepath.Join("testdata", "NetworkInterfaces.plist")},
 			queries: []string{"Interfaces/#BSD Name/SCNetworkInterfaceType/FireWire"},
 			expected: []map[string]string{
-				map[string]string{
+				{
 					"fullkey": "Interfaces/fw0/SCNetworkInterfaceType",
 					"key":     "SCNetworkInterfaceType",
 					"parent":  "Interfaces/fw0",
@@ -43,10 +43,10 @@ func TestPlist(t *testing.T) {
 				"LSHandlers/LSHandlerContentType=>*html/LSHandlerRole*",
 			},
 			expected: []map[string]string{
-				map[string]string{"fullkey": "LSHandlers/5/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/5", "value": "com.choosyosx.choosy"},
-				map[string]string{"fullkey": "LSHandlers/6/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/6", "value": "com.choosyosx.choosy"},
-				map[string]string{"fullkey": "LSHandlers/7/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/7", "value": "com.choosyosx.choosy"},
-				map[string]string{"fullkey": "LSHandlers/8/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/8", "value": "com.google.chrome"},
+				{"fullkey": "LSHandlers/5/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/5", "value": "com.choosyosx.choosy"},
+				{"fullkey": "LSHandlers/6/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/6", "value": "com.choosyosx.choosy"},
+				{"fullkey": "LSHandlers/7/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/7", "value": "com.choosyosx.choosy"},
+				{"fullkey": "LSHandlers/8/LSHandlerRoleAll", "key": "LSHandlerRoleAll", "parent": "LSHandlers/8", "value": "com.google.chrome"},
 			},
 		},
 	}
