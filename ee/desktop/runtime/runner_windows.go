@@ -17,7 +17,7 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-// runDesktopNative iterates over all the current explorer processes and
+// runConsoleUserDesktop iterates over all the current explorer processes and
 // runs the desktop process for the owner if none currently exists
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	explorerProcs, err := explorerProcesses()

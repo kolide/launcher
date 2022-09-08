@@ -33,6 +33,7 @@ type DesktopUsersProcessesRunner struct {
 	executablePath string
 }
 
+// addProcessForUser adds process information to the internal tracking state
 func (r *DesktopUsersProcessesRunner) addProcessForUser(uid string, osProcess *os.Process) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()

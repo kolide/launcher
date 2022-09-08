@@ -35,7 +35,7 @@ func handleSignals() {
 	signals := make(chan os.Signal, len(signalsToHandle))
 	signal.Notify(signals, signalsToHandle...)
 	sig := <-signals
-	fmt.Println(fmt.Sprintf("\nreceived %s signal, exiting", sig))
+	fmt.Printf("\nreceived %s signal, exiting", sig)
 	systray.Quit()
 }
 
@@ -50,13 +50,17 @@ func exitWhenParentGone() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
+
+		// pretty sure this is not needed since it should call cancel on it's won when time is exceeded
+		// https://cs.opensource.google/go/go/+/master:src/context/context.go;l=456?q=func%20WithDeadline&ss=go%2Fgo
+		// but the linter and the context.WithTimeout docs say to do it
 		cancel()
 		if err != nil || !exists {
 			break
 		}
 	}
 
-	fmt.Println("parent process is gone, exiting")
+	fmt.Print("\nparent process is gone, exiting")
 	systray.Quit()
 	os.Exit(1)
 }
