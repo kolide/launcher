@@ -54,7 +54,7 @@ jobs:
       run: make deps
 
     - name: Run govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck -v ./...
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
 
     - name: Build
       if: ${{ ! contains(matrix.os, 'ubuntu') }}
