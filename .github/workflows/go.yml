@@ -50,9 +50,11 @@ jobs:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
-
     - name: Get dependencies
       run: make deps
+
+    - name: Run govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck -v ./...
 
     - name: Build
       if: ${{ ! contains(matrix.os, 'ubuntu') }}
