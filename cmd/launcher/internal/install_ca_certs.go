@@ -9,6 +9,7 @@ import (
 )
 
 // default CA certs for osquery. Copied from macOS's `/etc/ssl/cert.pem`
+//
 //go:embed ca-bundle.crt
 var defaultCaCerts []byte
 

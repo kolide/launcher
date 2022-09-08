@@ -154,7 +154,7 @@ type mockClient struct{}
 
 func (mockClient) Query(sql string) ([]map[string]string, error) {
 	return []map[string]string{
-		map[string]string{
+		{
 			"os_version":       "",
 			"launcher_version": "",
 			"os_build":         "",

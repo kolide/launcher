@@ -33,7 +33,7 @@ var bestPracticesSimpleColumns = map[string]string{
 
 func BestPractices(client *osquery.ExtensionManagerClient) *table.Plugin {
 	columns := []table.ColumnDefinition{}
-	for col, _ := range bestPracticesSimpleColumns {
+	for col := range bestPracticesSimpleColumns {
 		columns = append(columns, table.IntegerColumn(col))
 	}
 

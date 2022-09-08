@@ -89,7 +89,7 @@ func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.
 	warnings := strings.Join(m.report.Warnings, ";")
 
 	results := []map[string]string{
-		map[string]string{
+		{
 			"start_time":    m.report.StartTime,
 			"end_time":      m.report.EndTime,
 			"console_user":  m.report.ConsoleUser,

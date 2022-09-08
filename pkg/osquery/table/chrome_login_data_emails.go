@@ -19,8 +19,8 @@ import (
 )
 
 var profileDirs = map[string][]string{
-	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
-	"darwin":  []string{"Library/Application Support/Google/Chrome"},
+	"windows": {"Appdata/Local/Google/Chrome/User Data"},
+	"darwin":  {"Library/Application Support/Google/Chrome"},
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
