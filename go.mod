@@ -32,8 +32,14 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
+	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/sirupsen/logrus v1.4.0 // indirect
+	github.com/smartystreets/goconvey v1.6.4 // indirect
+	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/testify v1.8.0
 	github.com/theupdateframework/notary v0.6.1
+	github.com/tklauser/go-sysconf v0.3.10 // indirect
+	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.22.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
@@ -82,11 +88,9 @@ require (
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v0.9.2 // indirect
-	github.com/sirupsen/logrus v1.4.0 // indirect
-	github.com/smartystreets/goconvey v1.6.4 // indirect
-	github.com/spf13/viper v1.2.1 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
+	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect

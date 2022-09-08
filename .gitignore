@@ -37,3 +37,4 @@ pkg/packagekit/wix/internal/assets.go
 # scratch pad (notes used during development)
 scratch.*
 /scratch
+/debug
