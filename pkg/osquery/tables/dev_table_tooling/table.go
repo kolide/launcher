@@ -48,7 +48,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		cmd, ok := GetAllowedCommands()[name]
+		cmd, ok := allowedCommands[name]
 
 		if !ok {
 			level.Info(t.logger).Log("msg", "Command not allowed", "name", name)
