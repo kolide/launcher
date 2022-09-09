@@ -5,10 +5,7 @@ package dev_table_tooling
 
 func GetAllowedCommands() map[string]AllowedCommand {
 	cmds := map[string]AllowedCommand{
-		"hostname": {
-			binPaths: []string{"hostname"},
-			args:     []string{},
-		},
+		// Add allowed commands here
 	}
 	return cmds
 }

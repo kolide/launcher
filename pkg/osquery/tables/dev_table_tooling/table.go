@@ -6,24 +6,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-func GetAllowedCommandNameList() []string {
-	cmds := GetAllowedCommands()
-	keys := make([]string, len(cmds))
-
-	i := 0
-	for k := range cmds {
-		keys[i] = k
-		i++
-	}
-
-	return keys
-}
 
 // Encapsulates the binary path(s) of a command allowed to execute
 // along with a strict list of arguments.
@@ -39,10 +25,10 @@ type Table struct {
 }
 
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-	columns := dataflattentable.Columns(
+	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("output"),
-	)
+	}
 
 	t := &Table{
 		client:    client,
@@ -56,17 +42,15 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	for _, name := range tablehelpers.GetConstraints(queryContext, "name", tablehelpers.WithAllowedValues(GetAllowedCommandNameList()), tablehelpers.WithDefaults("")) {
+	for _, name := range tablehelpers.GetConstraints(queryContext, "name", tablehelpers.WithDefaults("")) {
 		if name == "" {
-			level.Info(t.logger).Log("msg", "Command not allowed", "name", name)
+			level.Info(t.logger).Log("msg", "Command name must not be blank")
 			continue
 		}
 
-		// The ConstraintOps should have already filtered out disallowed command names
-		// If the cmd is not found, this could indicate a logic error
-		cmd, found := GetAllowedCommands()[name]
+		cmd, ok := GetAllowedCommands()[name]
 
-		if !found {
+		if !ok {
 			level.Info(t.logger).Log("msg", "Command not allowed", "name", name)
 			continue
 		} else {

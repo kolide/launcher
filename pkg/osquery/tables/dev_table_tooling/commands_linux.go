@@ -5,10 +5,7 @@ package dev_table_tooling
 
 func GetAllowedCommands() map[string]AllowedCommand {
 	cmds := map[string]AllowedCommand{
-		"ifconfig": {
-			binPaths: []string{"ifconfig"},
-			args:     []string{},
-		},
+		// Add allowed commands here
 	}
 	return cmds
 }
