@@ -3,6 +3,7 @@ package dev_table_tooling
 import (
 	"context"
 	"encoding/base64"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -27,6 +28,7 @@ type Table struct {
 func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
+		table.TextColumn("args"),
 		table.TextColumn("output"),
 	}
 
@@ -61,6 +63,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			} else {
 				results = append(results, map[string]string{
 					"name":   name,
+					"args":   strings.Join(cmd.args, " "),
 					"output": base64.StdEncoding.EncodeToString(output),
 				})
 			}
