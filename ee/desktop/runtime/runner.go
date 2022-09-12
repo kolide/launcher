@@ -31,6 +31,9 @@ type DesktopUsersProcessesRunner struct {
 	// due to needing to build the binary to test as a result of some test harness weirdness.
 	// See runner_test.go for more details.
 	executablePath string
+	// hostname is the host that launcher is connecting to. It gets passed to the desktop process
+	// and is used to determine which icon to display
+	hostname string
 }
 
 // addProcessForUser adds process information to the internal tracking state
@@ -64,7 +67,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProcessesRunner {
+func New(logger log.Logger, executionInterval time.Duration, hostname string) *DesktopUsersProcessesRunner {
 	return &DesktopUsersProcessesRunner{
 		logger:            logger,
 		interrupt:         make(chan struct{}),
@@ -72,6 +75,7 @@ func New(logger log.Logger, executionInterval time.Duration) *DesktopUsersProces
 		executionInterval: executionInterval,
 		procsWg:           &sync.WaitGroup{},
 		procsWgTimeout:    time.Second * 5,
+		hostname:          hostname,
 	}
 }
 

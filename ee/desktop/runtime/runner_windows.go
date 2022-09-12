@@ -49,7 +49,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 		defer accessToken.Close()
 
-		proc, err := runWithAccessToken(accessToken, executablePath, "desktop")
+		proc, err := runWithAccessToken(accessToken, executablePath, "desktop", fmt.Sprintf("--hostname=%s", r.hostname))
 		if err != nil {
 			return fmt.Errorf("running desktop: %w", err)
 		}
