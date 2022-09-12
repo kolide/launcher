@@ -194,7 +194,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	var desktopRunner *desktopRuntime.DesktopUsersProcessesRunner
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
 		desktopRunner = desktopRuntime.New(logger, time.Second*5, opts.KolideServerURL)
 		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
 	}
