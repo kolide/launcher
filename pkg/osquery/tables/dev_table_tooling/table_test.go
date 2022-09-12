@@ -26,9 +26,9 @@ func Test_generate(t *testing.T) {
 			commandName: []string{"ransomware.exe"},
 		},
 		{
-			name:           "should-always-work happy path",
+			name:           "should always work happy path",
 			commandName:    []string{"echo"},
-			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": base64.StdEncoding.EncodeToString([]byte("hello\n"))}},
+			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": base64.StdEncoding.EncodeToString([]byte(echoHelloOutput))}},
 		},
 	}
 

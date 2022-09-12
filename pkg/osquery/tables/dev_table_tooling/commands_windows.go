@@ -9,3 +9,6 @@ var allowedCommands = map[string]allowedCommand{
 		args:     []string{"hello"},
 	},
 }
+
+// Platform-specific test data
+var echoHelloOutput = "hello\r\n"
