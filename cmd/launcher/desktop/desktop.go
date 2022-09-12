@@ -41,7 +41,9 @@ func handleSignals() {
 
 // continuously monitor for ppid and exit if parent process terminates
 func exitWhenParentGone() {
-	for ; true; <-time.NewTicker(2 * time.Second).C {
+	ticker := time.NewTicker(2 * time.Second)
+
+	for ; true; <-ticker.C {
 		ppid := os.Getppid()
 
 		if ppid <= 1 {
