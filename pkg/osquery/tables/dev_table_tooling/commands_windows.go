@@ -4,5 +4,8 @@
 package dev_table_tooling
 
 var allowedCommands = map[string]allowedCommand{
-	// Add allowed commands here
+	"echo": {
+		binPaths: []string{"echo"},
+		args:     []string{"hello"},
+	},
 }

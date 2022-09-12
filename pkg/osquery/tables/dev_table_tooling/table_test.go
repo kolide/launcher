@@ -2,6 +2,7 @@ package dev_table_tooling
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -23,6 +24,11 @@ func Test_generate(t *testing.T) {
 		{
 			name:        "malware",
 			commandName: []string{"ransomware.exe"},
+		},
+		{
+			name:           "should-always-work happy path",
+			commandName:    []string{"echo"},
+			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": base64.StdEncoding.EncodeToString([]byte("hello\n"))}},
 		},
 	}
 
