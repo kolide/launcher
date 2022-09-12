@@ -41,7 +41,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		SlackConfig(client, logger),
 		SshKeys(client, logger),
 		cryptoinfotable.TablePlugin(logger),
-		dev_table_tooling.TablePlugin(client, logger),
+		dev_table_tooling.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),

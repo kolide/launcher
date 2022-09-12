@@ -3,6 +3,6 @@
 
 package dev_table_tooling
 
-var allowedCommands = map[string]AllowedCommand{
+var allowedCommands = map[string]allowedCommand{
 	// Add allowed commands here
 }

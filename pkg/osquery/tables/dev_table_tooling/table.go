@@ -12,9 +12,9 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-// Encapsulates the binary path(s) of a command allowed to execute
+// allowedCommand encapsulates the possible binary path(s) of a command allowed to execute
 // along with a strict list of arguments.
-type AllowedCommand struct {
+type allowedCommand struct {
 	binPaths []string
 	args     []string
 }
@@ -25,20 +25,20 @@ type Table struct {
 	tableName string
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("args"),
 		table.TextColumn("output"),
 	}
 
+	tableName := "kolide_dev_table_tooling"
+
 	t := &Table{
-		client:    client,
-		logger:    logger,
-		tableName: "kolide_dev_table_tooling",
+		logger: log.With(logger, "table", tableName),
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin(tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -55,19 +55,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		if !ok {
 			level.Info(t.logger).Log("msg", "Command not allowed", "name", name)
 			continue
-		} else {
-			output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args)
-			if err != nil {
-				level.Info(t.logger).Log("msg", "dev_table_tooling failed", "name", name, "err", err)
-				continue
-			} else {
-				results = append(results, map[string]string{
-					"name":   name,
-					"args":   strings.Join(cmd.args, " "),
-					"output": base64.StdEncoding.EncodeToString(output),
-				})
-			}
 		}
+
+		output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args)
+		if err != nil {
+			level.Info(t.logger).Log("msg", "dev_table_tooling failed", "name", name, "err", err)
+			continue
+		}
+
+		results = append(results, map[string]string{
+			"name":   name,
+			"args":   strings.Join(cmd.args, " "),
+			"output": base64.StdEncoding.EncodeToString(output),
+		})
 	}
 
 	return results, nil
