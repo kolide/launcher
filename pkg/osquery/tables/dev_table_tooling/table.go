@@ -20,9 +20,8 @@ type allowedCommand struct {
 }
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
-	logger    log.Logger
-	tableName string
+	client *osquery.ExtensionManagerClient
+	logger log.Logger
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
