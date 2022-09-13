@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -18,12 +19,35 @@ func RunDesktop(args []string) error {
 	go exitWhenParentGone()
 	go handleSignals()
 
+	flagset := flag.NewFlagSet("launcher desktop", flag.ExitOnError)
+	var (
+		flhostname = flagset.String(
+			"hostname",
+			"",
+			"hostname launcher is connected to",
+		)
+	)
+	if err := flagset.Parse(args); err != nil {
+		return err
+	}
+
 	onReady := func() {
 		systray.SetTemplateIcon(kolideDesktopIcon, kolideDesktopIcon)
 		systray.SetTooltip("Kolide")
 
 		versionItem := systray.AddMenuItem(fmt.Sprintf("Version %s", version.Version().Version), "")
 		versionItem.Disable()
+
+		// if prod environment, return
+		if *flhostname == "k2device-preprod.kolide.com" || *flhostname == "k2device.kolide.com" {
+			return
+		}
+
+		// in non prod environment
+		systray.SetTemplateIcon(kolideDesktopIconNonProd, kolideDesktopIconNonProd)
+		systray.AddSeparator()
+		systray.AddMenuItem("--- DEBUG ---", "").Disable()
+		systray.AddMenuItem(fmt.Sprintf("Hostname: %s", *flhostname), "").Disable()
 	}
 
 	systray.Run(onReady, func() {})

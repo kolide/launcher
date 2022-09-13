@@ -47,7 +47,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	proc, err := runAsUser(uid, executablePath, "desktop")
+	proc, err := runAsUser(uid, executablePath, "desktop", "--hostname", r.hostname)
 	if err != nil {
 		return fmt.Errorf("running desktop: %w", err)
 	}

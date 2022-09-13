@@ -7,5 +7,10 @@ import (
 	_ "embed"
 )
 
-//go:embed kolide-mark-only-purple-16x-32x.ico
-var kolideDesktopIcon []byte
+var (
+	//go:embed kolide-windows-prod-icon.ico
+	kolideDesktopIcon []byte
+
+	//go:embed kolide-windows-non-prod-icon.ico
+	kolideDesktopIconNonProd []byte
+)

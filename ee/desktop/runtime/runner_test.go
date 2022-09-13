@@ -92,7 +92,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadSafeBuffer
 
-			r := New(log.NewLogfmtLogger(&logBytes), time.Second*1)
+			r := New(log.NewLogfmtLogger(&logBytes), time.Second*1, "some-where-over-the-rainbow.example.com")
 			r.executablePath = executablePath
 
 			if tt.setup != nil {
