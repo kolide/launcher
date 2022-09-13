@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/airport"
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/falcon_kernel_check"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
@@ -85,6 +86,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		TouchIDUserConfig(client, logger),
 		TouchIDSystemConfig(client, logger),
 		UserAvatar(logger),
+		falcon_kernel_check.TablePlugin(logger),
 		ioreg.TablePlugin(client, logger),
 		profiles.TablePlugin(client, logger),
 		airport.TablePlugin(client, logger),
