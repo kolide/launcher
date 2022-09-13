@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/systray"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -32,7 +33,7 @@ func RunDesktop(args []string) error {
 	}
 
 	onReady := func() {
-		systray.SetTemplateIcon(kolideDesktopIcon, kolideDesktopIcon)
+		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
 		systray.SetTooltip("Kolide")
 
 		versionItem := systray.AddMenuItem(fmt.Sprintf("Version %s", version.Version().Version), "")
@@ -44,7 +45,7 @@ func RunDesktop(args []string) error {
 		}
 
 		// in non prod environment
-		systray.SetTemplateIcon(kolideDesktopIconNonProd, kolideDesktopIconNonProd)
+		systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
 		systray.AddSeparator()
 		systray.AddMenuItem("--- DEBUG ---", "").Disable()
 		systray.AddMenuItem(fmt.Sprintf("Hostname: %s", *flhostname), "").Disable()
