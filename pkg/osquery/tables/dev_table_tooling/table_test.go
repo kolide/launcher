@@ -46,21 +46,23 @@ func Test_generate(t *testing.T) {
 
 			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
 
-			if len(tt.expectedResult) > 0 {
-				assert.Equal(t, tt.expectedResult[0]["name"], got[0]["name"])
-				assert.Equal(t, tt.expectedResult[0]["args"], got[0]["args"])
-
-				// To verify output, let's convert back to utf8
-				decodedOutput, _ := base64.StdEncoding.DecodeString(got[0]["output"])
-				scanner := bufio.NewScanner(bytes.NewReader(decodedOutput))
-				for scanner.Scan() {
-					// Scanner "normalizes" the output by removing platform-specific newline characters
-					firstLine := scanner.Text()
-					assert.Equal(t, tt.expectedResult[0]["output"], firstLine)
-					break
-				}
-			} else {
+			if len(tt.expectedResult) <= 0 {
 				assert.ElementsMatch(t, tt.expectedResult, got)
+				return
+			}
+
+			// test for expected results
+			assert.Equal(t, tt.expectedResult[0]["name"], got[0]["name"])
+			assert.Equal(t, tt.expectedResult[0]["args"], got[0]["args"])
+
+			// To verify output, let's convert back to utf8
+			decodedOutput, _ := base64.StdEncoding.DecodeString(got[0]["output"])
+			scanner := bufio.NewScanner(bytes.NewReader(decodedOutput))
+			for scanner.Scan() {
+				// Scanner "normalizes" the output by removing platform-specific newline characters
+				firstLine := scanner.Text()
+				assert.Equal(t, tt.expectedResult[0]["output"], firstLine)
+				break
 			}
 		})
 	}
