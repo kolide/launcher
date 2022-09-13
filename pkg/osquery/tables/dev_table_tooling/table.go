@@ -8,7 +8,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -20,7 +19,6 @@ type allowedCommand struct {
 }
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
