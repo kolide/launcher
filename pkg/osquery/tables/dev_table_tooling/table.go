@@ -58,7 +58,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "dev_table_tooling failed", "name", name, "err", err)
+			level.Info(t.logger).Log("msg", "execution failed", "name", name, "err", err)
 			continue
 		}
 

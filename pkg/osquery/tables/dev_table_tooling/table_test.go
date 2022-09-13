@@ -17,7 +17,7 @@ func Test_generate(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		commandName    []string
+		commandName    string
 		expectedResult []map[string]string
 	}{
 		{
@@ -25,11 +25,11 @@ func Test_generate(t *testing.T) {
 		},
 		{
 			name:        "malware",
-			commandName: []string{"ransomware.exe"},
+			commandName: "ransomware.exe",
 		},
 		{
 			name:           "should always work happy path",
-			commandName:    []string{"echo"},
+			commandName:    "echo",
 			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": "hello"}},
 		},
 	}
@@ -42,16 +42,16 @@ func Test_generate(t *testing.T) {
 			t.Parallel()
 
 			constraints := make(map[string][]string)
-			constraints["name"] = tt.commandName
+			constraints["name"] = []string{tt.commandName}
 
 			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
 
 			if len(tt.expectedResult) <= 0 {
-				assert.ElementsMatch(t, tt.expectedResult, got)
+				assert.Empty(t, got)
 				return
 			}
 
-			// test for expected results
+			// Test for expected results
 			assert.Equal(t, tt.expectedResult[0]["name"], got[0]["name"])
 			assert.Equal(t, tt.expectedResult[0]["args"], got[0]["args"])
 
