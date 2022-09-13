@@ -1,6 +1,8 @@
 package dev_table_tooling
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"testing"
@@ -28,7 +30,7 @@ func Test_generate(t *testing.T) {
 		{
 			name:           "should always work happy path",
 			commandName:    []string{"echo"},
-			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": base64.StdEncoding.EncodeToString([]byte(echoHelloOutput))}},
+			expectedResult: []map[string]string{{"name": "echo", "args": "hello", "output": "hello"}},
 		},
 	}
 
@@ -44,7 +46,22 @@ func Test_generate(t *testing.T) {
 
 			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
 
-			assert.ElementsMatch(t, tt.expectedResult, got)
+			if len(tt.expectedResult) > 0 {
+				assert.Equal(t, tt.expectedResult[0]["name"], got[0]["name"])
+				assert.Equal(t, tt.expectedResult[0]["args"], got[0]["args"])
+
+				// To verify output, let's convert back to utf8
+				decodedOutput, _ := base64.StdEncoding.DecodeString(got[0]["output"])
+				scanner := bufio.NewScanner(bytes.NewReader(decodedOutput))
+				for scanner.Scan() {
+					// Scanner "normalizes" the output by removing platform-specific newline characters
+					firstLine := scanner.Text()
+					assert.Equal(t, tt.expectedResult[0]["output"], firstLine)
+					break
+				}
+			} else {
+				assert.ElementsMatch(t, tt.expectedResult, got)
+			}
 		})
 	}
 }
