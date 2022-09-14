@@ -12,6 +12,7 @@ import (
 	"fyne.io/systray"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/desktop/assets"
+	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -19,6 +20,12 @@ func RunDesktop(args []string) error {
 
 	go exitWhenParentGone()
 	go handleSignals()
+
+	go func() {
+		if err := server.Start(); err != nil {
+			//TODO: log this
+		}
+	}()
 
 	flagset := flag.NewFlagSet("launcher desktop", flag.ExitOnError)
 	var (
