@@ -35,21 +35,19 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	var results []map[string]string
-
-	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{kernelCheckUtilPath}, []string{})
+	output, err := tablehelpers.Exec(ctx, t.logger, 5, []string{kernelCheckUtilPath}, []string{})
 	if err != nil {
-		level.Info(t.logger).Log("msg", "falcon-kernel-check failed", "err", err)
+		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, err
 	}
 
 	status, err := parseStatus(string(output))
 	if err != nil {
-		level.Info(t.logger).Log("msg", "Error parsing falcon-kernel-check status", "err", err)
+		level.Info(t.logger).Log("msg", "Error parsing exec status", "err", err)
 		return nil, err
 	}
 
-	results = append(results, status)
+	results := []map[string]string{status}
 
 	return results, nil
 }
