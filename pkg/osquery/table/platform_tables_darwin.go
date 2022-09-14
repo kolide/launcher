@@ -9,6 +9,7 @@ import (
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
 	"github.com/kolide/launcher/pkg/osquery/tables/airport"
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
+	"github.com/kolide/launcher/pkg/osquery/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
@@ -91,6 +92,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(client, logger),
 		mdmclient.TablePlugin(client, logger),
+		apple_silicon_security_policy.TablePlugin(logger),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_diskutil_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "list", "-plist"}),
