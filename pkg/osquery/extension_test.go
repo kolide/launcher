@@ -551,7 +551,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) { //nolint:paralleltest
-	// t.Parallel() commented out do to timeouts in github actions runner
+	// t.Parallel() commented out due to timeouts in github actions runner
 
 	// Test for https://github.com/kolide/launcher/issues/219 in which a
 	// call to writeBufferedLogsForType with an invalid node key causes a
@@ -721,7 +721,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 }
 
 func TestExtensionWriteLogsLoop(t *testing.T) { //nolint:paralleltest
-	// t.Parallel() commented out do to timeouts in github actions runner
+	// t.Parallel() commented out due to timeouts in github actions runner
 
 	var gotStatusLogs, gotResultLogs []string
 	var funcInvokedStatus, funcInvokedResult bool
