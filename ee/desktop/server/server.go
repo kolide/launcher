@@ -11,6 +11,18 @@ import (
 
 var shutdownChan = make(chan struct{})
 
+// Start spins up a server that listens to a unix socket or named pipe for windows.
+//
+// On macos & linux you can curl this with:
+//
+//	curl --unix-socket /tmp/<pid>_launcher_desktop.sock ./<endpoint>
+//
+// For example:
+//
+//	curl --unix-socket /tmp/1234_launcher_desktop.sock ./shutdown
+//
+// On windows the socket path is \\.\pipe\<pid>_launcher_desktop.sock, but curl
+// doesn't seem to support named pipes on windows.
 func Start() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/shutdown", shutdown)
@@ -51,6 +63,7 @@ func Start() error {
 	return nil
 }
 
+// shutdown signals the server to shutdown and calls systray.Quit(), exiting the program.
 func shutdown(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\"msg\": \"shutting down\"}"))
