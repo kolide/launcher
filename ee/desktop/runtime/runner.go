@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/ee/desktop"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -120,24 +118,6 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 		defer close(wgDone)
 		r.procsWg.Wait()
 	}()
-
-	// signal := os.Interrupt
-	// // os.Interrupt is not supported on windows, so use os.Kill instead
-	// if runtime.GOOS == "windows" {
-	// 	signal = os.Kill
-	// }
-
-	// for uid, proc := range r.uidProcs {
-	// 	if err := proc.process.Signal(signal); err != nil {
-	// 		level.Error(r.logger).Log(
-	// 			"msg", fmt.Sprintf("error sending signal %s to desktop process", signal),
-	// 			"uid", uid,
-	// 			"pid", proc.process.Pid,
-	// 			"path", proc.path,
-	// 			"err", err,
-	// 		)
-	// 	}
-	// }
 
 	for uid, proc := range r.uidProcs {
 		if err := sendShutdownCommand(proc.process.Pid); err != nil {
@@ -252,11 +232,10 @@ func processExists(processRecord processRecord) bool {
 }
 
 func sendShutdownCommand(pid int) error {
+
 	client := http.Client{
 		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", desktop.DesktopSocketPath(pid))
-			},
+			DialContext: dialContext(pid),
 		},
 	}
 

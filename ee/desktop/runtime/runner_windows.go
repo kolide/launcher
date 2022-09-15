@@ -6,6 +6,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/user"
@@ -13,7 +14,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Microsoft/go-winio"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/desktop"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -147,4 +150,10 @@ func runWithAccessToken(accessToken syscall.Token, path string, args ...string) 
 	}
 
 	return cmd.Process, nil
+}
+
+func dialContext(pid int) func(_ context.Context, _, _ string) (net.Conn, error) {
+	return func(_ context.Context, _, _ string) (net.Conn, error) {
+		return winio.DialPipe(desktop.DesktopSocketPath(pid), nil)
+	}
 }

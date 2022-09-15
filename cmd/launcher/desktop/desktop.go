@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/systray"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/shirou/gopsutil/process"
@@ -56,6 +57,7 @@ func RunDesktop(args []string) error {
 		systray.AddSeparator()
 		systray.AddMenuItem("--- DEBUG ---", "").Disable()
 		systray.AddMenuItem(fmt.Sprintf("Hostname: %s", *flhostname), "").Disable()
+		systray.AddMenuItem(fmt.Sprintf("Socket Path: %s", desktop.DesktopSocketPath(os.Getpid())), "").Disable()
 	}
 
 	systray.Run(onReady, func() {})

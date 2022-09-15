@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"os"
 
@@ -26,15 +25,15 @@ func Start() error {
 		//TODO: log this
 	}
 
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := listener(socketPath)
 	if err != nil {
-		return err
+		//TODO: log this
 	}
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			// TODO: log this
-			<-shutdownChan
+			shutdownChan <- struct{}{}
 		}
 	}()
 
