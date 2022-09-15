@@ -74,7 +74,7 @@ func New(logger log.Logger, executionInterval time.Duration, hostname string) *D
 		uidProcs:          make(map[string]processRecord),
 		executionInterval: executionInterval,
 		procsWg:           &sync.WaitGroup{},
-		procsWgTimeout:    time.Second * 5,
+		procsWgTimeout:    time.Second * 10,
 		hostname:          hostname,
 	}
 }
