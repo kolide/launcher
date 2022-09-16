@@ -41,12 +41,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 
-		str := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
-		arr := strings.Split(str, ", ")
+		// TODO: Replace this with the output of the real command
+		output := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
+		dataArr := strings.Split(output, ", ")
 		rawKeyVals := make(map[string]interface{})
 
-		for _, foo := range arr {
-			a := re.Split(foo, 2)
+		for _, data := range dataArr {
+			a := re.Split(data, 2)
 			rawKeyVals[a[0]] = a[1]
 		}
 
