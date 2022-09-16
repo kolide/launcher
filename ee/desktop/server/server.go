@@ -1,71 +1,68 @@
+// server is a http server that listens to a unix socket or named pipe for windows.
+// Its implementation was driven by the need for "launcher proper" to be able to
+// communicate with launcher desktop running as a separate process.
 package server
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 
-	"fyne.io/systray"
 	"github.com/kolide/launcher/ee/desktop"
 )
 
-var shutdownChan = make(chan struct{})
+type DesktopServer struct {
+	server       *http.Server
+	listener     net.Listener
+	shutdownChan chan<- struct{}
+}
 
-// Start spins up a server that listens to a unix socket or named pipe for windows.
-//
-// On macos & linux you can curl this with:
-//
-//	curl --unix-socket /tmp/<pid>_launcher_desktop.sock ./<endpoint>
-//
-// For example:
-//
-//	curl --unix-socket /tmp/1234_launcher_desktop.sock ./shutdown
-//
-// On windows the socket path is \\.\pipe\<pid>_launcher_desktop.sock, but curl
-// doesn't seem to support named pipes on windows.
-func Start() error {
+func New(shutdownChan chan<- struct{}) (*DesktopServer, error) {
+	desktopServer := &DesktopServer{
+		shutdownChan: shutdownChan,
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/shutdown", shutdown)
+	mux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
 
-	server := http.Server{
+	desktopServer.server = &http.Server{
 		Handler: mux,
 	}
 
 	socketPath := desktop.DesktopSocketPath(os.Getpid())
 
+	// remove existing socket
 	if err := os.RemoveAll(socketPath); err != nil {
-		//TODO: log this
+		return nil, err
 	}
 
 	listener, err := listener(socketPath)
 	if err != nil {
-		//TODO: log this
+		return nil, err
 	}
+	desktopServer.listener = listener
 
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			// TODO: log this
-			shutdownChan <- struct{}{}
+	desktopServer.server.RegisterOnShutdown(func() {
+		// remove socket on shutdown
+		if err := os.RemoveAll(socketPath); err != nil {
+			//TODO: log this
 		}
-	}()
+	})
 
-	<-shutdownChan
-
-	if err := os.RemoveAll(socketPath); err != nil {
-		//TODO: log this
-	}
-
-	if err := server.Shutdown(context.Background()); err != nil {
-		//TODO: log this
-	}
-
-	systray.Quit()
-	return nil
+	return desktopServer, nil
 }
 
-// shutdown signals the server to shutdown and calls systray.Quit(), exiting the program.
-func shutdown(w http.ResponseWriter, req *http.Request) {
+func (s *DesktopServer) Serve() error {
+	return s.server.Serve(s.listener)
+}
+
+func (s *DesktopServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
+}
+
+func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\"msg\": \"shutting down\"}"))
-	shutdownChan <- struct{}{}
+	s.shutdownChan <- struct{}{}
 }

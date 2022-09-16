@@ -1,3 +1,4 @@
+// runtime handles multiuser process managment for launcher desktop
 package runtime
 
 import (
@@ -163,13 +164,14 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 	go func(username string, proc *os.Process) {
 		defer r.procsWg.Done()
 		// waiting here gives the parent a chance to clean up
-		_, err := proc.Wait()
+		state, err := proc.Wait()
 		if err != nil {
 			level.Error(r.logger).Log(
 				"msg", "desktop process died",
 				"uid", uid,
 				"pid", proc.Pid,
 				"err", err,
+				"state", state,
 			)
 		}
 	}(uid, proc)

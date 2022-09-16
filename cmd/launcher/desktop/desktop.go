@@ -3,78 +3,85 @@ package desktop
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
-	"fyne.io/systray"
-	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/desktop"
-	"github.com/kolide/launcher/ee/desktop/assets"
+	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
+	"github.com/oklog/run"
 	"github.com/shirou/gopsutil/process"
 )
 
-func RunDesktop(args []string) error {
-
-	go exitWhenParentGone()
-	go handleSignals()
-
-	go func() {
-		if err := server.Start(); err != nil {
-			//TODO: log this
-		}
-	}()
-
-	flagset := flag.NewFlagSet("launcher desktop", flag.ExitOnError)
-	var (
-		flhostname = flagset.String(
-			"hostname",
-			"",
-			"hostname launcher is connected to",
-		)
+var (
+	flagset    = flag.NewFlagSet("launcher desktop", flag.ExitOnError)
+	flhostname = flagset.String(
+		"hostname",
+		"",
+		"hostname launcher is connected to",
 	)
+)
+
+func RunDesktop(args []string) error {
 	if err := flagset.Parse(args); err != nil {
 		return err
 	}
 
-	onReady := func() {
-		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
-		systray.SetTooltip("Kolide")
+	shutdownChan := make(chan struct{})
 
-		versionItem := systray.AddMenuItem(fmt.Sprintf("Version %s", version.Version().Version), "")
-		versionItem.Disable()
+	go handleSignals(shutdownChan)
+	go monitorParentProcess(shutdownChan)
 
-		// if prod environment, return
-		if *flhostname == "k2device-preprod.kolide.com" || *flhostname == "k2device.kolide.com" {
-			return
-		}
+	var runGroup run.Group
 
-		// in non prod environment
-		systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
-		systray.AddSeparator()
-		systray.AddMenuItem("--- DEBUG ---", "").Disable()
-		systray.AddMenuItem(fmt.Sprintf("Hostname: %s", *flhostname), "").Disable()
-		systray.AddMenuItem(fmt.Sprintf("Socket Path: %s", desktop.DesktopSocketPath(os.Getpid())), "").Disable()
+	server, err := server.New(shutdownChan)
+	if err != nil {
+		return err
 	}
 
-	systray.Run(onReady, func() {})
+	// start desktop server
+	runGroup.Add(server.Serve, func(err error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			//TODO: log this
+		}
+	})
+
+	// wait for shutdown
+	runGroup.Add(func() error {
+		<-shutdownChan
+		return nil
+	}, func(err error) {
+		menu.Shutdown()
+	},
+	)
+
+	go func() {
+		if err := runGroup.Run(); err != nil {
+			//TODO: log this
+		}
+	}()
+
+	// blocks until shutdown called
+	menu.Init(*flhostname)
+
 	return nil
 }
 
-func handleSignals() {
-	signalsToHandle := []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+func handleSignals(signalReceivedChan chan<- struct{}) {
+	signalsToHandle := []os.Signal{os.Interrupt, os.Kill}
 	signals := make(chan os.Signal, len(signalsToHandle))
 	signal.Notify(signals, signalsToHandle...)
-	sig := <-signals
-	fmt.Printf("\nreceived %s signal, exiting", sig)
-	systray.Quit()
+
+	<-signals
+
+	//TODO: log signal
+	signalReceivedChan <- struct{}{}
 }
 
 // continuously monitor for ppid and exit if parent process terminates
-func exitWhenParentGone() {
+func monitorParentProcess(parentGoneChan chan<- struct{}) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
@@ -92,11 +99,10 @@ func exitWhenParentGone() {
 		// but the linter and the context.WithTimeout docs say to do it
 		cancel()
 		if err != nil || !exists {
+			//TODO: log parent gone
 			break
 		}
 	}
 
-	fmt.Print("\nparent process is gone, exiting")
-	systray.Quit()
-	os.Exit(1)
+	parentGoneChan <- struct{}{}
 }

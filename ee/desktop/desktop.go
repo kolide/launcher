@@ -8,7 +8,7 @@ import (
 )
 
 func DesktopSocketPath(pid int) string {
-	const socketBaseName = "launcher_desktop.sock"
+	const socketBaseName = "kolide_desktop.sock"
 
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf(`\\.\pipe\%d_%s`, pid, socketBaseName)
