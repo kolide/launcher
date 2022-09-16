@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -70,7 +69,6 @@ func parseStatus(status string) (map[string]string, error) {
 		return nil, errors.Errorf("Failed to match output: %s", status)
 	}
 	if len(matches[0]) != 5 {
-		spew.Dump(matches)
 		return nil, errors.Errorf("Got %d matches. Expected 5. Failed to match output: %s", len(matches[0]), status)
 	}
 

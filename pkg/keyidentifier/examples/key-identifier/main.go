@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/keyidentifier"
 )
@@ -27,6 +26,5 @@ func testIdentifyFile(path string) error {
 	}
 
 	fmt.Printf("%s\t%s\n", ki.Parser, path)
-	spew.Dump(ki)
 	return nil
 }
