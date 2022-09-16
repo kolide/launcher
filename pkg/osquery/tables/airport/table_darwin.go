@@ -74,7 +74,7 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 	options := tablehelpers.GetConstraints(queryContext, "option", tablehelpers.WithAllowedValues(allowedOptions))
 
 	if len(options) == 0 {
-		return nil, errors.Errorf("The %s table requires that you specify a constraint for option", tableName)
+		return nil, errors.Errorf("The %s table requires that you specify a constraint for WHERE option =. Valid values for option are (%s).", tableName, strings.Join(allowedOptions, ", "))
 	}
 
 	var results []map[string]string
