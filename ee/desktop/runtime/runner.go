@@ -1,4 +1,4 @@
-// runtime handles multiuser process managment for launcher desktop
+// runtime handles multiuser process management for launcher desktop
 package runtime
 
 import (
@@ -234,7 +234,6 @@ func processExists(processRecord processRecord) bool {
 }
 
 func sendShutdownCommand(pid int) error {
-
 	client := http.Client{
 		Transport: &http.Transport{
 			DialContext: dialContext(pid),

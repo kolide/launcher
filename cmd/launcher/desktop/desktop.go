@@ -54,10 +54,10 @@ func RunDesktop(args []string) error {
 		return nil
 	}, func(err error) {
 		menu.Shutdown()
-	},
-	)
+	})
 
 	go func() {
+		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
 			//TODO: log this
 		}
