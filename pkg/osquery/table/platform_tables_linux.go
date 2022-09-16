@@ -5,9 +5,9 @@ package table
 
 import (
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/osquery/tables/crowdstrike/falcon_kernel_check"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptsetup"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/falcon_kernel_check"
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
 	"github.com/kolide/launcher/pkg/osquery/tables/secureboot"
