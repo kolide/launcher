@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package runtime
+package runner
 
 import (
 	"fmt"
@@ -17,6 +17,7 @@ import (
 // runConsoleUserDesktop determines the owner of /dev/console and runs the desktop process as that user
 // if no desktop process exists for that user
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
@@ -47,7 +48,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	proc, err := runAsUser(uid, executablePath, "desktop", "--hostname", r.hostname)
+	proc, err := runAsUser(uid, os.Environ(), executablePath, "desktop", "--hostname", r.hostname)
 	if err != nil {
 		return fmt.Errorf("running desktop: %w", err)
 	}
@@ -77,7 +78,7 @@ func consoleOwnerUid() (uint32, error) {
 	return consoleInfo.Sys().(*syscall.Stat_t).Uid, nil
 }
 
-func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
+func runAsUser(uid string, env []string, path string, args ...string) (*os.Process, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("getting current user: %w", err)
@@ -89,6 +90,7 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 	}
 
 	cmd := exec.Command(path, args...)
+	cmd.Env = env
 
 	// current user not root
 	if currentUser.Uid != "0" {

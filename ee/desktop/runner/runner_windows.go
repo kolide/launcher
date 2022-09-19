@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package runtime
+package runner
 
 import (
 	"context"

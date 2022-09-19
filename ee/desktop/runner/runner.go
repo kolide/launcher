@@ -1,33 +1,71 @@
 // runtime handles multiuser process management for launcher desktop
-package runtime
+package runner
 
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/desktop"
+	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/shirou/gopsutil/process"
 )
+
+type DesktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
+
+// WithHostname sets the hostname for the runner
+func WithHostname(hostname string) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.hostname = hostname
+	}
+}
+
+func WithLogger(logger log.Logger) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.logger = logger
+	}
+}
+
+// WithUpdateInterval sets the interval on which the runner will create desktops for
+// user who don't have them and spin up new ones if any have died.
+func WithUpdateInterval(interval time.Duration) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.updateInterval = interval
+	}
+}
+
+// WithExecutablePath sets the path to the executable that will be run for each desktop.
+func WithExecutablePath(path string) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.executablePath = path
+	}
+}
+
+// WithInterruptTimeout sets the timeout for the runner to wait for processes to exit when interrupted.
+func WithInterruptTimeout(timeout time.Duration) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.interruptTimeout = timeout
+	}
+}
 
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
 // Initialize with New().
 type DesktopUsersProcessesRunner struct {
-	logger            log.Logger
-	executionInterval time.Duration
-	interrupt         chan struct{}
+	logger         log.Logger
+	updateInterval time.Duration
+	interrupt      chan struct{}
 	// uidProcs is a map of uid to desktop process
 	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
-	// procsWgTimeout how long to wait for desktop proccesses to finish on interrupt
-	procsWgTimeout time.Duration
+	// interruptTimeout how long to wait for desktop proccesses to finish on interrupt
+	interruptTimeout time.Duration
 	// executablePath is the path to the launcher executable. Currently this is only set during testing
 	// due to needing to build the binary to test as a result of some test harness weirdness.
 	// See runner_test.go for more details.
@@ -68,16 +106,21 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(logger log.Logger, executionInterval time.Duration, hostname string) *DesktopUsersProcessesRunner {
-	return &DesktopUsersProcessesRunner{
-		logger:            logger,
-		interrupt:         make(chan struct{}),
-		uidProcs:          make(map[string]processRecord),
-		executionInterval: executionInterval,
-		procsWg:           &sync.WaitGroup{},
-		procsWgTimeout:    time.Second * 10,
-		hostname:          hostname,
+func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner {
+	runner := &DesktopUsersProcessesRunner{
+		logger:           log.NewNopLogger(),
+		interrupt:        make(chan struct{}),
+		uidProcs:         make(map[string]processRecord),
+		updateInterval:   time.Second * 5,
+		procsWg:          &sync.WaitGroup{},
+		interruptTimeout: time.Second * 10,
 	}
+
+	for _, opt := range opts {
+		opt(runner)
+	}
+
+	return runner
 }
 
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
@@ -94,10 +137,17 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 
 	f()
 
+	ticker := time.NewTicker(r.updateInterval)
+
 	for {
 		select {
-		case <-time.NewTicker(r.executionInterval).C:
-			f()
+		case <-ticker.C:
+			if err := r.runConsoleUserDesktop(); err != nil {
+				level.Error(r.logger).Log(
+					"msg", "error running desktop",
+					"err", err,
+				)
+			}
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
 			return nil
@@ -121,7 +171,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}()
 
 	for uid, proc := range r.uidProcs {
-		if err := sendShutdownCommand(proc.process.Pid); err != nil {
+		if err := client.Shutdown(desktop.DesktopSocketPath(proc.process.Pid)); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to desktop process",
 				"uid", uid,
@@ -136,7 +186,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	case <-wgDone:
 		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
 		return
-	case <-time.After(r.procsWgTimeout):
+	case <-time.After(r.interruptTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
 		for uid, processRecord := range r.uidProcs {
 			if !processExists(processRecord) {
@@ -231,19 +281,4 @@ func processExists(processRecord processRecord) bool {
 	}
 
 	return true
-}
-
-func sendShutdownCommand(pid int) error {
-	client := http.Client{
-		Transport: &http.Transport{
-			DialContext: dialContext(pid),
-		},
-	}
-
-	resp, err := client.Get("http://unix/shutdown")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	return nil
 }

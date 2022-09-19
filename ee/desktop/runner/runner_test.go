@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"bytes"
@@ -85,7 +85,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		{
 			name: "procs waitgroup times out",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
-				r.procsWgTimeout = time.Millisecond
+				r.interruptTimeout = time.Millisecond
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)
 			},
@@ -102,8 +102,13 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadSafeBuffer
 
-			r := New(log.NewLogfmtLogger(&logBytes), time.Second*1, "some-where-over-the-rainbow.example.com")
-			r.executablePath = executablePath
+			r := New(
+				WithLogger(log.NewLogfmtLogger(&logBytes)),
+				WithExecutablePath(executablePath),
+				WithHostname("somewhere-over-the-rainbow.example.com"),
+				WithUpdateInterval(time.Millisecond*250),
+				WithInterruptTimeout(time.Second*5),
+			)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -114,7 +119,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			}()
 
 			// let is run a few interval
-			time.Sleep(r.executionInterval * 3)
+			time.Sleep(r.updateInterval * 3)
 			r.Interrupt(nil)
 
 			user, err := user.Current()

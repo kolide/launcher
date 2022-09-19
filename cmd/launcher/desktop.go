@@ -1,4 +1,4 @@
-package desktop
+package main
 
 import (
 	"context"
@@ -13,16 +13,17 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-var (
-	flagset    = flag.NewFlagSet("launcher desktop", flag.ExitOnError)
-	flhostname = flagset.String(
-		"hostname",
-		"",
-		"hostname launcher is connected to",
-	)
-)
+func runDesktop(args []string) error {
 
-func RunDesktop(args []string) error {
+	var (
+		flagset    = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
+		flhostname = flagset.String(
+			"hostname",
+			"",
+			"hostname launcher is connected to",
+		)
+	)
+
 	if err := flagset.Parse(args); err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func handleSignals(signalReceivedChan chan<- struct{}) {
 	signalReceivedChan <- struct{}{}
 }
 
-// continuously monitor for ppid and exit if parent process terminates
+// monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
 func monitorParentProcess(parentGoneChan chan<- struct{}) {
 	ticker := time.NewTicker(2 * time.Second)
 
