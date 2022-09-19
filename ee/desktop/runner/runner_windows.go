@@ -151,9 +151,3 @@ func runWithAccessToken(accessToken syscall.Token, path string, args ...string) 
 
 	return cmd.Process, nil
 }
-
-func dialContext(pid int) func(_ context.Context, _, _ string) (net.Conn, error) {
-	return func(_ context.Context, _, _ string) (net.Conn, error) {
-		return winio.DialPipe(desktop.DesktopSocketPath(pid), nil)
-	}
-}
