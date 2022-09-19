@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package runtime
@@ -10,8 +11,6 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/pkg/errors"
 )
-
-const extensionName = `osquery-extension.exe`
 
 func setpgid() *syscall.SysProcAttr {
 	// TODO: on unix we set the process group id and then
@@ -26,7 +25,7 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	return nil
 }
 
-func socketPath(rootDir string) string {
+func SocketPath(rootDir string) string {
 	// On windows, local names pipes paths are all rooted in \\.\pipe\
 	// their names are limited to 256 characters, and can include any
 	// character other than backslash. They are case insensitive.

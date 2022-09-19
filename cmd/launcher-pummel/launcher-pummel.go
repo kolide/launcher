@@ -189,7 +189,7 @@ func main() {
 		"msg", "all hosts started",
 	)
 
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
 }

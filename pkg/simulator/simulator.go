@@ -15,8 +15,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 )
 
@@ -63,6 +63,9 @@ func (h *HostSimulation) Enroll() error {
 	enrollmentAttempts := 5
 
 	var err error
+	var nodeKey string
+	var invalid bool
+
 	for currentAttempt := 1; currentAttempt <= enrollmentAttempts; currentAttempt++ {
 		if currentAttempt != 1 {
 			level.Debug(h.logger).Log(
@@ -71,7 +74,7 @@ func (h *HostSimulation) Enroll() error {
 			)
 			time.Sleep(time.Duration(math.Pow(2, float64(currentAttempt))) * time.Second)
 		}
-		nodeKey, invalid, err := h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid, service.EnrollmentDetails{})
+		nodeKey, invalid, err = h.state.serviceClient.RequestEnrollment(context.Background(), h.enrollSecret, h.uuid, service.EnrollmentDetails{})
 		if err != nil {
 			level.Debug(h.logger).Log(
 				"msg", "transport error in enrollment",

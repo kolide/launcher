@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -80,7 +80,7 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 		}
 		results = append(results, mdmResults)
 	} else {
-		results = []map[string]string{map[string]string{"enrolled": "false"}}
+		results = []map[string]string{{"enrolled": "false"}}
 	}
 	return results, nil
 }

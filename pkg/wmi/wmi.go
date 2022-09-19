@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 // Package wmi provides a basic interface for querying against
@@ -206,13 +207,23 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 		}
 		defer val.Clear()
 
-		// Not sure if we need to special case the nil, or iv Value() handles it.
+		// Not sure if we need to special case the nil, or if Value() handles it.
 		if val.VT == 0x1 { //VT_NULL
 			result[p] = nil
 			continue
 		}
 
-		result[p] = val.Value()
+		// Attempt to handle arrays
+		safeArray := val.ToArray()
+		if safeArray != nil {
+			// I would have expected to need
+			// `defersafeArray.Release()` here, if I add
+			// that, this routine stops working.
+			result[p] = safeArray.ToValueArray()
+		} else {
+			result[p] = val.Value()
+		}
+
 	}
 	if len(result) > 0 {
 		oh.results = append(oh.results, result)

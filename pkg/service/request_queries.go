@@ -10,7 +10,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/kolide/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"

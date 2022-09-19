@@ -46,9 +46,12 @@ func TestParser(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		parser := New(nil, log.NewNopLogger()).parser
 
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			inputBytes, err := ioutil.ReadFile(filepath.Join("testdata", tt.input))
 			require.NoError(t, err, "read file %s", tt.input)
 

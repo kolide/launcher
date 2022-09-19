@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package wmi
@@ -82,6 +83,12 @@ func TestQuery(t *testing.T) {
 			minRows:    1,
 		},
 		{
+			name:       "wmi properties with an array",
+			class:      "Win32_SystemEnclosure",
+			properties: []string{"ChassisTypes"},
+			minRows:    1,
+		},
+		{
 			name:       "unknown namespace",
 			class:      "Win32_OperatingSystem",
 			properties: []string{"name", "version"},
@@ -119,8 +126,10 @@ func TestQuery(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { // nolint:paralleltest
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+
 			rows, err := Query(ctx, tt.class, tt.properties, tt.options...)
 			if tt.err {
 				require.Error(t, err)

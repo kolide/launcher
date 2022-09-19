@@ -3,8 +3,8 @@ package table
 import (
 	"context"
 
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -46,7 +46,7 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 		discover = val
 	}
 	return []map[string]string{
-		map[string]string{
+		{
 			"username":    username,
 			"discover_by": discover,
 		},

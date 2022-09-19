@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package appicons
@@ -29,8 +30,8 @@ import (
 	"image/png"
 	"unsafe"
 
-	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/nfnt/resize"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"golang.org/x/image/tiff"
 )

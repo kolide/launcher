@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package munki
@@ -10,8 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -88,7 +89,7 @@ func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.
 	warnings := strings.Join(m.report.Warnings, ";")
 
 	results := []map[string]string{
-		map[string]string{
+		{
 			"start_time":    m.report.StartTime,
 			"end_time":      m.report.EndTime,
 			"console_user":  m.report.ConsoleUser,

@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 package pwpolicy
 
@@ -41,6 +42,7 @@ func TestQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		testTable := &Table{
 			logger: log.NewNopLogger(),
 			execCC: execFaker(tt.file),
@@ -48,6 +50,8 @@ func TestQueries(t *testing.T) {
 
 		testName := tt.file + "/" + tt.name
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
 				"query": tt.queryClause,
 			})

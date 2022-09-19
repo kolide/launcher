@@ -1,0 +1,45 @@
+name: golangci-lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: '**'
+
+jobs:
+  golangci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-18.04]
+    name: lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19
+
+      - run: make deps
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          skip-pkg-cache: true
+
+      # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
+      - name: golangci-lint
+        if: ${{ always() }}
+        run: golangci-lint run
+
+  # This job is here as a github status check -- it allows us to move
+  # the merge dependency from being on all the jobs to this single
+  # one.
+  lint_mergeable:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+    needs:
+      - golangci

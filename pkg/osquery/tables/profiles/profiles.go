@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 // Package profiles provides a table wrapper around the various
 // profiles options.
@@ -14,18 +15,16 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -108,8 +107,14 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, errors.Errorf("Unknown user argument: %s", user)
 					}
 
-					if _, err := t.execProfiles(ctx, profileArgs); err != nil {
-						level.Info(t.logger).Log("msg", "exec failed", "err", err)
+					output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{profilesPath}, profileArgs)
+					if err != nil {
+						level.Info(t.logger).Log("msg", "ioreg exec failed", "err", err)
+						continue
+					}
+
+					if bytes.Contains(output, []byte("requires root privileges")) {
+						level.Info(t.logger).Log("ioreg requires root privileges")
 						continue
 					}
 
@@ -146,29 +151,4 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 	}
 
 	return dataflatten.Plist(systemOutput, flattenOpts...)
-}
-
-func (t *Table) execProfiles(ctx context.Context, args []string) ([]byte, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, profilesPath, args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling profiles", "args", cmd.Args)
-
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling profiles. Got: %s", string(stderr.Bytes()))
-	}
-
-	// Check for an error about root permissions
-	if bytes.Contains(stdout.Bytes(), []byte("requires root privileges")) {
-		return nil, errors.New("Requires root privileges")
-	}
-
-	return stdout.Bytes(), nil
 }

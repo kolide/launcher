@@ -10,14 +10,14 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	osquery "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
 var chromeLocalStateDirs = map[string][]string{
-	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
-	"darwin":  []string{"Library/Application Support/Google/Chrome"},
+	"windows": {"Appdata/Local/Google/Chrome/User Data"},
+	"darwin":  {"Library/Application Support/Google/Chrome"},
 }
 
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'

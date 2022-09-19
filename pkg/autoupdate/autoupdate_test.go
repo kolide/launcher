@@ -1,3 +1,4 @@
+//nolint:typecheck // parts of this come from bindata, so lint fails
 package autoupdate
 
 import (
@@ -18,8 +19,7 @@ import (
 func TestCreateTUFRepoDirectory(t *testing.T) {
 	t.Parallel()
 
-	localTUFRepoPath, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
+	localTUFRepoPath := t.TempDir()
 
 	u := &Updater{logger: log.NewNopLogger()}
 	require.NoError(t, u.createTUFRepoDirectory(localTUFRepoPath, "pkg/autoupdate/assets", AssetDir))
@@ -39,7 +39,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 
 	for _, knownFilePath := range knownFilePaths {
 		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
-		_, err = os.Stat(fullFilePath)
+		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
 		jsonBytes, err := ioutil.ReadFile(fullFilePath)
@@ -62,7 +62,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 	// And retest
 	for _, knownFilePath := range knownFilePaths {
 		fullFilePath := filepath.Join(localTUFRepoPath, knownFilePath)
-		_, err = os.Stat(fullFilePath)
+		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
 		jsonBytes, err := ioutil.ReadFile(fullFilePath)
@@ -119,7 +119,10 @@ func TestValidLocalFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
 			require.NoError(t, err)
 			defer os.Remove(testFile.Name())
@@ -181,7 +184,10 @@ func TestNewUpdater(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			gun := fmt.Sprintf("kolide/app")
 			tt.opts = append(tt.opts, withoutBootstrap())
 			u, err := NewUpdater("/tmp/app", "/tmp/tuf", tt.opts...)
@@ -223,9 +229,7 @@ func TestFindCurrentUpdate(t *testing.T) {
 	}
 
 	// Setup the tests
-	tmpDir, err := ioutil.TempDir("", "test-autoupdate-findCurrentUpdate")
-	defer os.RemoveAll(tmpDir)
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 
 	updater := Updater{
 		binaryName:       "binary",

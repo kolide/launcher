@@ -12,24 +12,24 @@ import (
 	"testing/quick"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/mixer/clock"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
-func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
+func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 	file, err := ioutil.TempFile("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
 
-	db, err = bolt.Open(file.Name(), 0600, nil)
+	db, err = bbolt.Open(file.Name(), 0600, nil)
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
@@ -41,12 +41,16 @@ func makeTempDB(t *testing.T) (db *bolt.DB, cleanup func()) {
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
+	t.Parallel()
+
 	e, err := NewExtension(&mock.KolideService{}, nil, ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
 
 func TestNewExtensionDatabaseError(t *testing.T) {
+	t.Parallel()
+
 	file, err := ioutil.TempFile("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
@@ -57,7 +61,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	db.Close()
 
 	// Open read-only DB
-	db, err = bolt.Open(path, 0600, &bolt.Options{ReadOnly: true})
+	db, err = bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true})
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
@@ -72,6 +76,8 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 }
 
 func TestGetHostIdentifier(t *testing.T) {
+	t.Parallel()
+
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	e, err := NewExtension(&mock.KolideService{}, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
@@ -98,6 +104,8 @@ func TestGetHostIdentifier(t *testing.T) {
 }
 
 func TestGetHostIdentifierCorruptedData(t *testing.T) {
+	t.Parallel()
+
 	// Put bad data in the DB and ensure we can still generate a fresh UUID
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
@@ -105,7 +113,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	require.Nil(t, err)
 
 	// Put garbage UUID in DB
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		return b.Put([]byte(uuidKey), []byte("garbage_uuid"))
 	})
@@ -122,6 +130,8 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 }
 
 func TestExtensionEnrollTransportError(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", false, errors.New("transport")
@@ -144,7 +154,7 @@ type mockClient struct{}
 
 func (mockClient) Query(sql string) ([]map[string]string, error) {
 	return []map[string]string{
-		map[string]string{
+		{
 			"os_version":       "",
 			"launcher_version": "",
 			"os_build":         "",
@@ -158,6 +168,8 @@ func (mockClient) Query(sql string) ([]map[string]string, error) {
 }
 
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", true, nil
@@ -177,6 +189,8 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 }
 
 func TestExtensionEnroll(t *testing.T) {
+	t.Parallel()
+
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
 	m := &mock.KolideService{
@@ -233,6 +247,8 @@ func TestExtensionEnroll(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return "", false, errors.New("transport")
@@ -251,6 +267,8 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsCaching(t *testing.T) {
+	t.Parallel()
+
 	configVal := `{"foo": "bar"}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
@@ -281,6 +299,8 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
+	t.Parallel()
+
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -308,6 +328,8 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigs(t *testing.T) {
+	t.Parallel()
+
 	configVal := `{"foo": "bar"}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
@@ -326,6 +348,8 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 }
 
 func TestExtensionWriteLogsTransportError(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
@@ -342,6 +366,8 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 }
 
 func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
+	t.Parallel()
+
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -368,6 +394,8 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteLogs(t *testing.T) {
+	t.Parallel()
+
 	var gotNodeKey string
 	var gotLogType logger.LogType
 	var gotLogs []string
@@ -396,6 +424,8 @@ func TestExtensionWriteLogs(t *testing.T) {
 }
 
 func TestKeyConversion(t *testing.T) {
+	t.Parallel()
+
 	expectedUintKeyVals := []uint64{1, 2, 64, 128, 200, 1000, 2000, 500003, 10000003, 200003005}
 	byteKeys := make([][]byte, 0, len(expectedUintKeyVals))
 	for _, k := range expectedUintKeyVals {
@@ -415,6 +445,8 @@ func TestKeyConversion(t *testing.T) {
 }
 
 func TestRandomKeyConversion(t *testing.T) {
+	t.Parallel()
+
 	// Check that roundtrips for random values result in the same key
 	f := func(k uint64) bool {
 		return k == uint64FromByteKey(byteKeyFromUint64(k))
@@ -425,6 +457,8 @@ func TestRandomKeyConversion(t *testing.T) {
 }
 
 func TestByteKeyFromUint64(t *testing.T) {
+	t.Parallel()
+
 	// Assert correct sorted order of keys generated by key function
 	keyVals := []uint64{1, 2, 64, 128, 200, 1000, 2000, 50000, 1000000, 2000000}
 	keys := make([][]byte, 0, len(keyVals))
@@ -437,6 +471,8 @@ func TestByteKeyFromUint64(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			t.Error("Publish logs function should not be called")
@@ -456,6 +492,8 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogs(t *testing.T) {
+	t.Parallel()
+
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -512,7 +550,9 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	assert.Nil(t, gotResultLogs)
 }
 
-func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
+func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) { //nolint:paralleltest
+	// t.Parallel() commented out due to timeouts in github actions runner
+
 	// Test for https://github.com/kolide/launcher/issues/219 in which a
 	// call to writeBufferedLogsForType with an invalid node key causes a
 	// deadlock.
@@ -537,7 +577,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
 	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
 
-	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+	testutil.FatalAfterFunc(t, 2*time.Second, func() {
 		err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	})
 	assert.Nil(t, err)
@@ -547,6 +587,8 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
+	t.Parallel()
+
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -610,6 +652,8 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
+	t.Parallel()
+
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -632,6 +676,10 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	})
 	require.Nil(t, err)
 
+	startLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 0, startLogCount, "start with no buffered logs")
+
 	expectedResultLogs := []string{"res1", "res2", "res3", "res4"}
 	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! oh noes")
 	e.LogString(context.Background(), logger.LogTypeString, "res1")
@@ -641,6 +689,10 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeString, "res3")
 	e.LogString(context.Background(), logger.LogTypeString, "res4")
 	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
+
+	queuedLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 8, queuedLogCount, "correct number of enqueued logs")
 
 	// Should write first 3 logs
 	e.writeBufferedLogsForType(logger.LogTypeString)
@@ -662,9 +714,15 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	assert.False(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, gotResultLogs)
 	assert.Nil(t, gotStatusLogs)
+
+	finalLogCount, err := e.numberOfBufferedLogs(logger.LogTypeString)
+	require.NoError(t, err)
+	require.Equal(t, 0, finalLogCount, "no more queued logs")
 }
 
-func TestExtensionWriteLogsLoop(t *testing.T) {
+func TestExtensionWriteLogsLoop(t *testing.T) { //nolint:paralleltest
+	// t.Parallel() commented out due to timeouts in github actions runner
+
 	var gotStatusLogs, gotResultLogs []string
 	var funcInvokedStatus, funcInvokedResult bool
 	var done = make(chan struct{})
@@ -756,12 +814,14 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
-	testutil.FatalAfterFunc(t, 1*time.Second, func() {
+	testutil.FatalAfterFunc(t, 3*time.Second, func() {
 		e.Shutdown()
 	})
 }
 
 func TestExtensionPurgeBufferedLogs(t *testing.T) {
+	t.Parallel()
+
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -808,6 +868,8 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 }
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 			return nil, false, errors.New("transport")
@@ -825,6 +887,8 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 }
 
 func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
+	t.Parallel()
+
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -852,6 +916,8 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionGetQueries(t *testing.T) {
+	t.Parallel()
+
 	expectedQueries := map[string]string{
 		"time":    "select * from time",
 		"version": "select version from osquery_info",
@@ -875,6 +941,8 @@ func TestExtensionGetQueries(t *testing.T) {
 }
 
 func TestExtensionWriteResultsTransportError(t *testing.T) {
+	t.Parallel()
+
 	m := &mock.KolideService{
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
@@ -891,6 +959,8 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 }
 
 func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
+	t.Parallel()
+
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -917,6 +987,8 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteResults(t *testing.T) {
+	t.Parallel()
+
 	var gotResults []distributed.Result
 	m := &mock.KolideService{
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
@@ -941,4 +1013,30 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedResults, gotResults)
+}
+
+func TestLauncherKeys(t *testing.T) {
+	t.Parallel()
+
+	m := &mock.KolideService{}
+
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	_, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	require.NoError(t, err)
+
+	key, err := PrivateKeyFromDB(db)
+	require.NoError(t, err)
+
+	pubkeyPem, fingerprintStored, err := PublicKeyFromDB(db)
+	require.NoError(t, err)
+
+	fingerprint, err := rsaFingerprint(key)
+	require.NoError(t, err)
+	require.Equal(t, fingerprint, fingerprintStored)
+
+	pubkey, err := KeyFromPem([]byte(pubkeyPem))
+	require.NoError(t, err)
+
+	require.Equal(t, &key.PublicKey, pubkey)
 }

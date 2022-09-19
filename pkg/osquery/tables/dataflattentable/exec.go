@@ -3,15 +3,17 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +24,12 @@ type ExecTableOpt func(*Table)
 func WithKVSeparator(separator string) ExecTableOpt {
 	return func(t *Table) {
 		t.keyValueSeparator = separator
+	}
+}
+
+func WithBinDirs(binDirs ...string) ExecTableOpt {
+	return func(t *Table) {
+		t.binDirs = binDirs
 	}
 }
 
@@ -61,7 +69,15 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 
 	execBytes, err := t.exec(ctx)
 	if err != nil {
-		return results, errors.Wrap(err, "exec")
+		// exec will error if there's no binary, so we never want to record that
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		}
+
+		// If th exec failed for some reason, it's probably better to return no results, and log the,
+		//  error. Returning an error here will cause a table failure, and thus break joins
+		level.Info(t.logger).Log("msg", "failed to exec", "err", err)
+		return nil, nil
 	}
 
 	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
@@ -80,20 +96,39 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Second)
 	defer cancel()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
+	possibleBinaries := []string{}
 
-	cmd := exec.CommandContext(ctx, t.execArgs[0], t.execArgs[1:]...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling %s", "args", t.execArgs[0], cmd.Args)
-
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling %s. Got: %s", t.execArgs[0], string(stderr.Bytes()))
+	if t.binDirs == nil || len(t.binDirs) == 0 {
+		possibleBinaries = []string{t.execArgs[0]}
+	} else {
+		for _, possiblePath := range t.binDirs {
+			possibleBinaries = append(possibleBinaries, filepath.Join(possiblePath, t.execArgs[0]))
+		}
 	}
 
-	return stdout.Bytes(), nil
+	for _, execPath := range possibleBinaries {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		cmd := exec.CommandContext(ctx, execPath, t.execArgs[1:]...)
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		level.Debug(t.logger).Log("msg", "calling %s", "args", cmd.String())
+
+		if err := cmd.Run(); os.IsNotExist(err) {
+			// try the next binary
+			continue
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "calling %s. Got: %s", t.execArgs[0], string(stderr.Bytes()))
+		}
+
+		// success!
+		return stdout.Bytes(), nil
+	}
+
+	// None of the possible execs were found
+	return nil, errors.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
 }
 
 func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[string]string {

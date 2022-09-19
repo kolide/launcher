@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package table
@@ -11,6 +12,8 @@ import (
 )
 
 func TestMDMProfileStatus(t *testing.T) {
+	t.Parallel()
+
 	if env.Bool("SKIP_TEST_MDM", true) {
 		t.Skip("Skipping MDM Test")
 	}

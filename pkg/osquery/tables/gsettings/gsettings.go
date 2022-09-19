@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package gsettings
@@ -20,8 +21,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	osquery "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 

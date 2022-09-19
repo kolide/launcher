@@ -7,6 +7,8 @@ import (
 )
 
 func TestExtractOsqueryCaller(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		log      string
 		expected string
@@ -30,7 +32,10 @@ func TestExtractOsqueryCaller(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.expected, extractOsqueryCaller(tt.log))
 		})
 	}

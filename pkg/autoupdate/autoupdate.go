@@ -5,24 +5,24 @@
 // As different binaries need different strategies for restarting,
 // there are several moving parts to this:
 //
-//    github.com/kolide/updater/tuf is kolide's client to The Update
-//    Framework (also called notary). This library is based around
-//    signed metadata. When the metadata changes, it will download the
-//    linked file. (This idiom is a bit confusing, and a bit
-//    limiting. It downloads on _metadata_ change, and not as a file
-//    comparison)
+//	github.com/kolide/updater/tuf is kolide's client to The Update
+//	Framework (also called notary). This library is based around
+//	signed metadata. When the metadata changes, it will download the
+//	linked file. (This idiom is a bit confusing, and a bit
+//	limiting. It downloads on _metadata_ change, and not as a file
+//	comparison)
 //
-//    tuf.NotificationHandler is responsible for moving the downloaded
-//    binary into the desired location. It defined by this package,
-//    and is passed to TUF as a function. It is also used by TUF as a
-//    ad-hoc logging mechanism.
+//	tuf.NotificationHandler is responsible for moving the downloaded
+//	binary into the desired location. It defined by this package,
+//	and is passed to TUF as a function. It is also used by TUF as a
+//	ad-hoc logging mechanism.
 //
-//    autoupdate.UpdateFinalizer is responsible for finalizing the
-//    update. Eg: restarting the service appropriately. As it is
-//    different per binary, it is defined by main, and passed in to
-//    autoupdate.NewUpdater.
+//	autoupdate.UpdateFinalizer is responsible for finalizing the
+//	update. Eg: restarting the service appropriately. As it is
+//	different per binary, it is defined by main, and passed in to
+//	autoupdate.NewUpdater.
 //
-// Expected Usage
+// # Expected Usage
 //
 // For each binary that is being updated, main will create a rungroup
 // actor.Actor, for the autouopdate.Updater. main is responsible for
@@ -35,11 +35,13 @@
 // tuf will then call the updater's handler to move the resultant
 // binary. And finally pass off to the finalizer.
 //
-// Testing
+// # Testing
 //
 // While some functions can be unit tested, integration is tightly
 // coupled to TUF. One of the simplest ways to test this, is by
 // attaching to the `nightly` channel, and causing frequent updates.
+//
+//nolint:typecheck // parts of this come from bindata, so lint fails
 package autoupdate
 
 import (
@@ -64,10 +66,10 @@ import (
 type UpdateChannel string
 
 const (
-	Stable   UpdateChannel = "stable"
-	Beta                   = "beta"
-	Nightly                = "nightly"
-	localDev               = "development"
+	Stable  UpdateChannel = "stable"
+	Alpha                 = "alpha"
+	Beta                  = "beta"
+	Nightly               = "nightly"
 )
 
 const (
@@ -107,6 +109,14 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	// we add the extension. The suffix is inconistent. package-builder
 	// has a lot of gnarly code around that. We may need to import it.
 	binaryName := filepath.Base(binaryPath)
+
+	// this lets us run auto updater in vscode debug mode with dlv
+	// not really sure why the app can't handle __debug_bin as the executable name
+	// maybe look into it later if there is time
+	if binaryName == "__debug_bin" {
+		binaryName = "launcher"
+	}
+
 	strippedBinaryName := strings.TrimSuffix(binaryName, ".exe")
 	tufRepoPath := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf", strippedBinaryName))
 

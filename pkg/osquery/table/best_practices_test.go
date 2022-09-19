@@ -6,15 +6,17 @@ import (
 	"testing"
 	"time"
 
-	osquery_client "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/gen/osquery"
-	"github.com/kolide/osquery-go/mock"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery_client "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/gen/osquery"
+	"github.com/osquery/osquery-go/mock"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBestPractices(t *testing.T) {
+	t.Parallel()
+
 	mock := &mock.ExtensionManager{}
 	client := &osquery_client.ExtensionManagerClient{Client: mock}
 

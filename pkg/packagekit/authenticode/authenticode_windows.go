@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 // Authenticode is a light wrapper around signing code under windows.
@@ -128,5 +129,4 @@ func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args .
 		// Fallthrough to catch errors unrelated to timeouts
 		return errors.Wrap(err, "calling signtool")
 	}
-	return errors.New("How did you get here? Some logic bug")
 }

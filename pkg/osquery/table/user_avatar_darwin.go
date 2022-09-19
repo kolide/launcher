@@ -47,8 +47,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/osquery-go/plugin/table"
 	"github.com/nfnt/resize"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"golang.org/x/image/tiff"
 )
@@ -80,7 +80,7 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 	} else {
 		usernamesString := C.LocalUsers()
 		for _, posixName := range strings.Split(C.GoString(usernamesString), " ") {
-			usernames = append(usernames, string(posixName))
+			usernames = append(usernames, posixName)
 		}
 	}
 

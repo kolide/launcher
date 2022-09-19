@@ -1,0 +1,19 @@
+name: Add to project board
+
+# Add things into one of the kolide projects.
+
+on:
+  issues:
+    types: [opened, transferred]
+  pull_request_target:
+    types: [opened]
+    branches: [main]
+
+jobs:
+  add_to_board:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v0.3.0
+        with:
+          project-url: https://github.com/orgs/kolide/projects/13
+          github-token: ${{secrets.PROJECT_WORKFLOW_PAT}}

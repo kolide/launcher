@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 package table
@@ -6,13 +7,14 @@ import (
 	"context"
 	"strings"
 
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
 /*
 Spotlight returns a macOS spotlight table
 Example Query:
+
 	SELECT uid, f.path FROM file
 	AS f JOIN spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";

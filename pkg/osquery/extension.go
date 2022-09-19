@@ -3,35 +3,40 @@ package osquery
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/osquery-go/plugin/distributed"
-	"github.com/kolide/osquery-go/plugin/logger"
 	"github.com/mixer/clock"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Extension is the implementation of the osquery extension methods. It handles
-// both the communication with the osquery daemon and the Kolide server.
+// Extension is the implementation of the osquery extension
+// methods. It acts as a communication intermediary between osquery
+// and servers -- It provides a grpc and jsonrpc interface for
+// osquery. It does not provide any tables.
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	db            *bolt.DB
+	db            *bbolt.DB
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -74,6 +79,10 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
+	// DB keys for the rsa keys
+	privateKeyKey     = "privateKey"
+	publicKeyKey      = "publicKey"
+	keyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -117,7 +126,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts) (*Extension, error) {
 	// bucketNames contains the names of buckets that should be created when the
 	// extension opens the DB. It should be treated as a constant.
 	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
@@ -148,7 +157,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 	}
 
 	// Create Bolt buckets as necessary
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
 		for _, name := range bucketNames {
 			_, err := tx.CreateBucketIfNotExists([]byte(name))
 			if err != nil {
@@ -161,10 +170,25 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		return nil, errors.Wrap(err, "creating DB buckets")
 	}
 
+	if err := SetupLauncherKeys(db); err != nil {
+		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
+	}
+
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
 		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
 	}
+
+	nodekey, err := NodeKeyFromDB(db)
+	if err != nil {
+		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
+		return nil, errors.Wrap(err, "reading nodekey from db")
+	} else if nodekey == "" {
+		level.Debug(opts.Logger).Log("msg", "NewExtension did not find a nodekey. Likely first enroll")
+	} else {
+		level.Debug(opts.Logger).Log("msg", "NewExtension found existing nodekey")
+	}
+
 	initialRunner := &initialRunner{
 		logger:     opts.Logger,
 		identifier: identifier,
@@ -176,6 +200,7 @@ func NewExtension(client service.KolideService, db *bolt.DB, opts ExtensionOpts)
 		logger:        opts.Logger,
 		serviceClient: client,
 		db:            db,
+		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
 		initialRunner: initialRunner,
@@ -204,11 +229,106 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.db)
 }
 
+func SetupLauncherKeys(db *bbolt.DB) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
+
+		bucket, err := tx.CreateBucketIfNotExists([]byte(configBucket))
+		if err != nil {
+			return errors.Wrap(err, "creating bucket")
+		}
+
+		// This only checks the private key, but it should possibly check all the values we're setting.
+		if bucket.Get([]byte(privateKeyKey)) != nil {
+			return nil
+		}
+
+		key, err := rsaRandomKey()
+		if err != nil {
+			return fmt.Errorf("generating key: %w", err)
+		}
+
+		fingerprint, err := rsaFingerprint(key)
+		if err != nil {
+			return fmt.Errorf("generating fingerprint: %w", err)
+		}
+
+		var pub bytes.Buffer
+		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
+			return fmt.Errorf("marshalling pub: %w", err)
+		}
+
+		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			return fmt.Errorf("marshalling key: %w", err)
+		}
+
+		if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
+			return fmt.Errorf("storing key: %w", err)
+		}
+
+		if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
+			return fmt.Errorf("storing public key: %w", err)
+
+		}
+
+		if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
+			return fmt.Errorf("storing fingerprint: %w", err)
+		}
+
+		return nil
+	})
+
+	return err
+
+}
+
+// PrivateKeyFromDB returns the private launcher key. This is used to authenticate various launcher communications.
+func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
+	var privateKey []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		privateKey = b.Get([]byte(privateKeyKey))
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("error reading private key info from db: %w", err)
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private key: %w", err)
+	}
+
+	rsakey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("Private key is not an rsa key")
+	}
+
+	return rsakey, nil
+}
+
+// PublicKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
+func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
+	var publicKey []byte
+	var fingerprint []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		publicKey = b.Get([]byte(publicKeyKey))
+		fingerprint = b.Get([]byte(keyFingerprintKey))
+		return nil
+	}); err != nil {
+		return "", "", fmt.Errorf("error reading public key info from db: %w", err)
+	}
+
+	return string(publicKey), string(fingerprint), nil
+}
+
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
-// The function is exported to allow for building the kolide_launcher_identifier table.
-func IdentifierFromDB(db *bolt.DB) (string, error) {
+// The function is exported to allow for building the kolide_launcher_info table.
+func IdentifierFromDB(db *bbolt.DB) (string, error) {
 	var identifier string
-	err := db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		uuidBytes := b.Get([]byte(uuidKey))
 		gotID, err := uuid.ParseBytes(uuidBytes)
@@ -239,13 +359,13 @@ func IdentifierFromDB(db *bolt.DB) (string, error) {
 }
 
 // NodeKeyFromDB returns the device node key from a local bolt DB
-func NodeKeyFromDB(db *bolt.DB) (string, error) {
+func NodeKeyFromDB(db *bbolt.DB) (string, error) {
 	if db == nil {
 		return "", errors.New("received a nil db")
 	}
 
 	var key []byte
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		key = b.Get([]byte(nodeKeyKey))
 		return nil
@@ -261,13 +381,13 @@ func NodeKeyFromDB(db *bolt.DB) (string, error) {
 }
 
 // ConfigFromDB returns the device config from a local bolt DB
-func ConfigFromDB(db *bolt.DB) (string, error) {
+func ConfigFromDB(db *bbolt.DB) (string, error) {
 	if db == nil {
 		return "", errors.New("received a nil db")
 	}
 
 	var key []byte
-	err := db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		key = b.Get([]byte(configKey))
 		return nil
@@ -295,6 +415,10 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
+	logger := log.With(e.logger, "method", "enroll")
+
+	level.Debug(logger).Log("msg", "starting enrollment")
+
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
 	e.enrollMutex.Lock()
@@ -303,6 +427,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
+		level.Debug(logger).Log("msg", "node key exists, skipping")
 		return e.NodeKey, false, nil
 	}
 
@@ -324,12 +449,15 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
-	backoff := backoff.New(backoff.MaxAttempts(10))
-	if err := backoff.Run(func() error {
+	if err := backoff.WaitFor(func() error {
 		enrollDetails, err = getEnrollDetails(e.osqueryClient)
 		return err
-	}); err != nil {
-		return "", true, errors.Wrap(err, "query enrollment details, (even with retries)")
+	}, 2*time.Minute, 10*time.Second); err != nil {
+		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
+			return "", true, errors.Wrap(err, "query enrollment details")
+		}
+
+		level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 	}
 
 	// If no cached node key, enroll for new node key
@@ -348,7 +476,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.db.Update(func(tx *bolt.Tx) error {
+	err = e.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(configBucket))
 		return b.Put([]byte(nodeKeyKey), []byte(keyString))
 	})
@@ -367,7 +495,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.db.Update(func(tx *bolt.Tx) error {
+	e.db.Update(func(tx *bbolt.Tx) error {
 		tx.Bucket([]byte(configBucket)).Delete([]byte(nodeKeyKey))
 		return nil
 	})
@@ -386,7 +514,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		e.db.View(func(tx *bolt.Tx) error {
+		e.db.View(func(tx *bbolt.Tx) error {
 			b := tx.Bucket([]byte(configBucket))
 			confBytes = b.Get([]byte(configKey))
 			return nil
@@ -398,7 +526,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.db.Update(func(tx *bolt.Tx) error {
+		e.db.Update(func(tx *bbolt.Tx) error {
 			b := tx.Bucket([]byte(configBucket))
 			return b.Put([]byte(configKey), []byte(config))
 		})
@@ -525,6 +653,26 @@ func (e *Extension) writeLogsLoopRunner() {
 	}
 }
 
+// numberOfBufferedLogs returns the number of logs buffered for a given type.
+func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = e.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		count = b.Stats().KeyN
+		return nil
+	})
+	if err != nil {
+		return 0, errors.Wrap(err, "counting buffered logs")
+	}
+
+	return count, nil
+}
+
 // writeBufferedLogs flushes the log buffers, writing up to
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.
@@ -537,35 +685,48 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	err = e.db.View(func(tx *bolt.Tx) error {
+	err = e.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		c := b.Cursor()
 		k, v := c.First()
 		for totalBytes := 0; k != nil; {
+			// A somewhat cumbersome if block...
+			//
+			// 1. If the log is too big, skip it and mark for deletion.
+			// 2. If the buffer would be too big with the log, break for
+			// 3. Else append it
+			//
+			// Note that (1) must come first, otherwise (2) will always trigger.
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
 				level.Info(e.Opts.Logger).Log(
 					"msg", "dropped log",
+					"logID", k,
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
 			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled
+				// Buffer is filled. Break the loop and come back later.
 				break
 			} else {
 				logs = append(logs, string(v))
 				totalBytes += len(v)
-
-				// create a copy of k. It is retained in logIDs after the transaction is closed,
-				// when the goroutine ticks it zeroes out some of the IDs to delete below, causing logs
-				// to remain in the buffer and be sent again to the server.
-				logID := make([]byte, len(k))
-				copy(logID, k)
-				logIDs = append(logIDs, logID)
 			}
+
+			// Note the logID for deletion. We do this by
+			// making a copy of k. It is retained in
+			// logIDs after the transaction is closed,
+			// when the goroutine ticks it zeroes out some
+			// of the IDs to delete below, causing logs to
+			// remain in the buffer and be sent again to
+			// the server.
+			logID := make([]byte, len(k))
+			copy(logID, k)
+			logIDs = append(logIDs, logID)
+
 			k, v = c.Next()
 		}
 		return nil
@@ -585,7 +746,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	// Delete logs that were successfully sent
-	err = e.db.Update(func(tx *bolt.Tx) error {
+	err = e.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		for _, k := range logIDs {
 			b.Delete(k)
@@ -636,7 +797,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	if err != nil {
 		return err
 	}
-	err = e.db.Update(func(tx *bolt.Tx) error {
+	err = e.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		logCount := b.Stats().KeyN
@@ -688,7 +849,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
-	err = e.db.Update(func(tx *bolt.Tx) error {
+	err = e.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		// Log keys are generated with the auto-incrementing sequence
@@ -786,6 +947,21 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 }
 
 func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+	var details service.EnrollmentDetails
+
+	// To facilitate manual testing around missing enrollment details,
+	// there is a environmental variable to trigger the failure condition
+	if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_ERROR") == "true" {
+		return details, errors.New("Skipping enrollment details")
+	}
+
+	// This condition is indicative of a misordering (or race) in
+	// startup. Enrollment has started before `SetQuerier` has
+	// been called.
+	if client == nil {
+		return details, errors.New("no querier")
+	}
+
 	query := `
 	SELECT
 		osquery_info.version as osquery_version,
@@ -804,7 +980,6 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		system_info,
 		osquery_info;
 `
-	var details service.EnrollmentDetails
 	resp, err := client.Query(query)
 	if err != nil {
 		return details, errors.Wrap(err, "query enrollment details")
@@ -861,7 +1036,7 @@ type initialRunner struct {
 	enabled    bool
 	identifier string
 	client     Querier
-	db         *bolt.DB
+	db         *bbolt.DB
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
@@ -878,7 +1053,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 		}
 
 		// Run all the queries, snapshot and differential
-		for query, _ := range pack.Queries {
+		for query := range pack.Queries {
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			allQueries = append(allQueries, queryName)
 		}
@@ -952,7 +1127,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{}, error) {
 	known := make(map[string]struct{})
-	err := i.db.View(func(tx *bolt.Tx) error {
+	err := i.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(initialResultsBucket))
 		for _, q := range allFromConfig {
 			knownQuery := b.Get([]byte(q))
@@ -968,7 +1143,7 @@ func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{
 }
 
 func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
-	err := i.db.Update(func(tx *bolt.Tx) error {
+	err := i.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(initialResultsBucket))
 		for q := range known {
 			if err := b.Put([]byte(q), []byte(q)); err != nil {

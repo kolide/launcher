@@ -27,11 +27,12 @@ func main() {
 		flDebug        = fs.Bool("debug", false, "use a debug logger")
 		flBuildARCH    = fs.String("arch", runtime.GOARCH, "Architecture to build for.")
 		flBuildOS      = fs.String("os", runtime.GOOS, "Operating system to build for.")
-		flGoPath       = fs.String("go", "", "Path for go binary. Will attempt auto detection")
+		flGoPath       = fs.String("go", "", "Path for go binary. Will attempt auto detection.")
 		flRace         = fs.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic       = fs.Bool("static", false, "Build a static binary.")
 		flStampVersion = fs.Bool("linkstamp", false, "Add version info with ldflags.")
 		flFakeData     = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
+		flGithubOutput = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
 	)
 
 	ffOpts := []ff.Option{
@@ -70,22 +71,29 @@ func main() {
 		opts = append(opts, make.WithGoPath(*flGoPath))
 	}
 
-	b, err := make.New(opts...)
-	if err != nil {
-		logutil.Fatal(logger, "msg", "Failed to create builder", "err", err)
+	if *flGithubOutput {
+		opts = append(opts, make.WithGithubActionOutput())
+	}
 
+	// We need to avoid cgo on windows. See
+	// https://github.com/golang/go/issues/22439 which still
+	// appears current, at least with cgo. But, we need to use cgo
+	// on linux (for fscrypt)
+	optsMaybeCgo := opts
+	if *flBuildOS == "linux" {
+		// overwrite with append, since optsMaybyeCgo was a shallow clone
+		optsMaybeCgo = append(opts, make.WithCgo())
 	}
 
 	targetSet := map[string]func(context.Context) error{
-		"deps-go":               b.DepsGo,
-		"install-tools":         b.InstallTools,
-		"generate-tuf":          b.GenerateTUF,
-		"launcher":              b.BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
-		"osquery-extension.ext": b.BuildCmd("./cmd/osquery-extension", "osquery-extension.ext"),
-		"tables.ext":            b.BuildCmd("./cmd/launcher.ext", "tables.ext"),
-		"grpc.ext":              b.BuildCmd("./cmd/grpc.ext", "grpc.ext"),
-		"package-builder":       b.BuildCmd("./cmd/package-builder", "package-builder"),
-		"make":                  b.BuildCmd("./cmd/make", "make"),
+		"deps-go":         make.New(opts...).DepsGo,
+		"install-tools":   make.New(opts...).InstallTools,
+		"generate-tuf":    make.New(opts...).GenerateTUF,
+		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
+		"tables.ext":      make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
+		"grpc.ext":        make.New(opts...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
+		"package-builder": make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
+		"make":            make.New(opts...).BuildCmd("./cmd/make", "make"),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {

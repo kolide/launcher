@@ -58,7 +58,10 @@ func TestContext(t *testing.T) {
 	}
 
 	for _, pair := range contextPairs {
+		pair := pair
 		t.Run(pair.name, func(t *testing.T) {
+			t.Parallel()
+
 			actual, err := GetFromContext(ctx, pair.key)
 			require.NoError(t, err)
 			require.Equal(t, pair.val, actual)

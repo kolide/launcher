@@ -11,9 +11,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
-	"github.com/kolide/kit/fs"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/kolide/kit/fsutil"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 func GDriveSyncHistoryInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -45,7 +45,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(path, dst); err != nil {
+	if err := fsutil.CopyFile(path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
 	}
 

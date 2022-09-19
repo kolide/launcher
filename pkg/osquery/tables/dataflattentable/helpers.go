@@ -2,7 +2,7 @@ package dataflattentable
 
 import (
 	"github.com/kolide/launcher/pkg/dataflatten"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // ToMap is a helper function to convert Flatten output directly for

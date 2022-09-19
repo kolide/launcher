@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package table
@@ -10,12 +11,11 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/wmitable"
 
 	"github.com/go-kit/kit/log"
-	osquery "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery "github.com/osquery/osquery-go"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
-	return []*table.Plugin{
+func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+	return []osquery.OsqueryPlugin{
 		ProgramIcons(),
 		dsim_default_associations.TablePlugin(client, logger),
 		secedit.TablePlugin(client, logger),

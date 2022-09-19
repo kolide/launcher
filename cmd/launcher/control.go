@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package main
@@ -5,16 +6,16 @@ package main
 import (
 	"context"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/control"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
-func createControl(ctx context.Context, db *bolt.DB, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
+func createControl(ctx context.Context, db *bbolt.DB, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
 	level.Debug(logger).Log("msg", "creating control client")
 
 	controlOpts := []control.Option{

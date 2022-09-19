@@ -3,8 +3,8 @@ package table
 import (
 	"context"
 
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -33,7 +33,7 @@ var bestPracticesSimpleColumns = map[string]string{
 
 func BestPractices(client *osquery.ExtensionManagerClient) *table.Plugin {
 	columns := []table.ColumnDefinition{}
-	for col, _ := range bestPracticesSimpleColumns {
+	for col := range bestPracticesSimpleColumns {
 		columns = append(columns, table.IntegerColumn(col))
 	}
 

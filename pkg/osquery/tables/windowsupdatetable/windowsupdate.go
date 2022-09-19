@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package windowsupdatetable
@@ -14,8 +15,8 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"github.com/scjalliance/comshim"
 )
@@ -164,7 +165,7 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 		return nil, locale, isDefaultLocale, errors.Wrap(err, "getlocale")
 	}
 	if strconv.FormatUint(uint64(getLocale), 10) != locale && isDefaultLocale == 0 {
-		return nil, locale, isDefaultLocale, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, uint32(getLocale))
+		return nil, locale, isDefaultLocale, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, getLocale)
 	} else {
 		locale = strconv.FormatUint(uint64(getLocale), 10)
 	}

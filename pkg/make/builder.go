@@ -29,7 +29,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"github.com/theupdateframework/notary/client"
@@ -40,15 +40,17 @@ import (
 )
 
 type Builder struct {
-	os           string
-	arch         string
-	goVer        string
-	goPath       string
-	static       bool
-	race         bool
-	stampVersion bool
-	fakedata     bool
-	notStripped  bool
+	os                 string
+	arch               string
+	goVer              string
+	goPath             string
+	static             bool
+	race               bool
+	stampVersion       bool
+	fakedata           bool
+	notStripped        bool
+	cgo                bool
+	githubActionOutput bool
 
 	cmdEnv []string
 	execCC func(context.Context, string, ...string) *exec.Cmd
@@ -71,6 +73,12 @@ func WithOS(o string) Option {
 func WithArch(a string) Option {
 	return func(b *Builder) {
 		b.arch = a
+	}
+}
+
+func WithCgo() Option {
+	return func(b *Builder) {
+		b.cgo = true
 	}
 }
 
@@ -104,7 +112,13 @@ func WithFakeData() Option {
 	}
 }
 
-func New(opts ...Option) (*Builder, error) {
+func WithGithubActionOutput() Option {
+	return func(b *Builder) {
+		b.githubActionOutput = true
+	}
+}
+
+func New(opts ...Option) *Builder {
 	b := Builder{
 		os:     runtime.GOOS,
 		arch:   runtime.GOARCH,
@@ -123,13 +137,69 @@ func New(opts ...Option) (*Builder, error) {
 	cmdEnv = append(cmdEnv, "GO111MODULE=on")
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOOS=%s", b.os))
 	cmdEnv = append(cmdEnv, fmt.Sprintf("GOARCH=%s", b.arch))
+
+	// CGO...
+	switch {
+
+	// https://github.com/kolide/launcher/pull/776 has a theory
+	// that windows and cgo aren't friends. This might be wrong,
+	// but I don't want to change it yet.
+	case b.cgo && b.os == "windows":
+		panic("Windows and CGO are not friends")
+
+	// cgo is intentionally enabled
+	case b.cgo:
+		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
+
+	// When cross compiling for ARCH, cgo is not automatically detected. So we force it here.
+	case b.arch != runtime.GOARCH:
+		cmdEnv = append(cmdEnv, "CGO_ENABLED=1")
+	}
+
+	// Setup zig as cross compiler for linux
+	// (This is mostly to support fscrypt on linux)
+	if b.os == "linux" && (b.os != runtime.GOOS || b.arch != runtime.GOARCH) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			// panic here feels a little uncouth, but the
+			// caller here is a bunch simpler if we can
+			// return *Builder, and this error is
+			// exceedingly unlikely.
+			panic(fmt.Sprintf("Unable to get cwd: %s", err))
+		}
+
+		cmdEnv = append(
+			cmdEnv,
+			fmt.Sprintf("ZIGTARGET=%s", zigTarget(b.os, b.arch)),
+			fmt.Sprintf("CC=%s", filepath.Join(cwd, "tools", "zcc")),
+			fmt.Sprintf("CXX=%s", filepath.Join(cwd, "tools", "zxx")),
+		)
+	}
+
+	// I don't remember remember why we do this, but it might
+	// break linux, as we need CGO for fscrypt
 	if b.static {
 		cmdEnv = append(cmdEnv, "CGO_ENABLED=0")
 	}
 
 	b.cmdEnv = cmdEnv
 
-	return &b, nil
+	return &b
+}
+
+func zigTarget(goos, goarch string) string {
+	switch goarch {
+	case "amd64":
+		goarch = "x86_64"
+	case "arm64":
+		goarch = "aarch64"
+	}
+
+	if goos == "darwin" {
+		goos = "macos"
+	}
+
+	return fmt.Sprintf("%s-%s", goarch, goos)
 }
 
 // PlatformBinaryName is a helper to return the platform specific output path.
@@ -388,7 +458,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := fs.CopyDir(source, localRepo); err != nil {
+	if err := fsutil.CopyDir(source, localRepo); err != nil {
 		return errors.Wrap(err, "copying TUF repo metadata")
 	}
 
@@ -487,6 +557,11 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if err := cmd.Run(); err != nil {
 			return err
+		}
+
+		// Tell github where we're at
+		if b.githubActionOutput {
+			fmt.Printf("::set-output name=binary::%s\n", output)
 		}
 
 		// all the builds go to `build/<os>/binary`, but if the build OS is the same as the target OS,

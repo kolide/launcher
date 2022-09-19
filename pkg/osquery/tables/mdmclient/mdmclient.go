@@ -1,4 +1,6 @@
+//go:build !windows
 // +build !windows
+
 // (skip building windows, since the newline replacement doesn't work there)
 
 // Package mdmclient provides a table that parses the mdmclient
@@ -10,17 +12,15 @@ package mdmclient
 import (
 	"bytes"
 	"context"
-	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -70,7 +70,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := t.execMdmclient(ctx, mdmclientCommand)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{mdmclientPath}, []string{mdmclientCommand})
 			if err != nil {
 				level.Info(t.logger).Log("msg", "mdmclient failed", "err", err)
 				continue
@@ -105,26 +105,6 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 	}
 
 	return dataflatten.Plist(converted, flattenOpts...)
-}
-
-func (t *Table) execMdmclient(ctx context.Context, command string) ([]byte, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, mdmclientPath, command)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling mdmclient", "args", cmd.Args)
-
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling mdmclient. Got: %s", string(stderr.Bytes()))
-	}
-
-	return stdout.Bytes(), nil
 }
 
 // transformOutput has some hackish rules to transform the output into a "proper" gnustep plist

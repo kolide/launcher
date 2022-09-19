@@ -1,3 +1,4 @@
+//nolint:unconvert
 package table
 
 /*
@@ -7,7 +8,6 @@ package table
 import "C"
 import (
 	"fmt"
-	"reflect"
 	"unsafe"
 )
 
@@ -61,12 +61,7 @@ func goString(ref C.CFStringRef) string {
 		bytes := make([]byte, usedBufLen)
 		buffer := (*C.UInt8)(unsafe.Pointer(&bytes[0]))
 		if C.CFStringGetBytes(ref, cfRange, enc, 0, C.false, buffer, usedBufLen, nil) > 0 {
-			header := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
-			sh := &reflect.StringHeader{
-				Data: header.Data,
-				Len:  header.Len,
-			}
-			return *(*string)(unsafe.Pointer(sh))
+			return *(*string)(unsafe.Pointer(&bytes))
 		}
 	}
 

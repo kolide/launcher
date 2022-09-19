@@ -1,4 +1,5 @@
-//+build darwin
+//go:build darwin
+// +build darwin
 
 // Package systemprofiler provides a suite table wrapper around
 // `system_profiler` macOS command. It supports some basic arguments
@@ -48,8 +49,8 @@ import (
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 

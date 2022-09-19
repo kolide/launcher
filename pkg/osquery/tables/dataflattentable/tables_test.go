@@ -24,9 +24,9 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": Table{logger: logger, dataFunc: dataflatten.PlistFile},
-		"xml":   Table{logger: logger, dataFunc: dataflatten.PlistFile},
-		"json":  Table{logger: logger, dataFunc: dataflatten.JsonFile},
+		"plist": {logger: logger, dataFunc: dataflatten.PlistFile},
+		"xml":   {logger: logger, dataFunc: dataflatten.PlistFile},
+		"json":  {logger: logger, dataFunc: dataflatten.JsonFile},
 	}
 
 	var tests = []struct {
@@ -38,8 +38,8 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 				"metadata",
 			},
 			expected: []map[string]string{
-				map[string]string{"fullkey": "metadata/testing", "key": "testing", "parent": "metadata", "value": "true"},
-				map[string]string{"fullkey": "metadata/version", "key": "version", "parent": "metadata", "value": "1.0.1"},
+				{"fullkey": "metadata/testing", "key": "testing", "parent": "metadata", "value": "true"},
+				{"fullkey": "metadata/version", "key": "version", "parent": "metadata", "value": "1.0.1"},
 			},
 		},
 		{
@@ -48,8 +48,8 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 				"users/name=>*Chipmunk/id",
 			},
 			expected: []map[string]string{
-				map[string]string{"fullkey": "users/0/id", "key": "id", "parent": "users/0", "value": "1"},
-				map[string]string{"fullkey": "users/2/id", "key": "id", "parent": "users/2", "value": "3"},
+				{"fullkey": "users/0/id", "key": "id", "parent": "users/0", "value": "1"},
+				{"fullkey": "users/2/id", "key": "id", "parent": "users/2", "value": "3"},
 			},
 		},
 	}
@@ -58,7 +58,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 		for dataType, tableFunc := range testTables {
 			testFile := filepath.Join("testdata", "animals."+dataType)
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
-				"path":  []string{testFile},
+				"path":  {testFile},
 				"query": tt.queries,
 			})
 
@@ -96,18 +96,18 @@ func TestDataFlattenTables(t *testing.T) {
 	}{
 		// xml
 		{
-			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			expectedRows: 6,
 		},
 		{
-			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"simple/Items"},
 			expectedRows: 3,
 		},
 		{
-			testTables:   map[string]Table{"xml": Table{logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
@@ -115,18 +115,18 @@ func TestDataFlattenTables(t *testing.T) {
 
 		// ini
 		{
-			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			expectedRows: 87,
 		},
 		{
-			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"Registry Values"},
 			expectedRows: 59,
 		},
 		{
-			testTables:   map[string]Table{"ini": Table{logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
@@ -134,10 +134,15 @@ func TestDataFlattenTables(t *testing.T) {
 	}
 
 	for testN, tt := range tests {
+		tt := tt
 		for tableName, testTable := range tt.testTables {
+			tableName, testTable := tableName, testTable
+
 			t.Run(fmt.Sprintf("%d/%s", testN, tableName), func(t *testing.T) {
+				t.Parallel()
+
 				mockQC := tablehelpers.MockQueryContext(map[string][]string{
-					"path":  []string{tt.testFile},
+					"path":  {tt.testFile},
 					"query": tt.queries,
 				})
 

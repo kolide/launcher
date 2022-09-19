@@ -2,8 +2,8 @@
 
 ## Background & Requirements
 
-Kolide launcher packages are a collection of binaries (`osqueryd`,
-`launcher`, and `osquery-extension.ext`), configuration, and init
+Kolide launcher packages are a collection of binaries (`osqueryd` and
+`launcher`), configuration, and init
 scripts. This repository contains `package-builder`, a tool to produce
 these packages.
 
@@ -108,8 +108,7 @@ You can now use `package-builder` to make packages with those:
    --hostname=grpc.launcher.example.com:443 \
    --enroll_secret=foobar123 \
    --osquery_version stable \
-   --launcher_version ./build/darwin/launcher \
-   --extension_version ./build/darwin/osquery-extension.ext
+   --launcher_version ./build/darwin/launcher
 ```
 
 If you'd like to customize the keys that are used to sign the

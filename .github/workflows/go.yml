@@ -1,10 +1,15 @@
 name: ci
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [main, master]
+    tags: '*'
   pull_request:
-    branches: [ master ]
+    branches: '**'
+
+env:
+  GOVER: 1.19.1
 
 jobs:
   build_and_test:
@@ -14,32 +19,54 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-18.04
-            #- ubuntu-latest # No support for go 1.13
+          - ubuntu-latest
           - macos-latest
           - windows-latest
     steps:
     - name: Check out code
       id: checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v2
+    - name: Setup Go
+      uses: actions/setup-go@v3
       with:
-        go-version: 1.13 # 1.14 has issues with bolt's pointers
+        go-version: ${{env.GOVER}}
       id: go
+
+    - id: go-cache-paths
+      run: |
+        echo "::set-output name=go-build::$(go env GOCACHE)"
+        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+    - name: Go Build Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+    - name: Go Mod Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
     - name: Get dependencies
       run: make deps
 
-    - name: Lint
-      run: make -j lint
-      if: runner.os != 'Windows'
+    - name: Run govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
 
     - name: Build
-      run: make -j launcher extension grpc.ext tables.ext package-builder
+      if: ${{ ! contains(matrix.os, 'ubuntu') }}
+      run: make -j2 github-build
+
+    - name: Build (No Cross Compiles)
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      run: make -j2 github-build-no-cross
+
+    - name: Lipo
+      run: make github-lipo
+      if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test
       run: make test
@@ -55,3 +82,56 @@ jobs:
       with:
         name: ${{ matrix.os }}-coverage.out
         path: coverage.out
+
+
+  package_builder_test:
+    name: package_builder
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{env.GOVER}}
+      id: go
+
+    - id: go-cache-paths
+      run: |
+        echo "::set-output name=go-build::$(go env GOCACHE)"
+        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+    - name: Go Build Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+    - name: Go Mod Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - run: make deps
+    - id: build
+      run: make package-builder
+    - name: package
+      run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
+
+  # This job is here as a github status check -- it allows us to move
+  # the merge dependency from being on all the jobs to this single
+  # one.
+  ci_mergeable:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+    needs:
+      - build_and_test
+      - package_builder_test

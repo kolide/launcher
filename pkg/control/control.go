@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 type Client struct {
@@ -17,13 +17,13 @@ type Client struct {
 	baseURL    *url.URL
 	cancel     context.CancelFunc
 	client     *http.Client
-	db         *bolt.DB
+	db         *bbolt.DB
 	insecure   bool
 	disableTLS bool
 	logger     log.Logger
 }
 
-func NewControlClient(db *bolt.DB, addr string, opts ...Option) (*Client, error) {
+func NewControlClient(db *bbolt.DB, addr string, opts ...Option) (*Client, error) {
 	baseURL, err := url.Parse("https://" + addr)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing URL")

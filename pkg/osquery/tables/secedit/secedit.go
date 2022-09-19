@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package secedit
@@ -18,8 +19,8 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"

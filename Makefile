@@ -2,7 +2,7 @@ all: build
 
 .PHONY: build
 
-ifndef ($(GOPATH))
+ifndef $GOPATH
 	GOPATH = $(HOME)/go
 endif
 
@@ -19,7 +19,7 @@ endif
 
 
 all: build
-build: build_launcher build_osquery-extension.ext
+build: build_launcher
 
 .pre-build: ${BUILD_DIR}
 
@@ -36,7 +36,7 @@ endif
 
 build_%: TARGET =  $(word 2, $(subst _, ,$@))
 build_%: OS = $(word 3, $(subst _, ,$@))
-build_%: OSARG = $(if $(OS), --os $(OS))
+build_%: OSARG = $(if $(filter-out noop, $(OS)), --os $(OS))
 build_%: ARCH = $(word 4, $(subst _, ,$@))
 build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
@@ -62,16 +62,24 @@ lipo_%: build/darwin.amd64/% build/darwin.arm64/%
 # pointers, mostly for legacy reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
-extension: build_osquery-extension.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 
+##
+## GitHub Action Helpers
+##
+GITHUB_TARGETS=launcher grpc.ext tables.ext package-builder
+GITHUB_ARCHS=amd64 arm64
+# linux cross compiles aren't working. Disable for now
+github-build-no-cross: $(foreach t, $(GITHUB_TARGETS), build_$(t))
+github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
+github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 
 ##
 ## Cross Build targets
 ##
 
-RELEASE_TARGETS=launcher osquery-extension.ext package-builder
+RELEASE_TARGETS=launcher package-builder
 MANUAL_CROSS_OSES=darwin windows linux
 ARM64_OSES=darwin
 AMD64_OSES=darwin windows linux
@@ -81,10 +89,10 @@ AMD64_OSES=darwin windows linux
 xp: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(MANUAL_CROSS_OSES), build_$(target)_$(os)))
 
 # Actual release targets. Because of the m1 cgo cross stuff, this requires explicit go paths
-rel-amd64: CROSSGOPATH = /opt/go1.16beta1.darwin-amd64/go/bin/go
+rel-amd64: CROSSGOPATH = /opt/go1.16.10.darwin-amd64/bin/go
 rel-amd64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(AMD64_OSES), build_$(target)_$(os)_amd64))
 
-rel-arm64: CROSSGOPATH = /opt/go1.16beta1.darwin-arm64/go/bin/go
+rel-arm64: CROSSGOPATH = /opt/go1.16.10.darwin-arm64/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
 rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
@@ -174,8 +182,8 @@ notarize-check-%:
 
 # Using the `osslsigncode` we can sign windows binaries from
 # non-windows platforms.
-codesign-windows: codesign-windows-launcher.exe  codesign-windows-osquery-extension.exe
-codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2020.p12
+codesign-windows: codesign-windows-launcher.exe
+codesign-windows-%: P12 = ~/Documents/kolide-codesigning-2021-04.p12
 codesign-windows-%:
 	@if [ -z "${AUTHENTICODE_PASSPHRASE}" ]; then echo "Missing AUTHENTICODE_PASSPHRASE"; exit 1; fi
 	mv build/windows.amd64/$* build/windows.amd64/$*.tmp
@@ -218,59 +226,32 @@ test: generate
 ## Lint
 ##
 
-# These are escape newlines, looks super weird. Allows these to run in
-# parallel with `make -j`
-lint: \
-	lint-go-deadcode \
-	lint-misspell \
-	lint-go-vet \
-	lint-go-nakedret \
-	lint-go-fmt
-
-lint-go-deadcode: deps-go
-	deadcode cmd/ pkg/
-
-lint-misspell: deps-go
-	git ls-files \
-	  | grep -v pkg/simulator/testdata/bad_symlink \
-	  | grep -v assets.go$ \
-	  | xargs misspell -error -f 'misspell: {{ .Filename }}:{{ .Line }}:{{ .Column }}:corrected {{ printf "%q" .Original }} to {{ printf "%q" .Corrected }}'
-
-lint-go-vet:
-	go vet ./cmd/... ./pkg/...
-
-lint-go-nakedret: deps-go
-	nakedret ./pkg/... ./cmd/...
-
-# This is ugly. since go-fmt doesn't have a simple exit code, we use
-# some make trickery to handle failing if there;s output.
-lint-go-fmt: $(foreach c,$(shell gofmt -l ./pkg/ ./cmd/ | grep -vE 'assets.go|bindata.go'),fmt-fail/$(c))
-lint-go-fmt: deps-go
-fmt-fail/%:
-	@echo fmt failure in: $*
-	@false
+lint:
+	# Requires golangci-lint installed, see https://golangci-lint.run/usage/install#local-installation
+	golangci-lint -j3 run
 
 ##
 ## Docker Tooling
 ##
 
-CONTAINER_OSES = ubuntu16 ubuntu18 centos6 centos7 distroless
+CONTAINER_OSES = ubuntu16 ubuntu18 ubuntu20 centos6 centos7 distroless
 
 .PHONY: containers
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
 containers-push: $(foreach c,$(CONTAINER_OSES),dockerpush-$(c) dockerfakepush-$(c))
 
+build-docker: sha = $(shell git describe --always --abbrev=12)
 build-docker:
-	docker build -t launcher-build  .
+	docker build -t launcher-build --build-arg gitver=$(sha) .
 
 build-dockerfake:
-	docker build -t launcher-fakedata-build --build-arg FAKE=-fakedata .
+	docker build -t launcher-fakedata-build --build-arg gitver=v0.11.21 --build-arg FAKE=-fakedata .
 
-dockerfake-%:  #build-dockerfake
+dockerfake-%:  build-dockerfake
 	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
 
-docker-%: #build-docker
+docker-%: build-docker
 	@echo '#### Starting to build target: $@'
 	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
 

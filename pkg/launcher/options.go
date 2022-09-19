@@ -8,8 +8,13 @@ import (
 
 // Options is the set of options that may be configured for Launcher.
 type Options struct {
+	// AutoloadedExtensions to load with osquery, expected to be in same
+	// directory as launcher binary.
+	AutoloadedExtensions []string
 	// KolideServerURL is the URL of the management server to connect to.
 	KolideServerURL string
+	// KolideHosted true if using Kolide SaaS settings
+	KolideHosted bool
 	// EnrollSecret contains the raw enroll secret.
 	EnrollSecret string
 	// EnrollSecretPath contains the path to a file containing the enroll
@@ -35,11 +40,22 @@ type Options struct {
 	// Transport the transport that should be used for remote
 	// communication.
 	Transport string
+	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
+	// of log. When blank, launcher will pick a value
+	// appropriate for the transport.
+	LogMaxBytesPerBatch int
 
 	// Control enables the remote control functionality.
 	Control bool
 	// ControlServerURL URL for control server.
 	ControlServerURL string
+
+	// Osquery TLS options
+	OsqueryTlsConfigEndpoint           string
+	OsqueryTlsEnrollEndpoint           string
+	OsqueryTlsLoggerEndpoint           string
+	OsqueryTlsDistributedReadEndpoint  string
+	OsqueryTlsDistributedWriteEndpoint string
 
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
@@ -72,4 +88,6 @@ type Options struct {
 	InsecureTLS bool
 	// InsecureTransport disables TLS in the transport layer.
 	InsecureTransport bool
+	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
+	CompactDbMaxTx int64
 }

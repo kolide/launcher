@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package runtime
@@ -12,8 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const extensionName = `osquery-extension.ext`
-
 func setpgid() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setpgid: true}
 }
@@ -24,7 +23,7 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	return errors.Wrapf(err, "kill process group %d", cmd.Process.Pid)
 }
 
-func socketPath(rootDir string) string {
+func SocketPath(rootDir string) string {
 	return filepath.Join(rootDir, "osquery.sock")
 }
 

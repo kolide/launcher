@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package wifi_networks
@@ -5,6 +6,7 @@ package wifi_networks
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,13 +17,23 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks/internal"
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
-//go:generate go-bindata -nometadata -nocompress -pkg internal -o internal/assets.go internal/assets/
+// the c# .Net code in the asset below came from
+// https://github.com/metageek-llc/ManagedWifi/, and has been modified
+// slightly to support polling for scan completion. the powershell
+// script initially came from
+// https://jordanmills.wordpress.com/2014/01/12/updated-get-bssid-ps1-programmatic-access-to-available-wireless-networks/
+// with some slight modifications
+//
+//go:embed assets/nativewifi.cs
+var nativeCode []byte
+
+//go:embed assets/get-networks.ps1
+var pwshScript []byte
 
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
@@ -77,38 +89,16 @@ func execPwsh(logger log.Logger) execer {
 		defer os.RemoveAll(dir)
 
 		outputFile := filepath.Join(dir, "nativewificode.cs")
-		nativeCodeFile, err := os.Create(outputFile)
-		if err != nil {
-			return errors.Wrap(err, "creating file for native wifi code")
-		}
-
-		// the c# .Net code in the asset below came from
-		// https://github.com/metageek-llc/ManagedWifi/, and has been modified
-		// slightly to support polling for scan completion. the powershell
-		// script initially came from
-		// https://jordanmills.wordpress.com/2014/01/12/updated-get-bssid-ps1-programmatic-access-to-available-wireless-networks/
-		// with some slight modifications
-		nativeCode, err := internal.Asset("internal/assets/nativewifi.cs")
-		if err != nil {
-			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/nativewifi.cs")
-		}
-		_, err = nativeCodeFile.Write(nativeCode)
-		if err != nil {
-			return errors.Wrap(err, "writing native code file")
-		}
-		if err := nativeCodeFile.Close(); err != nil {
-			return errors.Wrap(err, "closing native code file")
+		if err := os.WriteFile(outputFile, nativeCode, 0755); err != nil {
+			return errors.Wrap(err, "writing native wifi code")
 		}
 
 		pwsh, err := exec.LookPath("powershell.exe")
 		if err != nil {
 			return errors.Wrap(err, "finding powershell.exe path")
 		}
-		psScript, err := internal.Asset("internal/assets/get-networks.ps1")
-		if err != nil {
-			return errors.Wrapf(err, "failed to get asset named %s", "internal/assets/get-networks.ps1")
-		}
-		args := append([]string{"-NoProfile", "-NonInteractive"}, string(psScript))
+
+		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
 		cmd := exec.CommandContext(ctx, pwsh, args...)
 		cmd.Dir = dir
 		var stderr bytes.Buffer

@@ -5,18 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/cmd/launcher/desktop"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
+	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 )
@@ -90,20 +92,9 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
-	if opts.DebugLogFile != "" {
-		logMirror, err := os.OpenFile(opts.DebugLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			level.Info(logger).Log("msg", "failed to create file logger", "err", err)
-			os.Exit(2)
-		}
-		defer logMirror.Close()
-
-		fileLogger := log.NewJSONLogger(log.NewSyncWriter(logMirror))
-		fileLogger = log.With(fileLogger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-		logger = teelogger.New(logger, fileLogger)
-
-		level.Info(logger).Log("msg", "mirroring logs to file", "file", logMirror.Name())
+	// Create a local logger. This logs to a known path, and aims to help diagnostics
+	if opts.RootDirectory != "" {
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
 	}
 
 	defer func() {
@@ -139,6 +130,12 @@ func runSubcommands() error {
 		run = runWindowsSvcForeground
 	case "version":
 		run = runVersion
+	case "compactdb":
+		run = runCompactDb
+	case "interactive":
+		run = runInteractive
+	case "desktop":
+		run = desktop.RunDesktop
 	default:
 		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}

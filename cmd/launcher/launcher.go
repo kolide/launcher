@@ -10,22 +10,30 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/cmd/launcher/internal"
+	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/osquery"
+	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
+	"go.etcd.io/bbolt"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -33,7 +41,6 @@ import (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
 	// determine the root directory, create one if it's not provided
@@ -41,7 +48,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
+			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
 				return errors.Wrap(err, "creating temporary root directory")
 			}
 		}
@@ -80,8 +87,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
-	boltOptions := &bolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
 		return errors.Wrap(err, "open launcher db")
 	}
@@ -90,6 +97,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return errors.Wrap(err, "write launcher pid to file")
 	}
+
+	// If we have successfully opened the DB, and written a pid,
+	// we expect we're live. Record the version for osquery to
+	// pickup
+	internal.RecordLauncherVersion(rootDirectory)
+
+	// Try to ensure useful info in the logs
+	checkpoint.Run(logger, db, *opts)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -139,9 +154,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
 			client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+		case "osquery":
+			client = service.NewNoopClient(logger)
 		default:
 			return errors.New("invalid transport option selected")
 		}
+	}
+
+	// init osquery instance history
+	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
+		return errors.Wrap(err, "error initializing osquery instance history")
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
@@ -171,9 +193,49 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
+	var desktopRunner *desktopRuntime.DesktopUsersProcessesRunner
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
+		desktopRunner = desktopRuntime.New(logger, time.Second*5, opts.KolideServerURL)
+		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
+	}
+
+	if opts.KolideServerURL == "k2device.kolide.com" ||
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+		opts.KolideServerURL == "localhost:3443" ||
+		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
+		ls, err := localserver.New(logger, db, opts.KolideServerURL)
+		if err != nil {
+			// For now, log this and move on. It might be a fatal error
+			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
+		}
+
+		ls.SetQuerier(extension)
+		runGroup.Add(ls.Start, ls.Interrupt)
+	}
+
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if opts.Autoupdate {
-		config := &updaterConfig{
+		osqueryUpdaterconfig := &updater.UpdaterConfig{
+			Logger:             logger,
+			RootDirectory:      rootDirectory,
+			AutoupdateInterval: opts.AutoupdateInterval,
+			UpdateChannel:      opts.UpdateChannel,
+			NotaryURL:          opts.NotaryServerURL,
+			MirrorURL:          opts.MirrorServerURL,
+			NotaryPrefix:       opts.NotaryPrefix,
+			HTTPClient:         httpClient,
+			InitialDelay:       opts.AutoupdateInitialDelay + opts.AutoupdateInterval/2,
+			SigChannel:         sigChannel,
+		}
+
+		// create an updater for osquery
+		osqueryUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
+		if err != nil {
+			return errors.Wrap(err, "create osquery updater")
+		}
+		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
+
+		launcherUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
 			AutoupdateInterval: opts.AutoupdateInterval,
@@ -186,23 +248,22 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			SigChannel:         sigChannel,
 		}
 
-		// create an updater for osquery
-		osqueryUpdater, err := createUpdater(ctx, opts.OsquerydPath, runnerRestart, config)
-		if err != nil {
-			return errors.Wrap(err, "create osquery updater")
-		}
-		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
-
 		// create an updater for launcher
 		launcherPath, err := os.Executable()
 		if err != nil {
 			logutil.Fatal(logger, "err", err)
 		}
-		launcherUpdater, err := createUpdater(
+		launcherUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
-			updateFinalizer(logger, runnerShutdown),
-			config,
+			updater.UpdateFinalizer(logger, func() error {
+				// stop desktop on auto updates
+				if desktopRunner != nil {
+					desktopRunner.Interrupt(nil)
+				}
+				return runnerShutdown()
+			}),
+			launcherUpdaterconfig,
 		)
 		if err != nil {
 			return errors.Wrap(err, "create launcher updater")

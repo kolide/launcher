@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const launcherAutoupdateConfigTableName = "kolide_launcher_autoupdate_config"
@@ -32,7 +32,7 @@ func boolToString(in bool) string {
 func generateLauncherAutoupdateConfigTable(opts *launcher.Options) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return []map[string]string{
-			map[string]string{
+			{
 				"autoupdate":          boolToString(opts.Autoupdate),
 				"notary_server_url":   opts.NotaryServerURL,
 				"mirror_server_url":   opts.MirrorServerURL,

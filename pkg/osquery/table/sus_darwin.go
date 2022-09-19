@@ -70,8 +70,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
 
@@ -124,7 +124,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	)
 
 	resp := []map[string]string{
-		map[string]string{
+		{
 			"autoupdate_managed":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
 			"autoupdate_enabled":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
 			"download":                        fmt.Sprintf("%d", doesBackgroundDownload),

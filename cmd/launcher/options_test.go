@@ -16,7 +16,7 @@ import (
 )
 
 // TestOptionsFromFlags isn't parallel to ensure that we don't pollute the environment
-func TestOptionsFromFlags(t *testing.T) {
+func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 	os.Clearenv()
 
 	testArgs, expectedOpts := getArgsAndResponse()
@@ -34,7 +34,7 @@ func TestOptionsFromFlags(t *testing.T) {
 	require.Equal(t, expectedOpts, opts)
 }
 
-func TestOptionsFromEnv(t *testing.T) {
+func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 
 	if runtime.GOOS == "windows" {
 		t.Skip("TODO: Windows Testing")
@@ -56,7 +56,7 @@ func TestOptionsFromEnv(t *testing.T) {
 	require.Equal(t, expectedOpts, opts)
 }
 
-func TestOptionsFromFile(t *testing.T) {
+func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	os.Clearenv()
 
 	testArgs, expectedOpts := getArgsAndResponse()
@@ -93,26 +93,29 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	// includes both `-` and `--` for variety.
 	args := map[string]string{
-		"-control":             "", // This is a bool, it's special cased in the test routines
-		"--hostname":           randomHostname,
-		"-autoupdate_interval": "48h",
-		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
-		"-osqueryd_path":       windowsAddExe("/dev/null"),
-		"-transport":           "grpc",
+		"-control":              "", // This is a bool, it's special cased in the test routines
+		"--hostname":            randomHostname,
+		"-autoupdate_interval":  "48h",
+		"-logging_interval":     fmt.Sprintf("%ds", randomInt),
+		"-osqueryd_path":        windowsAddExe("/dev/null"),
+		"-transport":            "grpc",
+		"-autoloaded_extension": "some-extension.ext",
 	}
 
 	opts := &launcher.Options{
+		AutoupdateInitialDelay: 1 * time.Hour,
+		AutoupdateInterval:     48 * time.Hour,
+		CompactDbMaxTx:         int64(65536),
 		Control:                true,
-		OsquerydPath:           windowsAddExe("/dev/null"),
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,
-		AutoupdateInterval:     48 * time.Hour,
-		AutoupdateInitialDelay: 1 * time.Hour,
-		NotaryServerURL:        "https://notary.kolide.co",
 		MirrorServerURL:        "https://dl.kolide.co",
 		NotaryPrefix:           "kolide",
-		UpdateChannel:          "stable",
+		NotaryServerURL:        "https://notary.kolide.co",
+		OsquerydPath:           windowsAddExe("/dev/null"),
 		Transport:              "grpc",
+		UpdateChannel:          "stable",
+		AutoloadedExtensions:   []string{"some-extension.ext"},
 	}
 
 	return args, opts

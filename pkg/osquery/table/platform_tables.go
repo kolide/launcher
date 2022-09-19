@@ -1,11 +1,12 @@
+//go:build !darwin && !windows && !linux
 // +build !darwin,!windows,!linux
 
 package table
 
 import (
 	"github.com/go-kit/kit/log"
-	osquery "github.com/kolide/osquery-go"
-	"github.com/kolide/osquery-go/plugin/table"
+	osquery "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // platformTables returns an empty set. It's here as a catchall for

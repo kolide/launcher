@@ -1,0 +1,41 @@
+run:
+  skip-dirs:
+    - test-cmds
+  timeout: 5m
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - gofmt
+    - govet
+    - misspell
+    - nakedret
+    - sqlclosecheck
+    - unconvert
+    - paralleltest
+  disable:
+    - errcheck
+    - gosec
+    - gosimple
+    - ineffassign
+    - interfacer
+    - maligned
+    - noctx
+    - staticcheck
+    - structcheck
+    - unused
+    - varcheck
+
+linters-settings:
+  errcheck:
+    ignore: github.com/go-kit/kit/log:Log
+  gofmt:
+    simplify: false
+
+issues:
+  exclude-rules:
+    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
+    - linters:
+      - paralleltest
+      text: "does not use range value in test Run"

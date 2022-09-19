@@ -2,6 +2,7 @@ package wix
 
 import (
 	"context"
+	"embed"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,12 +12,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/packagekit/wix/testdata"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate go-bindata  -nometadata -nocompress -pkg testdata -o testdata/assets.go testdata/assets/
+//go:embed testdata
+var testdata embed.FS
 
 func TestWixPackage(t *testing.T) {
 	t.Parallel()
@@ -32,14 +33,12 @@ func TestWixPackage(t *testing.T) {
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
-	packageRoot, err := ioutil.TempDir("", "packaging-root")
-	require.NoError(t, err)
-	defer os.RemoveAll(packageRoot)
+	packageRoot := t.TempDir()
 
-	err = setupPackageRoot(packageRoot)
+	err := setupPackageRoot(packageRoot)
 	require.NoError(t, err)
 
-	mainWxsContent, err := testdata.Asset("testdata/assets/product.wxs")
+	mainWxsContent, err := testdata.ReadFile("product.wxs")
 	require.NoError(t, err)
 
 	wixTool, err := New(packageRoot,

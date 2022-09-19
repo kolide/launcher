@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kardianos/osext"
-	"github.com/kolide/kit/fs"
 	"github.com/pkg/errors"
 )
 
@@ -15,9 +14,6 @@ type thingy struct {
 	binaryName string
 	stagedFile string
 }
-
-const serviceName = "upgradetest"
-const serviceDesc = "Launcher Auto Upgrade Testing"
 
 type processNotes struct {
 	Pid     int
@@ -74,38 +70,6 @@ func main() {
 	}
 
 	fmt.Printf("Finished Main (pid %d)\n", ProcessNotes.Pid)
-
-}
-
-func oldShit() {
-
-	fmt.Printf("\n\nStarting a new thread. Pid: %d\n", os.Getpid())
-	time.Sleep(1 * time.Second)
-
-	binaryName, err := osext.Executable()
-	if err != nil {
-		panic(errors.Wrap(err, "osext.Executable"))
-	}
-
-	// Should this get a random append?
-	stagedFile := fmt.Sprintf("%s-staged", binaryName)
-
-	// To emulate a new version, just copy the current binary to the staged location
-	fmt.Println("fs.CopyFile")
-	if err := fs.CopyFile(binaryName, stagedFile); err != nil {
-		panic(errors.Wrap(err, "fs.CopyFile"))
-	}
-
-	b := &thingy{
-		binaryName: binaryName,
-		stagedFile: stagedFile,
-	}
-
-	if err := b.rename(); err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("BAD BAD BAD old thread! (pid %d)\n", os.Getpid())
 
 }
 
