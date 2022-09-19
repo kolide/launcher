@@ -42,17 +42,17 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 func New(client *osquery.ExtensionManagerClient, logger log.Logger) *Table {
 	parser := NewParser(logger,
 		[]Matcher{
-			Matcher{
+			{
 				Match:   func(in string) bool { return strings.HasPrefix(in, "Password Enabled: ") },
 				KeyFunc: func(_ string) (string, error) { return "password_enabled", nil },
 				ValFunc: func(in string) (string, error) { return passwordValue(in) },
 			},
-			Matcher{
+			{
 				Match:   func(in string) bool { return strings.HasPrefix(in, "Mode: ") },
 				KeyFunc: func(_ string) (string, error) { return "mode", nil },
 				ValFunc: func(in string) (string, error) { return modeValue(in) },
 			},
-			Matcher{
+			{
 				Match:   func(in string) bool { return strings.HasPrefix(in, "Option roms ") },
 				KeyFunc: func(_ string) (string, error) { return "option_roms_allowed", nil },
 				ValFunc: func(in string) (string, error) { return optionRomValue(in) },

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/augeas"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -19,7 +19,7 @@ const extensionName = "com.kolide.launcher_interactive"
 
 func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
 
-	if err := os.MkdirAll(rootDir, fs.DirMode); err != nil {
+	if err := os.MkdirAll(rootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
@@ -28,7 +28,7 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 
 	// only install augeas lenses on non-windows platforms
 	if runtime.GOOS != "windows" {
-		if err := os.MkdirAll(augeasLensesPath, fs.DirMode); err != nil {
+		if err := os.MkdirAll(augeasLensesPath, fsutil.DirMode); err != nil {
 			return nil, nil, fmt.Errorf("creating augeas lens dir: %w", err)
 		}
 

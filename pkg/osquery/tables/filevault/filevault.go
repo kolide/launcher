@@ -53,7 +53,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	// It's a bit verbose to instatiate this directly, but it
 	// seems better than a needless append.
 	results := []map[string]string{
-		map[string]string{
+		{
 			"status": status,
 		},
 	}

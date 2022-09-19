@@ -4,7 +4,6 @@
 package runtime
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,7 +14,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
+// runConsoleUserDesktop determines the owner of /dev/console and runs the desktop process as that user
+// if no desktop process exists for that user
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return fmt.Errorf("getting console owner uid: %w", err)
@@ -24,48 +25,44 @@ func (r *SystrayUsersProcessesRunner) runConsoleUserSystray() error {
 	// there seems to be a brief moment during start up where root or system (non-human)
 	// users own the console, if we spin up the process for them it will add an
 	// unnecessary process. On macOS human users start at 501
-	if consoleOwnerUid < 500 {
+	if consoleOwnerUid < 501 {
 		level.Debug(r.logger).Log(
-			"msg", "skipping systray for root or system user",
+			"msg", "skipping desktop for root or system user",
 			"uid", consoleOwnerUid,
 		)
 
 		return nil
 	}
 
+	// consoleOwnerUid is a uint32, convert to string
 	uid := fmt.Sprint(consoleOwnerUid)
 
-	// already have a systray for the console owner
-	if proc, ok := r.uidProcs[uid]; ok {
-		// if the process is still running, return
-		if processExists(proc.Pid) {
-			return nil
-		}
-
-		// proc is dead
-		level.Info(r.logger).Log(
-			"msg", "existing systray process dead for console user, starting new systray process",
-			"dead_pid", r.uidProcs[uid].Pid,
-			"uid", consoleOwnerUid,
-		)
+	// already have a process, move on
+	if r.userHasDesktopProcess(uid) {
+		return nil
 	}
 
-	executable, err := os.Executable()
+	executablePath, err := r.determineExecutablePath()
 	if err != nil {
-		return fmt.Errorf("getting executable path: %w", err)
+		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	proc, err := runAsUser(uid, executable, "systray")
+	proc, err := runAsUser(uid, executablePath, "desktop", "--hostname", r.hostname)
 	if err != nil {
-		return fmt.Errorf("running systray: %w", err)
+		return fmt.Errorf("running desktop: %w", err)
 	}
-	r.uidProcs[uid] = proc
+
+	if err := r.addProcessForUser(uid, proc); err != nil {
+		return fmt.Errorf("adding process for user: %w", err)
+	}
 
 	level.Debug(r.logger).Log(
-		"msg", "systray started",
+		"msg", "desktop started",
 		"uid", consoleOwnerUid,
 		"pid", proc.Pid,
 	)
+
+	r.waitOnProcessAsync(uid, proc)
 
 	return nil
 }
@@ -135,45 +132,4 @@ func runAsUser(uid string, path string, args ...string) (*os.Process, error) {
 	}
 
 	return cmd.Process, nil
-}
-
-func processExists(pid int) bool {
-	// this code was adapted from https://github.com/shirou/gopsutil/blob/ed37dc27a286a25cbe76adf405176c69191a1f37/process/process_posix.go#L102
-	// thank you shirou!
-	if pid <= 0 {
-		return false
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	// from kill 1 man: If sig is 0, then no signal is sent, but error checking is still performed.
-	// bash equivalent of: kill -n 0 <pid>
-	err = proc.Signal(syscall.Signal(0))
-	if err == nil {
-		return true
-	}
-
-	if err.Error() == "os: process already finished" {
-		return false
-	}
-
-	var errno syscall.Errno
-	if !errors.As(err, &errno) {
-		return false
-	}
-
-	switch errno {
-	// No process or process group can be found corresponding to that specified by pid.
-	case syscall.ESRCH:
-		return false
-	// The sending process is not the super-user and its effective user id does not match the effective user-id of the receiving process.
-	// When signaling a process group, this error is returned if any members of the group could not be signaled.
-	case syscall.EPERM:
-		return true
-	}
-
-	return false
 }

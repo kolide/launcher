@@ -80,7 +80,7 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 		}
 		results = append(results, mdmResults)
 	} else {
-		results = []map[string]string{map[string]string{"enrolled": "false"}}
+		results = []map[string]string{{"enrolled": "false"}}
 	}
 	return results, nil
 }

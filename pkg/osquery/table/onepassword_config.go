@@ -12,14 +12,14 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 var onepasswordDataFiles = map[string][]string{
-	"windows": []string{"AppData/Local/1password/data/1Password10.sqlite"},
-	"darwin": []string{
+	"windows": {"AppData/Local/1password/data/1Password10.sqlite"},
+	"darwin": {
 		"Library/Application Support/1Password 4/Data/B5.sqlite",
 		"Library/Group Containers/2BUA8C4S2C.com.agilebits/Library/Application Support/1Password/Data/B5.sqlite",
 		"Library/Containers/2BUA8C4S2C.com.agilebits.onepassword-osx-helper/Data/Library/Data/B5.sqlite",
@@ -60,7 +60,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(fileInfo.path, dst); err != nil {
+	if err := fsutil.CopyFile(fileInfo.path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
 	}
 

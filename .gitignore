@@ -41,4 +41,4 @@ __debug_bin
 # scratch pad (notes used during development)
 scratch.*
 /scratch
-
+/debug

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
@@ -86,13 +86,13 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 	// explicitly close the write handle before untaring the archive
 	writeHandle.Close()
 
-	if err := os.MkdirAll(filepath.Dir(localBinaryPath), fs.DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localBinaryPath), fsutil.DirMode); err != nil {
 		return "", errors.Wrap(err, "couldn't create directory for binary")
 	}
 
 	// UntarBundle is a bit misnamed. this untars unto the directory
 	// containing that file. It has a call to filepath.Dir(destination) there.
-	if err := fs.UntarBundle(localBinaryPath, localPackagePath); err != nil {
+	if err := fsutil.UntarBundle(localBinaryPath, localPackagePath); err != nil {
 		return "", errors.Wrap(err, "couldn't untar download")
 	}
 

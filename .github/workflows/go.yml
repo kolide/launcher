@@ -9,7 +9,7 @@ on:
     branches: '**'
 
 env:
-  GOVER: 1.17
+  GOVER: 1.19.1
 
 jobs:
   build_and_test:
@@ -50,9 +50,11 @@ jobs:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
-
     - name: Get dependencies
       run: make deps
+
+    - name: Run govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
 
     - name: Build
       if: ${{ ! contains(matrix.os, 'ubuntu') }}

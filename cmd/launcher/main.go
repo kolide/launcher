@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/cmd/launcher/systray"
+	"github.com/kolide/launcher/cmd/launcher/desktop"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
@@ -134,8 +134,8 @@ func runSubcommands() error {
 		run = runCompactDb
 	case "interactive":
 		run = runInteractive
-	case "systray":
-		run = systray.RunSystray
+	case "desktop":
+		run = desktop.RunDesktop
 	default:
 		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}

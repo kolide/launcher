@@ -12,15 +12,18 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -28,7 +31,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
-	systrayruntime "github.com/kolide/launcher/pkg/systray/runtime"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
@@ -46,7 +48,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if rootDirectory == "" {
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fs.DirMode); err != nil {
+			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
 				return errors.Wrap(err, "creating temporary root directory")
 			}
 		}
@@ -160,8 +162,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	err = osqueryInstanceHistory.InitHistory(db)
-	if err != nil {
+	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
 		return errors.Wrap(err, "error initializing osquery instance history")
 	}
 
@@ -190,6 +191,26 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		} else {
 			level.Info(logger).Log("msg", "got nil control actor. Ignoring")
 		}
+	}
+
+	var desktopRunner *desktopRuntime.DesktopUsersProcessesRunner
+	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
+		desktopRunner = desktopRuntime.New(logger, time.Second*5, opts.KolideServerURL)
+		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
+	}
+
+	if opts.KolideServerURL == "k2device.kolide.com" ||
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+		opts.KolideServerURL == "localhost:3443" ||
+		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
+		ls, err := localserver.New(logger, db, opts.KolideServerURL)
+		if err != nil {
+			// For now, log this and move on. It might be a fatal error
+			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
+		}
+
+		ls.SetQuerier(extension)
+		runGroup.Add(ls.Start, ls.Interrupt)
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
@@ -235,18 +256,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		launcherUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
-			updater.UpdateFinalizer(logger, runnerShutdown),
+			updater.UpdateFinalizer(logger, func() error {
+				// stop desktop on auto updates
+				if desktopRunner != nil {
+					desktopRunner.Interrupt(nil)
+				}
+				return runnerShutdown()
+			}),
 			launcherUpdaterconfig,
 		)
 		if err != nil {
 			return errors.Wrap(err, "create launcher updater")
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
-	}
-
-	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS == "darwin" {
-		systrayRunner := systrayruntime.New(logger, time.Second*5)
-		runGroup.Add(systrayRunner.Execute, systrayRunner.Interrupt)
 	}
 
 	err = runGroup.Run()

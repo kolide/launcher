@@ -12,9 +12,9 @@
 // the parent process permissions.
 //
 // This is based on ideas from:
-//   * https://github.com/golang/go/issues/14592
-//   * https://wiki.freebsd.org/Per-Thread%20Credentials
-//   * https://pkg.go.dev/runtime#LockOSThread
+//   - https://github.com/golang/go/issues/14592
+//   - https://wiki.freebsd.org/Per-Thread%20Credentials
+//   - https://pkg.go.dev/runtime#LockOSThread
 //
 // There's future work in supporting other platforms. Linux may have
 // `syscall(SYS_setresuid, ...)` for this.

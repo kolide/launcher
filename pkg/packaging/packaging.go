@@ -15,7 +15,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packagekit"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
@@ -183,7 +183,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		rootPemPath := filepath.Join(p.confDir, "roots.pem")
 		launcherMapFlags["root_pem"] = p.canonicalizePath(rootPemPath)
 
-		if err := fs.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
+		if err := fsutil.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
 			return errors.Wrap(err, "copy root PEM")
 		}
 
@@ -348,7 +348,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		}
 	}
 
-	if err := fs.CopyFile(
+	if err := fsutil.CopyFile(
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),
 	); err != nil {
@@ -407,7 +407,7 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	logDir := fmt.Sprintf("/var/log/%s", p.Identifier)
 	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
 
-	if err := os.MkdirAll(filepath.Join(p.packageRoot, newSysLogDirectory), fs.DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Join(p.packageRoot, newSysLogDirectory), fsutil.DirMode); err != nil {
 		return errors.Wrap(err, "making newsyslog dir")
 	}
 
@@ -442,7 +442,7 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 	logDir := fmt.Sprintf("/var/log/%s", p.Identifier)
 	logrotateDirectory := filepath.Join("/etc", "logrotate.d")
 
-	if err := os.MkdirAll(filepath.Join(p.packageRoot, logrotateDirectory), fs.DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Join(p.packageRoot, logrotateDirectory), fsutil.DirMode); err != nil {
 		return errors.Wrap(err, "making logrotate.d dir")
 	}
 
@@ -536,7 +536,7 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 
 	p.initFile = filepath.Join(dir, file)
 
-	if err := os.MkdirAll(filepath.Join(p.packageRoot, dir), fs.DirMode); err != nil {
+	if err := os.MkdirAll(filepath.Join(p.packageRoot, dir), fsutil.DirMode); err != nil {
 		return errors.Wrapf(err, "mkdir failed, target %s", p.target.String())
 	}
 
@@ -719,7 +719,7 @@ func (p *PackageOptions) setupDirectories() error {
 	}
 
 	for _, d := range []string{p.binDir, p.confDir, p.rootDir} {
-		if err := os.MkdirAll(filepath.Join(p.packageRoot, d), fs.DirMode); err != nil {
+		if err := os.MkdirAll(filepath.Join(p.packageRoot, d), fsutil.DirMode); err != nil {
 			return errors.Wrapf(err, "create dir (%s) for %s", d, p.target.String())
 		}
 	}

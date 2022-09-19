@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/kolide/kit/env"
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packaging"
 )
 
@@ -54,7 +54,7 @@ func main() {
 
 	if *flOutput != "" {
 		platformOutput := target.PlatformBinaryName(*flOutput)
-		if err := fs.CopyFile(path, platformOutput); err != nil {
+		if err := fsutil.CopyFile(path, platformOutput); err != nil {
 			fmt.Printf("Couldn't copy file to %s: %s", platformOutput, err)
 			os.Exit(1)
 		}

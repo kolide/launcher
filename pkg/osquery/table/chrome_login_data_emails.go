@@ -13,14 +13,14 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
-	"github.com/kolide/kit/fs"
+	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 var profileDirs = map[string][]string{
-	"windows": []string{"Appdata/Local/Google/Chrome/User Data"},
-	"darwin":  []string{"Library/Application Support/Google/Chrome"},
+	"windows": {"Appdata/Local/Google/Chrome/User Data"},
+	"darwin":  {"Library/Application Support/Google/Chrome"},
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
@@ -50,7 +50,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
-	if err := fs.CopyFile(file.path, dst); err != nil {
+	if err := fsutil.CopyFile(file.path, dst); err != nil {
 		return nil, errors.Wrap(err, "copying sqlite file to tmp dir")
 	}
 

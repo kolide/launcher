@@ -272,6 +272,11 @@ func (o *OsqueryInstance) Healthy() error {
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
+
+	if o.extensionManagerClient == nil {
+		return nil, errors.New("client not ready")
+	}
+
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not query the extension manager client")
