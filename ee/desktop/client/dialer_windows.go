@@ -8,7 +8,6 @@ import (
 	"net"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/kolide/launcher/ee/desktop"
 )
 
 func dialContext(socketPath string) func(_ context.Context, _, _ string) (net.Conn, error) {
