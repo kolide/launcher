@@ -1,4 +1,4 @@
-package falconctl
+package falconctlstats
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	osquerygotable "github.com/osquery/osquery-go/plugin/table"
 )
 
-type table struct {
+type Table struct {
 	name   string
 	logger log.Logger
 }
@@ -22,10 +22,10 @@ const tableName = "kolide_crowdstrike"
 
 var re = regexp.MustCompile(`\s?=\s?|\s`)
 
-func tablePlugin(logger log.Logger) *osquerygotable.Plugin {
+func TablePlugin(logger log.Logger) *osquerygotable.Plugin {
 	columns := dataflattentable.Columns()
 
-	t := &table{
+	t := &Table{
 		name:   tableName,
 		logger: logger,
 	}
@@ -33,16 +33,37 @@ func tablePlugin(logger log.Logger) *osquerygotable.Plugin {
 	return osquerygotable.NewPlugin(t.name, columns, t.generate)
 }
 
-func (t *table) generate(ctx context.Context, queryContext osquerygotable.QueryContext) ([]map[string]string, error) {
+func (t *Table) generate(ctx context.Context, queryContext osquerygotable.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
+
+	// TODO: Replace this with the output of the real command
+	output := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
+
+	// options := []string{
+	// 	"-g",
+	// 	"--rfm-state",
+	// 	"--aid",
+	// 	"--version",
+	// 	"--metadata-query",
+	// 	"--rfm-reason",
+	// 	"--tags",
+	// 	"--feature",
+	// 	"--app",
+	// 	"--aph",
+	// 	"--provisioning-token",
+	// 	"--systags",
+	// 	"--cid",
+	// }
+	// output, err := tablehelpers.Exec(context.Background(), t.logger, 30, []string{"/opt/CrowdStrike/falconctl"}, options)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 
-		// TODO: Replace this with the output of the real command
-		output := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
 		dataArr := strings.Split(output, ", ")
 		rawKeyVals := make(map[string]interface{})
 

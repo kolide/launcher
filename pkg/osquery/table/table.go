@@ -2,7 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/osquery/tables/crowdstrike"
+	"github.com/kolide/launcher/pkg/osquery/tables/crowdstrike/falconctlstats"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
@@ -46,7 +46,7 @@ func PlatformTables(
 		SshKeys(client, logger),
 		cryptoinfotable.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
-		crowdstrike.TablePlugin(logger),
+		falconctlstats.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
 		dataflattentable.TablePluginExec(client, logger,
