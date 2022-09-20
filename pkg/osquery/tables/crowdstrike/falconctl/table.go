@@ -1,4 +1,4 @@
-package crowdstrike
+package falconctl
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go/plugin/table"
+	osquerygotable "github.com/osquery/osquery-go/plugin/table"
 )
 
-type Table struct {
+type table struct {
 	name   string
 	logger log.Logger
 }
@@ -22,18 +22,18 @@ const tableName = "kolide_crowdstrike"
 
 var re = regexp.MustCompile(`\s?=\s?|\s`)
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func tablePlugin(logger log.Logger) *osquerygotable.Plugin {
 	columns := dataflattentable.Columns()
 
-	t := &Table{
+	t := &table{
 		name:   tableName,
 		logger: logger,
 	}
 
-	return table.NewPlugin(t.name, columns, t.generate)
+	return osquerygotable.NewPlugin(t.name, columns, t.generate)
 }
 
-func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *table) generate(ctx context.Context, queryContext osquerygotable.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
