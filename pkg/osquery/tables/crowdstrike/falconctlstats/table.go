@@ -62,6 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext osquerygotable.QueryC
 }
 
 func parse(queryContext osquerygotable.QueryContext, logger log.Logger, output string) ([]map[string]string, error) {
+	// TODO: Add case for when CID not set
 	var results []map[string]string
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -86,8 +87,7 @@ func parse(queryContext osquerygotable.QueryContext, logger log.Logger, output s
 			)
 		}
 
-		rowData := make(map[string]string)
-		results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flatData, dataQuery, make(map[string]string))...)
 	}
 
 	return results, nil
