@@ -6,7 +6,7 @@
         {
             "label": "pre-debug",
             "type": "shell",
-            "command": "(cd ${workspaceFolder}; bash ./.vscode/pre-debug.sh)",
-        },
+            "command": "(cd ${workspaceFolder} && make deps)"
+        }
     ]
 }

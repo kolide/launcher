@@ -6,7 +6,7 @@
 1. [Install VS Code Go Extension](https://code.visualstudio.com/docs/languages/go)
 1. Osqueryd is available in your path or a common location
 1. Open launcher repo with VS Code
-1. Copy ./tools/vscode-debug/.vscode to ./.vscode (`mkdir -p ./.vscode && cp -r ./tools/vscode-debugging/conf/. ./.vscode`)
+1. Copy ./tools/vscode-debug/conf to ./.vscode (`mkdir -p ./.vscode && cp -r ./tools/vscode-debugging/conf/. ./.vscode`)
 * if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
 ## Debugging With Osquery Interactive

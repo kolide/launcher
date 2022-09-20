@@ -22,7 +22,7 @@
             "asRoot": true
         },
         {
-            "name": "k2",
+            "name": "k2-localhost",
             "type": "go",
             "request": "launch",
             "mode": "auto",
