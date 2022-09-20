@@ -18,6 +18,7 @@ type Table struct {
 	logger log.Logger
 }
 
+// TODO: Change table name to kolide_falconctl_stats
 const tableName = "kolide_crowdstrike"
 
 var re = regexp.MustCompile(`\s?=\s?|\s`)
@@ -34,30 +35,34 @@ func TablePlugin(logger log.Logger) *osquerygotable.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext osquerygotable.QueryContext) ([]map[string]string, error) {
-	var results []map[string]string
-
 	// TODO: Replace this with the output of the real command
-	output := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
+	// output := "aid is not set, aph is not set, app is not set, rfm-state is not set, rfm-reason is not set, feature is not set, metadata-query=enable (unset default), version = 6.38.13501.0"
 
-	// options := []string{
-	// 	"-g",
-	// 	"--rfm-state",
-	// 	"--aid",
-	// 	"--version",
-	// 	"--metadata-query",
-	// 	"--rfm-reason",
-	// 	"--tags",
-	// 	"--feature",
-	// 	"--app",
-	// 	"--aph",
-	// 	"--provisioning-token",
-	// 	"--systags",
-	// 	"--cid",
-	// }
-	// output, err := tablehelpers.Exec(context.Background(), t.logger, 30, []string{"/opt/CrowdStrike/falconctl"}, options)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	options := []string{
+		"-g",
+		"--rfm-state",
+		"--aid",
+		"--version",
+		"--metadata-query",
+		"--rfm-reason",
+		"--tags",
+		"--feature",
+		"--app",
+		"--aph",
+		"--provisioning-token",
+		"--systags",
+		"--cid",
+	}
+	output, err := tablehelpers.Exec(context.Background(), t.logger, 30, []string{"/opt/CrowdStrike/falconctl"}, options)
+	if err != nil {
+		panic(err)
+	}
+
+	return parse(queryContext, t.logger, string(output))
+}
+
+func parse(queryContext osquerygotable.QueryContext, logger log.Logger, output string) ([]map[string]string, error) {
+	var results []map[string]string
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
@@ -74,7 +79,7 @@ func (t *Table) generate(ctx context.Context, queryContext osquerygotable.QueryC
 
 		flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
 		if err != nil {
-			level.Debug(t.logger).Log(
+			level.Debug(logger).Log(
 				"msg", "failed to flatten data",
 				"table", tableName,
 				"err", err,
