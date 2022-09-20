@@ -13,10 +13,7 @@
             "program": "${workspaceFolder}/cmd/launcher",
             "args": [
                 "interactive",
-                "--osquery_flag=allow-unsafe",
-                "--osquery_flag=verbose",
-                // add atc config to the path below to load atc config
-                "--osquery_flag=config_path=${workspaceFolder}/debug/kolide-atc-config.json",
+                "--osquery_flag=verbose"
             ],
             "console": "integratedTerminal",
             "asRoot": true

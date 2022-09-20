@@ -9,7 +9,7 @@
 1. Copy ./tools/vscode-debug/conf to ./.vscode (`mkdir -p ./.vscode && cp -r ./tools/vscode-debugging/conf/. ./.vscode`)
 * if this is your first time using the VS Code go extension, you'll be prompted to install various go packages when you start debugging
 
-## Debugging With Osquery Interactive
+## Debugging With Launcher/Osquery Interactive
 
 1. Press cmd+p on macOS
 1. Type `debug interactive`
@@ -23,7 +23,7 @@ Now you should be able to set break points in VS Code and hit them by executing 
 
 1. Log into your local instance of K2 > Inventory > Add Device, the enroll_secret will be displayed in the launcher command
 1. Save your enroll_secret to `./debug/k2_enroll_secret`
-1. Either copy the {k2-repo}/tmp/localhost.crt to `./debug/localhost.crt` or create a sym like from `{k2-repo}/tmp/localhost.crt` -> `./debug/localhost.crt` at the root of your launcher repository
+1. Either copy the {k2-repo}/tmp/localhost.crt to `./debug/localhost.crt` or create a symlink from `{k2-repo}/tmp/localhost.crt` -> `./debug/localhost.crt`
    ```sh
    # symlink cmd
    ln -s <k2-repo>/tmp/localhost.crt <launcher-repo>/debug/localhost.crt
