@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/env"
+	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
@@ -35,15 +38,18 @@ func runDesktop(args []string) error {
 		return fmt.Errorf("setting flags: %w", err)
 	}
 
+	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
+	logger = log.With(logger, "component", "desktop_process")
+	level.Info(logger).Log("msg", "starting")
+
 	shutdownChan := make(chan struct{})
 
-	go handleSignals(shutdownChan)
-	go monitorParentProcess(shutdownChan)
+	go handleSignals(logger, shutdownChan)
+	go monitorParentProcess(logger, shutdownChan)
 
 	var runGroup run.Group
 
-	// TODO: use real logger
-	server, err := server.New(log.NewNopLogger(), *flauthtoken, desktop.DesktopSocketPath(os.Getpid()), shutdownChan)
+	server, err := server.New(logger, *flauthtoken, desktop.DesktopSocketPath(os.Getpid()), shutdownChan)
 	if err != nil {
 		return err
 	}
@@ -53,7 +59,10 @@ func runDesktop(args []string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			//TODO: log this
+			level.Error(logger).Log(
+				"msg", "shutting down server",
+				"err", err,
+			)
 		}
 	})
 
@@ -68,11 +77,12 @@ func runDesktop(args []string) error {
 	go func() {
 		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
-			//TODO: log this
+			level.Error(logger).Log(
+				"msg", "running run group",
+				"err", err,
+			)
 		}
 	}()
-
-	fmt.Print(desktop.DesktopSocketPath(os.Getpid()))
 
 	// blocks until shutdown called
 	menu.Init(*flhostname)
@@ -80,19 +90,23 @@ func runDesktop(args []string) error {
 	return nil
 }
 
-func handleSignals(signalReceivedChan chan<- struct{}) {
+func handleSignals(logger log.Logger, signalReceivedChan chan<- struct{}) {
 	signalsToHandle := []os.Signal{os.Interrupt, os.Kill}
 	signals := make(chan os.Signal, len(signalsToHandle))
 	signal.Notify(signals, signalsToHandle...)
 
-	<-signals
+	sig := <-signals
 
-	//TODO: log signal
+	level.Debug(logger).Log(
+		"msg", "received signal",
+		"signal", sig,
+	)
+
 	signalReceivedChan <- struct{}{}
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(parentGoneChan chan<- struct{}) {
+func monitorParentProcess(logger log.Logger, parentGoneChan chan<- struct{}) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
@@ -110,7 +124,10 @@ func monitorParentProcess(parentGoneChan chan<- struct{}) {
 		// but the linter and the context.WithTimeout docs say to do it
 		cancel()
 		if err != nil || !exists {
-			//TODO: log parent gone
+			level.Error(logger).Log(
+				"msg", "parent process gone",
+				"err", err,
+			)
 			break
 		}
 	}

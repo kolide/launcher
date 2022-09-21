@@ -180,7 +180,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}()
 
 	for uid, proc := range r.uidProcs {
-		if err := client.Shutdown(r.authToken, desktop.DesktopSocketPath(proc.process.Pid)); err != nil {
+		client := client.New(r.authToken, desktop.DesktopSocketPath(proc.process.Pid))
+		if err := client.Shutdown(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to desktop process",
 				"uid", uid,

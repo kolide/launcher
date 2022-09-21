@@ -26,7 +26,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
-		logger:       logger,
+		logger:       log.With(logger, "component", "desktop_server"),
 	}
 
 	authedMux := http.NewServeMux()
@@ -53,7 +53,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	desktopServer.server.RegisterOnShutdown(func() {
 		// remove socket on shutdown
 		if err := os.RemoveAll(socketPath); err != nil {
-			//TODO: log this
+			level.Error(logger).Log("msg", "removing socket on shutdown", "err", err)
 		}
 	})
 

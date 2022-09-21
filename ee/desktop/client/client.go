@@ -1,28 +1,60 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 )
 
-func Shutdown(authToken, socketPath string) error {
-	client := http.Client{
-		Transport: &http.Transport{
-			DialContext: dialContext(socketPath),
+type transport struct {
+	authToken string
+	base      http.Transport
+}
+
+func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", t.authToken))
+	return t.base.RoundTrip(req)
+}
+
+type Client struct {
+	base http.Client
+}
+
+func New(authToken, socketPath string) Client {
+	transport := &transport{
+		authToken: authToken,
+		base: http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
 		},
 	}
 
-	request, err := http.NewRequest("GET", "http://unix/shutdown", nil)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+	client := Client{
+		base: http.Client{
+			Transport: transport,
+			Timeout:   5 * time.Second,
+		},
 	}
 
-	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+	return client
+}
 
-	resp, err := client.Do(request)
+func (c *Client) Shutdown() error {
+	resp, err := c.base.Get("http://unix/shutdown")
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+
+	if resp.Body != nil {
+		resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	return nil
 }
