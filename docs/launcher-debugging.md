@@ -3,6 +3,8 @@
 To debug launcher, look at the logs. Depending on what's happening,
 you may need to enable debug level logs.
 
+## [Debugging with VS Code](../tools/vscode-debugging/README.md)
+
 ## Logs
 
 Launcher logs to stdout and stderr. Where these are placed, depends on

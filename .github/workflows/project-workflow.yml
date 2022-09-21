@@ -4,17 +4,16 @@ name: Add to project board
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, transferred]
   pull_request_target:
-    types: [opened, reopened]
-    branches: [main, master]
+    types: [opened]
+    branches: [main]
 
 jobs:
   add_to_board:
     runs-on: ubuntu-latest
     steps:
-      - uses: kolide/add-to-project-action@v1
+      - uses: actions/add-to-project@v0.3.0
         with:
-          token: ${{secrets.PROJECT_WORKFLOW_PAT}}
-          organization: kolide
-          project_number: 9
+          project-url: https://github.com/orgs/kolide/projects/13
+          github-token: ${{secrets.PROJECT_WORKFLOW_PAT}}
