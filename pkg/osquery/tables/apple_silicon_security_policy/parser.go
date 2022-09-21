@@ -2,11 +2,9 @@ package apple_silicon_security_policy
 
 import (
 	"bufio"
-	"bytes"
+	"io"
 	"regexp"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // This regexp gets matches for an arbitrary property name, and a four-character code (4CC) sequence
@@ -69,16 +67,22 @@ var volumeGroupRegexp = regexp.MustCompile("^((?:(?:.*) for volume group))(.*):"
 // Signed System Volume Status: Enabled    (sip1): absent
 // Kernel CTRR Status:          Enabled    (sip2): absent
 // Boot Args Filtering Status:  Enabled    (sip3): absent
-func parseStatus(rawdata []byte) ([]map[string]string, error) {
-	data := []map[string]string{}
+func parseBootPoliciesOutput(reader io.Reader) map[string]interface{} {
+	var volumeGroup string
+	var volumeGroupData []map[string]interface{}
+	results := make(map[string]interface{})
 
-	if len(rawdata) == 0 {
-		return nil, errors.New("No data")
+	// This function is called when either a new volume group has been found, or we
+	// have reached the end of the boot policy output. It's purpose is to add an
+	// entry for the most recent volume group processed, if it exists.
+	addVolumeGroupIfNeeded := func() {
+		if volumeGroup != "" && len(volumeGroupData) > 0 {
+			results[volumeGroup] = volumeGroupData
+		}
+		volumeGroupData = nil
 	}
 
-	var volumeGroup string
-
-	scanner := bufio.NewScanner(bytes.NewReader(rawdata))
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -86,6 +90,8 @@ func parseStatus(rawdata []byte) ([]map[string]string, error) {
 		// Once found, it will be the volume_group column associated with subsequent rows
 		m := volumeGroupRegexp.FindAllStringSubmatch(line, -1)
 		if len(m) == 1 && len(m[0]) == 3 {
+			// In the case we found more than one volume group, add the previous one to the results list now.
+			addVolumeGroupIfNeeded()
 			volumeGroup = strings.TrimSpace(m[0][2])
 			continue
 		}
@@ -95,75 +101,71 @@ func parseStatus(rawdata []byte) ([]map[string]string, error) {
 			continue
 		}
 
-		// Some lines have one colon, some have two colons
-		kv := strings.SplitN(line, ": ", 3)
-
-		var property, mode, code, value string
-		switch len(kv) {
-		case 2:
-			property, code, value = parseTwoColumns(kv)
-		case 3:
-			property, mode, code, value = parseThreeColumns(kv)
-		default:
-			// Skip blank lines or other unexpected input
-			continue
+		row := parsePolicyRow(line)
+		if row != nil {
+			volumeGroupData = append(volumeGroupData, row)
 		}
-
-		rowData := map[string]string{
-			"volume_group": volumeGroup,
-			"property":     strings.ReplaceAll(strings.TrimSpace(property), " ", "_"),
-			"mode":         strings.TrimSpace(mode),
-			"code":         code,
-			"value":        strings.TrimSpace(value),
-		}
-
-		data = append(data, rowData)
 	}
 
-	return data, nil
+	// In the case there was only one volume group found, add it to the results list now.
+	addVolumeGroupIfNeeded()
+
+	return results
 }
 
-// Parses lines which have two columns of data, for example:
-//
-// Local Policy Nonce Hash                 (lpnh): A8D3EC575A03E7F58**REDACTED**
-//
-// Signature Type                                : BAA
-//
-// returns property, code (optional), value
-func parseTwoColumns(kv []string) (string, string, string) {
-	var property, code, value string
-	matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[0], -1)
-	if len(matches) > 0 && len(matches[0]) == 4 {
-		// matches[0][2] = property name string
-		// matches[0][3] = four-character code (4CC) sequence
-		property = matches[0][2]
-		code = matches[0][3]
+// Parses a single line of text of boot policy output
+func parsePolicyRow(line string) map[string]interface{} {
+	// Some lines have one colon, some have two colons
+	kv := strings.SplitN(line, ": ", 3)
 
-	} else {
-		property = kv[0]
-	}
-
-	value = kv[1]
-
-	return property, code, value
-}
-
-// Parses lines which have three columns of data, for example:
-//
-// 3rd Party Kexts Status:      Disabled   (smb2): absent
-//
-// returns property, mode, code, value
-func parseThreeColumns(kv []string) (string, string, string, string) {
 	var property, mode, code, value string
-	matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[1], -1)
-	if len(matches) > 0 && len(matches[0]) == 4 {
-		// matches[0][2] = (Full|Enabled|Disabled)
-		// matches[0][3] = four-character code (4CC) sequence
-		property = kv[0]
-		mode = matches[0][2]
-		code = matches[0][3]
-		value = kv[2]
+	switch len(kv) {
+	case 2:
+		// Parses lines which have two columns of data, for example:
+		//
+		// Local Policy Nonce Hash                 (lpnh): A8D3EC575A03E7F58**REDACTED**
+		//
+		// Signature Type                                : BAA
+		matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[0], -1)
+		if len(matches) > 0 && len(matches[0]) == 4 {
+			// matches[0][2] = property name string
+			// matches[0][3] = four-character code (4CC) sequence
+			property = matches[0][2]
+			code = matches[0][3]
+
+		} else {
+			property = kv[0]
+		}
+
+		value = kv[1]
+	case 3:
+		// Parses lines which have three columns of data, for example:
+		//
+		// 3rd Party Kexts Status:      Disabled   (smb2): absent
+		//
+		matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[1], -1)
+		if len(matches) > 0 && len(matches[0]) == 4 {
+			// matches[0][2] = (Full|Enabled|Disabled)
+			// matches[0][3] = four-character code (4CC) sequence
+			property = kv[0]
+			mode = matches[0][2]
+			code = matches[0][3]
+			value = kv[2]
+		}
+	default:
+		// Skip blank lines or other unexpected input
+		return nil
 	}
 
-	return property, mode, code, value
+	objData := map[string]interface{}{
+		"value": strings.TrimSpace(value),
+		"mode":  strings.TrimSpace(mode),
+		"code":  code,
+	}
+
+	rowData := map[string]interface{}{
+		strings.ReplaceAll(strings.TrimSpace(property), " ", "_"): objData,
+	}
+
+	return rowData
 }
