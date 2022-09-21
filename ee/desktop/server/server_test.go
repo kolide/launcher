@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -49,7 +50,7 @@ func TestDesktopServer_authMiddleware(t *testing.T) {
 			t.Parallel()
 
 			var logBytes bytes.Buffer
-			server, _ := testServer(t, validAuthHeader, testSocketPath(t, tt.name), &logBytes)
+			server, _ := testServer(t, validAuthHeader, testSocketPath(t), &logBytes)
 
 			req, err := http.NewRequest("GET", "https://127.0.0.1:8080", nil)
 			require.NoError(t, err)
@@ -88,7 +89,7 @@ func TestDesktopServer_shutdownHandler(t *testing.T) {
 			t.Parallel()
 
 			var logBytes bytes.Buffer
-			server, shutdownChan := testServer(t, validAuthHeader, testSocketPath(t, tt.name), &logBytes)
+			server, shutdownChan := testServer(t, validAuthHeader, testSocketPath(t), &logBytes)
 
 			go func() {
 				<-shutdownChan
@@ -123,12 +124,18 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 	return server, shutdownChan
 }
 
-func testSocketPath(t *testing.T, testCaseName string) string {
+func testSocketPath(t *testing.T) string {
+	socketFileName := strings.Replace(t.Name(), "/", "_", -1)
+
 	// using t.TempDir() creates a file path too long for a unix socket
-	fileName := fmt.Sprintf("%s_%s", t.Name(), testCaseName)
-	socketPath := filepath.Join(os.TempDir(), fileName)
+	socketPath := filepath.Join(os.TempDir(), socketFileName)
+	// truncate socket path to max length
+	if len(socketPath) > 103 {
+		socketPath = socketPath[:103]
+	}
+
 	if runtime.GOOS == "windows" {
-		socketPath = fmt.Sprintf(`\\.\pipe\%s`, fileName)
+		socketPath = fmt.Sprintf(`\\.\pipe\%s`, socketFileName)
 	}
 
 	t.Cleanup(func() {
