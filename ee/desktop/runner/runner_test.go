@@ -108,6 +108,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithHostname("somewhere-over-the-rainbow.example.com"),
 				WithUpdateInterval(time.Millisecond*250),
 				WithInterruptTimeout(time.Second*5),
+				WithAuthToken("test-auth-token"),
 			)
 
 			if tt.setup != nil {

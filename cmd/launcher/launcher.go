@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/google/uuid"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
@@ -195,10 +196,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
+		authToken, err := uuid.NewRandom()
+		if err != nil {
+			return fmt.Errorf("error generating auth token: %w", err)
+		}
+
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithHostname(opts.KolideServerURL),
+			desktopRunner.WithAuthToken(authToken.String()),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 	}

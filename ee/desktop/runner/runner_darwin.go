@@ -48,7 +48,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	proc, err := runAsUser(uid, os.Environ(), executablePath, "desktop", "--hostname", r.hostname)
+	proc, err := runAsUser(uid, r.processEnvVars(), executablePath, "desktop")
 	if err != nil {
 		return fmt.Errorf("running desktop: %w", err)
 	}
@@ -78,7 +78,7 @@ func consoleOwnerUid() (uint32, error) {
 	return consoleInfo.Sys().(*syscall.Stat_t).Uid, nil
 }
 
-func runAsUser(uid string, env []string, path string, args ...string) (*os.Process, error) {
+func runAsUser(uid string, envVars []string, path string, args ...string) (*os.Process, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("getting current user: %w", err)
@@ -90,7 +90,7 @@ func runAsUser(uid string, env []string, path string, args ...string) (*os.Proce
 	}
 
 	cmd := exec.Command(path, args...)
-	cmd.Env = env
+	cmd.Env = envVars
 
 	// current user not root
 	if currentUser.Uid != "0" {

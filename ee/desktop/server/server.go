@@ -8,29 +8,36 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
-	"github.com/kolide/launcher/ee/desktop"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 type DesktopServer struct {
+	logger       log.Logger
 	server       *http.Server
 	listener     net.Listener
 	shutdownChan chan<- struct{}
+	authToken    string
 }
 
-func New(shutdownChan chan<- struct{}) (*DesktopServer, error) {
+func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
+		authToken:    authToken,
+		logger:       logger,
 	}
 
+	authedMux := http.NewServeMux()
+	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
+	mux.Handle("/", desktopServer.authMiddleware(authedMux))
 
 	desktopServer.server = &http.Server{
 		Handler: mux,
 	}
-
-	socketPath := desktop.DesktopSocketPath(os.Getpid())
 
 	// remove existing socket
 	if err := os.RemoveAll(socketPath); err != nil {
@@ -65,4 +72,28 @@ func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\"msg\": \"shutting down\"}"))
 	s.shutdownChan <- struct{}{}
+}
+
+func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body.Close()
+		}
+
+		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
+
+		if len(authHeader) != 2 {
+			level.Debug(s.logger).Log("msg", "malformed authorization header")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if authHeader[1] != s.authToken {
+			level.Debug(s.logger).Log("msg", "invalid authorization token")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

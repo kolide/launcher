@@ -52,6 +52,13 @@ func WithInterruptTimeout(timeout time.Duration) DesktopUsersProcessesRunnerOpti
 	}
 }
 
+// WithAuth sets the auth token for the runner
+func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.authToken = token
+	}
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -73,6 +80,8 @@ type DesktopUsersProcessesRunner struct {
 	// hostname is the host that launcher is connecting to. It gets passed to the desktop process
 	// and is used to determine which icon to display
 	hostname string
+	// authToken is the auth token to use when connecting to the launcher desktop server
+	authToken string
 }
 
 // addProcessForUser adds process information to the internal tracking state
@@ -171,7 +180,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}()
 
 	for uid, proc := range r.uidProcs {
-		if err := client.Shutdown(desktop.DesktopSocketPath(proc.process.Pid)); err != nil {
+		if err := client.Shutdown(r.authToken, desktop.DesktopSocketPath(proc.process.Pid)); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to desktop process",
 				"uid", uid,
@@ -281,4 +290,13 @@ func processExists(processRecord processRecord) bool {
 	}
 
 	return true
+}
+
+func (r *DesktopUsersProcessesRunner) processEnvVars() []string {
+	const varFmt = "%s=%s"
+	return append(
+		os.Environ(),
+		fmt.Sprintf(varFmt, "hostname", r.hostname),
+		fmt.Sprintf(varFmt, "authtoken", r.authToken),
+	)
 }

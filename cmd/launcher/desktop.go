@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
@@ -14,7 +17,6 @@ import (
 )
 
 func runDesktop(args []string) error {
-
 	var (
 		flagset    = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
 		flhostname = flagset.String(
@@ -22,10 +24,15 @@ func runDesktop(args []string) error {
 			"",
 			"hostname launcher is connected to",
 		)
+		flauthtoken = flagset.String(
+			"authtoken",
+			"",
+			"auth token for desktop server",
+		)
 	)
 
-	if err := flagset.Parse(args); err != nil {
-		return err
+	if err := setFlags(*flagset, args); err != nil {
+		return fmt.Errorf("setting flags: %w", err)
 	}
 
 	shutdownChan := make(chan struct{})
@@ -35,7 +42,8 @@ func runDesktop(args []string) error {
 
 	var runGroup run.Group
 
-	server, err := server.New(shutdownChan)
+	// TODO: use real logger
+	server, err := server.New(log.NewNopLogger(), *flauthtoken, desktop.DesktopSocketPath(os.Getpid()), shutdownChan)
 	if err != nil {
 		return err
 	}
@@ -63,6 +71,8 @@ func runDesktop(args []string) error {
 			//TODO: log this
 		}
 	}()
+
+	fmt.Print(desktop.DesktopSocketPath(os.Getpid()))
 
 	// blocks until shutdown called
 	menu.Init(*flhostname)
@@ -106,4 +116,24 @@ func monitorParentProcess(parentGoneChan chan<- struct{}) {
 	}
 
 	parentGoneChan <- struct{}{}
+}
+
+func setFlags(flagSet flag.FlagSet, args []string) error {
+	err := flagSet.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	flagSet.VisitAll(func(f *flag.Flag) {
+		if f.Value.String() != "" {
+			return
+		}
+
+		// look for env var
+		if value, ok := os.LookupEnv(f.Name); ok {
+			f.Value.Set(value)
+		}
+	})
+
+	return nil
 }
