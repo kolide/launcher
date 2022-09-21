@@ -65,7 +65,11 @@ func (s *DesktopServer) Serve() error {
 }
 
 func (s *DesktopServer) Shutdown(ctx context.Context) error {
-	return s.server.Shutdown(ctx)
+	err := s.server.Shutdown(ctx)
+	if err != nil {
+		return err
+	}
+	return s.listener.Close()
 }
 
 func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {

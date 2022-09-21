@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,15 +47,17 @@ func TestClient_Shutdown(t *testing.T) {
 			client := New(validAuthToken, socketPath)
 			err = client.Shutdown()
 			assert.NoError(t, err)
+			assert.NoError(t, server.Shutdown(context.Background()))
 		})
 	}
 }
 
-func testSocketPath(t *testing.T, testName string) string {
+func testSocketPath(t *testing.T, testCaseName string) string {
 	// using t.TempDir() creates a file path too long for a unix socket
-	socketPath := filepath.Join(os.TempDir(), testName)
+	fileName := fmt.Sprintf("%s_%s", t.Name(), testCaseName)
+	socketPath := filepath.Join(os.TempDir(), fileName)
 	if runtime.GOOS == "windows" {
-		socketPath = fmt.Sprintf(`\\.\pipe\%s`, testName)
+		socketPath = fmt.Sprintf(`\\.\pipe\%s`, fileName)
 	}
 
 	t.Cleanup(func() {

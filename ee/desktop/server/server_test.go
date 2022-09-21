@@ -67,7 +67,7 @@ func TestDesktopServer_authMiddleware(t *testing.T) {
 				assert.Contains(t, logBytes.String(), tt.loggedErr)
 			}
 
-			server.Shutdown(context.Background())
+			require.NoError(t, server.Shutdown(context.Background()))
 		})
 	}
 }
@@ -103,6 +103,8 @@ func TestDesktopServer_shutdownHandler(t *testing.T) {
 
 			assert.Empty(t, logBytes.String())
 			assert.Equal(t, http.StatusOK, rr.Code)
+
+			require.NoError(t, server.Shutdown(context.Background()))
 		})
 	}
 }
@@ -121,11 +123,12 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 	return server, shutdownChan
 }
 
-func testSocketPath(t *testing.T, testName string) string {
+func testSocketPath(t *testing.T, testCaseName string) string {
 	// using t.TempDir() creates a file path too long for a unix socket
-	socketPath := filepath.Join(os.TempDir(), testName)
+	fileName := fmt.Sprintf("%s_%s", t.Name(), testCaseName)
+	socketPath := filepath.Join(os.TempDir(), fileName)
 	if runtime.GOOS == "windows" {
-		socketPath = fmt.Sprintf(`\\.\pipe\%s`, testName)
+		socketPath = fmt.Sprintf(`\\.\pipe\%s`, fileName)
 	}
 
 	t.Cleanup(func() {

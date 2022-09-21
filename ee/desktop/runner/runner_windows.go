@@ -6,7 +6,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"os/user"
@@ -14,9 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Microsoft/go-winio"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/ee/desktop"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -52,7 +49,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 		defer accessToken.Close()
 
-		proc, err := runWithAccessToken(accessToken, executablePath, "desktop", "--hostname", r.hostname)
+		proc, err := runWithAccessToken(accessToken, r.processEnvVars(), executablePath, "desktop")
 		if err != nil {
 			return fmt.Errorf("running desktop: %w", err)
 		}
@@ -138,8 +135,9 @@ func processAccessToken(pid int32) (syscall.Token, error) {
 }
 
 // runWithAccessToken runs the given executable with the given arguments using the given access token
-func runWithAccessToken(accessToken syscall.Token, path string, args ...string) (*os.Process, error) {
+func runWithAccessToken(accessToken syscall.Token, envVars []string, path string, args ...string) (*os.Process, error) {
 	cmd := exec.Command(path, args...)
+	cmd.Env = envVars
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Token: accessToken,
