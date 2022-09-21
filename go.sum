@@ -121,6 +121,8 @@ github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQ
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
 github.com/kolide/kit v0.0.0-20220822193427-0680b087f9bd h1:/z9eL7GqXuM8po3JN4QaOGX2nSkFubhZqrsDbauwKmw=
 github.com/kolide/kit v0.0.0-20220822193427-0680b087f9bd/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
+github.com/kolide/kit v0.0.0-20220920212810-17eca5d2e6d2 h1:wp1mWNZ2tb2Nq9uCa7g19PrYVHzBUb3RxU1aZCVuQGY=
+github.com/kolide/kit v0.0.0-20220920212810-17eca5d2e6d2/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/krypto v0.0.0-20220830180245-7cb3a3940071 h1:CMQwFVCVQR3ziaje/2TaW62CsTQrGybilNTkOWBadwA=
 github.com/kolide/krypto v0.0.0-20220830180245-7cb3a3940071/go.mod h1:Xdw3V8Z6rsebg2tliGb1xU46QDOxhcwS2dz49qFtIwc=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
