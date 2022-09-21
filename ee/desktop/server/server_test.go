@@ -30,16 +30,16 @@ func TestDesktopServer_authMiddleware(t *testing.T) {
 		authHeader string
 	}{
 		{
-			name:      "malformed authorization header",
+			name:      "malformed_authorization_header",
 			loggedErr: "malformed authorization header",
 		},
 		{
-			name:       "invalid authorization token",
+			name:       "invalid_authorization_token",
 			loggedErr:  "invalid authorization token",
 			authHeader: "Bearer invalid",
 		},
 		{
-			name:       "valid token",
+			name:       "valid_token",
 			authHeader: fmt.Sprintf("Bearer %s", validAuthHeader),
 		},
 	}

@@ -23,7 +23,7 @@ func TestClient_Shutdown(t *testing.T) {
 		name string
 	}{
 		{
-			name: "happy path",
+			name: "happy_path",
 		},
 	}
 	for _, tt := range tests {
