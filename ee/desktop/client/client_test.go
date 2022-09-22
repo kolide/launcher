@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,11 +43,11 @@ func TestClient_Shutdown(t *testing.T) {
 
 			go func() {
 				<-shutdownChan
+				assert.NoError(t, server.Shutdown(context.Background()))
 			}()
 
 			client := New(validAuthToken, socketPath)
-			err = client.Shutdown()
-			assert.NoError(t, err)
+			assert.NoError(t, client.Shutdown())
 		})
 	}
 }

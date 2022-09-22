@@ -5,13 +5,11 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -76,15 +74,12 @@ func (s *DesktopServer) Shutdown(ctx context.Context) error {
 	}
 
 	// on windows we need to expliclty close the listener
-	// on nonwindows this gives an error
+	// on non-windows this gives an error
 	if runtime.GOOS == "windows" {
 		return s.listener.Close()
 	}
 
-	// on windows you cannot remove a file if it is open by another resource
-	// it takes a bit of time between the server shutdown and the socket file
-	// being freed up, so we wait for it to be removed
-	return waitForRemoveFile(s.socketPath, 1*time.Second, 5*time.Second)
+	return nil
 }
 
 func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
@@ -115,31 +110,4 @@ func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-// waitForRemoveFile tries to remove a file on the given interval, returns error if time out exceeded
-func waitForRemoveFile(path string, interval, timeout time.Duration) error {
-	intervalTicker := time.NewTicker(interval)
-	defer intervalTicker.Stop()
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	f := func() bool {
-		return os.RemoveAll(path) == nil
-	}
-
-	if f() {
-		return nil
-	}
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			return fmt.Errorf("timeout waiting for file deletion: %s", path)
-		case <-intervalTicker.C:
-			if f() {
-				return nil
-			}
-		}
-	}
 }
