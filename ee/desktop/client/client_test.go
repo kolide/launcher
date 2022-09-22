@@ -43,11 +43,11 @@ func TestClient_Shutdown(t *testing.T) {
 
 			go func() {
 				<-shutdownChan
-				assert.NoError(t, server.Shutdown(context.Background()))
 			}()
 
 			client := New(validAuthToken, socketPath)
 			assert.NoError(t, client.Shutdown())
+			assert.NoError(t, server.Shutdown(context.Background()))
 		})
 	}
 }

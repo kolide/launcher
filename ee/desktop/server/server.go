@@ -5,11 +5,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -43,7 +45,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	}
 
 	// remove existing socket
-	if err := os.RemoveAll(socketPath); err != nil {
+	if err := desktopServer.removeSocket(); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +57,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 
 	desktopServer.server.RegisterOnShutdown(func() {
 		// remove socket on shutdown
-		if err := os.RemoveAll(socketPath); err != nil {
+		if err := desktopServer.removeSocket(); err != nil {
 			level.Error(logger).Log("msg", "removing socket on shutdown", "err", err)
 		}
 	})
@@ -76,7 +78,9 @@ func (s *DesktopServer) Shutdown(ctx context.Context) error {
 	// on windows we need to expliclty close the listener
 	// on non-windows this gives an error
 	if runtime.GOOS == "windows" {
-		return s.listener.Close()
+		if err := s.listener.Close(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -110,4 +114,38 @@ func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// removeSocket is a helper function to remove the socket file. The reason it exists is that
+// on windows, you can't delete a file that is opened by another resource. When the server
+// shuts down, there is some lag time before the file is release, this can cause errors
+// when trying to delete the file.
+func (s *DesktopServer) removeSocket() error {
+	return waitForFileRemove(s.socketPath, 1*time.Millisecond, 5*time.Second)
+}
+
+func waitForFileRemove(path string, interval, timeout time.Duration) error {
+	intervalTicker := time.NewTicker(interval)
+	defer intervalTicker.Stop()
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+
+	f := func() bool {
+		return os.RemoveAll(path) == nil
+	}
+
+	if f() {
+		return nil
+	}
+
+	for {
+		select {
+		case <-timeoutTimer.C:
+			return fmt.Errorf("timeout waiting for file removal: %s", path)
+		case <-intervalTicker.C:
+			if f() {
+				return nil
+			}
+		}
+	}
 }
