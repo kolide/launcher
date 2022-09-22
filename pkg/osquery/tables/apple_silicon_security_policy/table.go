@@ -6,7 +6,6 @@ package apple_silicon_security_policy
 import (
 	"bytes"
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -45,36 +44,21 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return nil, nil
 	}
 
-	status, err := generatePoliciesTable(output, queryContext, t.logger)
-	if err != nil {
-		level.Info(t.logger).Log("msg", "Error parsing status", "err", err)
+	if len(output) == 0 {
+		level.Info(t.logger).Log("msg", "No bputil data to parse")
 		return nil, nil
 	}
 
-	results = status
-
-	return results, nil
-}
-
-func generatePoliciesTable(rawdata []byte, queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
-	data := []map[string]string{}
-
-	if len(rawdata) == 0 {
-		return nil, errors.New("No data")
-	}
-
-	var output map[string]interface{}
-	rowData := map[string]string{}
-
-	output = parseBootPoliciesOutput(bytes.NewReader(rawdata))
+	data := parseBootPoliciesOutput(bytes.NewReader(output))
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(output, dataflatten.WithLogger(logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
-			return nil, err
+			level.Info(t.logger).Log("msg", "Error flattening data", "err", err)
+			return nil, nil
 		}
-		data = append(data, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flattened, dataQuery, nil)...)
 	}
 
-	return data, nil
+	return results, nil
 }
