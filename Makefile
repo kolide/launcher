@@ -148,6 +148,10 @@ sudo-osqueryi-tables: build_tables.ext
 launchas-osqueryi-tables: build_tables.ext
 	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
 
+install-local-fake-update: D = $(shell date +%s)
+install-local-fake-update: build_launcher
+	sudo mkdir /usr/local/kolide-k2/bin/launcher-updates/$(D)
+	sudo cp build/launcher /usr/local/kolide-k2/bin/launcher-updates/$(D)/
 
 # `-o runtime` should be enough, however there was a catalina bug that
 # required we add `library`. This was fixed in 10.15.4. (from
