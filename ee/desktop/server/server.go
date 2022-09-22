@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -69,7 +70,14 @@ func (s *DesktopServer) Shutdown(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.listener.Close()
+
+	// on windows we need to expliclty close the listener
+	// on nonwindows this gives an error
+	if runtime.GOOS == "windows" {
+		return s.listener.Close()
+	}
+
+	return nil
 }
 
 func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
