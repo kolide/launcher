@@ -8,10 +8,10 @@ import (
 )
 
 // This regexp gets matches for an arbitrary property name, and a four-character code (4CC) sequence
-var fourCharCodeRegexp = regexp.MustCompile(`^((.*) (?:\((.{4})\)))`)
+var fourCharCodeRegexp = regexp.MustCompile(`^(.*)\s+\((.{4})\)`)
 
 // This regexp gets matches for the volume group UUID following the text "Local policy for volume group"
-var volumeGroupRegexp = regexp.MustCompile("^((?:(?:.*) for volume group))(.*):")
+var volumeGroupRegexp = regexp.MustCompile("^.* for volume group (.*):")
 
 // parseStatus parses the output from `bputil --display-all-policies`.
 // bputil reference: https://keith.github.io/xcode-man-pages/bputil.1.html
@@ -89,10 +89,10 @@ func parseBootPoliciesOutput(reader io.Reader) map[string]interface{} {
 		// Always look first for matches with the volume group regexp
 		// Once found, it will be the volume_group column associated with subsequent rows
 		m := volumeGroupRegexp.FindAllStringSubmatch(line, -1)
-		if len(m) == 1 && len(m[0]) == 3 {
+		if len(m) == 1 && len(m[0]) == 2 {
 			// In the case we found more than one volume group, add the previous one to the results list now.
 			addVolumeGroupIfNeeded()
-			volumeGroup = strings.TrimSpace(m[0][2])
+			volumeGroup = strings.TrimSpace(m[0][1])
 			continue
 		}
 
@@ -127,11 +127,11 @@ func parsePolicyRow(line string) map[string]interface{} {
 		//
 		// Signature Type                                : BAA
 		matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[0], -1)
-		if len(matches) > 0 && len(matches[0]) == 4 {
-			// matches[0][2] = property name string
-			// matches[0][3] = four-character code (4CC) sequence
-			property = matches[0][2]
-			code = matches[0][3]
+		if len(matches) > 0 && len(matches[0]) == 3 {
+			// matches[0][1] = property name string
+			// matches[0][2] = four-character code (4CC) sequence
+			property = matches[0][1]
+			code = matches[0][2]
 
 		} else {
 			property = kv[0]
@@ -144,12 +144,12 @@ func parsePolicyRow(line string) map[string]interface{} {
 		// 3rd Party Kexts Status:      Disabled   (smb2): absent
 		//
 		matches := fourCharCodeRegexp.FindAllStringSubmatch(kv[1], -1)
-		if len(matches) > 0 && len(matches[0]) == 4 {
-			// matches[0][2] = (Full|Enabled|Disabled)
-			// matches[0][3] = four-character code (4CC) sequence
+		if len(matches) > 0 && len(matches[0]) == 3 {
+			// matches[0][1] = (Full|Enabled|Disabled)
+			// matches[0][2] = four-character code (4CC) sequence
 			property = kv[0]
-			mode = matches[0][2]
-			code = matches[0][3]
+			mode = matches[0][1]
+			code = matches[0][2]
 			value = kv[2]
 		}
 	default:
