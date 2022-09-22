@@ -2,6 +2,7 @@ package apple_silicon_security_policy
 
 import (
 	"bytes"
+	_ "embed"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,54 +51,14 @@ func Test_ParseBootPoliciesOutputUnexpected(t *testing.T) {
 	}
 }
 
-const oneBootVol = `This utility is not meant for normal users or even sysadmins.
-It provides unabstracted access to capabilities which are normally handled for the user automatically when changing the security policy through GUIs such as the Startup Security Utility in macOS Recovery ("recoveryOS").
-It is possible to make your system security much weaker and therefore easier to compromise using this tool.
-This tool is not to be used in production environments.
-It is possible to render your system unbootable with this tool.
-It should only be used to understand how the security of Apple Silicon Macs works.
-Use at your own risk!
+//go:embed test-data/bputil-one-boot-vol.txt
+var oneBootVol string
 
+//go:embed test-data/bputil-multiple-boot-vol.txt
+var multipleBootVol string
 
-Local policy for volume group 1234567890:
-OS environment:
-OS Type                                       : macOS`
-
-const multipleBootVol = `This utility is not meant for normal users or even sysadmins.
-It provides unabstracted access to capabilities which are normally handled for the user automatically when changing the security policy through GUIs such as the Startup Security Utility in macOS Recovery ("recoveryOS").
-It is possible to make your system security much weaker and therefore easier to compromise using this tool.
-This tool is not to be used in production environments.
-It is possible to render your system unbootable with this tool.
-It should only be used to understand how the security of Apple Silicon Macs works.
-Use at your own risk!
-
-
-Local policy for volume group 123:
-OS environment:
-Boot Args Filtering Status:  Enabled    (sip3): absent
-
-Local policy for volume group 456:
-OS environment:
-Boot Args Filtering Status:  Enabled    (sip3): absent`
-
-const failedSecondVol = `This utility is not meant for normal users or even sysadmins.
-It provides unabstracted access to capabilities which are normally handled for the user automatically when changing the security policy through GUIs such as the Startup Security Utility in macOS Recovery ("recoveryOS").
-It is possible to make your system security much weaker and therefore easier to compromise using this tool.
-This tool is not to be used in production environments.
-It is possible to render your system unbootable with this tool.
-It should only be used to understand how the security of Apple Silicon Macs works.
-Use at your own risk!
-
-
-Local policy for volume group 5D0D176D-E8CC-4E8B-815C-444A679390BD:
-OS environment:
-OS Type                                       : macOS
-
-Local policy:
-Security Domain                         (SDOM): 0x1
-Production Status                       (CPRO): 1
-Can't get local policy for Volume Group UUID 5EADF322-3C85-4DF8-8516-0B556700CD5E
-Failed to display local policy for volume group 5EADF322-3C85-4DF8-8516-0B556700CD5E`
+//go:embed test-data/bputil-failed-second-vol.txt
+var failedSecondVol string
 
 func Test_ParsePoliciesTable(t *testing.T) {
 	t.Parallel()
