@@ -20,7 +20,7 @@ var titleRegex = regexp.MustCompile(`^\s*\|\s*(.+?)\s*\|\s*$`)
 // Capture output like:
 //
 //	IsDeviceJoined : NO
-var linesRegex = regexp.MustCompile(`^\s*(.*?)\s*:\s*(.*?)\s*$`)
+var lineRegex = regexp.MustCompile(`^\s*(.*?)\s*:\s*(.*?)\s*$`)
 
 func Parse(reader io.Reader) (any, error) {
 	results := make(map[string]map[string]interface{})
@@ -53,7 +53,7 @@ func Parse(reader io.Reader) (any, error) {
 		}
 
 		// Check if we've found a line
-		if m := linesRegex.FindStringSubmatch(line); len(m) > 0 {
+		if m := lineRegex.FindStringSubmatch(line); len(m) > 0 {
 			if currentSectionHeader == "" {
 				return nil, fmt.Errorf("Found line before section header: %s", line)
 			}
