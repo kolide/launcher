@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/ee/desktop"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
@@ -33,6 +35,11 @@ func runDesktop(args []string) error {
 			"",
 			"auth token for desktop server",
 		)
+		flsocketpath = flagset.String(
+			"socket_path",
+			"",
+			"path to create socket",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
@@ -44,6 +51,14 @@ func runDesktop(args []string) error {
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 	logger = log.With(logger, "component", "desktop_process")
 	level.Info(logger).Log("msg", "starting")
+
+	if *flsocketpath == "" {
+		*flsocketpath = defaultSocketPath()
+		level.Info(logger).Log(
+			"msg", "using default socket path since none was provided",
+			"socket_path", *flsocketpath,
+		)
+	}
 
 	var runGroup run.Group
 
@@ -60,7 +75,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, desktop.DesktopSocketPath(os.Getpid()), shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan)
 	if err != nil {
 		return err
 	}
@@ -141,4 +156,14 @@ func monitorParentProcess(logger log.Logger) {
 			break
 		}
 	}
+}
+
+func defaultSocketPath() string {
+	const socketBaseName = "kolide_desktop.sock"
+
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`\\.\pipe\%s_%d_%s`, socketBaseName, os.Getpid(), ulid.New())
+	}
+
+	return filepath.Join(os.TempDir(), fmt.Sprintf("%d_%s", os.Getpid(), socketBaseName))
 }

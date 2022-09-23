@@ -2,11 +2,9 @@ package menu
 
 import (
 	"fmt"
-	"os"
 
 	"fyne.io/systray"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
@@ -28,7 +26,6 @@ func Init(hostname string) {
 		systray.AddSeparator()
 		systray.AddMenuItem("--- DEBUG ---", "").Disable()
 		systray.AddMenuItem(fmt.Sprintf("Hostname: %s", hostname), "").Disable()
-		systray.AddMenuItem(fmt.Sprintf("Socket Path: %s", desktop.DesktopSocketPath(os.Getpid())), "").Disable()
 	}
 
 	systray.Run(onReady, func() {})

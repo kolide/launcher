@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -101,6 +102,16 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			t.Parallel()
 
 			var logBytes threadSafeBuffer
+			launcherRootDir := filepath.Join(t.TempDir(), "launcher_desktop_test", strings.ReplaceAll(tt.name, "/", "_"))
+
+			// on non windows the socket length cannot be more than 103 characters
+			// so use a short path and remove it
+			if runtime.GOOS != "windows" {
+				launcherRootDir = filepath.Join("tmp", "launcher_desktop_test", strings.ReplaceAll(tt.name, "/", "_"))
+				t.Cleanup(func() {
+					require.NoError(t, os.RemoveAll(launcherRootDir))
+				})
+			}
 
 			r := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
@@ -109,6 +120,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithUpdateInterval(time.Millisecond*250),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
+				WithLauncherRootDir(launcherRootDir),
 			)
 
 			if tt.setup != nil {

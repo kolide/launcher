@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/shirou/gopsutil/process"
 )
@@ -66,7 +66,7 @@ func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
 // for kolide desktop files on a per user basis
 func WithLauncherRootDir(token string) DesktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.authToken = token
+		r.launcherRootDir = token
 	}
 }
 
@@ -101,8 +101,9 @@ type DesktopUsersProcessesRunner struct {
 // processRecord is a struct to hold an *os.process and its path.
 // The path is used to ensure another process has not taken the same pid.
 type processRecord struct {
-	process *os.Process
-	path    string
+	process    *os.Process
+	path       string
+	socketPath string
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
@@ -114,6 +115,7 @@ func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		updateInterval:   time.Second * 5,
 		procsWg:          &sync.WaitGroup{},
 		interruptTimeout: time.Second * 10,
+		launcherRootDir:  filepath.Join(os.TempDir(), "launcher"),
 	}
 
 	for _, opt := range opts {
@@ -163,7 +165,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}()
 
 	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, desktop.DesktopSocketPath(proc.process.Pid))
+		client := client.New(r.authToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to desktop process",
@@ -214,14 +216,17 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			continue
 		}
 
-		proc, err := runAsUser(uid, r.processEnvVars(), executablePath, "desktop")
+		socketPath, err := r.socketPath(uid)
+		if err != nil {
+			return fmt.Errorf("getting socket path: %w", err)
+		}
+
+		proc, err := runAsUser(uid, r.processEnvVars(socketPath), executablePath, "desktop")
 		if err != nil {
 			return fmt.Errorf("starting desktop process: %w", err)
 		}
 
-		if err := r.addProcessTrackingRecordForUser(uid, proc); err != nil {
-			return fmt.Errorf("adding process to internal tracking state: %w", err)
-		}
+		r.waitOnProcessAsync(uid, proc)
 
 		level.Debug(r.logger).Log(
 			"msg", "desktop started",
@@ -229,14 +234,16 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			"pid", proc.Pid,
 		)
 
-		r.waitOnProcessAsync(uid, proc)
+		if err := r.addProcessTrackingRecordForUser(uid, socketPath, proc); err != nil {
+			return fmt.Errorf("adding process to internal tracking state: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // addProcessTrackingRecordForUser adds process information to the internal tracking state
-func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string, osProcess *os.Process) error {
+func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string, socketPath string, osProcess *os.Process) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
@@ -251,8 +258,9 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 	}
 
 	r.uidProcs[uid] = processRecord{
-		process: osProcess,
-		path:    path,
+		process:    osProcess,
+		path:       path,
+		socketPath: socketPath,
 	}
 
 	return nil
@@ -336,31 +344,43 @@ func processExists(processRecord processRecord) bool {
 	return true
 }
 
-func (r *DesktopUsersProcessesRunner) processEnvVars() []string {
+func (r *DesktopUsersProcessesRunner) processEnvVars(socketPath string) []string {
 	const varFmt = "%s=%s"
 	return append(
 		os.Environ(),
 		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
 		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
+		fmt.Sprintf(varFmt, "SOCKET_PATH", socketPath),
 	)
 }
 
 // socketPath returns standard pipe path for windows
 // on posix systems, it creates a folder and changes owner to the user
 // then provides a path to the socket in that folder
-func (r *DesktopUsersProcessesRunner) socketPath(uid int) (string, error) {
+func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf(`\\.\pipe\kolide_desktop_%s`, ulid.New()), nil
 	}
 
-	userFolderPath := filepath.Join(r.launcherRootDir, fmt.Sprintf("desktop_%d", uid))
+	userFolderPath := filepath.Join(r.launcherRootDir, fmt.Sprintf("desktop_%s", uid))
 	if err := os.MkdirAll(userFolderPath, 0700); err != nil {
 		return "", fmt.Errorf("creating user folder: %w", err)
 	}
 
-	if err := os.Chown(userFolderPath, uid, -1); err != nil {
+	uidInt, err := strconv.Atoi(uid)
+	if err != nil {
+		return "", fmt.Errorf("converting uid to int: %w", err)
+	}
+
+	if err := os.Chown(userFolderPath, uidInt, -1); err != nil {
 		return "", fmt.Errorf("chowning user folder: %w", err)
 	}
 
-	return filepath.Join(userFolderPath, "desktop.sock"), nil
+	path := filepath.Join(userFolderPath, "kolide_desktop.sock")
+	const maxSocketLength = 103
+	if len(path) > maxSocketLength {
+		return "", fmt.Errorf("socket path %s (length %d) is too long, max is %d", path, len(path), maxSocketLength)
+	}
+
+	return path, nil
 }
