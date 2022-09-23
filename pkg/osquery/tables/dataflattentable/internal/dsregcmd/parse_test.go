@@ -7,6 +7,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +26,27 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:     "not configured",
-			input:    mustReadFile(path.Join("test-data", "dsregcmd_not_configured.txt")),
-			expected: mustJsonUnmarshal(mustReadFile(path.Join("test-data", "dsregcmd_not_configured.expected.json"))),
+			input:    mustReadFile(path.Join("test-data", "not_configured.txt")),
+			expected: mustJsonUnmarshal(mustReadFile(path.Join("test-data", "not_configured.expected.json"))),
+		},
+
+		//
+		// Error Cases
+		//
+		{
+			name:        "lines before header",
+			input:       mustReadFile(path.Join("test-data", "error_lines_before_header.txt")),
+			expectedErr: true,
+		},
+		{
+			name:        "header missing line 3",
+			input:       mustReadFile(path.Join("test-data", "error_header_missing_line3.txt")),
+			expectedErr: true,
+		},
+		{
+			name:        "no section title",
+			input:       mustReadFile(path.Join("test-data", "error_no_section_title.txt")),
+			expectedErr: true,
 		},
 	}
 
@@ -36,7 +56,8 @@ func TestParse(t *testing.T) {
 			t.Parallel()
 			actual, err := Parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
-				require.Error(t, err)
+				assert.Error(t, err)
+				assert.Nil(t, actual)
 				return
 			}
 
