@@ -45,9 +45,14 @@ func Parse(reader io.Reader) (any, error) {
 			currentSectionHeader = m[1]
 			results[currentSectionHeader] = make(map[string]interface{})
 
-			// Consume the last line of the section header
+			// Consume the last line of the section header.
 			if ok := scanner.Scan(); !ok {
 				return nil, fmt.Errorf("failed to read third section header line")
+			} else {
+				line := scanner.Text()
+				if !startHeaderRegex.MatchString(line) {
+					return nil, fmt.Errorf("third section header line mismatch: %s", line)
+				}
 			}
 			continue
 		}
