@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -34,8 +35,8 @@ func runDesktop(args []string) error {
 		)
 	)
 
-	if err := setFlags(*flagset, args); err != nil {
-		return fmt.Errorf("setting flags: %w", err)
+	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
+		return fmt.Errorf("parsing flags: %w", err)
 	}
 
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
@@ -133,24 +134,4 @@ func monitorParentProcess(logger log.Logger, parentGoneChan chan<- struct{}) {
 	}
 
 	parentGoneChan <- struct{}{}
-}
-
-func setFlags(flagSet flag.FlagSet, args []string) error {
-	err := flagSet.Parse(args)
-	if err != nil {
-		return err
-	}
-
-	flagSet.VisitAll(func(f *flag.Flag) {
-		if f.Value.String() != "" {
-			return
-		}
-
-		// look for env var
-		if value, ok := os.LookupEnv(f.Name); ok {
-			f.Value.Set(value)
-		}
-	})
-
-	return nil
 }

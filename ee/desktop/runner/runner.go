@@ -297,7 +297,7 @@ func (r *DesktopUsersProcessesRunner) processEnvVars() []string {
 	const varFmt = "%s=%s"
 	return append(
 		os.Environ(),
-		fmt.Sprintf(varFmt, "hostname", r.hostname),
-		fmt.Sprintf(varFmt, "authtoken", r.authToken),
+		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
+		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
 	)
 }
