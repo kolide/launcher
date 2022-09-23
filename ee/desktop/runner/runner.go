@@ -5,11 +5,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/shirou/gopsutil/process"
@@ -59,6 +62,14 @@ func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
 	}
 }
 
+// WithLauncherRootDir sets the launcher root dir with will be the parent dir
+// for kolide desktop files on a per user basis
+func WithLauncherRootDir(token string) DesktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.authToken = token
+	}
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -82,29 +93,9 @@ type DesktopUsersProcessesRunner struct {
 	hostname string
 	// authToken is the auth token to use when connecting to the launcher desktop server
 	authToken string
-}
-
-// addProcessForUser adds process information to the internal tracking state
-func (r *DesktopUsersProcessesRunner) addProcessForUser(uid string, osProcess *os.Process) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-
-	psutilProc, err := process.NewProcessWithContext(ctx, int32(osProcess.Pid))
-	if err != nil {
-		return fmt.Errorf("creating process record: %w", err)
-	}
-
-	path, err := psutilProc.ExeWithContext(ctx)
-	if err != nil {
-		return fmt.Errorf("getting process path: %w", err)
-	}
-
-	r.uidProcs[uid] = processRecord{
-		process: osProcess,
-		path:    path,
-	}
-
-	return nil
+	// launcherRootDir is the launcher root dir with will be the parent dir
+	// for kolide desktop files on a per user basis
+	launcherRootDir string
 }
 
 // processRecord is a struct to hold an *os.process and its path.
@@ -137,10 +128,7 @@ func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 func (r *DesktopUsersProcessesRunner) Execute() error {
 	f := func() {
 		if err := r.runConsoleUserDesktop(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error running desktop",
-				"err", err,
-			)
+			level.Error(r.logger).Log("msg", "running console user desktop", "err", err)
 		}
 	}
 
@@ -151,12 +139,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	for {
 		select {
 		case <-ticker.C:
-			if err := r.runConsoleUserDesktop(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "error running desktop",
-					"err", err,
-				)
-			}
+			f()
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
 			return nil
@@ -213,6 +196,66 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 			}
 		}
 	}
+}
+
+func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+	executablePath, err := r.determineExecutablePath()
+	if err != nil {
+		return fmt.Errorf("determining executable path: %w", err)
+	}
+
+	consolerUsers, err := r.consoleUsers()
+	if err != nil {
+		return fmt.Errorf("getting console users: %w", err)
+	}
+
+	for _, uid := range consolerUsers {
+		if r.userHasDesktopProcess(uid) {
+			continue
+		}
+
+		proc, err := runAsUser(uid, r.processEnvVars(), executablePath, "desktop")
+		if err != nil {
+			return fmt.Errorf("starting desktop process: %w", err)
+		}
+
+		if err := r.addProcessTrackingRecordForUser(uid, proc); err != nil {
+			return fmt.Errorf("adding process to internal tracking state: %w", err)
+		}
+
+		level.Debug(r.logger).Log(
+			"msg", "desktop started",
+			"uid", consoleOwnerUid,
+			"pid", proc.Pid,
+		)
+
+		r.waitOnProcessAsync(uid, proc)
+	}
+
+	return nil
+}
+
+// addProcessTrackingRecordForUser adds process information to the internal tracking state
+func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string, osProcess *os.Process) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	psutilProc, err := process.NewProcessWithContext(ctx, int32(osProcess.Pid))
+	if err != nil {
+		return fmt.Errorf("creating process record: %w", err)
+	}
+
+	path, err := psutilProc.ExeWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("getting process path: %w", err)
+	}
+
+	r.uidProcs[uid] = processRecord{
+		process: osProcess,
+		path:    path,
+	}
+
+	return nil
 }
 
 // waitForProcess adds 1 to DesktopUserProcessRunner.procsWg and runs a goroutine to wait on the process to exit.
@@ -300,4 +343,24 @@ func (r *DesktopUsersProcessesRunner) processEnvVars() []string {
 		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
 		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
 	)
+}
+
+// socketPath returns standard pipe path for windows
+// on posix systems, it creates a folder and changes owner to the user
+// then provides a path to the socket in that folder
+func (r *DesktopUsersProcessesRunner) socketPath(uid int) (string, error) {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`\\.\pipe\kolide_desktop_%s`, ulid.New()), nil
+	}
+
+	userFolderPath := filepath.Join(r.launcherRootDir, fmt.Sprintf("desktop_%d", uid))
+	if err := os.MkdirAll(userFolderPath, 0700); err != nil {
+		return "", fmt.Errorf("creating user folder: %w", err)
+	}
+
+	if err := os.Chown(userFolderPath, uid, -1); err != nil {
+		return "", fmt.Errorf("chowning user folder: %w", err)
+	}
+
+	return filepath.Join(userFolderPath, "desktop.sock"), nil
 }

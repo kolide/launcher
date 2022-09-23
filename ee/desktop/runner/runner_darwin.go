@@ -14,13 +14,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// runConsoleUserDesktop determines the owner of /dev/console and runs the desktop process as that user
-// if no desktop process exists for that user
-func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
-
+func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
-		return fmt.Errorf("getting console owner uid: %w", err)
+		return nil, fmt.Errorf("getting console owner uid: %w", err)
 	}
 
 	// there seems to be a brief moment during start up where root or system (non-human)
@@ -32,40 +29,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			"uid", consoleOwnerUid,
 		)
 
-		return nil
+		return []string{}, nil
 	}
 
-	// consoleOwnerUid is a uint32, convert to string
-	uid := fmt.Sprint(consoleOwnerUid)
-
-	// already have a process, move on
-	if r.userHasDesktopProcess(uid) {
-		return nil
-	}
-
-	executablePath, err := r.determineExecutablePath()
-	if err != nil {
-		return fmt.Errorf("determining executable path: %w", err)
-	}
-
-	proc, err := runAsUser(uid, r.processEnvVars(), executablePath, "desktop")
-	if err != nil {
-		return fmt.Errorf("running desktop: %w", err)
-	}
-
-	if err := r.addProcessForUser(uid, proc); err != nil {
-		return fmt.Errorf("adding process for user: %w", err)
-	}
-
-	level.Debug(r.logger).Log(
-		"msg", "desktop started",
-		"uid", consoleOwnerUid,
-		"pid", proc.Pid,
-	)
-
-	r.waitOnProcessAsync(uid, proc)
-
-	return nil
+	return []string{fmt.Sprint(consoleOwnerUid)}, nil
 }
 
 func consoleOwnerUid() (uint32, error) {
