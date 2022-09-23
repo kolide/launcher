@@ -9,12 +9,12 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/ulid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,16 +102,6 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			t.Parallel()
 
 			var logBytes threadSafeBuffer
-			launcherRootDir := filepath.Join(t.TempDir(), "launcher_desktop_test", strings.ReplaceAll(tt.name, "/", "_"))
-
-			// on non windows the socket length cannot be more than 103 characters
-			// so use a short path and remove it
-			if runtime.GOOS != "windows" {
-				launcherRootDir = filepath.Join("tmp", "launcher_desktop_test", strings.ReplaceAll(tt.name, "/", "_"))
-				t.Cleanup(func() {
-					require.NoError(t, os.RemoveAll(launcherRootDir))
-				})
-			}
 
 			r := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
@@ -120,7 +110,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithUpdateInterval(time.Millisecond*250),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
-				WithLauncherRootDir(launcherRootDir),
+				WithLauncherRootDir(launcherRootDir(t)),
 			)
 
 			if tt.setup != nil {
@@ -181,4 +171,20 @@ func (b *threadSafeBuffer) String() string {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.String()
+}
+
+func launcherRootDir(t *testing.T) string {
+	safeTestName := fmt.Sprintf("%s_%s", "launcher_desktop_test", ulid.New())
+
+	path := filepath.Join(os.TempDir(), safeTestName)
+
+	if runtime.GOOS != "windows" {
+		path = filepath.Join("tmp", safeTestName)
+	}
+
+	t.Cleanup(func() {
+		require.NoError(t, os.RemoveAll(path))
+	})
+
+	return path
 }
