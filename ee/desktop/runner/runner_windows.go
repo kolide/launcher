@@ -13,61 +13,70 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/shirou/gopsutil/process"
 )
 
 // runConsoleUserDesktop iterates over all the current explorer processes and
 // runs the desktop process for the owner if none currently exists
-func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	explorerProcs, err := explorerProcesses()
 	if err != nil {
-		return fmt.Errorf("getting explorer processes: %w", err)
+		return nil, fmt.Errorf("getting explorer processes: %w", err)
 	}
+
+	var consoleUsers []string
 
 	for _, explorerProc := range explorerProcs {
 		uid, err := processOwnerUid(explorerProc)
 		if err != nil {
-			return fmt.Errorf("getting process owner uid: %w", err)
+			return nil, fmt.Errorf("getting process owner uid: %w", err)
 		}
-
-		// already have a process, move on
-		if r.userHasDesktopProcess(uid) {
-			continue
-		}
-
-		executablePath, err := r.determineExecutablePath()
-		if err != nil {
-			return fmt.Errorf("determining executable path: %w", err)
-		}
-
-		// get the access token of the user that owns the explorer process
-		// and use it to spawn a new process as that user
-		accessToken, err := processAccessToken(explorerProc.Pid)
-		if err != nil {
-			return fmt.Errorf("getting explorer process token: %w", err)
-		}
-		defer accessToken.Close()
-
-		proc, err := runWithAccessToken(accessToken, r.processEnvVars(), executablePath, "desktop")
-		if err != nil {
-			return fmt.Errorf("running desktop: %w", err)
-		}
-
-		if err := r.addProcessForUser(uid, proc); err != nil {
-			return fmt.Errorf("adding process for user: %w", err)
-		}
-
-		level.Debug(r.logger).Log(
-			"msg", "desktop started",
-			"uid", uid,
-			"pid", proc.Pid,
-		)
-
-		r.waitOnProcessAsync(uid, proc)
+		consoleUsers = append(consoleUsers, uid)
 	}
 
-	return nil
+	return consoleUsers, nil
+}
+
+func runAsUser(uid string, envVars []string, path string, args ...string) (*os.Process, error) {
+	explorerProc, err := userExplorerProcess(uid)
+	if err != nil {
+		return nil, fmt.Errorf("getting user explorer process: %w", err)
+	}
+
+	// get the access token of the user that owns the explorer process
+	// and use it to spawn a new process as that user
+	accessToken, err := processAccessToken(explorerProc.Pid)
+	if err != nil {
+		return nil, fmt.Errorf("getting explorer process token: %w", err)
+	}
+	defer accessToken.Close()
+
+	proc, err := runWithAccessToken(accessToken, envVars, path, args...)
+	if err != nil {
+		return nil, fmt.Errorf("running desktop: %w", err)
+	}
+
+	return proc, nil
+}
+
+func userExplorerProcess(uid string) (*process.Process, error) {
+	explorerProcs, err := explorerProcesses()
+	if err != nil {
+		return nil, fmt.Errorf("getting explorer processes: %w", err)
+	}
+
+	for _, proc := range explorerProcs {
+		procOwnerUid, err := processOwnerUid(proc)
+		if err != nil {
+			return nil, fmt.Errorf("getting process owner uid: %w", err)
+		}
+
+		if uid == procOwnerUid {
+			return proc, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // explorerProcesses returns a list of explorer processes whose

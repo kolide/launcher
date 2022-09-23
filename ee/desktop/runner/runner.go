@@ -225,7 +225,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 
 		level.Debug(r.logger).Log(
 			"msg", "desktop started",
-			"uid", consoleOwnerUid,
+			"uid", uid,
 			"pid", proc.Pid,
 		)
 
