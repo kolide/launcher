@@ -39,17 +39,27 @@ func runDesktop(args []string) error {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
+	// set up logging
+	// TODO: figure out where to write to log file
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 	logger = log.With(logger, "component", "desktop_process")
 	level.Info(logger).Log("msg", "starting")
 
-	shutdownChan := make(chan struct{})
-
-	go handleSignals(logger, shutdownChan)
-	go monitorParentProcess(logger, shutdownChan)
-
 	var runGroup run.Group
 
+	// listen for signals
+	runGroup.Add(func() error {
+		listenSignals(logger)
+		return nil
+	}, func(error) {})
+
+	// montior parent
+	runGroup.Add(func() error {
+		monitorParentProcess(logger)
+		return nil
+	}, func(error) {})
+
+	shutdownChan := make(chan struct{})
 	server, err := server.New(logger, *flauthtoken, desktop.DesktopSocketPath(os.Getpid()), shutdownChan)
 	if err != nil {
 		return err
@@ -67,7 +77,7 @@ func runDesktop(args []string) error {
 		}
 	})
 
-	// wait for shutdown
+	// listen on shutdown channel
 	runGroup.Add(func() error {
 		<-shutdownChan
 		return nil
@@ -75,6 +85,7 @@ func runDesktop(args []string) error {
 		menu.Shutdown()
 	})
 
+	// run run group
 	go func() {
 		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
@@ -91,7 +102,7 @@ func runDesktop(args []string) error {
 	return nil
 }
 
-func handleSignals(logger log.Logger, signalReceivedChan chan<- struct{}) {
+func listenSignals(logger log.Logger) {
 	signalsToHandle := []os.Signal{os.Interrupt, os.Kill}
 	signals := make(chan os.Signal, len(signalsToHandle))
 	signal.Notify(signals, signalsToHandle...)
@@ -102,12 +113,10 @@ func handleSignals(logger log.Logger, signalReceivedChan chan<- struct{}) {
 		"msg", "received signal",
 		"signal", sig,
 	)
-
-	signalReceivedChan <- struct{}{}
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger, parentGoneChan chan<- struct{}) {
+func monitorParentProcess(logger log.Logger) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
@@ -132,6 +141,4 @@ func monitorParentProcess(logger log.Logger, parentGoneChan chan<- struct{}) {
 			break
 		}
 	}
-
-	parentGoneChan <- struct{}{}
 }
