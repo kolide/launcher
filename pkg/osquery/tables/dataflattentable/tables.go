@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -25,16 +26,21 @@ const (
 	KeyValueType
 )
 
+type parserInt interface {
+	Parse(io.Reader) (any, error)
+}
+
 type Table struct {
-	client    *osquery.ExtensionManagerClient
-	logger    log.Logger
-	tableName string
+	client     *osquery.ExtensionManagerClient
+	logger     log.Logger
+	tableName  string
+	dataParser parserInt
 
-	dataFunc func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+	flattenFileFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
+	flattenBytesFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 
-	execDataFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
-	execArgs     []string
-	binDirs      []string
+	execArgs []string
+	binDirs  []string
 
 	keyValueSeparator string
 }
@@ -60,16 +66,16 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 
 	switch dataSourceType {
 	case PlistType:
-		t.dataFunc = dataflatten.PlistFile
+		t.flattenFileFunc = dataflatten.PlistFile
 		t.tableName = "kolide_plist"
 	case JsonType:
-		t.dataFunc = dataflatten.JsonFile
+		t.flattenFileFunc = dataflatten.JsonFile
 		t.tableName = "kolide_json"
 	case XmlType:
-		t.dataFunc = dataflatten.XmlFile
+		t.flattenFileFunc = dataflatten.XmlFile
 		t.tableName = "kolide_xml"
 	case IniType:
-		t.dataFunc = dataflatten.IniFile
+		t.flattenFileFunc = dataflatten.IniFile
 		t.tableName = "kolide_ini"
 	default:
 		panic("Unknown data source type")
@@ -121,7 +127,7 @@ func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]st
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
-	data, err := t.dataFunc(filePath, flattenOpts...)
+	data, err := t.flattenFileFunc(filePath, flattenOpts...)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
 		return nil, errors.Wrap(err, "parsing data")
