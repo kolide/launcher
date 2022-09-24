@@ -2,7 +2,6 @@ package dataflattentable
 
 import (
 	"context"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -26,15 +25,10 @@ const (
 	KeyValueType
 )
 
-type parserInt interface {
-	Parse(io.Reader) (any, error)
-}
-
 type Table struct {
-	client     *osquery.ExtensionManagerClient
-	logger     log.Logger
-	tableName  string
-	dataParser parserInt
+	client    *osquery.ExtensionManagerClient
+	logger    log.Logger
+	tableName string
 
 	flattenFileFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	flattenBytesFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
