@@ -24,9 +24,9 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": {logger: logger, dataFunc: dataflatten.PlistFile},
-		"xml":   {logger: logger, dataFunc: dataflatten.PlistFile},
-		"json":  {logger: logger, dataFunc: dataflatten.JsonFile},
+		"plist": {logger: logger, flattenFileFunc: dataflatten.PlistFile},
+		"xml":   {logger: logger, flattenFileFunc: dataflatten.PlistFile},
+		"json":  {logger: logger, flattenFileFunc: dataflatten.JsonFile},
 	}
 
 	var tests = []struct {
@@ -96,18 +96,18 @@ func TestDataFlattenTables(t *testing.T) {
 	}{
 		// xml
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			expectedRows: 6,
 		},
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"simple/Items"},
 			expectedRows: 3,
 		},
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, dataFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
@@ -115,18 +115,18 @@ func TestDataFlattenTables(t *testing.T) {
 
 		// ini
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			expectedRows: 87,
 		},
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"Registry Values"},
 			expectedRows: 59,
 		},
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, dataFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
