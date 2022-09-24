@@ -4,7 +4,9 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dsim_default_associations"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dsregcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/secedit"
 	"github.com/kolide/launcher/pkg/osquery/tables/wifi_networks"
 	"github.com/kolide/launcher/pkg/osquery/tables/windowsupdatetable"
@@ -23,5 +25,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, client, logger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, client, logger),
 		wmitable.TablePlugin(client, logger),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser{}, []string{`/Windows/System32/dsregcmd.exe`, `/status`}),
 	}
 }
