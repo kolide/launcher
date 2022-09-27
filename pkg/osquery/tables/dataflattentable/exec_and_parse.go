@@ -17,12 +17,13 @@ type flattenBytesInt interface {
 	FlattenBytes([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 }
 
-// execTable is the next iteration of the dataflattentable wrapper. Aim to migrate exec to this.
+// execTableV2 is the next iteration of the dataflattentable wrapper. Aim to migrate exec based tables to this.
 type execTableV2 struct {
 	logger         log.Logger
 	tableName      string
 	flattener      flattenBytesInt
 	timeoutSeconds int
+	tabledebug     bool
 	execPaths      []string
 	execArgs       []string
 }
@@ -32,6 +33,12 @@ type execTableV2Opt func(*execTableV2)
 func WithTimeout(ts int) execTableV2Opt {
 	return func(t *execTableV2) {
 		t.timeoutSeconds = ts
+	}
+}
+
+func WithTableDebug() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.tabledebug = true
 	}
 }
 
@@ -53,6 +60,10 @@ func NewExecAndParseTable(logger log.Logger, tableName string, parser parserInt,
 
 	for _, opt := range opts {
 		opt(t)
+	}
+
+	if t.tabledebug {
+		level.NewFilter(log.With(logger, "table", tableName), level.AllowDebug())
 	}
 
 	return table.NewPlugin(t.tableName, Columns(), t.generate)

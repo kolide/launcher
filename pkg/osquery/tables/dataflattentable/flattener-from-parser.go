@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -27,5 +28,12 @@ func (p parserFlattener) FlattenBytes(raw []byte, flattenOpts ...dataflatten.Fla
 		return nil, fmt.Errorf("error parsing data: %w", err)
 	}
 
-	return dataflatten.Flatten(data, flattenOpts...)
+	// Data comes in as map[string]map[string]interface{}, but Flatten expects a map[string]interface{}. I'm not sure
+	// how to resolve this, so for now we round trip through Json.
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling json: %w", err)
+	}
+
+	return dataflatten.Json(jsonBytes, flattenOpts...)
 }
