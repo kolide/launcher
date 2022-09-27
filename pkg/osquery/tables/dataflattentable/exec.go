@@ -137,3 +137,4 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	// None of the possible execs were found
 	return nil, errors.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
 }
+
