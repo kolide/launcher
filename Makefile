@@ -71,9 +71,12 @@ fake-launcher: fake_launcher
 GITHUB_TARGETS=launcher grpc.ext tables.ext package-builder
 GITHUB_ARCHS=amd64 arm64
 # linux cross compiles aren't working. Disable for now
-github-build-no-cross: $(foreach t, $(GITHUB_TARGETS), build_$(t))
-github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
+github-build-no-cross: go-info $(foreach t, $(GITHUB_TARGETS), build_$(t))
+github-build: go-info $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
+
+go-info:
+	go env
 
 ##
 ## Cross Build targets
