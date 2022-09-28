@@ -76,7 +76,10 @@ github-build: go-info $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCH
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 
 go-info:
-	echo $(PATH)
+	echo "$$PATH"
+	which go
+	type go
+	ls -l `which go`
 	go env
 
 ##

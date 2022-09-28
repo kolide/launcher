@@ -64,6 +64,8 @@ jobs:
       run: |
            echo $PATH
            go env
+    - name: make wtf
+      run: make go-info
       
     - name: Build (No Cross Compiles)
       if: ${{ contains(matrix.os, 'ubuntu') }}
