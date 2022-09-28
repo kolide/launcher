@@ -62,15 +62,15 @@ jobs:
 
     - name: go wtf
       run: |
-      	   echo $PATH
-	   go env
+           echo $PATH
+           go env
       
     - name: Build (No Cross Compiles)
       if: ${{ contains(matrix.os, 'ubuntu') }}
       run: |
-      	   echo $PATH
-	   go env
-	   make -j2 github-build-no-cross
+           echo $PATH
+           go env
+           make -j2 github-build-no-cross
 
     - name: Lipo
       run: make github-lipo
