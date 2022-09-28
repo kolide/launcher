@@ -2,10 +2,7 @@ all: build
 
 .PHONY: build
 
-ifndef $GOPATH
-	GOPATH = $(HOME)/go
-endif
-
+GOPATH ?= $(HOME)/go
 PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on
@@ -76,10 +73,12 @@ github-build: go-info $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCH
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 
 go-info:
+	echo $(HOME)/go
+	echo $(GOPATH)
 	echo "$$PATH"
 	which go
 	ls -l `which go`
-	go env
+#	go env
 
 ##
 ## Cross Build targets
