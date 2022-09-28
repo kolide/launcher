@@ -78,7 +78,6 @@ github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 go-info:
 	echo "$$PATH"
 	which go
-	type go
 	ls -l `which go`
 	go env
 

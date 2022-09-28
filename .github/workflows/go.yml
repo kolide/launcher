@@ -71,7 +71,7 @@ jobs:
       if: ${{ contains(matrix.os, 'ubuntu') }}
       run: |
            echo $PATH
-           go env
+           which go
            make -j2 github-build-no-cross
 
     - name: Lipo
