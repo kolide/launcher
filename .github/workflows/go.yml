@@ -60,6 +60,9 @@ jobs:
       if: ${{ ! contains(matrix.os, 'ubuntu') }}
       run: make -j2 github-build
 
+    - name: go wtf
+      run: go env
+      
     - name: Build (No Cross Compiles)
       if: ${{ contains(matrix.os, 'ubuntu') }}
       run: make -j2 github-build-no-cross
