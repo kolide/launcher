@@ -48,7 +48,7 @@ func WithAdditionalExecPaths(paths ...string) execTableV2Opt {
 	}
 }
 
-func NewExecAndParseTable(logger log.Logger, tableName string, parser parserInt, execCmd []string, opts ...execTableV2Opt) *table.Plugin {
+func NewExecAndParseTable(logger log.Logger, tableName string, parser parserInterface, execCmd []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
 		logger:         level.NewFilter(log.With(logger, "table", tableName), level.AllowInfo()),
 		tableName:      tableName,

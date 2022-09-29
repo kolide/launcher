@@ -9,16 +9,16 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 )
 
-type parserInt interface {
+type parserInterface interface {
 	Parse(io.Reader) (any, error)
 }
 
 // parserFlattener is a simple wrapper over a parser, to convert it to a flattener.
 type parserFlattener struct {
-	parser parserInt
+	parser parserInterface
 }
 
-func flattenerFromParser(parser parserInt) parserFlattener {
+func flattenerFromParser(parser parserInterface) parserFlattener {
 	return parserFlattener{parser: parser}
 }
 
