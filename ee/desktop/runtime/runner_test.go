@@ -36,11 +36,21 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	// due to flakey tests we are tracking the time it takes to build and attempting emit a meaningful error if we time out
+	timeout := time.Second * 60
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher")
+	buildStartTime := time.Now()
 	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("building launcher binary for desktop testing: %w", err)
+
+		if time.Since(buildStartTime) >= timeout {
+			err = fmt.Errorf("timeout (%v) met: %w", timeout, err)
+		}
+	}
 	require.NoError(t, err, string(out))
 
 	tests := []struct {

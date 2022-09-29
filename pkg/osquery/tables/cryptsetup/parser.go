@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -67,7 +66,6 @@ func parseFirstLine(line string) (map[string]interface{}, error) {
 		return nil, errors.Errorf("Failed to match first line: %s", line)
 	}
 	if len(m[0]) != 6 {
-		spew.Dump(m)
 		return nil, errors.Errorf("Got %d matches. Expected 6. Failed to match first line: %s", len(m[0]), line)
 	}
 
