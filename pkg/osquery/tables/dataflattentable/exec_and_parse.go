@@ -30,7 +30,7 @@ type execTableV2 struct {
 
 type execTableV2Opt func(*execTableV2)
 
-func WithTimeout(ts int) execTableV2Opt {
+func WithTimeoutSeconds(ts int) execTableV2Opt {
 	return func(t *execTableV2) {
 		t.timeoutSeconds = ts
 	}

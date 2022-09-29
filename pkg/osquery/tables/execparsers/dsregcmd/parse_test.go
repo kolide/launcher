@@ -26,8 +26,8 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:     "not configured",
-			input:    mustReadFile(path.Join("test-data", "not_configured.txt")),
-			expected: mustJsonUnmarshal(mustReadFile(path.Join("test-data", "not_configured.expected.json"))),
+			input:    readTestFile(t, path.Join("test-data", "not_configured.txt")),
+			expected: jsonUnmarshal(t, readTestFile(t, path.Join("test-data", "not_configured.expected.json"))),
 		},
 
 		//
@@ -35,17 +35,17 @@ func TestParse(t *testing.T) {
 		//
 		{
 			name:        "lines before header",
-			input:       mustReadFile(path.Join("test-data", "error_lines_before_header.txt")),
+			input:       readTestFile(t, path.Join("test-data", "error_lines_before_header.txt")),
 			expectedErr: true,
 		},
 		{
 			name:        "header missing line 3",
-			input:       mustReadFile(path.Join("test-data", "error_header_missing_line3.txt")),
+			input:       readTestFile(t, path.Join("test-data", "error_header_missing_line3.txt")),
 			expectedErr: true,
 		},
 		{
 			name:        "no section title",
-			input:       mustReadFile(path.Join("test-data", "error_no_section_title.txt")),
+			input:       readTestFile(t, path.Join("test-data", "error_no_section_title.txt")),
 			expectedErr: true,
 		},
 	}
@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			actual, err := Parse(bytes.NewReader(tt.input))
+			actual, err := parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
 				assert.Error(t, err)
 				assert.Nil(t, actual)
@@ -72,25 +72,19 @@ func TestParse(t *testing.T) {
 
 func jsonMarshal(t *testing.T, v any) []byte {
 	b, err := json.Marshal(v)
-	if err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 	return b
 }
 
-func mustReadFile(filepath string) []byte {
+func readTestFile(t *testing.T, filepath string) []byte {
 	b, err := os.ReadFile(filepath)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return b
 }
 
-func mustJsonUnmarshal(data []byte) any {
+func jsonUnmarshal(t *testing.T, data []byte) any {
 	var v any
 	err := json.Unmarshal(data, &v)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return v
 }

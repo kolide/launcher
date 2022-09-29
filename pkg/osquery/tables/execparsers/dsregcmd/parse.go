@@ -22,7 +22,7 @@ var titleRegex = regexp.MustCompile(`^\s*\|\s*(.+?)\s*\|\s*$`)
 //	IsDeviceJoined : NO
 var lineRegex = regexp.MustCompile(`^\s*(.*?)\s*:\s*(.*?)\s*$`)
 
-func Parse(reader io.Reader) (any, error) {
+func parse(reader io.Reader) (any, error) {
 	results := make(map[string]map[string]interface{})
 
 	var currentSectionHeader string

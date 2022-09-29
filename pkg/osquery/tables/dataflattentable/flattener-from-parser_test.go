@@ -22,7 +22,7 @@ func TestFlattenerFromParser(t *testing.T) {
 	}{
 		{
 			name:         "dsreg",
-			input:        mustReadFile("../execparsers/dsregcmd/test-data/not_configured.txt"),
+			input:        readTestFile(t, "../execparsers/dsregcmd/test-data/not_configured.txt"),
 			parser:       dsregcmd.Parser{},
 			expectedRows: 25,
 		},
@@ -42,10 +42,8 @@ func TestFlattenerFromParser(t *testing.T) {
 
 }
 
-func mustReadFile(filepath string) []byte {
+func readTestFile(t *testing.T, filepath string) []byte {
 	b, err := os.ReadFile(filepath)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return b
 }
