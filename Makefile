@@ -2,10 +2,7 @@ all: build
 
 .PHONY: build
 
-ifndef $GOPATH
-	GOPATH = $(HOME)/go
-endif
-
+GOPATH ?= $(HOME)/go
 PATH := $(GOPATH)/bin:$(PATH)
 
 export GO111MODULE=on

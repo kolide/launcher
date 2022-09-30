@@ -14,7 +14,7 @@ import (
 // TestPlist runs some real-world tests against sample plist data.
 func TestPlist(t *testing.T) {
 	t.Parallel()
-	plistTable := Table{dataFunc: dataflatten.PlistFile}
+	plistTable := Table{flattenFileFunc: dataflatten.PlistFile}
 
 	var tests = []struct {
 		paths    []string

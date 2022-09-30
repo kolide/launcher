@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -50,13 +51,13 @@ func TablePluginExec(client *osquery.ExtensionManagerClient, logger log.Logger, 
 
 	switch dataSourceType {
 	case PlistType:
-		t.execDataFunc = dataflatten.Plist
+		t.flattenBytesFunc = dataflatten.Plist
 	case JsonType:
-		t.execDataFunc = dataflatten.Json
+		t.flattenBytesFunc = dataflatten.Json
 	case KeyValueType:
 		// TODO: allow callers of TablePluginExec to specify the record
 		// splitting strategy
-		t.execDataFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
+		t.flattenBytesFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
 	default:
 		panic("Unknown data source type")
 	}
@@ -74,19 +75,25 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 			return nil, nil
 		}
 
-		// If th exec failed for some reason, it's probably better to return no results, and log the,
-		//  error. Returning an error here will cause a table failure, and thus break joins
+		// If the exec failed for some reason, it's probably better to return no results, and log the,
+		// error. Returning an error here will cause a table failure, and thus break joins
 		level.Info(t.logger).Log("msg", "failed to exec", "err", err)
 		return nil, nil
 	}
 
-	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
-		for _, constraint := range q.Constraints {
-			dataQuery := constraint.Expression
-			results = append(results, t.getRowsFromOutput(dataQuery, execBytes)...)
+	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+		flattenOpts := []dataflatten.FlattenOpts{
+			dataflatten.WithLogger(t.logger),
+			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
-	} else {
-		results = append(results, t.getRowsFromOutput("", execBytes)...)
+
+		flattened, err := t.flattenBytesFunc(execBytes, flattenOpts...)
+		if err != nil {
+			level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+			continue
+		}
+
+		results = append(results, ToMap(flattened, dataQuery, nil)...)
 	}
 
 	return results, nil
@@ -129,19 +136,4 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 
 	// None of the possible execs were found
 	return nil, errors.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
-}
-
-func (t *Table) getRowsFromOutput(dataQuery string, execOutput []byte) []map[string]string {
-	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
-		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-	}
-
-	data, err := t.execDataFunc(execOutput, flattenOpts...)
-	if err != nil {
-		level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
-		return nil
-	}
-
-	return ToMap(data, dataQuery, nil)
 }

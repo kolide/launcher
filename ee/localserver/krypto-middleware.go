@@ -10,7 +10,7 @@ import (
 	"github.com/kolide/krypto"
 )
 
-type kryptoInt interface {
+type kryptoInterface interface {
 	Encode(inResponseTo string, data []byte) (string, error)
 	EncodePng(inResponseTo string, data []byte, w io.Writer) error
 	DecodeRaw(data []byte) (*krypto.Box, error)
@@ -18,7 +18,7 @@ type kryptoInt interface {
 
 // kryptoBoxerMiddleware provides http middleware wrappers over the kryto pkg.
 type kryptoBoxerMiddleware struct {
-	boxer  kryptoInt
+	boxer  kryptoInterface
 	logger log.Logger
 }
 
