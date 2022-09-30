@@ -36,26 +36,25 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	return consoleUsers, nil
 }
 
-func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
+func runAsUser(uid string, cmd *exec.Cmd) error {
 	explorerProc, err := userExplorerProcess(uid)
 	if err != nil {
-		return nil, fmt.Errorf("getting user explorer process: %w", err)
+		return fmt.Errorf("getting user explorer process: %w", err)
 	}
 
 	// get the access token of the user that owns the explorer process
 	// and use it to spawn a new process as that user
 	accessToken, err := processAccessToken(explorerProc.Pid)
-
 	if err != nil {
-		return nil, fmt.Errorf("getting explorer process token: %w", err)
+		return fmt.Errorf("getting explorer process token: %w", err)
 	}
+	defer accessToken.Close()
 
-	cmd := exec.Command(path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Token: accessToken,
 	}
 
-	return cmd, nil
+	return cmd.Start()
 }
 
 func userExplorerProcess(uid string) (*process.Process, error) {
