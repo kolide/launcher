@@ -12,6 +12,6 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
-	return nil, fmt.Errorf("not implemented")
+func runAsUser(uid string, cmd *exec.Cmd) error {
+	return fmt.Errorf("not implemented")
 }

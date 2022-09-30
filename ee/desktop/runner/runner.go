@@ -224,19 +224,13 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		cmd, err := cmdAsUser(uid, executablePath, "desktop")
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath)
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if runtime.GOOS == "windows" {
-			defer cmd.SysProcAttr.Token.Close()
-		}
-
-		cmd.Env = r.processEnvVars(socketPath)
-
-		if err := r.startDesktopCommand(uid, cmd); err != nil {
-			return fmt.Errorf("starting desktop command: %w", err)
+		if err := runAsUser(uid, cmd); err != nil {
+			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
 		r.waitOnProcessAsync(uid, cmd.Process)
@@ -398,19 +392,19 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 	return path, nil
 }
 
-func (r *DesktopUsersProcessesRunner) startDesktopCommand(uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
+
+	cmd := exec.Command(executablePath, "desktop")
+	cmd.Env = r.processEnvVars(socketPath)
+
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
-		return fmt.Errorf("getting stderr pipe: %w", err)
+		return nil, fmt.Errorf("getting stderr pipe: %w", err)
 	}
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("getting stdout pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("starting desktop process: %w", err)
+		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
 	go func() {
@@ -426,5 +420,5 @@ func (r *DesktopUsersProcessesRunner) startDesktopCommand(uid string, cmd *exec.
 		}
 	}()
 
-	return nil
+	return cmd, nil
 }

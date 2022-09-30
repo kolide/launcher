@@ -45,50 +45,48 @@ func consoleOwnerUid() (uint32, error) {
 	return consoleInfo.Sys().(*syscall.Stat_t).Uid, nil
 }
 
-func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
+func runAsUser(uid string, cmd *exec.Cmd) error {
 	currentUser, err := user.Current()
 	if err != nil {
-		return nil, fmt.Errorf("getting current user: %w", err)
+		return fmt.Errorf("getting current user: %w", err)
 	}
 
 	runningUser, err := user.LookupId(uid)
 	if err != nil {
-		return nil, fmt.Errorf("looking up user with uid %s: %w", uid, err)
+		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
-
-	cmd := exec.Command(path, args...)
 
 	// current user not root
 	if currentUser.Uid != "0" {
 		// if the user is running for itself, just run without setting credentials
-		if currentUser.Uid == uid {
-			return cmd, nil
+		if currentUser.Uid == runningUser.Uid {
+			return cmd.Start()
 		}
 
 		// if the user is running for another user, we have an error because we can't set credentials
-		return nil, fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
+		return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
 	}
 
 	// the remaining code in this function is not covered by unit test since it requires root privileges
 	// We may be able to run passwordless sudo in GitHub actions, could possibly exec the tests as sudo.
 	// But we may not have a console user?
 
-	uidInt, err := strconv.ParseUint(uid, 10, 32)
+	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("converting uid to int: %w", err)
+		return fmt.Errorf("converting uid to int: %w", err)
 	}
 
-	gid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
+	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("converting gid to int: %w", err)
+		return fmt.Errorf("converting gid to int: %w", err)
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{
-			Uid: uint32(uidInt),
-			Gid: uint32(gid),
+			Uid: uint32(runningUserUid),
+			Gid: uint32(runningUserGid),
 		},
 	}
 
-	return cmd, nil
+	return cmd.Start()
 }
