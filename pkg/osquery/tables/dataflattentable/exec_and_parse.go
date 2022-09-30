@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type flattenBytesInt interface {
+type bytesFlattener interface {
 	FlattenBytes([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 }
 
@@ -21,7 +21,7 @@ type flattenBytesInt interface {
 type execTableV2 struct {
 	logger         log.Logger
 	tableName      string
-	flattener      flattenBytesInt
+	flattener      bytesFlattener
 	timeoutSeconds int
 	tabledebug     bool
 	execPaths      []string
