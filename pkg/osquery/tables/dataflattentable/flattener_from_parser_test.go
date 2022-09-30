@@ -17,7 +17,7 @@ func TestFlattenerFromParser(t *testing.T) {
 	var tests = []struct {
 		name         string
 		input        []byte
-		parser       parserInterface
+		parser       parser
 		expectedRows int
 	}{
 		{
