@@ -55,24 +55,6 @@ func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
 		Token: accessToken,
 	}
 
-	go func() {
-		// the whole purpose of this go routine is to close the access token
-		// howevever, we can't close the access token before the cmd has been started
-		// the calling function can't pipe the output after the cmd has been started
-		// so we have to wait for the cmd to start then return and the access token
-		// will close
-		defer accessToken.Close()
-
-		ticker := time.NewTicker(time.Second * 1)
-		defer ticker.Stop()
-
-		for ; true; <-ticker.C {
-			if cmd.Process != nil {
-				return
-			}
-		}
-	}()
-
 	return cmd, nil
 }
 

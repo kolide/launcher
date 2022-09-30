@@ -228,6 +228,11 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
+
+		if runtime.GOOS == "windows" {
+			defer cmd.SysProcAttr.Token.Close()
+		}
+
 		cmd.Env = r.processEnvVars(socketPath)
 
 		if err := r.startDesktopCommand(uid, cmd); err != nil {
