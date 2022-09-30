@@ -121,7 +121,7 @@ func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 // shuts down, there is some lag time before the file is release, this can cause errors
 // when trying to delete the file.
 func (s *DesktopServer) removeSocket() error {
-	return waitForFileRemove(s.socketPath, 1*time.Millisecond, 5*time.Second)
+	return waitForFileRemove(s.socketPath, 1*time.Second, 5*time.Second)
 }
 
 func waitForFileRemove(path string, interval, timeout time.Duration) error {

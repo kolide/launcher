@@ -140,6 +140,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	f()
 
 	ticker := time.NewTicker(r.updateInterval)
+	defer ticker.Stop()
 
 	for {
 		select {

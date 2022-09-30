@@ -59,7 +59,7 @@ func TestDesktopServer_authMiddleware(t *testing.T) {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
 
-			handler := server.authMiddleware(testHandler(t))
+			handler := server.authMiddleware(testHandler())
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
 
@@ -110,7 +110,7 @@ func TestDesktopServer_shutdownHandler(t *testing.T) {
 	}
 }
 
-func testHandler(t *testing.T) http.Handler {
+func testHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(r.URL.String()))
 	})
