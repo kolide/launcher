@@ -47,7 +47,6 @@ func runDesktop(args []string) error {
 	}
 
 	// set up logging
-	// TODO: figure out where to write to log file
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 	logger = log.With(logger,
 		"subprocess", "desktop",
