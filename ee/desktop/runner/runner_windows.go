@@ -6,7 +6,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
@@ -37,7 +36,7 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	return consoleUsers, nil
 }
 
-func runAsUser(uid string, envVars []string, path string, args ...string) (*os.Process, error) {
+func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
 	explorerProc, err := userExplorerProcess(uid)
 	if err != nil {
 		return nil, fmt.Errorf("getting user explorer process: %w", err)
@@ -46,17 +45,35 @@ func runAsUser(uid string, envVars []string, path string, args ...string) (*os.P
 	// get the access token of the user that owns the explorer process
 	// and use it to spawn a new process as that user
 	accessToken, err := processAccessToken(explorerProc.Pid)
+
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer process token: %w", err)
 	}
-	defer accessToken.Close()
 
-	proc, err := runWithAccessToken(accessToken, envVars, path, args...)
-	if err != nil {
-		return nil, fmt.Errorf("running desktop: %w", err)
+	cmd := exec.Command(path, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Token: accessToken,
 	}
 
-	return proc, nil
+	go func() {
+		// the whole purpose of this go routine is to close the access token
+		// howevever, we can't close the access token before the cmd has been started
+		// the calling function can't pipe the output after the cmd has been started
+		// so we have to wait for the cmd to start then return and the access token
+		// will close
+		defer accessToken.Close()
+
+		ticker := time.NewTicker(time.Second * 1)
+		defer ticker.Stop()
+
+		for ; true; <-ticker.C {
+			if cmd.Process != nil {
+				return
+			}
+		}
+	}()
+
+	return cmd, nil
 }
 
 func userExplorerProcess(uid string) (*process.Process, error) {
@@ -141,20 +158,4 @@ func processAccessToken(pid int32) (syscall.Token, error) {
 	}
 
 	return token, err
-}
-
-// runWithAccessToken runs the given executable with the given arguments using the given access token
-func runWithAccessToken(accessToken syscall.Token, envVars []string, path string, args ...string) (*os.Process, error) {
-	cmd := exec.Command(path, args...)
-	cmd.Env = envVars
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Token: accessToken,
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("starting command with access token: %w", err)
-	}
-
-	return cmd.Process, nil
 }
