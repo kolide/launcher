@@ -206,6 +206,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(authToken.String()),
+			desktopRunner.WithLauncherRootDir(rootDirectory),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 	}

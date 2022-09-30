@@ -45,7 +45,7 @@ func consoleOwnerUid() (uint32, error) {
 	return consoleInfo.Sys().(*syscall.Stat_t).Uid, nil
 }
 
-func runAsUser(uid string, envVars []string, path string, args ...string) (*os.Process, error) {
+func cmdAsUser(uid string, path string, args ...string) (*exec.Cmd, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("getting current user: %w", err)
@@ -57,17 +57,12 @@ func runAsUser(uid string, envVars []string, path string, args ...string) (*os.P
 	}
 
 	cmd := exec.Command(path, args...)
-	cmd.Env = envVars
 
 	// current user not root
 	if currentUser.Uid != "0" {
 		// if the user is running for itself, just run without setting credentials
 		if currentUser.Uid == uid {
-			err := cmd.Start()
-			if err != nil {
-				return nil, fmt.Errorf("running command: %w", err)
-			}
-			return cmd.Process, nil
+			return cmd, nil
 		}
 
 		// if the user is running for another user, we have an error because we can't set credentials
@@ -95,10 +90,5 @@ func runAsUser(uid string, envVars []string, path string, args ...string) (*os.P
 		},
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		return nil, fmt.Errorf("starting command: %w", err)
-	}
-
-	return cmd.Process, nil
+	return cmd, nil
 }

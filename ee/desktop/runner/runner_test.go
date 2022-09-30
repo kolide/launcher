@@ -179,7 +179,7 @@ func launcherRootDir(t *testing.T) string {
 	path := filepath.Join(os.TempDir(), safeTestName)
 
 	if runtime.GOOS != "windows" {
-		path = filepath.Join("tmp", safeTestName)
+		path = filepath.Join("/tmp", safeTestName)
 	}
 
 	t.Cleanup(func() {

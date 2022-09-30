@@ -2,9 +2,12 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -221,20 +224,25 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		proc, err := runAsUser(uid, r.processEnvVars(socketPath), executablePath, "desktop")
+		cmd, err := cmdAsUser(uid, executablePath, "desktop")
 		if err != nil {
-			return fmt.Errorf("starting desktop process: %w", err)
+			return fmt.Errorf("creating desktop command: %w", err)
+		}
+		cmd.Env = r.processEnvVars(socketPath)
+
+		if err := r.startDesktopCommand(uid, cmd); err != nil {
+			return fmt.Errorf("starting desktop command: %w", err)
 		}
 
-		r.waitOnProcessAsync(uid, proc)
+		r.waitOnProcessAsync(uid, cmd.Process)
 
 		level.Debug(r.logger).Log(
 			"msg", "desktop started",
 			"uid", uid,
-			"pid", proc.Pid,
+			"pid", cmd.Process.Pid,
 		)
 
-		if err := r.addProcessTrackingRecordForUser(uid, socketPath, proc); err != nil {
+		if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
 			return fmt.Errorf("adding process to internal tracking state: %w", err)
 		}
 	}
@@ -383,4 +391,35 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 	}
 
 	return path, nil
+}
+
+func (r *DesktopUsersProcessesRunner) startDesktopCommand(uid string, cmd *exec.Cmd) error {
+	stdErr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("getting stderr pipe: %w", err)
+	}
+
+	stdOut, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("getting stdout pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("starting desktop process: %w", err)
+	}
+
+	go func() {
+		combined := io.MultiReader(stdErr, stdOut)
+		scanner := bufio.NewScanner(combined)
+
+		for scanner.Scan() {
+			level.Info(r.logger).Log(
+				"uid", uid,
+				"pid", cmd.Process.Pid,
+				"msg", scanner.Text(),
+			)
+		}
+	}()
+
+	return nil
 }
