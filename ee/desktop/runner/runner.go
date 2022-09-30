@@ -415,7 +415,6 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		for scanner.Scan() {
 			level.Info(r.logger).Log(
 				"uid", uid,
-				"pid", cmd.Process.Pid,
 				"msg", scanner.Text(),
 			)
 		}
