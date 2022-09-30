@@ -23,7 +23,7 @@ func TestFlattenerFromParser(t *testing.T) {
 		{
 			name:         "dsreg",
 			input:        readTestFile(t, "../execparsers/dsregcmd/test-data/not_configured.txt"),
-			parser:       dsregcmd.Parser{},
+			parser:       dsregcmd.Parser,
 			expectedRows: 25,
 		},
 	}
