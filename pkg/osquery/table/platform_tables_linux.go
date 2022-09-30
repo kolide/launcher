@@ -5,6 +5,7 @@ package table
 
 import (
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/osquery/tables/crowdstrike/falcon_kernel_check"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptsetup"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
@@ -22,6 +23,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		secureboot.TablePlugin(client, logger),
 		xrdb.TablePlugin(client, logger),
 		fscrypt_info.TablePlugin(logger),
+		falcon_kernel_check.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
 			[]string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
