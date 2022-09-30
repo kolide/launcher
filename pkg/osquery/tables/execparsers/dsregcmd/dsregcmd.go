@@ -2,12 +2,15 @@ package dsregcmd
 
 import "io"
 
-type Parser struct{}
+type parser struct{}
 
-func New() Parser {
-	return Parser{}
+// Parser is a parser for dsregcmd output
+var Parser = New()
+
+func New() parser {
+	return parser{}
 }
 
-func (p Parser) Parse(reader io.Reader) (any, error) {
-	return parse(reader)
+func (p parser) Parse(reader io.Reader) (any, error) {
+	return parseDsreg(reader)
 }

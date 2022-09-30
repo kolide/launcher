@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			actual, err := parse(bytes.NewReader(tt.input))
+			actual, err := parseDsreg(bytes.NewReader(tt.input))
 			if tt.expectedErr {
 				assert.Error(t, err)
 				assert.Nil(t, actual)

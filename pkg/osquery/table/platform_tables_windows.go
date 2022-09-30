@@ -25,6 +25,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, client, logger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, client, logger),
 		wmitable.TablePlugin(client, logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.New(), []string{`/Windows/System32/dsregcmd.exe`, `/status`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, []string{`/Windows/System32/dsregcmd.exe`, `/status`}),
 	}
 }
