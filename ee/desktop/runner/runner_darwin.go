@@ -4,11 +4,13 @@
 package runner
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
@@ -20,10 +22,20 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 		return nil, fmt.Errorf("getting console owner uid: %w", err)
 	}
 
+	if consoleOwnerUid == "" {
+		return []string{}, nil
+	}
+
+	// convert string to int
+	uid, err := strconv.ParseInt(consoleOwnerUid, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("converting uid to int: %w", err)
+	}
+
 	// there seems to be a brief moment during start up where root or system (non-human)
 	// users own the console, if we spin up the process for them it will add an
 	// unnecessary process. On macOS human users start at 501
-	if consoleOwnerUid < 501 {
+	if uid < 501 {
 		level.Debug(r.logger).Log(
 			"msg", "skipping desktop for root or system user",
 			"uid", consoleOwnerUid,
@@ -32,17 +44,37 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 		return []string{}, nil
 	}
 
-	return []string{fmt.Sprint(consoleOwnerUid)}, nil
+	return []string{consoleOwnerUid}, nil
 }
 
-func consoleOwnerUid() (uint32, error) {
-	const consolePath = "/dev/console"
-	consoleInfo, err := os.Stat(consolePath)
+func consoleOwnerUid() (string, error) {
+	const cmd = `echo "show State:/Users/ConsoleUser" | scutil`
+	output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		return uint32(0), fmt.Errorf("stat %s: %w", consolePath, err)
+		return "", fmt.Errorf("getting console user: %w", err)
 	}
 
-	return consoleInfo.Sys().(*syscall.Stat_t).Uid, nil
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		const uidKey = "UID : "
+
+		if !strings.Contains(line, uidKey) {
+			continue
+		}
+
+		parts := strings.Split(line, uidKey)
+
+		if len(parts) != 2 {
+			return "", fmt.Errorf("unexpected output from scutil: %s", line)
+		}
+
+		return parts[1], nil
+	}
+
+	// there is no console user
+	return "", nil
 }
 
 func runAsUser(uid string, cmd *exec.Cmd) error {
