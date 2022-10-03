@@ -37,11 +37,8 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
 
-	mux := http.NewServeMux()
-	mux.Handle("/", desktopServer.authMiddleware(authedMux))
-
 	desktopServer.server = &http.Server{
-		Handler: mux,
+		Handler: desktopServer.authMiddleware(authedMux),
 	}
 
 	// remove existing socket

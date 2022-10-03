@@ -354,18 +354,8 @@ func processExists(processRecord processRecord) bool {
 	return true
 }
 
-func (r *DesktopUsersProcessesRunner) processEnvVars(socketPath string) []string {
-	const varFmt = "%s=%s"
-	return append(
-		os.Environ(),
-		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
-		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
-		fmt.Sprintf(varFmt, "SOCKET_PATH", socketPath),
-	)
-}
-
-// socketPath returns standard pipe path for windows
-// on posix systems, it creates a folder and changes owner to the user
+// socketPath returns standard pipe path for windows.
+// On posix systems, it creates a folder and changes owner to the user
 // then provides a path to the socket in that folder
 func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 	if runtime.GOOS == "windows" {
@@ -397,7 +387,14 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
-	cmd.Env = r.processEnvVars(socketPath)
+
+	const varFmt = "%s=%s"
+	cmd.Env = append(
+		os.Environ(),
+		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
+		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
+		fmt.Sprintf(varFmt, "SOCKET_PATH", socketPath),
+	)
 
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
