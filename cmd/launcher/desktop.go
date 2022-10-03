@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
@@ -40,17 +40,28 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
+		fldebug = flagset.Bool(
+			"debug",
+			false,
+			"enable debug logging",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
+	user, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("getting current user: %w", err)
+	}
+
 	// set up logging
-	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
+	logger := logutil.NewServerLogger(*fldebug)
 	logger = log.With(logger,
 		"subprocess", "desktop",
 		"pid", os.Getpid(),
+		"uid", user.Uid,
 	)
 	level.Info(logger).Log("msg", "starting")
 
@@ -146,7 +157,7 @@ func monitorParentProcess(logger log.Logger) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
 
-		// pretty sure this is not needed since it should call cancel on it's won when time is exceeded
+		// pretty sure this `cancel()` call is not needed since it should call cancel on it's own when time is exceeded
 		// https://cs.opensource.google/go/go/+/master:src/context/context.go;l=456?q=func%20WithDeadline&ss=go%2Fgo
 		// but the linter and the context.WithTimeout docs say to do it
 		cancel()
@@ -167,5 +178,5 @@ func defaultSocketPath() string {
 		return fmt.Sprintf(`\\.\pipe\%s_%d_%s`, socketBaseName, os.Getpid(), ulid.New())
 	}
 
-	return filepath.Join(os.TempDir(), fmt.Sprintf("%d_%s", os.Getpid(), socketBaseName))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
 }

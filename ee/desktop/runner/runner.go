@@ -1,4 +1,4 @@
-// runtime handles multiuser process management for launcher desktop
+// runner handles multiuser process management for launcher desktop
 package runner
 
 import (
@@ -32,7 +32,9 @@ func WithHostname(hostname string) DesktopUsersProcessesRunnerOption {
 
 func WithLogger(logger log.Logger) DesktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.logger = logger
+		r.logger = log.With(logger,
+			"component", "desktop_users_processes_runner",
+		)
 	}
 }
 
@@ -65,11 +67,11 @@ func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
 	}
 }
 
-// WithLauncherRootDir sets the launcher root dir with will be the parent dir
+// WithUsersFilesRoot sets the launcher root dir with will be the parent dir
 // for kolide desktop files on a per user basis
-func WithLauncherRootDir(token string) DesktopUsersProcessesRunnerOption {
+func WithUsersFilesRoot(token string) DesktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.launcherRootDir = token
+		r.usersFilesRoot = token
 	}
 }
 
@@ -96,9 +98,9 @@ type DesktopUsersProcessesRunner struct {
 	hostname string
 	// authToken is the auth token to use when connecting to the launcher desktop server
 	authToken string
-	// launcherRootDir is the launcher root dir with will be the parent dir
+	// usersFilesRoot is the launcher root dir with will be the parent dir
 	// for kolide desktop files on a per user basis
-	launcherRootDir string
+	usersFilesRoot string
 }
 
 // processRecord is a struct to hold an *os.process and its path.
@@ -118,7 +120,7 @@ func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		updateInterval:   time.Second * 5,
 		procsWg:          &sync.WaitGroup{},
 		interruptTimeout: time.Second * 10,
-		launcherRootDir:  filepath.Join(os.TempDir(), "launcher"),
+		usersFilesRoot:   filepath.Join(os.TempDir(), "kolide-desktop"),
 	}
 
 	for _, opt := range opts {
@@ -370,7 +372,7 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 		return fmt.Sprintf(`\\.\pipe\kolide_desktop_%s`, ulid.New()), nil
 	}
 
-	userFolderPath := filepath.Join(r.launcherRootDir, fmt.Sprintf("desktop_%s", uid))
+	userFolderPath := filepath.Join(r.usersFilesRoot, fmt.Sprintf("desktop_%s", uid))
 	if err := os.MkdirAll(userFolderPath, 0700); err != nil {
 		return "", fmt.Errorf("creating user folder: %w", err)
 	}
@@ -394,7 +396,6 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 }
 
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
-
 	cmd := exec.Command(executablePath, "desktop")
 	cmd.Env = r.processEnvVars(socketPath)
 
@@ -415,6 +416,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		for scanner.Scan() {
 			level.Info(r.logger).Log(
 				"uid", uid,
+				"subprocess", "desktop",
 				"msg", scanner.Text(),
 			)
 		}

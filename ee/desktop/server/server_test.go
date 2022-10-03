@@ -1,6 +1,3 @@
-// server is a http server that listens to a unix socket or named pipe for windows.
-// Its implementation was driven by the need for "launcher proper" to be able to
-// communicate with launcher desktop running as a separate process.
 package server
 
 import (

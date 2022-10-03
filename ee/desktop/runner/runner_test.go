@@ -110,7 +110,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithUpdateInterval(time.Millisecond*250),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
-				WithLauncherRootDir(launcherRootDir(t)),
+				WithUsersFilesRoot(launcherRootDir(t)),
 			)
 
 			if tt.setup != nil {

@@ -16,11 +16,11 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.base.RoundTrip(req)
 }
 
-type Client struct {
+type client struct {
 	base http.Client
 }
 
-func New(authToken, socketPath string) Client {
+func New(authToken, socketPath string) client {
 	transport := &transport{
 		authToken: authToken,
 		base: http.Transport{
@@ -28,17 +28,17 @@ func New(authToken, socketPath string) Client {
 		},
 	}
 
-	client := Client{
+	client := client{
 		base: http.Client{
 			Transport: transport,
-			Timeout:   5 * time.Second,
+			Timeout:   1 * time.Second,
 		},
 	}
 
 	return client
 }
 
-func (c *Client) Shutdown() error {
+func (c *client) Shutdown() error {
 	resp, err := c.base.Get("http://unix/shutdown")
 	if err != nil {
 		return err
