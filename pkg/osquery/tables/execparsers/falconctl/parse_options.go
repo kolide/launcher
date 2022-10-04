@@ -12,12 +12,11 @@ import (
 // treated as seperators.
 func parseOptions(reader io.Reader) (any, error) {
 	results := make(map[string]interface{})
-	errorLines := make([]string, 0)
+	errors := make([]error, 0)
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
-		hasErr := false
 		pairs := strings.Split(line, ",")
 		for _, pair := range pairs {
 			pair = strings.TrimSpace(pair)
@@ -42,7 +41,7 @@ func parseOptions(reader io.Reader) (any, error) {
 				continue
 			}
 
-			kv := strings.SplitN(pair, "=", 1)
+			kv := strings.SplitN(pair, "=", 2)
 			if len(kv) == 2 {
 				// remove quotes and extra spaces
 				kv[1] = strings.TrimSpace(strings.Trim(kv[1], `"`))
@@ -56,16 +55,13 @@ func parseOptions(reader io.Reader) (any, error) {
 			}
 
 			// Unknown format. Note the error
-			hasErr = true
+			errors = append(errors, fmt.Errorf("unknown format: `%s` on line %s", pair, line))
 		}
 
-		if hasErr {
-			errorLines = append(errorLines, line)
-		}
 	}
 
-	if len(errorLines) > 0 {
-		return results, fmt.Errorf("parseOptions: %d lines could not be parsed: %v", len(errorLines), errorLines)
+	if len(errors) > 0 {
+		return results, fmt.Errorf("errors parsing: %v", errors)
 	}
 	return results, nil
 }
