@@ -12,7 +12,7 @@ import (
 // treated as seperators.
 func parseOptions(reader io.Reader) (any, error) {
 	results := make(map[string]interface{})
-	errorLines := make([]error, 0)
+	errorLines := make([]string, 0)
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
