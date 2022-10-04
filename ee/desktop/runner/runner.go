@@ -103,8 +103,12 @@ type DesktopUsersProcessesRunner struct {
 	usersFilesRoot string
 }
 
-// processRecord is a struct to hold an *os.process and its path.
+// processRecord is a struct to hold an *os.process, its path, and the path to
+// the socket the desktop server listens on.
 // The path is used to ensure another process has not taken the same pid.
+// The existence of a process record does not mean the process is running.
+// If, for example, a user logs out, the process record will remain until the
+// user logs in again and it is replaced.
 type processRecord struct {
 	process    *os.Process
 	path       string
