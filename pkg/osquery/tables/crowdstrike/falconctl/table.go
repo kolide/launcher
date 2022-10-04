@@ -35,9 +35,12 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
+type execFunc func(context.Context, log.Logger, int, []string, []string) ([]byte, error)
+
 type falconctlOptionsTable struct {
 	logger    log.Logger
 	tableName string
+	execFunc  execFunc
 }
 
 func NewFalconctlOptionTable(logger log.Logger) *table.Plugin {
@@ -48,6 +51,7 @@ func NewFalconctlOptionTable(logger log.Logger) *table.Plugin {
 	t := &falconctlOptionsTable{
 		logger:    log.With(logger, "table", "kolide_falconctl_options"),
 		tableName: "kolide_falconctl_options",
+		execFunc:  tablehelpers.Exec,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -80,7 +84,7 @@ func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table
 
 		args := append([]string{"-g"}, options...)
 
-		output, err := tablehelpers.Exec(ctx, t.logger, 30, falconctlPaths, args)
+		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "exec failed", "err", err)
 			return nil, err
