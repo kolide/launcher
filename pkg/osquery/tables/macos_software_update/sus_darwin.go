@@ -1,4 +1,4 @@
-package table
+package macos_software_update
 
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
