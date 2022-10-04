@@ -2,6 +2,7 @@ package falconctl
 
 import (
 	"bytes"
+	"os"
 	"path"
 	"testing"
 
@@ -58,4 +59,10 @@ func TestParseOptions(t *testing.T) {
 		})
 	}
 
+}
+
+func readTestFile(t *testing.T, filepath string) []byte {
+	b, err := os.ReadFile(filepath)
+	require.NoError(t, err)
+	return b
 }
