@@ -6,12 +6,14 @@ package runner
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"os/user"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/go-kit/kit/log/level"
 )
@@ -48,8 +50,13 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 }
 
 func consoleOwnerUid() (string, error) {
-	const cmd = `echo "show State:/Users/ConsoleUser" | scutil`
-	output, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	context, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(context, "scutil")
+	cmd.Stdin = strings.NewReader("show State:/Users/ConsoleUser")
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("getting console user: %w", err)
 	}
