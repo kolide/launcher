@@ -1,4 +1,7 @@
-void softwareUpdate(
+extern void updatesFound(unsigned int);
+extern void updateKeyValueFound(unsigned int, char *, char *);
+
+void getSoftwareUpdateConfiguration(
 	int os_version,
 	int *isAutomaticallyCheckForUpdatesManaged,
 	int *isAutomaticallyCheckForUpdatesEnabled,
@@ -8,3 +11,5 @@ void softwareUpdate(
 	int *doesAutomaticCriticalUpdateInstall,
 	int *lastCheckTimestamp
 );
+
+void getRecommendedUpdates();

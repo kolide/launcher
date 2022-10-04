@@ -3,7 +3,7 @@
 #import <Cocoa/Cocoa.h>
 #import <SUSharedPrefs.h>
 
-void softwareUpdate(
+void getSoftwareUpdateConfiguration(
 	int os_version,
 	int *isAutomaticallyCheckForUpdatesManaged,
 	int *isAutomaticallyCheckForUpdatesEnabled,
@@ -59,5 +59,29 @@ void softwareUpdate(
 	}
 	NSDate * lastCheckSuccessfulDate = (NSDate *)[manager lastCheckSuccessfulDate];
 	*lastCheckTimestamp = [lastCheckSuccessfulDate timeIntervalSince1970];
+	return;
+}
+
+void getRecommendedUpdates() {
+	NSBundle *bundle;
+	bundle = [NSBundle bundleWithPath:@"/System/Library/PrivateFrameworks/SoftwareUpdate.framework"];
+	[bundle load];
+
+	Class SUSharedPrefs = [bundle classNamed:@"SUSharedPrefs"];
+	id manager = [SUSharedPrefs sharedPrefManager];
+
+	NSArray *updates = [manager recommendedUpdates];
+    unsigned int i = 0;
+
+    updatesFound([updates count]);
+
+	for (id update in updates) {
+        for (NSString *key in update) {
+            NSString *value = [update objectForKey:key];
+            updateKeyValueFound(i, (char *)[key UTF8String], (char *)[[value description] UTF8String]);
+        }
+        ++i;
+    }
+
 	return;
 }

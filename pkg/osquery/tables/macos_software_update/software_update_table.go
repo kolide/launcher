@@ -55,7 +55,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 		doesAutomaticCriticalUpdateInstall    = C.int(0)
 		lastCheckTimestamp                    = C.int(0)
 	)
-	C.softwareUpdate(
+	C.getSoftwareUpdateConfiguration(
 		version,
 		&isAutomaticallyCheckForUpdatesManaged,
 		&isAutomaticallyCheckForUpdatesEnabled,
