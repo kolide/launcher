@@ -16,8 +16,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/osquery"
-	"go.etcd.io/bbolt"
 	"golang.org/x/time/rate"
 )
 
@@ -54,7 +52,7 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, error) {
+func New(logger log.Logger, privateKey func() (*rsa.PrivateKey, error), kolideServer string) (*localServer, error) {
 	ls := &localServer{
 		logger:       log.With(logger, "component", "localserver"),
 		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
@@ -68,11 +66,11 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 
 	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateKeyFromDB(db)
+	key, err := privateKey()
 	if err != nil {
 		return nil, fmt.Errorf("fetching private key: %w", err)
 	}
-	ls.myKey = privateKey
+	ls.myKey = key
 
 	// Setup the krypto boxer middleware. This will be used for the http auth
 	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)

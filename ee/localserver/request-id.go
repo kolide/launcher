@@ -1,14 +1,17 @@
 package localserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os/user"
 	"time"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/pkg/consoleuser"
 )
 
 type identifiers struct {
@@ -20,8 +23,9 @@ type identifiers struct {
 type requestIdsResponse struct {
 	RequestId string
 	identifiers
-	Nonce     string
-	Timestamp time.Time
+	Nonce        string
+	Timestamp    time.Time
+	ConsoleUsers []*user.User
 }
 
 const (
@@ -68,6 +72,16 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 	}
 	response.identifiers = ls.identifiers
 
+	consoleUsers, err := consoleUsers()
+	if err != nil {
+		level.Error(ls.logger).Log(
+			"msg", "getting console users",
+			"err", err,
+		)
+	} else {
+		response.ConsoleUsers = consoleUsers
+	}
+
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
@@ -75,4 +89,27 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 	}
 
 	res.Write(jsonBytes)
+}
+
+func consoleUsers() ([]*user.User, error) {
+	context, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	uids, err := consoleuser.CurrentUids(context)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []*user.User
+
+	for _, uid := range uids {
+		user, err := user.LookupId(uid)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
 }
