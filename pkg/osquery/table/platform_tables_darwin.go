@@ -82,6 +82,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		KolideVulnerabilities(client, logger),
 		MDMInfo(logger),
 		macos_software_update.MacOSUpdate(client),
+		macos_software_update.RecommendedUpdates(logger),
 		MachoInfo(),
 		Spotlight(),
 		TouchIDUserConfig(client, logger),
