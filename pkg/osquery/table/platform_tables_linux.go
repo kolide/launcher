@@ -36,6 +36,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			[]string{"lsblk", "-J"},
 			dataflattentable.WithBinDirs("/usr/bin", "/bin"),
 		),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.Parser, []string{"/opt/CrowdStrike/falconctl", "-g", "--systags"}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), []string{"/opt/CrowdStrike/falconctl", "-g", "--systags"}),
 	}
 }

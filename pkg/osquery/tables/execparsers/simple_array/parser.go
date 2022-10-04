@@ -8,18 +8,17 @@ import (
 )
 
 type parser struct {
+	key string
 }
 
 func (p parser) Parse(reader io.Reader) (any, error) {
-	return parse(reader)
+	data, err := parse(reader)
+	return map[string]any{p.key: data}, err
 }
 
-func New() parser {
-	return parser{}
+func New(key string) parser {
+	return parser{key: key}
 }
-
-// Parser is a parser for dsregcmd output
-var Parser = New()
 
 // parser parses line by line, additionally splitting on commas. As this is an array of simple strings, anything with a space is an error
 func parse(reader io.Reader) (any, error) {

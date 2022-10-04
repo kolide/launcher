@@ -6,11 +6,15 @@ import (
 	"path"
 	"testing"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParser(t *testing.T) {
 	t.Parallel()
+
+	nonce := ulid.New()
+	testParser := New(nonce)
 
 	var tests = []struct {
 		name        string
@@ -52,6 +56,25 @@ func TestParser(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, actual)
+		})
+
+		t.Run(tt.name+" via struct", func(t *testing.T) {
+			t.Parallel()
+
+			actual, err := testParser.Parse(bytes.NewReader(tt.input))
+			if tt.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Len(t, actual, 1)
+
+			actualCasted, ok := actual.(map[string]any)
+			require.True(t, ok)
+			data, ok := actualCasted[nonce]
+			require.True(t, ok)
+			require.Equal(t, tt.expected, data)
 		})
 	}
 }
