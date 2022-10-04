@@ -17,7 +17,7 @@ import (
 var (
 	falconctlPaths = []string{"/opt/CrowdStrike/falconctl"}
 
-	// allowedOptions is the list of options this table is allowed to query. Notable exceotions
+	// allowedOptions is the list of options this table is allowed to query. Notable exceptions
 	// are `systags` (which is parsed seperatedly) and `provisioning-token` (which is a secret).
 	allowedOptions = []string{
 		"--aid",
