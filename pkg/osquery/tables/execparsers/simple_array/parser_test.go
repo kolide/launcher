@@ -1,4 +1,4 @@
-package falconctl
+package simple_array
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseSystags(t *testing.T) {
+func TestParser(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
@@ -23,9 +23,14 @@ func TestParseSystags(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name:     "normal",
-			input:    readTestFile(t, path.Join("test-data", "systags.txt")),
+			name:     "simple",
+			input:    readTestFile(t, path.Join("test-data", "simple.txt")),
 			expected: []string{"123", "12345678901234", "12345678901235", "12345678901236", "12345678901237", "12345678901238", "12345678901239", "12345678901230"},
+		},
+		{
+			name:     "complex",
+			input:    readTestFile(t, path.Join("test-data", "complex.txt")),
+			expected: []string{"one", "two", "three", "four", "five", "six", "seven", "eight"},
 		},
 		{
 			name:        "malformed",
@@ -39,7 +44,7 @@ func TestParseSystags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			actual, err := parseSystags(bytes.NewReader(tt.input))
+			actual, err := parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
 				require.Error(t, err)
 				return
