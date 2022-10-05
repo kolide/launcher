@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -205,7 +204,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		opts.KolideServerURL == "localhost:3443" ||
 		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
 
-		ls, err := localserver.New(logger, func() (*rsa.PrivateKey, error) { return osquery.PrivateKeyFromDB(db) }, opts.KolideServerURL)
+		ls, err := localserver.New(logger, db, opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
