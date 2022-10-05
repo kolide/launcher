@@ -15,9 +15,7 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-// runConsoleUserDesktop iterates over all the current explorer processes and
-// runs the desktop process for the owner if none currently exists
-func () consoleUsers() ([]string, error) {
+func consoleUsers() ([]string, error) {
 	explorerProcs, err := explorerProcesses()
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer processes: %w", err)
