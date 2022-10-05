@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package macos_software_update
 
 /*
