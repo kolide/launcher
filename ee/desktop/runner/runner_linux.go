@@ -8,7 +8,7 @@ import (
 	"os/exec"
 )
 
-func () consoleUsers() ([]string, error) {
+func consoleUsers() ([]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
