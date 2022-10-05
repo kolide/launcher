@@ -21,16 +21,16 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-type DesktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
+type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
 
 // WithHostname sets the hostname for the runner
-func WithHostname(hostname string) DesktopUsersProcessesRunnerOption {
+func WithHostname(hostname string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.hostname = hostname
 	}
 }
 
-func WithLogger(logger log.Logger) DesktopUsersProcessesRunnerOption {
+func WithLogger(logger log.Logger) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.logger = log.With(logger,
 			"component", "desktop_users_processes_runner",
@@ -40,28 +40,28 @@ func WithLogger(logger log.Logger) DesktopUsersProcessesRunnerOption {
 
 // WithUpdateInterval sets the interval on which the runner will create desktops for
 // user who don't have them and spin up new ones if any have died.
-func WithUpdateInterval(interval time.Duration) DesktopUsersProcessesRunnerOption {
+func WithUpdateInterval(interval time.Duration) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.updateInterval = interval
 	}
 }
 
 // WithExecutablePath sets the path to the executable that will be run for each desktop.
-func WithExecutablePath(path string) DesktopUsersProcessesRunnerOption {
+func WithExecutablePath(path string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.executablePath = path
 	}
 }
 
 // WithInterruptTimeout sets the timeout for the runner to wait for processes to exit when interrupted.
-func WithInterruptTimeout(timeout time.Duration) DesktopUsersProcessesRunnerOption {
+func WithInterruptTimeout(timeout time.Duration) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.interruptTimeout = timeout
 	}
 }
 
-// WithAuth sets the auth token for the runner
-func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
+// WithAuthToken sets the auth token for the runner
+func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.authToken = token
 	}
@@ -69,7 +69,7 @@ func WithAuthToken(token string) DesktopUsersProcessesRunnerOption {
 
 // WithUsersFilesRoot sets the launcher root dir with will be the parent dir
 // for kolide desktop files on a per user basis
-func WithUsersFilesRoot(token string) DesktopUsersProcessesRunnerOption {
+func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.usersFilesRoot = token
 	}
@@ -115,7 +115,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner {
+func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner {
 	runner := &DesktopUsersProcessesRunner{
 		logger:           log.NewNopLogger(),
 		interrupt:        make(chan struct{}),
@@ -138,7 +138,7 @@ func New(opts ...DesktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 func (r *DesktopUsersProcessesRunner) Execute() error {
 	f := func() {
 		if err := r.runConsoleUserDesktop(); err != nil {
-			level.Error(r.logger).Log("msg", "running console user desktop", "err", err)
+			level.Info(r.logger).Log("msg", "running console user desktop", "err", err)
 		}
 	}
 
@@ -215,7 +215,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	consolerUsers, err := r.consoleUsers()
+	consolerUsers, err := consoleUsers()
 	if err != nil {
 		return fmt.Errorf("getting console users: %w", err)
 	}
@@ -290,7 +290,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
 		if err != nil {
-			level.Error(r.logger).Log(
+			level.Info(r.logger).Log(
 				"msg", "desktop process died",
 				"uid", uid,
 				"pid", proc.Pid,
@@ -391,12 +391,11 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
-	const varFmt = "%s=%s"
 	cmd.Env = append(
 		os.Environ(),
-		fmt.Sprintf(varFmt, "HOSTNAME", r.hostname),
-		fmt.Sprintf(varFmt, "AUTHTOKEN", r.authToken),
-		fmt.Sprintf(varFmt, "SOCKET_PATH", socketPath),
+		fmt.Sprintf("HOSTNAME=%s", r.hostname),
+		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
+		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 	)
 
 	stdErr, err := cmd.StderrPipe()

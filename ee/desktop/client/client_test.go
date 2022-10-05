@@ -58,8 +58,9 @@ func testSocketPath(t *testing.T) string {
 	// using t.TempDir() creates a file path too long for a unix socket
 	socketPath := filepath.Join(os.TempDir(), socketFileName)
 	// truncate socket path to max length
-	if len(socketPath) > 103 {
-		socketPath = socketPath[:103]
+	const maxSocketLength = 103
+	if len(socketPath) > maxSocketLength {
+		socketPath = socketPath[:maxSocketLength]
 	}
 
 	if runtime.GOOS == "windows" {

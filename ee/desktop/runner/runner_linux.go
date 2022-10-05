@@ -8,7 +8,7 @@ import (
 	"os/exec"
 )
 
-func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
+func () consoleUsers() ([]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

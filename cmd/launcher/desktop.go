@@ -81,7 +81,7 @@ func runDesktop(args []string) error {
 		return nil
 	}, func(error) {})
 
-	// montior parent
+	// monitor parent
 	runGroup.Add(func() error {
 		monitorParentProcess(logger)
 		return nil

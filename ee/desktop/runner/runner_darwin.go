@@ -14,18 +14,16 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/go-kit/kit/log/level"
 )
 
-func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
+func consoleUsers() ([]string, error) {
 	consoleOwnerUid, err := consoleOwnerUid()
 	if err != nil {
 		return nil, fmt.Errorf("getting console owner uid: %w", err)
 	}
 
 	if consoleOwnerUid == "" {
-		return []string{}, nil
+		return nil, nil
 	}
 
 	// convert string to int
@@ -38,12 +36,7 @@ func (r *DesktopUsersProcessesRunner) consoleUsers() ([]string, error) {
 	// users own the console, if we spin up the process for them it will add an
 	// unnecessary process. On macOS human users start at 501
 	if uid < 501 {
-		level.Debug(r.logger).Log(
-			"msg", "skipping desktop for root or system user",
-			"uid", consoleOwnerUid,
-		)
-
-		return []string{}, nil
+		return nil, nil
 	}
 
 	return []string{consoleOwnerUid}, nil
