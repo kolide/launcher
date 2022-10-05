@@ -3,8 +3,6 @@ package macos_software_update
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
 #cgo darwin LDFLAGS: -framework Cocoa
-#import <Cocoa/Cocoa.h>
-#import <SUSharedPrefs.h>
 #include "sus.h"
 */
 import "C"
