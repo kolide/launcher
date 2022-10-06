@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -51,6 +53,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 			var response requestIdsResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
 
+			// in the current CI environment (GitHub Actions) the linux runner
+			// does not have a console user, so we expect an empty list
+			if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+				assert.Empty(t, response.ConsoleUsers)
+			}
+
 			assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 		})
 	}
@@ -82,6 +90,10 @@ func testBboltDb(t *testing.T) *bbolt.DB {
 		require.NoError(t, err)
 
 		return nil
+	})
+
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
 	})
 
 	return db
