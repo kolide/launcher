@@ -29,11 +29,6 @@ func CurrentUids(context context.Context) ([]string, error) {
 		return nil, fmt.Errorf("loginctl list-sessions unmarshall json output: %w", err)
 	}
 
-	// sanity check ... how could this code run without a session?
-	if len(sessions) == 0 {
-		return nil, fmt.Errorf("no sessions found, there has to be at least one session, this should never happen")
-	}
-
 	var uids []string
 	for _, s := range sessions {
 		// if there is no seat, this is not a graphical session
