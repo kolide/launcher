@@ -215,12 +215,12 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	consolerUsers, err := consoleUsers()
+	consoleUsers, err := consoleUsers()
 	if err != nil {
 		return fmt.Errorf("getting console users: %w", err)
 	}
 
-	for _, uid := range consolerUsers {
+	for _, uid := range consoleUsers {
 		if r.userHasDesktopProcess(uid) {
 			continue
 		}
