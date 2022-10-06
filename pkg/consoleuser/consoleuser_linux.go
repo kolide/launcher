@@ -23,7 +23,7 @@ func CurrentUids(context context.Context) ([]string, error) {
 		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
 	}
 
-	// unmarshall json ouput into listSessionsResult
+	// unmarshall json output into listSessionsResult
 	var sessions listSessionsResult
 	if err := json.Unmarshal(output, &sessions); err != nil {
 		return nil, fmt.Errorf("loginctl list-sessions unmarshall json output: %w", err)
