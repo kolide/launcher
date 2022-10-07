@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"os/user"
 	"path/filepath"
-	"time"
 
 	"github.com/shirou/gopsutil/process"
 )
 
-func CurrentUids(context context.Context) ([]string, error) {
-	explorerProcs, err := explorerProcesses()
+func CurrentUids(ctx context.Context) ([]string, error) {
+	explorerProcs, err := explorerProcesses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer processes: %w", err)
 	}
@@ -27,7 +26,7 @@ func CurrentUids(context context.Context) ([]string, error) {
 	uidsMap := make(map[string]struct{}, 1)
 
 	for _, explorerProc := range explorerProcs {
-		uid, err := processOwnerUid(explorerProc)
+		uid, err := processOwnerUid(ctx, explorerProc)
 		if err != nil {
 			return nil, fmt.Errorf("getting process owner uid: %w", err)
 		}
@@ -47,11 +46,8 @@ func CurrentUids(context context.Context) ([]string, error) {
 
 // explorerProcesses returns a list of explorer processes whose
 // filepath base is "explorer.exe".
-func explorerProcesses() ([]*process.Process, error) {
+func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
 	var explorerProcs []*process.Process
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
 
 	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
@@ -72,8 +68,8 @@ func explorerProcesses() ([]*process.Process, error) {
 	return explorerProcs, nil
 }
 
-func processOwnerUid(proc *process.Process) (string, error) {
-	username, err := proc.Username()
+func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
+	username, err := proc.UsernameWithContext(ctx)
 	if err != nil {
 		return "", fmt.Errorf("getting process username: %w", err)
 	}

@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-func CurrentUids(context context.Context) ([]string, error) {
-	cmd := exec.CommandContext(context, "scutil")
+func CurrentUids(ctx context.Context) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "scutil")
 	cmd.Stdin = strings.NewReader("show State:/Users/ConsoleUser")
 
 	output, err := cmd.CombinedOutput()
