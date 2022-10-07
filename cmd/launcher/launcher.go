@@ -203,6 +203,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
 		opts.KolideServerURL == "localhost:3443" ||
 		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
+
 		ls, err := localserver.New(logger, db, opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
