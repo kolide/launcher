@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/consoleuser"
+	"github.com/kolide/launcher/ee/consoleuser"
 )
 
 type identifiers struct {
