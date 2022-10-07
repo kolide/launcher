@@ -2,9 +2,6 @@ package localserver
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
@@ -57,21 +55,7 @@ func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
 	})
 	require.NoError(t, err)
 
-	err = db.Update(func(tx *bbolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte("config"))
-		require.NoError(t, err)
-
-		key, err := rsa.GenerateKey(rand.Reader, 2048)
-		require.NoError(t, err)
-
-		keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
-		require.NoError(t, err)
-
-		err = bucket.Put([]byte("privateKey"), keyBytes)
-		require.NoError(t, err)
-
-		return nil
-	})
+	require.NoError(t, osquery.SetupLauncherKeys(db))
 
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
