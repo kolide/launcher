@@ -15,25 +15,6 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-func consoleUsers() ([]string, error) {
-	explorerProcs, err := explorerProcesses()
-	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
-	}
-
-	var consoleUsers []string
-
-	for _, explorerProc := range explorerProcs {
-		uid, err := processOwnerUid(explorerProc)
-		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid: %w", err)
-		}
-		consoleUsers = append(consoleUsers, uid)
-	}
-
-	return consoleUsers, nil
-}
-
 func runAsUser(uid string, cmd *exec.Cmd) error {
 	explorerProc, err := userExplorerProcess(uid)
 	if err != nil {
@@ -73,33 +54,6 @@ func userExplorerProcess(uid string) (*process.Process, error) {
 	}
 
 	return nil, nil
-}
-
-// explorerProcesses returns a list of explorer processes whose
-// filepath base is "explorer.exe".
-func explorerProcesses() ([]*process.Process, error) {
-	var explorerProcs []*process.Process
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-
-	procs, err := process.ProcessesWithContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting processes: %w", err)
-	}
-
-	for _, proc := range procs {
-		exe, err := proc.ExeWithContext(ctx)
-		if err != nil {
-			continue
-		}
-
-		if filepath.Base(exe) == "explorer.exe" {
-			explorerProcs = append(explorerProcs, proc)
-		}
-	}
-
-	return explorerProcs, nil
 }
 
 func processOwnerUid(proc *process.Process) (string, error) {

@@ -4,78 +4,12 @@
 package runner
 
 import (
-	"bufio"
-	"bytes"
-	"context"
 	"fmt"
 	"os/exec"
 	"os/user"
 	"strconv"
-	"strings"
 	"syscall"
-	"time"
 )
-
-func consoleUsers() ([]string, error) {
-	consoleOwnerUid, err := consoleOwnerUid()
-	if err != nil {
-		return nil, fmt.Errorf("getting console owner uid: %w", err)
-	}
-
-	if consoleOwnerUid == "" {
-		return nil, nil
-	}
-
-	// convert string to int
-	uid, err := strconv.ParseInt(consoleOwnerUid, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("converting uid to int: %w", err)
-	}
-
-	// there seems to be a brief moment during start up where root or system (non-human)
-	// users own the console, if we spin up the process for them it will add an
-	// unnecessary process. On macOS human users start at 501
-	if uid < 501 {
-		return nil, nil
-	}
-
-	return []string{consoleOwnerUid}, nil
-}
-
-func consoleOwnerUid() (string, error) {
-	context, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(context, "scutil")
-	cmd.Stdin = strings.NewReader("show State:/Users/ConsoleUser")
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("getting console user: %w", err)
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		const uidKey = "UID : "
-
-		if !strings.Contains(line, uidKey) {
-			continue
-		}
-
-		parts := strings.Split(line, uidKey)
-
-		if len(parts) != 2 {
-			return "", fmt.Errorf("unexpected output from scutil: %s", line)
-		}
-
-		return parts[1], nil
-	}
-
-	// there is no console user
-	return "", nil
-}
 
 func runAsUser(uid string, cmd *exec.Cmd) error {
 	currentUser, err := user.Current()

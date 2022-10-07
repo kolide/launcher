@@ -17,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/shirou/gopsutil/process"
 )
@@ -215,7 +216,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	consoleUsers, err := consoleUsers()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	consoleUsers, err := consoleuser.CurrentUids(ctx)
 	if err != nil {
 		return fmt.Errorf("getting console users: %w", err)
 	}
