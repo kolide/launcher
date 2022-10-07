@@ -34,10 +34,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := testBboltDb(t)
-
 			var logBytes bytes.Buffer
-			server := testServer(t, &logBytes, db)
+			server := testServer(t, &logBytes)
 
 			req, err := http.NewRequest("", "", nil)
 			require.NoError(t, err)
@@ -65,13 +63,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	}
 }
 
-func testServer(t *testing.T, logBytes *bytes.Buffer, db *bbolt.DB) *localServer {
-	server, err := New(log.NewLogfmtLogger(logBytes), db, "")
-	require.NoError(t, err)
-	return server
-}
+func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
 
-func testBboltDb(t *testing.T) *bbolt.DB {
 	db, err := bbolt.Open(filepath.Join(t.TempDir(), "local_server_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
@@ -97,5 +90,7 @@ func testBboltDb(t *testing.T) *bbolt.DB {
 		require.NoError(t, db.Close())
 	})
 
-	return db
+	server, err := New(log.NewLogfmtLogger(logBytes), db, "")
+	require.NoError(t, err)
+	return server
 }

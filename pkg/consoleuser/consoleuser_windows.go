@@ -20,7 +20,7 @@ func CurrentUids(context context.Context) ([]string, error) {
 	}
 
 	// unclear if windows will ever have more than one explorer process for a single user
-	// guard against this by forcing uniquness
+	// guard against this by forcing uniqueness
 
 	// first store uids in a map to prevent duplicates
 	// most of the time it will be just 1 user, so start map at 1
