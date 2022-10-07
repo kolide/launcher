@@ -4,16 +4,20 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
-	"os/user"
 	"syscall"
+	"time"
 
-	"github.com/shirou/gopsutil/process"
+	"github.com/kolide/launcher/ee/consoleuser"
 )
 
 func runAsUser(uid string, cmd *exec.Cmd) error {
-	explorerProc, err := userExplorerProcess(uid)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)
 	}
@@ -31,40 +35,6 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	}
 
 	return cmd.Start()
-}
-
-func userExplorerProcess(uid string) (*process.Process, error) {
-	explorerProcs, err := explorerProcesses()
-	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
-	}
-
-	for _, proc := range explorerProcs {
-		procOwnerUid, err := processOwnerUid(proc)
-		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid: %w", err)
-		}
-
-		if uid == procOwnerUid {
-			return proc, nil
-		}
-	}
-
-	return nil, nil
-}
-
-func processOwnerUid(proc *process.Process) (string, error) {
-	username, err := proc.Username()
-	if err != nil {
-		return "", fmt.Errorf("getting process username: %w", err)
-	}
-
-	user, err := user.Lookup(username)
-	if err != nil {
-		return "", fmt.Errorf("looking up user: %w", err)
-	}
-
-	return user.Uid, nil
 }
 
 /*
