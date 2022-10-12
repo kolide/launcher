@@ -21,6 +21,7 @@ var (
 	// are `systags` (which is parsed seperatedly) and `provisioning-token` (which is a secret).
 	allowedOptions = []string{
 		"--aid",
+		"--apd",
 		"--aph",
 		"--app",
 		"--cid",
