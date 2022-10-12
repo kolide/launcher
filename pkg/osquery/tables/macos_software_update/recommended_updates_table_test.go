@@ -15,10 +15,9 @@ import (
 func Test_generateRecommendedUpdatesHappyPath(t *testing.T) {
 	t.Parallel()
 	table := Table{logger: log.NewNopLogger()}
-	t.Run("HappyPath", func(t *testing.T) {
-		_, err := table.generate(context.Background(), tablehelpers.MockQueryContext(nil))
 
-		// Since the output is dynamic and can be empty, just verify no error
-		require.NoError(t, err)
-	})
+	_, err := table.generate(context.Background(), tablehelpers.MockQueryContext(nil))
+
+	// Since the output is dynamic and can be empty, just verify no error
+	require.NoError(t, err)
 }

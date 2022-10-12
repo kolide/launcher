@@ -42,7 +42,6 @@ func RecommendedUpdates(logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	updatesData = nil
 	data := getUpdates()
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -74,6 +73,9 @@ func updateKeyValueFound(index C.uint, key, value *C.char) {
 
 func getUpdates() map[string]interface{} {
 	results := make(map[string]interface{})
+
+	// Since updatesData is package level, reset it before each invocation to purge stale results
+	updatesData = nil
 
 	C.getRecommendedUpdates()
 	results["RecommendedUpdates"] = updatesData
