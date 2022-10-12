@@ -83,7 +83,7 @@ func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table
 		rowData := map[string]string{"options": requested}
 
 		// As I understand it the falconctl command line uses `-g` to indicate it's fetching the options settings, and
-		// then the list of options to fetch. Set the command line thusly. 
+		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
 		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args)
