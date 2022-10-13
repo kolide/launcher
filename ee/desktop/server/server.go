@@ -36,7 +36,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
-	authedMux.HandleFunc("/ping", pongHandler)
+	authedMux.HandleFunc("/ping", pingHandler)
 
 	desktopServer.server = &http.Server{
 		Handler: desktopServer.authMiddleware(authedMux),
@@ -91,10 +91,10 @@ func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request
 	s.shutdownChan <- struct{}{}
 }
 
-func pongHandler(w http.ResponseWriter, req *http.Request) {
+func pingHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"ping": "Kolide"}` + "\n"))
+	w.Write([]byte(`{"pong": "Kolide"}` + "\n"))
 }
 
 func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
