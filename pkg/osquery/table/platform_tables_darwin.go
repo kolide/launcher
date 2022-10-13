@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
+	"github.com/kolide/launcher/pkg/osquery/tables/macos_software_update"
 	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
 	"github.com/kolide/launcher/pkg/osquery/tables/munki"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_user_exec_table"
@@ -80,7 +81,8 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		GDriveSyncHistoryInfo(client, logger),
 		KolideVulnerabilities(client, logger),
 		MDMInfo(logger),
-		MacOSUpdate(client),
+		macos_software_update.MacOSUpdate(client),
+		macos_software_update.RecommendedUpdates(logger),
 		MachoInfo(),
 		Spotlight(),
 		TouchIDUserConfig(client, logger),
