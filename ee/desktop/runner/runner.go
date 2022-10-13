@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/client"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -176,7 +177,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Shutdown(); err != nil {
+		if err := backoff.WaitFor(client.Shutdown, 5*time.Second, 1*time.Second); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to desktop process",
 				"uid", uid,
