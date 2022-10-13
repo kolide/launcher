@@ -395,12 +395,11 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
-	cmd.Env = append(
-		os.Environ(),
+	cmd.Env = []string{
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
-	)
+	}
 
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
