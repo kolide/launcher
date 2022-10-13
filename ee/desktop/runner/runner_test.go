@@ -184,7 +184,7 @@ func launcherRootDir(t *testing.T) string {
 	}
 
 	t.Cleanup(func() {
-		require.NoError(t, os.RemoveAll(path))
+		// require.NoError(t, os.RemoveAll(path))
 	})
 
 	return path
