@@ -1,12 +1,13 @@
 //go:build linux
 // +build linux
 
-package runtime
+package runner
 
 import (
 	"fmt"
+	"os/exec"
 )
 
-func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+func runAsUser(uid string, cmd *exec.Cmd) error {
 	return fmt.Errorf("not implemented")
 }

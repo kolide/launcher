@@ -19,10 +19,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	desktopRuntime "github.com/kolide/launcher/ee/desktop/runtime"
+	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
@@ -193,10 +194,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	var desktopRunner *desktopRuntime.DesktopUsersProcessesRunner
+	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
-		desktopRunner = desktopRuntime.New(logger, time.Second*5, opts.KolideServerURL)
-		runGroup.Add(desktopRunner.Execute, desktopRunner.Interrupt)
+		runner = desktopRunner.New(
+			desktopRunner.WithLogger(logger),
+			desktopRunner.WithUpdateInterval(time.Second*5),
+			desktopRunner.WithHostname(opts.KolideServerURL),
+			desktopRunner.WithAuthToken(ulid.New()),
+			desktopRunner.WithUsersFilesRoot(rootDirectory),
+		)
+		runGroup.Add(runner.Execute, runner.Interrupt)
 	}
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
@@ -259,8 +266,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			launcherPath,
 			updater.UpdateFinalizer(logger, func() error {
 				// stop desktop on auto updates
-				if desktopRunner != nil {
-					desktopRunner.Interrupt(nil)
+				if runner != nil {
+					runner.Interrupt(nil)
 				}
 				return runnerShutdown()
 			}),
