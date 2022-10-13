@@ -3,7 +3,6 @@ package falconctl
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -63,6 +62,7 @@ func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table
 
 	// Note that we don't use tablehelpers.AllowedValues here, because that would disallow us from
 	// passing `where options = "--aid --aph"`, and allowing that, allows us a single exec.
+OUTER:
 	for _, requested := range tablehelpers.GetConstraints(
 		queryContext,
 		"options",
@@ -76,8 +76,7 @@ func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table
 			option = strings.Trim(option, " ")
 			if !optionAllowed(option) {
 				level.Info(t.logger).Log("msg", "requested option not allowed", "option", option)
-				// Consider this a fatal error, don't just go on.
-				return nil, fmt.Errorf("requested option not allowed: %s", option)
+				continue OUTER
 			}
 		}
 

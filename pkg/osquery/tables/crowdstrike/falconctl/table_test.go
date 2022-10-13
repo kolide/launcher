@@ -16,30 +16,50 @@ func TestOptionRestrictions(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		name        string
-		options     []string
-		expectedErr bool
+		name          string
+		options       []string
+		expectedLog   []string
+		expectedExecs int
 	}{
 		{
 			name: "default",
+			expectedLog: []string{
+				"exec-in-test",
+			},
+			expectedExecs: 1,
 		},
 		{
 			name:    "allowed options as array",
 			options: []string{"--aid", "--aph"},
+			expectedLog: []string{
+				"exec-in-test",
+			},
+			expectedExecs: 2,
 		},
 		{
 			name:    "allowed options as string",
 			options: []string{"--aid --aph"},
+			expectedLog: []string{
+				"exec-in-test",
+			},
+			expectedExecs: 1,
 		},
 		{
-			name:        "disallowed option as array",
-			options:     []string{"--not-allowed", "--aid", "--aph"},
-			expectedErr: true,
+			name:    "disallowed option as array",
+			options: []string{"--not-allowed", "--aid", "--aph"},
+			expectedLog: []string{
+				"exec-in-test",
+				"requested option not allowed",
+			},
+			expectedExecs: 2,
 		},
 		{
-			name:        "disallowed option as string",
-			options:     []string{"--aid --aph --not-allowed"},
-			expectedErr: true,
+			name:    "disallowed option as string",
+			options: []string{"--aid --aph --not-allowed"},
+			expectedLog: []string{
+				"requested option not allowed",
+			},
+			expectedExecs: 0,
 		},
 	}
 
@@ -62,26 +82,14 @@ func TestOptionRestrictions(t *testing.T) {
 
 			// We've overridden exec with a noop, but we can check that we get the expected error back
 			_, err := testTable.generate(context.TODO(), mockQC)
-
-			if tt.expectedErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "requested option not allowed")
-				require.Equal(t, 0, strings.Count(logBytes.String(), "exec-in-test"))
-				return
-			}
-
 			require.NoError(t, err)
 
-			// We normally expect an exec per option. But the default is special.
-			if tt.name == "default" {
-				require.Equal(t, 1, strings.Count(logBytes.String(), "exec-in-test"))
-			} else {
-				require.Equal(t, len(tt.options), strings.Count(logBytes.String(), "exec-in-test"))
+			for _, expectedLog := range tt.expectedLog {
+				require.Contains(t, logBytes.String(), expectedLog)
 			}
 
-			for _, option := range tt.options {
-				require.Contains(t, logBytes.String(), option)
-			}
+			// test the number of times exec was called
+			require.Equal(t, tt.expectedExecs, strings.Count(logBytes.String(), "exec-in-test"))
 		})
 	}
 }
