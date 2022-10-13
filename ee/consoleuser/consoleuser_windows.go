@@ -44,6 +44,26 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	return uids, nil
 }
 
+func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
+	explorerProcs, err := explorerProcesses(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting explorer processes: %w", err)
+	}
+
+	for _, proc := range explorerProcs {
+		procOwnerUid, err := processOwnerUid(ctx, proc)
+		if err != nil {
+			return nil, fmt.Errorf("getting process owner uid: %w", err)
+		}
+
+		if uid == procOwnerUid {
+			return proc, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // explorerProcesses returns a list of explorer processes whose
 // filepath base is "explorer.exe".
 func explorerProcesses(ctx context.Context) ([]*process.Process, error) {

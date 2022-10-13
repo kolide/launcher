@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/ulid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +86,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		{
 			name: "procs waitgroup times out",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
-				r.procsWgTimeout = time.Millisecond
+				r.interruptTimeout = time.Millisecond
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)
 			},
@@ -102,8 +103,15 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadSafeBuffer
 
-			r := New(log.NewLogfmtLogger(&logBytes), time.Second*1, "some-where-over-the-rainbow.example.com")
-			r.executablePath = executablePath
+			r := New(
+				WithLogger(log.NewLogfmtLogger(&logBytes)),
+				WithExecutablePath(executablePath),
+				WithHostname("somewhere-over-the-rainbow.example.com"),
+				WithUpdateInterval(time.Millisecond*250),
+				WithInterruptTimeout(time.Second*5),
+				WithAuthToken("test-auth-token"),
+				WithUsersFilesRoot(launcherRootDir(t)),
+			)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -114,7 +122,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			}()
 
 			// let is run a few interval
-			time.Sleep(r.executionInterval * 3)
+			time.Sleep(r.updateInterval * 3)
 			r.Interrupt(nil)
 
 			user, err := user.Current()
@@ -163,4 +171,20 @@ func (b *threadSafeBuffer) String() string {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.String()
+}
+
+func launcherRootDir(t *testing.T) string {
+	safeTestName := fmt.Sprintf("%s_%s", "launcher_desktop_test", ulid.New())
+
+	path := filepath.Join(os.TempDir(), safeTestName)
+
+	if runtime.GOOS != "windows" {
+		path = filepath.Join("/tmp", safeTestName)
+	}
+
+	t.Cleanup(func() {
+		require.NoError(t, os.RemoveAll(path))
+	})
+
+	return path
 }
