@@ -54,3 +54,20 @@ func (c *client) Shutdown() error {
 
 	return nil
 }
+
+func (c *client) Ping() error {
+	resp, err := c.base.Get("http://unix/ping")
+	if err != nil {
+		return err
+	}
+
+	if resp.Body != nil {
+		resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
