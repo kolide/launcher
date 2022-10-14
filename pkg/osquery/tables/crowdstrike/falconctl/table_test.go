@@ -16,50 +16,39 @@ func TestOptionRestrictions(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		name          string
-		options       []string
-		expectedLog   []string
-		expectedExecs int
+		name              string
+		options           []string
+		expectedExecs     int
+		expectedDisallows int
 	}{
 		{
-			name: "default",
-			expectedLog: []string{
-				"exec-in-test",
-			},
-			expectedExecs: 1,
+			name:              "default",
+			expectedExecs:     1,
+			expectedDisallows: 0,
 		},
 		{
-			name:    "allowed options as array",
-			options: []string{"--aid", "--aph"},
-			expectedLog: []string{
-				"exec-in-test",
-			},
-			expectedExecs: 2,
+			name:              "allowed options as array",
+			options:           []string{"--aid", "--aph"},
+			expectedExecs:     2,
+			expectedDisallows: 0,
 		},
 		{
-			name:    "allowed options as string",
-			options: []string{"--aid --aph"},
-			expectedLog: []string{
-				"exec-in-test",
-			},
-			expectedExecs: 1,
+			name:              "allowed options as string",
+			options:           []string{"--aid --aph"},
+			expectedExecs:     1,
+			expectedDisallows: 0,
 		},
 		{
-			name:    "disallowed option as array",
-			options: []string{"--not-allowed", "--aid", "--aph"},
-			expectedLog: []string{
-				"exec-in-test",
-				"requested option not allowed",
-			},
-			expectedExecs: 2,
+			name:              "disallowed option as array",
+			options:           []string{"--not-allowed", "--definitely-not-allowed", "--aid", "--aph"},
+			expectedExecs:     2,
+			expectedDisallows: 2,
 		},
 		{
-			name:    "disallowed option as string",
-			options: []string{"--aid --aph --not-allowed"},
-			expectedLog: []string{
-				"requested option not allowed",
-			},
-			expectedExecs: 0,
+			name:              "disallowed option as string",
+			options:           []string{"--aid --aph --not-allowed"},
+			expectedExecs:     0,
+			expectedDisallows: 1,
 		},
 	}
 
@@ -80,16 +69,14 @@ func TestOptionRestrictions(t *testing.T) {
 				"options": tt.options,
 			})
 
-			// We've overridden exec with a noop, but we can check that we get the expected error back
 			_, err := testTable.generate(context.TODO(), mockQC)
 			require.NoError(t, err)
 
-			for _, expectedLog := range tt.expectedLog {
-				require.Contains(t, logBytes.String(), expectedLog)
-			}
-
 			// test the number of times exec was called
 			require.Equal(t, tt.expectedExecs, strings.Count(logBytes.String(), "exec-in-test"))
+
+			// test the number of times we disallowed an option
+			require.Equal(t, tt.expectedDisallows, strings.Count(logBytes.String(), "requested option not allowed"))
 		})
 	}
 }
