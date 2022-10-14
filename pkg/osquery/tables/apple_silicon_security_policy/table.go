@@ -26,7 +26,7 @@ type Table struct {
 func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
-	tableName := "apple_silicon_security_policy"
+	tableName := "kolide_apple_silicon_security_policy"
 
 	t := &Table{
 		logger: log.With(logger, "table", tableName),
