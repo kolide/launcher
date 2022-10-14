@@ -95,7 +95,7 @@ func getProducts() map[string]interface{} {
 	// Calling getAvailableProducts is an expensive operation and could cause performance
 	// problems if called too frequently. Here we cache the data and restrict the
 	// frequency of invocations to at most once per minute.
-	if productsData != nil || time.Since(cachedTime) < 1*time.Minute {
+	if productsData != nil && time.Since(cachedTime) < 1*time.Minute {
 		results["AvailableProducts"] = productsData
 		return results
 	}
