@@ -183,13 +183,17 @@ void getAvailableProducts() {
               i,
               (char*)[key UTF8String],
               (char*)[nestedKey UTF8String],
-              (nestedObject == (id)[NSNull null]) ? NULL : (char*)[[nestedObject description] UTF8String]);
+              (nestedObject == (id)[NSNull null])
+                  ? NULL
+                  : (char*)[[nestedObject description] UTF8String]);
         }];
       } else {
         // This is a basic key-value pair
         productKeyValueFound(i,
                              (char*)[key UTF8String],
-                             (object == (id)[NSNull null]) ? NULL : (char*)[[object description] UTF8String]);
+                             (object == (id)[NSNull null])
+                                 ? NULL
+                                 : (char*)[[object description] UTF8String]);
       }
     }];
 
