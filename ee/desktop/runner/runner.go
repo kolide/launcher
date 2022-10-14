@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/client"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -244,6 +245,11 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 
 		r.waitOnProcessAsync(uid, cmd.Process)
+
+		client := client.New(r.authToken, socketPath)
+		if err := backoff.WaitFor(client.Ping, 5*time.Second, 1*time.Second); err != nil {
+			return fmt.Errorf("pinging desktop server: %w", err)
+		}
 
 		level.Debug(r.logger).Log(
 			"msg", "desktop started",

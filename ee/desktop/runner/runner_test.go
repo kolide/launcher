@@ -141,7 +141,8 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
 					if processExists(p) {
-						p.process.Wait()
+						state, err := p.process.Wait()
+						require.NoError(t, err, fmt.Sprintf("failed to wait for process: %v", state))
 					}
 				}
 			})

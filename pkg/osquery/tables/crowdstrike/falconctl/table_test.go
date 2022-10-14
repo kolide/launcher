@@ -16,30 +16,39 @@ func TestOptionRestrictions(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		name        string
-		options     []string
-		expectedErr bool
+		name              string
+		options           []string
+		expectedExecs     int
+		expectedDisallows int
 	}{
 		{
-			name: "default",
+			name:              "default",
+			expectedExecs:     1,
+			expectedDisallows: 0,
 		},
 		{
-			name:    "allowed options as array",
-			options: []string{"--aid", "--aph"},
+			name:              "allowed options as array",
+			options:           []string{"--aid", "--aph"},
+			expectedExecs:     2,
+			expectedDisallows: 0,
 		},
 		{
-			name:    "allowed options as string",
-			options: []string{"--aid --aph"},
+			name:              "allowed options as string",
+			options:           []string{"--aid --aph"},
+			expectedExecs:     1,
+			expectedDisallows: 0,
 		},
 		{
-			name:        "disallowed option as array",
-			options:     []string{"--not-allowed", "--aid", "--aph"},
-			expectedErr: true,
+			name:              "disallowed option as array",
+			options:           []string{"--not-allowed", "--definitely-not-allowed", "--aid", "--aph"},
+			expectedExecs:     2,
+			expectedDisallows: 2,
 		},
 		{
-			name:        "disallowed option as string",
-			options:     []string{"--aid --aph --not-allowed"},
-			expectedErr: true,
+			name:              "disallowed option as string",
+			options:           []string{"--aid --aph --not-allowed"},
+			expectedExecs:     0,
+			expectedDisallows: 1,
 		},
 	}
 
@@ -60,28 +69,14 @@ func TestOptionRestrictions(t *testing.T) {
 				"options": tt.options,
 			})
 
-			// We've overridden exec with a noop, but we can check that we get the expected error back
 			_, err := testTable.generate(context.TODO(), mockQC)
-
-			if tt.expectedErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "requested option not allowed")
-				require.Equal(t, 0, strings.Count(logBytes.String(), "exec-in-test"))
-				return
-			}
-
 			require.NoError(t, err)
 
-			// We normally expect an exec per option. But the default is special.
-			if tt.name == "default" {
-				require.Equal(t, 1, strings.Count(logBytes.String(), "exec-in-test"))
-			} else {
-				require.Equal(t, len(tt.options), strings.Count(logBytes.String(), "exec-in-test"))
-			}
+			// test the number of times exec was called
+			require.Equal(t, tt.expectedExecs, strings.Count(logBytes.String(), "exec-in-test"))
 
-			for _, option := range tt.options {
-				require.Contains(t, logBytes.String(), option)
-			}
+			// test the number of times we disallowed an option
+			require.Equal(t, tt.expectedDisallows, strings.Count(logBytes.String(), "requested option not allowed"))
 		})
 	}
 }

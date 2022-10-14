@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/backoff"
 )
 
 type DesktopServer struct {
@@ -36,6 +36,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
+	authedMux.HandleFunc("/ping", pingHandler)
 
 	desktopServer.server = &http.Server{
 		Handler: desktopServer.authMiddleware(authedMux),
@@ -84,9 +85,16 @@ func (s *DesktopServer) Shutdown(ctx context.Context) error {
 }
 
 func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("{\"msg\": \"shutting down\"}"))
+	w.Write([]byte(`{"msg": "shutting down"}` + "\n"))
 	s.shutdownChan <- struct{}{}
+}
+
+func pingHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"pong": "Kolide"}` + "\n"))
 }
 
 func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
@@ -118,31 +126,7 @@ func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 // shuts down, there is some lag time before the file is release, this can cause errors
 // when trying to delete the file.
 func (s *DesktopServer) removeSocket() error {
-	return waitForFileRemove(s.socketPath, 1*time.Second, 5*time.Second)
-}
-
-func waitForFileRemove(path string, interval, timeout time.Duration) error {
-	intervalTicker := time.NewTicker(interval)
-	defer intervalTicker.Stop()
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	f := func() bool {
-		return os.RemoveAll(path) == nil
-	}
-
-	if f() {
-		return nil
-	}
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			return fmt.Errorf("timeout waiting for file removal: %s", path)
-		case <-intervalTicker.C:
-			if f() {
-				return nil
-			}
-		}
-	}
+	return backoff.WaitFor(func() error {
+		return os.RemoveAll(s.socketPath)
+	}, 5*time.Second, 1*time.Second)
 }
