@@ -24,7 +24,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 		table.IntegerColumn("sensor_version"),
 	}
 
-	tableName := "falcon_kernel_check"
+	tableName := "kolide_falcon_kernel_check"
 
 	t := &Table{
 		logger: log.With(logger, "table", tableName),

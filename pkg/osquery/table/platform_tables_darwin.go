@@ -83,6 +83,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		MDMInfo(logger),
 		macos_software_update.MacOSUpdate(client),
 		macos_software_update.RecommendedUpdates(logger),
+		macos_software_update.AvailableProducts(logger),
 		MachoInfo(),
 		Spotlight(),
 		TouchIDUserConfig(client, logger),
