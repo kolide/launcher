@@ -47,16 +47,37 @@ import (
 //   }
 //   UID : 501
 // }
+//
+// looking at the output above, here some of the important keys
+//
+// 1. kCGSSessionOnConsoleKey : < TRUE | FALSE >
+//    if a new desktop icon is created it will appear on the desktop
+//    of the user that has kCGSSessionOnConsoleKey : TRUE
+//
+// 2. kCGSSessionUserIDKey : < uid >
+//
+// 3. UID : < uid >
+//    this is the uid of the user that is currently logged in
+//
+//    a mismatch between the outer UID and kCGSSessionUserIDKey indicates
+//    that a new user was fast switched to and is going through
+//    or has completed the first time login flow
+//
+//    we cannot detect if a user has completed the flow or not and
+//    if we were to return a user in the process of the first time
+//    login flow and a downstream process created an icon for that
+//    user, it would appear on the last logged in users console
 
-// there is an edge case where the code below will return the previous logged in user
-// (a new user has the console, but the last logged in user is returned)
-// based on testing, this only occurs when:
+// there is an edge case where the code below will return no uids when a user
+// has just completed the first time login flow after being "fast switched" to
+//
+// this occurs when:
 //
 // 1. an existing user logs in
 // 2. the user uses "fast user switching" to log in as another user who has never logged in before
 //    * fast user switching: (https://support.apple.com/guide/mac-help/switch-quickly-between-users-mchlp2439/mac)
 // 3. even after the new user completes their first login flow, the last user is still marked as
-//    kCGSSessionOnConsoleKey : TRUE and gets returned
+//    kCGSSessionOnConsoleKey : TRUE, which doesn't match the outer UID, so we continue to return no uids
 // 4. after the new user logs out and logs back in, the new user is returned
 //
 // tested on M1 Monterey 12.6
@@ -74,6 +95,8 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 
 	kCGSSessionOnConsole := ""
 	kCGSSessionUserID := ""
+	lastkCGSSessionUserID := ""
+	uid := ""
 
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
@@ -92,6 +115,10 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		case key == "Name" && val == "loginwindow":
 			return nil, nil
 
+		// reported as the console user however,
+		case key == "UID":
+			uid = val
+
 		case key == "kCGSSessionOnConsoleKey":
 			kCGSSessionOnConsole = val
 
@@ -108,10 +135,19 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 
 		if kCGSSessionOnConsole == "TRUE" {
 			uids = append(uids, kCGSSessionUserID)
+			lastkCGSSessionUserID = kCGSSessionUserID
 		}
 
 		kCGSSessionOnConsole = ""
 		kCGSSessionUserID = ""
+
+		// this is the edge case where scutil gives a mismatch between the UID returned
+		// and the user that has kCGSSessionOnConsoleKey : TRUE
+		// this occurs when a user goes through the login flow for the first time
+		// after being "fast switched" to
+		if uid != "" && lastkCGSSessionUserID != "" && lastkCGSSessionUserID != uid {
+			return nil, nil
+		}
 	}
 
 	return uids, nil
