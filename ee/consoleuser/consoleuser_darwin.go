@@ -50,8 +50,7 @@ import (
 
 // there is an edge case where the code below will return the previous logged in user
 // (a new user has the console, but the last logged in user is returned)
-// so far this only occurs based on testing using Montery 12.6
-// when the following conditions are true:
+// based on testing, this only occurs when:
 //
 // 1. an existing user logs in
 // 2. the user uses "fast user switching" to log in as another user who has never logged in before
@@ -59,6 +58,8 @@ import (
 // 3. even after the new user completes their first login flow, the last user is still marked as
 //    kCGSSessionOnConsoleKey : TRUE and gets returned
 // 4. after the new user logs out and logs back in, the new user is returned
+//
+// tested on M1 Monterey 12.6
 
 func CurrentUids(ctx context.Context) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "scutil")
