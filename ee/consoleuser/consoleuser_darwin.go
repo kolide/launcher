@@ -78,51 +78,40 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// this is the name of the user at the login window
-		// kCGSSessionOnConsoleKey can still show true for other users here
-		if strings.Contains(line, "Name : loginwindow") {
-			return nil, nil
+		kv := strings.SplitN(line, ":", 2)
+		if len(kv) != 2 {
+			continue
 		}
 
-		const kCGSSessionUserIDKey = "kCGSSessionUserIDKey : "
-		const kCGSSessionOnConsoleKey = "kCGSSessionOnConsoleKey : "
+		key := strings.TrimSpace(kv[0])
+		val := strings.TrimSpace(kv[1])
 
 		switch {
-		// got user id key
-		case strings.Contains(line, kCGSSessionUserIDKey):
-			kCGSSessionUserID = scutilVal(line, kCGSSessionUserIDKey)
+		// at login window
+		case key == "Name" && val == "loginwindow":
+			return nil, nil
 
-		// got session key
-		case strings.Contains(line, kCGSSessionOnConsoleKey):
-			kCGSSessionOnConsole = scutilVal(line, kCGSSessionOnConsoleKey)
+		case key == "kCGSSessionOnConsoleKey":
+			kCGSSessionOnConsole = val
+
+		case key == "kCGSSessionUserIDKey":
+			kCGSSessionUserID = val
 
 		default:
 			continue
 		}
 
-		// if we don't have both values
 		if kCGSSessionOnConsole == "" || kCGSSessionUserID == "" {
 			continue
 		}
 
-		// have both values
 		if kCGSSessionOnConsole == "TRUE" {
 			uids = append(uids, kCGSSessionUserID)
 		}
 
-		// reset values
 		kCGSSessionOnConsole = ""
 		kCGSSessionUserID = ""
 	}
 
 	return uids, nil
-}
-
-func scutilVal(line, key string) string {
-	parts := strings.Split(line, key)
-	if len(parts) != 2 {
-		return ""
-	}
-
-	return parts[1]
 }
