@@ -66,10 +66,11 @@ import (
 //    we cannot detect if a user has completed the flow or not and
 //    if we were to return a user in the process of the first time
 //    login flow and a downstream process created an icon for that
-//    user, it would appear on the last logged in users console
+//    user, it would appear on the last logged in user's console
 
 // there is an edge case where the code below will return no uids when a user
-// has just completed the first time login flow after being "fast switched" to
+// is in the process of or has just completed the first time login flow
+// after being "fast switched" to
 //
 // this occurs when:
 //
@@ -96,7 +97,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	kCGSSessionOnConsole := ""
 	kCGSSessionUserID := ""
 	lastkCGSSessionUserID := ""
-	uid := ""
+	outerUid := ""
 
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
@@ -115,9 +116,9 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		case key == "Name" && val == "loginwindow":
 			return nil, nil
 
-		// reported as the console user however,
+		// this is the "outer uid" reported by scutil
 		case key == "UID":
-			uid = val
+			outerUid = val
 
 		case key == "kCGSSessionOnConsoleKey":
 			kCGSSessionOnConsole = val
@@ -145,7 +146,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// and the user that has kCGSSessionOnConsoleKey : TRUE
 		// this occurs when a user goes through the login flow for the first time
 		// after being "fast switched" to
-		if uid != "" && lastkCGSSessionUserID != "" && lastkCGSSessionUserID != uid {
+		if outerUid != "" && lastkCGSSessionUserID != "" && lastkCGSSessionUserID != outerUid {
 			return nil, nil
 		}
 	}
