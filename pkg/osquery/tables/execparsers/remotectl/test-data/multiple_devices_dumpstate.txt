@@ -1,0 +1,93 @@
+Local device
+	UUID: 4D259086-B8CF-4A99-A2FB-**REDACTED**
+	Messaging Protocol Version: 2
+	Product Type: iMacPro1,1
+	OS Build: 11.6 (20G165)
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => x86_64h
+		EffectiveProductionStatusSEP => false
+		EthernetMacAddress => d0:81:**REDACTED**
+		HWModel => J137AP
+		HasSEP => true
+		IsUIBuild => true
+		DeviceSupportsLockdown => false
+		EffectiveSecurityModeAp => false
+		SigningFuse => true
+		BuildVersion => 20G165
+		OSVersion => 11.6
+		BridgeVersion => 18.16.14759.0.1,0
+		SensitivePropertiesVisible => true
+		ProductType => iMacPro1,1
+		SerialNumber => C02V**REDACTED**
+		BootSessionUUID => A7C32508-8D2C-**REDACTED**
+		DeviceColor => unknown
+		EffectiveProductionStatusAp => false
+		EffectiveSecurityModeSEP => false
+		UniqueChipID => 14531085**REDACTED**
+		UniqueDeviceID => e664d52b5fbc5a68**REDACTED**
+		RemoteXPCVersionFlags => 7205759**REDACTED**
+		CertificateProductionStatus => false
+		CertificateSecurityMode => false
+		DeviceEnclosureColor => unknown
+		SecurityDomain => 1
+		OSInstallEnvironment => false
+		Image4Supported => false
+	}
+	Services:
+		com.apple.sysdiagnose.remote
+		com.apple.mobile.storage_mounter_proxy.bridge
+		com.apple.osanalytics.logRelay
+		com.apple.corecaptured.remoteservice
+		com.apple.mobile.storage_mounter_proxy.bridge.macOS
+
+Found localbridge (bridge)
+	State: connected (connectable)
+	UUID: 37D16267-478D-4B4D-**REDACTED**
+	Product Type: iBridge2,1
+	OS Build: 5.5 (18P4759a)
+	Messaging Protocol Version: 2
+	Heartbeat:
+		Last successful heartbeat sent 6.643s ago, received 6.639s ago (took 0.004s)
+		69363 heartbeats sent, 0 received
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => arm64
+		ChipID => 32786
+		EffectiveProductionStatusSEP => true
+		EthernetMacAddress => d0:81:**REDACTED**
+		HWModel => J137AP
+		HasSEP => true
+		LocationID => 2148**REDACTED**
+		IsUIBuild => true
+		RegionInfo => LL/A
+		DeviceSupportsLockdown => false
+		EffectiveSecurityModeAp => true
+		SigningFuse => true
+		BuildVersion => 18P4759a
+		OSVersion => 5.5
+		BridgeVersion => 18.16.14759.0.1,0
+		SensitivePropertiesVisible => true
+		BoardRevision => 9
+		Image4CryptoHashMethod => sha2-384
+		ProductType => iBridge2,1
+		SerialNumber => C02V**REDACTED**
+		BootSessionUUID => 6696D9BB-C1B0-**REDACTED**
+		BoardId => 10
+		DeviceColor => unknown
+		EffectiveProductionStatusAp => true
+		EffectiveSecurityModeSEP => true
+		UniqueChipID => 145310**REDACTED**
+		UniqueDeviceID => 00008012-**REDACTED**
+		RemoteXPCVersionFlags => 7205759**REDACTED**
+		CertificateProductionStatus => true
+		CertificateSecurityMode => true
+		DeviceEnclosureColor => unknown
+		ModelNumber => MQ2Y2
+		RegionCode => LL
+		SecurityDomain => 1
+		OSInstallEnvironment => false
+		InterfaceIndex => 9
+		HardwarePlatform => t8012
+		Image4Supported => true
+	}
