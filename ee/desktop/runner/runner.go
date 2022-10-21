@@ -248,7 +248,16 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 
 		client := client.New(r.authToken, socketPath)
 		if err := backoff.WaitFor(client.Ping, 5*time.Second, 1*time.Second); err != nil {
-			return fmt.Errorf("pinging desktop server: %w", err)
+			if err := cmd.Process.Kill(); err != nil {
+				level.Error(r.logger).Log(
+					"msg", "killing desktop process after startup ping failed",
+					"uid", uid,
+					"pid", cmd.Process.Pid,
+					"path", cmd.Path,
+					"err", err,
+				)
+			}
+			return fmt.Errorf("pinging desktop server after startup: %w", err)
 		}
 
 		level.Debug(r.logger).Log(
