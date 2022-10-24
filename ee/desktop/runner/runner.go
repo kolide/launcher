@@ -410,11 +410,14 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
-	cmd.Env = []string{
+	cmd.Env = append(
+		// if os.Environ() is not included, windows wiil not render the icon, producing the error:
+		// "unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
+		os.Environ(),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
-	}
+	)
 
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
