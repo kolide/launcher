@@ -108,32 +108,48 @@ func TestParse(t *testing.T) {
 							actualValueCount += 1
 							validateKeyValueInCommandOutput(t, propertyKey, propertyValue.(string), tt.input)
 						}
-					} else if topLevelKey == "Heartbeat" {
+
+						continue
+					}
+
+					if topLevelKey == "Heartbeat" {
 						for _, heartbeat := range topLevelValue.([]string) {
 							actualValueCount += 1
 							validateItemInCommandOutput(t, heartbeat, tt.input)
 						}
-					} else if topLevelKey == "Services" || topLevelKey == "Local Services" {
+
+						continue
+					}
+
+					if topLevelKey == "Services" || topLevelKey == "Local Services" {
 						for _, service := range topLevelValue.([]map[string]interface{}) {
 							for serviceKey, serviceValue := range service {
 								if serviceKey == "Name" {
 									actualValueCount += 1
 									validateItemInCommandOutput(t, serviceValue.(string), tt.input)
-								} else if serviceKey == "Properties" {
+
+									continue
+								}
+
+								if serviceKey == "Properties" {
 									for servicePropertyKey, servicePropertyValue := range serviceValue.(map[string]interface{}) {
 										actualValueCount += 1
 										validateKeyValueInCommandOutput(t, servicePropertyKey, servicePropertyValue.(string), tt.input)
 									}
-								} else {
-									actualValueCount += 1
-									validateKeyValueInCommandOutput(t, serviceKey, serviceValue.(string), tt.input)
+
+									continue
 								}
+
+								actualValueCount += 1
+								validateKeyValueInCommandOutput(t, serviceKey, serviceValue.(string), tt.input)
 							}
 						}
-					} else {
-						actualValueCount += 1
-						validateKeyValueInCommandOutput(t, topLevelKey, topLevelValue.(string), tt.input)
+
+						continue
 					}
+
+					actualValueCount += 1
+					validateKeyValueInCommandOutput(t, topLevelKey, topLevelValue.(string), tt.input)
 				}
 			}
 
