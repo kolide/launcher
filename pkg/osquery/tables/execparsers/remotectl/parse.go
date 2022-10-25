@@ -240,17 +240,16 @@ func (p *parser) getCurrentIndentationLevel() int {
 
 func extractPropertyKeyValue(line string) (string, string, error) {
 	// key-value pairs in the `Properties` dictionary are in the format `key => value`
-	extracted := strings.Split(line, "=>")
-	if len(extracted) != 2 {
-		return "", "", errors.New("key/value pair in properties in remotectl output is in an unexpected format")
-	}
-
-	return strings.TrimSpace(extracted[0]), strings.TrimSpace(extracted[1]), nil
+	return extractKeyValue(line, "=>")
 }
 
 func extractTopLevelKeyValue(line string) (string, string, error) {
 	// Top-level key-value pairs are in the format `key: value`
-	extracted := strings.Split(line, ":")
+	return extractKeyValue(line, ":")
+}
+
+func extractKeyValue(line, delimiter string) (string, string, error) {
+	extracted := strings.Split(line, delimiter)
 	if len(extracted) != 2 {
 		return "", "", errors.New("top-level key/value pair in remotectl output is in an unexpected format")
 	}
