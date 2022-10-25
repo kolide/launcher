@@ -411,6 +411,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
+		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
