@@ -411,6 +411,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
+		// without passing the temp var, the desktop icon will not appear on windows and emit the error:
+		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
 		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
