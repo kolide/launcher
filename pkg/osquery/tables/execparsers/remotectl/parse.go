@@ -69,13 +69,22 @@ func (p *parser) parseDevice() (map[string]interface{}, error) {
 	for p.scanner.Scan() {
 		p.lastReadLine = p.scanner.Text()
 
-		if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Heartbeat:") || strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Services:") {
-			arrayName, _, _ := strings.Cut(strings.TrimSpace(p.lastReadLine), ":")
-			arrayItems, eof, err := p.parseArray()
+		if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Heartbeat:") {
+			heartbeats, err := p.parseStringArray()
 			if err != nil {
 				return nil, err
 			}
-			deviceResults[arrayName] = arrayItems
+			deviceResults["Heartbeat"] = heartbeats
+
+			// Proceed with parsing p.lastReadLine, since arrays do not have ending delimiters.
+		}
+
+		if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Services:") {
+			services, eof, err := p.parseObjectArray()
+			if err != nil {
+				return nil, err
+			}
+			deviceResults["Services"] = services
 
 			// If we've reached the end of the command output ("Services" is sometimes the end), then return.
 			// Otherwise, proceed with parsing p.lastReadLine, since arrays do not have ending delimiters.
@@ -86,7 +95,7 @@ func (p *parser) parseDevice() (map[string]interface{}, error) {
 
 		// We handle Local Services separately from the above, to allow us to go directly from Services into Local Services
 		if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Local Services:") {
-			localServices, eof, err := p.parseArray()
+			localServices, eof, err := p.parseObjectArray()
 			if err != nil {
 				return nil, err
 			}
@@ -150,11 +159,37 @@ func (p *parser) parseDictionary() (map[string]interface{}, error) {
 	return nil, errors.New("unexpected end to dictionary")
 }
 
-func (p *parser) parseArray() ([]string, bool, error) {
+func (p *parser) parseStringArray() ([]string, error) {
 	arrayResults := make([]string, 0)
+
+	startingIndentationLevel := p.getCurrentIndentationLevel()
+	for p.scanner.Scan() {
+		p.lastReadLine = p.scanner.Text()
+
+		currentIndentationLevel := p.getCurrentIndentationLevel()
+
+		// Exiting array
+		if currentIndentationLevel <= startingIndentationLevel {
+			return arrayResults, nil
+		}
+
+		// Ignore everything not at the top level
+		if currentIndentationLevel == startingIndentationLevel+1 {
+			arrayResults = append(arrayResults, strings.TrimSpace(p.lastReadLine))
+		}
+	}
+
+	return arrayResults, nil
+}
+
+func (p *parser) parseObjectArray() ([]map[string]interface{}, bool, error) {
+	arrayResults := make([]map[string]interface{}, 0)
 	eof := false
 
 	startingIndentationLevel := p.getCurrentIndentationLevel()
+	arrayItemIndentationLevel := startingIndentationLevel + 1
+	arrayItemPropertyIndentationLevel := arrayItemIndentationLevel + 1
+
 	for p.scanner.Scan() {
 		p.lastReadLine = p.scanner.Text()
 
@@ -165,9 +200,33 @@ func (p *parser) parseArray() ([]string, bool, error) {
 			return arrayResults, eof, nil
 		}
 
-		// Ignore everything not at the top level
-		if currentIndentationLevel == startingIndentationLevel+1 {
-			arrayResults = append(arrayResults, strings.TrimSpace(p.lastReadLine))
+		// Process items
+		if currentIndentationLevel == arrayItemIndentationLevel {
+			item := make(map[string]interface{})
+			// Create artificial key "Name" to hold the name of the item
+			item["Name"] = strings.TrimSpace(p.lastReadLine)
+			arrayResults = append(arrayResults, item)
+			continue
+		}
+
+		// One more level indented -- we have properties attached to the item we processed last. Extract them.
+		if currentIndentationLevel >= arrayItemPropertyIndentationLevel {
+			lastProcessedItem := arrayResults[len(arrayResults)-1]
+
+			if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Properties:") {
+				itemProperties, err := p.parseDictionary()
+				if err != nil {
+					return nil, eof, err
+				}
+				lastProcessedItem["Properties"] = itemProperties
+				continue
+			}
+
+			propertyKey, propertyValue, err := extractTopLevelKeyValue(p.lastReadLine)
+			if err != nil {
+				return nil, eof, err
+			}
+			lastProcessedItem[propertyKey] = propertyValue
 		}
 	}
 

@@ -55,7 +55,7 @@ func TestParse(t *testing.T) {
 			name:                "dumpstate with multiple devices in output",
 			input:               []byte(multiple_devices_dumpstate),
 			expectedDeviceCount: 3,
-			expectedValueCount:  164,
+			expectedValueCount:  188,
 			expectedErr:         false,
 		},
 		{
@@ -108,11 +108,27 @@ func TestParse(t *testing.T) {
 							actualValueCount += 1
 							validateKeyValueInCommandOutput(t, propertyKey, propertyValue.(string), tt.input)
 						}
-					} else if topLevelKey == "Services" || topLevelKey == "Local Services" || topLevelKey == "Heartbeat" {
-						services := topLevelValue.([]string)
-						for _, service := range services {
+					} else if topLevelKey == "Heartbeat" {
+						for _, heartbeat := range topLevelValue.([]string) {
 							actualValueCount += 1
-							validateItemInCommandOutput(t, service, tt.input)
+							validateItemInCommandOutput(t, heartbeat, tt.input)
+						}
+					} else if topLevelKey == "Services" || topLevelKey == "Local Services" {
+						for _, service := range topLevelValue.([]map[string]interface{}) {
+							for serviceKey, serviceValue := range service {
+								if serviceKey == "Name" {
+									actualValueCount += 1
+									validateItemInCommandOutput(t, serviceValue.(string), tt.input)
+								} else if serviceKey == "Properties" {
+									for servicePropertyKey, servicePropertyValue := range serviceValue.(map[string]interface{}) {
+										actualValueCount += 1
+										validateKeyValueInCommandOutput(t, servicePropertyKey, servicePropertyValue.(string), tt.input)
+									}
+								} else {
+									actualValueCount += 1
+									validateKeyValueInCommandOutput(t, serviceKey, serviceValue.(string), tt.input)
+								}
+							}
 						}
 					} else {
 						actualValueCount += 1
