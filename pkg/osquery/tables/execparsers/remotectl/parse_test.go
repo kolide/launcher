@@ -79,7 +79,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p := New()
-			result, err := p.parseDumpstate(bytes.NewReader(tt.input))
+			result, err := p.Parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
 				assert.Error(t, err)
 				assert.Nil(t, result)
@@ -97,7 +97,7 @@ func TestParse(t *testing.T) {
 				if deviceName != "" && len(deviceValues) != 0 {
 					actualDeviceCount += 1
 				}
-				validateItemInCommandOutput(t, deviceName, tt.input)
+				assert.True(t, bytes.Contains(tt.input, []byte(deviceName)))
 				// Confirm that we stripped "Found" from the front of the device name
 				assert.False(t, strings.HasPrefix(deviceName, "Found"), fmt.Sprintf("device name not extracted correctly: got %s", deviceName))
 
@@ -115,7 +115,7 @@ func TestParse(t *testing.T) {
 					if topLevelKey == "Heartbeat" {
 						for _, heartbeat := range topLevelValue.([]string) {
 							actualValueCount += 1
-							validateItemInCommandOutput(t, heartbeat, tt.input)
+							assert.True(t, bytes.Contains(tt.input, []byte(heartbeat)))
 						}
 
 						continue
@@ -126,7 +126,7 @@ func TestParse(t *testing.T) {
 							for serviceKey, serviceValue := range service {
 								if serviceKey == "Name" {
 									actualValueCount += 1
-									validateItemInCommandOutput(t, serviceValue.(string), tt.input)
+									assert.True(t, bytes.Contains(tt.input, []byte(serviceValue.(string))))
 
 									continue
 								}
@@ -161,15 +161,11 @@ func TestParse(t *testing.T) {
 
 func validateKeyValueInCommandOutput(t *testing.T, key, val string, commandOutput []byte) {
 	// First, confirm that the key and value both exists in the original output
-	validateItemInCommandOutput(t, key, commandOutput)
-	validateItemInCommandOutput(t, val, commandOutput)
+	assert.True(t, bytes.Contains(commandOutput, []byte(key)))
+	assert.True(t, bytes.Contains(commandOutput, []byte(val)))
 
 	// Validate that the key and value were associated with each other
 	regexFmt := `\Q%s\E.+\Q%s\E` // match key, then any delimiter, then value, on one line
 	re := regexp.MustCompile(fmt.Sprintf(regexFmt, key, val))
 	assert.True(t, re.Match(commandOutput), fmt.Sprintf("expected to see %s : %s in original command output but did not", key, val))
-}
-
-func validateItemInCommandOutput(t *testing.T, item string, commandOutput []byte) {
-	assert.True(t, bytes.Contains(commandOutput, []byte(item)))
 }
