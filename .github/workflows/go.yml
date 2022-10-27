@@ -67,6 +67,10 @@ jobs:
     - name: Lipo
       run: make github-lipo
       if: ${{ contains(matrix.os, 'macos') }}
+    
+    - name: App Bundle
+      run: make launcher-app
+      if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test
       run: make test
