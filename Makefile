@@ -56,6 +56,14 @@ lipo_%: build/darwin.amd64/% build/darwin.arm64/%
 	@mkdir -p build/darwin.universal
 	lipo -create $^ -output build/darwin.universal/$*
 
+# Build an app bundle for macOS
+# TODO: need to add build/Launcher.app/Contents/embedded.provisionprofile
+launcher-app: lipo_launcher
+	mkdir -p build/Kolide.app/Contents/MacOS
+	cp build/darwin.universal/launcher build/Kolide.app/Contents/MacOS/
+	mkdir -p build/Kolide.app/Contents/Resources
+	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > build/Kolide.app/Contents/Info.plist
+
 # pointers, mostly for legacy reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
@@ -108,6 +116,7 @@ release-phase1:
 	rm -rf build
 	$(MAKE) rel-amd64 rel-arm64
 	$(MAKE) rel-lipo
+	$(MAKE) launcher-app
 #	$(MAKE) codesign
 #	$(MAKE) binary-bundles
 
