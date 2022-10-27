@@ -13,7 +13,7 @@ import (
 func removeLauncher(ctx context.Context, logger log.Logger, identifier string) error {
 	// Launch the Windows Settings app using the ms-settings: URI scheme
 	// https://learn.microsoft.com/en-us/windows/uwp/launch-resume/launch-settings-app#apps
-	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"start"}, "ms-settings:appsfeatures"); err != nil {
+	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"start"}, []string{"ms-settings:appsfeatures"}); err != nil {
 		return err
 	}
 
