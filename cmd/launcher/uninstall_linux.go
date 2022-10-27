@@ -4,24 +4,15 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"strings"
-
-	"github.com/pkg/errors"
+	"os/exec"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {
 	if identifier == "" {
 		identifier = "kolide-k2"
-	}
-
-	isDebianOS, err := isDebian(ctx, logger)
-	if err != nil {
-		return err
 	}
 
 	serviceName := fmt.Sprintf("launcher.%s", identifier)
@@ -34,19 +25,19 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	}
 
 	// Disable launcher service
-	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", serviceName}...)
+	cmd = exec.CommandContext(ctx, "systemctl", []string{"disable", serviceName}...)
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
 	// Tell the appropriate package manager to remove launcher
-	if isDebianOS {
-		cmd := exec.CommandContext(ctx, "dpkg", []string{"--purge", packageName}...)
+	if _, err := os.Stat("/usr/bin/dpkg"); err == nil {
+		cmd = exec.CommandContext(ctx, "dpkg", []string{"--purge", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
-	} else {
-		cmd := exec.CommandContext(ctx, "rpm", []string{"-e", packageName}...)
+	} else if _, err := os.Stat("/bin/rpm"); err == nil {
+		cmd = exec.CommandContext(ctx, "rpm", []string{"-e", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
@@ -65,23 +56,4 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	}
 
 	return nil
-}
-
-func isDebian(ctx context.Context, logger log.Logger) (bool, error) {
-	output, err := tablehelpers.Exec(ctx, logger, 30, []string{"cat"}, []string{"/etc/os-release"})
-	if err != nil {
-		return false, err
-	}
-
-	prefix := "ID_LIKE="
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.HasPrefix(line, prefix) {
-			return strings.Contains(line, "debian"), nil
-		}
-	}
-
-	return false, errors.New("unable to determine type of Linux distribution")
 }
