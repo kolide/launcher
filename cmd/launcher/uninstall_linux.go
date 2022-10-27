@@ -11,12 +11,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/pkg/errors"
 )
 
-func removeLauncher(ctx context.Context, logger log.Logger, identifier string) error {
+func removeLauncher(ctx context.Context, identifier string) error {
 	if identifier == "" {
 		identifier = "kolide-k2"
 	}
@@ -30,22 +28,26 @@ func removeLauncher(ctx context.Context, logger log.Logger, identifier string) e
 	packageName := fmt.Sprintf("launcher-%s", identifier)
 
 	// Stop launcher service
-	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"systemctl"}, []string{"stop", serviceName}); err != nil {
+	cmd := exec.CommandContext(ctx, "systemctl", []string{"stop", serviceName}...)
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 
 	// Disable launcher service
-	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"systemctl"}, []string{"disable", serviceName}); err != nil {
+	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", serviceName}...)
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 
 	// Tell the appropriate package manager to remove launcher
 	if isDebianOS {
-		if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"dpkg"}, []string{"--purge", packageName}); err != nil {
+		cmd := exec.CommandContext(ctx, "dpkg", []string{"--purge", packageName}...)
+		if err := cmd.Run(); err != nil {
 			return err
 		}
 	} else {
-		if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"rpm"}, []string{"-e", packageName}); err != nil {
+		cmd := exec.CommandContext(ctx, "rpm", []string{"-e", packageName}...)
+		if err := cmd.Run(); err != nil {
 			return err
 		}
 	}

@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/kit/logutil"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/pkg/errors"
 )
@@ -27,15 +26,13 @@ func runUninstall(args []string) error {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	logger := logutil.NewCLILogger(true)
-
 	// Attempt to get the identifier from the config file if one was provided
 	identifier, err := getIdentifierFromConfigFile(*flconfig)
 	if err != nil {
 		return err
 	}
 
-	return removeLauncher(context.Background(), logger, identifier)
+	return removeLauncher(context.Background(), identifier)
 }
 
 func getIdentifierFromConfigFile(configFilePath string) (string, error) {

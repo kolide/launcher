@@ -5,15 +5,13 @@ package main
 
 import (
 	"context"
-
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 )
 
-func removeLauncher(ctx context.Context, logger log.Logger, identifier string) error {
+func removeLauncher(ctx context.Context, identifier string) error {
 	// Launch the Windows Settings app using the ms-settings: URI scheme
 	// https://learn.microsoft.com/en-us/windows/uwp/launch-resume/launch-settings-app#apps
-	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{"start"}, []string{"ms-settings:appsfeatures"}); err != nil {
+	cmd := exec.CommandContext(ctx, "start", "ms-settings:appsfeatures"...)
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 

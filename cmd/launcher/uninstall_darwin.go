@@ -7,12 +7,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"os/exec"
 )
 
-func removeLauncher(ctx context.Context, logger log.Logger, identifier string) error {
+func removeLauncher(ctx context.Context, identifier string) error {
 	if identifier == "" {
 		// Ensure identifier is non-empty and use the default if none provided
 		identifier = "kolide-k2"
@@ -22,7 +20,8 @@ func removeLauncher(ctx context.Context, logger log.Logger, identifier string) e
 	launchCtlPath := "/bin/launchctl"
 	launchCtlArgs := []string{"unload", launchDaemonPList}
 
-	if _, err := tablehelpers.Exec(ctx, logger, 30, []string{launchCtlPath}, launchCtlArgs); err != nil {
+	cmd := exec.CommandContext(ctx, launchCtlPath, launchCtlArgs...)
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 
