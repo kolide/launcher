@@ -35,36 +35,37 @@ func runUninstall(args []string) error {
 		return err
 	}
 
-	err = removeLauncher(context.Background(), logger, identifier)
-
-	return err
+	return removeLauncher(context.Background(), logger, identifier)
 }
 
 func getIdentifierFromConfigFile(configFilePath string) (string, error) {
-	var identifier string
 	if configFilePath == "" {
-		return identifier, nil
+		return "", nil
 	}
 
 	f, err := os.Open(configFilePath)
 	if err != nil {
-		return identifier, errors.Wrapf(err, "failed to open config file '%s'.", configFilePath)
+		return "", errors.Wrapf(err, "failed to open config file '%s'.", configFilePath)
 	}
 	defer f.Close()
 
+	var identifier string
 	prefix := "root_directory "
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Find the root_directory line, parse out the identifier part of the path
-		if strings.HasPrefix(line, prefix) {
-			substrs := strings.Split(strings.TrimSpace(strings.TrimPrefix(line, prefix)), string(os.PathSeparator))
+		// Find the root_directory line
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
 
-			if len(substrs) >= 3 {
-				identifier = strings.TrimSpace(substrs[2])
-				break
-			}
+		// Parse out the identifier part of the path
+		substrs := strings.Split(strings.TrimSpace(strings.TrimPrefix(line, prefix)), string(os.PathSeparator))
+
+		if len(substrs) >= 3 {
+			identifier = strings.TrimSpace(substrs[2])
+			break
 		}
 	}
 
