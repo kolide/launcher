@@ -13,7 +13,7 @@ import (
 	"github.com/peterbourgon/ff/v3"
 )
 
-var rootDirRegexp = regexp.MustCompile(`^root_directory \/var\/(.*)\/.*\.kolide\.com`)
+var rootDirRegexp = regexp.MustCompile(`^root_directory \/var\/([-a-zA-Z0-9]*)\/.*\.kolide\.com`)
 
 func runUninstall(args []string) error {
 	var (
