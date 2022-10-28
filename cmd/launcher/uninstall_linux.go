@@ -32,12 +32,12 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	// Tell the appropriate package manager to remove launcher
 	if _, err := os.Stat("/usr/bin/dpkg"); err == nil {
-		cmd = exec.CommandContext(ctx, "dpkg", []string{"--purge", packageName}...)
+		cmd = exec.CommandContext(ctx, "/usr/bin/dpkg", []string{"--purge", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
 	} else if _, err := os.Stat("/bin/rpm"); err == nil {
-		cmd = exec.CommandContext(ctx, "rpm", []string{"-e", packageName}...)
+		cmd = exec.CommandContext(ctx, "/bin/rpm", []string{"-e", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
