@@ -69,7 +69,7 @@ jobs:
       if: ${{ contains(matrix.os, 'macos') }}
     
     - name: App Bundle
-      run: make launcher-app
+      run: make github-launcherapp
       if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test

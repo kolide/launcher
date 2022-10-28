@@ -58,12 +58,13 @@ lipo_%: build/darwin.amd64/% build/darwin.arm64/%
 
 # Build an app bundle for macOS
 # TODO: need to add build/Launcher.app/Contents/embedded.provisionprofile
-launcher-app: lipo_launcher
-	mkdir -p build/Kolide.app/Contents/MacOS
-	cp build/darwin.universal/launcher build/Kolide.app/Contents/MacOS/
-	mkdir -p build/Kolide.app/Contents/Resources
-	cp tools/images/Kolide.icns build/Kolide.app/Contents/Resources
-	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > build/Kolide.app/Contents/Info.plist
+launcherapp_%: ARCH = $(word 2, $(subst _, ,$@))
+launcherapp_%: build/darwin.%/launcher
+	mkdir -p build/darwin.$(ARCH)/Kolide.app/Contents/MacOS
+	cp build/darwin.$(ARCH)/launcher build/darwin.$(ARCH)/Kolide.app/Contents/MacOS/
+	mkdir -p build/darwin.$(ARCH)/Kolide.app/Contents/Resources
+	cp tools/images/Kolide.icns build/darwin.$(ARCH)/Kolide.app/Contents/Resources
+	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > build/darwin.$(ARCH)/Kolide.app/Contents/Info.plist
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
@@ -72,6 +73,7 @@ grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 build/darwin.amd64/%: build_%_darwin_amd64
 build/darwin.arm64/%: build_%_darwin_arm64
+build/darwin.universal/%: lipo_%
 
 ##
 ## GitHub Action Helpers
@@ -82,6 +84,7 @@ GITHUB_ARCHS=amd64 arm64
 github-build-no-cross: $(foreach t, $(GITHUB_TARGETS), build_$(t))
 github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
+github-launcherapp: $(foreach a, $(GITHUB_ARCHS) universal, launcherapp_$(a))
 
 ##
 ## Cross Build targets
@@ -91,6 +94,7 @@ RELEASE_TARGETS=launcher package-builder
 MANUAL_CROSS_OSES=darwin windows linux
 ARM64_OSES=darwin
 AMD64_OSES=darwin windows linux
+DARWIN_ARCHS=arm64 amd64 universal
 
 # xp is a helper for quick cross platform builds, and sanity checking
 # for breakage. humans only
@@ -104,6 +108,8 @@ rel-arm64: CROSSGOPATH = /opt/go1.16.10.darwin-arm64/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
 rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
+
+rel-launcherapp: $(foreach arch, $(DARWIN_ARCHES), launcherapp_$(arch))
 
 ##
 ## Release Process Stuff
@@ -119,7 +125,7 @@ release-phase1:
 	rm -rf build
 	$(MAKE) rel-amd64 rel-arm64
 	$(MAKE) rel-lipo
-	$(MAKE) launcher-app
+	$(MAKE) rel-launcherapp
 #	$(MAKE) codesign
 #	$(MAKE) binary-bundles
 
