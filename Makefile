@@ -62,13 +62,16 @@ launcher-app: lipo_launcher
 	mkdir -p build/Kolide.app/Contents/MacOS
 	cp build/darwin.universal/launcher build/Kolide.app/Contents/MacOS/
 	mkdir -p build/Kolide.app/Contents/Resources
+	cp tools/images/Kolide.icns build/Kolide.app/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > build/Kolide.app/Contents/Info.plist
 
-# pointers, mostly for legacy reasons
+# pointers, mostly for convenience reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
+build/darwin.amd64/%: build_%_darwin_amd64
+build/darwin.arm64/%: build_%_darwin_arm64
 
 ##
 ## GitHub Action Helpers
