@@ -8,39 +8,44 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {
-	if identifier == "" {
+	if strings.TrimSpace(identifier) == "" {
 		identifier = "kolide-k2"
 	}
 
 	serviceName := fmt.Sprintf("launcher.%s", identifier)
 	packageName := fmt.Sprintf("launcher-%s", identifier)
 
-	// Stop launcher service
-	cmd := exec.CommandContext(ctx, "systemctl", []string{"stop", serviceName}...)
+	// Stop and disable launcher service
+	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", "--now", serviceName}...)
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
-	// Disable launcher service
-	cmd = exec.CommandContext(ctx, "systemctl", []string{"disable", serviceName}...)
-	if err := cmd.Run(); err != nil {
-		return err
+	fileExists := func(f string) bool {
+		if _, err := os.Stat(f); err == nil {
+			return true
+		}
+		return false
 	}
 
 	// Tell the appropriate package manager to remove launcher
-	if _, err := os.Stat("/usr/bin/dpkg"); err == nil {
+	switch {
+	case fileExists("/usr/bin/dpkg"):
 		cmd = exec.CommandContext(ctx, "/usr/bin/dpkg", []string{"--purge", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
-	} else if _, err := os.Stat("/bin/rpm"); err == nil {
+	case fileExists("/bin/rpm"):
 		cmd = exec.CommandContext(ctx, "/bin/rpm", []string{"-e", packageName}...)
 		if err := cmd.Run(); err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("unsupported package manager")
 	}
 
 	dirsToRemove := []string{

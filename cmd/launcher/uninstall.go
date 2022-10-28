@@ -8,9 +8,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/peterbourgon/ff/v3"
-	"github.com/pkg/errors"
 )
 
 var rootDirRegexp = regexp.MustCompile(`^root_directory \/var\/(.*)\/.*\.kolide\.com`)
@@ -35,7 +35,10 @@ func runUninstall(args []string) error {
 		return err
 	}
 
-	return removeLauncher(context.Background(), identifier)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	return removeLauncher(ctx, identifier)
 }
 
 func getIdentifierFromConfigFile(configFilePath string) (string, error) {
@@ -45,7 +48,7 @@ func getIdentifierFromConfigFile(configFilePath string) (string, error) {
 
 	f, err := os.Open(configFilePath)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to open config file '%s'.", configFilePath)
+		return "", fmt.Errorf("opening config file '%s': %w", configFilePath, err)
 	}
 	defer f.Close()
 
