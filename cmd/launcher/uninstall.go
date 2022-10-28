@@ -6,11 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/peterbourgon/ff/v3"
 	"github.com/pkg/errors"
 )
+
+var rootDirRegexp = regexp.MustCompile(`^root_directory \/var\/(.*)\/.*\.kolide\.com`)
 
 func runUninstall(args []string) error {
 	var (
@@ -46,25 +49,18 @@ func getIdentifierFromConfigFile(configFilePath string) (string, error) {
 	}
 	defer f.Close()
 
-	var identifier string
-	prefix := "root_directory "
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Find the root_directory line
-		if !strings.HasPrefix(line, prefix) {
+		matches := rootDirRegexp.FindAllStringSubmatch(line, -1)
+		if !(len(matches) == 1 && len(matches[0]) == 2) {
+			// Skip lines that do not match regexp
 			continue
 		}
 
-		// Parse out the identifier part of the path
-		substrs := strings.Split(strings.TrimSpace(strings.TrimPrefix(line, prefix)), string(os.PathSeparator))
-
-		if len(substrs) >= 3 {
-			identifier = strings.TrimSpace(substrs[2])
-			break
-		}
+		return strings.TrimSpace(matches[0][1]), nil
 	}
 
-	return identifier, nil
+	return "", nil
 }
