@@ -67,9 +67,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return errors.Wrap(err, "detecting platform")
 	}
 
-	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
-	debug.AttachDebugHandler(debugAddrPath, logger)
-	defer os.Remove(debugAddrPath)
+	debug.AttachDebugHandler(rootDirectory, logger)
+	defer os.Remove(rootDirectory)
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient

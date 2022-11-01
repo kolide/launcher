@@ -1,6 +1,3 @@
-//go:build !windows
-// +build !windows
-
 package debug
 
 import (
@@ -21,11 +18,11 @@ import (
 
 const debugPrefix = "/debug/"
 
-func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) {
+func startDebugServer(addrPath string, logger log.Logger) (*http.Server, string, error) {
 	// Generate new (random) token to use for debug server auth
 	token, err := uuid.NewRandom()
 	if err != nil {
-		return nil, errors.Wrap(err, "generating debug token")
+		return nil, "", errors.Wrap(err, "generating debug token")
 	}
 
 	// Start the debug server
@@ -39,7 +36,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	// already used port.
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return nil, errors.Wrap(err, "opening socket")
+		return nil, "", errors.Wrap(err, "opening socket")
 	}
 
 	go func() {
@@ -57,7 +54,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	addr := url.String()
 	// Write the address to a file for easy access by users
 	if err := ioutil.WriteFile(addrPath, []byte(addr), 0600); err != nil {
-		return nil, errors.Wrap(err, "writing debug address")
+		return nil, "", errors.Wrap(err, "writing debug address")
 	}
 
 	level.Info(logger).Log(
@@ -65,7 +62,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 		"addr", addr,
 	)
 
-	return &serv, nil
+	return &serv, addr, nil
 }
 
 // The below handler code is adapted from MIT licensed github.com/e-dard/netbug

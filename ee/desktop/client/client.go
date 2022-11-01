@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/kolide/launcher/ee/socket"
 )
 
 type transport struct {
@@ -24,7 +26,7 @@ func New(authToken, socketPath string) client {
 	transport := &transport{
 		authToken: authToken,
 		base: http.Transport{
-			DialContext: dialContext(socketPath),
+			DialContext: socket.Dial(socketPath),
 		},
 	}
 

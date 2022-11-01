@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/socket"
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
@@ -47,7 +48,7 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 		return nil, err
 	}
 
-	listener, err := listener(socketPath)
+	listener, err := socket.Listen(socketPath)
 	if err != nil {
 		return nil, err
 	}

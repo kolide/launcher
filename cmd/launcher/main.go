@@ -135,6 +135,8 @@ func runSubcommands() error {
 		run = runInteractive
 	case "desktop":
 		run = runDesktop
+	case "debug":
+		run = runDebug
 	default:
 		return errors.Errorf("Unknown subcommand %s", os.Args[1])
 	}
