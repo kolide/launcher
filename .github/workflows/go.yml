@@ -35,15 +35,12 @@ jobs:
         go-version: ${{env.GOVER}}
       id: go
 
+    # use bash, because the powershell syntax is different and this is a cross platform workflow
     - id: go-cache-paths
+      shell: bash
       run: |
         echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-
-    - name: seph test
-      run: |
-        cat "$GITHUB_OUTPUT"
-        echo ${{ steps.go-cache-paths.outputs.go-build }}
 
     - name: Go Build Cache
       uses: actions/cache@v3
