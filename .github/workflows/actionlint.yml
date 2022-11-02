@@ -20,5 +20,6 @@ jobs:
       - name: install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
       - name: actionlint
-        echo "::add-matcher::.github/actionlint-matcher.json"
-        run: actionlint -color -ignore 'SC2016:'
+        run: |
+          echo "::add-matcher::.github/actionlint-matcher.json"
+          actionlint -color -ignore 'SC2016:'
