@@ -22,4 +22,4 @@ jobs:
       - name: actionlint
         run: |
           echo "::add-matcher::.github/actionlint-matcher.json"
-          actionlint -color -ignore 'SC2016:'
+          actionlint -color
