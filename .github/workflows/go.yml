@@ -6,7 +6,7 @@ on:
     branches: [main, master]
     tags: '*'
   pull_request:
-    branches: '*'
+    branches: '**'
 
 env:
   GOVER: 1.19.3
