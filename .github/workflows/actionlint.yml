@@ -20,4 +20,5 @@ jobs:
       - name: install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
       - name: actionlint
-        run: actionlint -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}%0A```%0A{{replace $err.Snippet "\\n" "%0A"}}%0A```\n{{end}}' -ignore 'SC2016:'
+        echo "::add-matcher::.github/actionlint-matcher.json"
+        run: actionlint -color -ignore 'SC2016:'
