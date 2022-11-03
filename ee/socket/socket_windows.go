@@ -4,7 +4,6 @@
 package socket
 
 import (
-	"context"
 	"net"
 
 	"github.com/Microsoft/go-winio"

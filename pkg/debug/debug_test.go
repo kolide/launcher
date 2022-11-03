@@ -1,7 +1,3 @@
-//go:build !windows
-// +build !windows
-
-//nolint:bodyclose
 package debug
 
 import (
