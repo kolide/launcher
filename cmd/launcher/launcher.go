@@ -68,7 +68,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	debug.AttachDebugHandler(rootDirectory, logger)
-	defer os.Remove(rootDirectory)
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient

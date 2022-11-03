@@ -9,7 +9,6 @@ import (
 
 func Dial(socketPath string) (net.Conn, error) {
 	return net.Dial("unix", socketPath)
-
 }
 
 func Listen(socketPath string) (net.Listener, error) {
