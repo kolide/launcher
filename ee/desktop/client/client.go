@@ -1,7 +1,9 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -26,7 +28,9 @@ func New(authToken, socketPath string) client {
 	transport := &transport{
 		authToken: authToken,
 		base: http.Transport{
-			DialContext: socket.Dial(socketPath),
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return socket.Dial(socketPath)
+			},
 		},
 	}
 

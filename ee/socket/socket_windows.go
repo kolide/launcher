@@ -10,10 +10,8 @@ import (
 	"github.com/Microsoft/go-winio"
 )
 
-func Dial(socketPath string) func(_ context.Context, _, _ string) (net.Conn, error) {
-	return func(_ context.Context, _, _ string) (net.Conn, error) {
-		return winio.DialPipe(socketPath, nil)
-	}
+func Dial(socketPath string) (net.Conn, error) {
+	return winio.DialPipe(socketPath, nil)
 }
 
 func Listen(socketPath string) (net.Listener, error) {

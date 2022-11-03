@@ -8,11 +8,13 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
-	"syscall"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
-	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/ulid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func TestStartDebugServer(t *testing.T) {
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
 
-	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
+	serv, _, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
 	require.Nil(t, err)
 
 	url := getDebugURL(t, tokenFile.Name())
@@ -46,7 +48,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
 	require.Nil(t, err)
 
-	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
+	serv, _, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
 	require.Nil(t, err)
 
 	url := getDebugURL(t, tokenFile.Name())
@@ -62,44 +64,55 @@ func TestDebugServerUnauthorized(t *testing.T) {
 func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
 
-	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
-	require.Nil(t, err)
-
-	AttachDebugHandler(tokenFile.Name(), log.NewNopLogger())
+	rootDir := testRootDir(t)
+	AttachDebugHandler(rootDir, log.NewNopLogger())
 
 	// Start server
-	syscall.Kill(syscall.Getpid(), debugSignal)
-	time.Sleep(1 * time.Second)
+	url, err := ToggleDebugServer(rootDir)
+	require.NoError(t, err)
 
-	url := getDebugURL(t, tokenFile.Name())
 	resp, err := http.Get(url)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	defer resp.Body.Close()
 
 	// Stop server
-	syscall.Kill(syscall.Getpid(), debugSignal)
-	time.Sleep(1 * time.Second)
+	_, err = ToggleDebugServer(rootDir)
+	require.NoError(t, err)
 
 	_, err = http.Get(url)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// Start server
-	syscall.Kill(syscall.Getpid(), debugSignal)
-	time.Sleep(1 * time.Second)
+	url, err = ToggleDebugServer(rootDir)
+	require.NoError(t, err)
 
-	newUrl := getDebugURL(t, tokenFile.Name())
-	assert.NotEqual(t, url, newUrl)
-
-	_, err = http.Get(newUrl)
-	require.Nil(t, err)
+	resp, err = http.Get(url)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
 	// Stop server
-	syscall.Kill(syscall.Getpid(), debugSignal)
-	time.Sleep(1 * time.Second)
+	_, err = ToggleDebugServer(rootDir)
+	require.NoError(t, err)
 
 	_, err = http.Get(url)
-	require.NotNil(t, err)
+	require.Error(t, err)
+}
+
+func testRootDir(t *testing.T) string {
+	// on windows were not worried about socket length since it's all based on the named pipe convention
+	if runtime.GOOS == "windows" {
+		return t.TempDir()
+	}
+
+	// keeping it short so we don't hit the 103 char limit for unix sockets
+	rootDir := filepath.Join("tmp", ulid.New())
+	require.NoError(t, os.MkdirAll(rootDir, 0700))
+
+	t.Cleanup(func() {
+		require.NoError(t, os.RemoveAll(rootDir))
+	})
+
+	return rootDir
 }
