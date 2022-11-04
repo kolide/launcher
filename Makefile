@@ -60,7 +60,8 @@ lipo_%: build/darwin.amd64/% build/darwin.arm64/%
 # TODO: need to add build/Launcher.app/Contents/embedded.provisionprofile
 build/darwin.%/Kolide.app: build/darwin.%/launcher
 	mkdir -p $@/Contents/MacOS
-	cp $@/../launcher $@/Contents/MacOS/
+	mv $@/../launcher $@/Contents/MacOS/
+	ln -s Kolide.app/Contents/MacOS/launcher $@/../
 	mkdir -p $@/Contents/Resources
 	cp tools/images/Kolide.icns $@/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
