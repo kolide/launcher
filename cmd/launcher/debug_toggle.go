@@ -27,7 +27,7 @@ func runDebug(args []string) error {
 		return fmt.Errorf("--root_directory is required")
 	}
 
-	response, err := debug.ToggleDebugServer(*flRootDirectory)
+	response, err := debug.ToggleDebug(*flRootDirectory)
 
 	if err != nil {
 		return fmt.Errorf("toggling debug server: %w", err)

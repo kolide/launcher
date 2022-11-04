@@ -1,3 +1,4 @@
+//nolint:bodyclose
 package debug
 
 import (
@@ -61,10 +62,13 @@ func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
 
 	rootDir := testRootDir(t)
-	AttachDebugHandler(rootDir, log.NewNopLogger())
+	debugToggleListener := NewDebugToggleListener(log.NewNopLogger(), rootDir)
+	go func() {
+		require.NoError(t, debugToggleListener.Listen())
+	}()
 
 	// Start server
-	url, err := ToggleDebugServer(rootDir)
+	url, err := ToggleDebug(rootDir)
 	require.NoError(t, err)
 
 	resp, err := http.Get(url)
@@ -73,14 +77,14 @@ func TestAttachDebugHandler(t *testing.T) {
 	defer resp.Body.Close()
 
 	// Stop server
-	_, err = ToggleDebugServer(rootDir)
+	_, err = sendOnDebugToggleSocket(rootDir)
 	require.NoError(t, err)
 
 	_, err = http.Get(url)
 	require.Error(t, err)
 
 	// Start server
-	url, err = ToggleDebugServer(rootDir)
+	url, err = sendOnDebugToggleSocket(rootDir)
 	require.NoError(t, err)
 
 	resp, err = http.Get(url)
@@ -89,11 +93,13 @@ func TestAttachDebugHandler(t *testing.T) {
 	resp.Body.Close()
 
 	// Stop server
-	_, err = ToggleDebugServer(rootDir)
+	_, err = sendOnDebugToggleSocket(rootDir)
 	require.NoError(t, err)
 
 	_, err = http.Get(url)
 	require.Error(t, err)
+
+	require.NoError(t, debugToggleListener.Shutdown())
 }
 
 func testRootDir(t *testing.T) string {
@@ -103,7 +109,7 @@ func testRootDir(t *testing.T) string {
 	}
 
 	// keeping it short so we don't hit the 103 char limit for unix sockets
-	rootDir := filepath.Join("tmp", ulid.New())
+	rootDir := filepath.Join("/tmp", ulid.New())
 	require.NoError(t, os.MkdirAll(rootDir, 0700))
 
 	t.Cleanup(func() {

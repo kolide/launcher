@@ -4,7 +4,7 @@ require (
 	fyne.io/systray v1.10.0
 	github.com/Masterminds/semver v1.4.2
 	github.com/clbanning/mxj v1.8.4
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
@@ -55,8 +55,9 @@ require (
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
 
+require github.com/Microsoft/go-winio v0.4.11
+
 require (
-	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/WatchBeam/clock v0.0.0-20170901150240-b08e6b4da7ea // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect

@@ -67,8 +67,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return errors.Wrap(err, "detecting platform")
 	}
 
-	debug.AttachDebugHandler(rootDirectory, logger)
-
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
 	if opts.InsecureTLS {
@@ -119,6 +117,28 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	var runGroup run.Group
+
+	debugToggleListener := debug.NewDebugToggleListener(logger, rootDirectory)
+	runGroup.Add(func() error {
+		if err := debugToggleListener.Listen(); err != nil {
+			level.Error(logger).Log(
+				"msg", "starting debug toggle listener",
+				"err", err,
+			)
+		}
+		// kind a weird, but we don't want to stop launcher from working
+		// due to a debugger issue, so wait forever
+		c := make(chan struct{})
+		<-c
+		return nil
+	}, func(err error) {
+		if err := debugToggleListener.Shutdown(); err != nil {
+			level.Error(logger).Log(
+				"msg", "shutting down debug toggle listener",
+				"err", err,
+			)
+		}
+	})
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)

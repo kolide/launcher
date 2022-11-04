@@ -119,8 +119,6 @@ github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQD5Q2jXmPdTJS8L8JfA1GquHnFeK3PDcl26E/k=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
-github.com/kolide/kit v0.0.0-20220822193427-0680b087f9bd h1:/z9eL7GqXuM8po3JN4QaOGX2nSkFubhZqrsDbauwKmw=
-github.com/kolide/kit v0.0.0-20220822193427-0680b087f9bd/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/kit v0.0.0-20220920212810-17eca5d2e6d2 h1:wp1mWNZ2tb2Nq9uCa7g19PrYVHzBUb3RxU1aZCVuQGY=
 github.com/kolide/kit v0.0.0-20220920212810-17eca5d2e6d2/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/krypto v0.0.0-20220830180245-7cb3a3940071 h1:CMQwFVCVQR3ziaje/2TaW62CsTQrGybilNTkOWBadwA=
