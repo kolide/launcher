@@ -26,7 +26,6 @@ func runDebug(args []string) error {
 	if *flRootDirectory == "" {
 		return fmt.Errorf("--root_directory is required")
 	}
-
 	response, err := debug.ToggleDebug(*flRootDirectory)
 
 	if err != nil {

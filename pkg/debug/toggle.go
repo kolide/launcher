@@ -35,32 +35,17 @@ func NewDebugToggleListener(logger log.Logger, rootDir string) *DebugToggleListe
 func (d *DebugToggleListener) Listen() error {
 	socketPath, err := writeSocketPath(d.rootDir)
 	if err != nil {
-		d.logger.Log(
-			"msg", "writing socket path",
-			"err", err,
-		)
-		return err
+		return fmt.Errorf("write socket path: %w", err)
 	}
-
 	d.socketPath = socketPath
 
 	if err := os.RemoveAll(socketPath); err != nil {
-		d.logger.Log(
-			"msg", "removing existing socket",
-			"socket_path", socketPath,
-			"err", err,
-		)
-		return err
+		return fmt.Errorf("removing existing socket: %w", err)
 	}
 
 	listener, err := socket.Listen(socketPath)
 	if err != nil {
-		d.logger.Log(
-			"msg", "listening on socket",
-			"socket_path", socketPath,
-			"err", err,
-		)
-		return err
+		return fmt.Errorf("creating socket listener: %w", err)
 	}
 	defer listener.Close()
 	d.listener = listener
@@ -83,11 +68,7 @@ func (d *DebugToggleListener) Listen() error {
 }
 
 func (d *DebugToggleListener) Shutdown() error {
-	level.Debug(d.logger).Log(
-		"msg", "shutting down debug toggle listener",
-	)
-
-	return backoff.WaitFor(func() error {
+	err := backoff.WaitFor(func() error {
 		// only close on windows, gives error on posix
 		if runtime.GOOS == "windows" {
 			if err := d.listener.Close(); err != nil {
@@ -108,6 +89,12 @@ func (d *DebugToggleListener) Shutdown() error {
 
 		return nil
 	}, 5*time.Second, 1*time.Second)
+
+	if err != nil {
+		return fmt.Errorf("shutting down debug toggle listener: %w", err)
+	}
+
+	return nil
 }
 
 func (d *DebugToggleListener) handleConnection(conn net.Conn) {
@@ -115,7 +102,7 @@ func (d *DebugToggleListener) handleConnection(conn net.Conn) {
 	if d.debugServer == nil {
 		debugServer, addr, err := startDebugServer(filepath.Join(d.rootDir, "debug_addr"), d.logger)
 		if err != nil {
-			d.logger.Log(
+			level.Error(d.logger).Log(
 				"msg", "starting debug server",
 				"err", err,
 			)
@@ -134,7 +121,7 @@ func (d *DebugToggleListener) handleConnection(conn net.Conn) {
 	d.debugServer = nil
 
 	if err != nil {
-		d.logger.Log(
+		level.Error(d.logger).Log(
 			"msg", "shutting down debug server",
 			"err", err,
 		)
@@ -220,5 +207,5 @@ func readSocketPath(rootDir string) (string, error) {
 }
 
 func socketPathFilePath(rootDir string) string {
-	return filepath.Join(rootDir, "debug_enable_socket_path")
+	return filepath.Join(rootDir, "toggle_debug_socket_path")
 }

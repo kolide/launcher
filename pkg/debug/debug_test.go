@@ -77,14 +77,14 @@ func TestAttachDebugHandler(t *testing.T) {
 	defer resp.Body.Close()
 
 	// Stop server
-	_, err = sendOnDebugToggleSocket(rootDir)
+	_, err = ToggleDebug(rootDir)
 	require.NoError(t, err)
 
 	_, err = http.Get(url)
 	require.Error(t, err)
 
 	// Start server
-	url, err = sendOnDebugToggleSocket(rootDir)
+	url, err = ToggleDebug(rootDir)
 	require.NoError(t, err)
 
 	resp, err = http.Get(url)
@@ -93,7 +93,7 @@ func TestAttachDebugHandler(t *testing.T) {
 	resp.Body.Close()
 
 	// Stop server
-	_, err = sendOnDebugToggleSocket(rootDir)
+	_, err = ToggleDebug(rootDir)
 	require.NoError(t, err)
 
 	_, err = http.Get(url)
