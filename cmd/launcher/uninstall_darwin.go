@@ -25,21 +25,19 @@ func removeLauncher(ctx context.Context, identifier string) error {
 		return err
 	}
 
-	// Now we can delete the plist which controls the launcher daemon
-	if err := os.Remove(launchDaemonPList); err != nil {
-		fmt.Printf("error removing file %s: %s\n", launchDaemonPList, err)
-	}
-
-	dirsToRemove := []string{
+	pathsToRemove := []string{
+		launchDaemonPList,
 		fmt.Sprintf("/usr/local/%s", identifier),
 		fmt.Sprintf("/etc/%s", identifier),
 		fmt.Sprintf("/var/%s", identifier),
+		fmt.Sprintf("/var/log/%s", identifier),
+		fmt.Sprintf("/etc/newsyslog.d/%s.conf", identifier),
 	}
 
-	// Now remove the local dirs used for launcher/osquery binaries and app data
-	for _, dir := range dirsToRemove {
-		if err := os.RemoveAll(dir); err != nil {
-			fmt.Printf("error removing dir %s: %s\n", dir, err)
+	// Now remove the paths used for launcher/osquery binaries and app data
+	for _, path := range pathsToRemove {
+		if err := os.RemoveAll(path); err != nil {
+			fmt.Printf("error removing path %s: %s\n", path, err)
 		}
 	}
 

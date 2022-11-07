@@ -48,15 +48,15 @@ func removeLauncher(ctx context.Context, identifier string) error {
 		return fmt.Errorf("unsupported package manager")
 	}
 
-	dirsToRemove := []string{
+	pathsToRemove := []string{
 		fmt.Sprintf("/var/%s", identifier),
 		fmt.Sprintf("/etc/%s", identifier),
 	}
 
-	// Now remove the local dirs used for launcher/osquery binaries and app data
-	for _, dir := range dirsToRemove {
-		if err := os.RemoveAll(dir); err != nil {
-			fmt.Printf("error removing dir %s: %s\n", dir, err)
+	// Now remove the paths used for launcher/osquery binaries and app data
+	for _, path := range pathsToRemove {
+		if err := os.RemoveAll(path); err != nil {
+			fmt.Printf("error removing path %s: %s\n", path, err)
 		}
 	}
 
