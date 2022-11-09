@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {
