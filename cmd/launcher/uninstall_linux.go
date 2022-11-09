@@ -13,6 +13,7 @@ import (
 
 func removeLauncher(ctx context.Context, identifier string) error {
 	if strings.TrimSpace(identifier) == "" {
+		// Ensure identifier is non-empty and use the default if none provided
 		identifier = "kolide-k2"
 	}
 
