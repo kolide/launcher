@@ -22,6 +22,11 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	// Stop and disable launcher service
 	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", "--now", serviceName}...)
+	if out, err := cmd.Output(); err != nil {
+		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", out, err)
+		return err
+	}
+
 	if err := cmd.Run(); err != nil {
 		return err
 	}
@@ -60,6 +65,8 @@ func removeLauncher(ctx context.Context, identifier string) error {
 			fmt.Printf("error removing path %s: %s\n", path, err)
 		}
 	}
+
+	fmt.Println("Kolide launcher uninstalled successfully")
 
 	return nil
 }

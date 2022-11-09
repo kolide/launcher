@@ -22,7 +22,8 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	launchCtlArgs := []string{"unload", launchDaemonPList}
 
 	cmd := exec.CommandContext(ctx, launchCtlPath, launchCtlArgs...)
-	if err := cmd.Run(); err != nil {
+	if out, err := cmd.Output(); err != nil {
+		fmt.Printf("error occurred while unloading launcher daemon, launchctl output %s: err: %s\n", out, err)
 		return err
 	}
 
@@ -41,6 +42,8 @@ func removeLauncher(ctx context.Context, identifier string) error {
 			fmt.Printf("error removing path %s: %s\n", path, err)
 		}
 	}
+
+	fmt.Println("Kolide launcher uninstalled successfully")
 
 	return nil
 }
