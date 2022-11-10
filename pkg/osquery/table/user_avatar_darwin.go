@@ -33,7 +33,9 @@ const char * LocalUsers() {
 	return cString;
 }
 */
-import "C"
+import (
+	"C"
+)
 import (
 	"bytes"
 	"context"
@@ -49,7 +51,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"golang.org/x/image/tiff"
 )
 
@@ -137,7 +139,7 @@ func getUserAvatar(username string) (image.Image, uint64, error) {
 
 	image, err := tiff.Decode(bytes.NewBuffer(goBytes))
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "decoding tiff data from C")
+		return nil, 0, fmt.Errorf("decoding tiff data from C: %w", err)
 	}
 	hash := crc64.Checksum(goBytes, crcTable)
 	return image, hash, nil

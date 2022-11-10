@@ -1,10 +1,10 @@
 package dataflatten
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/clbanning/mxj"
-	"github.com/pkg/errors"
 )
 
 func XmlFile(file string, opts ...FlattenOpts) ([]Row, error) {
@@ -25,7 +25,7 @@ func Xml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 	mv, err := mxj.NewMapXml(rawdata)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "mxj parse")
+		return nil, fmt.Errorf("mxj parse: %w", err)
 	}
 
 	return Flatten(mv.Old(), opts...)

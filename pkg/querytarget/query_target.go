@@ -2,6 +2,8 @@ package querytarget
 
 import (
 	"context"
+
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -11,6 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -34,24 +37,24 @@ func NewQueryTargeter(logger log.Logger, db *bbolt.DB, grpcConn *grpc.ClientConn
 func (qtu *QueryTargetUpdater) updateTargetMemberships(ctx context.Context) error {
 	nodeKey, err := osquery.NodeKeyFromDB(qtu.db)
 	if err != nil {
-		return errors.Wrap(err, "getting node key from db")
+		return fmt.Errorf("getting node key from db: %w", err)
 	}
 
 	resp, err := qtu.targetClient.GetTargets(ctx, &qt.GetTargetsRequest{NodeKey: nodeKey})
 	if err != nil {
-		return errors.Wrap(err, "fetching target memberships")
+		return fmt.Errorf("fetching target memberships: %w", err)
 	}
 
 	targetRespBytes, err := proto.Marshal(resp)
 	if err != nil {
-		return errors.Wrap(err, "marshaling targets to bytes")
+		return fmt.Errorf("marshaling targets to bytes: %w", err)
 	}
 
 	if err := qtu.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osquery.ServerProvidedDataBucket))
 		err := b.Put([]byte(table.TargetMembershipKey), targetRespBytes)
 
-		return errors.Wrap(err, "updating target memberships")
+		return fmt.Errorf("updating target memberships: %w", err)
 	}); err != nil {
 		return err
 	}

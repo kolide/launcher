@@ -3,10 +3,10 @@ package table
 import (
 	"context"
 	"debug/macho"
+	"errors"
 	"strings"
 
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func MachoInfo() *table.Plugin {

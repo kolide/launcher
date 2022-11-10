@@ -2,10 +2,10 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func Airdrop(client *osquery.ExtensionManagerClient) *table.Plugin {
@@ -27,7 +27,7 @@ func (t *airdropTable) generateAirdrop(ctx context.Context, queryContext table.Q
 	if t.primaryUser == "" {
 		username, err := queryPrimaryUser(t.client)
 		if err != nil {
-			return nil, errors.Wrap(err, "query primary user for airdrop table")
+			return nil, fmt.Errorf("query primary user for airdrop table: %w", err)
 		}
 		t.primaryUser = username
 	}
@@ -57,7 +57,7 @@ func queryPrimaryUser(client *osquery.ExtensionManagerClient) (string, error) {
 	query := `select username from last where username not in ('', 'root') group by username order by count(username) desc limit 1`
 	row, err := client.QueryRow(query)
 	if err != nil {
-		return "", errors.Wrap(err, "querying for primaryUser version")
+		return "", fmt.Errorf("querying for primaryUser version: %w", err)
 	}
 	var username string
 	if val, ok := row["username"]; ok {

@@ -25,7 +25,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
 	osquerygo "github.com/osquery/osquery-go"
-	"github.com/pkg/errors"
 )
 
 func runFlare(args []string) error {
@@ -175,7 +174,7 @@ func reportOsqueryProcessInfo(
 	// create the osquery runtime socket directory
 	if _, err := os.Stat(filepath.Dir(socketPath)); os.IsNotExist(err) {
 		if err := os.Mkdir(filepath.Dir(socketPath), fsutil.DirMode); err != nil {
-			return errors.Wrap(err, "creating socket path base directory")
+			return fmt.Errorf("creating socket path base directory: %w", err)
 		}
 	}
 
@@ -194,7 +193,7 @@ func reportOsqueryProcessInfo(
 	// start a osquery runtime
 	runner, err := runtime.LaunchInstance(opts...)
 	if err != nil {
-		return errors.Wrap(err, "creating osquery instance for process info query")
+		return fmt.Errorf("creating osquery instance for process info query: %w", err)
 	}
 	defer func() {
 		if err := runner.Shutdown(); err != nil {
@@ -214,7 +213,7 @@ func reportOsqueryProcessInfo(
 	// start a client and query it
 	client, err := osquerygo.NewClient(socketPath, 5*time.Second)
 	if err != nil {
-		return errors.Wrapf(err, "creating osquerygo client with socket path %s", socketPath)
+		return fmt.Errorf("creating osquerygo client with socket path %s: %w", socketPath, err)
 	}
 	defer client.Close()
 
@@ -226,7 +225,7 @@ func reportOsqueryProcessInfo(
 	const query = `select * from processes where name like '%osqueryd%' OR name like '%launcher%';`
 	resp, err := client.Query(query)
 	if err != nil {
-		return errors.Wrap(err, "running osquery query for process info")
+		return fmt.Errorf("running osquery query for process info: %w", err)
 	}
 
 	logger.Log(
@@ -235,7 +234,7 @@ func reportOsqueryProcessInfo(
 	)
 
 	if resp.Status.Code != int32(0) {
-		return errors.Errorf("Error running query: %s", resp.Status.Message)
+		return fmt.Errorf("Error running query: %s", resp.Status.Message)
 	}
 
 	results := struct {
@@ -248,7 +247,7 @@ func reportOsqueryProcessInfo(
 	enc := json.NewEncoder(output)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(results); err != nil {
-		return errors.Wrap(err, "encoding JSON query results")
+		return fmt.Errorf("encoding JSON query results: %w", err)
 	}
 
 	return nil
@@ -277,7 +276,7 @@ func reportGRPCNetwork(
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "establishing grpc connection to server")
+		return fmt.Errorf("establishing grpc connection to server: %w", err)
 	}
 	remote := service.NewGRPCClient(conn, logger)
 
@@ -322,7 +321,7 @@ func reportNotaryPing(
 	notaryURL.Path = "/_notary_server/health"
 	req, err := http.NewRequest(http.MethodGet, notaryURL.String(), nil)
 	if err != nil {
-		return errors.Wrapf(err, "create http request to %s", notaryURL)
+		return fmt.Errorf("create http request to %s: %w", notaryURL, err)
 	}
 	req = req.WithContext(ctx)
 	resp, err := http.DefaultClient.Do(req)

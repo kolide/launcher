@@ -8,7 +8,9 @@ package macos_software_update
 #cgo darwin LDFLAGS: -framework Cocoa
 #include "sus.h"
 */
-import "C"
+import (
+	"C"
+)
 import (
 	"context"
 	"strings"

@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/serenize/snaker"
 )
 
@@ -245,7 +244,7 @@ func (s *Service) Match(line string) (bool, error) {
 	}
 
 	if s.count > s.expectedCount {
-		return isMatch, errors.Errorf("Too many matches. Have %d, expected %d. (on %s)", s.count, s.expectedCount, s.matchString)
+		return isMatch, fmt.Errorf("Too many matches. Have %d, expected %d. (on %s)", s.count, s.expectedCount, s.matchString)
 	}
 
 	return isMatch, nil

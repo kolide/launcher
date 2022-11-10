@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -49,11 +49,11 @@ func encodeGRPCHealthcheckResponse(_ context.Context, request interface{}) (inte
 func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(healthcheckResponse)
 	if !ok {
-		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *healthcheckResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *healthcheckResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
+	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
 }
 
 func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
@@ -63,7 +63,7 @@ func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (
 	var result healthcheckResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshalling CheckHealth response")
+		return nil, fmt.Errorf("unmarshalling CheckHealth response: %w", err)
 	}
 
 	return result, nil
@@ -94,7 +94,7 @@ func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
 	_, rep, err := s.health.ServeGRPC(ctx, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "check health")
+		return nil, fmt.Errorf("check health: %w", err)
 	}
 	return rep.(*pb.HealthCheckResponse), nil
 }

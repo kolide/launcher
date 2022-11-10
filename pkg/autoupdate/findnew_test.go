@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -320,11 +319,11 @@ func copyFile(dstPath, srcPath string, truncate bool) error {
 	} else {
 		stat, err := src.Stat()
 		if err != nil {
-			return errors.Wrap(err, "statting srcFile")
+			return fmt.Errorf("statting srcFile: %w", err)
 		}
 
 		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
-			return errors.Wrap(err, "statting srcFile")
+			return fmt.Errorf("statting srcFile: %w", err)
 		}
 	}
 

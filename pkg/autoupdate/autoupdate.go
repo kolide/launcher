@@ -58,7 +58,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/updater/tuf"
-	"github.com/pkg/errors"
 )
 
 // UpdateChannel determines the TUF target for a Updater.
@@ -156,11 +155,11 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	}
 
 	if err := updater.setTargetPath(); err != nil {
-		return nil, errors.Wrapf(err, "set updater target for destination %s", binaryPath)
+		return nil, fmt.Errorf("set updater target for destination %s: %w", binaryPath, err)
 	}
 
 	if err := updater.bootstrapFn(); err != nil {
-		return nil, errors.Wrap(err, "creating local TUF repo")
+		return nil, fmt.Errorf("creating local TUF repo: %w", err)
 	}
 
 	level.Debug(updater.logger).Log(
@@ -177,13 +176,13 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 // assets. (TUF requires an initial starting repo)
 func (u *Updater) createLocalTufRepo() error {
 	if err := os.MkdirAll(u.settings.LocalRepoPath, 0755); err != nil {
-		return errors.Wrapf(err, "mkdir LocalRepoPath (%s)", u.settings.LocalRepoPath)
+		return fmt.Errorf("mkdir LocalRepoPath (%s): %w", u.settings.LocalRepoPath, err)
 	}
 	localRepo := filepath.Base(u.settings.LocalRepoPath)
 	assetPath := path.Join("pkg", "autoupdate", "assets", localRepo)
 
 	if err := u.createTUFRepoDirectory(u.settings.LocalRepoPath, assetPath, AssetDir); err != nil {
-		return errors.Wrapf(err, "createTUFRepoDirectory %s", u.settings.LocalRepoPath)
+		return fmt.Errorf("createTUFRepoDirectory %s: %w", u.settings.LocalRepoPath, err)
 	}
 	return nil
 }
@@ -195,7 +194,7 @@ type assetDirFunc func(string) ([]string, error)
 func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath string, assetDir assetDirFunc) error {
 	paths, err := assetDir(currentAssetPath)
 	if err != nil {
-		return errors.Wrap(err, "assetDir")
+		return fmt.Errorf("assetDir: %w", err)
 	}
 
 	for _, assetPath := range paths {
@@ -216,10 +215,10 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 
 			asset, err := Asset(fullAssetPath)
 			if err != nil {
-				return errors.Wrap(err, "could not get asset")
+				return fmt.Errorf("could not get asset: %w", err)
 			}
 			if err := ioutil.WriteFile(fullLocalPath, asset, 0644); err != nil {
-				return errors.Wrap(err, "could not write file")
+				return fmt.Errorf("could not write file: %w", err)
 			}
 			continue
 		}
@@ -227,10 +226,10 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 		// if fullAssetPath is not a JSON file, it's a directory. Create the
 		// directory in localPath and recurse into it
 		if err := os.MkdirAll(fullLocalPath, 0755); err != nil {
-			return errors.Wrapf(err, "mkdir fullLocalPath (%s)", fullLocalPath)
+			return fmt.Errorf("mkdir fullLocalPath (%s): %w", fullLocalPath, err)
 		}
 		if err := u.createTUFRepoDirectory(fullLocalPath, fullAssetPath, assetDir); err != nil {
-			return errors.Wrap(err, "could not recurse into createTUFRepoDirectory")
+			return fmt.Errorf("could not recurse into createTUFRepoDirectory: %w", err)
 		}
 	}
 	return nil
@@ -371,7 +370,7 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 		updaterOpts...,
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "launching %s updater service", filepath.Base(u.binaryName))
+		return nil, fmt.Errorf("launching %s updater service: %w", filepath.Base(u.binaryName), err)
 	}
 	return client.Stop, nil
 }
@@ -381,7 +380,7 @@ func (u *Updater) Run(opts ...tuf.Option) (stop func(), err error) {
 func (u *Updater) setTargetPath() error {
 	platform, err := osquery.DetectPlatform()
 	if err != nil {
-		return errors.Wrap(err, "detect platform")
+		return fmt.Errorf("detect platform: %w", err)
 	}
 
 	// filename = <strippedBinaryName>-<update-channel>.tar.gz

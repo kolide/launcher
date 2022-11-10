@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
+
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc"
@@ -301,7 +301,7 @@ func parseCertPins(pins []string) ([][]byte, error) {
 		for _, hexPin := range pins {
 			pin, err := hex.DecodeString(hexPin)
 			if err != nil {
-				return nil, errors.Wrap(err, "decoding cert pin")
+				return nil, fmt.Errorf("decoding cert pin: %w", err)
 			}
 			certPins = append(certPins, pin)
 		}

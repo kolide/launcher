@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/kolide/kit/env"
 	osquerygo "github.com/osquery/osquery-go"
-	"github.com/pkg/errors"
 )
 
 type queryFile struct {
@@ -41,20 +41,20 @@ func runQuery(args []string) error {
 	if _, err := os.Stat(*flQueries); err == nil {
 		data, err := ioutil.ReadFile(*flQueries)
 		if err != nil {
-			return errors.Wrap(err, "reading supplied queries file")
+			return fmt.Errorf("reading supplied queries file: %w", err)
 		}
 		if err := json.Unmarshal(data, &queries); err != nil {
-			return errors.Wrap(err, "unmarshalling queries file json")
+			return fmt.Errorf("unmarshalling queries file json: %w", err)
 		}
 	}
 
 	if *flQueries == "" {
 		stdinQueries, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			return errors.Wrap(err, "reading stdin")
+			return fmt.Errorf("reading stdin: %w", err)
 		}
 		if err := json.Unmarshal(stdinQueries, &queries); err != nil {
-			return errors.Wrap(err, "unmarshalling stdin queries json")
+			return fmt.Errorf("unmarshalling stdin queries json: %w", err)
 		}
 	}
 
@@ -64,7 +64,7 @@ func runQuery(args []string) error {
 
 	client, err := osquerygo.NewClient(*flSocket, 5*time.Second)
 	if err != nil {
-		return errors.Wrap(err, "opening osquery client connection on "+*flSocket)
+		return fmt.Errorf("opening osquery client connection on "+*flSocket+": %w", err)
 	}
 	defer client.Close()
 
@@ -77,7 +77,7 @@ func runQuery(args []string) error {
 	for name, query := range queries.Queries {
 		resp, err := client.Query(query)
 		if err != nil {
-			return errors.Wrap(err, "running query")
+			return fmt.Errorf("running query: %w", err)
 		}
 
 		if resp.Status.Code != int32(0) {
@@ -90,7 +90,7 @@ func runQuery(args []string) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "    ")
 	if err := enc.Encode(results); err != nil {
-		return errors.Wrap(err, "encoding JSON query results")
+		return fmt.Errorf("encoding JSON query results: %w", err)
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
+
 	"fmt"
 	"os"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -167,7 +169,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "creating DB buckets")
+		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
 	if err := SetupLauncherKeys(db); err != nil {
@@ -176,13 +178,13 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
-		return nil, errors.Wrap(err, "get host identifier from db when creating new extension")
+		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
 	}
 
 	nodekey, err := NodeKeyFromDB(db)
 	if err != nil {
 		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
-		return nil, errors.Wrap(err, "reading nodekey from db")
+		return nil, fmt.Errorf("reading nodekey from db: %w", err)
 	} else if nodekey == "" {
 		level.Debug(opts.Logger).Log("msg", "NewExtension did not find a nodekey. Likely first enroll")
 	} else {
@@ -234,7 +236,7 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 
 		bucket, err := tx.CreateBucketIfNotExists([]byte(configBucket))
 		if err != nil {
-			return errors.Wrap(err, "creating bucket")
+			return fmt.Errorf("creating bucket: %w", err)
 		}
 
 		// This only checks the private key, but it should possibly check all the values we're setting.
@@ -342,13 +344,13 @@ func IdentifierFromDB(db *bbolt.DB) (string, error) {
 		// Generate new (random) UUID
 		gotID, err = uuid.NewRandom()
 		if err != nil {
-			return errors.Wrap(err, "generating new UUID")
+			return fmt.Errorf("generating new UUID: %w", err)
 		}
 		identifier = gotID.String()
 
 		// Save new UUID
 		err = b.Put([]byte(uuidKey), []byte(identifier))
-		return errors.Wrap(err, "saving new UUID")
+		return fmt.Errorf("saving new UUID: %w", err)
 	})
 
 	if err != nil {
@@ -371,7 +373,7 @@ func NodeKeyFromDB(db *bbolt.DB) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "error reading node key from db")
+		return "", fmt.Errorf("error reading node key from db: %w", err)
 	}
 	if key != nil {
 		return string(key), nil
@@ -393,7 +395,7 @@ func ConfigFromDB(db *bbolt.DB) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "error reading config from db")
+		return "", fmt.Errorf("error reading config from db: %w", err)
 	}
 	if key != nil {
 		return string(key), nil
@@ -434,7 +436,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// Look up a node key cached in the local store
 	key, err := NodeKeyFromDB(e.db)
 	if err != nil {
-		return "", false, errors.Wrap(err, "error reading node key from db")
+		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
 
 	if key != "" {
@@ -444,7 +446,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
-		return "", true, errors.Wrap(err, "generating UUID")
+		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
 	// We've seen this fail, so add some retry logic.
@@ -454,7 +456,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return err
 	}, 2*time.Minute, 10*time.Second); err != nil {
 		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-			return "", true, errors.Wrap(err, "query enrollment details")
+			return "", true, fmt.Errorf("query enrollment details: %w", err)
 		}
 
 		level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
@@ -466,13 +468,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return "", true, errors.Wrap(err, "transport error in enrollment")
+		return "", true, fmt.Errorf("transport error in enrollment: %w", err)
 	}
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
 		}
-		return "", true, errors.Wrap(err, "enrollment invalid")
+		return "", true, fmt.Errorf("enrollment invalid: %w", err)
 	}
 
 	// Save newly acquired node key if successful
@@ -481,7 +483,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return b.Put([]byte(nodeKeyKey), []byte(keyString))
 	})
 	if err != nil {
-		return "", true, errors.Wrap(err, "saving node key")
+		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
 
 	e.NodeKey = keyString
@@ -521,7 +523,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		})
 
 		if len(confBytes) == 0 {
-			return nil, errors.Wrap(err, "loading config failed, no cached config")
+			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
 		}
 		config = string(confBytes)
 	} else {
@@ -547,7 +549,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return "", errors.Wrap(err, "transport error retrieving config")
+		return "", fmt.Errorf("transport error retrieving config: %w", err)
 	}
 
 	if invalid {
@@ -556,13 +558,13 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		}
 
 		if !reenroll {
-			return "", errors.Wrap(err, "enrollment invalid, reenroll disabled")
+			return "", fmt.Errorf("enrollment invalid, reenroll disabled: %w", err)
 		}
 
 		e.RequireReenroll(ctx)
 		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
-			return "", errors.Wrap(err, "enrollment invalid, reenrollment errored")
+			return "", fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
 		}
 		if invalid {
 			return "", reenrollmentInvalidErr
@@ -573,7 +575,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	if err := e.initialRunner.Execute(config, e.writeLogsWithReenroll); err != nil {
-		return "", errors.Wrap(err, "initial run results")
+		return "", fmt.Errorf("initial run results: %w", err)
 	}
 
 	return config, nil
@@ -604,7 +606,7 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 	case logger.LogTypeStatus:
 		return statusLogsBucket, nil
 	default:
-		return "", errors.Errorf("unknown log type: %v", typ)
+		return "", fmt.Errorf("unknown log type: %v", typ)
 
 	}
 }
@@ -620,8 +622,7 @@ func (e *Extension) writeAndPurgeLogs() {
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
 			level.Info(e.Opts.Logger).Log(
-				"err",
-				errors.Wrapf(err, "sending %v logs", typ),
+				"err", fmt.Errorf("sending %v logs: %w", typ, err),
 			)
 		}
 
@@ -629,8 +630,7 @@ func (e *Extension) writeAndPurgeLogs() {
 		err = e.purgeBufferedLogsForType(typ)
 		if err != nil {
 			level.Info(e.Opts.Logger).Log(
-				"err",
-				errors.Wrapf(err, "purging %v logs", typ),
+				"err", fmt.Errorf("purging %v logs: %w", typ, err),
 			)
 		}
 	}
@@ -667,7 +667,7 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, errors.Wrap(err, "counting buffered logs")
+		return 0, fmt.Errorf("counting buffered logs: %w", err)
 	}
 
 	return count, nil
@@ -732,7 +732,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "reading buffered logs")
+		return fmt.Errorf("reading buffered logs: %w", err)
 	}
 
 	if len(logs) == 0 {
@@ -742,7 +742,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
 	if err != nil {
-		return errors.Wrap(err, "writing logs")
+		return fmt.Errorf("writing logs: %w", err)
 	}
 
 	// Delete logs that were successfully sent
@@ -754,7 +754,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "deleting sent logs")
+		return fmt.Errorf("deleting sent logs: %w", err)
 	}
 
 	return nil
@@ -766,7 +766,7 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return errors.Wrap(err, "transport error sending logs")
+		return fmt.Errorf("transport error sending logs: %w", err)
 	}
 
 	if invalid {
@@ -777,7 +777,7 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 		e.RequireReenroll(ctx)
 		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
-			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
+			return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
 		}
 		if invalid {
 			return errors.New("enrollment invalid, reenrollment invalid")
@@ -824,7 +824,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "deleting overflowed logs")
+		return fmt.Errorf("deleting overflowed logs: %w", err)
 	}
 	return nil
 }
@@ -845,7 +845,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 			"msg", "Received unknown log type",
 			"log_type", typ,
 		)
-		return errors.Wrap(err, "unknown log type")
+		return fmt.Errorf("unknown log type: %w", err)
 	}
 
 	// Buffer the log for sending later in a batch
@@ -857,14 +857,14 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		// (which we do with byteKeyFromUint64 function).
 		key, err := b.NextSequence()
 		if err != nil {
-			return errors.Wrap(err, "generating key")
+			return fmt.Errorf("generating key: %w", err)
 		}
 
 		return b.Put(byteKeyFromUint64(key), []byte(logText))
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "buffering log")
+		return fmt.Errorf("buffering log: %w", err)
 	}
 
 	return nil
@@ -882,7 +882,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return nil, errors.Wrap(err, "transport error getting queries")
+		return nil, fmt.Errorf("transport error getting queries: %w", err)
 	}
 
 	if invalid {
@@ -891,13 +891,13 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 		}
 
 		if !reenroll {
-			return nil, errors.Wrap(err, "enrollment invalid, reenroll disabled")
+			return nil, fmt.Errorf("enrollment invalid, reenroll disabled: %w", err)
 		}
 
 		e.RequireReenroll(ctx)
 		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "enrollment invalid, reenrollment errored")
+			return nil, fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
 		}
 		if invalid {
 			return nil, errors.New("enrollment invalid, reenrollment invalid")
@@ -922,7 +922,7 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return errors.Wrap(err, "transport error writing results")
+		return fmt.Errorf("transport error writing results: %w", err)
 	}
 
 	if invalid {
@@ -933,7 +933,7 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 		e.RequireReenroll(ctx)
 		_, invalid, err := e.Enroll(ctx)
 		if err != nil {
-			return errors.Wrap(err, "enrollment invalid, reenrollment errored")
+			return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
 		}
 		if invalid {
 			return errors.New("enrollment invalid, reenrollment invalid")
@@ -982,7 +982,7 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 `
 	resp, err := client.Query(query)
 	if err != nil {
-		return details, errors.Wrap(err, "query enrollment details")
+		return details, fmt.Errorf("query enrollment details: %w", err)
 	}
 
 	if len(resp) < 1 {
@@ -1042,7 +1042,7 @@ type initialRunner struct {
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
-		return errors.Wrap(err, "unmarshal osquery config blob")
+		return fmt.Errorf("unmarshal osquery config blob: %w", err)
 	}
 
 	var allQueries []string
@@ -1061,7 +1061,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 	toRun, err := i.queriesToRun(allQueries)
 	if err != nil {
-		return errors.Wrap(err, "checking if query should run")
+		return fmt.Errorf("checking if query should run: %w", err)
 	}
 
 	var initialRunResults []OsqueryResultLog
@@ -1104,7 +1104,7 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 	for _, result := range initialRunResults {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(result); err != nil {
-			return errors.Wrap(err, "encoding initial run result")
+			return fmt.Errorf("encoding initial run result: %w", err)
 		}
 		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
 			level.Debug(i.logger).Log(
@@ -1139,7 +1139,7 @@ func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{
 		return nil
 	})
 
-	return known, errors.Wrap(err, "check bolt for queries to run")
+	return known, fmt.Errorf("check bolt for queries to run: %w", err)
 }
 
 func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
@@ -1147,12 +1147,12 @@ func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
 		b := tx.Bucket([]byte(initialResultsBucket))
 		for q := range known {
 			if err := b.Put([]byte(q), []byte(q)); err != nil {
-				return errors.Wrapf(err, "cache initial result query %q", q)
+				return fmt.Errorf("cache initial result query %q: %w", q, err)
 			}
 		}
 		return nil
 	})
-	return errors.Wrap(err, "caching known initial result queries")
+	return fmt.Errorf("caching known initial result queries: %w", err)
 }
 
 func minInt(a, b int) int {

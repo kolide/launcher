@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/agent"
@@ -10,7 +11,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -44,7 +45,7 @@ func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 				// In other places, we'd log the error
 				// and continue. We don't have logs
 				// here, so we'll just return it.
-				return results, errors.Wrapf(err, "flattening with query %s", dataQuery)
+				return results, fmt.Errorf("flattening with query %s: %w", dataQuery, err)
 
 			}
 

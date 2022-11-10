@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // boolPtr makes a pointer from a boolean. We use it to fake a ternary unknown/true/false
@@ -25,12 +24,12 @@ func readSizedString(r *bytes.Reader) (string, error) {
 	strLen := binary.BigEndian.Uint32(strLenBytes)
 
 	if strLen > uint32(r.Len()) {
-		return "", errors.Errorf("requsted %d, but only %d remain", strLen, r.Len())
+		return "", fmt.Errorf("requsted %d, but only %d remain", strLen, r.Len())
 	}
 
 	str := make([]byte, strLen)
 	if _, err := io.ReadFull(r, str); err != nil {
-		return "", errors.Wrap(err, "error reading buffer")
+		return "", fmt.Errorf("error reading buffer: %w", err)
 	}
 
 	return string(str), nil

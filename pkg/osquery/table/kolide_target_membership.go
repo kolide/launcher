@@ -2,12 +2,13 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/kolide/launcher/pkg/osquery"
 	qt "github.com/kolide/launcher/pkg/pb/querytarget"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -32,12 +33,12 @@ func generateTargetMembershipTable(db *bbolt.DB) table.GenerateFunc {
 
 			return nil
 		}); err != nil {
-			return nil, errors.Wrap(err, "fetching data")
+			return nil, fmt.Errorf("fetching data: %w", err)
 		}
 
 		var cachedResp qt.GetTargetsResponse
 		if err := proto.Unmarshal(targetRespBytes, &cachedResp); err != nil {
-			return nil, errors.Wrap(err, "unmarshalling target resp")
+			return nil, fmt.Errorf("unmarshalling target resp: %w", err)
 		}
 
 		targets := cachedResp.GetTargets()

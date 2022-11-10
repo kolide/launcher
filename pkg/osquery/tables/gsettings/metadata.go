@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,7 +20,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type GsettingsMetadata struct {
@@ -93,17 +93,17 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 
 	dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-metadata-%s", schema))
 	if err != nil {
-		return descriptions, errors.Wrap(err, "mktemp")
+		return descriptions, fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return descriptions, errors.Wrap(err, "chmod")
+		return descriptions, fmt.Errorf("chmod: %w", err)
 	}
 
 	keys, err := t.listKeys(ctx, schema, dir)
 	if err != nil {
-		return descriptions, errors.Wrap(err, "fetching keys to describe")
+		return descriptions, fmt.Errorf("fetching keys to describe: %w", err)
 	}
 
 	for _, k := range keys {
@@ -129,7 +129,7 @@ func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string)
 
 	err := t.cmdRunner(ctx, []string{"list-keys", schema}, tmpdir, output)
 	if err != nil {
-		return keys, errors.Wrap(err, "fetching keys")
+		return keys, fmt.Errorf("fetching keys: %w", err)
 	}
 	scanner := bufio.NewScanner(output)
 
@@ -157,13 +157,13 @@ func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir
 
 	d, err := t.getDescription(ctx, schema, key, tmpdir)
 	if err != nil {
-		return desc, errors.Wrap(err, "getting key's description")
+		return desc, fmt.Errorf("getting key's description: %w", err)
 	}
 	desc.Description = d
 
 	datatype, err := t.getType(ctx, schema, key, tmpdir)
 	if err != nil {
-		return desc, errors.Wrap(err, "discerning key's type")
+		return desc, fmt.Errorf("discerning key's type: %w", err)
 	}
 	desc.Type = datatype
 
@@ -175,7 +175,7 @@ func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmp
 
 	err := t.cmdRunner(ctx, []string{"describe", schema, key}, tmpdir, output)
 	if err != nil {
-		return "", errors.Wrap(err, "describing key")
+		return "", fmt.Errorf("describing key: %w", err)
 	}
 
 	return strings.TrimSpace(output.String()), nil
@@ -190,7 +190,7 @@ func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir str
 
 	err := t.cmdRunner(ctx, []string{"range", schema, key}, tmpdir, output)
 	if err != nil {
-		return "", errors.Wrap(err, "running 'gsettings range'")
+		return "", fmt.Errorf("running 'gsettings range': %w", err)
 	}
 
 	result := strings.TrimSpace(strings.ReplaceAll(output.String(), "\n", " "))
@@ -232,7 +232,7 @@ func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, out
 	cmd.Stdout = output
 
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "running gsettings %s", command)
+		return fmt.Errorf("running gsettings %s: %w", command, err)
 	}
 
 	return nil

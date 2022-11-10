@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -33,7 +34,7 @@ import (
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -50,7 +51,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
 		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
 			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
-				return errors.Wrap(err, "creating temporary root directory")
+				return fmt.Errorf("creating temporary root directory: %w", err)
 			}
 		}
 		level.Info(logger).Log(
@@ -60,11 +61,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
-		return errors.Wrap(err, "creating root directory")
+		return fmt.Errorf("creating root directory: %w", err)
 	}
 
 	if _, err := osquery.DetectPlatform(); err != nil {
-		return errors.Wrap(err, "detecting platform")
+		return fmt.Errorf("detecting platform: %w", err)
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
@@ -91,12 +92,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
 	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
 	if err != nil {
-		return errors.Wrap(err, "open launcher db")
+		return fmt.Errorf("open launcher db: %w", err)
 	}
 	defer db.Close()
 
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
-		return errors.Wrap(err, "write launcher pid to file")
+		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
 	// If we have successfully opened the DB, and written a pid,
@@ -113,10 +114,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		rootPool = x509.NewCertPool()
 		pemContents, err := ioutil.ReadFile(opts.RootPEM)
 		if err != nil {
-			return errors.Wrapf(err, "reading root certs PEM at path: %s", opts.RootPEM)
+			return fmt.Errorf("reading root certs PEM at path: %s: %w", opts.RootPEM, err)
 		}
 		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return errors.Errorf("found no valid certs in PEM at path: %s", opts.RootPEM)
+			return fmt.Errorf("found no valid certs in PEM at path: %s", opts.RootPEM)
 		}
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -147,7 +148,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		case "grpc":
 			grpcConn, err := service.DialGRPC(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
 			if err != nil {
-				return errors.Wrap(err, "dialing grpc server")
+				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
@@ -164,13 +165,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// init osquery instance history
 	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
-		return errors.Wrap(err, "error initializing osquery instance history")
+		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
 	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, client, opts)
 	if err != nil {
-		return errors.Wrap(err, "create extension with runtime")
+		return fmt.Errorf("create extension with runtime: %w", err)
 	}
 	runGroup.Add(extension.Execute, extension.Interrupt)
 
@@ -185,7 +186,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.Control {
 		control, err := createControl(ctx, db, logger, opts)
 		if err != nil {
-			return errors.Wrap(err, "create control actor")
+			return fmt.Errorf("create control actor: %w", err)
 		}
 		if control != nil {
 			runGroup.Add(control.Execute, control.Interrupt)
@@ -239,7 +240,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// create an updater for osquery
 		osqueryUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
 		if err != nil {
-			return errors.Wrap(err, "create osquery updater")
+			return fmt.Errorf("create osquery updater: %w", err)
 		}
 		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
 
@@ -274,16 +275,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			launcherUpdaterconfig,
 		)
 		if err != nil {
-			return errors.Wrap(err, "create launcher updater")
+			return fmt.Errorf("create launcher updater: %w", err)
 		}
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
 	err = runGroup.Run()
-	return errors.Wrap(err, "run service")
+	return fmt.Errorf("run service: %w", err)
 }
 
 func writePidFile(path string) error {
 	err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600)
-	return errors.Wrap(err, "writing pidfile")
+	return fmt.Errorf("writing pidfile: %w", err)
 }

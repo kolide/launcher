@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/peterbourgon/ff/v3"
-	"github.com/pkg/errors"
 )
 
 func checkError(err error) {
@@ -38,7 +37,7 @@ func main() {
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
 	); err != nil {
-		checkError(errors.Wrap(err, "parsing flags"))
+		checkError(fmt.Errorf("parsing flags: %w", err))
 	}
 
 	logger := logutil.NewCLILogger(*flDebug)
@@ -53,25 +52,25 @@ func main() {
 
 	if *flPlist != "" {
 		data, err := dataflatten.PlistFile(*flPlist, opts...)
-		checkError(errors.Wrap(err, "flattening plist file"))
+		checkError(fmt.Errorf("flattening plist file: %w", err))
 		rows = append(rows, data...)
 	}
 
 	if *flJson != "" {
 		data, err := dataflatten.JsonFile(*flJson, opts...)
-		checkError(errors.Wrap(err, "flattening json file"))
+		checkError(fmt.Errorf("flattening json file: %w", err))
 		rows = append(rows, data...)
 	}
 
 	if *flXml != "" {
 		data, err := dataflatten.XmlFile(*flXml, opts...)
-		checkError(errors.Wrap(err, "flattening xml file"))
+		checkError(fmt.Errorf("flattening xml file: %w", err))
 		rows = append(rows, data...)
 	}
 
 	if *flIni != "" {
 		data, err := dataflatten.IniFile(*flIni, opts...)
-		checkError(errors.Wrap(err, "flattening ini file"))
+		checkError(fmt.Errorf("flattening ini file: %w", err))
 		rows = append(rows, data...)
 	}
 

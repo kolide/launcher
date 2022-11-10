@@ -3,13 +3,13 @@ package table
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -56,7 +56,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	cmd := exec.CommandContext(ctx, "/usr/sbin/system_profiler", "SPiBridgeDataType")
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrap(err, "calling system_profiler")
+		return nil, fmt.Errorf("calling system_profiler: %w", err)
 	}
 
 	r := regexp.MustCompile(` (?P<chip>T\d) `) // Matching on: Apple T[1|2] Security Chip
@@ -72,7 +72,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	cmd = exec.CommandContext(ctx, "/usr/bin/bioutil", "-r", "-s")
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrap(err, "calling bioutil for system configuration")
+		return nil, fmt.Errorf("calling bioutil for system configuration: %w", err)
 	}
 	configOutStr := string(stdout.Bytes())
 	configSplit := strings.Split(configOutStr, ":")

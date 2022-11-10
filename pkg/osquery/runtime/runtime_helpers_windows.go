@@ -4,12 +4,12 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"syscall"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/pkg/errors"
 )
 
 func setpgid() *syscall.SysProcAttr {
