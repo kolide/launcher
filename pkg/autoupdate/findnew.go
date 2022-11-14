@@ -146,7 +146,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	possibleUpdates, err := getPossibleUpdates(updateDir, binaryName)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not find possible updates", "err", err)
-		return ""
+		return fullBinaryPath
 	}
 
 	// iterate backwards over files, looking for a suitable binary
