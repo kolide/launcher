@@ -207,6 +207,20 @@ func TestTargetPlatformBinaryName(t *testing.T) {
 		require.Equal(t, tt.outwin, targetWin.PlatformBinaryName(tt.in), fmt.Sprintf("Test: %s", tt.in))
 	}
 }
+
+func TestPlatformLauncherPath(t *testing.T) {
+	t.Parallel()
+
+	targetDarwin := &Target{Platform: Darwin, Init: LaunchD, Package: Pkg}
+	require.Equal(t, "/some/dir/Kolide.app/Contents/MacOS/launcher", targetDarwin.PlatformLauncherPath("/some/dir"))
+
+	targetWin := &Target{Platform: Windows, Init: NoInit, Package: Msi}
+	require.Equal(t, "/some/dir/launcher.exe", targetWin.PlatformLauncherPath("/some/dir"))
+
+	targetLinux := &Target{Platform: Linux, Init: NoInit, Package: Deb}
+	require.Equal(t, "/some/dir/launcher", targetLinux.PlatformLauncherPath("/some/dir"))
+}
+
 func TestTargetPlatformExtensionName(t *testing.T) {
 	t.Parallel()
 

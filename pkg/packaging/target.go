@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -107,6 +108,14 @@ func (t *Target) PlatformBinaryName(input string) string {
 		return input + ".exe"
 	}
 	return input
+}
+
+func (t *Target) PlatformLauncherPath(rootDir string) string {
+	if t.Platform == Darwin {
+		return filepath.Join(rootDir, "Kolide.app", "Contents", "MacOS", "launcher")
+	}
+
+	return filepath.Join(rootDir, t.PlatformBinaryName("launcher"))
 }
 
 // InitFromString sets a target's init flavor from string representation

@@ -3,6 +3,7 @@ package packaging
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -18,7 +19,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	logger := log.With(ctxlog.FromContext(ctx), "library", "detectLauncherVersion")
 	level.Debug(logger).Log("msg", "Attempting launcher autodetection")
 
-	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
+	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
 		return errors.Wrapf(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s)", stdout)
@@ -44,6 +45,17 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 
 	p.PackageVersion = version
 	return nil
+}
+
+func (p *PackageOptions) launcherLocation(rootDir string) string {
+	if p.target.Platform == Darwin {
+		appBundleBinaryPath := filepath.Join(rootDir, "Kolide.app", "Contents", "MacOS", "launcher")
+		if info, err := os.Stat(appBundleBinaryPath); err == nil && !info.IsDir() {
+			return appBundleBinaryPath
+		}
+	}
+
+	return filepath.Join(rootDir, p.target.PlatformBinaryName("launcher"))
 }
 
 // formatVersion formats the version. This is specific to windows. It

@@ -280,7 +280,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",
 		Description: "The Kolide Launcher",
-		Path:        filepath.Join(p.binDir, "launcher"),
+		Path:        p.target.PlatformLauncherPath(p.binDir),
 		Identifier:  p.Identifier,
 		Flags:       []string{"-config", flagFilePath},
 		Environment: map[string]string{},
@@ -346,6 +346,19 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		if err != nil {
 			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
 		}
+	}
+
+	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
+	appBundleInfo, err := os.Stat(appBundlePath)
+	if err == nil && appBundleInfo.IsDir() {
+		if err := fsutil.CopyDir(
+			appBundlePath,
+			filepath.Join(p.packageRoot, p.binDir, "Kolide.app"),
+		); err != nil {
+			return errors.Wrapf(err, "could not copy app bundle")
+		}
+
+		return nil
 	}
 
 	if err := fsutil.CopyFile(
