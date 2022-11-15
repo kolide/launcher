@@ -350,7 +350,11 @@ func IdentifierFromDB(db *bbolt.DB) (string, error) {
 
 		// Save new UUID
 		err = b.Put([]byte(uuidKey), []byte(identifier))
-		return fmt.Errorf("saving new UUID: %w", err)
+		if err != nil {
+			return fmt.Errorf("saving new UUID: %w", err)
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -1139,7 +1143,11 @@ func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{
 		return nil
 	})
 
-	return known, fmt.Errorf("check bolt for queries to run: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("check bolt for queries to run: %w", err)
+	}
+
+	return known, nil
 }
 
 func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
@@ -1152,7 +1160,12 @@ func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
 		}
 		return nil
 	})
-	return fmt.Errorf("caching known initial result queries: %w", err)
+
+	if err != nil {
+		return fmt.Errorf("cache initial result queries: %w", err)
+	}
+
+	return nil
 }
 
 func minInt(a, b int) int {
