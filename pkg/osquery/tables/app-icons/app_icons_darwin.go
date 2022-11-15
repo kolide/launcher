@@ -19,11 +19,15 @@ void Icon(CFDataRef *iconDataRef, char* path) {
 	*iconDataRef = (CFDataRef)imageData;
 }
 */
-import "C"
+import (
+	"C"
+)
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
+
 	"fmt"
 	"hash/crc64"
 	"image"
@@ -32,7 +36,7 @@ import (
 
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"golang.org/x/image/tiff"
 )
 
@@ -81,7 +85,7 @@ func getAppIcon(appPath string, queryContext table.QueryContext) (image.Image, u
 	tiffBytes := C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(data)), C.int(C.CFDataGetLength(data)))
 	img, err := tiff.Decode(bytes.NewBuffer(tiffBytes))
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "decoding tiff bytes")
+		return nil, 0, fmt.Errorf("decoding tiff bytes: %w", err)
 	}
 	checksum := crc64.Checksum(tiffBytes, crcTable)
 

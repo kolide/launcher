@@ -6,6 +6,7 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"github.com/scjalliance/comshim"
 )
 
@@ -94,12 +95,12 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 
 	searcher, setLocale, isDefaultLocale, err := getSearcher(locale)
 	if err != nil {
-		return nil, errors.Wrap(err, "new searcher")
+		return nil, fmt.Errorf("new searcher: %w", err)
 	}
 
 	searchResults, err := t.queryFunc(searcher)
 	if err != nil {
-		return nil, errors.Wrap(err, "search")
+		return nil, fmt.Errorf("search: %w", err)
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -130,7 +131,7 @@ func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]da
 	// we marshal to json. This is a deficiency in dataflatten.
 	jsonBytes, err := json.Marshal(searchResults)
 	if err != nil {
-		return nil, errors.Wrap(err, "json")
+		return nil, fmt.Errorf("json: %w", err)
 	}
 
 	return dataflatten.Json(jsonBytes, flattenOpts...)
@@ -141,7 +142,7 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 
 	session, err := windowsupdate.NewUpdateSession()
 	if err != nil {
-		return nil, locale, isDefaultLocale, errors.Wrap(err, "NewUpdateSession")
+		return nil, locale, isDefaultLocale, fmt.Errorf("NewUpdateSession: %w", err)
 	}
 
 	// If a specific locale is requested, set it.
@@ -150,10 +151,10 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 	} else {
 		requestedLocale, err := strconv.ParseUint(locale, 10, 32)
 		if err != nil {
-			return nil, locale, isDefaultLocale, errors.Wrapf(err, "Parse locale %s", locale)
+			return nil, locale, isDefaultLocale, fmt.Errorf("Parse locale %s: %w", locale, err)
 		}
 		if err := session.SetLocal(uint32(requestedLocale)); err != nil {
-			return nil, locale, isDefaultLocale, errors.Wrapf(err, "setting local to %d", uint32(requestedLocale))
+			return nil, locale, isDefaultLocale, fmt.Errorf("setting local to %d: %w", uint32(requestedLocale), err)
 		}
 	}
 
@@ -162,17 +163,17 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 	// block it.
 	getLocale, err := session.GetLocal()
 	if err != nil {
-		return nil, locale, isDefaultLocale, errors.Wrap(err, "getlocale")
+		return nil, locale, isDefaultLocale, fmt.Errorf("getlocale: %w", err)
 	}
 	if strconv.FormatUint(uint64(getLocale), 10) != locale && isDefaultLocale == 0 {
-		return nil, locale, isDefaultLocale, errors.Wrapf(err, "set locale(%s) doesn't match returned locale(%d) sqlite will filter", locale, getLocale)
+		return nil, locale, isDefaultLocale, fmt.Errorf("set locale(%s) doesn't match returned locale(%d) sqlite will filter: %w", locale, getLocale, err)
 	} else {
 		locale = strconv.FormatUint(uint64(getLocale), 10)
 	}
 
 	searcher, err := session.CreateUpdateSearcher()
 	if err != nil {
-		return nil, locale, isDefaultLocale, errors.Wrap(err, "new searcher")
+		return nil, locale, isDefaultLocale, fmt.Errorf("new searcher: %w", err)
 	}
 
 	return searcher, locale, isDefaultLocale, err

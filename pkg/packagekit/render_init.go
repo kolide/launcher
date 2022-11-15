@@ -3,11 +3,11 @@ package packagekit
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"io"
 	"strings"
 	"text/template"
 
-	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
@@ -30,7 +30,7 @@ func RenderInit(ctx context.Context, w io.Writer, initOptions *InitOptions) erro
 
 	t, err := template.New("initd").Funcs(funcsMap).Parse(string(initdTemplate))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse initd template")
+		return fmt.Errorf("not able to parse initd template: %w", err)
 	}
 	return t.ExecuteTemplate(w, "initd", data)
 

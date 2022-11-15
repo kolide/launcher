@@ -2,8 +2,7 @@ package packagekit
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type contextKey int

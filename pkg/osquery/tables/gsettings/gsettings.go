@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,7 +24,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const gsettingsPath = "/usr/bin/gsettings"
@@ -92,7 +92,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 
 	u, err := user.Lookup(username)
 	if err != nil {
-		return errors.Wrapf(err, "finding user by username '%s'", username)
+		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
 	cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively")
@@ -104,17 +104,17 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	// Check if the supplied UID is that of the current user
 	currentUser, err := user.Current()
 	if err != nil {
-		return errors.Wrap(err, "checking current user uid")
+		return fmt.Errorf("checking current user uid: %w", err)
 	}
 
 	if u.Uid != currentUser.Uid {
 		uid, err := strconv.ParseInt(u.Uid, 10, 32)
 		if err != nil {
-			return errors.Wrap(err, "converting uid from string to int")
+			return fmt.Errorf("converting uid from string to int: %w", err)
 		}
 		gid, err := strconv.ParseInt(u.Gid, 10, 32)
 		if err != nil {
-			return errors.Wrap(err, "converting gid from string to int")
+			return fmt.Errorf("converting gid from string to int: %w", err)
 		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 		cmd.SysProcAttr.Credential = &syscall.Credential{
@@ -125,14 +125,14 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 
 	dir, err := ioutil.TempDir("", "osq-gsettings")
 	if err != nil {
-		return errors.Wrap(err, "mktemp")
+		return fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	// if we don't chmod the dir, we get errors like:
 	// 'fork/exec /usr/bin/gsettings: permission denied'
 	if err := os.Chmod(dir, 0755); err != nil {
-		return errors.Wrap(err, "chmod")
+		return fmt.Errorf("chmod: %w", err)
 	}
 
 	cmd.Dir = dir
@@ -142,7 +142,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	cmd.Stdout = buf
 
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "running gsettings, err is: %s", stderr.String())
+		return fmt.Errorf("running gsettings, err is: %s: %w", stderr.String(), err)
 	}
 
 	return nil

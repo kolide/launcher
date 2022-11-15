@@ -2,9 +2,8 @@ package keyidentifier
 
 import (
 	"bytes"
+	"errors"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const ppkBegin = "PuTTY-User-Key-File-2"

@@ -10,7 +10,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -91,7 +90,7 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 	var result enrollmentResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshalling RequestEnrollment response")
+		return nil, fmt.Errorf("unmarshalling RequestEnrollment response: %w", err)
 	}
 
 	return result, nil
@@ -100,11 +99,15 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(enrollmentResponse)
 	if !ok {
-		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
+	if err != nil {
+		return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	}
+
+	return encodeJSONResponse(b, nil)
 }
 
 func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {

@@ -3,13 +3,13 @@ package tdebug
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"runtime/debug"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/pkg/errors"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -53,7 +53,7 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 		// bounce through json to serialize GCStats
 		jsonBytes, err := json.Marshal(t.stats)
 		if err != nil {
-			return nil, errors.Wrap(err, "json")
+			return nil, fmt.Errorf("json: %w", err)
 		}
 
 		flatData, err := dataflatten.Json(

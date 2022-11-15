@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -10,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 // detectLauncherVersion invokes launcher and looks for the version string
@@ -21,7 +21,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	launcherPath := filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
-		return errors.Wrapf(err, "Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s)", stdout)
+		return fmt.Errorf("Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s): %w", stdout, err)
 	}
 
 	stdoutSplit := strings.Split(stdout, "\n")
@@ -37,7 +37,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 		level.Debug(logger).Log("msg", "reformating for windows", "origVersion", version)
 		version, err = formatVersion(version)
 		if err != nil {
-			return errors.Wrap(err, "formatting version")
+			return fmt.Errorf("formatting version: %w", err)
 		}
 		level.Debug(logger).Log("msg", "reformating for windows", "newVersion", version)
 	}
@@ -54,18 +54,18 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 func formatVersion(rawVersion string) (string, error) {
 	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:-(\d+).*)?`)
 	if err != nil {
-		return "", errors.Wrap(err, "version regex")
+		return "", fmt.Errorf("version regex: %w", err)
 	}
 
 	// regex match and check the results
 	matches := versionRegex.FindAllStringSubmatch(rawVersion, -1)
 
 	if len(matches) == 0 {
-		return "", errors.Errorf("Version %s did not match expected format", rawVersion)
+		return "", fmt.Errorf("Version %s did not match expected format", rawVersion)
 	}
 
 	if len(matches[0]) != 5 {
-		return "", errors.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), rawVersion)
+		return "", fmt.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), rawVersion)
 	}
 
 	major := matches[0][1]

@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 type wixTool struct {
@@ -122,7 +121,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 	if wo.buildDir == "" {
 		wo.buildDir, err = ioutil.TempDir("", "wix-build-dir")
 		if err != nil {
-			return nil, errors.Wrap(err, "making temp wix-build-dir")
+			return nil, fmt.Errorf("making temp wix-build-dir: %w", err)
 		}
 		wo.cleanDirs = append(wo.cleanDirs, wo.buildDir)
 	}
@@ -134,7 +133,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 		case "amd64":
 			wo.msArch = "x64"
 		default:
-			return nil, errors.Errorf("unknown arch for windows %s", runtime.GOARCH)
+			return nil, fmt.Errorf("unknown arch for windows %s", runtime.GOARCH)
 		}
 	}
 
@@ -143,7 +142,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 			filepath.Join(wo.buildDir, ef.Name),
 			ef.Content,
 			0644); err != nil {
-			return nil, errors.Wrapf(err, "writing extra file %s", ef.Name)
+			return nil, fmt.Errorf("writing extra file %s: %w", ef.Name, err)
 		}
 	}
 
@@ -153,7 +152,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 		mainWxsPath,
 		mainWxsContent,
 		0644); err != nil {
-		return nil, errors.Wrapf(err, "writing %s", mainWxsPath)
+		return nil, fmt.Errorf("writing %s: %w", mainWxsPath, err)
 	}
 
 	return wo, nil
@@ -174,19 +173,19 @@ func (wo *wixTool) Cleanup() {
 // package. The path for the resultant package will be returned.
 func (wo *wixTool) Package(ctx context.Context) (string, error) {
 	if err := wo.heat(ctx); err != nil {
-		return "", errors.Wrap(err, "running heat")
+		return "", fmt.Errorf("running heat: %w", err)
 	}
 
 	if err := wo.addServices(ctx); err != nil {
-		return "", errors.Wrap(err, "adding services")
+		return "", fmt.Errorf("adding services: %w", err)
 	}
 
 	if err := wo.candle(ctx); err != nil {
-		return "", errors.Wrap(err, "running candle")
+		return "", fmt.Errorf("running candle: %w", err)
 	}
 
 	if err := wo.light(ctx); err != nil {
-		return "", errors.Wrap(err, "running light")
+		return "", fmt.Errorf("running light: %w", err)
 	}
 
 	return filepath.Join(wo.buildDir, "out.msi"), nil
@@ -211,12 +210,12 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	heatFile := filepath.Join(wo.buildDir, "AppFiles.wxs")
 	heatContent, err := ioutil.ReadFile(heatFile)
 	if err != nil {
-		return errors.Wrap(err, "reading AppFiles.wxs")
+		return fmt.Errorf("reading AppFiles.wxs: %w", err)
 	}
 
 	heatWrite, err := os.Create(heatFile)
 	if err != nil {
-		return errors.Wrap(err, "opening AppFiles.wxs for writing")
+		return fmt.Errorf("opening AppFiles.wxs for writing: %w", err)
 	}
 	defer heatWrite.Close()
 
@@ -227,11 +226,11 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 		for _, service := range wo.services {
 			isMatch, err := service.Match(line)
 			if err != nil {
-				return errors.Wrap(err, "match error")
+				return fmt.Errorf("match error: %w", err)
 			}
 			if isMatch {
 				if err := service.Xml(heatWrite); err != nil {
-					return errors.Wrap(err, "adding service")
+					return fmt.Errorf("adding service: %w", err)
 				}
 			}
 		}
@@ -344,7 +343,7 @@ func (wo *wixTool) execOut(ctx context.Context, argv0 string, args ...string) (s
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "run command %s %v\nstdout=%s\nstderr=%s", argv0, args, stdout, stderr)
+		return "", fmt.Errorf("run command %s %v\nstdout=%s\nstderr=%s: %w", argv0, args, stdout, stderr, err)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }
@@ -371,11 +370,11 @@ func isDirectory(d string) error {
 	dStat, err := os.Stat(d)
 
 	if os.IsNotExist(err) {
-		return errors.Wrapf(err, "missing packageRoot %s", d)
+		return fmt.Errorf("missing packageRoot %s: %w", d, err)
 	}
 
 	if !dStat.IsDir() {
-		return errors.Errorf("packageRoot (%s) isn't a directory", d)
+		return fmt.Errorf("packageRoot (%s) isn't a directory", d)
 	}
 
 	return nil

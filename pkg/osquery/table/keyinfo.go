@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/go-kit/kit/log"
@@ -9,7 +10,6 @@ import (
 	"github.com/kolide/launcher/pkg/keyidentifier"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type KeyInfoTable struct {

@@ -23,7 +23,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -56,7 +56,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	} else if opts.EnrollSecretPath != "" {
 		content, err := ioutil.ReadFile(opts.EnrollSecretPath)
 		if err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "could not read enroll_secret_path: %s", opts.EnrollSecretPath)
+			return nil, nil, nil, fmt.Errorf("could not read enroll_secret_path: %s: %w", opts.EnrollSecretPath, err)
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	}
@@ -95,7 +95,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	// create the extension
 	ext, err := osquery.NewExtension(launcherClient, db, extOpts)
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "starting grpc extension")
+		return nil, nil, nil, fmt.Errorf("starting grpc extension: %w", err)
 	}
 
 	var runnerOptions []runtime.OsqueryInstanceOption
@@ -104,7 +104,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 		var err error
 		runnerOptions, err = osqueryRunnerOptions(logger, db, opts)
 		if err != nil {
-			return nil, nil, nil, errors.Wrap(err, "creating osquery runner options")
+			return nil, nil, nil, fmt.Errorf("creating osquery runner options: %w", err)
 		}
 	} else {
 		runnerOptions = grpcRunnerOptions(logger, db, opts, ext)
@@ -128,7 +128,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 
 					// Start the osqueryd instance
 					if err := runner.Start(); err != nil {
-						return errors.Wrap(err, "launching osquery instance")
+						return fmt.Errorf("launching osquery instance: %w", err)
 					}
 
 					// If we're using osquery transport, we don't need the extension
@@ -160,10 +160,10 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 						// enroll this launcher with the server
 						_, invalid, err := ext.Enroll(ctx)
 						if err != nil {
-							return errors.Wrap(err, "enrolling host")
+							return fmt.Errorf("enrolling host: %w", err)
 						}
 						if invalid {
-							return errors.Wrap(err, "invalid enroll secret")
+							return fmt.Errorf("invalid enroll secret: %w", err)
 						}
 					}
 
@@ -234,7 +234,7 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Option
 		var err error
 		caCertFile, err = internal.InstallCaCerts(opts.RootDirectory)
 		if err != nil {
-			return nil, errors.Wrap(err, "writing CA certs")
+			return nil, fmt.Errorf("writing CA certs: %w", err)
 		}
 	}
 

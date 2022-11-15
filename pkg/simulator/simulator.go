@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -17,7 +18,6 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
-	"github.com/pkg/errors"
 )
 
 // QueryRunner is the interface which defines the pluggable behavior of a simulated
@@ -81,7 +81,7 @@ func (h *HostSimulation) Enroll() error {
 				"err", err.Error(),
 				"uuid", h.uuid,
 			)
-			err = errors.Wrap(err, "transport error in enrollment")
+			err = fmt.Errorf("transport error in enrollment: %w", err)
 			continue
 		}
 		if invalid {
@@ -123,7 +123,7 @@ func (h *HostSimulation) RequestConfig() error {
 			"err", err.Error(),
 			"uuid", h.uuid,
 		)
-		return errors.Wrap(err, "transport error retrieving config")
+		return fmt.Errorf("transport error retrieving config: %w", err)
 	}
 	if invalid {
 		level.Debug(h.logger).Log(
@@ -156,7 +156,7 @@ func (h *HostSimulation) PublishLogs() error {
 			"err", err.Error(),
 			"uuid", h.uuid,
 		)
-		return errors.Wrap(err, "transport error publishing logs")
+		return fmt.Errorf("transport error publishing logs: %w", err)
 	}
 	if invalid {
 		level.Debug(h.logger).Log(
@@ -187,7 +187,7 @@ func (h *HostSimulation) RequestQueries() error {
 			"err", err.Error(),
 			"uuid", h.uuid,
 		)
-		return errors.Wrap(err, "transport error requesting queries")
+		return fmt.Errorf("transport error requesting queries: %w", err)
 	}
 	if invalid {
 		level.Debug(h.logger).Log(
@@ -236,7 +236,7 @@ func (h *HostSimulation) RequestQueries() error {
 			"err", err.Error(),
 			"uuid", h.uuid,
 		)
-		return errors.Wrap(err, "transport error publishing results")
+		return fmt.Errorf("transport error publishing results: %w", err)
 	}
 	if invalid {
 		level.Debug(h.logger).Log(
@@ -345,7 +345,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		} else {
 			host, _, err := net.SplitHostPort(grpcURL)
 			if err != nil {
-				err = errors.Wrapf(err, "split grpc server host and port: %s", grpcURL)
+				err = fmt.Errorf("split grpc server host and port: %s: %w", grpcURL, err)
 				h.state.failed = true
 				h.state.lock.Unlock()
 				level.Info(logger).Log("msg", "got error exiting simulator goroutine", "err", err)

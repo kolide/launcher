@@ -1,6 +1,8 @@
 package tablehelpers
 
-import "regexp"
+import (
+	"regexp"
+)
 
 var (
 	twoEOLs = regexp.MustCompile(`(\r?\n){2}`)

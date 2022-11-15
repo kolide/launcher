@@ -4,10 +4,10 @@
 package autoupdate
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // checkExecutablePermissions checks wehether a specific file looks
@@ -27,7 +27,7 @@ func checkExecutablePermissions(potentialBinary string) error {
 	case stat.IsDir():
 		return errors.New("is a directory")
 	case err != nil:
-		return errors.Wrap(err, "statting file")
+		return fmt.Errorf("statting file: %w", err)
 	case !strings.HasSuffix(potentialBinary, ".exe"):
 		return errors.New("not executable")
 	}
