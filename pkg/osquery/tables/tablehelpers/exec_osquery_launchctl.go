@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
@@ -24,7 +24,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 
 	targetUser, err := user.Lookup(username)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking up username %s", username)
+		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
 	cmd := exec.CommandContext(ctx,
@@ -44,12 +44,12 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 
 	dir, err := ioutil.TempDir("", "osq-launchctl")
 	if err != nil {
-		return nil, errors.Wrap(err, "mktemp")
+		return nil, fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return nil, errors.Wrap(err, "chmod")
+		return nil, fmt.Errorf("chmod: %w", err)
 	}
 
 	cmd.Dir = dir
@@ -58,7 +58,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "running osquery. Got: '%s'", string(stderr.Bytes()))
+		return nil, fmt.Errorf("running osquery. Got: '%s': %w", string(stderr.Bytes()), err)
 	}
 
 	return stdout.Bytes(), nil
@@ -79,7 +79,7 @@ func ExecOsqueryLaunchctlParsed(ctx context.Context, logger log.Logger, timeoutS
 			"err", err,
 			"stdout", string(outBytes),
 		)
-		return nil, errors.Wrap(err, "unmarshalling json")
+		return nil, fmt.Errorf("unmarshalling json: %w", err)
 	}
 
 	return osqueryResults, nil

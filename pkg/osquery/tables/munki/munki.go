@@ -13,7 +13,6 @@ import (
 	"github.com/groob/plist"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const defaultReportPath = "/Library/Managed Installs/ManagedInstallReport.plist"
@@ -128,7 +127,7 @@ func (m *MunkiInfo) loadReport() error {
 
 	file, err := os.Open(m.reportPath)
 	if err != nil {
-		return errors.Wrap(err, "open ManagedInstallReport file")
+		return fmt.Errorf("open ManagedInstallReport file: %w", err)
 	}
 	defer file.Close()
 
@@ -136,7 +135,7 @@ func (m *MunkiInfo) loadReport() error {
 	m.report = &report
 
 	if err := plist.NewDecoder(file).Decode(&report); err != nil {
-		return errors.Wrap(err, "decode ManagedInstallReport plist")
+		return fmt.Errorf("decode ManagedInstallReport plist: %w", err)
 	}
 	return nil
 }

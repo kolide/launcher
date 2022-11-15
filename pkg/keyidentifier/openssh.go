@@ -2,10 +2,10 @@ package keyidentifier
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -31,7 +31,7 @@ func ParseOpenSSHPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	if err := ssh.Unmarshal(remaining, &w); err != nil {
-		return nil, errors.Wrap(err, "ssh.Unmarshal")
+		return nil, fmt.Errorf("ssh.Unmarshal: %w", err)
 	}
 
 	ki := &KeyInfo{

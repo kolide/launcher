@@ -1,6 +1,8 @@
 package applenotarization
 
-import "time"
+import (
+	"time"
+)
 
 // notarizationResponse is the response from altool. It probably only
 // have NotarizationInfo or NotarizationUpload populated.

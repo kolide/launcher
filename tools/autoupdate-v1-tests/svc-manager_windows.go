@@ -4,27 +4,29 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/kardianos/osext"
-	"github.com/pkg/errors"
+
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
 func runInstallService(args []string) error {
 	exepath, err := osext.Executable()
 	if err != nil {
-		return errors.Wrap(err, "osext.Executable")
+		return fmt.Errorf("osext.Executable: %w", err)
 	}
 
 	m, err := mgr.Connect()
 	if err != nil {
-		return errors.Wrap(err, "mgr.Connect")
+		return fmt.Errorf("mgr.Connect: %w", err)
 	}
 	defer m.Disconnect()
 
 	s, err := m.OpenService(serviceName)
 	if err == nil {
 		s.Close()
-		return errors.Errorf("service %s already exists", serviceName)
+		return fmt.Errorf("service %s already exists", serviceName)
 	}
 
 	cfg := mgr.Config{DisplayName: serviceDesc, StartType: mgr.StartAutomatic}
@@ -33,7 +35,7 @@ func runInstallService(args []string) error {
 
 	s, err = m.CreateService(serviceName, exepath, cfg, "svc")
 	if err != nil {
-		return errors.Wrap(err, "CreateService")
+		return fmt.Errorf("CreateService: %w", err)
 	}
 	defer s.Close()
 
@@ -47,14 +49,14 @@ func runInstallService(args []string) error {
 func runRemoveService(args []string) error {
 	m, err := mgr.Connect()
 	if err != nil {
-		return errors.Wrap(err, "mgr.Connect")
+		return fmt.Errorf("mgr.Connect: %w", err)
 	}
 	defer m.Disconnect()
 
 	s, err := m.OpenService(serviceName)
 	if err != nil {
 		s.Close()
-		return errors.Errorf("service %s is not installed", serviceName)
+		return fmt.Errorf("service %s is not installed", serviceName)
 	}
 	defer s.Close()
 

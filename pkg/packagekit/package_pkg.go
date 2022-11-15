@@ -14,7 +14,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/applenotarization"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -28,7 +28,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 
 	outputPathDir, err := ioutil.TempDir("", "packaging-pkg-output")
 	if err != nil {
-		return errors.Wrap(err, "making TempDir")
+		return fmt.Errorf("making TempDir: %w", err)
 	}
 	defer os.RemoveAll(outputPathDir)
 
@@ -36,25 +36,25 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	distributionPkgPath := filepath.Join(outputPathDir, fmt.Sprintf("%s-%s.pkg", po.Name, po.Version))
 
 	if err := runPkbuild(ctx, flatPkgPath, po); err != nil {
-		return errors.Wrap(err, "running pkgbuild")
+		return fmt.Errorf("running pkgbuild: %w", err)
 	}
 
 	if err := runProductbuild(ctx, flatPkgPath, distributionPkgPath, po); err != nil {
-		return errors.Wrap(err, "running productbuild")
+		return fmt.Errorf("running productbuild: %w", err)
 	}
 
 	if err := runNotarize(ctx, distributionPkgPath, po); err != nil {
-		return errors.Wrap(err, "running notarize")
+		return fmt.Errorf("running notarize: %w", err)
 	}
 
 	outputFH, err := os.Open(distributionPkgPath)
 	if err != nil {
-		return errors.Wrap(err, "opening resultant output file")
+		return fmt.Errorf("opening resultant output file: %w", err)
 	}
 	defer outputFH.Close()
 
 	if _, err := io.Copy(w, outputFH); err != nil {
-		return errors.Wrap(err, "copying output")
+		return fmt.Errorf("copying output: %w", err)
 	}
 
 	setInContext(ctx, ContextLauncherVersionKey, po.Version)
@@ -77,7 +77,7 @@ func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
 	notarizer := applenotarization.New(po.AppleNotarizeUserId, po.AppleNotarizeAppPassword, po.AppleNotarizeAccountId)
 	uuid, err := notarizer.Submit(ctx, file, bundleid)
 	if err != nil {
-		return errors.Wrap(err, "submitting file for notarization")
+		return fmt.Errorf("submitting file for notarization: %w", err)
 	}
 
 	level.Debug(logger).Log(
@@ -124,7 +124,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "creating flat pkg package: %s", stderr)
+		return fmt.Errorf("creating flat pkg package: %s: %w", stderr, err)
 	}
 
 	return nil
@@ -161,7 +161,7 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "creating distribution pkg package: %s", stderr)
+		return fmt.Errorf("creating distribution pkg package: %s: %w", stderr, err)
 	}
 
 	return nil

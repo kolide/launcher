@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const sshcomBegin = "---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----"
@@ -47,7 +47,7 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	// TODO: Is this ever Little Endian?
 	if err := binary.Read(blockReader, binary.BigEndian, &sshData); err != nil {
-		return nil, errors.Wrap(err, "binary read")
+		return nil, fmt.Errorf("binary read: %w", err)
 	}
 
 	if sshData.Magic != sshcomMagicNumber {
@@ -56,12 +56,12 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	keyType, err := readSizedString(blockReader)
 	if err != nil {
-		return nil, errors.Wrap(err, "readstring keyType")
+		return nil, fmt.Errorf("readstring keyType: %w", err)
 	}
 
 	cipherName, err := readSizedString(blockReader)
 	if err != nil {
-		return nil, errors.Wrap(err, "cipherName")
+		return nil, fmt.Errorf("cipherName: %w", err)
 	}
 
 	ki := &KeyInfo{
@@ -76,7 +76,7 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 		ki.Encrypted = boolPtr(true)
 		ki.Encryption = cipherName
 	default:
-		return nil, errors.Errorf("sshcom bad cipher name: %s. Should be none or 3des-cbc", cipherName)
+		return nil, fmt.Errorf("sshcom bad cipher name: %s. Should be none or 3des-cbc", cipherName)
 	}
 
 	switch {
@@ -85,7 +85,7 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	case strings.HasPrefix(keyType, "dl-modp{sign{dsa"):
 		ki.Type = "ssh-dss"
 	default:
-		return nil, errors.Errorf("Unknown key type: %s", keyType)
+		return nil, fmt.Errorf("Unknown key type: %s", keyType)
 	}
 
 	return ki, nil

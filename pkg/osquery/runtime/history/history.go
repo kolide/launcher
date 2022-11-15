@@ -1,11 +1,11 @@
 package history
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -38,7 +38,7 @@ func InitHistory(db *bbolt.DB) error {
 	currentHistory.db = db
 
 	if err := currentHistory.load(); err != nil {
-		return errors.Wrap(err, "error loading osquery_instance_history")
+		return fmt.Errorf("error loading osquery_instance_history: %w", err)
 	}
 
 	return nil
@@ -91,7 +91,7 @@ func NewInstance() (*Instance, error) {
 	currentHistory.addInstanceToHistory(newInstance)
 
 	if err := currentHistory.save(); err != nil {
-		return newInstance, errors.Wrap(err, "error saving osquery_instance_history")
+		return newInstance, fmt.Errorf("error saving osquery_instance_history: %w", err)
 	}
 
 	return newInstance, nil

@@ -5,6 +5,7 @@ package filevault
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -45,7 +46,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
-		return nil, errors.Wrap(err, "calling fdesetup")
+		return nil, fmt.Errorf("calling fdesetup: %w", err)
 	}
 
 	status := strings.TrimSuffix(string(output), "\n")

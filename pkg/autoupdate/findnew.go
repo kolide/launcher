@@ -2,6 +2,7 @@ package autoupdate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,7 +15,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 // defaultBuildTimestamp is used to set the _oldest_ allowed update. Eg, if
@@ -86,7 +86,7 @@ func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
 
 	exPath, err := os.Executable()
 	if err != nil {
-		return "", errors.Wrap(err, "determine running executable path")
+		return "", fmt.Errorf("determine running executable path: %w", err)
 	}
 
 	if exPath == "" {

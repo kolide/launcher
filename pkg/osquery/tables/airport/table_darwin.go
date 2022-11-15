@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -74,7 +74,7 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 	options := tablehelpers.GetConstraints(queryContext, "option", tablehelpers.WithAllowedValues(allowedOptions))
 
 	if len(options) == 0 {
-		return nil, errors.Errorf("The %s table requires that you specify a constraint for WHERE option. Valid values for option are (%s).", tableName, strings.Join(allowedOptions, ", "))
+		return nil, fmt.Errorf("The %s table requires that you specify a constraint for WHERE option. Valid values for option are (%s).", tableName, strings.Join(allowedOptions, ", "))
 	}
 
 	var results []map[string]string
@@ -109,7 +109,7 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 	case "scan":
 		unmarshalledOutput = unmarshallScanOuput(airportOutput)
 	default:
-		return nil, errors.Errorf("unsupported option %s", option)
+		return nil, fmt.Errorf("unsupported option %s", option)
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {

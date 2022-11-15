@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Target is the platform being targeted by the build. As "platform"
@@ -57,7 +55,7 @@ var knownPackageFlavors = [...]PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman}
 func (t *Target) Parse(s string) error {
 	components := strings.Split(s, "-")
 	if len(components) != 3 {
-		return errors.Errorf("Unable to parse %s, should have exactly 3 components", s)
+		return fmt.Errorf("Unable to parse %s, should have exactly 3 components", s)
 	}
 
 	if err := t.PlatformFromString(components[0]); err != nil {
@@ -126,7 +124,7 @@ func (t *Target) InitFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown init %s", s)
+	return fmt.Errorf("Unknown init %s", s)
 }
 
 // PlatformFromString sets a target's platform flavor from string representation
@@ -137,7 +135,7 @@ func (t *Target) PlatformFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown platform %s", s)
+	return fmt.Errorf("Unknown platform %s", s)
 }
 
 // PackageFromString sets a target's package flavor from string representation
@@ -148,7 +146,7 @@ func (t *Target) PackageFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown package %s", s)
+	return fmt.Errorf("Unknown package %s", s)
 
 }
 

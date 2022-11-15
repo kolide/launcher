@@ -3,12 +3,12 @@ package authenticode
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 // signtoolOptions are the options for how we call signtool.exe. These
@@ -61,7 +61,7 @@ func (so *signtoolOptions) execOut(ctx context.Context, argv0 string, args ...st
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil {
-		return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
+		return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), fmt.Errorf("run command %s %v, stderr=%s: %w", argv0, args, stderr, err)
 	}
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), nil
 }
