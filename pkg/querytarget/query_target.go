@@ -52,9 +52,11 @@ func (qtu *QueryTargetUpdater) updateTargetMemberships(ctx context.Context) erro
 
 	if err := qtu.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osquery.ServerProvidedDataBucket))
-		err := b.Put([]byte(table.TargetMembershipKey), targetRespBytes)
+		if err := b.Put([]byte(table.TargetMembershipKey), targetRespBytes); err != nil {
+			return fmt.Errorf("updating target memberships: %w", err)
+		}
 
-		return fmt.Errorf("updating target memberships: %w", err)
+		return nil
 	}); err != nil {
 		return err
 	}

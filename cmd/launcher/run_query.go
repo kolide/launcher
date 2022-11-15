@@ -64,7 +64,7 @@ func runQuery(args []string) error {
 
 	client, err := osquerygo.NewClient(*flSocket, 5*time.Second)
 	if err != nil {
-		return fmt.Errorf("opening osquery client connection on "+*flSocket+": %w", err)
+		return fmt.Errorf("opening osquery client connection on %s: %w", *flSocket, err)
 	}
 	defer client.Close()
 

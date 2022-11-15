@@ -55,8 +55,10 @@ func (iUpdateSession *IUpdateSession) GetLocal() (uint32, error) {
 }
 
 func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
-	_, err := oleconv.ToUint32Err(oleutil.PutProperty(iUpdateSession.disp, "UserLocale", locale))
-	return fmt.Errorf("getproperty userlocale: %w", err)
+	if _, err := oleconv.ToUint32Err(oleutil.PutProperty(iUpdateSession.disp, "UserLocale", locale)); err != nil {
+		return fmt.Errorf("putproperty userlocale: %w", err)
+	}
+	return nil
 }
 
 // CreateUpdateSearcher returns an IUpdateSearcher interface for this session.

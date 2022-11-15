@@ -133,7 +133,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
 	data, err := ioutil.ReadAll(rd)
 	if err != nil {
-		return nil, fmt.Errorf("error reading secedit output file: %s: %w", err, err)
+		return nil, fmt.Errorf("error reading secedit output file: %s: %w", dst, err)
 	}
 
 	return data, nil

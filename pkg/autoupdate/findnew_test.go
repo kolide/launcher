@@ -350,7 +350,7 @@ func copyFile(dstPath, srcPath string, truncate bool) error {
 		}
 
 		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
-			return fmt.Errorf("statting srcFile: %w", err)
+			return fmt.Errorf("copying srcFile: %w", err)
 		}
 	}
 
