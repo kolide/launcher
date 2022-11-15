@@ -335,7 +335,11 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 		"msg", "Finished",
 	)
 
-	return fmt.Errorf("install tools: %w", err)
+	if err != nil {
+		return fmt.Errorf("install tools: %w", err)
+	}
+
+	return nil
 }
 
 func (b *Builder) installTool(ctx context.Context, importPath string) error {
@@ -428,7 +432,12 @@ func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	)
 	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
-	return fmt.Errorf("run bindata for dir %s, output=%s: %w", dir, out, err)
+
+	if err != nil {
+		return fmt.Errorf("run bindata for dir %s, output=%s: %w", dir, out, err)
+	}
+
+	return nil
 }
 
 func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string) error {
