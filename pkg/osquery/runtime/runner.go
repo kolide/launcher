@@ -133,7 +133,7 @@ func (r *Runner) Shutdown() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	r.instance.cancel()
-	if err := r.instance.errgroup.Wait(); err != context.Canceled {
+	if err := r.instance.errgroup.Wait(); err != context.Canceled && err != nil {
 		return fmt.Errorf("while shutting down instance: %w", err)
 	}
 	return nil

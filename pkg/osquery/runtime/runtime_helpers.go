@@ -19,8 +19,10 @@ func setpgid() *syscall.SysProcAttr {
 
 // kill process group kills a process and all its children.
 func killProcessGroup(cmd *exec.Cmd) error {
-	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	return fmt.Errorf("kill process group %d: %w", cmd.Process.Pid, err)
+	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+		return fmt.Errorf("kill process group %d: %w", cmd.Process.Pid, err)
+	}
+	return nil
 }
 
 func SocketPath(rootDir string) string {
