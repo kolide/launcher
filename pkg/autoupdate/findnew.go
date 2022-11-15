@@ -143,7 +143,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 	)
 
 	// If no updates are found, the forloop is skipped, and we return either the seed fullBinaryPath or ""
-	possibleUpdates, err := getPossibleUpdates(updateDir, binaryName)
+	possibleUpdates, err := getPossibleUpdates(ctx, updateDir, binaryName)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not find possible updates", "err", err)
 		return fullBinaryPath
@@ -158,6 +158,8 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		updateDownloadTime := filepath.Base(basedir)
 		foundExecutable := file
 		if strings.HasSuffix(file, ".app") {
+			// Add back the rest of the path to the binary that we'd stripped off to make
+			// timestamp comparison and old/broken updates cleanup easier.
 			foundExecutable = filepath.Join(file, "Contents", "MacOS", binaryName)
 		}
 
@@ -267,7 +269,9 @@ func getUpdateDir(fullBinaryPath string) string {
 // that match the requested pattern. We sort the list to ensure that
 // we can tell which ones are earlier or later (remember, these are
 // timestamps).
-func getPossibleUpdates(updateDir, binaryName string) ([]string, error) {
+func getPossibleUpdates(ctx context.Context, updateDir, binaryName string) ([]string, error) {
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
 	// If this is launcher running on macOS, then we should have app bundles available instead --
 	// check for those first.
 	if runtime.GOOS == "darwin" {
@@ -278,10 +282,20 @@ func getPossibleUpdates(updateDir, binaryName string) ([]string, error) {
 		if err == nil && len(possibleUpdates) > 0 {
 			appBundleNames := make([]string, len(possibleUpdates))
 			for i, binaryPath := range possibleUpdates {
+				// We trim the suffix here for compatibility with prior logic for timestamp
+				// comparison in the directory and cleanup for old/broken updates. The suffix
+				// is added back later by the caller.
 				appBundleNames[i] = strings.TrimSuffix(binaryPath, "/"+binarySuffix)
 			}
 			sort.Strings(appBundleNames)
 			return appBundleNames, nil
+		}
+
+		// If the error is non-nil, something has gone very wrong -- log and then ignore the
+		// error so that we can fall back to previous behavior below, so that launcher is
+		// still able to auto-update.
+		if err != nil {
+			level.Error(logger).Log("msg", "could not glob for app bundle binaries", "err", err)
 		}
 	}
 
