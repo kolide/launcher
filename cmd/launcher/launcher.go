@@ -280,11 +280,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
 	}
 
-	err = runGroup.Run()
-	return fmt.Errorf("run service: %w", err)
+	if err := runGroup.Run(); err != nil {
+		return fmt.Errorf("run service: %w", err)
+	}
+
+	return nil
 }
 
 func writePidFile(path string) error {
-	err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600)
-	return fmt.Errorf("writing pidfile: %w", err)
+	if err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
+		return fmt.Errorf("writing pidfile: %w", err)
+	}
+	return nil
 }

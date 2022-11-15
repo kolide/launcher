@@ -52,25 +52,33 @@ func main() {
 
 	if *flPlist != "" {
 		data, err := dataflatten.PlistFile(*flPlist, opts...)
-		checkError(fmt.Errorf("flattening plist file: %w", err))
+		if err != nil {
+			checkError(fmt.Errorf("flattening plist file: %w", err))
+		}
 		rows = append(rows, data...)
 	}
 
 	if *flJson != "" {
 		data, err := dataflatten.JsonFile(*flJson, opts...)
-		checkError(fmt.Errorf("flattening json file: %w", err))
+		if err != nil {
+			checkError(fmt.Errorf("flattening json file: %w", err))
+		}
 		rows = append(rows, data...)
 	}
 
 	if *flXml != "" {
 		data, err := dataflatten.XmlFile(*flXml, opts...)
-		checkError(fmt.Errorf("flattening xml file: %w", err))
+		if err != nil {
+			checkError(fmt.Errorf("flattening xml file: %w", err))
+		}
 		rows = append(rows, data...)
 	}
 
 	if *flIni != "" {
 		data, err := dataflatten.IniFile(*flIni, opts...)
-		checkError(fmt.Errorf("flattening ini file: %w", err))
+		if err != nil {
+			checkError(fmt.Errorf("flattening ini file: %w", err))
+		}
 		rows = append(rows, data...)
 	}
 

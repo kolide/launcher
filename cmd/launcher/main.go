@@ -138,8 +138,12 @@ func runSubcommands() error {
 		return fmt.Errorf("Unknown subcommand %s", os.Args[1])
 	}
 
-	err := run(os.Args[2:])
-	return fmt.Errorf("running subcommand %s: %w", os.Args[1], err)
+	if err := run(os.Args[2:]); err != nil {
+		return fmt.Errorf("running subcommand %s: %w", os.Args[1], err)
+	}
+
+	return nil
+
 }
 
 func commandUsage(fs *flag.FlagSet, short string) func() {
