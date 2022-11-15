@@ -53,7 +53,11 @@ func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	if err != nil {
+		return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	}
+
+	return encodeJSONResponse(b, nil)
 }
 
 func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
