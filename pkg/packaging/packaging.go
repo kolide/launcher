@@ -356,7 +356,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 			appBundlePath,
 			filepath.Join(p.packageRoot, p.binDir, "Kolide.app"),
 		); err != nil {
-			return errors.Wrapf(err, "could not copy app bundle")
+			return fmt.Errorf("could not copy app bundle: %w", err)
 		}
 
 		return nil
