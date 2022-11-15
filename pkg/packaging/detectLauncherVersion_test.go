@@ -62,12 +62,12 @@ func TestLauncherLocation(t *testing.T) {
 	pDarwin := &PackageOptions{target: Target{Platform: Darwin}}
 
 	// First, test that if the app bundle doesn't exist, we fall back to the top-level binary
-	require.Equal(t, "/some/dir/launcher", pDarwin.launcherLocation("/some/dir"))
+	require.Equal(t, filepath.Join("some", "dir", "launcher"), pDarwin.launcherLocation(filepath.Join("some", "dir")))
 
 	// Create a temp directory with an app bundle in it
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS"), 0755)
-	baseDir := filepath.Join(tmpDir, "Kolide.app/Contents/MacOS")
+	baseDir := filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS")
 	expectedLauncherBinaryPath := filepath.Join(baseDir, "launcher")
 	f, err := os.Create(expectedLauncherBinaryPath)
 	if err != nil {
@@ -82,9 +82,9 @@ func TestLauncherLocation(t *testing.T) {
 
 	// No file check for windows, just expect the binary in the given location
 	pWindows := &PackageOptions{target: Target{Platform: Windows}}
-	require.Equal(t, "/some/dir/launcher.exe", pWindows.launcherLocation("/some/dir"))
+	require.Equal(t, filepath.Join("some", "dir", "launcher.exe"), pWindows.launcherLocation(filepath.Join("some", "dir")))
 
 	// Same as for windows: no file check, just expect the binary in the given location
 	pLinux := &PackageOptions{target: Target{Platform: Linux}}
-	require.Equal(t, "/some/dir/launcher", pLinux.launcherLocation("/some/dir"))
+	require.Equal(t, filepath.Join("some", "dir", "launcher"), pLinux.launcherLocation(filepath.Join("some", "dir")))
 }
