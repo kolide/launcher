@@ -98,8 +98,32 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runPkbuild")
 
+	// Run analyze to generate our component plist
+	componentPlist := "./launcher.plist"
+	analyzeCmd := exec.CommandContext(ctx, "pkgbuild", "--analyze", "--root", po.Root, componentPlist)
+	if err := analyzeCmd.Run(); err != nil {
+		return fmt.Errorf("running analyze: %w", err)
+	}
+
+	// Clean up the newly-generated component plist after we're done with it
+	defer func() {
+		if err := os.Remove(componentPlist); err != nil {
+			level.Error(logger).Log(
+				"msg", "could not clean up component plist after pkgbuild",
+				"plist", componentPlist,
+			)
+		}
+	}()
+
+	// Set BundleIsRelocatable in the component plist to false
+	replaceCmd := exec.CommandContext(ctx, "plutil", "-replace", "BundleIsRelocatable", "-bool", "false", componentPlist)
+	if err := replaceCmd.Run(); err != nil {
+		return fmt.Errorf("running plutil -replace: %w", err)
+	}
+
 	args := []string{
 		"--root", po.Root,
+		"--component-plist", componentPlist,
 		"--identifier", fmt.Sprintf("com.%s.launcher", po.Identifier),
 		"--version", po.Version,
 	}
