@@ -47,6 +47,9 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	return nil
 }
 
+// launcherLocation returns the location of the launcher binary within `rootDir`. For darwin,
+// it may be in an app bundle -- we check to see if the binary exists there first, and then
+// fall back to the common location if it doesn't.
 func (p *PackageOptions) launcherLocation(rootDir string) string {
 	if p.target.Platform == Darwin {
 		appBundleBinaryPath := filepath.Join(rootDir, "Kolide.app", "Contents", "MacOS", "launcher")

@@ -349,6 +349,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		}
 	}
 
+	// Check to see if we fetched an app bundle. If so, copy over the app bundle directory.
 	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
 	appBundleInfo, err := os.Stat(appBundlePath)
 	if err == nil && appBundleInfo.IsDir() {
@@ -362,6 +363,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
+	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),
