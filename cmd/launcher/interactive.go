@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
@@ -35,6 +36,7 @@ func runInteractive(args []string) error {
 		if osquerydPath == "" {
 			return errors.New("Could not find osqueryd binary")
 		}
+		osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
 	}
 
 	// have to keep tempdir name short so we don't exceed socket length
