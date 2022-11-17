@@ -34,6 +34,10 @@ func dbKeyValueRows(bucketName string, db *bbolt.DB) ([]map[string]string, error
 
 	if err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket not found", bucketName)
+		}
+
 		b.ForEach(func(k, v []byte) error {
 			results = append(results, map[string]string{
 				"key":   string(k),
