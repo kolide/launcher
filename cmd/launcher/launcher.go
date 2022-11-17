@@ -152,8 +152,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
-			queryTargeter := createQueryTargetUpdater(logger, db, grpcConn)
-			runGroup.Add(queryTargeter.Execute, queryTargeter.Interrupt)
 		case "jsonrpc":
 			client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
 		case "osquery":
