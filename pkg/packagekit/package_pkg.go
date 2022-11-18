@@ -201,7 +201,7 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 		if err := os.Remove(distributionFile); err != nil {
 			level.Error(logger).Log(
 				"msg", "could not clean up distribution.dist after productbuild",
-				"plist", distributionFile,
+				"dist", distributionFile,
 			)
 		}
 	}()
