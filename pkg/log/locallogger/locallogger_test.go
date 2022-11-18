@@ -81,29 +81,21 @@ func TestCleanUpRenamedDebugLogs(t *testing.T) {
 
 	tempDir := t.TempDir()
 
-	// Make a log file that should be cleaned up
+	// Create two files that should be cleaned up and one that should not
 	legacyDebugLogPath := filepath.Join(tempDir, "debug.log")
-	f1, err := os.Create(legacyDebugLogPath)
-	require.NoError(t, err, "could not create log file for test")
-	defer f1.Close()
-
-	// Make a rotated log file that should be cleaned up
 	legacyDebugLogRotatedPath := filepath.Join(tempDir, "debug-2022-11-18T18-35-48.858.log.gz")
-	f2, err := os.Create(legacyDebugLogRotatedPath)
-	require.NoError(t, err, "could not create log file for test")
-	defer f2.Close()
-
-	// Make a log file that should NOT be cleaned up
 	newDebugLogPath := filepath.Join(tempDir, "debug.json")
-	f3, err := os.Create(newDebugLogPath)
-	require.NoError(t, err, "could not create log file for test")
-	defer f3.Close()
+	for _, f := range []string{legacyDebugLogPath, legacyDebugLogRotatedPath, newDebugLogPath} {
+		fh, err := os.Create(f)
+		require.NoError(t, err, "could not create log file for test")
+		fh.Close()
+	}
 
 	// Call cleanup
 	CleanUpRenamedDebugLogs(tempDir, log.NewJSONLogger(os.Stderr))
 
 	// Validate that we only cleaned up the files we meant to
-	_, err = os.Stat(legacyDebugLogPath)
+	_, err := os.Stat(legacyDebugLogPath)
 	require.True(t, os.IsNotExist(err))
 
 	_, err = os.Stat(legacyDebugLogRotatedPath)

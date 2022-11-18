@@ -55,8 +55,7 @@ func CleanUpRenamedDebugLogs(cleanupPath string, logger log.Logger) {
 		level.Error(logger).Log("msg", "could not glob for legacy debug log files to clean up", "pattern", legacyDebugLogPattern, "err", err)
 	} else {
 		for _, fileToCleanUp := range filesToCleanUp {
-			err := os.Remove(fileToCleanUp)
-			if err != nil {
+			if err := os.Remove(fileToCleanUp); err != nil {
 				level.Error(logger).Log("msg", "could not clean up legacy debug log file", "file", fileToCleanUp, "err", err)
 			}
 		}
