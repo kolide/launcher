@@ -302,6 +302,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
+		Title:                    "Kolide Endpoint Agent",
 		Root:                     p.packageRoot,
 		Scripts:                  p.scriptRoot,
 		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,

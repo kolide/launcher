@@ -115,7 +115,8 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 		}
 	}()
 
-	// Set BundleIsRelocatable in the component plist to false
+	// Set BundleIsRelocatable in the component plist to false -- this makes sure that the installer
+	// will install Kolide.app to the location that we expect
 	replaceCmd := exec.CommandContext(ctx, "plutil", "-replace", "BundleIsRelocatable", "-bool", "false", componentPlist)
 	if err := replaceCmd.Run(); err != nil {
 		return fmt.Errorf("running plutil -replace: %w", err)
@@ -164,14 +165,57 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runProductbuild")
 
-	args := []string{}
+	// Create a distribution file so that we can set the title and the minimum OS version
+	distributionFileContents := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+	<title>%s</title>
+	<pkg-ref id="com.%s.launcher">
+		<bundle-version>
+			<bundle CFBundleShortVersionString="%s" CFBundleVersion="%s" id="com.%s.launcher" path="usr/local/kolide/bin/Kolide.app"/>
+		</bundle-version>
+	</pkg-ref>
+	<options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+	<choices-outline>
+		<line choice="default">
+			<line choice="com.%s.launcher"/>
+		</line>
+	</choices-outline>
+	<choice id="default"/>
+	<choice id="com.%s.launcher" visible="false">
+		<pkg-ref id="com.%s.launcher"/>
+	</choice>
+	<pkg-ref id="com.%s.launcher" version="%s" onConclusion="none">#%s</pkg-ref>
+	<allowed-os-versions>
+		<os-version min="10.14"/>
+	</allowed-os-versions>
+</installer-gui-script>`, po.Title, po.Identifier, po.Version, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Version, filepath.Base(flatPkgPath))
+
+	distributionFile := "./distribution.dist"
+
+	if err := os.WriteFile(distributionFile, []byte(distributionFileContents), 0644); err != nil {
+		return fmt.Errorf("writing distribution file %s: %w", distributionFile, err)
+	}
+
+	// Clean up the newly-generated distribution file after we're done with it
+	defer func() {
+		if err := os.Remove(distributionFile); err != nil {
+			level.Error(logger).Log(
+				"msg", "could not clean up distribution.dist after productbuild",
+				"plist", distributionFile,
+			)
+		}
+	}()
+
+	args := []string{
+		"--distribution", distributionFile,
+	}
 
 	if po.AppleSigningKey != "" {
 		args = append(args, "--sign", po.AppleSigningKey)
 	}
 
 	args = append(args,
-		"--package", flatPkgPath,
+		"--package-path", filepath.Dir(flatPkgPath),
 		distributionPkgPath,
 	)
 
