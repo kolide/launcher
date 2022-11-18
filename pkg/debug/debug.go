@@ -4,6 +4,7 @@
 package debug
 
 import (
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net"
@@ -16,7 +17,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 )
 
 const debugPrefix = "/debug/"
@@ -25,7 +25,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	// Generate new (random) token to use for debug server auth
 	token, err := uuid.NewRandom()
 	if err != nil {
-		return nil, errors.Wrap(err, "generating debug token")
+		return nil, fmt.Errorf("generating debug token: %w", err)
 	}
 
 	// Start the debug server
@@ -39,7 +39,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	// already used port.
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return nil, errors.Wrap(err, "opening socket")
+		return nil, fmt.Errorf("opening socket: %w", err)
 	}
 
 	go func() {
@@ -57,7 +57,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	addr := url.String()
 	// Write the address to a file for easy access by users
 	if err := ioutil.WriteFile(addrPath, []byte(addr), 0600); err != nil {
-		return nil, errors.Wrap(err, "writing debug address")
+		return nil, fmt.Errorf("writing debug address: %w", err)
 	}
 
 	level.Info(logger).Log(

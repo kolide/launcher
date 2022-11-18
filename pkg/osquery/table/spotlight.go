@@ -5,10 +5,11 @@ package table
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 /*
@@ -41,7 +42,7 @@ func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]
 	}
 	lines, err := mdfind(query...)
 	if err != nil {
-		return nil, errors.Wrap(err, "call mdfind")
+		return nil, fmt.Errorf("call mdfind: %w", err)
 	}
 	var resp []map[string]string
 	for _, line := range lines {

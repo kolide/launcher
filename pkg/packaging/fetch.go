@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -56,44 +57,44 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 	// Download the package
 	downloadReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", errors.Wrap(err, "new request")
+		return "", fmt.Errorf("new request: %w", err)
 	}
 	downloadReq = downloadReq.WithContext(ctx)
 
 	httpClient := http.DefaultClient
 	response, err := httpClient.Do(downloadReq)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't download binary archive")
+		return "", fmt.Errorf("couldn't download binary archive: %w", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return "", errors.Errorf("Failed download. Got http status %s", response.Status)
+		return "", fmt.Errorf("Failed download. Got http status %s", response.Status)
 	}
 
 	// Store it in cache
 	writeHandle, err := os.Create(localPackagePath)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't create file handle at local package download path")
+		return "", fmt.Errorf("couldn't create file handle at local package download path: %w", err)
 	}
 	defer writeHandle.Close()
 
 	_, err = io.Copy(writeHandle, response.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't copy HTTP response body to file")
+		return "", fmt.Errorf("couldn't copy HTTP response body to file: %w", err)
 	}
 
 	// explicitly close the write handle before untaring the archive
 	writeHandle.Close()
 
 	if err := os.MkdirAll(filepath.Dir(localBinaryPath), fsutil.DirMode); err != nil {
-		return "", errors.Wrap(err, "couldn't create directory for binary")
+		return "", fmt.Errorf("couldn't create directory for binary: %w", err)
 	}
 
 	// UntarBundle is a bit misnamed. this untars unto the directory
 	// containing that file. It has a call to filepath.Dir(destination) there.
 	if err := fsutil.UntarBundle(localBinaryPath, localPackagePath); err != nil {
-		return "", errors.Wrap(err, "couldn't untar download")
+		return "", fmt.Errorf("couldn't untar download: %w", err)
 	}
 
 	if _, err := os.Stat(localBinaryPath); err != nil {
@@ -101,7 +102,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 			"msg", "Missing local binary",
 			"localBinaryPath", localBinaryPath,
 		)
-		return "", errors.Wrap(err, "local binary does not exist but it should")
+		return "", fmt.Errorf("local binary does not exist but it should: %w", err)
 	}
 
 	return localBinaryPath, nil

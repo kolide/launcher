@@ -3,6 +3,8 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
+
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,7 +129,7 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 			// try the next binary
 			continue
 		} else if err != nil {
-			return nil, errors.Wrapf(err, "calling %s. Got: %s", t.execArgs[0], string(stderr.Bytes()))
+			return nil, fmt.Errorf("calling %s. Got: %s: %w", t.execArgs[0], string(stderr.Bytes()), err)
 		}
 
 		// success!
@@ -135,5 +137,5 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	}
 
 	// None of the possible execs were found
-	return nil, errors.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
+	return nil, fmt.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
 }

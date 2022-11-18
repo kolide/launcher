@@ -1,9 +1,8 @@
 package osquery
 
 import (
+	"fmt"
 	"runtime"
-
-	"github.com/pkg/errors"
 )
 
 // OsqueryPlatform is the specific type assigned to osquery platform strings
@@ -27,6 +26,6 @@ func DetectPlatform() (OsqueryPlatform, error) {
 	case "linux":
 		return Linux, nil
 	default:
-		return Unknown, errors.Errorf("unrecognized runtime.GOOS: %s", runtime.GOOS)
+		return Unknown, fmt.Errorf("unrecognized runtime.GOOS: %s", runtime.GOOS)
 	}
 }

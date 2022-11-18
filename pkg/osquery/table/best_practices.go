@@ -2,10 +2,10 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 // bestPracticesSimpleColumns is a map of the best practices columns that are
@@ -47,11 +47,11 @@ func generateBestPractices(client *osquery.ExtensionManagerClient) table.Generat
 		for col, query := range bestPracticesSimpleColumns {
 			row, err := client.QueryRow(query)
 			if err != nil {
-				return nil, errors.Wrapf(err, "query %s", col)
+				return nil, fmt.Errorf("query %s: %w", col, err)
 			}
 			val, ok := row["compliant"]
 			if !ok {
-				return nil, errors.Errorf("query %s did not have 'compliant' column", col)
+				return nil, fmt.Errorf("query %s did not have 'compliant' column", col)
 			}
 			res[col] = val
 		}

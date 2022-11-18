@@ -8,7 +8,9 @@ package macos_software_update
 #cgo darwin LDFLAGS: -framework Cocoa
 #include "sus.h"
 */
-import "C"
+import (
+	"C"
+)
 import (
 	"context"
 	"fmt"
@@ -16,7 +18,6 @@ import (
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
@@ -42,7 +43,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	if table.macOSBuildVersionPrefix == 0 {
 		buildPrefix, err := macOSBuildVersionPrefix(table.client)
 		if err != nil {
-			return nil, errors.Wrap(err, "determine macOS build prefix for software update table")
+			return nil, fmt.Errorf("determine macOS build prefix for software update table: %w", err)
 		}
 		table.macOSBuildVersionPrefix = buildPrefix
 	}
@@ -85,11 +86,11 @@ func macOSBuildVersionPrefix(client *osquery.ExtensionManagerClient) (int, error
 	query := `SELECT CAST(SUBSTR(build,0,3) AS int) AS build_prefix FROM os_version`
 	row, err := client.QueryRow(query)
 	if err != nil {
-		return 0, errors.Wrap(err, "querying for macOS version")
+		return 0, fmt.Errorf("querying for macOS version: %w", err)
 	}
 	buildPrefix, err := strconv.Atoi(row["build_prefix"])
 	if err != nil {
-		return 0, errors.Wrap(err, "converting build prefix from string to int")
+		return 0, fmt.Errorf("converting build prefix from string to int: %w", err)
 	}
 	return buildPrefix, nil
 }

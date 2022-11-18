@@ -3,11 +3,11 @@ package packagekit
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"html/template"
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
@@ -105,7 +105,7 @@ func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, u
 
 	t, err := template.New("UpstartConf").Funcs(funcsMap).Parse(string(upstartTemplate))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse Upstart template")
+		return fmt.Errorf("not able to parse Upstart template: %w", err)
 	}
 	return t.ExecuteTemplate(w, "UpstartConf", data)
 }

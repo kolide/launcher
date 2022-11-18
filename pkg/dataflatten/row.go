@@ -1,6 +1,8 @@
 package dataflatten
 
-import "strings"
+import (
+	"strings"
+)
 
 // Row is the record type we return.
 type Row struct {

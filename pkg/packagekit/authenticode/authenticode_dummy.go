@@ -3,7 +3,9 @@
 
 package authenticode
 
-import "context"
+import (
+	"context"
+)
 
 func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	return nil

@@ -3,7 +3,9 @@
 
 package debug
 
-import "github.com/go-kit/kit/log"
+import (
+	"github.com/go-kit/kit/log"
+)
 
 func AttachDebugHandler(addrPath string, logger log.Logger) {
 	// TODO: noop for now

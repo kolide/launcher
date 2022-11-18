@@ -1,9 +1,8 @@
 package backoff
 
 import (
+	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type Opt func(*Backoff)
@@ -48,7 +47,7 @@ func (b *Backoff) try() error {
 	err := b.runFunc()
 	if err != nil {
 		if b.count >= b.maxAttempt {
-			return errors.Wrap(err, "done trying")
+			return fmt.Errorf("done trying: %w", err)
 		}
 
 		// Wait for amount of time

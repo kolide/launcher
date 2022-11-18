@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"regexp"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func KolideVulnerabilities(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -42,7 +42,7 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 	row := map[string]string{"name": "CVE-2017-7149"}
 	volumes, err := getEncryptedAPFSVolumes()
 	if err != nil {
-		level.Error(logger).Log("err", errors.Wrap(err, "getting encrypted APFS volumes"))
+		level.Error(logger).Log("err", fmt.Errorf("getting encrypted APFS volumes: %w", err))
 		return row
 	}
 
@@ -52,7 +52,7 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 	for _, vol := range volumes {
 		vulnerable, err := checkVolumeVulnerability(vol)
 		if err != nil {
-			level.Error(logger).Log("err", errors.Wrapf(err, "checking volume %s vulnerability", vol))
+			level.Error(logger).Log("err", fmt.Errorf("checking volume %s vulnerability: %w", vol, err))
 			continue
 		}
 
@@ -70,7 +70,7 @@ func generateCVE_2017_7149(logger log.Logger) map[string]string {
 
 	detailJSON, err := json.Marshal(details)
 	if err != nil {
-		level.Error(logger).Log("err", errors.Wrap(err, "marshalling CVE_2017_7149 details"))
+		level.Error(logger).Log("err", fmt.Errorf("marshalling CVE_2017_7149 details: %w", err))
 		return row
 	}
 	row["details"] = string(detailJSON)
@@ -84,7 +84,7 @@ func getEncryptedAPFSVolumes() ([]string, error) {
 	cmd := exec.Command("diskutil", "apfs", "list")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, errors.Wrap(err, "execing diskutil apfs list")
+		return nil, fmt.Errorf("execing diskutil apfs list: %w", err)
 	}
 
 	volumeSection := regexp.MustCompile(`(?s)Volume .+? Encrypted:\s+(Yes|No)`)
@@ -113,7 +113,7 @@ func checkVolumeVulnerability(volume string) (bool, error) {
 	cmd := exec.Command("diskutil", "apfs", "listCryptoUsers", volume)
 	out, err := cmd.Output()
 	if err != nil {
-		return false, errors.Wrapf(err, "execing diskutil apfs listCryptoUsers %s", volume)
+		return false, fmt.Errorf("execing diskutil apfs listCryptoUsers %s: %w", volume, err)
 	}
 
 	userSectionWithHint := regexp.MustCompile(`(?s) (\S+-\S+-\S+-\S+-\S+).+? Hint: ([^\n]+)`)
