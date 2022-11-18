@@ -151,8 +151,7 @@ func Test_getBinary(t *testing.T) {
 	binaryName := "launcher"
 	version := "nightly"
 	localBinaryDir := filepath.Join(tmpCacheDir, fmt.Sprintf("launcher-%s-%s", runtime.GOOS, version))
-	err := os.Mkdir(localBinaryDir, 0755)
-	assert.NoError(t, err, "could not make temp cache directory")
+	assert.NoError(t, os.Mkdir(localBinaryDir, 0755), "could not make temp cache directory")
 	cachedBinaryPath := filepath.Join(localBinaryDir, binaryName)
 	f, err := os.Create(cachedBinaryPath)
 	assert.NoError(t, err, "could not create binary")
@@ -161,8 +160,7 @@ func Test_getBinary(t *testing.T) {
 	// Set up output directory
 	tmpPkgRoot := t.TempDir()
 	binDir := "bin"
-	err = os.Mkdir(filepath.Join(tmpPkgRoot, binDir), 0755)
-	assert.NoError(t, err, "could not make temp output directory")
+	assert.NoError(t, os.Mkdir(filepath.Join(tmpPkgRoot, binDir), 0755), "could not make temp output directory")
 
 	p := &PackageOptions{
 		packageRoot: tmpPkgRoot,
@@ -189,7 +187,7 @@ func Test_getBinary(t *testing.T) {
 		defer f.Close()
 
 		// Verify we found the app bundle and copied over the entire directory to the expected location
-		err = p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath)
+		assert.NoError(t, p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath), "expected to find app bundle but did not")
 		assert.NoError(t, err, "expected to find app bundle but did not")
 
 		appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, binDir, "Kolide.app"))
