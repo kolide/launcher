@@ -131,10 +131,34 @@ jobs:
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
     - run: make deps
+
     - id: build
       run: make package-builder
+
     - name: package
+      id: run-package-builder
+      if: ${{ ! contains(matrix.os, 'macos') }}
       run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
+
+    - name: package macOS
+      id: run-package-builder-macos
+      if: ${{ contains(matrix.os, 'macos') }}
+      shell: bash
+      run: |
+        # Capture last line of output, `Built packages in /var/some/location`
+        OUTPUT=$(${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret --launcher_version=nightly | tail -n 1)
+        OUTPUT_PREFIX="Built packages in "
+        echo "launcher-pkg-path=${OUTPUT#"$OUTPUT_PREFIX"}" >> "$GITHUB_OUTPUT"
+
+    - name: Test install macOS
+      if: ${{ contains(matrix.os, 'macos') }}
+      run: |
+        # Check that we can install
+        sudo installer -dumplog -pkg ${{ steps.run-package-builder-macos.outputs.launcher-pkg-path }}/launcher.darwin-launchd-pkg.pkg -target /
+        # Quick check that at least a couple of the files we expect now exist
+        if [ ! -f /Library/LaunchDaemons/com.launcher.launcher.plist ]; then echo "missing launchd entry" && exit 1; fi
+        if [ ! -f /usr/local/launcher/bin/osqueryd ]; then echo "missing osquery binary" && exit 1; fi
+        if [ ! -f /usr/local/launcher/bin/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
