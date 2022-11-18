@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -140,9 +139,15 @@ func TestFindNewestNonExecutable(t *testing.T) {
 
 	require.Equal(t, binaryPath, FindNewest(ctx, binaryPath), "update dir, but only plain files")
 
-	require.NoError(t, os.Chmod(filepath.Join(updatesDir, "1", "binary"), 0755))
+	expectedNewest := filepath.Join(updatesDir, "1", "binary")
+	require.NoError(t, os.Chmod(expectedNewest, 0755))
+	if runtime.GOOS == "darwin" {
+		expectedNewest = filepath.Join(updatesDir, "1", "Test.app", "Contents", "MacOS", "binary")
+		require.NoError(t, os.Chmod(expectedNewest, 0755))
+	}
+
 	require.Equal(t,
-		filepath.Join(updatesDir, "1", "binary"),
+		expectedNewest,
 		FindNewest(ctx, binaryPath),
 		"Should find number 1",
 	)
@@ -159,6 +164,8 @@ func TestFindNewestExecutableUpdates(t *testing.T) {
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
 	if runtime.GOOS == "windows" {
 		expectedNewest = expectedNewest + ".exe"
+	} else if runtime.GOOS == "darwin" {
+		expectedNewest = filepath.Join(updatesDir, "5", "Test.app", "Contents", "MacOS", "binary")
 	}
 
 	require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
@@ -184,6 +191,8 @@ func TestFindNewestCleanup(t *testing.T) {
 	expectedNewest := filepath.Join(updatesDir, "5", "binary")
 	if runtime.GOOS == "windows" {
 		expectedNewest = expectedNewest + ".exe"
+	} else if runtime.GOOS == "darwin" {
+		expectedNewest = filepath.Join(updatesDir, "5", "Test.app", "Contents", "MacOS", "binary")
 	}
 
 	{
@@ -214,6 +223,8 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	expectedNewest := filepath.Join(updatesDir, "3", "binary")
 	if runtime.GOOS == "windows" {
 		expectedNewest = expectedNewest + ".exe"
+	} else if runtime.GOOS == "darwin" {
+		expectedNewest = filepath.Join(updatesDir, "3", "Test.app", "Contents", "MacOS", "binary")
 	}
 
 	{
@@ -265,23 +276,35 @@ func setupTestDir(t *testing.T, stage setupState) (string, string) {
 	// (these are out of order, to jumble up the create times)
 	for _, n := range []string{"2", "5", "3", "1"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n), 0755))
+		if runtime.GOOS == "darwin" {
+			require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS"), 0755))
+		}
 	}
 
 	if stage <= emptyUpdateDirs {
 		return tmpDir, binaryName
 	}
 
+	// Copy executable to update directories
 	for _, n := range []string{"2", "5", "3", "1"} {
 		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
 		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
+		if runtime.GOOS == "darwin" {
+			updatedAppBundleBinaryPath := filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", filepath.Base(binaryPath))
+			require.NoError(t, copyFile(updatedAppBundleBinaryPath, binaryPath, false), "copy executable")
+		}
 	}
 
 	if stage <= nonExecutableUpdates {
 		return tmpDir, binaryName
 	}
 
+	// Make our top-level binaries executable
 	for _, n := range []string{"2", "5", "3", "1"} {
 		require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, binaryName), 0755))
+		if runtime.GOOS == "darwin" {
+			require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", binaryName), 0755))
+		}
 	}
 
 	if stage <= executableUpdates {
@@ -291,6 +314,9 @@ func setupTestDir(t *testing.T, stage setupState) (string, string) {
 	for _, n := range []string{"5", "1"} {
 		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
 		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, true), "copy & truncate executable")
+		if runtime.GOOS == "darwin" {
+			require.NoError(t, copyFile(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", binaryName), binaryPath, true), "copy & truncate executable")
+		}
 	}
 
 	return tmpDir, binaryName
@@ -320,11 +346,11 @@ func copyFile(dstPath, srcPath string, truncate bool) error {
 	} else {
 		stat, err := src.Stat()
 		if err != nil {
-			return errors.Wrap(err, "statting srcFile")
+			return fmt.Errorf("statting srcFile: %w", err)
 		}
 
 		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
-			return errors.Wrap(err, "statting srcFile")
+			return fmt.Errorf("copying srcFile: %w", err)
 		}
 	}
 
@@ -458,6 +484,9 @@ func TestBuildTimestamp(t *testing.T) {
 			} else {
 				updateFragment := strings.TrimPrefix(strings.TrimPrefix(returnedNewest, updatesDir), "/")
 				expectedNewest := filepath.Join(tt.expectedNewest, "binary")
+				if runtime.GOOS == "darwin" {
+					expectedNewest = filepath.Join(tt.expectedNewest, "Test.app", "Contents", "MacOS", "binary")
+				}
 				require.Equal(t, expectedNewest, updateFragment)
 			}
 

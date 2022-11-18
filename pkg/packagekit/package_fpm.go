@@ -3,6 +3,7 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -89,7 +90,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 
 	outputPathDir, err := ioutil.TempDir("", "packaging-fpm-output")
 	if err != nil {
-		return errors.Wrap(err, "making TempDir")
+		return fmt.Errorf("making TempDir: %w", err)
 	}
 	defer os.RemoveAll(outputPathDir)
 
@@ -151,19 +152,19 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 			"stderr", stderr,
 			"stdout", stdout,
 		)
-		return errors.Wrapf(err, "creating fpm package: %s", stderr)
+		return fmt.Errorf("creating fpm package: %s: %w", stderr, err)
 	}
 	level.Debug(logger).Log("msg", "fpm exited cleanly")
 
 	outputFH, err := os.Open(filepath.Join(outputPathDir, outputFilename))
 	if err != nil {
-		return errors.Wrap(err, "opening resultant output file")
+		return fmt.Errorf("opening resultant output file: %w", err)
 	}
 	defer outputFH.Close()
 
 	level.Debug(logger).Log("msg", "Copying fpm built to remote filehandle")
 	if _, err := io.Copy(w, outputFH); err != nil {
-		return errors.Wrap(err, "copying output")
+		return fmt.Errorf("copying output: %w", err)
 	}
 
 	setInContext(ctx, ContextLauncherVersionKey, po.Version)

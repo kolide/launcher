@@ -40,6 +40,7 @@ package systemprofiler
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -51,7 +52,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const systemprofilerPath = "/usr/sbin/system_profiler"
@@ -110,7 +110,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	datatypeQ, ok := queryContext.Constraints["datatype"]
 	if !ok || len(datatypeQ.Constraints) == 0 {
-		return results, errors.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
+		return results, fmt.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
 	}
 
 	for _, datatypeConstraint := range datatypeQ.Constraints {
@@ -142,7 +142,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	systemProfilerOutput, err := t.execSystemProfiler(ctx, detailLevel, requestedDatatypes)
 	if err != nil {
-		return results, errors.Wrap(err, "exec")
+		return results, fmt.Errorf("exec: %w", err)
 	}
 
 	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
@@ -219,7 +219,7 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 	level.Debug(t.logger).Log("msg", "calling system_profiler", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling system_profiler. Got: %s", string(stderr.Bytes()))
+		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", string(stderr.Bytes()), err)
 	}
 
 	return stdout.Bytes(), nil

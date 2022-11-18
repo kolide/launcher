@@ -3,8 +3,8 @@ package keyidentifier
 import (
 	"bytes"
 	"encoding/binary"
-
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 )
 
 const ssh1LegacyBegin = "SSH PRIVATE KEY FILE FORMAT 1.1\n"
@@ -34,7 +34,7 @@ func ParseSsh1PrivateKey(keyBytes []byte) (*KeyInfo, error) {
 
 	// TODO: Is this ever Little Endian!?
 	if err := binary.Read(keyReader, binary.BigEndian, &sshData); err != nil {
-		return nil, errors.Wrap(err, "failed binary read")
+		return nil, fmt.Errorf("failed binary read: %w", err)
 	}
 
 	ki := &KeyInfo{
@@ -50,7 +50,7 @@ func ParseSsh1PrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	case 3:
 		ki.Encrypted = boolPtr(true)
 	default:
-		return nil, errors.Errorf("ssh1 bad cipher type: %d. Should be 0 or 3", sshData.CipherType)
+		return nil, fmt.Errorf("ssh1 bad cipher type: %d. Should be 0 or 3", sshData.CipherType)
 	}
 
 	return ki, nil

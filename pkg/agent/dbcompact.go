@@ -1,10 +1,11 @@
 package agent
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -39,18 +40,18 @@ func compact(boltPath, newBoltPath string, compactMaxTxSize int64) error {
 	// compact is a janky re-write operation. So we need to ensure no one has the DB open
 	src, err := bbolt.Open(boltPath, 0444, boltOptions)
 	if err != nil {
-		return errors.Wrap(err, "unable to open existing launcher.db. Perhaps launcher is still running?")
+		return fmt.Errorf("unable to open existing launcher.db. Perhaps launcher is still running?: %w", err)
 	}
 	defer src.Close()
 
 	dst, err := bbolt.Open(newBoltPath, 0600, boltOptions)
 	if err != nil {
-		return errors.Wrap(err, "open new launcher.db")
+		return fmt.Errorf("open new launcher.db: %w", err)
 	}
 	defer dst.Close()
 
 	if err := bbolt.Compact(dst, src, compactMaxTxSize); err != nil {
-		return errors.Wrap(err, "compacting database")
+		return fmt.Errorf("compacting database: %w", err)
 	}
 
 	return nil
@@ -58,11 +59,11 @@ func compact(boltPath, newBoltPath string, compactMaxTxSize int64) error {
 
 func rename(boltPath, newBoltPath, oldBoltPath string) error {
 	if err := os.Rename(boltPath, oldBoltPath); err != nil {
-		return errors.Wrap(err, "moving launcher.db to launcher.db.old")
+		return fmt.Errorf("moving launcher.db to launcher.db.old: %w", err)
 	}
 
 	if err := os.Rename(newBoltPath, boltPath); err != nil {
-		return errors.Wrap(err, "moving launcher.db.new to launcher.db")
+		return fmt.Errorf("moving launcher.db.new to launcher.db: %w", err)
 	}
 
 	return nil

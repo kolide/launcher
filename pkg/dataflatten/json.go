@@ -2,9 +2,8 @@ package dataflatten
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
-
-	"github.com/pkg/errors"
 )
 
 func JsonFile(file string, opts ...FlattenOpts) ([]Row, error) {
@@ -19,7 +18,7 @@ func Json(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 	var data interface{}
 
 	if err := json.Unmarshal(rawdata, &data); err != nil {
-		return nil, errors.Wrap(err, "unmarshalling json")
+		return nil, fmt.Errorf("unmarshalling json: %w", err)
 	}
 
 	return Flatten(data, opts...)

@@ -49,7 +49,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
-	"github.com/pkg/errors"
+
 	howett "howett.net/plist"
 )
 
@@ -214,7 +214,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 
 			if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
-				return errors.Wrap(err, "flattening array")
+				return fmt.Errorf("flattening array: %w", err)
 			}
 		}
 	case map[string]interface{}:
@@ -227,14 +227,14 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 
 			if err := fl.descend(append(path, k), e, depth+1); err != nil {
-				return errors.Wrap(err, "flattening map")
+				return fmt.Errorf("flattening map: %w", err)
 			}
 		}
 	case []map[string]interface{}:
 		level.Debug(logger).Log("msg", "checking an array of maps")
 		for i, e := range v {
 			if err := fl.descend(append(path, strconv.Itoa(i)), e, depth+1); err != nil {
-				return errors.Wrap(err, "flattening array of maps")
+				return fmt.Errorf("flattening array of maps: %w", err)
 			}
 		}
 	case nil:
@@ -251,7 +251,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 		return fl.descendMaybePlist(path, v, depth)
 	default:
 		if err := fl.handleStringLike(logger, path, v, depth); err != nil {
-			return errors.Wrapf(err, "flattening at path %v", path)
+			return fmt.Errorf("flattening at path %v: %w", path, err)
 		}
 	}
 	return nil
@@ -316,7 +316,7 @@ func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) er
 	}
 
 	if err := fl.descend(path, innerData, depth); err != nil {
-		return errors.Wrap(err, "flattening plist data")
+		return fmt.Errorf("flattening plist data: %w", err)
 	}
 
 	return nil
@@ -503,7 +503,7 @@ func stringify(data interface{}) (string, error) {
 		return v.String(), nil
 	default:
 		// spew.Dump(data)
-		return "", errors.Errorf("unknown type on %v", data)
+		return "", fmt.Errorf("unknown type on %v", data)
 	}
 }
 

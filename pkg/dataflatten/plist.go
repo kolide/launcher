@@ -1,9 +1,9 @@
 package dataflatten
 
 import (
+	"fmt"
 	"io/ioutil"
 
-	"github.com/pkg/errors"
 	"howett.net/plist"
 )
 
@@ -19,7 +19,7 @@ func Plist(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 	var data interface{}
 
 	if _, err := plist.Unmarshal(rawdata, &data); err != nil {
-		return nil, errors.Wrap(err, "unmarshalling plist")
+		return nil, fmt.Errorf("unmarshalling plist: %w", err)
 	}
 
 	return Flatten(data, opts...)

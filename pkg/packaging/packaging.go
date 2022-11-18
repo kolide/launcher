@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,7 +18,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packagekit"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -104,23 +105,23 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	var err error
 
 	if p.packageRoot, err = ioutil.TempDir("", "package.packageRoot"); err != nil {
-		return errors.Wrap(err, "unable to create temporary packaging root directory")
+		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.packageRoot)
 
 	if p.scriptRoot, err = ioutil.TempDir("", fmt.Sprintf("package.scriptRoot")); err != nil {
-		return errors.Wrap(err, "unable to create temporary packaging root directory")
+		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.scriptRoot)
 
 	if err := p.setupDirectories(); err != nil {
-		return errors.Wrap(err, "setup directories")
+		return fmt.Errorf("setup directories: %w", err)
 	}
 
 	flagFilePath := filepath.Join(p.confDir, "launcher.flags")
 	flagFile, err := os.Create(filepath.Join(p.packageRoot, flagFilePath))
 	if err != nil {
-		return errors.Wrap(err, "creating flag file")
+		return fmt.Errorf("creating flag file: %w", err)
 	}
 	defer flagFile.Close()
 
@@ -184,28 +185,28 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherMapFlags["root_pem"] = p.canonicalizePath(rootPemPath)
 
 		if err := fsutil.CopyFile(p.RootPEM, filepath.Join(p.packageRoot, rootPemPath)); err != nil {
-			return errors.Wrap(err, "copy root PEM")
+			return fmt.Errorf("copy root PEM: %w", err)
 		}
 
 		if err := os.Chmod(filepath.Join(p.packageRoot, rootPemPath), 0600); err != nil {
-			return errors.Wrap(err, "chmod root PEM")
+			return fmt.Errorf("chmod root PEM: %w", err)
 		}
 	}
 
 	// Write the flags to the flagFile
 	for _, k := range launcherBoolFlags {
 		if _, err := flagFile.WriteString(fmt.Sprintf("%s\n", k)); err != nil {
-			return errors.Wrapf(err, "failed to write %s to flagfile", k)
+			return fmt.Errorf("failed to write %s to flagfile: %w", k, err)
 		}
 	}
 	for k, v := range launcherMapFlags {
 		if _, err := flagFile.WriteString(fmt.Sprintf("%s %s\n", k, v)); err != nil {
-			return errors.Wrapf(err, "failed to write %s to flagfile", k)
+			return fmt.Errorf("failed to write %s to flagfile: %w", k, err)
 		}
 	}
 	for _, flag := range p.OsqueryFlags {
 		if _, err := flagFile.WriteString(fmt.Sprintf("osquery_flag %s\n", flag)); err != nil {
-			return errors.Wrapf(err, "failed to write osquery_flag to flagfile: %s", flag)
+			return fmt.Errorf("failed to write osquery_flag to flagfile: %s: %w", flag, err)
 		}
 
 	}
@@ -222,7 +223,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			[]byte(p.Secret),
 			secretPerms,
 		); err != nil {
-			return errors.Wrap(err, "could not write secret string to file for packaging")
+			return fmt.Errorf("could not write secret string to file for packaging: %w", err)
 		}
 	}
 
@@ -234,7 +235,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		p.OsqueryDownloadVersionOverride = p.OsqueryVersion
 	}
 	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryDownloadVersionOverride); err != nil {
-		return errors.Wrapf(err, "fetching binary osqueryd")
+		return fmt.Errorf("fetching binary osqueryd: %w", err)
 	}
 
 	if p.LauncherDownloadVersionOverride == "" {
@@ -242,13 +243,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherDownloadVersionOverride); err != nil {
-		return errors.Wrapf(err, "fetching binary launcher")
+		return fmt.Errorf("fetching binary launcher: %w", err)
 	}
 
 	// Some darwin specific bits
 	if p.target.Platform == Darwin {
 		if err := p.renderNewSyslogConfig(ctx); err != nil {
-			return errors.Wrap(err, "render")
+			return fmt.Errorf("render: %w", err)
 		}
 
 		// launchd seems to need the log directory to be pre-created. So,
@@ -257,7 +258,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		// merge logic, and pass the logs paths as an option.
 		logDir := filepath.Join(p.packageRoot, "var", "log", p.Identifier)
 		if err := os.MkdirAll(logDir, 0755); err != nil {
-			return errors.Wrapf(err, "mkdir logdir %s", logDir)
+			return fmt.Errorf("mkdir logdir %s: %w", logDir, err)
 		}
 	}
 
@@ -265,7 +266,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// integrated logging. So we'll need a logrotate config.
 	if p.target.Init == UpstartAmazonAMI {
 		if err := p.renderLogrotateConfig(ctx); err != nil {
-			return errors.Wrap(err, "render")
+			return fmt.Errorf("render: %w", err)
 		}
 	}
 
@@ -273,7 +274,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// know until we've downloaded it.
 	if p.PackageVersion == "" {
 		if err := p.detectLauncherVersion(ctx); err != nil {
-			return errors.Wrap(err, "version detection")
+			return fmt.Errorf("version detection: %w", err)
 		}
 	}
 
@@ -287,15 +288,15 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	if err := p.setupInit(ctx); err != nil {
-		return errors.Wrapf(err, "setup init script for %s", p.target.String())
+		return fmt.Errorf("setup init script for %s: %w", p.target.String(), err)
 	}
 
 	if err := p.setupPostinst(ctx); err != nil {
-		return errors.Wrapf(err, "setup postInst for %s", p.target.String())
+		return fmt.Errorf("setup postInst for %s: %w", p.target.String(), err)
 	}
 
 	if err := p.setupPrerm(ctx); err != nil {
-		return errors.Wrapf(err, "setup setupPrerm for %s", p.target.String())
+		return fmt.Errorf("setup setupPrerm for %s: %w", p.target.String(), err)
 	}
 
 	p.packagekitops = &packagekit.PackageOptions{
@@ -318,7 +319,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 
 	if err := p.makePackage(ctx); err != nil {
-		return errors.Wrap(err, "making package")
+		return fmt.Errorf("making package: %w", err)
 	}
 
 	return nil
@@ -344,7 +345,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 	default:
 		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
 		if err != nil {
-			return errors.Wrapf(err, "could not fetch path to binary %s %s", binaryName, binaryVersion)
+			return fmt.Errorf("could not fetch path to binary %s %s: %w", binaryName, binaryVersion, err)
 		}
 	}
 
@@ -352,7 +353,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),
 	); err != nil {
-		return errors.Wrapf(err, "could not copy binary %s", binaryName)
+		return fmt.Errorf("could not copy binary %s: %w", binaryName, err)
 	}
 	return nil
 }
@@ -370,33 +371,33 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 	switch {
 	case p.target.Package == Deb:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb(), packagekit.WithReplaces(oldPackageNames)); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Rpm:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames)); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 
 	case p.target.Package == Tar:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsTar(), packagekit.WithReplaces(oldPackageNames)); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Pacman:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsPacman(), packagekit.WithReplaces(oldPackageNames)); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Pkg:
 		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Msi:
 		// pass whether to include a service as a bool argument to PackageWixMSI
 		includeService := p.target.Init == WindowsService
 		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops, includeService); err != nil {
-			return errors.Wrapf(err, "packaging, target %s", p.target.String())
+			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	default:
-		return errors.Errorf("Don't know how to package %s", p.target.String())
+		return fmt.Errorf("Don't know how to package %s", p.target.String())
 	}
 
 	return nil
@@ -408,13 +409,13 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 	newSysLogDirectory := filepath.Join("/etc", "newsyslog.d")
 
 	if err := os.MkdirAll(filepath.Join(p.packageRoot, newSysLogDirectory), fsutil.DirMode); err != nil {
-		return errors.Wrap(err, "making newsyslog dir")
+		return fmt.Errorf("making newsyslog dir: %w", err)
 	}
 
 	newSysLogPath := filepath.Join(p.packageRoot, newSysLogDirectory, fmt.Sprintf("%s.conf", p.Identifier))
 	newSyslogFile, err := os.Create(newSysLogPath)
 	if err != nil {
-		return errors.Wrap(err, "creating newsyslog conf file")
+		return fmt.Errorf("creating newsyslog conf file: %w", err)
 	}
 	defer newSyslogFile.Close()
 
@@ -430,10 +431,10 @@ func (p *PackageOptions) renderNewSyslogConfig(ctx context.Context) error {
 {{.LogPath}}               640  3  4000   *   G  {{.PidPath}} 15`
 	tmpl, err := template.New("syslog").Parse(syslogTemplate)
 	if err != nil {
-		return errors.Wrap(err, "not able to parse newsyslog template")
+		return fmt.Errorf("not able to parse newsyslog template: %w", err)
 	}
 	if err := tmpl.ExecuteTemplate(newSyslogFile, "syslog", logOptions); err != nil {
-		return errors.Wrap(err, "execute template")
+		return fmt.Errorf("execute template: %w", err)
 	}
 	return nil
 }
@@ -443,13 +444,13 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 	logrotateDirectory := filepath.Join("/etc", "logrotate.d")
 
 	if err := os.MkdirAll(filepath.Join(p.packageRoot, logrotateDirectory), fsutil.DirMode); err != nil {
-		return errors.Wrap(err, "making logrotate.d dir")
+		return fmt.Errorf("making logrotate.d dir: %w", err)
 	}
 
 	logrotatePath := filepath.Join(p.packageRoot, logrotateDirectory, fmt.Sprintf("%s", p.Identifier))
 	logrotateFile, err := os.Create(logrotatePath)
 	if err != nil {
-		return errors.Wrap(err, "creating logrotate conf file")
+		return fmt.Errorf("creating logrotate conf file: %w", err)
 	}
 	defer logrotateFile.Close()
 
@@ -463,15 +464,15 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 
 	logrotateTemplate, err := assets.ReadFile("assets/logrotate.conf")
 	if err != nil {
-		return errors.Wrapf(err, "failed to get template named %s", "assets/logrotate.conf")
+		return fmt.Errorf("failed to get template named %s: %w", "assets/logrotate.conf", err)
 	}
 
 	tmpl, err := template.New("logrotate").Parse(string(logrotateTemplate))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse logrotate template")
+		return fmt.Errorf("not able to parse logrotate template: %w", err)
 	}
 	if err := tmpl.ExecuteTemplate(logrotateFile, "logrotate", logOptions); err != nil {
-		return errors.Wrap(err, "execute template")
+		return fmt.Errorf("execute template: %w", err)
 	}
 	return nil
 }
@@ -531,23 +532,23 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		// Do nothing, this is handled in the packaging step.
 		return nil
 	default:
-		return errors.Errorf("Unsupported launcher target %s", p.target.String())
+		return fmt.Errorf("Unsupported launcher target %s", p.target.String())
 	}
 
 	p.initFile = filepath.Join(dir, file)
 
 	if err := os.MkdirAll(filepath.Join(p.packageRoot, dir), fsutil.DirMode); err != nil {
-		return errors.Wrapf(err, "mkdir failed, target %s", p.target.String())
+		return fmt.Errorf("mkdir failed, target %s: %w", p.target.String(), err)
 	}
 
 	fh, err := os.Create(filepath.Join(p.packageRoot, p.initFile))
 	if err != nil {
-		return errors.Wrapf(err, "create filehandle, target %s", p.target.String())
+		return fmt.Errorf("create filehandle, target %s: %w", p.target.String(), err)
 	}
 	defer fh.Close()
 
 	if err := renderFunc(ctx, fh, p.initOptions); err != nil {
-		return errors.Wrapf(err, "rendering init file (%s), target %s", p.initFile, p.target.String())
+		return fmt.Errorf("rendering init file (%s), target %s: %w", p.initFile, p.target.String(), err)
 	}
 
 	return nil
@@ -581,21 +582,21 @@ func (p *PackageOptions) setupPrerm(ctx context.Context) error {
 
 	t, err := template.New("prerm").Parse(prermTemplate)
 	if err != nil {
-		return errors.Wrap(err, "not able to parse template")
+		return fmt.Errorf("not able to parse template: %w", err)
 	}
 
 	fh, err := os.Create(filepath.Join(p.scriptRoot, "prerm"))
 	if err != nil {
-		return errors.Wrapf(err, "create prerm filehandle")
+		return fmt.Errorf("create prerm filehandle: %w", err)
 	}
 	defer fh.Close()
 
 	if err := os.Chmod(filepath.Join(p.scriptRoot, "prerm"), 0755); err != nil {
-		return errors.Wrap(err, "chmod prerm")
+		return fmt.Errorf("chmod prerm: %w", err)
 	}
 
 	if err := t.ExecuteTemplate(fh, "prerm", data); err != nil {
-		return errors.Wrap(err, "executing template")
+		return fmt.Errorf("executing template: %w", err)
 	}
 
 	return nil
@@ -626,7 +627,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 
 	postinstTemplate, err := assets.ReadFile(path.Join("assets", postinstTemplateName))
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get template named %s", postinstTemplateName)
+		return fmt.Errorf("Failed to get template named %s: %w", postinstTemplateName, err)
 	}
 
 	// installer info will be dumped into the filesystem
@@ -644,7 +645,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 
 	jsonBlob, err := json.MarshalIndent(installerInfo, "", "  ")
 	if err != nil {
-		return errors.Wrap(err, "marshaling installer info")
+		return fmt.Errorf("marshaling installer info: %w", err)
 	}
 
 	var data = struct {
@@ -665,21 +666,21 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 
 	t, err := template.New("postinstall").Funcs(funcsMap).Parse(string(postinstTemplate))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse template")
+		return fmt.Errorf("not able to parse template: %w", err)
 	}
 
 	fh, err := os.Create(filepath.Join(p.scriptRoot, "postinstall"))
 	if err != nil {
-		return errors.Wrapf(err, "create postinstall filehandle")
+		return fmt.Errorf("create postinstall filehandle: %w", err)
 	}
 	defer fh.Close()
 
 	if err := os.Chmod(filepath.Join(p.scriptRoot, "postinstall"), 0755); err != nil {
-		return errors.Wrap(err, "chmod postinst")
+		return fmt.Errorf("chmod postinst: %w", err)
 	}
 
 	if err := t.ExecuteTemplate(fh, "postinstall", data); err != nil {
-		return errors.Wrap(err, "executing template")
+		return fmt.Errorf("executing template: %w", err)
 	}
 
 	return nil
@@ -715,12 +716,12 @@ func (p *PackageOptions) setupDirectories() error {
 		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
 		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data")
 	default:
-		return errors.Errorf("Unknown platform %s", string(p.target.Platform))
+		return fmt.Errorf("Unknown platform %s", string(p.target.Platform))
 	}
 
 	for _, d := range []string{p.binDir, p.confDir, p.rootDir} {
 		if err := os.MkdirAll(filepath.Join(p.packageRoot, d), fsutil.DirMode); err != nil {
-			return errors.Wrapf(err, "create dir (%s) for %s", d, p.target.String())
+			return fmt.Errorf("create dir (%s) for %s: %w", d, p.target.String(), err)
 		}
 	}
 	return nil
@@ -736,7 +737,7 @@ func (p *PackageOptions) execOut(ctx context.Context, argv0 string, args ...stri
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
+		return "", fmt.Errorf("run command %s %v, stderr=%s: %w", argv0, args, stderr, err)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

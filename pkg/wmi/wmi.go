@@ -41,7 +41,7 @@ import (
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
+
 	"github.com/scjalliance/comshim"
 )
 
@@ -140,20 +140,20 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 
 	unknown, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
-		return nil, errors.Wrap(err, "ole createObject")
+		return nil, fmt.Errorf("ole createObject: %w", err)
 	}
 	defer unknown.Release()
 
 	wmi, err := unknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, errors.Wrap(err, "query interface create")
+		return nil, fmt.Errorf("query interface create: %w", err)
 	}
 	defer wmi.Release()
 
 	// service is a SWbemServices
 	serviceRaw, err := oleutil.CallMethod(wmi, "ConnectServer", qs.ConnectServerArgs()...)
 	if err != nil {
-		return nil, errors.Wrap(err, "wmi connectserver")
+		return nil, fmt.Errorf("wmi connectserver: %w", err)
 	}
 	defer serviceRaw.Clear()
 
@@ -165,7 +165,7 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 	// result is a SWBemObjectSet
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Running query %s", queryString)
+		return nil, fmt.Errorf("Running query %s: %w", queryString, err)
 	}
 	defer resultRaw.Clear()
 
@@ -173,7 +173,7 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 	defer result.Release()
 
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
-		return nil, errors.Wrap(err, "ole foreach")
+		return nil, fmt.Errorf("ole foreach: %w", err)
 	}
 
 	return handler.results, nil

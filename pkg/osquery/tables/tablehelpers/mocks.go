@@ -1,6 +1,8 @@
 package tablehelpers
 
-import "github.com/osquery/osquery-go/plugin/table"
+import (
+	"github.com/osquery/osquery-go/plugin/table"
+)
 
 func MockQueryContext(constraints map[string][]string) table.QueryContext {
 	queryContext := table.QueryContext{

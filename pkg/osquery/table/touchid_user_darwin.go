@@ -3,6 +3,7 @@ package table
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os/exec"
 	"os/user"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"

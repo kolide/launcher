@@ -1,7 +1,8 @@
 package history
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 )
 
 type Instance struct {
@@ -53,7 +54,7 @@ func (i *Instance) Connected(querier Querier) error {
 	i.Version = version
 
 	if err := currentHistory.save(); err != nil {
-		return errors.Wrap(err, "error saving osquery_instance_history")
+		return fmt.Errorf("error saving osquery_instance_history: %w", err)
 	}
 
 	return nil
@@ -71,7 +72,7 @@ func (i *Instance) Exited(exitError error) error {
 	i.ExitTime = timeNow()
 
 	if err := currentHistory.save(); err != nil {
-		return errors.Wrap(err, "error saving osquery_instance_history")
+		return fmt.Errorf("error saving osquery_instance_history: %w", err)
 	}
 
 	return nil
