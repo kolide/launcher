@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -218,7 +217,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Unless we're omitting the secret, write it into the package.
 	// Note that we _always_ set KOLIDE_LAUNCHER_ENROLL_SECRET_PATH
 	if !p.OmitSecret {
-		if err := ioutil.WriteFile(
+		if err := os.WriteFile(
 			filepath.Join(p.packageRoot, p.confDir, "secret"),
 			[]byte(p.Secret),
 			secretPerms,

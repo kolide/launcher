@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +82,7 @@ func setupPackageRoot(packageRoot string) error {
 		return fmt.Errorf("mkdir bin: %w", err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(binDir, "hello.txt"), []byte("Hello"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(binDir, "hello.txt"), []byte("Hello"), 0755); err != nil {
 		return fmt.Errorf("Unable to write bin/hello.txt: %w", err)
 	}
 
@@ -93,7 +92,7 @@ func setupPackageRoot(packageRoot string) error {
 		return fmt.Errorf("mkdir var: %w", err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(varDir, "vroom.txt"), []byte("Vroom Vroom"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(varDir, "vroom.txt"), []byte("Vroom Vroom"), 0755); err != nil {
 		return fmt.Errorf("Unable to write var/vroom.txt: %w", err)
 	}
 	return nil

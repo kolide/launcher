@@ -4,7 +4,6 @@ package autoupdate
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,7 +51,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		os.Remove(filepath.Join(localTUFRepoPath, knownFilePaths[0])),
 		"remove a tuf file")
 	require.NoError(t,
-		ioutil.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
+		os.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
 		"truncate a tuf file")
 
 	// Attempt to re-create

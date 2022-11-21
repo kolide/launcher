@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -286,7 +285,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 }
 
 func writePidFile(path string) error {
-	if err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil

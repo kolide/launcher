@@ -5,7 +5,6 @@ package authenticode
 
 import (
 	"context"
-	"io/ioutil"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -42,7 +41,7 @@ func TestSign(t *testing.T) {
 	// copy our test file
 	data, err := os.ReadFile(srcExe)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(testExe, data, 0755)
+	err = os.WriteFile(testExe, data, 0755)
 	require.NoError(t, err)
 
 	// confirm that we _don't_ have a sig on this file
