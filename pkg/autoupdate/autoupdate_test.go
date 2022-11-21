@@ -122,7 +122,7 @@ func TestValidLocalFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
+			testFile, err := os.CreateTemp("", "TestValidLocalFile")
 			require.NoError(t, err)
 			defer os.Remove(testFile.Name())
 
