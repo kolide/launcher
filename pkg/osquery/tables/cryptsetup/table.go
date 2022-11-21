@@ -2,6 +2,7 @@ package cryptsetup
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -11,7 +12,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 var cryptsetupPaths = []string{
@@ -50,7 +50,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	)
 
 	if len(requestedNames) == 0 {
-		return results, errors.Errorf("The %s table requires that you specify a constraint for name", t.name)
+		return results, fmt.Errorf("The %s table requires that you specify a constraint for name", t.name)
 	}
 
 	for _, name := range requestedNames {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquery_logger "github.com/osquery/osquery-go/plugin/logger"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -86,13 +87,13 @@ func main() {
 
 	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "open local store"), "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", fmt.Errorf("open local store: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	defer db.Close()
 
 	ext, err := grpcext.NewExtension(remote, db, extOpts)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "starting grpc extension"), "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", fmt.Errorf("starting grpc extension: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 
 	// create an extension server
@@ -115,10 +116,10 @@ func main() {
 	ctx := context.Background()
 	_, invalid, err := ext.Enroll(ctx)
 	if err != nil {
-		logutil.Fatal(logger, "err", errors.Wrap(err, "enrolling host"), "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", fmt.Errorf("enrolling host: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	if invalid {
-		logutil.Fatal(logger, errors.Wrap(err, "invalid enroll secret"), "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, fmt.Errorf("invalid enroll secret: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	ext.Start()
 	defer ext.Shutdown()
@@ -138,7 +139,7 @@ type queryier struct {
 func (q *queryier) Query(query string) ([]map[string]string, error) {
 	resp, err := q.client.Query(query)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not query the extension manager client")
+		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
 		return nil, errors.New(resp.Status.Message)

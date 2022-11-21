@@ -11,6 +11,7 @@ import (
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/remotectl"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
 	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
@@ -114,5 +115,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		systemprofiler.TablePlugin(client, logger),
 		munki.ManagedInstalls(client, logger),
 		munki.MunkiReport(client, logger),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
 	}
 }

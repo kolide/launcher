@@ -11,6 +11,7 @@ package authenticode
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -63,15 +64,15 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	// https://knowledge.digicert.com/generalinformation/INFO2274.html
 	if strings.HasSuffix(file, ".msi") {
 		if err := so.signtoolSign(ctx, file, "/ph", "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
-			return errors.Wrap(err, "signing msi with sha256")
+			return fmt.Errorf("signing msi with sha256: %w", err)
 		}
 	} else {
 		if err := so.signtoolSign(ctx, file, "/ph", "/fd", "sha1", "/t", so.timestampServer); err != nil {
-			return errors.Wrap(err, "signing file with sha1")
+			return fmt.Errorf("signing file with sha1: %w", err)
 		}
 
 		if err := so.signtoolSign(ctx, file, "/as", "/ph", "/fd", "sha256", "/td", "sha256", "/tr", so.rfc3161Server); err != nil {
-			return errors.Wrap(err, "signing file with sha256")
+			return fmt.Errorf("signing file with sha256: %w", err)
 		}
 	}
 
@@ -81,7 +82,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 
 	_, _, err := so.execOut(ctx, so.signtoolPath, "verify", "/pa", "/v", file)
 	if err != nil {
-		return errors.Wrap(err, "verify")
+		return fmt.Errorf("verify: %w", err)
 	}
 
 	return nil
@@ -113,7 +114,7 @@ func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args .
 		}
 
 		if attempt > maxRetries {
-			return errors.Wrapf(err, "Reached max number of retries. %d is too many", attempt)
+			return fmt.Errorf("Reached max number of retries. %d is too many: %w", attempt, err)
 		}
 
 		if !strings.Contains(stderr, timeoutErrorString) {
@@ -127,6 +128,6 @@ func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args .
 		}
 
 		// Fallthrough to catch errors unrelated to timeouts
-		return errors.Wrap(err, "calling signtool")
+		return fmt.Errorf("calling signtool: %w", err)
 	}
 }

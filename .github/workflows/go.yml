@@ -9,7 +9,7 @@ on:
     branches: '**'
 
 env:
-  GOVER: 1.19.2
+  GOVER: 1.19.3
 
 jobs:
   build_and_test:
@@ -35,15 +35,19 @@ jobs:
         go-version: ${{env.GOVER}}
       id: go
 
+    # use bash, because the powershell syntax is different and this is a cross platform workflow
     - id: go-cache-paths
+      shell: bash
       run: |
-        echo "::set-output name=go-build::$(go env GOCACHE)"
-        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
     - name: Go Build Cache
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
     - name: Go Mod Cache
       uses: actions/cache@v3
       with:
@@ -66,6 +70,10 @@ jobs:
 
     - name: Lipo
       run: make github-lipo
+      if: ${{ contains(matrix.os, 'macos') }}
+
+    - name: App Bundle
+      run: make github-launcherapp
       if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test
@@ -105,14 +113,17 @@ jobs:
       id: go
 
     - id: go-cache-paths
+      shell: bash
       run: |
-        echo "::set-output name=go-build::$(go env GOCACHE)"
-        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
     - name: Go Build Cache
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
     - name: Go Mod Cache
       uses: actions/cache@v3
       with:

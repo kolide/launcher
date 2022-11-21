@@ -2,10 +2,10 @@ package wsrelay
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/url"
 
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 )
 
 // Client is a websocket client
@@ -35,7 +35,7 @@ func NewClient(brokerAddr, path string, disableTLS bool, insecure bool) (*Client
 
 	if err != nil {
 		if err == websocket.ErrBadHandshake {
-			return nil, errors.Wrapf(err, "handshake failed with status %d", resp.StatusCode)
+			return nil, fmt.Errorf("handshake failed with status %d: %w", resp.StatusCode, err)
 		}
 		return nil, err
 	}

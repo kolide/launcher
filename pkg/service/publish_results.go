@@ -11,7 +11,6 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -77,7 +76,7 @@ func decodeJSONRPCPublishResultsResponse(_ context.Context, res jsonrpc.Response
 	var result publishResultsResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshalling PublishResults response")
+		return nil, fmt.Errorf("unmarshalling PublishResults response: %w", err)
 	}
 
 	return result, nil
@@ -138,11 +137,11 @@ func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (i
 func encodeJSONRPCPublishResultsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(publishResultsResponse)
 	if !ok {
-		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *publishResultsResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *publishResultsResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
+	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
 }
 
 func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {

@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -19,7 +20,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 type Notarizer struct {
@@ -132,14 +132,14 @@ func (n *Notarizer) Check(ctx context.Context, uuid string) (string, error) {
 			"msg", "error getting notarization-info",
 			"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
 		)
-		return "", errors.Wrap(err, "exec")
+		return "", fmt.Errorf("exec: %w", err)
 	}
 
 	if response.NotarizationInfo.RequestUUID != uuid {
-		return "", errors.Errorf("Something went wrong. Expected response for %s, but got %s",
+		return "", fmt.Errorf("Something went wrong. Expected response for %s, but got %s",
 			response.NotarizationInfo.RequestUUID,
-			uuid,
-		)
+			uuid)
+
 	}
 
 	if response.NotarizationInfo.Status != "success" {
@@ -177,7 +177,7 @@ func (n *Notarizer) runAltool(ctx context.Context, cmdArgs []string) (*notarizat
 	if n.fakeResponse != "" {
 		response := &notarizationResponse{}
 		if err := plist.NewXMLDecoder(strings.NewReader(n.fakeResponse)).Decode(response); err != nil {
-			return nil, errors.Wrap(err, "plist decode")
+			return nil, fmt.Errorf("plist decode: %w", err)
 		}
 
 		// This isn't quite right -- we're returng nil, and
@@ -192,7 +192,7 @@ func (n *Notarizer) runAltool(ctx context.Context, cmdArgs []string) (*notarizat
 	// So far, we get xml output even in the face of errors. So we may as well try to parse it here.
 	response := &notarizationResponse{}
 	if err := plist.NewXMLDecoder(stdout).Decode(response); err != nil {
-		return nil, errors.Wrap(err, "plist decode")
+		return nil, fmt.Errorf("plist decode: %w", err)
 	}
 
 	return response, cmdErr

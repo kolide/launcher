@@ -1,20 +1,19 @@
 package packagekit
 
 import (
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 func isDirectory(d string) error {
 	dStat, err := os.Stat(d)
 
 	if os.IsNotExist(err) {
-		return errors.Wrapf(err, "missing packageRoot %s", d)
+		return fmt.Errorf("missing packageRoot %s: %w", d, err)
 	}
 
 	if !dStat.IsDir() {
-		return errors.Errorf("packageRoot (%s) isn't a directory", d)
+		return fmt.Errorf("packageRoot (%s) isn't a directory", d)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -324,7 +324,7 @@ func parseCertPins(pins string) ([][]byte, error) {
 		for _, hexPin := range strings.Split(pins, ",") {
 			pin, err := hex.DecodeString(hexPin)
 			if err != nil {
-				return nil, errors.Wrap(err, "decoding cert pin")
+				return nil, fmt.Errorf("decoding cert pin: %w", err)
 			}
 			certPins = append(certPins, pin)
 		}

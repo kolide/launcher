@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -77,7 +76,7 @@ func main() {
 	// handle that argument. Fall-back to running launcher
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(); err != nil {
-			logutil.Fatal(logger, "err", errors.Wrap(err, "run with positional args"))
+			logutil.Fatal(logger, "err", fmt.Errorf("run with positional args: %w", err))
 		}
 		os.Exit(0)
 	}
@@ -138,11 +137,15 @@ func runSubcommands() error {
 	case "uninstall":
 		run = runUninstall
 	default:
-		return errors.Errorf("Unknown subcommand %s", os.Args[1])
+		return fmt.Errorf("Unknown subcommand %s", os.Args[1])
 	}
 
-	err := run(os.Args[2:])
-	return errors.Wrapf(err, "running subcommand %s", os.Args[1])
+	if err := run(os.Args[2:]); err != nil {
+		return fmt.Errorf("running subcommand %s: %w", os.Args[1], err)
+	}
+
+	return nil
+
 }
 
 func commandUsage(fs *flag.FlagSet, short string) func() {

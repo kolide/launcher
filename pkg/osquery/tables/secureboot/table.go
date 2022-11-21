@@ -2,13 +2,13 @@ package secureboot
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/efi"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type Table struct {
@@ -33,13 +33,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	sb, err := efi.ReadSecureBoot()
 	if err != nil {
 		level.Info(t.logger).Log("msg", "Unable to read secureboot", "err", err)
-		return nil, errors.Wrap(err, "Reading secure_boot from efi")
+		return nil, fmt.Errorf("Reading secure_boot from efi: %w", err)
 	}
 
 	sm, err := efi.ReadSetupMode()
 	if err != nil {
 		level.Info(t.logger).Log("msg", "Unable to read setupmode", "err", err)
-		return nil, errors.Wrap(err, "Reading setup_mode from efi")
+		return nil, fmt.Errorf("Reading setup_mode from efi: %w", err)
 	}
 
 	row := map[string]string{

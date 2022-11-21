@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kardianos/osext"
-	"github.com/pkg/errors"
 )
 
 type thingy struct {
@@ -28,12 +27,12 @@ func main() {
 
 	binaryName, err := osext.Executable()
 	if err != nil {
-		panic(errors.Wrap(err, "osext.Executable"))
+		panic(fmt.Errorf("osext.Executable: %w", err))
 	}
 
 	processStat, err := os.Stat(binaryName)
 	if err != nil {
-		panic(errors.Wrap(err, "os.Stat"))
+		panic(fmt.Errorf("os.Stat: %w", err))
 	}
 
 	ProcessNotes.Pid = os.Getpid()
@@ -66,7 +65,7 @@ func main() {
 
 	err = run(os.Args[2:])
 	if err != nil {
-		panic(errors.Wrapf(err, "Running subcommand %s", os.Args[1]))
+		panic(fmt.Errorf("Running subcommand %s: %w", os.Args[1], err))
 	}
 
 	fmt.Printf("Finished Main (pid %d)\n", ProcessNotes.Pid)
@@ -78,22 +77,22 @@ func (b *thingy) rename() error {
 
 	fmt.Println("os.Rename cur to old")
 	if err := os.Rename(b.binaryName, tmpCurFile); err != nil {
-		return errors.Wrap(err, "os.Rename cur top old")
+		return fmt.Errorf("os.Rename cur top old: %w", err)
 	}
 
 	fmt.Println("os.Rename stage to cur")
 	if err := os.Rename(b.stagedFile, b.binaryName); err != nil {
-		return errors.Wrap(err, "os.Rename staged to cur")
+		return fmt.Errorf("os.Rename staged to cur: %w", err)
 	}
 
 	fmt.Println("os.Chmod")
 	if err := os.Chmod(b.binaryName, 0755); err != nil {
-		return errors.Wrap(err, "os.Chmod")
+		return fmt.Errorf("os.Chmod: %w", err)
 	}
 
 	fmt.Println("syscall.Exec")
 	if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-		return errors.Wrap(err, "syscall.Exec")
+		return fmt.Errorf("syscall.Exec: %w", err)
 	}
 
 	return nil

@@ -2,12 +2,12 @@ package table
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func EmailAddresses(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -33,7 +33,7 @@ func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryC
 	// add results from chrome profiles
 	chromeResults, err := t.chromeUserProfilesTable.generate(ctx, queryContext)
 	if err != nil {
-		return nil, errors.Wrap(err, "get email addresses from chrome state")
+		return nil, fmt.Errorf("get email addresses from chrome state: %w", err)
 	}
 	for _, result := range chromeResults {
 		email := result["email"]
@@ -47,7 +47,7 @@ func (t *emailAddressesTable) generateEmailAddresses(ctx context.Context, queryC
 	// add results from 1password
 	onePassResults, err := t.onePasswordAccountsTable.generate(ctx, queryContext)
 	if err != nil {
-		return nil, errors.Wrap(err, "adding email results from 1password config")
+		return nil, fmt.Errorf("adding email results from 1password config: %w", err)
 	}
 	for _, onePassResult := range onePassResults {
 		results = addEmailToResults(onePassResult["user_email"], results)

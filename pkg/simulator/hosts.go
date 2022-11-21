@@ -1,6 +1,8 @@
 package simulator
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
@@ -10,7 +12,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 )
 
 type queryRunner struct {
@@ -57,7 +58,7 @@ type querySpec struct {
 func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil, errors.Wrap(err, "listing hosts directory")
+		return nil, fmt.Errorf("listing hosts directory: %w", err)
 	}
 
 	hostMap := map[string]*queryRunner{}
@@ -68,13 +69,13 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 			path := filepath.Join(dir, file.Name())
 			contents, err := ioutil.ReadFile(path)
 			if err != nil {
-				return nil, errors.Wrapf(err, "reading file %s", path)
+				return nil, fmt.Errorf("reading file %s: %w", path, err)
 			}
 
 			var h querySpec
 			err = yaml.Unmarshal(contents, &h)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unmarshal yaml for %s", path)
+				return nil, fmt.Errorf("unmarshal yaml for %s: %w", path, err)
 			}
 
 			runner := &queryRunner{
@@ -88,7 +89,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 			for _, q := range h.Queries {
 				re, err := regexp.Compile(strings.ToLower(q.Pattern))
 				if err != nil {
-					return nil, errors.Wrapf(err, "compile regexp for %s", path)
+					return nil, fmt.Errorf("compile regexp for %s: %w", path, err)
 				}
 				runner.Queries = append(runner.Queries, matcher{re, q.Results})
 			}
@@ -97,7 +98,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 			// to provide multiple definitions for the same host
 			// type.
 			if _, exists := hostMap[runner.Name]; exists {
-				return nil, errors.Errorf("duplicate host type: %s", runner.Name)
+				return nil, fmt.Errorf("duplicate host type: %s", runner.Name)
 			}
 
 			hostMap[runner.Name] = runner
@@ -112,7 +113,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 
 		parent, ok := hostMap[runner.ParentName]
 		if !ok {
-			return nil, errors.Errorf("missing parent named: %s", runner.ParentName)
+			return nil, fmt.Errorf("missing parent named: %s", runner.ParentName)
 		}
 		runner.parent = parent
 	}

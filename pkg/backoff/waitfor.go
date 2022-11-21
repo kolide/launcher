@@ -2,9 +2,9 @@ package backoff
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 )
 
@@ -32,7 +32,7 @@ func WaitFor(fn func() error, timeout, interval time.Duration) error {
 
 		// Did we timeout? If so, send the error
 		if limiter.Wait(deadlineCtx) != nil {
-			return errors.Wrapf(err, "timeout after %s (%d attempts)", timeout, counter)
+			return fmt.Errorf("timeout after %s (%d attempts): %w", timeout, counter, err)
 		}
 	}
 }
