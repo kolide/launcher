@@ -174,7 +174,7 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 	distributionFile := "./distribution.dist"
 	fh, err := os.Create(distributionFile)
 	if err != nil {
-		return fmt.Errorf("could not distribution file %s: %w", distributionFile, err)
+		return fmt.Errorf("could not create distribution file %s: %w", distributionFile, err)
 	}
 	defer fh.Close()
 
