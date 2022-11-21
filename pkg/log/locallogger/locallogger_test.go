@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,4 +74,39 @@ func TestKitLogging(t *testing.T) {
 		assert.Equal(t, v, contents[k])
 	}
 
+}
+
+func TestCleanUpRenamedDebugLogs(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	// Create two files that should be cleaned up and one that should not
+	legacyDebugLogPath := filepath.Join(tempDir, "debug.log")
+	legacyDebugLogRotatedPath := filepath.Join(tempDir, "debug-2022-11-18T18-35-48.858.log.gz")
+	newDebugLogPath := filepath.Join(tempDir, "debug.json")
+	for _, f := range []string{legacyDebugLogPath, legacyDebugLogRotatedPath, newDebugLogPath} {
+		fh, err := os.Create(f)
+		require.NoError(t, err, "could not create log file for test")
+		fh.Close()
+	}
+
+	// Call cleanup
+	CleanUpRenamedDebugLogs(tempDir, log.NewJSONLogger(os.Stderr))
+
+	// Validate that we only cleaned up the files we meant to
+	_, err := os.Stat(legacyDebugLogPath)
+	require.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(legacyDebugLogRotatedPath)
+	require.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(newDebugLogPath)
+	require.NoError(t, err)
+
+	// Call cleanup again -- should be a no-op
+	CleanUpRenamedDebugLogs(tempDir, log.NewJSONLogger(os.Stderr))
+
+	_, err = os.Stat(newDebugLogPath)
+	require.NoError(t, err)
 }
