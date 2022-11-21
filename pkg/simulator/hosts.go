@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -56,7 +57,7 @@ type querySpec struct {
 // LoadHosts will load the host specifications and return a map of the
 // queryRunners representing these host types.
 func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("listing hosts directory: %w", err)
 	}

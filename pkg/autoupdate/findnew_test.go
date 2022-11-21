@@ -196,7 +196,7 @@ func TestFindNewestCleanup(t *testing.T) {
 	}
 
 	{
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(updatesOnDisk))
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
@@ -204,7 +204,7 @@ func TestFindNewestCleanup(t *testing.T) {
 
 	{
 		_ = FindNewest(ctx, binaryPath, DeleteOldUpdates())
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 		require.Equal(t, 2, len(updatesOnDisk), "after delete")
@@ -228,7 +228,7 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	}
 
 	{
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(updatesOnDisk))
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
@@ -236,7 +236,7 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 
 	{
 		_ = FindNewest(ctx, binaryPath, DeleteCorruptUpdates())
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(updatesOnDisk), "after cleaning corruption")
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
@@ -475,7 +475,7 @@ func TestBuildTimestamp(t *testing.T) {
 				DeleteOldUpdates(),
 			)
 
-			updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+			updatesOnDisk, err := os.ReadDir(updatesDir)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedOnDisk, len(updatesOnDisk), "remaining updates on disk")
 
