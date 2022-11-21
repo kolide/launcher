@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"time"
@@ -49,7 +50,7 @@ func runQuery(args []string) error {
 	}
 
 	if *flQueries == "" {
-		stdinQueries, err := ioutil.ReadAll(os.Stdin)
+		stdinQueries, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return fmt.Errorf("reading stdin: %w", err)
 		}

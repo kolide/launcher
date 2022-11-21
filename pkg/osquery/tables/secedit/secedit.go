@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -131,7 +132,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// By default, secedit outputs files encoded in UTF16 Little Endian. Sadly the Go INI parser
 	// cannot read this format by default, therefore we decode the bytes into UTF-8
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
-	data, err := ioutil.ReadAll(rd)
+	data, err := io.ReadAll(rd)
 	if err != nil {
 		return nil, fmt.Errorf("error reading secedit output file: %s: %w", dst, err)
 	}
