@@ -63,7 +63,7 @@ func main() {
 				"oldVersion", version.Version().Version,
 				"newBinary", newerBinary,
 			)
-			if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ(), os.Stdin); err != nil {
+			if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
 				logutil.Fatal(logger, err, "exec")
 			}
 			panic("how")

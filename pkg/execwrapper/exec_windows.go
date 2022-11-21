@@ -16,13 +16,13 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
-func Exec(ctx context.Context, argv0 string, argv []string, envv []string, in *os.File) error {
+func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
 	cmd.Env = envv
 
-	cmd.Stdin = in
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
