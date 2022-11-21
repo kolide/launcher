@@ -38,7 +38,7 @@ func TestCheckSuccess(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fileBytes, err := ioutil.ReadFile(tt.fakeFile)
+		fileBytes, err := os.ReadFile(tt.fakeFile)
 		require.NoError(t, err)
 		n := New("myname@example.com", "123password", "X11111AAAA")
 		n.fakeResponse = string(fileBytes)
@@ -77,7 +77,7 @@ func TestSubmit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fileBytes, err := ioutil.ReadFile(tt.fakeFile)
+		fileBytes, err := os.ReadFile(tt.fakeFile)
 		require.NoError(t, err)
 		n := New("myname@example.com", "123password", "X11111AAAA")
 		n.fakeResponse = string(fileBytes)

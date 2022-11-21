@@ -8,6 +8,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ import (
 )
 
 func getDebugURL(t *testing.T, tokenPath string) string {
-	url, err := ioutil.ReadFile(tokenPath)
+	url, err := os.ReadFile(tokenPath)
 	require.Nil(t, err)
 	return string(url)
 }

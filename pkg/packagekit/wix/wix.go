@@ -208,7 +208,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	}
 
 	heatFile := filepath.Join(wo.buildDir, "AppFiles.wxs")
-	heatContent, err := ioutil.ReadFile(heatFile)
+	heatContent, err := os.ReadFile(heatFile)
 	if err != nil {
 		return fmt.Errorf("reading AppFiles.wxs: %w", err)
 	}

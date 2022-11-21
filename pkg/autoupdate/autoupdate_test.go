@@ -41,7 +41,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")
@@ -64,7 +64,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")

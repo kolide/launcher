@@ -3,7 +3,6 @@ package simulator
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -68,7 +67,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".yaml") {
 			path := filepath.Join(dir, file.Name())
-			contents, err := ioutil.ReadFile(path)
+			contents, err := os.ReadFile(path)
 			if err != nil {
 				return nil, fmt.Errorf("reading file %s: %w", path, err)
 			}

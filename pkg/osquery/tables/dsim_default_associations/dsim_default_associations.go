@@ -98,7 +98,7 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
 	}
 
-	data, err := ioutil.ReadFile(filepath.Join(dir, dstFile))
+	data, err := os.ReadFile(filepath.Join(dir, dstFile))
 	if err != nil {
 		return nil, fmt.Errorf("error reading dism output file: %s: %w", err, err)
 	}

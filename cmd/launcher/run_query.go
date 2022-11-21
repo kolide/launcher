@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -40,7 +39,7 @@ func runQuery(args []string) error {
 	var queries queryFile
 
 	if _, err := os.Stat(*flQueries); err == nil {
-		data, err := ioutil.ReadFile(*flQueries)
+		data, err := os.ReadFile(*flQueries)
 		if err != nil {
 			return fmt.Errorf("reading supplied queries file: %w", err)
 		}

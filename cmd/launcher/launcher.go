@@ -112,7 +112,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	var rootPool *x509.CertPool
 	if opts.RootPEM != "" {
 		rootPool = x509.NewCertPool()
-		pemContents, err := ioutil.ReadFile(opts.RootPEM)
+		pemContents, err := os.ReadFile(opts.RootPEM)
 		if err != nil {
 			return fmt.Errorf("reading root certs PEM at path: %s: %w", opts.RootPEM, err)
 		}
