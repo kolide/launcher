@@ -3,12 +3,14 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"text/template"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -17,6 +19,9 @@ import (
 
 	"go.opencensus.io/trace"
 )
+
+//go:embed assets/distribution.dist
+var distributionTemplate []byte
 
 func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
@@ -166,34 +171,31 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runProductbuild")
 
 	// Create a distribution file so that we can set the title and the minimum OS version
-	distributionFileContents := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
-<installer-gui-script minSpecVersion="2">
-	<title>%s</title>
-	<pkg-ref id="com.%s.launcher">
-		<bundle-version>
-			<bundle CFBundleShortVersionString="%s" CFBundleVersion="%s" id="com.%s.launcher" path="usr/local/kolide/bin/Kolide.app"/>
-		</bundle-version>
-	</pkg-ref>
-	<options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
-	<choices-outline>
-		<line choice="default">
-			<line choice="com.%s.launcher"/>
-		</line>
-	</choices-outline>
-	<choice id="default"/>
-	<choice id="com.%s.launcher" visible="false">
-		<pkg-ref id="com.%s.launcher"/>
-	</choice>
-	<pkg-ref id="com.%s.launcher" version="%s" onConclusion="none">#%s</pkg-ref>
-	<allowed-os-versions>
-		<os-version min="10.14"/>
-	</allowed-os-versions>
-</installer-gui-script>`, po.Title, po.Identifier, po.Version, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Identifier, po.Version, filepath.Base(flatPkgPath))
-
 	distributionFile := "./distribution.dist"
+	fh, err := os.Create(distributionFile)
+	if err != nil {
+		return fmt.Errorf("could not distribution file %s: %w", distributionFile, err)
+	}
+	defer fh.Close()
 
-	if err := os.WriteFile(distributionFile, []byte(distributionFileContents), 0644); err != nil {
-		return fmt.Errorf("writing distribution file %s: %w", distributionFile, err)
+	var templateData = struct {
+		Title      string
+		Identifier string
+		Version    string
+		PkgName    string
+	}{
+		Title:      po.Title,
+		Identifier: po.Identifier,
+		Version:    po.Version,
+		PkgName:    filepath.Base(flatPkgPath),
+	}
+	t, err := template.New("distribution").Parse(string(distributionTemplate))
+	if err != nil {
+		return fmt.Errorf("could not parse distribution template: %w", err)
+	}
+	err = t.ExecuteTemplate(fh, "distribution", templateData)
+	if err != nil {
+		return fmt.Errorf("could not write distribution file: %w", err)
 	}
 
 	// Clean up the newly-generated distribution file after we're done with it
