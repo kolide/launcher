@@ -5,6 +5,7 @@ package authenticode
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
