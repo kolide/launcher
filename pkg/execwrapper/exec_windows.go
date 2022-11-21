@@ -15,12 +15,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
+func Exec(ctx context.Context, argv0 string, argv []string, envv []string, in *os.File) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
 	cmd.Env = envv
 
+	cmd.Stdin = in
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
