@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,7 +94,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-	dir, err := ioutil.TempDir("", "kolide_secedit_config")
+	dir, err := os.MkdirTemp("", "kolide_secedit_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_secedit_config tmp dir: %w", err)
 	}

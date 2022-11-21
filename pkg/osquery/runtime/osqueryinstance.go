@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -593,7 +592,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 }
 
 func osqueryTempDir() (string, func(), error) {
-	tempPath, err := ioutil.TempDir("", "")
+	tempPath, err := os.MkdirTemp("", "")
 	if err != nil {
 		return "", func() {}, fmt.Errorf("could not make temp path: %w", err)
 	}

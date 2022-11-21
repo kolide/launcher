@@ -119,7 +119,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 
 	var err error
 	if wo.buildDir == "" {
-		wo.buildDir, err = ioutil.TempDir("", "wix-build-dir")
+		wo.buildDir, err = os.MkdirTemp("", "wix-build-dir")
 		if err != nil {
 			return nil, fmt.Errorf("making temp wix-build-dir: %w", err)
 		}

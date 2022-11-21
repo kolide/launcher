@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/kolide/kit/env"
@@ -36,7 +35,7 @@ func main() {
 	cacheDir := *flCacheDir
 	var err error
 	if *flCacheDir == "" {
-		cacheDir, err = ioutil.TempDir("", "download_cache")
+		cacheDir, err = os.MkdirTemp("", "download_cache")
 		if err != nil {
 			fmt.Printf("Could not create temp dir for caching files %v", err)
 			os.Exit(1)
