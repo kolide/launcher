@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
@@ -12,7 +14,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 var slackConfigDirs = map[string][]string{
@@ -65,11 +66,11 @@ func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInf
 	var results []map[string]string
 	data, err := ioutil.ReadFile(file.path)
 	if err != nil {
-		return results, errors.Wrap(err, "Reading slack teams file")
+		return results, fmt.Errorf("Reading slack teams file: %w", err)
 	}
 	var slackTeamConfigs slackTeamsFile
 	if err := json.Unmarshal(data, &slackTeamConfigs); err != nil {
-		return results, errors.Wrap(err, "unmarshalling slack teams")
+		return results, fmt.Errorf("unmarshalling slack teams: %w", err)
 	}
 	for _, teamConfig := range slackTeamConfigs {
 		results = append(results, map[string]string{

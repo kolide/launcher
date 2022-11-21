@@ -1,7 +1,8 @@
 package agent
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -35,11 +36,11 @@ func GetStats(db *bbolt.DB) (*Stats, error) {
 		stats.DB.Size = tx.Size()
 
 		if err := tx.ForEach(bucketStatsFunc(stats)); err != nil {
-			return errors.Wrap(err, "dumping bucket")
+			return fmt.Errorf("dumping bucket: %w", err)
 		}
 		return nil
 	}); err != nil {
-		return nil, errors.Wrap(err, "creating view tx")
+		return nil, fmt.Errorf("creating view tx: %w", err)
 	}
 
 	return stats, nil

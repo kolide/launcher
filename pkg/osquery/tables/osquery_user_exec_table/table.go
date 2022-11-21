@@ -19,12 +19,12 @@ package osquery_user_exec_table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -66,7 +66,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	)
 
 	if len(users) == 0 {
-		return nil, errors.Errorf("The %s table requires a user", t.tablename)
+		return nil, fmt.Errorf("The %s table requires a user", t.tablename)
 	}
 
 	for _, user := range users {

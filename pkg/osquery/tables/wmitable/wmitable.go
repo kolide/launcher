@@ -5,6 +5,7 @@ package wmitable
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"

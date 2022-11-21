@@ -5,7 +5,9 @@ package table
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
 #include <CoreFoundation/CoreFoundation.h>
 */
-import "C"
+import (
+	"C"
+)
 import (
 	"fmt"
 	"unsafe"

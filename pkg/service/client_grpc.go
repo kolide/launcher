@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/pkg/errors"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -123,7 +124,7 @@ func DialGRPC(
 	} else {
 		host, _, err := net.SplitHostPort(serverURL)
 		if err != nil {
-			return nil, errors.Wrapf(err, "split grpc server host and port: %s", serverURL)
+			return nil, fmt.Errorf("split grpc server host and port: %s: %w", serverURL, err)
 		}
 
 		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(host, insecureTLS, certPins, rootPool, logger))}

@@ -11,7 +11,6 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/pkg/errors"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
@@ -34,7 +33,7 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	var result queryCollectionResponse
 	err := json.Unmarshal(res.Result, &result)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshalling RequestQueries response")
+		return nil, fmt.Errorf("unmarshalling RequestQueries response: %w", err)
 	}
 
 	return result, nil
@@ -102,11 +101,15 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(queryCollectionResponse)
 	if !ok {
-		return encodeJSONResponse(nil, errors.Errorf("Asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, errors.Wrap(err, "marshal json response"))
+	if err != nil {
+		return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	}
+
+	return encodeJSONResponse(b, nil)
 }
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {

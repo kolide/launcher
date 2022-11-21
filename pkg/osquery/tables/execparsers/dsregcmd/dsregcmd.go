@@ -1,6 +1,8 @@
 package dsregcmd
 
-import "io"
+import (
+	"io"
+)
 
 type parser struct{}
 

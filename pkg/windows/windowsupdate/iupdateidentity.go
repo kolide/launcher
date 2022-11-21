@@ -1,10 +1,11 @@
 package windowsupdate
 
 import (
+	"fmt"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
-	"github.com/pkg/errors"
 )
 
 // IUpdateIdentity represents the unique identifier of an update.
@@ -22,11 +23,11 @@ func toIUpdateIdentity(updateIdentityDisp *ole.IDispatch) (*IUpdateIdentity, err
 	}
 
 	if iUpdateIdentity.RevisionNumber, err = oleconv.ToInt32Err(oleutil.GetProperty(updateIdentityDisp, "RevisionNumber")); err != nil {
-		return nil, errors.Wrap(err, "RevisionNumber")
+		return nil, fmt.Errorf("RevisionNumber: %w", err)
 	}
 
 	if iUpdateIdentity.UpdateID, err = oleconv.ToStringErr(oleutil.GetProperty(updateIdentityDisp, "UpdateID")); err != nil {
-		return nil, errors.Wrap(err, "UpdateID")
+		return nil, fmt.Errorf("UpdateID: %w", err)
 	}
 
 	return iUpdateIdentity, nil

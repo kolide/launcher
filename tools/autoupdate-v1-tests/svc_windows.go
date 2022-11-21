@@ -13,7 +13,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/log/eventlog"
-	"github.com/pkg/errors"
+
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -27,7 +27,7 @@ const (
 func runWindowsSvc(args []string) error {
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
 	if err != nil {
-		return errors.Wrap(err, "create eventlog writer")
+		return fmt.Errorf("create eventlog writer: %w", err)
 	}
 	defer eventLogWriter.Close()
 
@@ -138,13 +138,13 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 func fixRecoveryActions(name string) error {
 	m, err := mgr.Connect()
 	if err != nil {
-		return errors.Wrap(err, "mgr.Connect")
+		return fmt.Errorf("mgr.Connect: %w", err)
 	}
 	defer m.Disconnect()
 
 	s, err := m.OpenService(name)
 	if err != nil {
-		return errors.Errorf("service %s is not installed", name)
+		return fmt.Errorf("service %s is not installed", name)
 	}
 	defer s.Close()
 
@@ -155,7 +155,7 @@ func fixRecoveryActions(name string) error {
 	resetPeriod := uint32(3)
 
 	if err := s.SetRecoveryActions([]mgr.RecoveryAction{ra}, resetPeriod); err != nil {
-		return errors.Wrap(err, "SetRecoveryActions")
+		return fmt.Errorf("SetRecoveryActions: %w", err)
 	}
 
 	return nil

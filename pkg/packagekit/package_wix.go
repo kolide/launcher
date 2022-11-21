@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -59,7 +59,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	// for opinionated background
 	guidNonce, err := uuid.NewRandom()
 	if err != nil {
-		return errors.Wrap(err, "generating uuid as guid nonce")
+		return fmt.Errorf("generating uuid as guid nonce: %w", err)
 
 	}
 	extraGuidIdentifiers := []string{
@@ -80,12 +80,12 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
 	if err != nil {
-		return errors.Wrap(err, "not able to parse main.wxs template")
+		return fmt.Errorf("not able to parse main.wxs template: %w", err)
 	}
 
 	mainWxsContent := new(bytes.Buffer)
 	if err := wixTemplate.ExecuteTemplate(mainWxsContent, "WixTemplate", templateData); err != nil {
-		return errors.Wrap(err, "executing WixTemplate")
+		return fmt.Errorf("executing WixTemplate: %w", err)
 	}
 
 	wixArgs := []wix.WixOpt{}
@@ -111,7 +111,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		for _, f := range assetFiles {
 			fileBytes, err := assets.ReadFile(path.Join("assets", f))
 			if err != nil {
-				return errors.Wrapf(err, "getting asset %s", f)
+				return fmt.Errorf("getting asset %s: %w", f, err)
 			}
 
 			wixArgs = append(wixArgs, wix.WithFile(f, fileBytes))
@@ -135,14 +135,14 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes(), wixArgs...)
 	if err != nil {
-		return errors.Wrap(err, "making wixTool")
+		return fmt.Errorf("making wixTool: %w", err)
 	}
 	defer wixTool.Cleanup()
 
 	// Use wix to compile into an MSI
 	msiFile, err := wixTool.Package(ctx)
 	if err != nil {
-		return errors.Wrap(err, "wix packaging")
+		return fmt.Errorf("wix packaging: %w", err)
 	}
 
 	// Sign?
@@ -152,19 +152,19 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
 			authenticode.WithSigntoolPath(signtoolPath),
 		); err != nil {
-			return errors.Wrap(err, "authenticode signing")
+			return fmt.Errorf("authenticode signing: %w", err)
 		}
 	}
 
 	// Copy MSI into our filehandle
 	msiFH, err := os.Open(msiFile)
 	if err != nil {
-		return errors.Wrap(err, "opening msi output file")
+		return fmt.Errorf("opening msi output file: %w", err)
 	}
 	defer msiFH.Close()
 
 	if _, err := io.Copy(w, msiFH); err != nil {
-		return errors.Wrap(err, "copying output")
+		return fmt.Errorf("copying output: %w", err)
 	}
 
 	setInContext(ctx, ContextLauncherVersionKey, po.Version)

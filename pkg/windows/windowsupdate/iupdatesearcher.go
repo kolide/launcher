@@ -1,10 +1,11 @@
 package windowsupdate
 
 import (
+	"fmt"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
-	"github.com/pkg/errors"
 )
 
 // IUpdateSearcher searches for updates on a server.
@@ -26,27 +27,27 @@ func toIUpdateSearcher(updateSearcherDisp *ole.IDispatch) (*IUpdateSearcher, err
 	}
 
 	if iUpdateSearcher.CanAutomaticallyUpgradeService, err = oleconv.ToBoolErr(oleutil.GetProperty(updateSearcherDisp, "CanAutomaticallyUpgradeService")); err != nil {
-		return nil, errors.Wrap(err, "CanAutomaticallyUpgradeService")
+		return nil, fmt.Errorf("CanAutomaticallyUpgradeService: %w", err)
 	}
 
 	if iUpdateSearcher.ClientApplicationID, err = oleconv.ToStringErr(oleutil.GetProperty(updateSearcherDisp, "ClientApplicationID")); err != nil {
-		return nil, errors.Wrap(err, "ClientApplicationID")
+		return nil, fmt.Errorf("ClientApplicationID: %w", err)
 	}
 
 	if iUpdateSearcher.IncludePotentiallySupersededUpdates, err = oleconv.ToBoolErr(oleutil.GetProperty(updateSearcherDisp, "IncludePotentiallySupersededUpdates")); err != nil {
-		return nil, errors.Wrap(err, "IncludePotentiallySupersededUpdates")
+		return nil, fmt.Errorf("IncludePotentiallySupersededUpdates: %w", err)
 	}
 
 	if iUpdateSearcher.Online, err = oleconv.ToBoolErr(oleutil.GetProperty(updateSearcherDisp, "Online")); err != nil {
-		return nil, errors.Wrap(err, "Online")
+		return nil, fmt.Errorf("Online: %w", err)
 	}
 
 	if iUpdateSearcher.ServerSelection, err = oleconv.ToInt32Err(oleutil.GetProperty(updateSearcherDisp, "ServerSelection")); err != nil {
-		return nil, errors.Wrap(err, "ServerSelection")
+		return nil, fmt.Errorf("ServerSelection: %w", err)
 	}
 
 	if iUpdateSearcher.ServiceID, err = oleconv.ToStringErr(oleutil.GetProperty(updateSearcherDisp, "ServiceID")); err != nil {
-		return nil, errors.Wrap(err, "ServiceID")
+		return nil, fmt.Errorf("ServiceID: %w", err)
 	}
 
 	return iUpdateSearcher, nil

@@ -3,13 +3,13 @@ package tablehelpers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 )
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
@@ -48,10 +48,10 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 			continue
 		default:
 			// an actual error
-			return nil, errors.Wrapf(err, "exec '%s'. Got: '%s'", cmd.String(), string(stderr.Bytes()))
+			return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
 		}
 
 	}
 	// Getting here means no binary was found
-	return nil, errors.Wrapf(os.ErrNotExist, "No binary found in specified paths: %v", possibleBins)
+	return nil, fmt.Errorf("No binary found in specified paths: %v: %w", possibleBins, os.ErrNotExist)
 }

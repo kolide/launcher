@@ -3,11 +3,11 @@ package cryptsetup
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // parseStatus parses the output from `cryptsetup status`. This is a
@@ -58,15 +58,15 @@ var firstLineRegexp = regexp.MustCompile(`^(?:Device (.*) (not found))|(?:(.*?) 
 // examples)
 func parseFirstLine(line string) (map[string]interface{}, error) {
 	if line == "" {
-		return nil, errors.Errorf("Invalid first line")
+		return nil, fmt.Errorf("Invalid first line")
 	}
 
 	m := firstLineRegexp.FindAllStringSubmatch(line, -1)
 	if len(m) != 1 {
-		return nil, errors.Errorf("Failed to match first line: %s", line)
+		return nil, fmt.Errorf("Failed to match first line: %s", line)
 	}
 	if len(m[0]) != 6 {
-		return nil, errors.Errorf("Got %d matches. Expected 6. Failed to match first line: %s", len(m[0]), line)
+		return nil, fmt.Errorf("Got %d matches. Expected 6. Failed to match first line: %s", len(m[0]), line)
 	}
 
 	data := make(map[string]interface{}, 3)
@@ -86,5 +86,5 @@ func parseFirstLine(line string) (map[string]interface{}, error) {
 		return data, nil
 	}
 
-	return nil, errors.Errorf("Unknown first line: %s", line)
+	return nil, fmt.Errorf("Unknown first line: %s", line)
 }

@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 )
 
 func runLauncher(ctx context.Context, cancel func(), args []string, logger log.Logger) error {
@@ -25,7 +25,7 @@ func runLauncher(ctx context.Context, cancel func(), args []string, logger log.L
 
 		if count > 4 {
 			if err := triggerUpgrade(ctx, cancel, logger); err != nil {
-				return errors.Wrap(err, "triggerUpgrade")
+				return fmt.Errorf("triggerUpgrade: %w", err)
 			}
 			break
 		}

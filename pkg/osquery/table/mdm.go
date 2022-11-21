@@ -3,6 +3,7 @@ package table
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func MDMInfo(logger log.Logger) *table.Plugin {
@@ -92,12 +92,12 @@ func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
 	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "-L", "-o", "stdout-xml")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, errors.Wrap(err, "calling /usr/bin/profiles to get MDM profile payload")
+		return nil, fmt.Errorf("calling /usr/bin/profiles to get MDM profile payload: %w", err)
 	}
 
 	var profiles profilesOutput
 	if err := plist.Unmarshal(out, &profiles); err != nil {
-		return nil, errors.Wrap(err, "unmarshal profiles output")
+		return nil, fmt.Errorf("unmarshal profiles output: %w", err)
 	}
 
 	return &profiles, nil
@@ -135,16 +135,16 @@ func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
 	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "status", "-type", "enrollment")
 	out, err := cmd.Output()
 	if err != nil {
-		return profileStatus{}, errors.Wrap(err, "calling /usr/bin/profiles to get MDM profile status")
+		return profileStatus{}, fmt.Errorf("calling /usr/bin/profiles to get MDM profile status: %w", err)
 	}
 	lines := bytes.Split(out, []byte("\n"))
 	depEnrollmentParts := bytes.SplitN(lines[0], []byte(":"), 2)
 	if len(depEnrollmentParts) < 2 {
-		return profileStatus{}, errors.Errorf("mdm: could not split the DEP Enrollment source %s", string(out))
+		return profileStatus{}, fmt.Errorf("mdm: could not split the DEP Enrollment source %s", string(out))
 	}
 	enrollmentStatusParts := bytes.SplitN(lines[1], []byte(":"), 2)
 	if len(enrollmentStatusParts) < 2 {
-		return profileStatus{}, errors.Errorf("mdm: could not split the DEP Enrollment status %s", string(out))
+		return profileStatus{}, fmt.Errorf("mdm: could not split the DEP Enrollment status %s", string(out))
 	}
 	return profileStatus{
 		DEPEnrolled:  bytes.Contains(depEnrollmentParts[1], []byte("Yes")),

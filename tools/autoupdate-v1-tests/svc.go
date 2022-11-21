@@ -3,7 +3,9 @@
 
 package main
 
-import "errors"
+import (
+	"errors"
+)
 
 func runWindowsSvc(args []string) error {
 	return errors.New("This isn't windows")

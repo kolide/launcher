@@ -2,8 +2,8 @@ package history
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 )
 
@@ -29,14 +29,14 @@ func (h *History) load() error {
 		instancesBytes = b.Get([]byte(osqueryHistoryInstanceKey))
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "error reading osquery_instance_history from db")
+		return fmt.Errorf("error reading osquery_instance_history from db: %w", err)
 	}
 
 	var instances []*Instance
 
 	if instancesBytes != nil {
 		if err := json.Unmarshal(instancesBytes, &instances); err != nil {
-			return errors.Wrap(err, "error unmarshalling osquery_instance_history")
+			return fmt.Errorf("error unmarshalling osquery_instance_history: %w", err)
 		}
 	} else {
 		return nil
@@ -54,17 +54,17 @@ func (h *History) save() error {
 
 	instancesBytes, err := json.Marshal(h.instances)
 	if err != nil {
-		return errors.Wrap(err, "error marshalling osquery_instance_history")
+		return fmt.Errorf("error marshalling osquery_instance_history: %w", err)
 	}
 
 	if err := h.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(osqueryHistoryInstanceKey))
 		if err := b.Put([]byte(osqueryHistoryInstanceKey), instancesBytes); err != nil {
-			return errors.Wrap(err, "error writing osquery_instance_history to db")
+			return fmt.Errorf("error writing osquery_instance_history to db: %w", err)
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "error writing osquery_instance_history to db")
+		return fmt.Errorf("error writing osquery_instance_history to db: %w", err)
 	}
 
 	return nil
@@ -82,7 +82,7 @@ func createBboltBucketIfNotExists(db *bbolt.DB) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "error creating osquery_instance_history bucket")
+		return fmt.Errorf("error creating osquery_instance_history bucket: %w", err)
 	}
 
 	return nil

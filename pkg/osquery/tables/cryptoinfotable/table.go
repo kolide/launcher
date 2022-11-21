@@ -3,6 +3,8 @@ package cryptoinfotable
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +16,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type Table struct {
@@ -88,18 +89,18 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func flattenCryptoInfo(filename, passphrase string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
 	filebytes, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading %s", filename)
+		return nil, fmt.Errorf("reading %s: %w", filename, err)
 	}
 
 	result, err := cryptoinfo.Identify(filebytes, passphrase)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing with cryptoinfo")
+		return nil, fmt.Errorf("parsing with cryptoinfo: %w", err)
 	}
 
 	// convert to json, so it's parsable
 	jsonBytes, err := json.Marshal(result)
 	if err != nil {
-		return nil, errors.Wrap(err, "json")
+		return nil, fmt.Errorf("json: %w", err)
 	}
 
 	return dataflatten.Json(jsonBytes, opts...)
