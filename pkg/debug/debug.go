@@ -6,11 +6,11 @@ package debug
 import (
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net"
 	"net/http"
 	nhpprof "net/http/pprof"
 	"net/url"
+	"os"
 	"runtime/pprof"
 	"strings"
 
@@ -56,7 +56,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 	}
 	addr := url.String()
 	// Write the address to a file for easy access by users
-	if err := ioutil.WriteFile(addrPath, []byte(addr), 0600); err != nil {
+	if err := os.WriteFile(addrPath, []byte(addr), 0600); err != nil {
 		return nil, fmt.Errorf("writing debug address: %w", err)
 	}
 

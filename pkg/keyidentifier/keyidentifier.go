@@ -8,7 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -61,7 +61,7 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 		"file", path,
 	)
 
-	keyBytes, err := ioutil.ReadFile(path)
+	keyBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %s: %w", path, err)
 	}

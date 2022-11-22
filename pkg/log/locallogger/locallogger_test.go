@@ -3,7 +3,6 @@ package locallogger
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,7 +51,7 @@ func TestKitLogging(t *testing.T) {
 	//	expectedJson, err := json.Marshal(expected)
 	//require.NoError(t, err, "json marshal expected")
 
-	tmpfile, err := ioutil.TempFile("", "test-locallogger")
+	tmpfile, err := os.CreateTemp("", "test-locallogger")
 	require.NoError(t, err, "make temp file")
 	defer os.Remove(tmpfile.Name())
 

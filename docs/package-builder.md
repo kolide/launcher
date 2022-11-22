@@ -164,7 +164,7 @@ To display the list of support targets, invoke `package-builder list-targets`
 #### Docker Temp Directories
 
 Packaging for linux used `fpm` via a docker container. This operates
-on files in a directory created by golang's `ioutil.TempFile`. On osx,
+on files in a directory created by golang's `os.CreateTemp`. On osx,
 the default temp directory is in `/var`, which is not accessible to
 docker.
 
@@ -178,7 +178,7 @@ You can configure shared paths from Docker -> Preferences... -> File Sharing.
 See https://docs.docker.com/docker-for-mac/osxfs/#namespaces for more info.
 ```
 
-As `ioutil.TempFile` respects the `TMPDIR` environmental variable, there is a simple workaround:
+As `os.CreateTemp` respects the `TMPDIR` environmental variable, there is a simple workaround:
 
 ``` shell
 export TMPDIR=/tmp

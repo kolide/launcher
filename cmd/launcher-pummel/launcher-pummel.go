@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -111,7 +110,7 @@ func main() {
 	if *flEnrollSecret != "" {
 		enrollSecret = *flEnrollSecret
 	} else if *flEnrollSecretPath != "" {
-		content, err := ioutil.ReadFile(*flEnrollSecretPath)
+		content, err := os.ReadFile(*flEnrollSecretPath)
 		if err != nil {
 			logutil.Fatal(logger, "err", fmt.Errorf("could not read enroll_secret_path: %w", err), "enroll_secret_path", *flEnrollSecretPath)
 		}
