@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,7 +71,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	// dism.exe outputs xml, but with weird intermingled status. So
 	// instead, we dump it to a temp file.
-	dir, err := ioutil.TempDir("", "kolide_dism")
+	dir, err := os.MkdirTemp("", "kolide_dism")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}
@@ -98,7 +97,7 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
 	}
 
-	data, err := ioutil.ReadFile(filepath.Join(dir, dstFile))
+	data, err := os.ReadFile(filepath.Join(dir, dstFile))
 	if err != nil {
 		return nil, fmt.Errorf("error reading dism output file: %s: %w", err, err)
 	}

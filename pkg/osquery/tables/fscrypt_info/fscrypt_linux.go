@@ -5,7 +5,7 @@ package fscrypt_info
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 
 	"github.com/google/fscrypt/actions"
@@ -29,7 +29,7 @@ func GetInfo(dirpath string) (*Info, error) {
 	defer func() {
 		log.SetOutput(origLog)
 	}()
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 
 	fsctx, err := actions.NewContextFromPath(dirpath, nil)
 	if err != nil {

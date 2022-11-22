@@ -1,7 +1,6 @@
 package table
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -58,7 +57,7 @@ func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) 
 	if ff.username == "" {
 		for _, possibleHome := range homedirRoots {
 
-			userDirs, err := ioutil.ReadDir(possibleHome)
+			userDirs, err := os.ReadDir(possibleHome)
 			if err != nil {
 				// This possibleHome doesn't exist. Move on
 				continue

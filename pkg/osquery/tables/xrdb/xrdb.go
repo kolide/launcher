@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -127,7 +126,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		}
 	}
 
-	dir, err := ioutil.TempDir("", "osq-xrdb")
+	dir, err := os.MkdirTemp("", "osq-xrdb")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

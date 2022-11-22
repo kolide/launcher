@@ -1,7 +1,7 @@
 package zfs
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,7 +31,7 @@ func TestParseColumns(t *testing.T) {
 		t.Run(tt.infile, func(t *testing.T) {
 			t.Parallel()
 
-			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.infile))
+			input, err := os.ReadFile(filepath.Join("testdata", tt.infile))
 			require.NoError(t, err, "read input file")
 
 			rows, err := parseColumns(input)

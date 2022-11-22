@@ -2,13 +2,13 @@ package dataflatten
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"howett.net/plist"
 )
 
 func PlistFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	rawdata, err := ioutil.ReadFile(file)
+	rawdata, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

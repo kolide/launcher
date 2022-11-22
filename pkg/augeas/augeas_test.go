@@ -1,7 +1,6 @@
 package augeas
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +15,7 @@ func TestInstallLenses(t *testing.T) {
 
 	require.NoError(t, InstallLenses(tmpDir), "install lenses")
 
-	files, err := ioutil.ReadDir(tmpDir)
+	files, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
 	require.Greater(t, len(files), 5, "Has enough files")
@@ -26,7 +25,7 @@ func TestInstallLenses(t *testing.T) {
 
 	// Replace missing files
 	require.NoError(t, InstallLenses(tmpDir), "reinstall lenses")
-	files2, err := ioutil.ReadDir(tmpDir)
+	files2, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
 
 	require.Equal(t, len(files), len(files2))
