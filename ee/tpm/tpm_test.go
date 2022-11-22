@@ -5,6 +5,7 @@ package tpm
 
 import (
 	"crypto/rsa"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 
 func TestSealUnseal(t *testing.T) {
 	t.Parallel()
+	CheckSkipCI(t)
 
 	message := []byte("message to be sealed")
 
@@ -29,6 +31,7 @@ func TestSealUnseal(t *testing.T) {
 
 func TestSealMaxSize(t *testing.T) {
 	t.Parallel()
+	CheckSkipCI(t)
 
 	_, err := Seal(make([]byte, MaxSealBytes+1))
 	require.Error(t, err)
@@ -36,6 +39,7 @@ func TestSealMaxSize(t *testing.T) {
 
 func TestSignVerify(t *testing.T) {
 	t.Parallel()
+	CheckSkipCI(t)
 
 	message := []byte("message to be signed and verified")
 
@@ -52,4 +56,10 @@ func TestSignVerify(t *testing.T) {
 	hash.Write(message)
 
 	require.NoError(t, rsa.VerifyPKCS1v15(pubKey, CryptoHash, hash.Sum(nil), signed))
+}
+
+func CheckSkipCI(t *testing.T) {
+	if os.Getenv("CI") == "true" {
+		t.Skip("TPM not available in CI environment")
+	}
 }
