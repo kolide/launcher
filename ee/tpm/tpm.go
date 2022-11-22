@@ -70,7 +70,7 @@ func Seal(input []byte) ([]byte, error) {
 }
 
 // Unseal unseals the provided input with the TPMs storage root key.
-// Unsealing includes decryption plus additional verificaiton of the state of the TPM.
+// Unsealing includes decryption plus additional verification of the state of the TPM.
 func Unseal(input []byte) ([]byte, error) {
 	rwc, err := tpm2.OpenTPM()
 	if err != nil {
