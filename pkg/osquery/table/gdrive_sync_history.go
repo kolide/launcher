@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -38,7 +37,7 @@ type GDriveSyncHistory struct {
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_gdrive_sync_history")
+	dir, err := os.MkdirTemp("", "kolide_gdrive_sync_history")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_gdrive_sync_history tmp dir: %w", err)
 	}

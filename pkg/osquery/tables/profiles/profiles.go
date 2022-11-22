@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,7 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					// for some subset of the profiles command. I've reported it
 					// to apple (feedback FB8962811), and while it may someday
 					// be fixed, we need to support it where it is.
-					dir, err := ioutil.TempDir("", "kolide_profiles")
+					dir, err := os.MkdirTemp("", "kolide_profiles")
 					if err != nil {
 						return nil, fmt.Errorf("creating kolide_profiles tmp dir: %w", err)
 					}

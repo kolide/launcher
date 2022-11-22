@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -123,7 +122,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		}
 	}
 
-	dir, err := ioutil.TempDir("", "osq-gsettings")
+	dir, err := os.MkdirTemp("", "osq-gsettings")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

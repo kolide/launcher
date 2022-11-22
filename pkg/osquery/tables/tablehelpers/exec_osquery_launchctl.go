@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -42,7 +41,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		query,
 	)
 
-	dir, err := ioutil.TempDir("", "osq-launchctl")
+	dir, err := os.MkdirTemp("", "osq-launchctl")
 	if err != nil {
 		return nil, fmt.Errorf("mktemp: %w", err)
 	}

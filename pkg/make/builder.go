@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -364,7 +363,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	// are present (Asset, AssetDir, etc). Once the symbols are present, we can run
 	// the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
 	// the bindata file with the real TUF metadata.
-	dir, err := ioutil.TempDir("", "bootstrap-launcher-bindata")
+	dir, err := os.MkdirTemp("", "bootstrap-launcher-bindata")
 	if err != nil {
 		return fmt.Errorf("create empty dir for bindata: %w", err)
 	}

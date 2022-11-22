@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -119,7 +118,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 
 	var err error
 	if wo.buildDir == "" {
-		wo.buildDir, err = ioutil.TempDir("", "wix-build-dir")
+		wo.buildDir, err = os.MkdirTemp("", "wix-build-dir")
 		if err != nil {
 			return nil, fmt.Errorf("making temp wix-build-dir: %w", err)
 		}
@@ -138,7 +137,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 	}
 
 	for _, ef := range wo.extraFiles {
-		if err := ioutil.WriteFile(
+		if err := os.WriteFile(
 			filepath.Join(wo.buildDir, ef.Name),
 			ef.Content,
 			0644); err != nil {
@@ -148,7 +147,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 
 	mainWxsPath := filepath.Join(wo.buildDir, "Installer.wxs")
 
-	if err := ioutil.WriteFile(
+	if err := os.WriteFile(
 		mainWxsPath,
 		mainWxsContent,
 		0644); err != nil {
@@ -208,7 +207,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	}
 
 	heatFile := filepath.Join(wo.buildDir, "AppFiles.wxs")
-	heatContent, err := ioutil.ReadFile(heatFile)
+	heatContent, err := os.ReadFile(heatFile)
 	if err != nil {
 		return fmt.Errorf("reading AppFiles.wxs: %w", err)
 	}
