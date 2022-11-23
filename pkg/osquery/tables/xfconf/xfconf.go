@@ -203,7 +203,6 @@ func setUserForCommandAndRun(cmd *exec.Cmd, u *user.User, output *bytes.Buffer) 
 		Uid: uint32(uid),
 		Gid: uint32(gid),
 	}
-	cmd.Env = append(cmd.Env, "DBUS_SESSION_BUS_ADDRESS='unix:abstract=/tmp/dbus-p9JPVwAZyv,guid=3c7c8e978222bd60d55bdd6a637e3dce'")
 
 	// Set output
 	stderr := new(bytes.Buffer)
