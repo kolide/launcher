@@ -2,7 +2,7 @@ package dataflatten
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -21,7 +21,7 @@ type flattenTestCase struct {
 func TestFlatten_Complex2(t *testing.T) {
 	t.Parallel()
 
-	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "complex2.json"))
+	dataRaw, err := os.ReadFile(filepath.Join("testdata", "complex2.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
 	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")
@@ -73,7 +73,7 @@ func TestFlatten_Complex2(t *testing.T) {
 func TestFlatten_NestingBug(t *testing.T) {
 	t.Parallel()
 
-	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "nested.json"))
+	dataRaw, err := os.ReadFile(filepath.Join("testdata", "nested.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
 	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")
@@ -119,7 +119,7 @@ func TestFlatten_Complex(t *testing.T) {
 	t.Parallel()
 
 	// Do the unmarshaling here, so we don't keep doing it again and again
-	dataRaw, err := ioutil.ReadFile(filepath.Join("testdata", "animals.json"))
+	dataRaw, err := os.ReadFile(filepath.Join("testdata", "animals.json"))
 	require.NoError(t, err, "reading file")
 	var dataIn interface{}
 	require.NoError(t, json.Unmarshal(dataRaw, &dataIn), "unmarshalling json")

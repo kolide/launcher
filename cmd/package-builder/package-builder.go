@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -222,7 +221,7 @@ func runMake(args []string) error {
 	cacheDir := *flCacheDir
 	var err error
 	if cacheDir == "" {
-		cacheDir, err = ioutil.TempDir("", "download_cache")
+		cacheDir, err = os.MkdirTemp("", "download_cache")
 		if err != nil {
 			return fmt.Errorf("could not create temp dir for caching files: %w", err)
 		}
@@ -263,7 +262,7 @@ func runMake(args []string) error {
 	// NOTE: if you are using docker-for-mac, you probably need to set the TMPDIR env to /tmp
 	if outputDir == "" {
 		var err error
-		outputDir, err = ioutil.TempDir("", fmt.Sprintf("launcher-package"))
+		outputDir, err = os.MkdirTemp("", fmt.Sprintf("launcher-package"))
 		if err != nil {
 			return fmt.Errorf("making output dir: %w", err)
 		}

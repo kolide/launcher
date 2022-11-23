@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"runtime"
@@ -61,7 +60,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	testArgs, expectedOpts := getArgsAndResponse()
 
-	flagFile, err := ioutil.TempFile("", "flag-file")
+	flagFile, err := os.CreateTemp("", "flag-file")
 	require.NoError(t, err)
 	defer os.Remove(flagFile.Name())
 

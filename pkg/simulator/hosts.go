@@ -3,7 +3,7 @@ package simulator
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -56,7 +56,7 @@ type querySpec struct {
 // LoadHosts will load the host specifications and return a map of the
 // queryRunners representing these host types.
 func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("listing hosts directory: %w", err)
 	}
@@ -67,7 +67,7 @@ func LoadHosts(dir string, logger log.Logger) (map[string]*queryRunner, error) {
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".yaml") {
 			path := filepath.Join(dir, file.Name())
-			contents, err := ioutil.ReadFile(path)
+			contents, err := os.ReadFile(path)
 			if err != nil {
 				return nil, fmt.Errorf("reading file %s: %w", path, err)
 			}

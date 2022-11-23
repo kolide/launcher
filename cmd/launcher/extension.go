@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -54,7 +53,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, launcherClient se
 	if opts.EnrollSecret != "" {
 		enrollSecret = opts.EnrollSecret
 	} else if opts.EnrollSecretPath != "" {
-		content, err := ioutil.ReadFile(opts.EnrollSecretPath)
+		content, err := os.ReadFile(opts.EnrollSecretPath)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not read enroll_secret_path: %s: %w", opts.EnrollSecretPath, err)
 		}

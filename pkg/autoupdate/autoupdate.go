@@ -47,7 +47,6 @@ package autoupdate
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -217,7 +216,7 @@ func (u *Updater) createTUFRepoDirectory(localPath string, currentAssetPath stri
 			if err != nil {
 				return fmt.Errorf("could not get asset: %w", err)
 			}
-			if err := ioutil.WriteFile(fullLocalPath, asset, 0644); err != nil {
+			if err := os.WriteFile(fullLocalPath, asset, 0644); err != nil {
 				return fmt.Errorf("could not write file: %w", err)
 			}
 			continue

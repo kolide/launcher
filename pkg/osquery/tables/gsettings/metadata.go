@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -91,7 +90,7 @@ type keyDescription struct {
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
 	var descriptions []keyDescription
 
-	dir, err := ioutil.TempDir("", fmt.Sprintf("osq-gsettings-metadata-%s", schema))
+	dir, err := os.MkdirTemp("", fmt.Sprintf("osq-gsettings-metadata-%s", schema))
 	if err != nil {
 		return descriptions, fmt.Errorf("mktemp: %w", err)
 	}

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,7 +94,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-	dir, err := ioutil.TempDir("", "kolide_secedit_config")
+	dir, err := os.MkdirTemp("", "kolide_secedit_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_secedit_config tmp dir: %w", err)
 	}
@@ -131,7 +131,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// By default, secedit outputs files encoded in UTF16 Little Endian. Sadly the Go INI parser
 	// cannot read this format by default, therefore we decode the bytes into UTF-8
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
-	data, err := ioutil.ReadAll(rd)
+	data, err := io.ReadAll(rd)
 	if err != nil {
 		return nil, fmt.Errorf("error reading secedit output file: %s: %w", dst, err)
 	}

@@ -3,11 +3,11 @@ package dataflatten
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 func JsonFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	rawdata, err := ioutil.ReadFile(file)
+	rawdata, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

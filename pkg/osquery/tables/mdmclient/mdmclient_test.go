@@ -6,7 +6,7 @@
 package mdmclient
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -42,7 +42,7 @@ func TestTransformOutput(t *testing.T) {
 		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 
-			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.in))
+			input, err := os.ReadFile(filepath.Join("testdata", tt.in))
 			require.NoError(t, err, "read input file")
 
 			output, err := table.flattenOutput("", input)

@@ -6,8 +6,8 @@ package debug
 
 import (
 	"context"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -18,14 +18,14 @@ import (
 )
 
 func getDebugURL(t *testing.T, tokenPath string) string {
-	url, err := ioutil.ReadFile(tokenPath)
+	url, err := os.ReadFile(tokenPath)
 	require.Nil(t, err)
 	return string(url)
 }
 
 func TestStartDebugServer(t *testing.T) {
 	t.Parallel()
-	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
 	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
@@ -43,7 +43,7 @@ func TestStartDebugServer(t *testing.T) {
 
 func TestDebugServerUnauthorized(t *testing.T) {
 	t.Parallel()
-	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
 	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
@@ -62,7 +62,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
 
-	tokenFile, err := ioutil.TempFile("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
 	AttachDebugHandler(tokenFile.Name(), log.NewNopLogger())

@@ -2,7 +2,6 @@ package applenotarization
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -38,7 +37,7 @@ func TestCheckSuccess(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fileBytes, err := ioutil.ReadFile(tt.fakeFile)
+		fileBytes, err := os.ReadFile(tt.fakeFile)
 		require.NoError(t, err)
 		n := New("myname@example.com", "123password", "X11111AAAA")
 		n.fakeResponse = string(fileBytes)
@@ -58,7 +57,7 @@ func TestSubmit(t *testing.T) {
 	t.Parallel()
 	ctx := context.TODO()
 
-	tmpZipFile, err := ioutil.TempFile("", "fake-for-submission.*.zip")
+	tmpZipFile, err := os.CreateTemp("", "fake-for-submission.*.zip")
 	require.NoError(t, err)
 	defer os.Remove(tmpZipFile.Name())
 
@@ -77,7 +76,7 @@ func TestSubmit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fileBytes, err := ioutil.ReadFile(tt.fakeFile)
+		fileBytes, err := os.ReadFile(tt.fakeFile)
 		require.NoError(t, err)
 		n := New("myname@example.com", "123password", "X11111AAAA")
 		n.fakeResponse = string(fileBytes)

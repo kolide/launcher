@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -64,7 +64,7 @@ type slackTeamsFile map[string]struct {
 
 func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
 	var results []map[string]string
-	data, err := ioutil.ReadFile(file.path)
+	data, err := os.ReadFile(file.path)
 	if err != nil {
 		return results, fmt.Errorf("Reading slack teams file: %w", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -97,7 +96,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 
 	cmd := exec.CommandContext(ctx, "/usr/sbin/firmwarepasswd", subcommand)
 
-	dir, err := ioutil.TempDir("", "osq-firmwarepasswd")
+	dir, err := os.MkdirTemp("", "osq-firmwarepasswd")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

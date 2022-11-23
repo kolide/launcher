@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,7 +30,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return err
 	}
 
-	outputPathDir, err := ioutil.TempDir("", "packaging-pkg-output")
+	outputPathDir, err := os.MkdirTemp("", "packaging-pkg-output")
 	if err != nil {
 		return fmt.Errorf("making TempDir: %w", err)
 	}

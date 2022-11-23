@@ -8,7 +8,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,7 +81,7 @@ func execPwsh(logger log.Logger) execer {
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe
-		dir, err := ioutil.TempDir("", "nativewifi")
+		dir, err := os.MkdirTemp("", "nativewifi")
 		if err != nil {
 			return fmt.Errorf("creating nativewifi tmp dir: %w", err)
 		}

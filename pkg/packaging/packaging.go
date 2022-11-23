@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -104,12 +103,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	var err error
 
-	if p.packageRoot, err = ioutil.TempDir("", "package.packageRoot"); err != nil {
+	if p.packageRoot, err = os.MkdirTemp("", "package.packageRoot"); err != nil {
 		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.packageRoot)
 
-	if p.scriptRoot, err = ioutil.TempDir("", fmt.Sprintf("package.scriptRoot")); err != nil {
+	if p.scriptRoot, err = os.MkdirTemp("", fmt.Sprintf("package.scriptRoot")); err != nil {
 		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.scriptRoot)
@@ -218,7 +217,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Unless we're omitting the secret, write it into the package.
 	// Note that we _always_ set KOLIDE_LAUNCHER_ENROLL_SECRET_PATH
 	if !p.OmitSecret {
-		if err := ioutil.WriteFile(
+		if err := os.WriteFile(
 			filepath.Join(p.packageRoot, p.confDir, "secret"),
 			[]byte(p.Secret),
 			secretPerms,
