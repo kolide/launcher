@@ -19,7 +19,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-20.04
           - macos-latest
           - windows-latest
     steps:
@@ -80,9 +80,17 @@ jobs:
       run: make test
 
     - name: Upload Build
+      if: ${{ ! contains(matrix.os, 'ubuntu') }}
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}-build
+        path: build/
+
+    - name: Upload Build - Ubuntu
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu-latest-build
         path: build/
 
     - name: Upload coverage
@@ -99,7 +107,7 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-20.04
           - macos-latest
           - windows-latest
     steps:
