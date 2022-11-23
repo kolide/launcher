@@ -80,9 +80,17 @@ jobs:
       run: make test
 
     - name: Upload Build
+      if: ${{ ! contains(matrix.os, 'ubuntu') }}
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}-build
+        path: build/
+
+    - name: Upload Build - Ubuntu
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu-latest-build
         path: build/
 
     - name: Upload coverage
