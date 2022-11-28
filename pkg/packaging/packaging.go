@@ -47,6 +47,7 @@ type PackageOptions struct {
 	ControlHostname   string
 	DisableControlTLS bool
 	Identifier        string
+	Title             string
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
@@ -298,10 +299,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("setup setupPrerm for %s: %w", p.target.String(), err)
 	}
 
+	if p.Title == "" {
+		p.Title = fmt.Sprintf("Launcher agent for %s", p.Identifier)
+	}
+
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
-		Title:                    "Kolide Endpoint Agent",
+		Title:                    p.Title,
 		Root:                     p.packageRoot,
 		Scripts:                  p.scriptRoot,
 		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,
