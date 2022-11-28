@@ -4,12 +4,7 @@
 package xfconf
 
 import (
-	"bytes"
 	"os/user"
-	"testing"
-
-	"github.com/go-kit/kit/log"
-	"github.com/stretchr/testify/require"
 )
 
 type parseTestCase struct {
@@ -142,21 +137,5 @@ func getParseTestCases() []parseTestCase {
 				},
 			},
 		},
-	}
-}
-
-func Test_parseProperties(t *testing.T) {
-	t.Parallel()
-
-	testCases := getParseTestCases()
-
-	xfconf := XfconfQuerier{
-		logger: log.NewNopLogger(),
-	}
-
-	for _, tt := range testCases {
-		input := bytes.NewReader([]byte(tt.input))
-		results := xfconf.parseProperties(input, tt.channelName, tt.user)
-		require.Equal(t, tt.expectedOutput, results)
 	}
 }
