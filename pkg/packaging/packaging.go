@@ -345,7 +345,8 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 	var localPath string
 
 	switch {
-	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
+	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"), strings.HasPrefix(binaryVersion, `\`),
+		strings.HasPrefix(binaryVersion, "C:"), strings.HasPrefix(binaryVersion, "D:"):
 		localPath = binaryVersion
 	default:
 		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)

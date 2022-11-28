@@ -142,15 +142,14 @@ func TestHelperProcess(t *testing.T) {
 func Test_getBinary(t *testing.T) {
 	t.Parallel()
 
-	if runtime.GOOS == "windows" {
-		t.SkipNow()
-	}
-
 	// Set up cache directory with only a launcher binary in it
 	tmpCacheDir := t.TempDir()
 	binaryName := "launcher"
+	if runtime.GOOS == "windows" {
+		binaryName = "launcher.exe"
+	}
 	version := "nightly"
-	localBinaryDir := filepath.Join(tmpCacheDir, fmt.Sprintf("launcher-%s-%s", runtime.GOOS, version))
+	localBinaryDir := filepath.Join(tmpCacheDir, fmt.Sprintf("%s-%s-%s", binaryName, runtime.GOOS, version))
 	assert.NoError(t, os.Mkdir(localBinaryDir, 0755), "could not make temp cache directory")
 	cachedBinaryPath := filepath.Join(localBinaryDir, binaryName)
 	f, err := os.Create(cachedBinaryPath)
