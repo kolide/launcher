@@ -70,12 +70,9 @@ func TestLauncherLocation(t *testing.T) {
 	baseDir := filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS")
 	expectedLauncherBinaryPath := filepath.Join(baseDir, "launcher")
 	f, err := os.Create(expectedLauncherBinaryPath)
-	if err != nil {
-		t.Errorf("could not create temp file for test: %v", err)
-		t.FailNow()
-	}
-	defer require.NoError(t, f.Close())
-	defer require.NoError(t, os.Remove(expectedLauncherBinaryPath))
+	require.NoError(t, err, "could not create temp file for test")
+	defer f.Close()
+	defer os.Remove(expectedLauncherBinaryPath)
 
 	// Now, confirm that we find the binary inside the app bundle
 	require.Equal(t, expectedLauncherBinaryPath, pDarwin.launcherLocation(baseDir))
