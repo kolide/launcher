@@ -69,7 +69,15 @@ func (t *XfconfQuerier) generate(ctx context.Context, queryContext table.QueryCo
 func (t *XfconfQuerier) getUserConfig(u *user.User, dataQuery string, rowData map[string]string) ([]map[string]string, error) {
 	var results []map[string]string
 
-	// First, get defaults
+	// First, get user-specific settings
+	userConfigDir := getUserXfconfDir(u)
+	userConfigRows, err := t.getConfigFromDirectory(userConfigDir, dataQuery, rowData)
+	if err != nil {
+		return nil, fmt.Errorf("error getting config for user %s from directory %s: %w", u.Name, userConfigDir, err)
+	}
+	results = append(results, userConfigRows...)
+
+	// Then, get defaults
 	defaultDirs := getDefaultXfconfDirs()
 	for _, dir := range defaultDirs {
 		defaultConfigRows, err := t.getConfigFromDirectory(dir, dataQuery, rowData)
@@ -79,36 +87,8 @@ func (t *XfconfQuerier) getUserConfig(u *user.User, dataQuery string, rowData ma
 		results = append(results, defaultConfigRows...)
 	}
 
-	// Now, get user-specific settings, which will overwrite the defaults
-	userConfigDir := getUserXfconfDir(u)
-	userConfigRows, err := t.getConfigFromDirectory(userConfigDir, dataQuery, rowData)
-	if err != nil {
-		return nil, fmt.Errorf("error getting config for user %s from directory %s: %w", u.Name, userConfigDir, err)
-	}
-
-	return append(results, userConfigRows...), nil
-}
-
-func getDefaultXfconfDirs() []string {
-	envDefaultDirsStr := os.Getenv("XDG_CONFIG_DIRS")
-	if envDefaultDirsStr != "" {
-		dirs := strings.Split(envDefaultDirsStr, ":")
-		for i, d := range dirs {
-			dirs[i] = filepath.Join(d, xfconfChannelXmlPath)
-		}
-		return dirs
-	}
-
-	return []string{filepath.Join("/", "etc", "xdg", xfconfChannelXmlPath)}
-}
-
-func getUserXfconfDir(u *user.User) string {
-	userConfigDir := os.Getenv("XDG_CONFIG_HOME")
-	if userConfigDir != "" {
-		return filepath.Join(userConfigDir, xfconfChannelXmlPath)
-	}
-
-	return filepath.Join(u.HomeDir, ".config", xfconfChannelXmlPath)
+	// Make sure we only include defaults if there isn't already a user-specific setting
+	return deduplicate(results), nil
 }
 
 func (t *XfconfQuerier) getConfigFromDirectory(dir string, dataQuery string, rowData map[string]string) ([]map[string]string, error) {
@@ -135,4 +115,41 @@ func (t *XfconfQuerier) getConfigFromDirectory(dir string, dataQuery string, row
 	}
 
 	return results, nil
+}
+
+func getDefaultXfconfDirs() []string {
+	envDefaultDirsStr := os.Getenv("XDG_CONFIG_DIRS")
+	if envDefaultDirsStr != "" {
+		dirs := strings.Split(envDefaultDirsStr, ":")
+		for i, d := range dirs {
+			dirs[i] = filepath.Join(d, xfconfChannelXmlPath)
+		}
+		return dirs
+	}
+
+	return []string{filepath.Join("/", "etc", "xdg", xfconfChannelXmlPath)}
+}
+
+func getUserXfconfDir(u *user.User) string {
+	userConfigDir := os.Getenv("XDG_CONFIG_HOME")
+	if userConfigDir != "" {
+		return filepath.Join(userConfigDir, xfconfChannelXmlPath)
+	}
+
+	return filepath.Join(u.HomeDir, ".config", xfconfChannelXmlPath)
+}
+
+func deduplicate(rows []map[string]string) []map[string]string {
+	var deduplicated []map[string]string
+
+	seenKeys := make(map[string]bool)
+
+	for _, row := range rows {
+		if _, ok := seenKeys[row["fullkey"]]; !ok {
+			seenKeys[row["fullkey"]] = true
+			deduplicated = append(deduplicated, row)
+		}
+	}
+
+	return deduplicated
 }

@@ -15,6 +15,8 @@ import (
 )
 
 func Test_getUserConfig(t *testing.T) {
+	t.Parallel()
+
 	setUpConfigFiles(t)
 
 	xfconf := XfconfQuerier{
@@ -33,6 +35,10 @@ func Test_getUserConfig(t *testing.T) {
 	for _, configRow := range config {
 		require.Equalf(t, testUsername, configRow["username"], "unexpected username: %s", configRow["username"])
 		require.Truef(t, (configRow["channel"] == "xfce4-session" || configRow["channel"] == "xfce4-power-manager" || configRow["channel"] == "thunar-volman"), "unexpected channel: %s", configRow["channel"])
+
+		if configRow["channel"] == "xfce4-power-manager" && configRow["fullkey"] == "channel/property/property/1/-value" {
+			require.Equal(t, "true", configRow["value"], "default settings for power manager not overridden by user settings")
+		}
 	}
 }
 
@@ -41,6 +47,7 @@ func setUpConfigFiles(t *testing.T) {
 	tmpDefaultDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDefaultDir, xfconfChannelXmlPath), 0755), "error making temp directory")
 	fsutil.CopyFile(filepath.Join("testdata", "xfce4-session.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-session.xml"))
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager-default.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
 
 	// Set the environment variable for the default directory
 	os.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
