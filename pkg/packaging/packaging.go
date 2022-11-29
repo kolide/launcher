@@ -47,6 +47,7 @@ type PackageOptions struct {
 	ControlHostname   string
 	DisableControlTLS bool
 	Identifier        string
+	Title             string
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
@@ -280,7 +281,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",
 		Description: "The Kolide Launcher",
-		Path:        filepath.Join(p.binDir, "launcher"),
+		Path:        p.target.PlatformLauncherPath(p.binDir),
 		Identifier:  p.Identifier,
 		Flags:       []string{"-config", flagFilePath},
 		Environment: map[string]string{},
@@ -298,9 +299,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("setup setupPrerm for %s: %w", p.target.String(), err)
 	}
 
+	if p.Title == "" {
+		p.Title = fmt.Sprintf("Launcher agent for %s", p.Identifier)
+	}
+
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
+		Title:                    p.Title,
 		Root:                     p.packageRoot,
 		Scripts:                  p.scriptRoot,
 		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,
@@ -339,7 +345,8 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 	var localPath string
 
 	switch {
-	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
+	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"), strings.HasPrefix(binaryVersion, `\`),
+		strings.HasPrefix(binaryVersion, "C:"), strings.HasPrefix(binaryVersion, "D:"):
 		localPath = binaryVersion
 	default:
 		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
@@ -348,6 +355,21 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		}
 	}
 
+	// Check to see if we fetched an app bundle. If so, copy over the app bundle directory.
+	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
+	appBundleInfo, err := os.Stat(appBundlePath)
+	if err == nil && appBundleInfo.IsDir() {
+		if err := fsutil.CopyDir(
+			appBundlePath,
+			filepath.Join(p.packageRoot, p.binDir, "Kolide.app"),
+		); err != nil {
+			return fmt.Errorf("could not copy app bundle: %w", err)
+		}
+
+		return nil
+	}
+
+	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),

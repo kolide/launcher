@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -207,6 +208,20 @@ func TestTargetPlatformBinaryName(t *testing.T) {
 		require.Equal(t, tt.outwin, targetWin.PlatformBinaryName(tt.in), fmt.Sprintf("Test: %s", tt.in))
 	}
 }
+
+func TestPlatformLauncherPath(t *testing.T) {
+	t.Parallel()
+
+	targetDarwin := &Target{Platform: Darwin, Init: LaunchD, Package: Pkg}
+	require.Equal(t, filepath.Join("some", "dir", "Kolide.app", "Contents", "MacOS", "launcher"), targetDarwin.PlatformLauncherPath(filepath.Join("some", "dir")))
+
+	targetWin := &Target{Platform: Windows, Init: NoInit, Package: Msi}
+	require.Equal(t, filepath.Join("some", "dir", "launcher.exe"), targetWin.PlatformLauncherPath(filepath.Join("some", "dir")))
+
+	targetLinux := &Target{Platform: Linux, Init: NoInit, Package: Deb}
+	require.Equal(t, filepath.Join("some", "dir", "launcher"), targetLinux.PlatformLauncherPath(filepath.Join("some", "dir")))
+}
+
 func TestTargetPlatformExtensionName(t *testing.T) {
 	t.Parallel()
 
