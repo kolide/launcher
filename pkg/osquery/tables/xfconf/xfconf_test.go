@@ -4,138 +4,53 @@
 package xfconf
 
 import (
+	"os"
 	"os/user"
+	"path/filepath"
+	"testing"
+
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/fsutil"
+	"github.com/stretchr/testify/require"
 )
 
-type parseTestCase struct {
-	channelName    string
-	user           *user.User
-	input          string
-	expectedOutput []map[string]string
+func Test_getUserConfig(t *testing.T) {
+	setUpConfigFiles(t)
+
+	xfconf := XfconfQuerier{
+		logger: log.NewNopLogger(),
+	}
+
+	testUsername := "testUser"
+	rowData := map[string]string{"username": testUsername}
+
+	// Get the config without error
+	config, err := xfconf.getUserConfig(&user.User{Username: testUsername}, "*", rowData)
+	require.NoError(t, err, "expected no error fetching xfconf config")
+
+	// Confirm we have some data in the config and that it looks correct
+	require.Greater(t, len(config), 0)
+	for _, configRow := range config {
+		require.Equalf(t, testUsername, configRow["username"], "unexpected username: %s", configRow["username"])
+		require.Truef(t, (configRow["channel"] == "xfce4-session" || configRow["channel"] == "xfce4-power-manager" || configRow["channel"] == "thunar-volman"), "unexpected channel: %s", configRow["channel"])
+	}
 }
 
-func getParseTestCases() []parseTestCase {
-	testUsername := "headless"
-	testUser := user.User{
-		Name: testUsername,
-	}
+func setUpConfigFiles(t *testing.T) {
+	// Make a temporary directory for default config, put config files there
+	tmpDefaultDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDefaultDir, xfconfChannelXmlPath), 0755), "error making temp directory")
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-session.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-session.xml"))
 
-	return []parseTestCase{
-		{
-			channelName: "xfce4-power-manager",
-			user:        &testUser,
-			input: `/xfce4-power-manager/lock-screen-suspend-hibernate  true
-/xfce4-power-manager/power-button-action            3`,
-			expectedOutput: []map[string]string{
-				{
-					"channel":  "xfce4-power-manager",
-					"key":      "/xfce4-power-manager/lock-screen-suspend-hibernate",
-					"value":    "true",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-power-manager",
-					"key":      "/xfce4-power-manager/power-button-action",
-					"value":    "3",
-					"username": testUsername,
-				},
-			},
-		},
-		{
-			channelName: "thunar-volman",
-			user:        &testUser,
-			input: `/autobrowse/enabled        false
-/automount-drives/enabled  false
-/automount-media/enabled   false
-/autoopen/enabled          false
-/autorun/enabled           true`,
-			expectedOutput: []map[string]string{
-				{
-					"channel":  "thunar-volman",
-					"key":      "/autobrowse/enabled",
-					"value":    "false",
-					"username": testUsername,
-				},
-				{
-					"channel":  "thunar-volman",
-					"key":      "/automount-drives/enabled",
-					"value":    "false",
-					"username": testUsername,
-				},
-				{
-					"channel":  "thunar-volman",
-					"key":      "/automount-media/enabled",
-					"value":    "false",
-					"username": testUsername,
-				},
-				{
-					"channel":  "thunar-volman",
-					"key":      "/autoopen/enabled",
-					"value":    "false",
-					"username": testUsername,
-				},
-				{
-					"channel":  "thunar-volman",
-					"key":      "/autorun/enabled",
-					"value":    "true",
-					"username": testUsername,
-				},
-			},
-		},
-		{
-			channelName: "xfce4-session",
-			user:        &testUser,
-			input: `/general/FailsafeSessionName          Failsafe
-/general/LockCommand                  
-/sessions/Failsafe/Client0_Command    <<UNSUPPORTED>>
-/sessions/Failsafe/Client0_PerScreen  false
-/sessions/Failsafe/Client0_Priority   15
-/sessions/Failsafe/Count              1
-/sessions/Failsafe/IsFailsafe         true`,
-			expectedOutput: []map[string]string{
-				{
-					"channel":  "xfce4-session",
-					"key":      "/general/FailsafeSessionName",
-					"value":    "Failsafe",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/general/LockCommand",
-					"value":    "",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/sessions/Failsafe/Client0_Command",
-					"value":    "<<UNSUPPORTED>>",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/sessions/Failsafe/Client0_PerScreen",
-					"value":    "false",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/sessions/Failsafe/Client0_Priority",
-					"value":    "15",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/sessions/Failsafe/Count",
-					"value":    "1",
-					"username": testUsername,
-				},
-				{
-					"channel":  "xfce4-session",
-					"key":      "/sessions/Failsafe/IsFailsafe",
-					"value":    "true",
-					"username": testUsername,
-				},
-			},
-		},
-	}
+	// Set the environment variable for the default directory
+	os.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
+
+	// Make a temporary directory for user-specific config, put config files there
+	tmpUserDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpUserDir, xfconfChannelXmlPath), 0755), "error making temp directory")
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
+	fsutil.CopyFile(filepath.Join("testdata", "thunar-volman.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "thunar-volman.xml"))
+
+	// Set the environment variable for the user config directory
+	os.Setenv("XDG_CONFIG_HOME", tmpUserDir)
 }
