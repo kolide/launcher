@@ -5,6 +5,7 @@ package packagekit
 type PackageOptions struct {
 	Identifier string // What is the identifier? (eg: kolide-app)
 	Name       string // What's the name for this package (eg: launcher)
+	Title      string // MacOS app bundle only -- the title displayed during installation
 	Root       string // source directory to package
 	Scripts    string // directory of packaging scripts (postinst, prerm, etc)
 	Version    string // package version
