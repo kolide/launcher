@@ -105,7 +105,7 @@ func (t *XfconfQuerier) getConfigFromDirectory(dir string, dataQuery string, row
 	}
 
 	for _, match := range matches {
-		flattened, err := dataflatten.XmlFile(filepath.Join(match), flattenOpts...)
+		flattened, err := parseXfconfXml(match, flattenOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("could not read in xml file %s: %w", match, err)
 		}

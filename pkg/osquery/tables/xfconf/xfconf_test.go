@@ -36,7 +36,8 @@ func Test_getUserConfig(t *testing.T) {
 		require.Equalf(t, testUsername, configRow["username"], "unexpected username: %s", configRow["username"])
 		require.Truef(t, (configRow["channel"] == "xfce4-session" || configRow["channel"] == "xfce4-power-manager" || configRow["channel"] == "thunar-volman"), "unexpected channel: %s", configRow["channel"])
 
-		if configRow["channel"] == "xfce4-power-manager" && configRow["fullkey"] == "channel/property/property/1/-value" {
+		// Confirm that we took user-specific config values over default ones
+		if configRow["channel"] == "xfce4-power-manager" && configRow["fullkey"] == "channel/xfce4-power-manager/xfce4-power-manager/lock-screen-suspend-hibernate" {
 			require.Equal(t, "true", configRow["value"], "default settings for power manager not overridden by user settings")
 		}
 	}
