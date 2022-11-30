@@ -71,9 +71,11 @@ func (c ChannelXML) toMap() map[string]interface{} {
 	return results
 }
 
+// mapValue transforms p into a value to be set in a map.
 func (p Property) mapValue() interface{} {
 	var propertyValue interface{}
 	if len(p.Properties) > 0 {
+		// This is an empty property with nested properties inside -- extract them.
 		childPropertyMaps := make(map[string]interface{}, 0)
 		for _, child := range p.Properties {
 			// Call recursively for each child
@@ -82,6 +84,7 @@ func (p Property) mapValue() interface{} {
 
 		propertyValue = childPropertyMaps
 	} else if p.Type == "array" {
+		// This property has a nested array -- extract the array.
 		arrayValues := make([]interface{}, len(p.Values))
 		for i, v := range p.Values {
 			arrayValues[i] = v.Value
@@ -89,6 +92,7 @@ func (p Property) mapValue() interface{} {
 
 		propertyValue = arrayValues
 	} else {
+		// This property is a terminal/leaf property; just grab the value.
 		propertyValue = p.Value
 	}
 

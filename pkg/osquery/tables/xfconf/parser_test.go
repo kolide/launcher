@@ -13,12 +13,12 @@ import (
 func Test_readChannelXml(t *testing.T) {
 	t.Parallel()
 
-	type parseTestCase struct {
+	type readTestCase struct {
 		filePath       string
 		expectedResult ChannelXML
 	}
 
-	testCases := []parseTestCase{
+	testCases := []readTestCase{
 		{
 			filePath: "./testdata/thunar-volman.xml",
 			expectedResult: ChannelXML{
