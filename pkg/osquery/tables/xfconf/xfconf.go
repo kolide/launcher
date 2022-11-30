@@ -117,6 +117,9 @@ func (t *XfconfQuerier) getConfigFromDirectory(dir string, dataQuery string, row
 	return results, nil
 }
 
+// getDefaultXfconfDirs returns the path to xfconf per-channel xml files that contain
+// default settings. It checks for an override, otherwise defaults to /etc/xdg/...
+// See https://docs.xfce.org/xfce/xfce4-session/advanced#files_and_environment_variables.
 func getDefaultXfconfDirs() []string {
 	envDefaultDirsStr := os.Getenv("XDG_CONFIG_DIRS")
 	if envDefaultDirsStr != "" {
@@ -130,6 +133,10 @@ func getDefaultXfconfDirs() []string {
 	return []string{filepath.Join("/", "etc", "xdg", xfconfChannelXmlPath)}
 }
 
+// getUserXfconfDir returns to xfconf per-channel xml files that contain user-specific
+// settings. It checks for an override via environment variable, otherwise defaults to
+// ~/.config/...
+// See https://docs.xfce.org/xfce/xfce4-session/advanced#files_and_environment_variables.
 func getUserXfconfDir(u *user.User) string {
 	userConfigDir := os.Getenv("XDG_CONFIG_HOME")
 	if userConfigDir != "" {
@@ -139,6 +146,8 @@ func getUserXfconfDir(u *user.User) string {
 	return filepath.Join(u.HomeDir, ".config", xfconfChannelXmlPath)
 }
 
+// deduplicate takes an array of rows that may have duplicate keys and deduplicates,
+// always taking the first instance of the row and discarding subsequent ones.
 func deduplicate(rows []map[string]string) []map[string]string {
 	var deduplicated []map[string]string
 
