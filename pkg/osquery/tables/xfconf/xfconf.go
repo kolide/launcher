@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -56,12 +57,22 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 	for _, username := range users {
 		u, err := user.Lookup(username)
 		if err != nil {
-			return nil, fmt.Errorf("finding user by username '%s': %w", username, err)
+			level.Warn(t.logger).Log(
+				"msg", "could not find user by username",
+				"username", username,
+				"err", err,
+			)
+			continue
 		}
 
 		userRows, err := t.generateForUser(u, queryContext, defaultConfig)
 		if err != nil {
-			return nil, fmt.Errorf("generating rows for user '%s': %w", username, err)
+			level.Warn(t.logger).Log(
+				"msg", "could not generate config for user",
+				"username", username,
+				"err", err,
+			)
+			continue
 		}
 
 		results = append(results, userRows...)

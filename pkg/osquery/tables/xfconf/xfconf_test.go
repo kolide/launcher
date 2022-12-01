@@ -4,6 +4,7 @@
 package xfconf
 
 import (
+	"context"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -102,4 +103,33 @@ func setUpConfigFiles(t *testing.T) {
 
 	// Set the environment variable for the user config directory
 	os.Setenv("XDG_CONFIG_HOME", tmpUserDir)
+}
+
+func Test_getUserConfig_SoftError(t *testing.T) {
+	t.Parallel()
+
+	setUpConfigFiles(t)
+
+	xfconf := xfconfTable{
+		logger: log.NewNopLogger(),
+	}
+
+	// Get the combined config without error
+	constraintList := table.ConstraintList{
+		Affinity: table.ColumnTypeText,
+		Constraints: []table.Constraint{
+			{
+				Operator:   table.OperatorEquals,
+				Expression: "AFakeUserThatDoesNotExist",
+			},
+		},
+	}
+	q := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			"username": constraintList,
+		},
+	}
+	config, err := xfconf.generate(context.TODO(), q)
+	require.NoError(t, err, "expected no error fetching xfconf config")
+	require.Equal(t, 0, len(config), "expected no rows")
 }
