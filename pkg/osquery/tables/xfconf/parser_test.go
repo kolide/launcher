@@ -255,8 +255,12 @@ func Test_readChannelXml(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		result, err := readChannelXml(tt.filePath)
-		require.NoError(t, err, "did not expect error parsing xml")
-		require.Equal(t, tt.expectedResult, result)
+		tt := tt
+		t.Run(tt.filePath, func(t *testing.T) {
+			t.Parallel()
+			result, err := readChannelXml(tt.filePath)
+			require.NoError(t, err, "did not expect error parsing xml")
+			require.Equal(t, tt.expectedResult, result)
+		})
 	}
 }

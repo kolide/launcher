@@ -7,8 +7,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
-
-	"github.com/kolide/launcher/pkg/dataflatten"
 )
 
 type (
@@ -30,16 +28,16 @@ type (
 	}
 )
 
-// parseXml reads in the given xml file, parses it as an xfconf XML file, and then flattens
+// parseXfconfXml reads in the given xml file, parses it as an xfconf XML file, and then flattens
 // it. Because most XML elements in the xfconf files are `property`, we parse the file into
 // a map with the name attributes set as the keys to avoid loss of meaningful full keys.
-func parseXfconfXml(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
+func parseXfconfXml(file string) (map[string]interface{}, error) {
 	channelXml, err := readChannelXml(file)
 	if err != nil {
 		return nil, fmt.Errorf("could not read xfconf channel file %s: %w", file, err)
 	}
 
-	return dataflatten.Flatten(channelXml.toMap(), opts...)
+	return channelXml.toMap(), nil
 }
 
 func readChannelXml(file string) (ChannelXML, error) {

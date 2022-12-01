@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
+	"golang.org/x/exp/maps"
 )
 
 // Provides configuration settings for devices using XFCE desktop environment.
@@ -34,7 +35,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 		logger: logger,
 	}
 
-	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("channel")), t.generate)
+	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username")), t.generate)
 }
 
 func (t *XfconfQuerier) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -45,73 +46,41 @@ func (t *XfconfQuerier) generate(ctx context.Context, queryContext table.QueryCo
 		return results, errors.New("kolide_xfconf requires at least one username to be specified")
 	}
 
+	// Get default config that will apply to all users unless overridden
+	defaultConfig, err := t.getDefaultConfig()
+	if err != nil {
+		return results, fmt.Errorf("could not get default config: %w", err)
+	}
+
+	// For each user, fetch their config, check against constraints, and add to results
 	for _, username := range users {
 		u, err := user.Lookup(username)
 		if err != nil {
 			return nil, fmt.Errorf("finding user by username '%s': %w", username, err)
 		}
 
-		rowData := map[string]string{"username": username}
-
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			userConfig, err := t.getUserConfig(u, dataQuery, rowData)
-			if err != nil {
-				return nil, fmt.Errorf("could not get xfconf settings for user %s and query %s: %w", username, dataQuery, err)
-			}
-
-			results = append(results, userConfig...)
+		userRows, err := t.generateForUser(u, queryContext, defaultConfig)
+		if err != nil {
+			return nil, fmt.Errorf("generating rows for user '%s': %w", username, err)
 		}
+
+		results = append(results, userRows...)
 	}
 
 	return results, nil
 }
 
-func (t *XfconfQuerier) getUserConfig(u *user.User, dataQuery string, rowData map[string]string) ([]map[string]string, error) {
-	var results []map[string]string
+// getDefaultConfig reads default xfconf settings from the filesystem
+func (t *XfconfQuerier) getDefaultConfig() (map[string]interface{}, error) {
+	results := make(map[string]interface{}, 0)
 
-	// First, get user-specific settings
-	userConfigDir := getUserXfconfDir(u)
-	userConfigRows, err := t.getConfigFromDirectory(userConfigDir, dataQuery, rowData)
-	if err != nil {
-		return nil, fmt.Errorf("error getting config for user %s from directory %s: %w", u.Name, userConfigDir, err)
-	}
-	results = append(results, userConfigRows...)
-
-	// Then, get defaults
 	defaultDirs := getDefaultXfconfDirs()
 	for _, dir := range defaultDirs {
-		defaultConfigRows, err := t.getConfigFromDirectory(dir, dataQuery, rowData)
+		defaultConfig, err := t.getConfigFromDirectory(dir)
 		if err != nil {
-			return nil, fmt.Errorf("error getting config for user %s from default directory %s: %w", u.Name, dir, err)
+			return nil, fmt.Errorf("error getting config from default directory %s: %w", dir, err)
 		}
-		results = append(results, defaultConfigRows...)
-	}
-
-	// Make sure we only include defaults if there isn't already a user-specific setting
-	return deduplicate(results), nil
-}
-
-func (t *XfconfQuerier) getConfigFromDirectory(dir string, dataQuery string, rowData map[string]string) ([]map[string]string, error) {
-	var results []map[string]string
-
-	matches, err := filepath.Glob(filepath.Join(dir, "*.xml"))
-	if err != nil {
-		return nil, fmt.Errorf("could not glob for files in directory %s: %w", dir, err)
-	}
-
-	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
-		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-	}
-
-	for _, match := range matches {
-		flattened, err := parseXfconfXml(match, flattenOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("could not read in xml file %s: %w", match, err)
-		}
-		rowData["channel"] = strings.TrimSuffix(filepath.Base(match), ".xml")
-
-		results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+		maps.Copy(results, defaultConfig)
 	}
 
 	return results, nil
@@ -133,6 +102,40 @@ func getDefaultXfconfDirs() []string {
 	return []string{filepath.Join("/", "etc", "xdg", xfconfChannelXmlPath)}
 }
 
+// generateForUser returns flattened rows for the given user.
+func (t *XfconfQuerier) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]interface{}) ([]map[string]string, error) {
+	var results []map[string]string
+
+	// Fetch the user's config from the filesystem once, so we don't have to do it
+	// repeatedly for each constraint
+	userConfig, err := t.getUserConfig(u)
+	if err != nil {
+		return nil, fmt.Errorf("getting user config for user %s: %w", u.Username, err)
+	}
+
+	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+		userConfig, err := t.getCombinedFlattenedConfig(u, userConfig, defaultConfig, dataQuery)
+		if err != nil {
+			return nil, fmt.Errorf("could not get xfconf settings for user %s and query %s: %w", u.Username, dataQuery, err)
+		}
+
+		results = append(results, userConfig...)
+	}
+
+	return results, nil
+}
+
+// getUserConfig reads user-specific xfconf settings from the filesystem
+func (t *XfconfQuerier) getUserConfig(u *user.User) (map[string]interface{}, error) {
+	userConfigDir := getUserXfconfDir(u)
+	userConfig, err := t.getConfigFromDirectory(userConfigDir)
+	if err != nil {
+		return nil, fmt.Errorf("error getting config for user %s from directory %s: %w", u.Name, userConfigDir, err)
+	}
+
+	return userConfig, nil
+}
+
 // getUserXfconfDir returns to xfconf per-channel xml files that contain user-specific
 // settings. It checks for an override via environment variable, otherwise defaults to
 // ~/.config/...
@@ -144,6 +147,58 @@ func getUserXfconfDir(u *user.User) string {
 	}
 
 	return filepath.Join(u.HomeDir, ".config", xfconfChannelXmlPath)
+}
+
+// getConfigFromDirectory expects a `dir` that contains per-channel xfconf xml files. It parses
+// each XML file in the directory and returns the result as a slice of unflattened maps.
+func (t *XfconfQuerier) getConfigFromDirectory(dir string) (map[string]interface{}, error) {
+	results := make(map[string]interface{}, 0)
+
+	matches, err := filepath.Glob(filepath.Join(dir, "*.xml"))
+	if err != nil {
+		return nil, fmt.Errorf("could not glob for files in directory %s: %w", dir, err)
+	}
+
+	for _, match := range matches {
+		parsed, err := parseXfconfXml(match)
+		if err != nil {
+			return nil, fmt.Errorf("could not read in xml file %s: %w", match, err)
+		}
+
+		maps.Copy(results, parsed)
+	}
+
+	return results, nil
+}
+
+// getCombinedFlattenedConfig flattens and combines the given user config and default config;
+// in the case of duplicate settings, it takes the value from the user config.
+func (t *XfconfQuerier) getCombinedFlattenedConfig(u *user.User, userConfig map[string]interface{}, defaultConfig map[string]interface{}, dataQuery string) ([]map[string]string, error) {
+	var results []map[string]string
+
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithLogger(t.logger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+	}
+
+	rowData := map[string]string{"username": u.Username}
+
+	// Flatten user-specific settings
+	userConfigRows, err := dataflatten.Flatten(userConfig, flattenOpts...)
+	if err != nil {
+		return results, fmt.Errorf("could not flatten user settings for user %s: %w", u.Username, err)
+	}
+	results = append(results, dataflattentable.ToMap(userConfigRows, dataQuery, rowData)...)
+
+	// Add in the default settings
+	defaultConfigRows, err := dataflatten.Flatten(defaultConfig, flattenOpts...)
+	if err != nil {
+		return results, fmt.Errorf("could not flatten default settings: %w", err)
+	}
+	results = append(results, dataflattentable.ToMap(defaultConfigRows, dataQuery, rowData)...)
+
+	// Deduplicate the user and default configs, by taking the first instance in the results array
+	return deduplicate(results), nil
 }
 
 // deduplicate takes an array of rows that may have duplicate keys and deduplicates,
