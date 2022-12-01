@@ -3,14 +3,13 @@ module github.com/kolide/launcher
 require (
 	fyne.io/systray v1.10.0
 	github.com/Masterminds/semver v1.4.2
+	github.com/Microsoft/go-winio v0.4.11
 	github.com/clbanning/mxj v1.8.4
-	github.com/davecgh/go-spew v1.1.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.8.0
 	github.com/go-ole/go-ole v1.2.6
-	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.3.2
 	github.com/google/fscrypt v0.3.3
 	github.com/google/uuid v1.1.0
@@ -43,6 +42,7 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.22.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
@@ -56,7 +56,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.4.11 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/WatchBeam/clock v0.0.0-20170901150240-b08e6b4da7ea // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
@@ -65,6 +64,7 @@ require (
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go v1.5.1-1 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -93,7 +93,6 @@ require (
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
