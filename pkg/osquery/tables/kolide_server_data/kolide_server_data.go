@@ -20,10 +20,10 @@ func TablePlugin(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("value"),
 	}
 
-	return table.NewPlugin(tableName, columns, generateTargetMembershipTable(db))
+	return table.NewPlugin(tableName, columns, generateServerDataTable(db))
 }
 
-func generateTargetMembershipTable(db *bbolt.DB) table.GenerateFunc {
+func generateServerDataTable(db *bbolt.DB) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return dbKeyValueRows(osquery.ServerProvidedDataBucket, db)
 	}
