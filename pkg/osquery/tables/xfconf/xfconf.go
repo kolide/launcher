@@ -26,19 +26,19 @@ import (
 
 var xfconfChannelXmlPath string = filepath.Join("xfce4", "xfconf", "xfce-perchannel-xml")
 
-type XfconfQuerier struct {
+type xfconfTable struct {
 	logger log.Logger
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
-	t := &XfconfQuerier{
+	t := &xfconfTable{
 		logger: logger,
 	}
 
 	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username")), t.generate)
 }
 
-func (t *XfconfQuerier) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username")
@@ -71,7 +71,7 @@ func (t *XfconfQuerier) generate(ctx context.Context, queryContext table.QueryCo
 }
 
 // getDefaultConfig reads default xfconf settings from the filesystem
-func (t *XfconfQuerier) getDefaultConfig() (map[string]interface{}, error) {
+func (t *xfconfTable) getDefaultConfig() (map[string]interface{}, error) {
 	results := make(map[string]interface{}, 0)
 
 	defaultDirs := getDefaultXfconfDirs()
@@ -103,7 +103,7 @@ func getDefaultXfconfDirs() []string {
 }
 
 // generateForUser returns flattened rows for the given user.
-func (t *XfconfQuerier) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]interface{}) ([]map[string]string, error) {
+func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]interface{}) ([]map[string]string, error) {
 	var results []map[string]string
 
 	// Fetch the user's config from the filesystem once, so we don't have to do it
@@ -126,7 +126,7 @@ func (t *XfconfQuerier) generateForUser(u *user.User, queryContext table.QueryCo
 }
 
 // getUserConfig reads user-specific xfconf settings from the filesystem
-func (t *XfconfQuerier) getUserConfig(u *user.User) (map[string]interface{}, error) {
+func (t *xfconfTable) getUserConfig(u *user.User) (map[string]interface{}, error) {
 	userConfigDir := getUserXfconfDir(u)
 	userConfig, err := t.getConfigFromDirectory(userConfigDir)
 	if err != nil {
@@ -151,7 +151,7 @@ func getUserXfconfDir(u *user.User) string {
 
 // getConfigFromDirectory expects a `dir` that contains per-channel xfconf xml files. It parses
 // each XML file in the directory and returns the result as a slice of unflattened maps.
-func (t *XfconfQuerier) getConfigFromDirectory(dir string) (map[string]interface{}, error) {
+func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]interface{}, error) {
 	results := make(map[string]interface{}, 0)
 
 	matches, err := filepath.Glob(filepath.Join(dir, "*.xml"))
@@ -173,7 +173,7 @@ func (t *XfconfQuerier) getConfigFromDirectory(dir string) (map[string]interface
 
 // getCombinedFlattenedConfig flattens and combines the given user config and default config;
 // in the case of duplicate settings, it takes the value from the user config.
-func (t *XfconfQuerier) getCombinedFlattenedConfig(u *user.User, userConfig map[string]interface{}, defaultConfig map[string]interface{}, dataQuery string) ([]map[string]string, error) {
+func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[string]interface{}, defaultConfig map[string]interface{}, dataQuery string) ([]map[string]string, error) {
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{

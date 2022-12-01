@@ -21,7 +21,7 @@ func Test_getUserConfig(t *testing.T) {
 
 	setUpConfigFiles(t)
 
-	xfconf := XfconfQuerier{
+	xfconf := xfconfTable{
 		logger: log.NewNopLogger(),
 	}
 
