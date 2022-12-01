@@ -72,7 +72,7 @@ const (
 	// Bucket name to use for buffered result logs.
 	resultLogsBucket = "result_logs"
 
-	// the bucket which we push values into from server-backed tables, like kolide_target_membership
+	// the bucket which we push values into from server-backed tables
 	ServerProvidedDataBucket = "server_provided_data"
 
 	// DB key for UUID
