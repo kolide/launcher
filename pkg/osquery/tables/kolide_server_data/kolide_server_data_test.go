@@ -10,7 +10,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func Test_generateTargetMembershipTable(t *testing.T) {
+func Test_generateServerDataTable(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
