@@ -36,7 +36,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 		logger: logger,
 	}
 
-	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username")), t.generate)
+	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
 }
 
 func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -82,8 +82,8 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 }
 
 // getDefaultConfig reads default xfconf settings from the filesystem
-func (t *xfconfTable) getDefaultConfig() (map[string]interface{}, error) {
-	results := make(map[string]interface{}, 0)
+func (t *xfconfTable) getDefaultConfig() (map[string]map[string]interface{}, error) {
+	results := make(map[string]map[string]interface{}, 0)
 
 	defaultDirs := getDefaultXfconfDirs()
 	for _, dir := range defaultDirs {
@@ -114,7 +114,7 @@ func getDefaultXfconfDirs() []string {
 }
 
 // generateForUser returns flattened rows for the given user.
-func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]interface{}) ([]map[string]string, error) {
+func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]map[string]interface{}) ([]map[string]string, error) {
 	var results []map[string]string
 
 	// Fetch the user's config from the filesystem once, so we don't have to do it
@@ -137,7 +137,7 @@ func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryCont
 }
 
 // getUserConfig reads user-specific xfconf settings from the filesystem
-func (t *xfconfTable) getUserConfig(u *user.User) (map[string]interface{}, error) {
+func (t *xfconfTable) getUserConfig(u *user.User) (map[string]map[string]interface{}, error) {
 	userConfigDir := getUserXfconfDir(u)
 	userConfig, err := t.getConfigFromDirectory(userConfigDir)
 	if err != nil {
@@ -161,9 +161,10 @@ func getUserXfconfDir(u *user.User) string {
 }
 
 // getConfigFromDirectory expects a `dir` that contains per-channel xfconf xml files. It parses
-// each XML file in the directory and returns the result as a slice of unflattened maps.
-func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]interface{}, error) {
-	results := make(map[string]interface{}, 0)
+// each XML file in the directory and returns the result as map from filepaths to the data contained
+// in that file.
+func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]map[string]interface{}, error) {
+	results := make(map[string]map[string]interface{}, 0)
 
 	matches, err := filepath.Glob(filepath.Join(dir, "*.xml"))
 	if err != nil {
@@ -176,7 +177,7 @@ func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]interface{}
 			return nil, fmt.Errorf("could not read in xml file %s: %w", match, err)
 		}
 
-		maps.Copy(results, parsed)
+		results[match] = parsed
 	}
 
 	return results, nil
@@ -184,7 +185,7 @@ func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]interface{}
 
 // getCombinedFlattenedConfig flattens and combines the given user config and default config;
 // in the case of duplicate settings, it takes the value from the user config.
-func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[string]interface{}, defaultConfig map[string]interface{}, dataQuery string) ([]map[string]string, error) {
+func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[string]map[string]interface{}, defaultConfig map[string]map[string]interface{}, dataQuery string) ([]map[string]string, error) {
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
@@ -192,21 +193,27 @@ func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[st
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
-	rowData := map[string]string{"username": u.Username}
-
 	// Flatten user-specific settings
-	userConfigRows, err := dataflatten.Flatten(userConfig, flattenOpts...)
-	if err != nil {
-		return results, fmt.Errorf("could not flatten user settings for user %s: %w", u.Username, err)
+	for userConfigPath, userConfigData := range userConfig {
+		userConfigRows, err := dataflatten.Flatten(userConfigData, flattenOpts...)
+		if err != nil {
+			return results, fmt.Errorf("could not flatten user settings for user %s: %w", u.Username, err)
+		}
+
+		rowData := map[string]string{"username": u.Username, "path": userConfigPath}
+		results = append(results, dataflattentable.ToMap(userConfigRows, dataQuery, rowData)...)
 	}
-	results = append(results, dataflattentable.ToMap(userConfigRows, dataQuery, rowData)...)
 
 	// Add in the default settings
-	defaultConfigRows, err := dataflatten.Flatten(defaultConfig, flattenOpts...)
-	if err != nil {
-		return results, fmt.Errorf("could not flatten default settings: %w", err)
+	for defaultConfigPath, defaultConfigData := range defaultConfig {
+		defaultConfigRows, err := dataflatten.Flatten(defaultConfigData, flattenOpts...)
+		if err != nil {
+			return results, fmt.Errorf("could not flatten default settings: %w", err)
+		}
+
+		rowData := map[string]string{"username": u.Username, "path": defaultConfigPath}
+		results = append(results, dataflattentable.ToMap(defaultConfigRows, dataQuery, rowData)...)
 	}
-	results = append(results, dataflattentable.ToMap(defaultConfigRows, dataQuery, rowData)...)
 
 	// Deduplicate the user and default configs, by taking the first instance in the results array
 	return deduplicate(results), nil

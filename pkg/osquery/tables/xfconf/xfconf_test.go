@@ -20,7 +20,7 @@ import (
 func Test_getUserConfig(t *testing.T) {
 	t.Parallel()
 
-	setUpConfigFiles(t)
+	tmpDefaultDir, tmpUserDir := setUpConfigFiles(t)
 
 	xfconf := xfconfTable{
 		logger: log.NewNopLogger(),
@@ -33,7 +33,9 @@ func Test_getUserConfig(t *testing.T) {
 	require.NoError(t, err, "expected no error fetching default xfconfig")
 	require.Greater(t, len(defaultConfig), 0)
 	// Confirm lock-screen-suspend-hibernate is false now so we can validate that it got overridden after
-	powerManagerChannel, ok := defaultConfig["channel/xfce4-power-manager"]
+	powerManagerChannelConfig, ok := defaultConfig[filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-power-manager.xml")]
+	require.True(t, ok, "invalid default data format -- missing channel file")
+	powerManagerChannel, ok := powerManagerChannelConfig["channel/xfce4-power-manager"]
 	require.True(t, ok, "invalid default data format -- missing channel")
 	powerManagerProperties, ok := powerManagerChannel.(map[string]interface{})["xfce4-power-manager"]
 	require.True(t, ok, "invalid default data format -- missing xfce4-power-manager property")
@@ -50,6 +52,11 @@ func Test_getUserConfig(t *testing.T) {
 	for _, configRow := range config {
 		// Confirm username was set correctly on all rows
 		require.Equalf(t, testUsername, configRow["username"], "unexpected username: %s", configRow["username"])
+
+		// Confirm path was set correctly on all rows
+		require.True(t, strings.HasPrefix(configRow["path"], filepath.Join(tmpDefaultDir, xfconfChannelXmlPath)) ||
+			strings.HasPrefix(configRow["path"], filepath.Join(tmpUserDir, xfconfChannelXmlPath)),
+			"unexpected path: %s", configRow["path"])
 
 		// Confirm each row came from an expected channel
 		require.Truef(t, (strings.HasPrefix(configRow["fullkey"], "channel/xfce4-session") ||
@@ -85,26 +92,6 @@ func Test_getUserConfig(t *testing.T) {
 	require.Equal(t, "false", constrainedConfig[0]["value"], "fetched incorrect value for autoopen enabled")
 }
 
-func setUpConfigFiles(t *testing.T) {
-	// Make a temporary directory for default config, put config files there
-	tmpDefaultDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDefaultDir, xfconfChannelXmlPath), 0755), "error making temp directory")
-	fsutil.CopyFile(filepath.Join("testdata", "xfce4-session.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-session.xml"))
-	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager-default.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
-
-	// Set the environment variable for the default directory
-	os.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
-
-	// Make a temporary directory for user-specific config, put config files there
-	tmpUserDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpUserDir, xfconfChannelXmlPath), 0755), "error making temp directory")
-	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
-	fsutil.CopyFile(filepath.Join("testdata", "thunar-volman.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "thunar-volman.xml"))
-
-	// Set the environment variable for the user config directory
-	os.Setenv("XDG_CONFIG_HOME", tmpUserDir)
-}
-
 func Test_getUserConfig_SoftError(t *testing.T) {
 	t.Parallel()
 
@@ -132,4 +119,26 @@ func Test_getUserConfig_SoftError(t *testing.T) {
 	config, err := xfconf.generate(context.TODO(), q)
 	require.NoError(t, err, "expected no error fetching xfconf config")
 	require.Equal(t, 0, len(config), "expected no rows")
+}
+
+func setUpConfigFiles(t *testing.T) (string, string) {
+	// Make a temporary directory for default config, put config files there
+	tmpDefaultDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDefaultDir, xfconfChannelXmlPath), 0755), "error making temp directory")
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-session.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-session.xml"))
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager-default.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
+
+	// Set the environment variable for the default directory
+	os.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
+
+	// Make a temporary directory for user-specific config, put config files there
+	tmpUserDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpUserDir, xfconfChannelXmlPath), 0755), "error making temp directory")
+	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
+	fsutil.CopyFile(filepath.Join("testdata", "thunar-volman.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "thunar-volman.xml"))
+
+	// Set the environment variable for the user config directory
+	os.Setenv("XDG_CONFIG_HOME", tmpUserDir)
+
+	return tmpDefaultDir, tmpUserDir
 }
