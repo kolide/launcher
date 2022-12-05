@@ -49,6 +49,9 @@ type Options struct {
 	Control bool
 	// ControlServerURL URL for control server.
 	ControlServerURL string
+	// ControlRequestInterval is the interval at which control client
+	// will check for updates from the control server.
+	ControlRequestInterval time.Duration
 
 	// Osquery TLS options
 	OsqueryTlsConfigEndpoint           string

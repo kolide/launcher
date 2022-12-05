@@ -179,17 +179,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	// If the control server has been opted-in to, run it
+	// If the control server has been opted-in to, run the control service
 	if opts.Control {
-		control, err := createControl(ctx, db, logger, opts)
+		control, err := createControlService(ctx, logger, opts)
 		if err != nil {
-			return fmt.Errorf("create control actor: %w", err)
+			return fmt.Errorf("Failed to setup control service: %w", err)
 		}
-		if control != nil {
-			runGroup.Add(control.Execute, control.Interrupt)
-		} else {
-			level.Info(logger).Log("msg", "got nil control actor. Ignoring")
-		}
+		runGroup.Add(control.Execute, control.Interrupt)
 	}
 
 	var runner *desktopRunner.DesktopUsersProcessesRunner

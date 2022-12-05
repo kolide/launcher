@@ -1,6 +1,3 @@
-//go:build !windows
-// +build !windows
-
 package main
 
 import (
@@ -10,38 +7,50 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
-	"github.com/kolide/launcher/pkg/control"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/pkg/launcher"
-
-	"go.etcd.io/bbolt"
 )
 
-func createControl(ctx context.Context, db *bbolt.DB, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
-	level.Debug(logger).Log("msg", "creating control client")
+func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Options) (*control.HTTPClient, error) {
+	level.Debug(logger).Log("msg", "creating control http client")
 
-	controlOpts := []control.Option{
-		control.WithLogger(logger),
-	}
+	clientOpts := []control.HTTPClientOption{}
 	if opts.InsecureTLS {
-		controlOpts = append(controlOpts, control.WithInsecureSkipVerify())
+		clientOpts = append(clientOpts, control.WithInsecureSkipVerify())
 	}
 	if opts.DisableControlTLS {
-		controlOpts = append(controlOpts, control.WithDisableTLS())
+		clientOpts = append(clientOpts, control.WithDisableTLS())
 	}
-	controlClient, err := control.NewControlClient(db, opts.ControlServerURL, controlOpts...)
+	client, err := control.NewControlHTTPClient(opts.ControlServerURL, clientOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("creating control client: %w", err)
+		return nil, fmt.Errorf("creating control http client: %w", err)
 	}
+
+	return client, nil
+}
+
+func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
+	level.Debug(logger).Log("msg", "creating control service")
+
+	client, err := createHTTPClient(ctx, logger, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	controlOpts := []control.Option{
+		control.WithRequestInterval(opts.ControlRequestInterval),
+	}
+	service := control.NewControlService(logger, client, controlOpts...)
 
 	return &actor.Actor{
 		Execute: func() error {
-			level.Info(logger).Log("msg", "control started")
-			controlClient.Start(ctx)
+			level.Info(logger).Log("msg", "control service started")
+			service.Start(ctx)
 			return nil
 		},
 		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "control interrupted", "err", err)
-			controlClient.Stop()
+			level.Info(logger).Log("msg", "control service interrupted", "err", err)
+			service.Stop()
 		},
 	}, nil
 }
