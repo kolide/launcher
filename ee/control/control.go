@@ -20,7 +20,7 @@ type ControlService struct {
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
 	data            dataProvider
-	lastLoaded      map[string]string
+	lastFetched     map[string]string
 }
 
 // consumer is an interface for something that consumes control server data updates.
@@ -43,6 +43,8 @@ func NewControlService(logger log.Logger, data dataProvider, opts ...Option) *Co
 	cs := &ControlService{
 		logger:          logger,
 		requestInterval: 60 * time.Second,
+		consumers:       make(map[string]consumer),
+		subscribers:     make(map[string][]subscriber),
 		data:            data,
 	}
 
@@ -104,37 +106,37 @@ func (cs *ControlService) Fetch() error {
 	// 	otherwise
 	// 		ask the dataProvider for the latest update for this subsystem (make a new HTTP request)
 
-	// 		if latest update is successfully fetched
-	// 			notify the consumer of this subsystem, and give them the control data
+	// 	if latest update is successfully fetched
+	// 		notify the consumer of this subsystem, and give them the control data
 
-	// 			for each subscriber of this subsystem
-	// 				ping the subscriber
+	// 		for each subscriber of this subsystem
+	// 			ping the subscriber
 
-	// 			cache latest update hash retrieved for this subsystem
+	// 		cache latest update hash retrieved for this subsystem
 
 	return nil
 }
 
-func (c *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
-	if _, ok := c.consumers[subsystem]; ok {
+func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
+	if _, ok := cs.consumers[subsystem]; ok {
 		return fmt.Errorf("consumer already registered for subsystem %s", subsystem)
 	}
-	c.consumers[subsystem] = consumer
+	cs.consumers[subsystem] = consumer
 	return nil
 }
 
-func (c *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
-	c.subscribers[subsystem] = append(c.subscribers[subsystem], subscriber)
+func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
+	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
 }
 
-func (c *ControlService) update(subsystem string, reader io.Reader) {
+func (cs *ControlService) update(subsystem string, reader io.Reader) {
 	// First, send to consumer, if any
-	if consumer, ok := c.consumers[subsystem]; ok {
+	if consumer, ok := cs.consumers[subsystem]; ok {
 		consumer.Update(reader)
 	}
 
 	// Then send a ping to all subscribers
-	for _, subscriber := range c.subscribers[subsystem] {
+	for _, subscriber := range cs.subscribers[subsystem] {
 		subscriber.Ping()
 	}
 }
