@@ -30,7 +30,7 @@ type controlRequest struct {
 }
 
 func NewControlHTTPClient(addr string, opts ...HTTPClientOption) (*HTTPClient, error) {
-	baseURL, err := url.Parse(fmt.Sprintf("https://%s", "addr"))
+	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
