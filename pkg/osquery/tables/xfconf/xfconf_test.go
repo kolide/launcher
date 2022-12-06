@@ -90,19 +90,10 @@ func Test_getUserConfig(t *testing.T) {
 	require.Equal(t, 1, len(constrainedConfig), "query wrong number of rows, expected exactly 1")
 	require.Equal(t, "channel/thunar-volman/autoopen/enabled", constrainedConfig[0]["fullkey"], "query fetched wrong row")
 	require.Equal(t, "false", constrainedConfig[0]["value"], "fetched incorrect value for autoopen enabled")
-}
 
-func Test_getUserConfig_SoftError(t *testing.T) {
-	t.Parallel()
-
-	setUpConfigFiles(t)
-
-	xfconf := xfconfTable{
-		logger: log.NewNopLogger(),
-	}
-
-	// Get the combined config without error
-	constraintList := table.ConstraintList{
+	// Confirm that if we run into an error (e.g. requested user not existing), we fail soft -- still
+	// returning a config, no error.
+	fakeUserConstraintList := table.ConstraintList{
 		Affinity: table.ColumnTypeText,
 		Constraints: []table.Constraint{
 			{
@@ -111,14 +102,14 @@ func Test_getUserConfig_SoftError(t *testing.T) {
 			},
 		},
 	}
-	q := table.QueryContext{
+	fakeUserQuery := table.QueryContext{
 		Constraints: map[string]table.ConstraintList{
-			"username": constraintList,
+			"username": fakeUserConstraintList,
 		},
 	}
-	config, err := xfconf.generate(context.TODO(), q)
+	fakeUserNoConfig, err := xfconf.generate(context.TODO(), fakeUserQuery)
 	require.NoError(t, err, "expected no error fetching xfconf config")
-	require.Equal(t, 0, len(config), "expected no rows")
+	require.Equal(t, 0, len(fakeUserNoConfig), "expected no rows")
 }
 
 func setUpConfigFiles(t *testing.T) (string, string) {
