@@ -4,6 +4,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -207,6 +208,34 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 					"err", err,
 				)
 			}
+		}
+	}
+}
+
+func (r *DesktopUsersProcessesRunner) Update(data io.Reader) {
+	var desktopStatus client.DesktopUserStatus
+	if err := json.NewDecoder(data).Decode(&desktopStatus); err != nil {
+		level.Error(r.logger).Log(
+			"msg", "failed to decode desktop user control data",
+			"err", err,
+		)
+		return
+	}
+
+	if desktopStatus.Status == "" {
+		return
+	}
+
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.authToken, proc.socketPath)
+		if err := client.SetStatus(desktopStatus.Status); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending status command to desktop process",
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
 		}
 	}
 }

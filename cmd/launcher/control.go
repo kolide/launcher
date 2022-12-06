@@ -30,12 +30,12 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
+func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*actor.Actor, *control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	controlOpts := []control.Option{
@@ -53,5 +53,5 @@ func createControlService(ctx context.Context, logger log.Logger, opts *launcher
 			level.Info(logger).Log("msg", "control service interrupted", "err", err)
 			service.Stop()
 		},
-	}, nil
+	}, service, nil
 }

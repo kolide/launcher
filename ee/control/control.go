@@ -11,14 +11,19 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
+// Registry is a registrar of consumers & subscribers
+type Registry struct {
+	consumers   map[string]consumer
+	subscribers map[string][]subscriber
+}
+
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
+	Registry
 	logger          log.Logger
 	cancel          context.CancelFunc
 	requestInterval time.Duration
-	consumers       map[string]consumer
-	subscribers     map[string][]subscriber
 	fetcher         dataProvider
 	lastFetched     map[string]string
 }
@@ -41,13 +46,17 @@ type dataProvider interface {
 	Get(hash string) (data io.Reader, err error)
 }
 
-func New(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
+	r := Registry{
+		consumers:   make(map[string]consumer),
+		subscribers: make(map[string][]subscriber),
+	}
 	cs := &ControlService{
+		Registry:        r,
 		logger:          logger,
 		requestInterval: 60 * time.Second,
-		consumers:       make(map[string]consumer),
-		subscribers:     make(map[string][]subscriber),
-		fetcher:         data,
+		fetcher:         fetcher,
+		lastFetched:     make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -78,71 +87,63 @@ func (cs *ControlService) Stop() {
 	cs.cancel()
 }
 
-// controlResponse is the payload received from the control server
-type controlResponse struct {
-	// TODO: This is a temporary and simple data format for phase 1
-	Message string `json:"message,omitempty"`
-	Err     string `json:"error,omitempty"`
-}
-
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
+	// Empty hash means get the subsystem map of hashes
 	data, err := cs.fetcher.Get("")
 	if err != nil {
-		return fmt.Errorf("getting initial config: %w", err)
+		return fmt.Errorf("getting subsystems map: %w", err)
 	}
 
-	var controlData controlResponse
-	if err := json.NewDecoder(data).Decode(&controlData); err != nil {
-		return fmt.Errorf("decoding initial config map: %w", err)
+	var subsystems map[string]string
+	if err := json.NewDecoder(data).Decode(&subsystems); err != nil {
+		return fmt.Errorf("decoding subsystems map: %w", err)
 	}
 
-	level.Debug(cs.logger).Log(
-		"msg", "Got response",
-		"controlData.Message", controlData.Message,
-	)
+	for subsystem, hash := range subsystems {
+		if hash == cs.lastFetched[subsystem] {
+			// The most recent hash matches the last one we fetched
+			// Nothing to do, skip to the next subsystem
+			continue
+		}
 
-	// TODO: Here's where the subsystems, and their consumers and subscribers come into play
+		data, err := cs.fetcher.Get(hash)
+		if err != nil {
+			return fmt.Errorf("failed to get control data: %w", err)
+		}
 
-	// Here's a pseudo code outline of what would follow here
+		// Consumer and subscriber(s) notified now
+		cs.update(subsystem, data)
 
-	// for each (subsystem, hash) in the list
-	// 	if the hash matches the last update for this subsystem
-	// 		skip to next subsystem
-	// 	otherwise
-	// 		ask the dataProvider for the latest update for this subsystem (make a new HTTP request)
+		// Remember the hash of the last fetched version of this subsystem's data
+		cs.lastFetched[subsystem] = hash
+	}
 
-	// 	if latest update is successfully fetched
-	// 		notify the consumer of this subsystem, and give them the control data
-
-	// 		for each subscriber of this subsystem
-	// 			ping the subscriber
-
-	// 		cache latest update hash retrieved for this subsystem
+	level.Debug(cs.logger).Log("msg", "control data fetch complete")
 
 	return nil
 }
 
-func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
-	if _, ok := cs.consumers[subsystem]; ok {
+func (r *Registry) RegisterConsumer(subsystem string, consumer consumer) error {
+	if _, ok := r.consumers[subsystem]; ok {
 		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
 	}
-	cs.consumers[subsystem] = consumer
+	r.consumers[subsystem] = consumer
 	return nil
 }
 
-func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
-	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
+func (r *Registry) RegisterSubscriber(subsystem string, subscriber subscriber) {
+	r.subscribers[subsystem] = append(r.subscribers[subsystem], subscriber)
 }
 
-func (cs *ControlService) update(subsystem string, reader io.Reader) {
+func (r *Registry) update(subsystem string, reader io.Reader) {
 	// First, send to consumer, if any
-	if consumer, ok := cs.consumers[subsystem]; ok {
+	if consumer, ok := r.consumers[subsystem]; ok {
 		consumer.Update(reader)
 	}
 
 	// Then send a ping to all subscribers
-	for _, subscriber := range cs.subscribers[subsystem] {
+	for _, subscriber := range r.subscribers[subsystem] {
 		subscriber.Ping()
 	}
 }

@@ -2,7 +2,6 @@ package control
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +19,6 @@ type HTTPClient struct {
 	client     *http.Client
 	insecure   bool
 	disableTLS bool
-}
-
-// controlRequest is the payload sent in control server requests
-type controlRequest struct {
-	// TODO: This is a temporary and simple data format for phase 1
-	Message string `json:"message"`
 }
 
 func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
@@ -48,11 +41,8 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 
 func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
 	verb, path := "GET", fmt.Sprintf("/api/v1/control/%s", hash)
-	params := &controlRequest{
-		Message: "ping",
-	}
 
-	response, err := c.do(verb, path, params)
+	response, err := c.do(verb, path)
 	if err != nil {
 		level.Error(c.logger).Log(
 			"msg", "error making request to control server endpoint",
@@ -91,7 +81,7 @@ func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
 	// response.Body will be closed before this function exits, get all the data now
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		level.Error(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error reading response body from control server",
 			"err", err,
 		)
@@ -102,20 +92,11 @@ func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
 	return reader, nil
 }
 
-func (c *HTTPClient) do(verb, path string, params interface{}) (*http.Response, error) {
-	var bodyBytes []byte
-	var err error
-	if params != nil {
-		bodyBytes, err = json.Marshal(params)
-		if err != nil {
-			return nil, fmt.Errorf("marshaling json: %w", err)
-		}
-	}
-
+func (c *HTTPClient) do(verb, path string) (*http.Response, error) {
 	request, err := http.NewRequest(
 		verb,
 		c.url(path).String(),
-		bytes.NewBuffer(bodyBytes),
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating request object: %w", err)

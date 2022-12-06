@@ -104,14 +104,18 @@ func TestControlServiceUpdate(t *testing.T) {
 	var updateCount int
 	var pingCount int
 	tests := []struct {
-		name      string
-		subsystem string
-		c         consumer
-		s         []subscriber
+		name            string
+		subsystem       string
+		c               consumer
+		s               []subscriber
+		expectedUpdates int
+		expectedPings   int
 	}{
 		{
-			name:      "one consumer, two subscribers",
-			subsystem: "desktop",
+			name:            "one consumer, two subscribers",
+			subsystem:       "desktop",
+			expectedUpdates: 1,
+			expectedPings:   2,
 			c: &mockConsumer{
 				updateFn: func() {
 					updateCount++
@@ -148,8 +152,8 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			cs.update(tt.subsystem, nil)
 
-			assert.Equal(t, updateCount, 1)
-			assert.Equal(t, pingCount, 2)
+			assert.Equal(t, updateCount, tt.expectedUpdates)
+			assert.Equal(t, pingCount, tt.expectedPings)
 		})
 	}
 }
