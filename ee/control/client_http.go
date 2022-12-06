@@ -44,10 +44,6 @@ func NewControlHTTPClient(addr string, opts ...HTTPClientOption) (*HTTPClient, e
 		opt(c)
 	}
 
-	if c.disableTLS {
-		c.baseURL.Scheme = "http"
-	}
-
 	return c, nil
 }
 

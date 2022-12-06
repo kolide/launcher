@@ -21,5 +21,6 @@ func WithInsecureSkipVerify() HTTPClientOption {
 func WithDisableTLS() HTTPClientOption {
 	return func(c *HTTPClient) {
 		c.disableTLS = true
+		c.baseURL.Scheme = "http"
 	}
 }
