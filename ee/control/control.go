@@ -19,7 +19,7 @@ type ControlService struct {
 	requestInterval time.Duration
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
-	data            dataProvider
+	fetcher         dataProvider
 	lastFetched     map[string]string
 }
 
@@ -47,7 +47,7 @@ func New(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
 		requestInterval: 60 * time.Second,
 		consumers:       make(map[string]consumer),
 		subscribers:     make(map[string][]subscriber),
-		data:            data,
+		fetcher:         data,
 	}
 
 	for _, opt := range opts {
@@ -87,7 +87,7 @@ type controlResponse struct {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	_, data, err := cs.data.Get("")
+	_, data, err := cs.fetcher.Get("")
 	if err != nil {
 		return fmt.Errorf("getting initial config: %w", err)
 	}
