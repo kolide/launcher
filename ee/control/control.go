@@ -61,11 +61,15 @@ func (cs *ControlService) Start(ctx context.Context) {
 	ctx, cs.cancel = context.WithCancel(ctx)
 	requestTicker := time.NewTicker(cs.requestInterval)
 	for {
+		// Fetch immediately on each iteration, avoiding the initial ticker delay
+		cs.Fetch()
+
 		select {
 		case <-ctx.Done():
 			return
 		case <-requestTicker.C:
-			cs.Fetch()
+			// Go fetch!
+			continue
 		}
 	}
 }
