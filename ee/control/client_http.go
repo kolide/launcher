@@ -76,7 +76,6 @@ func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Rea
 		// the client that the cached version of the response is still good to use
 		level.Debug(c.logger).Log(
 			"msg", "got HTTP 304 making control server request",
-			"err", err,
 		)
 		return "", nil, err
 	}
