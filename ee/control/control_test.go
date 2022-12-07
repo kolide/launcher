@@ -3,9 +3,9 @@ package control
 import (
 	"io"
 	"testing"
-	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,13 +38,7 @@ func (dp nopDataProvider) Get(subsystem string) (hash string, data io.Reader, er
 
 func testCS() *ControlService {
 	data := nopDataProvider{}
-	cs := &ControlService{
-		logger:          log.NewNopLogger(),
-		requestInterval: 60 * time.Second,
-		consumers:       make(map[string]consumer),
-		subscribers:     make(map[string][]subscriber),
-		data:            data,
-	}
+	cs := control.New(log.NewNopLogger(), data, nil)
 
 	return cs
 }

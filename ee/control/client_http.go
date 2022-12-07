@@ -28,14 +28,14 @@ type controlRequest struct {
 	Message string `json:"message"`
 }
 
-func NewControlHTTPClient(addr string, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &HTTPClient{
 		baseURL: baseURL,
-		client:  http.DefaultClient,
+		client:  client,
 		addr:    addr,
 	}
 
