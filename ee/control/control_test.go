@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/ee/control"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +60,8 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 			t.Parallel()
 
 			data := nopDataProvider{}
-			cs := control.New(log.NewNopLogger(), data, nil)
+			controlOpts := []Option{}
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -88,7 +88,8 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 			t.Parallel()
 
 			data := nopDataProvider{}
-			cs := control.New(log.NewNopLogger(), data, nil)
+			controlOpts := []Option{}
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -136,7 +137,9 @@ func TestControlServiceUpdate(t *testing.T) {
 			t.Parallel()
 
 			updateCount, pingCount = 0, 0
-			cs := testCS()
+			data := nopDataProvider{}
+			controlOpts := []Option{}
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
