@@ -39,7 +39,7 @@ type dataProvider interface {
 	Get(subsystem, cachedETag string) (etag string, data io.Reader, err error)
 }
 
-func NewControlService(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          logger,
 		requestInterval: 60 * time.Second,
@@ -119,7 +119,7 @@ func (cs *ControlService) Fetch() error {
 
 func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
 	if _, ok := cs.consumers[subsystem]; ok {
-		return fmt.Errorf("consumer already registered for subsystem %s", subsystem)
+		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
 	}
 	cs.consumers[subsystem] = consumer
 	return nil

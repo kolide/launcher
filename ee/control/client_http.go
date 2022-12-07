@@ -68,9 +68,8 @@ func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Rea
 		// This could indicate an inconsistency in server data, or a client logic error
 		level.Error(c.logger).Log(
 			"msg", "got HTTP 404 making control server request",
-			"err", err,
 		)
-		return "", nil, err
+		return "", nil, nil
 
 	case http.StatusNotModified:
 		// The control server sends back a 304 Not Modified status, without a body, which tells
