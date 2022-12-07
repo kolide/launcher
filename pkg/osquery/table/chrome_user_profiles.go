@@ -3,7 +3,8 @@ package table
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 var chromeLocalStateDirs = map[string][]string{
@@ -58,13 +58,13 @@ type chromeProfileInfo struct {
 
 func (c *chromeUserProfilesTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
 	var results []map[string]string
-	data, err := ioutil.ReadFile(fileInfo.path)
+	data, err := os.ReadFile(fileInfo.path)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading chrome local state file")
+		return nil, fmt.Errorf("reading chrome local state file: %w", err)
 	}
 	var localState chromeLocalState
 	if err := json.Unmarshal(data, &localState); err != nil {
-		return nil, errors.Wrap(err, "unmarshalling chome local state")
+		return nil, fmt.Errorf("unmarshalling chome local state: %w", err)
 	}
 
 	for _, profileInfo := range localState.Profile.InfoCache {

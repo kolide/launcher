@@ -13,7 +13,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 // UpdateFinalizer finalizes a launcher update. It assume the new
@@ -36,7 +35,7 @@ func UpdateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 
 		if err != nil {
 			level.Info(logger).Log("method", "updateFinalizer", "err", err)
-			return errors.Wrap(err, "finding newest")
+			return fmt.Errorf("finding newest: %w", err)
 		}
 
 		// replace launcher
@@ -45,7 +44,7 @@ func UpdateFinalizer(logger log.Logger, shutdownOsquery func() error) func() err
 			"newPath", binaryPath,
 		)
 		if err := syscall.Exec(binaryPath, os.Args, os.Environ()); err != nil {
-			return errors.Wrap(err, "exec updated launcher")
+			return fmt.Errorf("exec updated launcher: %w", err)
 		}
 		return nil
 	}

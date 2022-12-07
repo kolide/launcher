@@ -1,6 +1,8 @@
 package cryptoinfo
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type KeyInfo struct {
 	Type     kiType

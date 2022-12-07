@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type DataSourceType int
@@ -84,7 +84,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	if len(requestedPaths) == 0 {
-		return results, errors.Errorf("The %s table requires that you specify a single constraint for path", t.tableName)
+		return results, fmt.Errorf("The %s table requires that you specify a single constraint for path", t.tableName)
 	}
 
 	for _, requestedPath := range requestedPaths {
@@ -92,7 +92,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		// We take globs in via the sql %, but glob needs *. So convert.
 		filePaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
 		if err != nil {
-			return results, errors.Wrap(err, "bad glob")
+			return results, fmt.Errorf("bad glob: %w", err)
 		}
 
 		for _, filePath := range filePaths {
@@ -124,7 +124,7 @@ func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]st
 	data, err := t.flattenFileFunc(filePath, flattenOpts...)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
-		return nil, errors.Wrap(err, "parsing data")
+		return nil, fmt.Errorf("parsing data: %w", err)
 	}
 
 	rowData := map[string]string{

@@ -2,12 +2,13 @@ package packagekit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 
 	"github.com/groob/plist"
-	"github.com/pkg/errors"
+
 	"go.opencensus.io/trace"
 )
 
@@ -59,7 +60,7 @@ func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) e
 	enc := plist.NewEncoder(w)
 	enc.Indent("   ")
 	if err := enc.Encode(lOpts); err != nil {
-		return errors.Wrap(err, "plist encode")
+		return fmt.Errorf("plist encode: %w", err)
 	}
 	return nil
 }

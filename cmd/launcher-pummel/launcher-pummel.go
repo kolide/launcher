@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,7 +16,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/simulator"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -112,9 +110,9 @@ func main() {
 	if *flEnrollSecret != "" {
 		enrollSecret = *flEnrollSecret
 	} else if *flEnrollSecretPath != "" {
-		content, err := ioutil.ReadFile(*flEnrollSecretPath)
+		content, err := os.ReadFile(*flEnrollSecretPath)
 		if err != nil {
-			logutil.Fatal(logger, "err", errors.Wrap(err, "could not read enroll_secret_path"), "enroll_secret_path", *flEnrollSecretPath)
+			logutil.Fatal(logger, "err", fmt.Errorf("could not read enroll_secret_path: %w", err), "enroll_secret_path", *flEnrollSecretPath)
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	}

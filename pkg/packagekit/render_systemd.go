@@ -2,11 +2,11 @@ package packagekit
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
 
@@ -59,7 +59,7 @@ WantedBy=multi-user.target`
 
 	t, err := template.New("SystemdUnit").Funcs(funcsMap).Parse(systemdTemplate)
 	if err != nil {
-		return errors.Wrap(err, "not able to parse Systemd Unit template")
+		return fmt.Errorf("not able to parse Systemd Unit template: %w", err)
 	}
 	return t.ExecuteTemplate(w, "SystemdUnit", data)
 

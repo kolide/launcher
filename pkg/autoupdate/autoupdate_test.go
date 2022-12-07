@@ -4,11 +4,9 @@ package autoupdate
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -42,7 +40,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")
@@ -53,7 +51,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		os.Remove(filepath.Join(localTUFRepoPath, knownFilePaths[0])),
 		"remove a tuf file")
 	require.NoError(t,
-		ioutil.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
+		os.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
 		"truncate a tuf file")
 
 	// Attempt to re-create
@@ -65,7 +63,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")
@@ -123,7 +121,7 @@ func TestValidLocalFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
+			testFile, err := os.CreateTemp("", "TestValidLocalFile")
 			require.NoError(t, err)
 			defer os.Remove(testFile.Name())
 
@@ -216,59 +214,4 @@ func withPlatform(t *testing.T, format string) string {
 		t.Fatal(err)
 	}
 	return fmt.Sprintf(format, platform)
-}
-
-func TestFindCurrentUpdate(t *testing.T) {
-	t.Parallel()
-
-	// This test seems broken on windows. The underlying
-	// functionality seems to work, so it's probably just the
-	// test. Would be nice to fix it though
-	if runtime.GOOS == "windows" {
-		t.Skip("TODO: Test broken on windows")
-	}
-
-	// Setup the tests
-	tmpDir := t.TempDir()
-
-	updater := Updater{
-		binaryName:       "binary",
-		updatesDirectory: tmpDir,
-		logger:           log.NewNopLogger(),
-	}
-
-	if runtime.GOOS == "windows" {
-		updater.binaryName = updater.binaryName + ".exe"
-	}
-
-	// test with empty directory
-	require.Equal(t, updater.findCurrentUpdate(), "", "No subdirs, nothing should be found")
-
-	// make some (still empty) test directories
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.Mkdir(filepath.Join(tmpDir, n), 0755))
-	}
-
-	// empty directories -- should still be none
-	require.Equal(t, "", updater.findCurrentUpdate(), "Empty directories should not be found")
-
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, copyFile(filepath.Join(tmpDir, n, updater.binaryName), os.Args[0], false), "copy executable")
-	}
-
-	// Nothing executable -- should still be none
-	require.Equal(t, "", updater.findCurrentUpdate(), "Non-executable files should not be found")
-
-	//
-	// Chmod some of them
-	//
-
-	require.NoError(t, os.Chmod(filepath.Join(tmpDir, "1", "binary"), 0755))
-	require.Equal(t, filepath.Join(tmpDir, "1", "binary"), updater.findCurrentUpdate(), "Should find number 1")
-
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.Chmod(filepath.Join(tmpDir, n, "binary"), 0755))
-	}
-	require.Equal(t, filepath.Join(tmpDir, "5", "binary"), updater.findCurrentUpdate(), "Should find number 5")
-
 }

@@ -56,11 +56,23 @@ lipo_%: build/darwin.amd64/% build/darwin.arm64/%
 	@mkdir -p build/darwin.universal
 	lipo -create $^ -output build/darwin.universal/$*
 
-# pointers, mostly for legacy reasons
+# Build an app bundle for macOS
+# TODO: need to add build/Launcher.app/Contents/embedded.provisionprofile
+build/darwin.%/Kolide.app: build/darwin.%/launcher
+	mkdir -p $@/Contents/MacOS
+	cp $@/../launcher $@/Contents/MacOS/
+	mkdir -p $@/Contents/Resources
+	cp tools/images/Kolide.icns $@/Contents/Resources
+	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
+
+# pointers, mostly for convenience reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
 grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
+build/darwin.amd64/%: build_%_darwin_amd64
+build/darwin.arm64/%: build_%_darwin_arm64
+build/darwin.universal/%: lipo_%
 
 ##
 ## GitHub Action Helpers
@@ -71,6 +83,7 @@ GITHUB_ARCHS=amd64 arm64
 github-build-no-cross: $(foreach t, $(GITHUB_TARGETS), build_$(t))
 github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
+github-launcherapp: $(foreach a, $(GITHUB_ARCHS) universal, build/darwin.$(a)/Kolide.app)
 
 ##
 ## Cross Build targets
@@ -80,6 +93,7 @@ RELEASE_TARGETS=launcher package-builder
 MANUAL_CROSS_OSES=darwin windows linux
 ARM64_OSES=darwin
 AMD64_OSES=darwin windows linux
+DARWIN_ARCHS=arm64 amd64 universal
 
 # xp is a helper for quick cross platform builds, and sanity checking
 # for breakage. humans only
@@ -93,6 +107,8 @@ rel-arm64: CROSSGOPATH = /opt/go1.16.10.darwin-arm64/bin/go
 rel-arm64: $(foreach target, $(RELEASE_TARGETS), $(foreach os, $(ARM64_OSES), build_$(target)_$(os)_arm64))
 
 rel-lipo: $(foreach target, $(RELEASE_TARGETS), lipo_$(target))
+
+rel-launcherapp: $(foreach arch, $(DARWIN_ARCHES), build/darwin.$(arch)/Kolide.app)
 
 ##
 ## Release Process Stuff
@@ -108,6 +124,7 @@ release-phase1:
 	rm -rf build
 	$(MAKE) rel-amd64 rel-arm64
 	$(MAKE) rel-lipo
+	$(MAKE) rel-launcherapp
 #	$(MAKE) codesign
 #	$(MAKE) binary-bundles
 

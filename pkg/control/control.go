@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -26,7 +27,7 @@ type Client struct {
 func NewControlClient(db *bbolt.DB, addr string, opts ...Option) (*Client, error) {
 	baseURL, err := url.Parse("https://" + addr)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing URL")
+		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &Client{
 		logger:  log.NewNopLogger(),
@@ -72,7 +73,7 @@ func (c *Client) doWithHeaders(verb, path string, params interface{}, headers ma
 	if params != nil {
 		bodyBytes, err = json.Marshal(params)
 		if err != nil {
-			return nil, errors.Wrap(err, "marshaling json")
+			return nil, fmt.Errorf("marshaling json: %w", err)
 		}
 	}
 
@@ -82,7 +83,7 @@ func (c *Client) doWithHeaders(verb, path string, params interface{}, headers ma
 		bytes.NewBuffer(bodyBytes),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating request object")
+		return nil, fmt.Errorf("creating request object: %w", err)
 	}
 	for k, v := range headers {
 		request.Header.Set(k, v)

@@ -3,14 +3,14 @@ package table
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
@@ -53,26 +53,26 @@ type onePasswordAccountsTable struct {
 // generate the onepassword account info results given the path to a
 // onepassword sqlite DB
 func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_onepassword_accounts")
+	dir, err := os.MkdirTemp("", "kolide_onepassword_accounts")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_onepassword_accounts tmp dir")
+		return nil, fmt.Errorf("creating kolide_onepassword_accounts tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fsutil.CopyFile(fileInfo.path, dst); err != nil {
-		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
+		return nil, fmt.Errorf("copying sqlite db to tmp dir: %w", err)
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, errors.Wrap(err, "connecting to sqlite db")
+		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
 	defer db.Close()
 
 	rows, err := db.Query("SELECT user_email, team_name, server, user_first_name, user_last_name, account_type FROM accounts")
 	if err != nil {
-		return nil, errors.Wrap(err, "query rows from onepassword account configuration db")
+		return nil, fmt.Errorf("query rows from onepassword account configuration db: %w", err)
 	}
 	defer rows.Close()
 
@@ -80,7 +80,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	for rows.Next() {
 		var email, team, server, firstName, lastName, accountType string
 		if err := rows.Scan(&email, &team, &server, &firstName, &lastName, &accountType); err != nil {
-			return nil, errors.Wrap(err, "scanning onepassword account configuration db row")
+			return nil, fmt.Errorf("scanning onepassword account configuration db row: %w", err)
 		}
 		results = append(results, map[string]string{
 			"user_email":      email,

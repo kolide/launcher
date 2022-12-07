@@ -7,9 +7,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -23,7 +23,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 var xrdbPath = "/usr/bin/xrdb"
@@ -97,7 +96,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 
 	u, err := user.Lookup(username)
 	if err != nil {
-		return errors.Wrapf(err, "finding user by username '%s'", username)
+		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
 	cmd := exec.CommandContext(ctx, xrdbPath, "-display", displayNum, "-global", "-query")
@@ -108,17 +107,17 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 	// Check if the supplied UID is that of the current user
 	currentUser, err := user.Current()
 	if err != nil {
-		return errors.Wrap(err, "checking current user uid")
+		return fmt.Errorf("checking current user uid: %w", err)
 	}
 
 	if u.Uid != currentUser.Uid {
 		uid, err := strconv.ParseInt(u.Uid, 10, 32)
 		if err != nil {
-			return errors.Wrap(err, "converting uid from string to int")
+			return fmt.Errorf("converting uid from string to int: %w", err)
 		}
 		gid, err := strconv.ParseInt(u.Gid, 10, 32)
 		if err != nil {
-			return errors.Wrap(err, "converting gid from string to int")
+			return fmt.Errorf("converting gid from string to int: %w", err)
 		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 		cmd.SysProcAttr.Credential = &syscall.Credential{
@@ -127,14 +126,14 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		}
 	}
 
-	dir, err := ioutil.TempDir("", "osq-xrdb")
+	dir, err := os.MkdirTemp("", "osq-xrdb")
 	if err != nil {
-		return errors.Wrap(err, "mktemp")
+		return fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return errors.Wrap(err, "chmod")
+		return fmt.Errorf("chmod: %w", err)
 	}
 	cmd.Dir = dir
 	stderr := new(bytes.Buffer)
@@ -142,7 +141,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 	cmd.Stdout = buf
 
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "running xrdb, err is: %s", stderr.String())
+		return fmt.Errorf("running xrdb, err is: %s: %w", stderr.String(), err)
 	}
 
 	return nil

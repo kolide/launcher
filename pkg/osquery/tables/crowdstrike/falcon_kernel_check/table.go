@@ -2,13 +2,13 @@ package falcon_kernel_check
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const kernelCheckUtilPath = "/opt/CrowdStrike/falcon-kernel-check"
@@ -66,10 +66,10 @@ var kernelCheckRegexp = regexp.MustCompile(`^((?:Host OS (.*) (is supported|is n
 func parseStatus(status string) (map[string]string, error) {
 	matches := kernelCheckRegexp.FindAllStringSubmatch(status, -1)
 	if len(matches) != 1 {
-		return nil, errors.Errorf("Failed to match output: %s", status)
+		return nil, fmt.Errorf("Failed to match output: %s", status)
 	}
 	if len(matches[0]) != 5 {
-		return nil, errors.Errorf("Got %d matches. Expected 5. Failed to match output: %s", len(matches[0]), status)
+		return nil, fmt.Errorf("Got %d matches. Expected 5. Failed to match output: %s", len(matches[0]), status)
 	}
 
 	// matches[0][2] = kernel version string

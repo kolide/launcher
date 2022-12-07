@@ -4,13 +4,13 @@
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 )
 
 func setpgid() *syscall.SysProcAttr {
@@ -19,8 +19,10 @@ func setpgid() *syscall.SysProcAttr {
 
 // kill process group kills a process and all its children.
 func killProcessGroup(cmd *exec.Cmd) error {
-	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	return errors.Wrapf(err, "kill process group %d", cmd.Process.Pid)
+	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+		return fmt.Errorf("kill process group %d: %w", cmd.Process.Pid, err)
+	}
+	return nil
 }
 
 func SocketPath(rootDir string) string {
@@ -38,7 +40,7 @@ func isExitOk(err error) bool {
 func ensureProperPermissions(o *OsqueryInstance, path string) error {
 	fd, err := os.Stat(path)
 	if err != nil {
-		return errors.Wrap(err, "stat-ing path")
+		return fmt.Errorf("stat-ing path: %w", err)
 	}
 	sys := fd.Sys().(*syscall.Stat_t)
 	isRootOwned := (sys.Uid == 0)
@@ -58,7 +60,7 @@ func ensureProperPermissions(o *OsqueryInstance, path string) error {
 	// level of privilege is needed to place something in the launcher root
 	// directory.
 	if err = os.Chown(path, os.Getuid(), os.Getgid()); err != nil {
-		return errors.Wrap(err, "attempting to chown path")
+		return fmt.Errorf("attempting to chown path: %w", err)
 	}
 	return nil
 }

@@ -3,13 +3,12 @@ package table
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
@@ -36,20 +35,20 @@ type ChromeLoginKeychain struct {
 }
 
 func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_chrome_login_keychain")
+	dir, err := os.MkdirTemp("", "kolide_chrome_login_keychain")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_chrome_login_keychain tmp dir")
+		return nil, fmt.Errorf("creating kolide_chrome_login_keychain tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fsutil.CopyFile(path, dst); err != nil {
-		return nil, errors.Wrap(err, "copying db to tmp dir")
+		return nil, fmt.Errorf("copying db to tmp dir: %w", err)
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, errors.Wrap(err, "connecting to sqlite db")
+		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
 	defer db.Close()
 
@@ -57,7 +56,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 
 	rows, err := db.Query("SELECT origin_url, action_url, username_value FROM logins")
 	if err != nil {
-		return nil, errors.Wrap(err, "query rows from chrome login keychain db")
+		return nil, fmt.Errorf("query rows from chrome login keychain db: %w", err)
 	}
 	defer rows.Close()
 
@@ -69,7 +68,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 		var action_url string
 		var username_value string
 		if err := rows.Scan(&origin_url, &action_url, &username_value); err != nil {
-			return nil, errors.Wrap(err, "scanning chrome login keychain db row")
+			return nil, fmt.Errorf("scanning chrome login keychain db row: %w", err)
 		}
 
 		results = append(results, map[string]string{
@@ -84,7 +83,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 func (c *ChromeLoginKeychain) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	files, err := findFileInUserDirs("Library/Application Support/Google/Chrome/*/Login Data", c.logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "find chrome login data sqlite DBs")
+		return nil, fmt.Errorf("find chrome login data sqlite DBs: %w", err)
 	}
 
 	var results []map[string]string

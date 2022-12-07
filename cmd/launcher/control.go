@@ -5,13 +5,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/control"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/pkg/errors"
+
 	"go.etcd.io/bbolt"
 )
 
@@ -29,7 +30,7 @@ func createControl(ctx context.Context, db *bbolt.DB, logger log.Logger, opts *l
 	}
 	controlClient, err := control.NewControlClient(db, opts.ControlServerURL, controlOpts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating control client")
+		return nil, fmt.Errorf("creating control client: %w", err)
 	}
 
 	return &actor.Actor{

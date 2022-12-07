@@ -5,6 +5,8 @@ package execwrapper
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,7 +14,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
@@ -21,6 +22,7 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
 	cmd.Env = envv
 
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -36,9 +38,9 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 
 	if cmd.ProcessState.ExitCode() == -1 {
 		if err == nil {
-			return errors.Errorf("Unknown error trying to exec %s (and nil err)", strings.Join(cmd.Args, " "))
+			return fmt.Errorf("Unknown error trying to exec %s (and nil err)", strings.Join(cmd.Args, " "))
 		}
-		return errors.Wrapf(err, "Unknown error trying to exec %s", strings.Join(cmd.Args, " "))
+		return fmt.Errorf("Unknown error trying to exec %s: %w", strings.Join(cmd.Args, " "), err)
 	}
 
 	if err != nil {

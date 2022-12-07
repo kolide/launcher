@@ -9,7 +9,7 @@ on:
     branches: '**'
 
 env:
-  GOVER: 1.19.2
+  GOVER: 1.19.3
 
 jobs:
   build_and_test:
@@ -19,8 +19,8 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-latest
-          - macos-latest
+          - ubuntu-20.04
+          - macos-11
           - windows-latest
     steps:
     - name: Check out code
@@ -35,15 +35,19 @@ jobs:
         go-version: ${{env.GOVER}}
       id: go
 
+    # use bash, because the powershell syntax is different and this is a cross platform workflow
     - id: go-cache-paths
+      shell: bash
       run: |
-        echo "::set-output name=go-build::$(go env GOCACHE)"
-        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
     - name: Go Build Cache
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
     - name: Go Mod Cache
       uses: actions/cache@v3
       with:
@@ -68,13 +72,32 @@ jobs:
       run: make github-lipo
       if: ${{ contains(matrix.os, 'macos') }}
 
+    - name: App Bundle
+      run: make github-launcherapp
+      if: ${{ contains(matrix.os, 'macos') }}
+
     - name: Test
       run: make test
 
-    - name: Upload Build
+    - name: Upload Build - Windows
+      if: ${{ contains(matrix.os, 'windows') }}
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}-build
+        path: build/
+
+    - name: Upload Build - macOS
+      if: ${{ contains(matrix.os, 'macos') }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos-latest-build
+        path: build/
+
+    - name: Upload Build - Ubuntu
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu-latest-build
         path: build/
 
     - name: Upload coverage
@@ -91,8 +114,8 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - ubuntu-latest
-          - macos-latest
+          - ubuntu-20.04
+          - macos-11
           - windows-latest
     steps:
     - uses: actions/checkout@v3
@@ -105,14 +128,17 @@ jobs:
       id: go
 
     - id: go-cache-paths
+      shell: bash
       run: |
-        echo "::set-output name=go-build::$(go env GOCACHE)"
-        echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
     - name: Go Build Cache
       uses: actions/cache@v3
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
     - name: Go Mod Cache
       uses: actions/cache@v3
       with:
@@ -120,10 +146,23 @@ jobs:
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
     - run: make deps
+
     - id: build
       run: make package-builder
+
     - name: package
-      run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret
+      id: run-package-builder
+      run: ${{ steps.build.outputs.binary }} make -debug --hostname=localhost --enroll_secret=secret --launcher_version=nightly --output_dir=./
+
+    - name: Test install macOS
+      if: ${{ contains(matrix.os, 'macos') }}
+      run: |
+        # Check that we can install
+        sudo installer -dumplog -pkg ./launcher.darwin-launchd-pkg.pkg -target /
+        # Quick check that at least a couple of the files we expect now exist
+        if [ ! -f /Library/LaunchDaemons/com.launcher.launcher.plist ]; then echo "missing launchd entry" && exit 1; fi
+        if [ ! -f /usr/local/launcher/bin/osqueryd ]; then echo "missing osquery binary" && exit 1; fi
+        if [ ! -f /usr/local/launcher/bin/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single

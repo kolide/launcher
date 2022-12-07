@@ -19,7 +19,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/osquery/osquery-go"
-	"github.com/pkg/errors"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
@@ -187,7 +187,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 func downloadOsqueryInBinDir(binDirectory string) error {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return errors.Wrapf(err, "Error parsing platform: %s", runtime.GOOS)
+		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
 	}
 
 	outputFile := filepath.Join(binDirectory, "osqueryd") //, target.PlatformBinaryName("osqueryd"))
@@ -195,11 +195,11 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
-		return errors.Wrap(err, "An error occurred fetching the osqueryd binary")
+		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
 	}
 
 	if err := fsutil.CopyFile(path, outputFile); err != nil {
-		return errors.Wrapf(err, "Couldn't copy file to %s", outputFile)
+		return fmt.Errorf("Couldn't copy file to %s: %w", outputFile, err)
 	}
 
 	return nil

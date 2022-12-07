@@ -3,13 +3,12 @@ package table
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
@@ -38,20 +37,20 @@ type GDriveSyncHistory struct {
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_gdrive_sync_history")
+	dir, err := os.MkdirTemp("", "kolide_gdrive_sync_history")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_gdrive_sync_history tmp dir")
+		return nil, fmt.Errorf("creating kolide_gdrive_sync_history tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fsutil.CopyFile(path, dst); err != nil {
-		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
+		return nil, fmt.Errorf("copying sqlite db to tmp dir: %w", err)
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, errors.Wrap(err, "connecting to sqlite db")
+		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
 	defer db.Close()
 
@@ -59,7 +58,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 
 	rows, err := db.Query("select distinct le.inode, le.filename, le.modified AS mtime, le.size from local_entry le, cloud_entry ce using (checksum) order by le.modified desc;")
 	if err != nil {
-		return nil, errors.Wrap(err, "query rows from gdrive sync history db")
+		return nil, fmt.Errorf("query rows from gdrive sync history db: %w", err)
 	}
 	defer rows.Close()
 
@@ -72,7 +71,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 		var mtime string
 		var size string
 		if err := rows.Scan(&inode, &filename, &mtime, &size); err != nil {
-			return nil, errors.Wrap(err, "scanning gdrive sync history db row")
+			return nil, fmt.Errorf("scanning gdrive sync history db row: %w", err)
 		}
 
 		results = append(results, map[string]string{
@@ -90,7 +89,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	files, err := findFileInUserDirs("Library/Application Support/Google/Drive/user_default/snapshot.db", g.logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "find gdrive sync history sqlite DBs")
+		return nil, fmt.Errorf("find gdrive sync history sqlite DBs: %w", err)
 	}
 
 	var results []map[string]string

@@ -6,7 +6,8 @@ package secedit
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
+
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
@@ -93,9 +94,9 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-	dir, err := ioutil.TempDir("", "kolide_secedit_config")
+	dir, err := os.MkdirTemp("", "kolide_secedit_config")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_secedit_config tmp dir")
+		return nil, fmt.Errorf("creating kolide_secedit_config tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
@@ -118,21 +119,21 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	level.Debug(t.logger).Log("msg", "calling secedit", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling secedit. Got: %s", stderr.String())
+		return nil, fmt.Errorf("calling secedit. Got: %s: %w", stderr.String(), err)
 	}
 
 	file, err := os.Open(dst)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error opening secedit output file: %s", dst)
+		return nil, fmt.Errorf("error opening secedit output file: %s: %w", dst, err)
 	}
 	defer file.Close()
 
 	// By default, secedit outputs files encoded in UTF16 Little Endian. Sadly the Go INI parser
 	// cannot read this format by default, therefore we decode the bytes into UTF-8
 	rd := transform.NewReader(file, unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
-	data, err := ioutil.ReadAll(rd)
+	data, err := io.ReadAll(rd)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading secedit output file: %s", err)
+		return nil, fmt.Errorf("error reading secedit output file: %s: %w", dst, err)
 	}
 
 	return data, nil

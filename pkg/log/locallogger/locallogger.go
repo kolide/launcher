@@ -2,8 +2,11 @@ package locallogger
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -38,6 +41,26 @@ func NewKitLogger(logFilePath string) log.Logger {
 func (ll localLogger) Log(keyvals ...interface{}) error {
 	filterResults(keyvals...)
 	return ll.logger.Log(keyvals...)
+}
+
+func CleanUpRenamedDebugLogs(cleanupPath string, logger log.Logger) {
+	// We renamed the debug log file from debug.log to debug.json for compatibility with support tools.
+	// Check to see if we have any of the old debug.log files still hanging around, and clean them up
+	// if so. The current one is always named debug.log, and rotated files are in the format
+	// `debug-<date>.log.gz`. We do not return an error if we can't clean up these files -- it's not
+	// a big deal.
+	legacyDebugLogPattern := filepath.Join(cleanupPath, "debug*.log*")
+	filesToCleanUp, err := filepath.Glob(legacyDebugLogPattern)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not glob for legacy debug log files to clean up", "pattern", legacyDebugLogPattern, "err", err)
+		return
+	}
+
+	for _, fileToCleanUp := range filesToCleanUp {
+		if err := os.Remove(fileToCleanUp); err != nil {
+			level.Error(logger).Log("msg", "could not clean up legacy debug log file", "file", fileToCleanUp, "err", err)
+		}
+	}
 }
 
 // filterResults filteres out the osquery results,

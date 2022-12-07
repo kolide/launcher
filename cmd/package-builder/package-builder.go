@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"github.com/kolide/launcher/pkg/packaging"
-	"github.com/pkg/errors"
 )
 
 func runVersion(args []string) error {
@@ -214,7 +213,7 @@ func runMake(args []string) error {
 	// Validate that pinned certs are valid hex
 	for _, pin := range strings.Split(*flCertPins, ",") {
 		if _, err := hex.DecodeString(pin); err != nil {
-			return errors.Wrap(err, "unable to parse cert pins")
+			return fmt.Errorf("unable to parse cert pins: %w", err)
 		}
 	}
 
@@ -222,9 +221,9 @@ func runMake(args []string) error {
 	cacheDir := *flCacheDir
 	var err error
 	if cacheDir == "" {
-		cacheDir, err = ioutil.TempDir("", "download_cache")
+		cacheDir, err = os.MkdirTemp("", "download_cache")
 		if err != nil {
-			return errors.Wrap(err, "could not create temp dir for caching files")
+			return fmt.Errorf("could not create temp dir for caching files: %w", err)
 		}
 		defer os.RemoveAll(cacheDir)
 	}
@@ -263,13 +262,13 @@ func runMake(args []string) error {
 	// NOTE: if you are using docker-for-mac, you probably need to set the TMPDIR env to /tmp
 	if outputDir == "" {
 		var err error
-		outputDir, err = ioutil.TempDir("", fmt.Sprintf("launcher-package"))
+		outputDir, err = os.MkdirTemp("", fmt.Sprintf("launcher-package"))
 		if err != nil {
-			return errors.Wrap(err, "making output dir")
+			return fmt.Errorf("making output dir: %w", err)
 		}
 	}
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return errors.Wrap(err, "mkdir")
+		return fmt.Errorf("mkdir: %w", err)
 	}
 
 	targets, err := getTargets(*flTargets)
@@ -281,12 +280,12 @@ func runMake(args []string) error {
 		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
 		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
 		if err != nil {
-			return errors.Wrap(err, "Failed to make package output file")
+			return fmt.Errorf("Failed to make package output file: %w", err)
 		}
 		defer outputFile.Close()
 
 		if err := packageOptions.Build(ctx, outputFile, target); err != nil {
-			return errors.Wrap(err, "could not generate packages")
+			return fmt.Errorf("could not generate packages: %w", err)
 		}
 	}
 
