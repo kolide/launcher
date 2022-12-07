@@ -47,8 +47,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		// Primary options
 		flAutoloadedExtensions   arrayFlags
 		flCertPins               = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
-		flControl                = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
-		flControlServerURL       = flagset.String("control_hostname", "", "The hostname of the control server")
 		flControlRequestInterval = flagset.Duration("control_request_interval", 60*time.Second, "The interval at which the control server requests will be made")
 		flEnrollSecret           = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
 		flEnrollSecretPath       = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
@@ -184,8 +182,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
 		CertPins:                           certPins,
 		CompactDbMaxTx:                     *flCompactDbMaxTx,
-		Control:                            *flControl,
-		ControlServerURL:                   *flControlServerURL,
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
 		DisableControlTLS:                  *flDisableControlTLS,
