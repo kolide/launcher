@@ -36,13 +36,6 @@ func (dp nopDataProvider) Get(subsystem string) (hash string, data io.Reader, er
 	return "", nil, nil
 }
 
-func testCS() *ControlService {
-	data := nopDataProvider{}
-	cs := control.New(log.NewNopLogger(), data, nil)
-
-	return cs
-}
-
 func TestControlServiceRegisterConsumer(t *testing.T) {
 	t.Parallel()
 
@@ -67,7 +60,8 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cs := testCS()
+			data := nopDataProvider{}
+			cs := control.New(log.NewNopLogger(), data, nil)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -93,7 +87,8 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cs := testCS()
+			data := nopDataProvider{}
+			cs := control.New(log.NewNopLogger(), data, nil)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
