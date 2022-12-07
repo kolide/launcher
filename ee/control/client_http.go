@@ -46,13 +46,13 @@ func NewControlHTTPClient(addr string, opts ...HTTPClientOption) (*HTTPClient, e
 	return c, nil
 }
 
-func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Reader, err error) {
+func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err error) {
 	verb, path := "GET", "/api/v1/control"
 	params := &controlRequest{
 		Message: "ping",
 	}
 
-	response, err := c.do(verb, path, cachedETag, params)
+	response, err := c.do(verb, path, params)
 	if err != nil {
 		level.Error(c.logger).Log(
 			"msg", "error making request to control server endpoint",
@@ -90,22 +90,7 @@ func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Rea
 	return "", response.Body, nil
 }
 
-func (c *HTTPClient) do(verb, path, etag string, params interface{}) (*http.Response, error) {
-	headers := map[string]string{
-		"Content-Type": "application/json",
-		"Accept":       "application/json",
-	}
-
-	if etag != "" {
-		// If we have a cached version of this resource, include the etag so the server
-		// can compare the client's etag with its current version of the resource.
-		headers["If-None-Match"] = etag
-	}
-
-	return c.doWithHeaders(verb, path, params, headers)
-}
-
-func (c *HTTPClient) doWithHeaders(verb, path string, params interface{}, headers map[string]string) (*http.Response, error) {
+func (c *HTTPClient) do(verb, path string, params interface{}) (*http.Response, error) {
 	var bodyBytes []byte
 	var err error
 	if params != nil {
@@ -123,9 +108,9 @@ func (c *HTTPClient) doWithHeaders(verb, path string, params interface{}, header
 	if err != nil {
 		return nil, fmt.Errorf("creating request object: %w", err)
 	}
-	for k, v := range headers {
-		request.Header.Set(k, v)
-	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json")
 
 	return c.client.Do(request)
 }

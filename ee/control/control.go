@@ -23,12 +23,14 @@ type ControlService struct {
 	lastFetched     map[string]string
 }
 
-// consumer is an interface for something that consumes control server data updates.
+// consumer is an interface for something that consumes control server data updates. The
+// control server supports at most one consumer per subsystem.
 type consumer interface {
 	Update(io.Reader)
 }
 
 // subscriber is an interface for something that wants to be notified when a subsystem has been updated.
+// Subscribers do not receive data -- they are expected to read the data from where consumers write it.
 type subscriber interface {
 	Ping()
 }
@@ -36,7 +38,7 @@ type subscriber interface {
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
-	Get(subsystem, cachedETag string) (etag string, data io.Reader, err error)
+	Get(subsystem string) (hash string, data io.Reader, err error)
 }
 
 func New(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
@@ -81,7 +83,7 @@ type controlResponse struct {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	_, data, err := cs.data.Get("", "")
+	_, data, err := cs.data.Get("")
 	if err != nil {
 		return fmt.Errorf("getting initial config: %w", err)
 	}
@@ -100,8 +102,8 @@ func (cs *ControlService) Fetch() error {
 
 	// Here's a pseudo code outline of what would follow here
 
-	// for each (subsystem, etag) in the list
-	// 	if the etag matches the last update for this subsystem
+	// for each (subsystem, hash) in the list
+	// 	if the hash matches the last update for this subsystem
 	// 		skip to next subsystem
 	// 	otherwise
 	// 		ask the dataProvider for the latest update for this subsystem (make a new HTTP request)

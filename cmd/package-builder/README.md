@@ -38,8 +38,6 @@ If you would like the resultant launcher binary to be invoked with any of the fo
 - `--insecure_grpc`
 - `--autoupdate`
 - `--update_channel`
-- `--control`
-- `--control_hostname`
 
 For example, consider the following usage:
 

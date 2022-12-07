@@ -92,7 +92,6 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	// includes both `-` and `--` for variety.
 	args := map[string]string{
-		"-control":              "", // This is a bool, it's special cased in the test routines
 		"--hostname":            randomHostname,
 		"-autoupdate_interval":  "48h",
 		"-logging_interval":     fmt.Sprintf("%ds", randomInt),

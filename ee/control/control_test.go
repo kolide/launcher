@@ -32,7 +32,7 @@ func (mc *mockSubscriber) Ping() {
 
 type nopDataProvider struct{}
 
-func (dp nopDataProvider) Get(subsystem, cachedETag string) (etag string, data io.Reader, err error) {
+func (dp nopDataProvider) Get(subsystem string) (hash string, data io.Reader, err error) {
 	return "", nil, nil
 }
 
