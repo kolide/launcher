@@ -40,7 +40,7 @@ func createControlService(ctx context.Context, logger log.Logger, opts *launcher
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
 	}
-	service := control.NewControlService(logger, client, controlOpts...)
+	service := control.New(logger, client, controlOpts...)
 
 	return &actor.Actor{
 		Execute: func() error {

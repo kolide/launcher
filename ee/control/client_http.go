@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -69,7 +68,7 @@ func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Rea
 		level.Error(c.logger).Log(
 			"msg", "got HTTP 404 making control server request",
 		)
-		return "", nil, nil
+		return "", nil, err
 
 	case http.StatusNotModified:
 		// The control server sends back a 304 Not Modified status, without a body, which tells
@@ -88,17 +87,7 @@ func (c *HTTPClient) Get(subsystem, cachedETag string) (etag string, data io.Rea
 		return "", nil, err
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		level.Error(c.logger).Log(
-			"msg", "error reading response body from control server",
-			"err", err,
-		)
-		return "", nil, err
-	}
-
-	reader := bytes.NewReader(body)
-	return "", reader, nil
+	return "", response.Body, nil
 }
 
 func (c *HTTPClient) do(verb, path, etag string, params interface{}) (*http.Response, error) {
