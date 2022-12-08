@@ -83,6 +83,7 @@ func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
 		level.Error(c.logger).Log(
 			"msg", "got not-ok status code from control server",
 			"response_code", response.StatusCode,
+			"response_body", response.Body,
 		)
 		return nil, err
 	}
