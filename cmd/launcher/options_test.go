@@ -105,6 +105,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		AutoupdateInterval:     48 * time.Hour,
 		CompactDbMaxTx:         int64(65536),
 		Control:                false,
+		ControlServerURL:       "localhost:3000",
 		ControlRequestInterval: 60 * time.Second,
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,

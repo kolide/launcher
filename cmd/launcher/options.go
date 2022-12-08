@@ -182,7 +182,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
 		CertPins:                           certPins,
 		CompactDbMaxTx:                     *flCompactDbMaxTx,
-		Control:                            true,
+		Control:                            false,
 		ControlServerURL:                   "localhost:3000",
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
