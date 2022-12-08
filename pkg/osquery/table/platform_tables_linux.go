@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
 	"github.com/kolide/launcher/pkg/osquery/tables/secureboot"
+	"github.com/kolide/launcher/pkg/osquery/tables/xfconf"
 	"github.com/kolide/launcher/pkg/osquery/tables/xrdb"
 	osquery "github.com/osquery/osquery-go"
 )
@@ -27,6 +28,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		fscrypt_info.TablePlugin(logger),
 		falcon_kernel_check.TablePlugin(logger),
 		falconctl.NewFalconctlOptionTable(logger),
+		xfconf.TablePlugin(logger),
 
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
