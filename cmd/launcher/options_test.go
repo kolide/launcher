@@ -92,7 +92,6 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	// includes both `-` and `--` for variety.
 	args := map[string]string{
-		"-control":              "", // This is a bool, it's special cased in the test routines
 		"--hostname":            randomHostname,
 		"-autoupdate_interval":  "48h",
 		"-logging_interval":     fmt.Sprintf("%ds", randomInt),
@@ -105,7 +104,9 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		AutoupdateInitialDelay: 1 * time.Hour,
 		AutoupdateInterval:     48 * time.Hour,
 		CompactDbMaxTx:         int64(65536),
-		Control:                true,
+		Control:                false,
+		ControlServerURL:       "localhost:3000",
+		ControlRequestInterval: 60 * time.Second,
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,
 		MirrorServerURL:        "https://dl.kolide.co",
