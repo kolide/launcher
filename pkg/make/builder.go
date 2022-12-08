@@ -511,7 +511,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if b.os == "windows" {
 			// this prevents a cmd promopt opening up when desktop is launched
-			ldFlags = append(ldFlags, "-H=windowsgui")
+			ldFlags = append(ldFlags, "-H windowsgui")
 		}
 
 		if b.stampVersion {
