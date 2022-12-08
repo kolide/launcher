@@ -31,8 +31,8 @@ func (mc *mockSubscriber) Ping() {
 
 type nopDataProvider struct{}
 
-func (dp nopDataProvider) Get(subsystem string) (hash string, data io.Reader, err error) {
-	return "", nil, nil
+func (dp nopDataProvider) Get(hash string) (data io.Reader, err error) {
+	return nil, nil
 }
 
 func TestControlServiceRegisterConsumer(t *testing.T) {

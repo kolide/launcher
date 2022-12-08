@@ -38,7 +38,7 @@ type subscriber interface {
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
-	Get(subsystem string) (hash string, data io.Reader, err error)
+	Get(hash string) (data io.Reader, err error)
 }
 
 func New(logger log.Logger, data dataProvider, opts ...Option) *ControlService {
@@ -87,7 +87,7 @@ type controlResponse struct {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	_, data, err := cs.fetcher.Get("")
+	data, err := cs.fetcher.Get("")
 	if err != nil {
 		return fmt.Errorf("getting initial config: %w", err)
 	}

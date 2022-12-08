@@ -46,8 +46,8 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 	return c, nil
 }
 
-func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err error) {
-	verb, path := "GET", "/api/v1/control"
+func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
+	verb, path := "GET", fmt.Sprintf("/api/v1/control/%s", hash)
 	params := &controlRequest{
 		Message: "ping",
 	}
@@ -58,7 +58,7 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 			"msg", "error making request to control server endpoint",
 			"err", err,
 		)
-		return "", nil, err
+		return nil, err
 	}
 	defer response.Body.Close()
 
@@ -68,7 +68,7 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 		level.Error(c.logger).Log(
 			"msg", "got HTTP 404 making control server request",
 		)
-		return "", nil, err
+		return nil, err
 
 	case http.StatusNotModified:
 		// The control server sends back a 304 Not Modified status, without a body, which tells
@@ -76,7 +76,7 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 		level.Debug(c.logger).Log(
 			"msg", "got HTTP 304 making control server request",
 		)
-		return "", nil, err
+		return nil, err
 	}
 
 	if response.StatusCode != http.StatusOK {
@@ -84,7 +84,7 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 			"msg", "got not-ok status code from control server",
 			"response_code", response.StatusCode,
 		)
-		return "", nil, err
+		return nil, err
 	}
 
 	// response.Body will be closed before this function exits, get all the data now
@@ -94,11 +94,11 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 			"msg", "error reading response body from control server",
 			"err", err,
 		)
-		return "", nil, err
+		return nil, err
 	}
 
 	reader := bytes.NewReader(body)
-	return "", reader, nil
+	return reader, nil
 }
 
 func (c *HTTPClient) do(verb, path string, params interface{}) (*http.Response, error) {
