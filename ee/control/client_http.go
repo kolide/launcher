@@ -87,7 +87,18 @@ func (c *HTTPClient) Get(subsystem string) (hash string, data io.Reader, err err
 		return "", nil, err
 	}
 
-	return "", response.Body, nil
+	// response.Body will be closed before this function exits, get all the data now
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		level.Error(c.logger).Log(
+			"msg", "error reading response body from control server",
+			"err", err,
+		)
+		return "", nil, err
+	}
+
+	reader := bytes.NewReader(body)
+	return "", reader, nil
 }
 
 func (c *HTTPClient) do(verb, path string, params interface{}) (*http.Response, error) {
