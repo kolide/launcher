@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -20,8 +19,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 type client struct {
-	baseURL *url.URL
-	base    http.Client
+	base http.Client
 }
 
 // desktopUserStatus is all the device data sent to the desktop user process
