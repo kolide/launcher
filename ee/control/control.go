@@ -89,7 +89,7 @@ func (cs *ControlService) Stop() {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	// Empty hash means get the subsystem map of hashes
+	// Empty hash means get the map of subsystems & hashes
 	data, err := cs.fetcher.Get("")
 	if err != nil {
 		return fmt.Errorf("getting subsystems map: %w", err)
@@ -102,7 +102,7 @@ func (cs *ControlService) Fetch() error {
 
 	for subsystem, hash := range subsystems {
 		if hash == cs.lastFetched[subsystem] {
-			// The most recent hash matches the last one we fetched
+			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
 		}
