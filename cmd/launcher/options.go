@@ -251,9 +251,6 @@ func shortUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("control")
-	printOpt("control_hostname")
-	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")
 	if !skipEnvParse {

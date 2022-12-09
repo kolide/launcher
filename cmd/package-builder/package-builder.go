@@ -104,11 +104,6 @@ func runMake(args []string) error {
 			env.String("UPDATE_CHANNEL", ""),
 			"the value that should be used when invoking the launcher's --update_channel flag. Autoupdates will be disabled unless this is specified",
 		)
-		flControlHostname = flagset.String(
-			"control_hostname",
-			env.String("CONTROL_HOSTNAME", ""),
-			"the value that should be used when invoking the launcher's --control_hostname flag",
-		)
 		flDisableControlTLS = flagset.Bool(
 			"disable_control_tls",
 			env.Bool("DISABLE_CONTROL_TLS", false),
@@ -242,7 +237,6 @@ func runMake(args []string) error {
 		InsecureTransport: *flInsecureTransport,
 		UpdateChannel:     *flUpdateChannel,
 		InitialRunner:     *flInitialRunner,
-		ControlHostname:   *flControlHostname,
 		DisableControlTLS: *flDisableControlTLS,
 		Identifier:        *flIdentifier,
 		OmitSecret:        *flOmitSecret,
