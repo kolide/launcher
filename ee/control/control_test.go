@@ -98,24 +98,27 @@ func TestControlServiceUpdate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		subsystem string
-		c         *mockConsumer
-		s         []*mockSubscriber
+		name            string
+		subsystem       string
+		c               *mockConsumer
+		s               []*mockSubscriber
+		expectedUpdates int
 	}{
 		{
-			name:      "one consumer, two subscribers",
-			subsystem: "desktop",
-			c:         &mockConsumer{},
+			name:            "one consumer, two subscribers",
+			subsystem:       "desktop",
+			expectedUpdates: 1,
+			c:               &mockConsumer{},
 			s: []*mockSubscriber{
 				{},
 				{},
 			},
 		},
 		{
-			name:      "one consumer, no subscribers",
-			subsystem: "desktop",
-			c:         &mockConsumer{},
+			name:            "one consumer, no subscribers",
+			subsystem:       "desktop",
+			expectedUpdates: 1,
+			c:               &mockConsumer{},
 		},
 	}
 	for _, tt := range tests {
@@ -135,11 +138,68 @@ func TestControlServiceUpdate(t *testing.T) {
 			cs.update(tt.subsystem, nil)
 
 			// Expect consumer to have gotten exactly one update
-			assert.Equal(t, tt.c.updates, 1)
+			assert.Equal(t, tt.c.updates, tt.expectedUpdates)
 
 			// Expect each subscriber to have gotten exactly one ping
 			for _, s := range tt.s {
-				assert.Equal(t, s.pings, 1)
+				assert.Equal(t, s.pings, tt.expectedUpdates)
+			}
+		})
+	}
+}
+
+func TestControlServiceFetch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		hashData        map[string]any
+		subsystems      map[string]string
+		subsystem       string
+		c               *mockConsumer
+		s               []*mockSubscriber
+		expectedUpdates int
+		fetches         int
+	}{
+		{
+			name:            "one consumer, two subscribers",
+			subsystem:       "desktop",
+			subsystems:      map[string]string{"desktop": "502a42f0"},
+			hashData:        map[string]any{"502a42f0": "status"},
+			expectedUpdates: 1,
+			fetches:         3,
+			c:               &mockConsumer{},
+			s: []*mockSubscriber{
+				{},
+				{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			data := &TestClient{tt.subsystems, tt.hashData}
+			controlOpts := []Option{}
+			cs := New(log.NewNopLogger(), data, controlOpts...)
+			err := cs.RegisterConsumer(tt.subsystem, tt.c)
+			require.NoError(t, err)
+			for _, ss := range tt.s {
+				cs.RegisterSubscriber(tt.subsystem, ss)
+			}
+
+			// Repeat fetches to verify no changes
+			for i := 0; i < tt.fetches; i++ {
+				err = cs.Fetch()
+
+				// Expect consumer to have gotten exactly one update
+				assert.Equal(t, tt.c.updates, tt.expectedUpdates)
+
+				// Expect each subscriber to have gotten exactly one ping
+				for _, s := range tt.s {
+					assert.Equal(t, s.pings, tt.expectedUpdates)
+				}
 			}
 		})
 	}
