@@ -11,24 +11,18 @@ import (
 
 type (
 	mockConsumer struct {
-		updates  int
-		updateFn func(mc *mockConsumer)
+		updates int
 	}
 	mockSubscriber struct {
-		pings  int
-		pingFn func(ms *mockSubscriber)
+		pings int
 	}
 )
 
 func (mc *mockConsumer) Update(io.Reader) {
-	if mc.updateFn != nil {
-		mc.updateFn(mc)
-	}
+	mc.updates++
 }
 func (ms *mockSubscriber) Ping() {
-	if ms.pingFn != nil {
-		ms.pingFn(ms)
-	}
+	ms.pings++
 }
 
 type nopDataProvider struct{}
@@ -112,23 +106,16 @@ func TestControlServiceUpdate(t *testing.T) {
 		{
 			name:      "one consumer, two subscribers",
 			subsystem: "desktop",
-			c: &mockConsumer{
-				updateFn: func(mc *mockConsumer) {
-					mc.updates++
-				},
-			},
+			c:         &mockConsumer{},
 			s: []*mockSubscriber{
-				{
-					pingFn: func(ms *mockSubscriber) {
-						ms.pings++
-					},
-				},
-				{
-					pingFn: func(ms *mockSubscriber) {
-						ms.pings++
-					},
-				},
+				{},
+				{},
 			},
+		},
+		{
+			name:      "one consumer, no subscribers",
+			subsystem: "desktop",
+			c:         &mockConsumer{},
 		},
 	}
 	for _, tt := range tests {
