@@ -11,21 +11,23 @@ import (
 
 type (
 	mockConsumer struct {
-		updateFn func()
+		updates  int
+		updateFn func(mc *mockConsumer)
 	}
 	mockSubscriber struct {
-		pingFn func()
+		pings  int
+		pingFn func(ms *mockSubscriber)
 	}
 )
 
 func (mc *mockConsumer) Update(io.Reader) {
 	if mc.updateFn != nil {
-		mc.updateFn()
+		mc.updateFn(mc)
 	}
 }
-func (mc *mockSubscriber) Ping() {
-	if mc.pingFn != nil {
-		mc.pingFn()
+func (ms *mockSubscriber) Ping() {
+	if ms.pingFn != nil {
+		ms.pingFn(ms)
 	}
 }
 
@@ -41,7 +43,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 	tests := []struct {
 		name      string
 		subsystem string
-		c         consumer
+		c         *mockConsumer
 	}{
 		{
 			name:      "empty subsystem",
@@ -74,7 +76,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 	tests := []struct {
 		name      string
 		subsystem string
-		c         consumer
+		c         *mockConsumer
 	}{
 		{
 			name:      "registered twice",
@@ -101,35 +103,29 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 func TestControlServiceUpdate(t *testing.T) {
 	t.Parallel()
 
-	var updateCount int
-	var pingCount int
 	tests := []struct {
-		name            string
-		subsystem       string
-		c               consumer
-		s               []subscriber
-		expectedUpdates int
-		expectedPings   int
+		name      string
+		subsystem string
+		c         *mockConsumer
+		s         []*mockSubscriber
 	}{
 		{
-			name:            "one consumer, two subscribers",
-			subsystem:       "desktop",
-			expectedUpdates: 1,
-			expectedPings:   2,
+			name:      "one consumer, two subscribers",
+			subsystem: "desktop",
 			c: &mockConsumer{
-				updateFn: func() {
-					updateCount++
+				updateFn: func(mc *mockConsumer) {
+					mc.updates++
 				},
 			},
-			s: []subscriber{
-				&mockSubscriber{
-					pingFn: func() {
-						pingCount++
+			s: []*mockSubscriber{
+				{
+					pingFn: func(ms *mockSubscriber) {
+						ms.pings++
 					},
 				},
-				&mockSubscriber{
-					pingFn: func() {
-						pingCount++
+				{
+					pingFn: func(ms *mockSubscriber) {
+						ms.pings++
 					},
 				},
 			},
@@ -140,7 +136,6 @@ func TestControlServiceUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			updateCount, pingCount = 0, 0
 			data := nopDataProvider{}
 			controlOpts := []Option{}
 			cs := New(log.NewNopLogger(), data, controlOpts...)
@@ -152,8 +147,13 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			cs.update(tt.subsystem, nil)
 
-			assert.Equal(t, updateCount, tt.expectedUpdates)
-			assert.Equal(t, pingCount, tt.expectedPings)
+			// Expect consumer to have gotten exactly one update
+			assert.Equal(t, tt.c.updates, 1)
+
+			// Expect each subscriber to have gotten exactly one ping
+			for _, s := range tt.s {
+				assert.Equal(t, s.pings, 1)
+			}
 		})
 	}
 }
