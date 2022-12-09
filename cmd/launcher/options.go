@@ -90,6 +90,8 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
+		_ = flagset.Bool("control", false, "DEPRECATED")
+		_ = flagset.String("control_hostname", "", "DEPRECATED")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
