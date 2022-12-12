@@ -40,7 +40,7 @@ func (i *arrayFlags) Set(value string) error {
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
 func parseOptions(args []string) (*launcher.Options, error) {
-	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
+	flagset := flag.NewFlagSet("launcher", flag.ContinueOnError)
 	flagset.Usage = func() { usage(flagset) }
 
 	var (
