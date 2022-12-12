@@ -37,7 +37,7 @@ func LauncherInfoTable(logger log.Logger, db *bbolt.DB) *table.Plugin {
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(logger, db))
 }
 
-var hardwarePublicEncryptionKey, hardwarePublicSigningKey string
+var hardwarePublicEncryptionKey, hardwarePublicEncryptionKeyFingerprint, hardwarePublicSigningKey, hardwarePublicSigningKeyFingerprint string
 
 func generateLauncherInfoTable(logger log.Logger, db *bbolt.DB) table.GenerateFunc {
 
@@ -59,7 +59,7 @@ func generateLauncherInfoTable(logger log.Logger, db *bbolt.DB) table.GenerateFu
 			fingerprint = ""
 		}
 
-		if runtime.GOOS != "darwin" {
+		if runtime.GOOS == "windows" || runtime.GOOS == "linux" {
 			if err := setHardwareKeys(&krypto.TpmEncoder{}); err != nil {
 				level.Info(logger).Log(
 					"msg", "TPM public keys not retreived",
@@ -84,8 +84,10 @@ func generateLauncherInfoTable(logger log.Logger, db *bbolt.DB) table.GenerateFu
 				"public_key":          publicKey,
 				// hardware encryption and signing keys refers to keys provided by either
 				// Apple's secure enclave or Linux / Windows TPM
-				"hardware_public_encryption_key": hardwarePublicEncryptionKey,
-				"hardware_public_signing_key":    hardwarePublicSigningKey,
+				"hardware_public_encryption_key":             hardwarePublicEncryptionKey,
+				"hardware_public_encryption_key_fingerprint": hardwarePublicEncryptionKeyFingerprint,
+				"hardware_public_signing_key":                hardwarePublicSigningKey,
+				"hardware_public_signing_key_fingerprint":    hardwarePublicSigningKeyFingerprint,
 			},
 		}
 
@@ -99,7 +101,7 @@ type keyer interface {
 }
 
 func setHardwareKeys(keyer keyer) error {
-	if hardwarePublicEncryptionKey != "" && hardwarePublicSigningKey != "" {
+	if hardwarePublicEncryptionKey != "" && hardwarePublicEncryptionKeyFingerprint != "" && hardwarePublicSigningKey != "" && hardwarePublicSigningKeyFingerprint != "" {
 		return nil
 	}
 
@@ -109,9 +111,19 @@ func setHardwareKeys(keyer keyer) error {
 		return fmt.Errorf("getting public encryption key: %w", err)
 	}
 
+	hardwarePublicEncryptionKeyFingerprint, err = krypto.RsaFingerprint(hardwarePublicEncryptionKey)
+	if err != nil {
+		return fmt.Errorf("fingerprinting public encryption key: %w", err)
+	}
+
 	hardwarePublicSigningKey, err = keyToString(keyer.PublicSigningKey)
 	if err != nil {
 		return fmt.Errorf("getting public signing key: %w", err)
+	}
+
+	hardwarePublicSigningKeyFingerprint, err = krypto.RsaFingerprint(hardwarePublicSigningKey)
+	if err != nil {
+		return fmt.Errorf("fingerprinting public signing key: %w", err)
 	}
 
 	return nil
