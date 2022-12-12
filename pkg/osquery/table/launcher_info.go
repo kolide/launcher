@@ -31,8 +31,10 @@ func LauncherInfoTable(logger log.Logger, db *bbolt.DB) *table.Plugin {
 		table.TextColumn("osquery_instance_id"),
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
-		table.TextColumn("hardware_public_signing_key"),
 		table.TextColumn("hardware_public_encryption_key"),
+		table.TextColumn("hardware_public_encryption_key_fingerprint"),
+		table.TextColumn("hardware_public_signing_key"),
+		table.TextColumn("hardware_public_signing_key_fingerprint"),
 	}
 	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(logger, db))
 }
@@ -105,23 +107,34 @@ func setHardwareKeys(keyer keyer) error {
 		return nil
 	}
 
-	var err error
-	hardwarePublicEncryptionKey, err = keyToString(keyer.PublicEncryptionKey)
+	// encryption key
+	rsaEncryptionKey, err := keyer.PublicEncryptionKey()
 	if err != nil {
-		return fmt.Errorf("getting public encryption key: %w", err)
+		return fmt.Errorf("getting public encryption key from keyer: %w", err)
 	}
 
-	hardwarePublicEncryptionKeyFingerprint, err = krypto.RsaFingerprint(hardwarePublicEncryptionKey)
+	hardwarePublicEncryptionKey, err = keyToString(rsaEncryptionKey)
+	if err != nil {
+		return fmt.Errorf("converting public encryption key to string: %w", err)
+	}
+
+	hardwarePublicEncryptionKeyFingerprint, err = krypto.RsaFingerprint(rsaEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("fingerprinting public encryption key: %w", err)
 	}
 
-	hardwarePublicSigningKey, err = keyToString(keyer.PublicSigningKey)
+	// singing key
+	rsaSigningKey, err := keyer.PublicSigningKey()
 	if err != nil {
-		return fmt.Errorf("getting public signing key: %w", err)
+		return fmt.Errorf("getting public signing key from keyer: %w", err)
 	}
 
-	hardwarePublicSigningKeyFingerprint, err = krypto.RsaFingerprint(hardwarePublicSigningKey)
+	hardwarePublicSigningKey, err = keyToString(rsaSigningKey)
+	if err != nil {
+		return fmt.Errorf("coverting public signing key to string: %w", err)
+	}
+
+	hardwarePublicSigningKeyFingerprint, err = krypto.RsaFingerprint(rsaSigningKey)
 	if err != nil {
 		return fmt.Errorf("fingerprinting public signing key: %w", err)
 	}
@@ -129,13 +142,7 @@ func setHardwareKeys(keyer keyer) error {
 	return nil
 }
 
-func keyToString(f func() (*rsa.PublicKey, error)) (string, error) {
-	key, err := f()
-
-	if err != nil {
-		return "", err
-	}
-
+func keyToString(key *rsa.PublicKey) (string, error) {
 	var b bytes.Buffer
 	if err := krypto.RsaPublicToPublicPem(key, &b); err != nil {
 		return "", fmt.Errorf("marshalling key to pem: %w", err)
