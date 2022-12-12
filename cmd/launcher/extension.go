@@ -214,7 +214,7 @@ func commonRunnerOptions(logger log.Logger, db *bbolt.DB, opts *launcher.Options
 	return []runtime.OsqueryInstanceOption{
 		runtime.WithOsquerydBinary(opts.OsquerydPath),
 		runtime.WithRootDirectory(opts.RootDirectory),
-		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, opts)...),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(logger, db, opts)...),
 		runtime.WithStdout(osqueryStdoutLogger),
 		runtime.WithStderr(osqueryStderrLogger),
 		runtime.WithLogger(logger),

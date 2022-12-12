@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
@@ -44,7 +45,7 @@ func runSocket(args []string) error {
 	}
 
 	if *flLauncherTables {
-		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil)...))
+		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(log.NewNopLogger(), nil, nil)...))
 	}
 
 	runner, err := runtime.LaunchInstance(opts...)

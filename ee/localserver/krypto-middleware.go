@@ -26,7 +26,7 @@ type kryptoBoxerMiddleware struct {
 func NewKryptoBoxerMiddleware(logger log.Logger, myKey *rsa.PrivateKey, serverKey *rsa.PublicKey) (*kryptoBoxerMiddleware, error) {
 
 	kbrw := &kryptoBoxerMiddleware{
-		boxer:  krypto.NewBoxer(myKey, serverKey),
+		boxer:  krypto.NewKeyBoxer(myKey, serverKey, serverKey),
 		logger: logger,
 	}
 

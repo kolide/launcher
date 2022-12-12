@@ -33,9 +33,9 @@ func TestUnwrapV0(t *testing.T) {
 	malloryKey, err := krypto.RsaRandomKey()
 	require.NoError(t, err)
 
-	counterpartyBoxer := krypto.NewBoxer(counterpartyKey, nil)
+	counterpartyBoxer := krypto.NewKeyBoxer(counterpartyKey, nil, nil)
 
-	malloryBoxer := krypto.NewBoxer(malloryKey, nil)
+	malloryBoxer := krypto.NewKeyBoxer(malloryKey, nil, nil)
 
 	// Make some signed boxes
 	signedIncorrectBox, err := counterpartyBoxer.Sign("", []byte("incorrect"))

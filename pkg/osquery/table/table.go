@@ -18,11 +18,11 @@ import (
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(logger log.Logger, db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(db),
 		LauncherDbInfo(db),
-		LauncherInfoTable(db),
+		LauncherInfoTable(logger, db),
 		kolide_server_data.TablePlugin(db),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
