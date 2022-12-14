@@ -22,7 +22,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	if opts.DisableControlTLS {
 		clientOpts = append(clientOpts, control.WithDisableTLS())
 	}
-	client, err := control.NewControlHTTPClient(opts.ControlServerURL, http.DefaultClient, clientOpts...)
+	client, err := control.NewControlHTTPClient(logger, opts.ControlServerURL, http.DefaultClient, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating control http client: %w", err)
 	}

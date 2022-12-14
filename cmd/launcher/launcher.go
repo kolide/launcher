@@ -32,7 +32,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/osquery/tables/kolide_server_data"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/oklog/run"
 
@@ -187,16 +186,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// If the control server has been opted-in to, run the control service
 		if opts.Control {
 			// If the control server has been opted-in to, run the control service
-			control, controlService, err := createControlService(ctx, logger, opts)
+			ctl, controlService, err := createControlService(ctx, logger, opts)
 			if err != nil {
 				return fmt.Errorf("Failed to setup control service: %w", err)
 			}
-			runGroup.Add(control.Execute, control.Interrupt)
+			runGroup.Add(ctl.Execute, ctl.Interrupt)
 			controlRegistry = &controlService.Registry
 
-			// serverDataUpdateHandler acts as a consumer of the server data table updates
-			serverDataUpdateHandler := kolide_server_data.NewUpdateHandler(db)
-			controlRegistry.RegisterConsumer("kolide_server_data", serverDataUpdateHandler)
+			// serverDataBucketConsumer handles server data table updates
+			serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
+			controlRegistry.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 		}
 
 		runner = desktopRunner.New(

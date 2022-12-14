@@ -21,12 +21,13 @@ type HTTPClient struct {
 	disableTLS bool
 }
 
-func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(logger log.Logger, addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &HTTPClient{
+		logger:  logger,
 		baseURL: baseURL,
 		client:  client,
 		addr:    addr,
