@@ -11,21 +11,18 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// Registry is a registrar of consumers & subscribers
-type Registry struct {
-	consumers   map[string]consumer
-	subscribers map[string][]subscriber
-}
-
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	Registry
 	logger          log.Logger
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
 	lastFetched     map[string]string
+	consumers       map[string]consumer
+	subscribers     map[string][]subscriber
+	Execute         func() error
+	Interrupt       func(error)
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -47,16 +44,13 @@ type dataProvider interface {
 }
 
 func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
-	r := Registry{
-		consumers:   make(map[string]consumer),
-		subscribers: make(map[string][]subscriber),
-	}
 	cs := &ControlService{
-		Registry:        r,
 		logger:          logger,
 		requestInterval: 60 * time.Second,
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
+		consumers:       make(map[string]consumer),
+		subscribers:     make(map[string][]subscriber),
 	}
 
 	for _, opt := range opts {
@@ -124,26 +118,26 @@ func (cs *ControlService) Fetch() error {
 	return nil
 }
 
-func (r *Registry) RegisterConsumer(subsystem string, consumer consumer) error {
-	if _, ok := r.consumers[subsystem]; ok {
+func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
+	if _, ok := cs.consumers[subsystem]; ok {
 		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
 	}
-	r.consumers[subsystem] = consumer
+	cs.consumers[subsystem] = consumer
 	return nil
 }
 
-func (r *Registry) RegisterSubscriber(subsystem string, subscriber subscriber) {
-	r.subscribers[subsystem] = append(r.subscribers[subsystem], subscriber)
+func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
+	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
 }
 
-func (r *Registry) update(subsystem string, reader io.Reader) {
+func (cs *ControlService) update(subsystem string, reader io.Reader) {
 	// First, send to consumer, if any
-	if consumer, ok := r.consumers[subsystem]; ok {
+	if consumer, ok := cs.consumers[subsystem]; ok {
 		consumer.Update(reader)
 	}
 
 	// Then send a ping to all subscribers
-	for _, subscriber := range r.subscribers[subsystem] {
+	for _, subscriber := range cs.subscribers[subsystem] {
 		subscriber.Ping()
 	}
 }

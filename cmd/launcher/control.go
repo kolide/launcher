@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/pkg/launcher"
 )
@@ -30,12 +29,12 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*actor.Actor, *control.ControlService, error) {
+func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	controlOpts := []control.Option{
@@ -43,15 +42,15 @@ func createControlService(ctx context.Context, logger log.Logger, opts *launcher
 	}
 	service := control.New(logger, client, controlOpts...)
 
-	return &actor.Actor{
-		Execute: func() error {
-			level.Info(logger).Log("msg", "control service started")
-			service.Start(ctx)
-			return nil
-		},
-		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "control service interrupted", "err", err)
-			service.Stop()
-		},
-	}, service, nil
+	service.Execute = func() error {
+		level.Info(logger).Log("msg", "control service started")
+		service.Start(ctx)
+		return nil
+	}
+	service.Interrupt = func(err error) {
+		level.Info(logger).Log("msg", "control service interrupted", "err", err)
+		service.Stop()
+	}
+
+	return service, nil
 }

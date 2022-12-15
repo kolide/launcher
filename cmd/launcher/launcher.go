@@ -180,22 +180,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	var controlRegistry *control.Registry
+	var controlService *control.ControlService
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
-		// If the control server has been opted-in to, run the control service
 		if opts.Control {
 			// If the control server has been opted-in to, run the control service
-			ctl, controlService, err := createControlService(ctx, logger, opts)
+			controlService, err = createControlService(ctx, logger, opts)
 			if err != nil {
 				return fmt.Errorf("Failed to setup control service: %w", err)
 			}
-			runGroup.Add(ctl.Execute, ctl.Interrupt)
-			controlRegistry = &controlService.Registry
+			runGroup.Add(controlService.Execute, controlService.Interrupt)
 
 			// serverDataBucketConsumer handles server data table updates
 			serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
-			controlRegistry.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+			controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 		}
 
 		runner = desktopRunner.New(
@@ -207,8 +205,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 
-		if controlRegistry != nil {
-			controlRegistry.RegisterConsumer("desktop", runner)
+		if controlService != nil {
+			controlService.RegisterConsumer("desktop", runner)
 		}
 	}
 
