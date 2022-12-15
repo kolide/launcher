@@ -36,13 +36,14 @@ func (bc *BucketConsumer) Update(data io.Reader) {
 			"data", data,
 			"err", err,
 		)
+		return
 	}
 
 	bc.db.Update(func(tx *bbolt.Tx) error {
 		// Clear the bucket first
 		tx.DeleteBucket([]byte(bc.bucketName))
 
-		bucket, err := tx.CreateBucketIfNotExists([]byte(bc.bucketName))
+		bucket, err := tx.CreateBucket([]byte(bc.bucketName))
 		if err != nil {
 			return fmt.Errorf("creating bucket: %w", err)
 		}
