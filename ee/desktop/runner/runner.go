@@ -212,32 +212,37 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}
 }
 
-func (r *DesktopUsersProcessesRunner) Update(data io.Reader) {
+func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	var desktopStatus client.DesktopUserStatus
 	if err := json.NewDecoder(data).Decode(&desktopStatus); err != nil {
-		level.Error(r.logger).Log(
-			"msg", "failed to decode desktop user control data",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("failed to decode desktop user control data: %w", err)
 	}
 
 	if desktopStatus.Status == "" {
-		return
+		return fmt.Errorf("empty desktop status")
 	}
 
-	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
-		if err := client.SetStatus(desktopStatus.Status); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending status command to desktop process",
-				"uid", uid,
-				"pid", proc.process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
-		}
-	}
+	// TODO: TBD how desktop user processes are notified and ingest control data
+	// Below code leverages the HTTP server but I'm thinking it's preferable
+	// to persist the data to a file, and optionally "ping" the server to let it know
+	// an update has occurred. The desktop can read from the file and react on it's own
+	// One advantage here is that the status info can be passed along even if the desktop
+	// server is unavailable (it would read the file on startup)
+
+	// for uid, proc := range r.uidProcs {
+	// 	client := client.New(r.authToken, proc.socketPath)
+	// 	if err := client.SetStatus(desktopStatus.Status); err != nil {
+	// 		level.Error(r.logger).Log(
+	// 			"msg", "error sending status command to desktop process",
+	// 			"uid", uid,
+	// 			"pid", proc.process.Pid,
+	// 			"path", proc.path,
+	// 			"err", err,
+	// 		)
+	// 	}
+	// }
+
+	return nil
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {

@@ -42,6 +42,7 @@ func Test_Update(t *testing.T) {
 				"one":   "one",
 				"two":   "two",
 				"three": "three",
+				"four":  "",
 			},
 			want: []map[string]string{
 				{

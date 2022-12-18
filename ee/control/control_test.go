@@ -18,9 +18,11 @@ type (
 	}
 )
 
-func (mc *mockConsumer) Update(io.Reader) {
+func (mc *mockConsumer) Update(io.Reader) error {
 	mc.updates++
+	return nil
 }
+
 func (ms *mockSubscriber) Ping() {
 	ms.pings++
 }

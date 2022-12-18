@@ -28,7 +28,7 @@ type ControlService struct {
 // consumer is an interface for something that consumes control server data updates. The
 // control server supports at most one consumer per subsystem.
 type consumer interface {
-	Update(io.Reader)
+	Update(io.Reader) error
 }
 
 // subscriber is an interface for something that wants to be notified when a subsystem has been updated.
@@ -133,7 +133,11 @@ func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscr
 func (cs *ControlService) update(subsystem string, reader io.Reader) {
 	// First, send to consumer, if any
 	if consumer, ok := cs.consumers[subsystem]; ok {
-		consumer.Update(reader)
+		err := consumer.Update(reader)
+		level.Error(cs.logger).Log(
+			"msg", "failed to update control data consumer",
+			"subsystem", subsystem,
+			"err", err)
 	}
 
 	// Then send a ping to all subscribers
