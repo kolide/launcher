@@ -65,7 +65,11 @@ func (cs *ControlService) Start(ctx context.Context) {
 	requestTicker := time.NewTicker(cs.requestInterval)
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
-		cs.Fetch()
+		if err := cs.Fetch(); err != nil {
+			level.Error(cs.logger).Log(
+				"msg", "failed to fetch data from control server",
+				"err", err)
+		}
 
 		select {
 		case <-ctx.Done():
@@ -107,7 +111,16 @@ func (cs *ControlService) Fetch() error {
 		}
 
 		// Consumer and subscriber(s) notified now
-		cs.update(subsystem, data)
+		err = cs.update(subsystem, data)
+		if err != nil {
+			level.Error(cs.logger).Log(
+				"msg", "failed to update consumers and subscribers",
+				"subsystem", subsystem,
+				"err", err)
+			// Although we failed to update, the payload may be bad and there's no
+			// sense in repeatedly attempting to apply a bad update.
+			// A new update will have a new hash, so continue and remember this hash.
+		}
 
 		// Remember the hash of the last fetched version of this subsystem's data
 		cs.lastFetched[subsystem] = hash
@@ -118,6 +131,7 @@ func (cs *ControlService) Fetch() error {
 	return nil
 }
 
+// Registers a consumer for ingesting subsystem updates
 func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
 	if _, ok := cs.consumers[subsystem]; ok {
 		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
@@ -126,22 +140,25 @@ func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) 
 	return nil
 }
 
+// Registers a subscriber for subsystem update notifications
 func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
 	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
 }
 
-func (cs *ControlService) update(subsystem string, reader io.Reader) {
+// Updates all registered consumers and subscribers of subsystem updates
+func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 	// First, send to consumer, if any
 	if consumer, ok := cs.consumers[subsystem]; ok {
-		err := consumer.Update(reader)
-		level.Error(cs.logger).Log(
-			"msg", "failed to update control data consumer",
-			"subsystem", subsystem,
-			"err", err)
+		if err := consumer.Update(reader); err != nil {
+			// No need to ping subscribers if the consumer update failed
+			return err
+		}
 	}
 
 	// Then send a ping to all subscribers
 	for _, subscriber := range cs.subscribers[subsystem] {
 		subscriber.Ping()
 	}
+
+	return nil
 }

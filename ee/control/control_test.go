@@ -137,7 +137,8 @@ func TestControlServiceUpdate(t *testing.T) {
 				cs.RegisterSubscriber(tt.subsystem, ss)
 			}
 
-			cs.update(tt.subsystem, nil)
+			err = cs.update(tt.subsystem, nil)
+			require.NoError(t, err)
 
 			// Expect consumer to have gotten exactly one update
 			assert.Equal(t, tt.c.updates, tt.expectedUpdates)
@@ -194,6 +195,7 @@ func TestControlServiceFetch(t *testing.T) {
 			// Repeat fetches to verify no changes
 			for i := 0; i < tt.fetches; i++ {
 				err = cs.Fetch()
+				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
 				assert.Equal(t, tt.c.updates, tt.expectedUpdates)
