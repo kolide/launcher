@@ -64,6 +64,7 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 	mkdir -p $@/Contents/Resources
 	cp tools/images/Kolide.icns $@/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
+	cp tools/packaging/Kolide_Endpoint_Agent.provisionprofile $@/Contents/
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
