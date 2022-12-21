@@ -361,6 +361,13 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 			return fmt.Errorf("could not copy app bundle: %w", err)
 		}
 
+		// Create a symlink from <bin dir>/<binary> to the actual binary location within the app bundle
+		target := filepath.Join("..", "Kolide.app", "Contents", "MacOS", binaryName)
+		symlinkFile := filepath.Join(p.packageRoot, p.binDir, binaryName)
+		if err := os.Symlink(target, symlinkFile); err != nil {
+			return fmt.Errorf("could not create symlink after copying app bundle: %w", err)
+		}
+
 		return nil
 	}
 
