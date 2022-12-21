@@ -213,13 +213,13 @@ func TestPlatformLauncherPath(t *testing.T) {
 	t.Parallel()
 
 	targetDarwin := &Target{Platform: Darwin, Init: LaunchD, Package: Pkg}
-	require.Equal(t, filepath.Join("some", "dir", "Kolide.app", "Contents", "MacOS", "launcher"), targetDarwin.PlatformLauncherPath(filepath.Join("some", "dir")))
+	require.Equal(t, filepath.Join("some", "dir", "Kolide.app", "Contents", "MacOS", "launcher"), targetDarwin.PlatformLauncherPath(filepath.Join("some", "dir", "bin")))
 
 	targetWin := &Target{Platform: Windows, Init: NoInit, Package: Msi}
-	require.Equal(t, filepath.Join("some", "dir", "launcher.exe"), targetWin.PlatformLauncherPath(filepath.Join("some", "dir")))
+	require.Equal(t, filepath.Join("some", "dir", "bin", "launcher.exe"), targetWin.PlatformLauncherPath(filepath.Join("some", "dir", "bin")))
 
 	targetLinux := &Target{Platform: Linux, Init: NoInit, Package: Deb}
-	require.Equal(t, filepath.Join("some", "dir", "launcher"), targetLinux.PlatformLauncherPath(filepath.Join("some", "dir")))
+	require.Equal(t, filepath.Join("some", "dir", "bin", "launcher"), targetLinux.PlatformLauncherPath(filepath.Join("some", "dir", "bin")))
 }
 
 func TestTargetPlatformExtensionName(t *testing.T) {

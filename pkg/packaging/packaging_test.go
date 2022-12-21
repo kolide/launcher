@@ -158,45 +158,74 @@ func Test_getBinary(t *testing.T) {
 
 	// Set up output directory
 	tmpPkgRoot := t.TempDir()
-	binDir := "bin"
-	assert.NoError(t, os.Mkdir(filepath.Join(tmpPkgRoot, binDir), 0755), "could not make temp output directory")
+	binDir := filepath.Join(tmpPkgRoot, "bin")
+	assert.NoError(t, os.Mkdir(binDir, 0755), "could not make temp output directory")
 
 	p := &PackageOptions{
 		packageRoot: tmpPkgRoot,
-		binDir:      binDir,
+		binDir:      "bin",
 	}
 
 	// Verify we found the non-app bundle binary and copied it to the expected location
 	err = p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath)
 	assert.NoError(t, err, "expected to find binary but did not")
 
-	_, err = os.Stat(filepath.Join(tmpPkgRoot, binDir, binaryName))
+	_, err = os.Stat(filepath.Join(binDir, binaryName))
 	assert.NoError(t, err, "did not find binary in output directory")
+}
 
-	// Test looking for app bundle, if we're on macOS
-	if runtime.GOOS == "darwin" {
-		// Set up app bundle directory structure
-		appBundleLocation := filepath.Join(localBinaryDir, "Kolide.app")
-		err := os.MkdirAll(filepath.Join(appBundleLocation, "Contents", "MacOS"), 0755)
-		assert.NoError(t, err, "could not make temp app bundle directory")
+func Test_getBinary_AppBundle(t *testing.T) {
+	t.Parallel()
 
-		// Add binary to app bundle
-		f, err := os.Create(filepath.Join(appBundleLocation, "Contents", "MacOS", binaryName))
-		assert.NoError(t, err, "could not create app bundle binary")
-		defer f.Close()
-
-		// Verify we found the app bundle and copied over the entire directory to the expected location
-		assert.NoError(t, p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath), "expected to find app bundle but did not")
-		assert.NoError(t, err, "expected to find app bundle but did not")
-
-		appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, binDir, "Kolide.app"))
-		assert.NoError(t, err, "did not find app bundle in output directory")
-		assert.True(t, appBundleInfo.IsDir(), "app bundle not copied over correctly")
-
-		binaryInfo, err := os.Stat(filepath.Join(tmpPkgRoot, binDir, "Kolide.app", "Contents", "MacOS", binaryName))
-		assert.NoError(t, err, "did not find app bundle binary in output directory")
-		assert.False(t, binaryInfo.IsDir(), "app bundle binary not copied over correctly")
+	if runtime.GOOS != "darwin" {
+		// App bundles are darwin only
+		t.Skip()
 	}
+
+	// Set up cache directory
+	tmpCacheDir := t.TempDir()
+	binaryName := "launcher"
+	version := "nightly"
+	localBinaryDir := filepath.Join(tmpCacheDir, fmt.Sprintf("%s-%s-%s", binaryName, runtime.GOOS, version))
+	assert.NoError(t, os.Mkdir(localBinaryDir, 0755), "could not make temp cache directory")
+
+	// Set up app bundle directory structure in cache
+	appBundleLocation := filepath.Join(localBinaryDir, "Kolide.app")
+	err := os.MkdirAll(filepath.Join(appBundleLocation, "Contents", "MacOS"), 0755)
+	require.NoError(t, err, "could not make temp app bundle directory")
+
+	// Add binary to app bundle in cache
+	f, err := os.Create(filepath.Join(appBundleLocation, "Contents", "MacOS", binaryName))
+	require.NoError(t, err, "could not create app bundle binary")
+	defer f.Close()
+
+	// Set up output directory
+	tmpPkgRoot := t.TempDir()
+	binDir := filepath.Join(tmpPkgRoot, "bin")
+	assert.NoError(t, os.Mkdir(binDir, 0755), "could not make temp output directory")
+
+	p := &PackageOptions{
+		packageRoot: tmpPkgRoot,
+		binDir:      "bin",
+	}
+
+	// Verify we found the app bundle and copied over the entire directory to the expected location
+	require.NoError(t, p.getBinary(context.TODO(), binaryName, binaryName, filepath.Join(localBinaryDir, binaryName)), "expected to find app bundle but did not")
+	require.NoError(t, err, "expected to find app bundle but did not")
+
+	appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, "Kolide.app"))
+	require.NoError(t, err, "did not find app bundle in output directory")
+	require.True(t, appBundleInfo.IsDir(), "app bundle not copied over correctly")
+
+	binaryInfo, err := os.Stat(filepath.Join(tmpPkgRoot, "Kolide.app", "Contents", "MacOS", binaryName))
+	require.NoError(t, err, "did not find app bundle binary in output directory")
+	require.False(t, binaryInfo.IsDir(), "app bundle binary not copied over correctly")
+
+	// Verify that we made the symlink
+	symlinkInfo, err := os.Lstat(filepath.Join(binDir, binaryName))
+	require.NoError(t, err, "did not find symlink in bin directory")
+	// Confirm it's a symlink
+	require.True(t, strings.HasPrefix(symlinkInfo.Mode().String(), "L"))
 }
 
 func testedTargets() []Target {
