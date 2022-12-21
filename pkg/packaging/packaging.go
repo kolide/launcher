@@ -350,12 +350,13 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 	}
 
 	// Check to see if we fetched an app bundle. If so, copy over the app bundle directory.
+	// We want the app bundle to go one level above bin dir (e.g. /usr/local/Kolide.app, not /usr/local/bin/Kolide.app).
 	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
 	appBundleInfo, err := os.Stat(appBundlePath)
 	if err == nil && appBundleInfo.IsDir() {
 		if err := fsutil.CopyDir(
 			appBundlePath,
-			filepath.Join(p.packageRoot, p.binDir, "Kolide.app"),
+			filepath.Join(p.packageRoot, filepath.Dir(p.binDir), "Kolide.app"),
 		); err != nil {
 			return fmt.Errorf("could not copy app bundle: %w", err)
 		}

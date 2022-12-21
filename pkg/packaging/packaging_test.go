@@ -178,24 +178,24 @@ func Test_getBinary(t *testing.T) {
 		// Set up app bundle directory structure
 		appBundleLocation := filepath.Join(localBinaryDir, "Kolide.app")
 		err := os.MkdirAll(filepath.Join(appBundleLocation, "Contents", "MacOS"), 0755)
-		assert.NoError(t, err, "could not make temp app bundle directory")
+		require.NoError(t, err, "could not make temp app bundle directory")
 
 		// Add binary to app bundle
 		f, err := os.Create(filepath.Join(appBundleLocation, "Contents", "MacOS", binaryName))
-		assert.NoError(t, err, "could not create app bundle binary")
+		require.NoError(t, err, "could not create app bundle binary")
 		defer f.Close()
 
 		// Verify we found the app bundle and copied over the entire directory to the expected location
-		assert.NoError(t, p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath), "expected to find app bundle but did not")
-		assert.NoError(t, err, "expected to find app bundle but did not")
+		require.NoError(t, p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath), "expected to find app bundle but did not")
+		require.NoError(t, err, "expected to find app bundle but did not")
 
-		appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, binDir, "Kolide.app"))
-		assert.NoError(t, err, "did not find app bundle in output directory")
-		assert.True(t, appBundleInfo.IsDir(), "app bundle not copied over correctly")
+		appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, "Kolide.app"))
+		require.NoError(t, err, "did not find app bundle in output directory")
+		require.True(t, appBundleInfo.IsDir(), "app bundle not copied over correctly")
 
-		binaryInfo, err := os.Stat(filepath.Join(tmpPkgRoot, binDir, "Kolide.app", "Contents", "MacOS", binaryName))
-		assert.NoError(t, err, "did not find app bundle binary in output directory")
-		assert.False(t, binaryInfo.IsDir(), "app bundle binary not copied over correctly")
+		binaryInfo, err := os.Stat(filepath.Join(tmpPkgRoot, "Kolide.app", "Contents", "MacOS", binaryName))
+		require.NoError(t, err, "did not find app bundle binary in output directory")
+		require.False(t, binaryInfo.IsDir(), "app bundle binary not copied over correctly")
 	}
 }
 

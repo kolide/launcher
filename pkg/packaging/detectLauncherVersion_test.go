@@ -66,8 +66,10 @@ func TestLauncherLocation(t *testing.T) {
 
 	// Create a temp directory with an app bundle in it
 	tmpDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS"), 0755))
+	binDir := filepath.Join(tmpDir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0755))
 	baseDir := filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS")
+	require.NoError(t, os.MkdirAll(baseDir, 0755))
 	expectedLauncherBinaryPath := filepath.Join(baseDir, "launcher")
 	f, err := os.Create(expectedLauncherBinaryPath)
 	require.NoError(t, err, "could not create temp file for test")
@@ -75,7 +77,7 @@ func TestLauncherLocation(t *testing.T) {
 	defer os.Remove(expectedLauncherBinaryPath)
 
 	// Now, confirm that we find the binary inside the app bundle
-	require.Equal(t, expectedLauncherBinaryPath, pDarwin.launcherLocation(baseDir))
+	require.Equal(t, expectedLauncherBinaryPath, pDarwin.launcherLocation(binDir))
 
 	// No file check for windows, just expect the binary in the given location
 	pWindows := &PackageOptions{target: Target{Platform: Windows}}
