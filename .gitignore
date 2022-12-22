@@ -33,6 +33,7 @@ pkg/packagekit/wix/internal/assets.go
 
 # VS Code Files
 .vscode/
+.devcontainer/
 
 # scratch pad (notes used during development)
 scratch.*

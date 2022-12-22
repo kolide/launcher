@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,8 +91,13 @@ func TestFindBaseDir(t *testing.T) {
 		out string
 	}{
 		{in: "", out: ""},
-		{in: "/a/path/launcher", out: filepath.Clean("/a/path")},
-		{in: "/a/path/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path")},
+		{in: "/a/path/bin/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
 	}
 
 	for _, tt := range tests {
@@ -196,7 +200,7 @@ func TestFindNewestCleanup(t *testing.T) {
 	}
 
 	{
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(updatesOnDisk))
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
@@ -204,7 +208,7 @@ func TestFindNewestCleanup(t *testing.T) {
 
 	{
 		_ = FindNewest(ctx, binaryPath, DeleteOldUpdates())
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 5")
 		require.Equal(t, 2, len(updatesOnDisk), "after delete")
@@ -228,7 +232,7 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	}
 
 	{
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(updatesOnDisk))
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
@@ -236,7 +240,7 @@ func TestCheckExecutableCorruptCleanup(t *testing.T) {
 
 	{
 		_ = FindNewest(ctx, binaryPath, DeleteCorruptUpdates())
-		updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+		updatesOnDisk, err := os.ReadDir(updatesDir)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(updatesOnDisk), "after cleaning corruption")
 		require.Equal(t, expectedNewest, FindNewest(ctx, binaryPath), "Should find number 3")
@@ -412,7 +416,7 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	t.Parallel()
 
 	// First make a broken truncated binary. Lots of setup for this.
-	truncatedBinary, err := ioutil.TempFile("", "test-autoupdate-check-executable-truncation")
+	truncatedBinary, err := os.CreateTemp("", "test-autoupdate-check-executable-truncation")
 	require.NoError(t, err, "make temp file")
 	defer os.Remove(truncatedBinary.Name())
 	truncatedBinary.Close()
@@ -475,7 +479,7 @@ func TestBuildTimestamp(t *testing.T) {
 				DeleteOldUpdates(),
 			)
 
-			updatesOnDisk, err := ioutil.ReadDir(updatesDir)
+			updatesOnDisk, err := os.ReadDir(updatesDir)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedOnDisk, len(updatesOnDisk), "remaining updates on disk")
 

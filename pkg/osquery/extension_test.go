@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
@@ -24,7 +23,7 @@ import (
 )
 
 func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
-	file, err := ioutil.TempFile("", "kolide_launcher_test")
+	file, err := os.CreateTemp("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
@@ -51,7 +50,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 func TestNewExtensionDatabaseError(t *testing.T) {
 	t.Parallel()
 
-	file, err := ioutil.TempFile("", "kolide_launcher_test")
+	file, err := os.CreateTemp("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}

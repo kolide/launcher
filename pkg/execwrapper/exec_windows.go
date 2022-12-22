@@ -22,6 +22,7 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
 	cmd.Env = envv
 
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -16,7 +15,7 @@ func TestForceNoChunkedEncoding(t *testing.T) {
 
 	req := &http.Request{
 		Method: "POST",
-		Body:   ioutil.NopCloser(bytes.NewBufferString("Hello World")),
+		Body:   io.NopCloser(bytes.NewBufferString("Hello World")),
 	}
 
 	// Check no ContentLength

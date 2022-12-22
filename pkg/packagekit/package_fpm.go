@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,7 +87,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 
 	outputFilename := fmt.Sprintf("%s-%s.%s", po.Name, po.Version, f.outputType)
 
-	outputPathDir, err := ioutil.TempDir("", "packaging-fpm-output")
+	outputPathDir, err := os.MkdirTemp("", "packaging-fpm-output")
 	if err != nil {
 		return fmt.Errorf("making TempDir: %w", err)
 	}

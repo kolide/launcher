@@ -4,7 +4,6 @@ package autoupdate
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -41,7 +40,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")
@@ -52,7 +51,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		os.Remove(filepath.Join(localTUFRepoPath, knownFilePaths[0])),
 		"remove a tuf file")
 	require.NoError(t,
-		ioutil.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
+		os.WriteFile(filepath.Join(localTUFRepoPath, knownFilePaths[1]), nil, 0644),
 		"truncate a tuf file")
 
 	// Attempt to re-create
@@ -64,7 +63,7 @@ func TestCreateTUFRepoDirectory(t *testing.T) {
 		_, err := os.Stat(fullFilePath)
 		require.NoError(t, err, "stat file")
 
-		jsonBytes, err := ioutil.ReadFile(fullFilePath)
+		jsonBytes, err := os.ReadFile(fullFilePath)
 		require.NoError(t, err, "read file")
 
 		require.True(t, json.Valid(jsonBytes), "file is json")
@@ -122,7 +121,7 @@ func TestValidLocalFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			testFile, err := ioutil.TempFile("", "TestValidLocalFile")
+			testFile, err := os.CreateTemp("", "TestValidLocalFile")
 			require.NoError(t, err)
 			defer os.Remove(testFile.Name())
 

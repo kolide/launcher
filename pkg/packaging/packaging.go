@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -45,9 +44,9 @@ type PackageOptions struct {
 	InsecureTransport bool
 	UpdateChannel     string
 	InitialRunner     bool
-	ControlHostname   string
 	DisableControlTLS bool
 	Identifier        string
+	Title             string
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
@@ -104,12 +103,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	var err error
 
-	if p.packageRoot, err = ioutil.TempDir("", "package.packageRoot"); err != nil {
+	if p.packageRoot, err = os.MkdirTemp("", "package.packageRoot"); err != nil {
 		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.packageRoot)
 
-	if p.scriptRoot, err = ioutil.TempDir("", fmt.Sprintf("package.scriptRoot")); err != nil {
+	if p.scriptRoot, err = os.MkdirTemp("", fmt.Sprintf("package.scriptRoot")); err != nil {
 		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.scriptRoot)
@@ -136,11 +135,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.InitialRunner {
 		launcherBoolFlags = append(launcherBoolFlags, "with_initial_runner")
-	}
-
-	if p.ControlHostname != "" {
-		launcherMapFlags["control_hostname"] = p.ControlHostname
-		launcherBoolFlags = append(launcherBoolFlags, "control")
 	}
 
 	if p.UpdateChannel != "" {
@@ -218,7 +212,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Unless we're omitting the secret, write it into the package.
 	// Note that we _always_ set KOLIDE_LAUNCHER_ENROLL_SECRET_PATH
 	if !p.OmitSecret {
-		if err := ioutil.WriteFile(
+		if err := os.WriteFile(
 			filepath.Join(p.packageRoot, p.confDir, "secret"),
 			[]byte(p.Secret),
 			secretPerms,
@@ -281,7 +275,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",
 		Description: "The Kolide Launcher",
-		Path:        filepath.Join(p.binDir, "launcher"),
+		Path:        p.target.PlatformLauncherPath(p.binDir),
 		Identifier:  p.Identifier,
 		Flags:       []string{"-config", flagFilePath},
 		Environment: map[string]string{},
@@ -299,9 +293,14 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("setup setupPrerm for %s: %w", p.target.String(), err)
 	}
 
+	if p.Title == "" {
+		p.Title = fmt.Sprintf("Launcher agent for %s", p.Identifier)
+	}
+
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
+		Title:                    p.Title,
 		Root:                     p.packageRoot,
 		Scripts:                  p.scriptRoot,
 		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,
@@ -340,7 +339,8 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 	var localPath string
 
 	switch {
-	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"):
+	case strings.HasPrefix(binaryVersion, "./"), strings.HasPrefix(binaryVersion, "/"), strings.HasPrefix(binaryVersion, `\`),
+		strings.HasPrefix(binaryVersion, "C:"), strings.HasPrefix(binaryVersion, "D:"):
 		localPath = binaryVersion
 	default:
 		localPath, err = FetchBinary(ctx, p.CacheDir, symbolicName, binaryName, binaryVersion, p.target)
@@ -349,6 +349,29 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		}
 	}
 
+	// Check to see if we fetched an app bundle. If so, copy over the app bundle directory.
+	// We want the app bundle to go one level above bin dir (e.g. /usr/local/Kolide.app, not /usr/local/bin/Kolide.app).
+	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
+	appBundleInfo, err := os.Stat(appBundlePath)
+	if err == nil && appBundleInfo.IsDir() {
+		if err := fsutil.CopyDir(
+			appBundlePath,
+			filepath.Join(p.packageRoot, filepath.Dir(p.binDir), "Kolide.app"),
+		); err != nil {
+			return fmt.Errorf("could not copy app bundle: %w", err)
+		}
+
+		// Create a symlink from <bin dir>/<binary> to the actual binary location within the app bundle
+		target := filepath.Join("..", "Kolide.app", "Contents", "MacOS", binaryName)
+		symlinkFile := filepath.Join(p.packageRoot, p.binDir, binaryName)
+		if err := os.Symlink(target, symlinkFile); err != nil {
+			return fmt.Errorf("could not create symlink after copying app bundle: %w", err)
+		}
+
+		return nil
+	}
+
+	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
 		filepath.Join(p.packageRoot, p.binDir, binaryName),

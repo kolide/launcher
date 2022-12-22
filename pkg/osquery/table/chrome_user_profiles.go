@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -58,7 +58,7 @@ type chromeProfileInfo struct {
 
 func (c *chromeUserProfilesTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
 	var results []map[string]string
-	data, err := ioutil.ReadFile(fileInfo.path)
+	data, err := os.ReadFile(fileInfo.path)
 	if err != nil {
 		return nil, fmt.Errorf("reading chrome local state file: %w", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -33,7 +32,7 @@ func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Contex
 	}
 	r.Body.Close()
 	r.ContentLength = bodyReadBytes
-	r.Body = ioutil.NopCloser(bodyBuf)
+	r.Body = io.NopCloser(bodyBuf)
 
 	return ctx
 }

@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -112,7 +111,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	var rootPool *x509.CertPool
 	if opts.RootPEM != "" {
 		rootPool = x509.NewCertPool()
-		pemContents, err := ioutil.ReadFile(opts.RootPEM)
+		pemContents, err := os.ReadFile(opts.RootPEM)
 		if err != nil {
 			return fmt.Errorf("reading root certs PEM at path: %s: %w", opts.RootPEM, err)
 		}
@@ -180,21 +179,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	// If the control server has been opted-in to, run it
-	if opts.Control {
-		control, err := createControl(ctx, db, logger, opts)
-		if err != nil {
-			return fmt.Errorf("create control actor: %w", err)
-		}
-		if control != nil {
-			runGroup.Add(control.Execute, control.Interrupt)
-		} else {
-			level.Info(logger).Log("msg", "got nil control actor. Ignoring")
-		}
-	}
-
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if (opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443") && runtime.GOOS != "linux" {
+		// If the control server has been opted-in to, run the control service
+		if opts.Control {
+			control, err := createControlService(ctx, logger, opts)
+			if err != nil {
+				return fmt.Errorf("Failed to setup control service: %w", err)
+			}
+			runGroup.Add(control.Execute, control.Interrupt)
+		}
+
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
@@ -286,7 +281,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 }
 
 func writePidFile(path string) error {
-	if err := ioutil.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil

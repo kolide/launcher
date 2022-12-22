@@ -3,12 +3,13 @@ package packagekit
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"text/template"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -18,6 +19,9 @@ import (
 	"go.opencensus.io/trace"
 )
 
+//go:embed assets/distribution.dist
+var distributionTemplate []byte
+
 func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
 	defer span.End()
@@ -26,7 +30,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return err
 	}
 
-	outputPathDir, err := ioutil.TempDir("", "packaging-pkg-output")
+	outputPathDir, err := os.MkdirTemp("", "packaging-pkg-output")
 	if err != nil {
 		return fmt.Errorf("making TempDir: %w", err)
 	}
@@ -98,8 +102,33 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runPkbuild")
 
+	// Run analyze to generate our component plist
+	componentPlist := "./launcher.plist"
+	analyzeCmd := exec.CommandContext(ctx, "pkgbuild", "--analyze", "--root", po.Root, componentPlist)
+	if err := analyzeCmd.Run(); err != nil {
+		return fmt.Errorf("running analyze: %w", err)
+	}
+
+	// Clean up the newly-generated component plist after we're done with it
+	defer func() {
+		if err := os.Remove(componentPlist); err != nil {
+			level.Error(logger).Log(
+				"msg", "could not clean up component plist after pkgbuild",
+				"plist", componentPlist,
+			)
+		}
+	}()
+
+	// Set BundleIsRelocatable in the component plist to false -- this makes sure that the installer
+	// will install Kolide.app to the location that we expect
+	replaceCmd := exec.CommandContext(ctx, "plutil", "-replace", "BundleIsRelocatable", "-bool", "false", componentPlist)
+	if err := replaceCmd.Run(); err != nil {
+		return fmt.Errorf("running plutil -replace: %w", err)
+	}
+
 	args := []string{
 		"--root", po.Root,
+		"--component-plist", componentPlist,
 		"--identifier", fmt.Sprintf("com.%s.launcher", po.Identifier),
 		"--version", po.Version,
 	}
@@ -140,14 +169,54 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runProductbuild")
 
-	args := []string{}
+	// Create a distribution file so that we can set the title and the minimum OS version
+	distributionFile := "./distribution.dist"
+	fh, err := os.Create(distributionFile)
+	if err != nil {
+		return fmt.Errorf("could not create distribution file %s: %w", distributionFile, err)
+	}
+	defer fh.Close()
+
+	var templateData = struct {
+		Title      string
+		Identifier string
+		Version    string
+		PkgName    string
+	}{
+		Title:      po.Title,
+		Identifier: po.Identifier,
+		Version:    po.Version,
+		PkgName:    filepath.Base(flatPkgPath),
+	}
+	t, err := template.New("distribution").Parse(string(distributionTemplate))
+	if err != nil {
+		return fmt.Errorf("could not parse distribution template: %w", err)
+	}
+	err = t.ExecuteTemplate(fh, "distribution", templateData)
+	if err != nil {
+		return fmt.Errorf("could not write distribution file: %w", err)
+	}
+
+	// Clean up the newly-generated distribution file after we're done with it
+	defer func() {
+		if err := os.Remove(distributionFile); err != nil {
+			level.Error(logger).Log(
+				"msg", "could not clean up distribution.dist after productbuild",
+				"dist", distributionFile,
+			)
+		}
+	}()
+
+	args := []string{
+		"--distribution", distributionFile,
+	}
 
 	if po.AppleSigningKey != "" {
 		args = append(args, "--sign", po.AppleSigningKey)
 	}
 
 	args = append(args,
-		"--package", flatPkgPath,
+		"--package-path", filepath.Dir(flatPkgPath),
 		distributionPkgPath,
 	)
 

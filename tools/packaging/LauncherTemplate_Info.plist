@@ -5,7 +5,7 @@
 	<key>CFBundleExecutable</key>
 	<string>launcher</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.kolide.launcher</string>
+	<string>com.kolide.agent</string>
 	<key>CFBundleName</key>
 	<string>Kolide</string>
 	<key>LSUIElement</key>

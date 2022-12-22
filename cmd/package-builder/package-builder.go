@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -104,11 +103,6 @@ func runMake(args []string) error {
 			"update_channel",
 			env.String("UPDATE_CHANNEL", ""),
 			"the value that should be used when invoking the launcher's --update_channel flag. Autoupdates will be disabled unless this is specified",
-		)
-		flControlHostname = flagset.String(
-			"control_hostname",
-			env.String("CONTROL_HOSTNAME", ""),
-			"the value that should be used when invoking the launcher's --control_hostname flag",
 		)
 		flDisableControlTLS = flagset.Bool(
 			"disable_control_tls",
@@ -222,7 +216,7 @@ func runMake(args []string) error {
 	cacheDir := *flCacheDir
 	var err error
 	if cacheDir == "" {
-		cacheDir, err = ioutil.TempDir("", "download_cache")
+		cacheDir, err = os.MkdirTemp("", "download_cache")
 		if err != nil {
 			return fmt.Errorf("could not create temp dir for caching files: %w", err)
 		}
@@ -243,7 +237,6 @@ func runMake(args []string) error {
 		InsecureTransport: *flInsecureTransport,
 		UpdateChannel:     *flUpdateChannel,
 		InitialRunner:     *flInitialRunner,
-		ControlHostname:   *flControlHostname,
 		DisableControlTLS: *flDisableControlTLS,
 		Identifier:        *flIdentifier,
 		OmitSecret:        *flOmitSecret,
@@ -263,7 +256,7 @@ func runMake(args []string) error {
 	// NOTE: if you are using docker-for-mac, you probably need to set the TMPDIR env to /tmp
 	if outputDir == "" {
 		var err error
-		outputDir, err = ioutil.TempDir("", fmt.Sprintf("launcher-package"))
+		outputDir, err = os.MkdirTemp("", fmt.Sprintf("launcher-package"))
 		if err != nil {
 			return fmt.Errorf("making output dir: %w", err)
 		}

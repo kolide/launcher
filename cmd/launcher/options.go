@@ -45,25 +45,24 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 	var (
 		// Primary options
-		flAutoloadedExtensions arrayFlags
-		flCertPins             = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
-		flControl              = flagset.Bool("control", false, "Whether or not the control server is enabled (default: false)")
-		flControlServerURL     = flagset.String("control_hostname", "", "The hostname of the control server")
-		flEnrollSecret         = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
-		flEnrollSecretPath     = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
-		flInitialRunner        = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
-		flKolideServerURL      = flagset.String("hostname", "", "The hostname of the gRPC server")
-		flKolideHosted         = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport            = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
-		flLoggingInterval      = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
-		flOsquerydPath         = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flRootDirectory        = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
-		flRootPEM              = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
-		flVersion              = flagset.Bool("version", false, "Print Launcher version and exit")
-		flLogMaxBytesPerBatch  = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
-		flOsqueryFlags         arrayFlags // set below with flagset.Var
-		flCompactDbMaxTx       = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
-		_                      = flagset.String("config", "", "config file to parse options from (optional)")
+		flAutoloadedExtensions   arrayFlags
+		flCertPins               = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControlRequestInterval = flagset.Duration("control_request_interval", 60*time.Second, "The interval at which the control server requests will be made")
+		flEnrollSecret           = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath       = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flInitialRunner          = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL        = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flKolideHosted           = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
+		flTransport              = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flLoggingInterval        = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath           = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flRootDirectory          = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootPEM                = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion                = flagset.Bool("version", false, "Print Launcher version and exit")
+		flLogMaxBytesPerBatch    = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
+		flOsqueryFlags           arrayFlags // set below with flagset.Var
+		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
+		_                        = flagset.String("config", "", "config file to parse options from (optional)")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -91,6 +90,8 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
+		_ = flagset.Bool("control", false, "DEPRECATED")
+		_ = flagset.String("control_hostname", "", "DEPRECATED")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -183,8 +184,9 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
 		CertPins:                           certPins,
 		CompactDbMaxTx:                     *flCompactDbMaxTx,
-		Control:                            *flControl,
-		ControlServerURL:                   *flControlServerURL,
+		Control:                            false,
+		ControlServerURL:                   "localhost:3000",
+		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
 		DisableControlTLS:                  *flDisableControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
@@ -250,9 +252,6 @@ func shortUsage(flagset *flag.FlagSet) {
 	printOpt("osqueryd_path")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("autoupdate")
-	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("control")
-	printOpt("control_hostname")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("version")
 	fmt.Fprintf(os.Stderr, "\n")

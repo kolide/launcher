@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -74,7 +74,7 @@ const (
 
 func calcCertFingerprint(t *testing.T, certpath string) string {
 	// openssl rsa -in certchain-old/leaf.key -outform der -pubout | openssl dgst -sha256
-	certcontents, err := ioutil.ReadFile(certpath)
+	certcontents, err := os.ReadFile(certpath)
 	require.NoError(t, err, "reading", certpath)
 
 	block, _ := pem.Decode(certcontents)
@@ -94,9 +94,9 @@ func TestSwappingCert(t *testing.T) { // nolint:paralleltest
 	stop := startServer(t, &tls.Config{Certificates: []tls.Certificate{cert}})
 	time.Sleep(1 * time.Second)
 
-	pem1, err := ioutil.ReadFile(badCert)
+	pem1, err := os.ReadFile(badCert)
 	require.Nil(t, err)
-	pem2, err := ioutil.ReadFile(goodCert)
+	pem2, err := os.ReadFile(goodCert)
 	require.Nil(t, err)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(pem1)
@@ -138,9 +138,9 @@ func TestCertRemainsBad(t *testing.T) { // nolint:paralleltest
 	timer := time.NewTimer(time.Second * 2)
 	<-timer.C
 
-	pem1, err := ioutil.ReadFile(badCert)
+	pem1, err := os.ReadFile(badCert)
 	require.NoError(t, err)
-	pem2, err := ioutil.ReadFile(goodCert)
+	pem2, err := os.ReadFile(goodCert)
 	require.NoError(t, err)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(pem1)
@@ -178,7 +178,7 @@ func TestCertPinning(t *testing.T) { // nolint:paralleltest
 	defer stop()
 	time.Sleep(1 * time.Second)
 
-	pem1, err := ioutil.ReadFile(rootCert)
+	pem1, err := os.ReadFile(rootCert)
 	require.Nil(t, err)
 	pool := x509.NewCertPool()
 	ok := pool.AppendCertsFromPEM(pem1)
@@ -243,9 +243,9 @@ func TestRootCAs(t *testing.T) { // nolint:paralleltest
 	defer stop()
 	time.Sleep(1 * time.Second)
 
-	rootPEM, err := ioutil.ReadFile(rootCert)
+	rootPEM, err := os.ReadFile(rootCert)
 	require.NoError(t, err)
-	otherPEM, err := ioutil.ReadFile(goodCert)
+	otherPEM, err := os.ReadFile(goodCert)
 	require.NoError(t, err)
 
 	emptyPool := x509.NewCertPool()

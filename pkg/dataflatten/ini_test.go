@@ -1,7 +1,7 @@
 package dataflatten
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -64,7 +64,7 @@ func TestIniFile(t *testing.T) {
 func TestIni(t *testing.T) {
 	t.Parallel()
 
-	fileBytes, err := ioutil.ReadFile(iniTestFilePath)
+	fileBytes, err := os.ReadFile(iniTestFilePath)
 	require.NoError(t, err)
 
 	rows, err := Ini(fileBytes)
