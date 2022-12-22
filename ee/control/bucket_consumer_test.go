@@ -13,49 +13,77 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func Test_Update(t *testing.T) {
+func Test_Updates(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		data map[string]string
-		want []map[string]string
+		name    string
+		updates []map[string]string
+		want    []map[string]string
 	}{
-		{
-			name: "empty",
-			data: map[string]string{},
-			want: []map[string]string{},
+		/*{
+			name:    "empty",
+			updates: []map[string]string{{}, {}},
+			want:    []map[string]string{},
 		},
 		{
-			name: "single",
-			data: map[string]string{"one": "one"},
+			name:    "single",
+			updates: []map[string]string{{"one": "one"}, {"one": "new_one"}},
 			want: []map[string]string{
 				{
 					"key":   "one",
-					"value": "one",
+					"value": "new_one",
 				},
 			},
 		},
 		{
 			name: "multiple",
-			data: map[string]string{
-				"one":   "one",
-				"two":   "two",
-				"three": "three",
-				"four":  "",
+			updates: []map[string]string{
+				{
+					"one":   "one",
+					"two":   "two",
+					"three": "three",
+				},
+				{
+					"one":   "new_one",
+					"two":   "new_two",
+					"three": "new_three",
+				},
 			},
 			want: []map[string]string{
 				{
 					"key":   "one",
-					"value": "one",
+					"value": "new_one",
 				},
 				{
 					"key":   "two",
-					"value": "two",
+					"value": "new_two",
 				},
 				{
 					"key":   "three",
-					"value": "three",
+					"value": "new_three",
+				},
+			},
+		},*/
+		{
+			name: "delete stale keys",
+			updates: []map[string]string{
+				{
+					"one":   "one",
+					"two":   "two",
+					"three": "three",
+					"four":  "four",
+					"five":  "five",
+					"six":   "six",
+				},
+				{
+					"four": "four",
+				},
+			},
+			want: []map[string]string{
+				{
+					"key":   "four",
+					"value": "four",
 				},
 			},
 		},
@@ -65,13 +93,15 @@ func Test_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := createDb(t, tt.data)
+			db := createDb(t)
 			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
 
-			dataBytes, err := json.Marshal(tt.data)
-			require.NoError(t, err)
+			for _, update := range tt.updates {
+				updateBytes, err := json.Marshal(update)
+				require.NoError(t, err)
 
-			bc.Update(bytes.NewReader(dataBytes))
+				bc.Update(bytes.NewReader(updateBytes))
+			}
 
 			kvps, err := getKeyValueRows(db, tt.name)
 			require.NoError(t, err)
@@ -81,7 +111,7 @@ func Test_Update(t *testing.T) {
 	}
 }
 
-func createDb(t *testing.T, values map[string]string) *bbolt.DB {
+func createDb(t *testing.T) *bbolt.DB {
 	dir := t.TempDir()
 
 	db, err := bbolt.Open(filepath.Join(dir, "db"), 0600, nil)
