@@ -21,7 +21,7 @@ func Test_Updates(t *testing.T) {
 		updates []map[string]string
 		want    []map[string]string
 	}{
-		/*{
+		{
 			name:    "empty",
 			updates: []map[string]string{{}, {}},
 			want:    []map[string]string{},
@@ -64,7 +64,7 @@ func Test_Updates(t *testing.T) {
 					"value": "new_three",
 				},
 			},
-		},*/
+		},
 		{
 			name: "delete stale keys",
 			updates: []map[string]string{
