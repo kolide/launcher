@@ -10,15 +10,15 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// BucketConsumer processes control server updates for a named bucket
-type BucketConsumer struct {
+// bucketConsumer processes control server updates for a named bucket
+type bucketConsumer struct {
 	logger     log.Logger
 	db         *bbolt.DB
 	bucketName string
 }
 
-func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *BucketConsumer {
-	bc := &BucketConsumer{
+func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *bucketConsumer {
+	bc := &bucketConsumer{
 		logger:     logger,
 		db:         db,
 		bucketName: bucketName,
@@ -27,7 +27,7 @@ func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *Buck
 	return bc
 }
 
-func (bc *BucketConsumer) Update(data io.Reader) error {
+func (bc *bucketConsumer) Update(data io.Reader) error {
 	var kvPairs map[string]string
 	if err := json.NewDecoder(data).Decode(&kvPairs); err != nil {
 		return fmt.Errorf("failed to decode '%s' bucket consumer json: %w", bc.bucketName, err)
