@@ -15,14 +15,13 @@ import (
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
 	logger          log.Logger
+	ctx             context.Context
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
 	lastFetched     map[string]string
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
-	Execute         func() error
-	Interrupt       func(error)
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -43,9 +42,10 @@ type dataProvider interface {
 	Get(hash string) (data io.Reader, err error)
 }
 
-func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          logger,
+		ctx:             ctx,
 		requestInterval: 60 * time.Second,
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
@@ -58,6 +58,12 @@ func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlServic
 	}
 
 	return cs
+}
+
+func (cs *ControlService) Execute() error {
+	level.Info(cs.logger).Log("msg", "control service started")
+	cs.Start(cs.ctx)
+	return nil
 }
 
 func (cs *ControlService) Start(ctx context.Context) {
@@ -79,6 +85,11 @@ func (cs *ControlService) Start(ctx context.Context) {
 			continue
 		}
 	}
+}
+
+func (cs *ControlService) Interrupt(err error) {
+	level.Info(cs.logger).Log("msg", "control service interrupted", "err", err)
+	cs.Stop()
 }
 
 func (cs *ControlService) Stop() {

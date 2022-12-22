@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"io"
 	"testing"
 
@@ -59,7 +60,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -87,7 +88,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -130,7 +131,7 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -185,7 +186,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {

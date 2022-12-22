@@ -40,17 +40,7 @@ func createControlService(ctx context.Context, logger log.Logger, opts *launcher
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
 	}
-	service := control.New(logger, client, controlOpts...)
-
-	service.Execute = func() error {
-		level.Info(logger).Log("msg", "control service started")
-		service.Start(ctx)
-		return nil
-	}
-	service.Interrupt = func(err error) {
-		level.Info(logger).Log("msg", "control service interrupted", "err", err)
-		service.Stop()
-	}
+	service := control.New(logger, ctx, client, controlOpts...)
 
 	return service, nil
 }
