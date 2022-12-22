@@ -76,7 +76,7 @@ func (bc *bucketConsumer) Update(data io.Reader) error {
 			}
 
 			// Key exists in the bucket but not in kvPairs, delete it
-			if err := bucket.Delete([]byte(key)); err != nil {
+			if err := bucket.Delete(key); err != nil {
 				// Log errors but ignore the failure
 				level.Error(bc.logger).Log(
 					"msg", "failed to remove key from bucket",
