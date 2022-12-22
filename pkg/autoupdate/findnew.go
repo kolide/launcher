@@ -320,6 +320,28 @@ func FindBaseDir(path string) string {
 		return ""
 	}
 
+	// If this is an app bundle installation, we need to adjust the directory -- otherwise we end up with a library
+	// of updates at /usr/local/<identifier>/Kolide.app/Contents/MacOS/launcher-updates.
+	if strings.Contains(path, "Kolide.app") {
+		components := strings.SplitN(path, "Kolide.app", 2)
+		baseDir := filepath.Dir(components[0])
+
+		// If baseDir still contains an update directory (i.e. the original path was something like
+		// /usr/local/<identifier>/launcher-updates/<timestamp>/Kolide.app/Contents/MacOS/launcher),
+		// then strip the update directory out.
+		if strings.Contains(baseDir, updateDirSuffix) {
+			baseDirComponents := strings.SplitN(baseDir, updateDirSuffix, 2)
+			baseDir = filepath.Dir(baseDirComponents[0])
+		}
+
+		// We moved the Kolide.app installation out of the bin directory, but we want the bin directory
+		// here -- so put the "bin" suffix back on if needed.
+		if !strings.HasSuffix(baseDir, "bin") {
+			baseDir = filepath.Join(baseDir, "bin")
+		}
+		return baseDir
+	}
+
 	components := strings.SplitN(path, updateDirSuffix, 2)
 	return filepath.Dir(components[0])
 }
