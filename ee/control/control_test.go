@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"io"
 	"testing"
 
@@ -11,22 +12,20 @@ import (
 
 type (
 	mockConsumer struct {
-		updateFn func()
+		updates int
 	}
 	mockSubscriber struct {
-		pingFn func()
+		pings int
 	}
 )
 
-func (mc *mockConsumer) Update(io.Reader) {
-	if mc.updateFn != nil {
-		mc.updateFn()
-	}
+func (mc *mockConsumer) Update(io.Reader) error {
+	mc.updates++
+	return nil
 }
-func (mc *mockSubscriber) Ping() {
-	if mc.pingFn != nil {
-		mc.pingFn()
-	}
+
+func (ms *mockSubscriber) Ping() {
+	ms.pings++
 }
 
 type nopDataProvider struct{}
@@ -41,7 +40,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 	tests := []struct {
 		name      string
 		subsystem string
-		c         consumer
+		c         *mockConsumer
 	}{
 		{
 			name:      "empty subsystem",
@@ -61,7 +60,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -74,7 +73,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 	tests := []struct {
 		name      string
 		subsystem string
-		c         consumer
+		c         *mockConsumer
 	}{
 		{
 			name:      "registered twice",
@@ -89,7 +88,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -101,33 +100,82 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 func TestControlServiceUpdate(t *testing.T) {
 	t.Parallel()
 
-	var updateCount int
-	var pingCount int
 	tests := []struct {
-		name      string
-		subsystem string
-		c         consumer
-		s         []subscriber
+		name            string
+		subsystem       string
+		c               *mockConsumer
+		s               []*mockSubscriber
+		expectedUpdates int
 	}{
 		{
-			name:      "one consumer, two subscribers",
-			subsystem: "desktop",
-			c: &mockConsumer{
-				updateFn: func() {
-					updateCount++
-				},
+			name:            "one consumer, two subscribers",
+			subsystem:       "desktop",
+			expectedUpdates: 1,
+			c:               &mockConsumer{},
+			s: []*mockSubscriber{
+				{},
+				{},
 			},
-			s: []subscriber{
-				&mockSubscriber{
-					pingFn: func() {
-						pingCount++
-					},
-				},
-				&mockSubscriber{
-					pingFn: func() {
-						pingCount++
-					},
-				},
+		},
+		{
+			name:            "one consumer, no subscribers",
+			subsystem:       "desktop",
+			expectedUpdates: 1,
+			c:               &mockConsumer{},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			data := nopDataProvider{}
+			controlOpts := []Option{}
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			err := cs.RegisterConsumer(tt.subsystem, tt.c)
+			require.NoError(t, err)
+			for _, ss := range tt.s {
+				cs.RegisterSubscriber(tt.subsystem, ss)
+			}
+
+			err = cs.update(tt.subsystem, nil)
+			require.NoError(t, err)
+
+			// Expect consumer to have gotten exactly one update
+			assert.Equal(t, tt.c.updates, tt.expectedUpdates)
+
+			// Expect each subscriber to have gotten exactly one ping
+			for _, s := range tt.s {
+				assert.Equal(t, s.pings, tt.expectedUpdates)
+			}
+		})
+	}
+}
+
+func TestControlServiceFetch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		hashData        map[string]any
+		subsystems      map[string]string
+		subsystem       string
+		c               *mockConsumer
+		s               []*mockSubscriber
+		expectedUpdates int
+		fetches         int
+	}{
+		{
+			name:            "one consumer, two subscribers",
+			subsystem:       "desktop",
+			subsystems:      map[string]string{"desktop": "502a42f0"},
+			hashData:        map[string]any{"502a42f0": "status"},
+			expectedUpdates: 1,
+			fetches:         3,
+			c:               &mockConsumer{},
+			s: []*mockSubscriber{
+				{},
+				{},
 			},
 		},
 	}
@@ -136,20 +184,28 @@ func TestControlServiceUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			updateCount, pingCount = 0, 0
-			data := nopDataProvider{}
+			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
 				cs.RegisterSubscriber(tt.subsystem, ss)
 			}
 
-			cs.update(tt.subsystem, nil)
+			// Repeat fetches to verify no changes
+			for i := 0; i < tt.fetches; i++ {
+				err = cs.Fetch()
+				require.NoError(t, err)
 
-			assert.Equal(t, updateCount, 1)
-			assert.Equal(t, pingCount, 2)
+				// Expect consumer to have gotten exactly one update
+				assert.Equal(t, tt.c.updates, tt.expectedUpdates)
+
+				// Expect each subscriber to have gotten exactly one ping
+				for _, s := range tt.s {
+					assert.Equal(t, s.pings, tt.expectedUpdates)
+				}
+			}
 		})
 	}
 }

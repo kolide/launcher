@@ -22,10 +22,10 @@ sequenceDiagram
 
     loop On request interval
         ControlService->>K2: GET /api/v1/control
-        K2-->>ControlService: Returns list of subsystems & hashes
+        K2-->>ControlService: Returns map of subsystems & hashes
 
         loop For each subsystem
-            alt If cached update is still fresh
+            alt If last fetched update is still fresh
                 ControlService->>ControlService: Skip to next subsystem
             else
                 ControlService->>K2: GET /api/v1/control/{objectHash}
@@ -38,7 +38,7 @@ sequenceDiagram
                 ControlService->>Subscriber: Ping()
             end
 
-            ControlService->>ControlService: Cache update
+            ControlService->>ControlService: Cache hash of the update
         end
     end
 ```
