@@ -247,6 +247,11 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 //
 // It makes some string assumptions about how things are named.
 func getUpdateDir(fullBinaryPath string) string {
+	if strings.Contains(fullBinaryPath, "Kolide.app") {
+		binary := filepath.Base(fullBinaryPath)
+		return filepath.Join(FindBaseDir(fullBinaryPath), binary+updateDirSuffix)
+	}
+
 	// These are cases that shouldn't really happen. But, this is
 	// a bare string function. So return "" when they do.
 	if strings.HasSuffix(fullBinaryPath, "/") {

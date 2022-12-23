@@ -67,12 +67,17 @@ func TestGetUpdateDir(t *testing.T) {
 		in  string
 		out string
 	}{
-		{in: "/a/path", out: "/a/path-updates"},
-		{in: "/a/path-updates", out: "/a/path-updates"},
-		{in: "/a/path-updates/1234/binary", out: "/a/path-updates"},
-		{in: "/a/path/foo/bar-updates/1234/binary", out: "/a/path/foo/bar-updates"},
-		{in: "/a/b-updates/123/b-updates/456/b", out: "/a/b-updates"},
-		{in: "/a/path/", out: "/a/path-updates"},
+		{in: "/a/bin/path", out: "/a/bin/path-updates"},
+		{in: "/a/bin/path-updates", out: "/a/bin/path-updates"},
+		{in: "/a/bin/path-updates/1234/binary", out: "/a/bin/path-updates"},
+		{in: "/a/bin/path/foo/bar-updates/1234/binary", out: "/a/bin/path/foo/bar-updates"},
+		{in: "/a/bin/b-updates/123/b-updates/456/b", out: "/a/bin/b-updates"},
+		{in: "/a/bin/path/", out: "/a/bin/path-updates"},
+		{in: "/a/Kolide.app/Contents/MacOS/path", out: "/a/bin/path-updates"},
+		{in: "/a/bin/path-updates/1234/Kolide.app/Contents/MacOS/path", out: "/a/bin/path-updates"},
+		{in: "/a/bin/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/path", out: filepath.Clean("/a/bin/path-updates")},
+		{in: "/a/bin/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/bin/launcher-updates")},
+		{in: "/a/bin/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/bin/launcher-updates")},
 		{in: "", out: ""},
 		{in: "/", out: ""},
 	}
