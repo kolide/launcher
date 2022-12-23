@@ -79,23 +79,23 @@ jobs:
     - name: Test
       run: make test
 
-    # Launcher should always print its version info when called with `version`, which includes the golang version;
-    # we confirm that it contains that info here.
+    # Launcher should always print its version info when called with `version` -- this is a quick
+    # check to ensure that launcher can update to this build.
     - name: Test build - macOS and ubuntu
       if: ${{ contains(matrix.os, 'macos') || contains(matrix.os, 'ubuntu') }}
       run: |
-        if [[ $(./build/launcher version) != *go${{env.GOVER}}* ]]; then
+        if [[ $(./build/launcher --version) != *"launcher - version"* ]]; then
           echo "launcher version did not print version information"
           exit 1
         fi
 
-    # Launcher should always print its version info when called with `version`, which includes the golang version;
-    # we confirm that it contains that info here.
+    # Launcher should always print its version info when called with `version` -- this is a quick
+    # check to ensure that launcher can update to this build.
     - name: Test build - Windows
       if: ${{ contains(matrix.os, 'windows') }}
       shell: powershell
       run: |
-        if(-not (.\build\launcher.exe version | findstr "go$env:GOVER")) {
+        if(-not (.\build\launcher.exe --version | findstr "launcher - version")) {
           throw "launcher.exe version did not print version information"
         }
 
