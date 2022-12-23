@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/log"
 	"github.com/kolide/kit/stringutil"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,7 @@ func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 		}
 	}
 
-	opts, err := parseOptions(testFlags)
+	opts, err := parseOptions(log.NewNopLogger(), testFlags)
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -50,7 +51,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
 		require.NoError(t, os.Setenv(name, val))
 	}
-	opts, err := parseOptions([]string{})
+	opts, err := parseOptions(log.NewNopLogger(), []string{})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -81,7 +82,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := parseOptions([]string{"-config", flagFile.Name()})
+	opts, err := parseOptions(log.NewNopLogger(), []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }

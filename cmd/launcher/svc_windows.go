@@ -45,7 +45,7 @@ func runWindowsSvc(args []string) error {
 		"version", version.Version().Version,
 	)
 
-	opts, err := parseOptions(os.Args[2:])
+	opts, err := parseOptions(logger, os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("msg", "Error parsing options", "err", err)
 		os.Exit(1)
@@ -119,7 +119,7 @@ func runWindowsSvcForeground(args []string) error {
 	logger := logutil.NewCLILogger(true)
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
-	opts, err := parseOptions(os.Args[2:])
+	opts, err := parseOptions(logger, os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)

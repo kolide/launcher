@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -39,7 +41,7 @@ func (i *arrayFlags) Set(value string) error {
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
-func parseOptions(args []string) (*launcher.Options, error) {
+func parseOptions(logger log.Logger, args []string) (*launcher.Options, error) {
 	flagset := flag.NewFlagSet("launcher", flag.ContinueOnError)
 	flagset.Usage = func() { usage(flagset) }
 
@@ -112,7 +114,10 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		ffOpts = append(ffOpts, ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"))
 	}
 
-	ff.Parse(flagset, args, ffOpts...)
+	if err := ff.Parse(flagset, args, ffOpts...); err != nil {
+		// We want to log about flag parsing errors, but not exit
+		level.Info(logger).Log("msg", "Error parsing flags. Moving on", "err", err)
+	}
 
 	// handle --version
 	if *flVersion {
