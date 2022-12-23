@@ -575,7 +575,18 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		// Tell github where we're at
 		if b.githubActionOutput {
-			fmt.Printf("::set-output name=binary::%s\n", output)
+			outputFilePath := os.Getenv("GITHUB_OUTPUT")
+
+			f, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_WRONLY, 0600)
+			if err != nil {
+				return fmt.Errorf("failed to open $GITHUB_OUTPUT file: %w", err)
+			}
+
+			defer f.Close()
+
+			if _, err = f.WriteString(fmt.Sprintf("binary=%s\n", output)); err != nil {
+				return fmt.Errorf("failed to write to $GITHUB_OUTPUT file: %w", err)
+			}
 		}
 
 		// all the builds go to `build/<os>/binary`, but if the build OS is the same as the target OS,
