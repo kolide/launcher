@@ -247,6 +247,11 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 //
 // It makes some string assumptions about how things are named.
 func getUpdateDir(fullBinaryPath string) string {
+	if strings.Contains(fullBinaryPath, ".app") {
+		binary := filepath.Base(fullBinaryPath)
+		return filepath.Join(FindBaseDir(fullBinaryPath), binary+updateDirSuffix)
+	}
+
 	// These are cases that shouldn't really happen. But, this is
 	// a bare string function. So return "" when they do.
 	if strings.HasSuffix(fullBinaryPath, "/") {
@@ -322,9 +327,9 @@ func FindBaseDir(path string) string {
 
 	// If this is an app bundle installation, we need to adjust the directory -- otherwise we end up with a library
 	// of updates at /usr/local/<identifier>/Kolide.app/Contents/MacOS/launcher-updates.
-	if strings.Contains(path, "Kolide.app") {
-		components := strings.SplitN(path, "Kolide.app", 2)
-		baseDir := filepath.Dir(components[0])
+	if strings.Contains(path, ".app") {
+		components := strings.SplitN(path, ".app", 2)
+		baseDir := filepath.Dir(components[0]) // gets rid of app bundle name and trailing slash
 
 		// If baseDir still contains an update directory (i.e. the original path was something like
 		// /usr/local/<identifier>/launcher-updates/<timestamp>/Kolide.app/Contents/MacOS/launcher),
