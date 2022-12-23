@@ -135,6 +135,8 @@ func runSubcommands() error {
 		run = runInteractive
 	case "desktop":
 		run = runDesktop
+	case "uninstall":
+		run = runUninstall
 	default:
 		return fmt.Errorf("Unknown subcommand %s", os.Args[1])
 	}

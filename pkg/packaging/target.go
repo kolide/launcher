@@ -108,12 +108,13 @@ func (t *Target) PlatformBinaryName(input string) string {
 	return input
 }
 
-func (t *Target) PlatformLauncherPath(rootDir string) string {
+func (t *Target) PlatformLauncherPath(binDir string) string {
 	if t.Platform == Darwin {
-		return filepath.Join(rootDir, "Kolide.app", "Contents", "MacOS", "launcher")
+		// We want /usr/local/Kolide.app, not /usr/local/bin/Kolide.app, so we use Dir to strip out `bin`
+		return filepath.Join(filepath.Dir(binDir), "Kolide.app", "Contents", "MacOS", "launcher")
 	}
 
-	return filepath.Join(rootDir, t.PlatformBinaryName("launcher"))
+	return filepath.Join(binDir, t.PlatformBinaryName("launcher"))
 }
 
 // InitFromString sets a target's init flavor from string representation
