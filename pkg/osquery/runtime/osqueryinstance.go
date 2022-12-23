@@ -3,9 +3,9 @@ package runtime
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go"
-	"github.com/pkg/errors"
+
 	"golang.org/x/sync/errgroup"
 )
 
@@ -242,13 +242,13 @@ func (o *OsqueryInstance) Healthy() error {
 	for _, srv := range o.extensionManagerServers {
 		serverStatus, err := srv.Ping(context.TODO())
 		if err != nil {
-			return errors.Wrap(err, "could not ping extension server")
+			return fmt.Errorf("could not ping extension server: %w", err)
 		}
 		if serverStatus.Code != 0 {
-			return errors.Errorf("ping extension server returned %d: %s",
+			return fmt.Errorf("ping extension server returned %d: %s",
 				serverStatus.Code,
-				serverStatus.Message,
-			)
+				serverStatus.Message)
+
 		}
 	}
 
@@ -257,13 +257,13 @@ func (o *OsqueryInstance) Healthy() error {
 
 	clientStatus, err := o.extensionManagerClient.Ping()
 	if err != nil {
-		return errors.Wrap(err, "could not ping osquery extension client")
+		return fmt.Errorf("could not ping osquery extension client: %w", err)
 	}
 	if clientStatus.Code != 0 {
-		return errors.Errorf("ping extension client returned %d: %s",
+		return fmt.Errorf("ping extension client returned %d: %s",
 			clientStatus.Code,
-			clientStatus.Message,
-		)
+			clientStatus.Message)
+
 	}
 
 	return nil
@@ -279,7 +279,7 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 
 	resp, err := o.extensionManagerClient.Query(query)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not query the extension manager client")
+		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
 		return nil, errors.New(resp.Status.Message)
@@ -388,7 +388,7 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating autoload file")
+		return nil, fmt.Errorf("creating autoload file: %w", err)
 	}
 	defer osqueryAutoloadFile.Close()
 
@@ -399,7 +399,7 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 	// Determine the path to the extension
 	exPath, err := os.Executable()
 	if err != nil {
-		return nil, errors.Wrap(err, "finding path of launcher executable")
+		return nil, fmt.Errorf("finding path of launcher executable: %w", err)
 	}
 
 	for index, extension := range opts.autoloadedExtensions {
@@ -412,9 +412,9 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 
 			if _, err := os.Stat(extensionPath); err != nil {
 				if os.IsNotExist(err) {
-					return nil, errors.Wrapf(err, "extension path does not exist: %s", extension)
+					return nil, fmt.Errorf("extension path does not exist: %s: %w", extension, err)
 				} else {
-					return nil, errors.Wrapf(err, "could not stat extension path")
+					return nil, fmt.Errorf("could not stat extension path: %w", err)
 				}
 			}
 		}
@@ -423,7 +423,7 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 
 		_, err := osqueryAutoloadFile.WriteString(fmt.Sprintf("%s\n", extensionPath))
 		if err != nil {
-			return nil, errors.Wrapf(err, "writing to autoload file")
+			return nil, fmt.Errorf("writing to autoload file: %w", err)
 		}
 	}
 
@@ -554,7 +554,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
 		level.Debug(logger).Log("msg", "could not create an extension server", "err", err)
-		return errors.Wrap(err, "could not create an extension server")
+		return fmt.Errorf("could not create an extension server: %w", err)
 	}
 
 	extensionManagerServer.RegisterPlugin(plugins...)
@@ -568,7 +568,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	o.errgroup.Go(func() error {
 		if err := extensionManagerServer.Start(); err != nil {
 			level.Info(logger).Log("msg", "Extension manager server startup got error", "err", err)
-			return errors.Wrap(err, "running extension server")
+			return fmt.Errorf("running extension server: %w", err)
 		}
 		return errors.New("extension manager server exited")
 	})
@@ -592,9 +592,9 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 }
 
 func osqueryTempDir() (string, func(), error) {
-	tempPath, err := ioutil.TempDir("", "")
+	tempPath, err := os.MkdirTemp("", "")
 	if err != nil {
-		return "", func() {}, errors.Wrap(err, "could not make temp path")
+		return "", func() {}, fmt.Errorf("could not make temp path: %w", err)
 	}
 
 	return tempPath, func() {
@@ -612,13 +612,13 @@ func getOsqueryInfoForLog(path string) []interface{} {
 
 	file, err := os.Open(path)
 	if err != nil {
-		return append(msgPairs, "extraerr", errors.Wrap(err, "opening file"))
+		return append(msgPairs, "extraerr", fmt.Errorf("opening file: %w", err))
 	}
 	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return append(msgPairs, "extraerr", errors.Wrap(err, "stat file"))
+		return append(msgPairs, "extraerr", fmt.Errorf("stat file: %w", err))
 	}
 
 	msgPairs = append(
@@ -629,7 +629,7 @@ func getOsqueryInfoForLog(path string) []interface{} {
 
 	sum := sha256.New()
 	if _, err := io.Copy(sum, file); err != nil {
-		return append(msgPairs, "extraerr", errors.Wrap(err, "hashing file"))
+		return append(msgPairs, "extraerr", fmt.Errorf("hashing file: %w", err))
 	}
 
 	msgPairs = append(

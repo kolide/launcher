@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 func GDriveSyncConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
@@ -34,20 +33,20 @@ type gdrive struct {
 }
 
 func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_gdrive_sync_config")
+	dir, err := os.MkdirTemp("", "kolide_gdrive_sync_config")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_gdrive_sync_config tmp dir")
+		return nil, fmt.Errorf("creating kolide_gdrive_sync_config tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fsutil.CopyFile(path, dst); err != nil {
-		return nil, errors.Wrap(err, "copying sqlite db to tmp dir")
+		return nil, fmt.Errorf("copying sqlite db to tmp dir: %w", err)
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, errors.Wrap(err, "connecting to sqlite db")
+		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
 	defer db.Close()
 
@@ -59,7 +58,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 		WHERE entry_key = 'user_email' OR entry_key='local_sync_root_path'
 			AND data_value IS NOT NULL`)
 	if err != nil {
-		return nil, errors.Wrap(err, "query rows from gdrive sync config db")
+		return nil, fmt.Errorf("query rows from gdrive sync config db: %w", err)
 	}
 	defer rows.Close()
 
@@ -71,7 +70,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 			dataValue string
 		)
 		if err := rows.Scan(&entryKey, &dataValue); err != nil {
-			return nil, errors.Wrap(err, "scanning gdrive sync config db row")
+			return nil, fmt.Errorf("scanning gdrive sync config db row: %w", err)
 		}
 
 		switch entryKey {
@@ -94,7 +93,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	files, err := findFileInUserDirs("/Library/Application Support/Google/Drive/user_default/sync_config.db", g.logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "find gdrive sync config sqlite DBs")
+		return nil, fmt.Errorf("find gdrive sync config sqlite DBs: %w", err)
 	}
 
 	var results []map[string]string

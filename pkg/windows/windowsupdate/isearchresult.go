@@ -1,10 +1,11 @@
 package windowsupdate
 
 import (
+	"fmt"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
-	"github.com/pkg/errors"
 )
 
 // ISearchResult represents the result of a search.
@@ -24,37 +25,37 @@ func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
 	}
 
 	if iSearchResult.ResultCode, err = oleconv.ToInt32Err(oleutil.GetProperty(searchResultDisp, "ResultCode")); err != nil {
-		return nil, errors.Wrap(err, "ResultCode")
+		return nil, fmt.Errorf("ResultCode: %w", err)
 	}
 
 	rootCategoriesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(searchResultDisp, "RootCategories"))
 	if err != nil {
-		return nil, errors.Wrap(err, "RootCategories")
+		return nil, fmt.Errorf("RootCategories: %w", err)
 	}
 	if rootCategoriesDisp != nil {
 		if iSearchResult.RootCategories, err = toICategories(rootCategoriesDisp); err != nil {
-			return nil, errors.Wrap(err, "toICategories")
+			return nil, fmt.Errorf("toICategories: %w", err)
 		}
 	}
 
 	// Updates is a IUpdateCollection, and we want the full details. So cast it ia toIUpdates
 	updatesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(searchResultDisp, "Updates"))
 	if err != nil {
-		return nil, errors.Wrap(err, "Updates")
+		return nil, fmt.Errorf("Updates: %w", err)
 	}
 	if updatesDisp != nil {
 		if iSearchResult.Updates, err = toIUpdates(updatesDisp); err != nil {
-			return nil, errors.Wrap(err, "toIUpdates")
+			return nil, fmt.Errorf("toIUpdates: %w", err)
 		}
 	}
 
 	warningsDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(searchResultDisp, "Warnings"))
 	if err != nil {
-		return nil, errors.Wrap(err, "Warnings")
+		return nil, fmt.Errorf("Warnings: %w", err)
 	}
 	if warningsDisp != nil {
 		if iSearchResult.Warnings, err = toIUpdateExceptions(warningsDisp); err != nil {
-			return nil, errors.Wrap(err, "toIUpdateExceptions")
+			return nil, fmt.Errorf("toIUpdateExceptions: %w", err)
 		}
 	}
 

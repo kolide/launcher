@@ -12,8 +12,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,7 +31,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
+
 	"github.com/theupdateframework/notary/client"
 	"github.com/theupdateframework/notary/trustpinning"
 	"github.com/theupdateframework/notary/tuf/data"
@@ -230,13 +230,13 @@ func (b *Builder) goVersionCompatible(logger log.Logger) error {
 
 	goVer, err := semver.NewVersion(b.goVer)
 	if err != nil {
-		return errors.Wrapf(err, "parse go version %q as semver", b.goVer)
+		return fmt.Errorf("parse go version %q as semver: %w", b.goVer, err)
 	}
 
 	goConstraint := ">= 1.11"
 	c, _ := semver.NewConstraint(goConstraint)
 	if !c.Check(goVer) {
-		return errors.Errorf("project requires Go version %s, have %s", goConstraint, goVer)
+		return fmt.Errorf("project requires Go version %s, have %s", goConstraint, goVer)
 	}
 	return nil
 }
@@ -260,7 +260,7 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "run go mod download, output=%s", out)
+		return fmt.Errorf("run go mod download, output=%s: %w", out, err)
 	}
 
 	level.Debug(logger).Log(
@@ -293,19 +293,19 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return errors.Wrap(err, "create stdout pipe for go list command")
+		return fmt.Errorf("create stdout pipe for go list command: %w", err)
 	}
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
-		return errors.Wrapf(err, "run go list command, %s", stderr)
+		return fmt.Errorf("run go list command, %s: %w", stderr, err)
 	}
 
 	var list struct {
 		Imports []string
 	}
 	if err := json.NewDecoder(stdout).Decode(&list); err != nil {
-		return errors.Wrap(err, "decode go list output")
+		return fmt.Errorf("decode go list output: %w", err)
 	}
 
 	var g errgroup.Group
@@ -334,7 +334,11 @@ func (b *Builder) InstallTools(ctx context.Context) error {
 		"msg", "Finished",
 	)
 
-	return errors.Wrap(err, "install tools")
+	if err != nil {
+		return fmt.Errorf("install tools: %w", err)
+	}
+
+	return nil
 }
 
 func (b *Builder) installTool(ctx context.Context, importPath string) error {
@@ -345,7 +349,7 @@ func (b *Builder) installTool(ctx context.Context, importPath string) error {
 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "run go install %s, output=%s", importPath, out)
+		return fmt.Errorf("run go install %s, output=%s: %w", importPath, out, err)
 	}
 	level.Debug(ctxlog.FromContext(ctx)).Log("target", "install tool", "import_path", importPath, "output", string(out))
 	return nil
@@ -359,14 +363,14 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	// are present (Asset, AssetDir, etc). Once the symbols are present, we can run
 	// the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
 	// the bindata file with the real TUF metadata.
-	dir, err := ioutil.TempDir("", "bootstrap-launcher-bindata")
+	dir, err := os.MkdirTemp("", "bootstrap-launcher-bindata")
 	if err != nil {
-		return errors.Wrapf(err, "create empty dir for bindata")
+		return fmt.Errorf("create empty dir for bindata: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := b.execBindata(ctx, dir); err != nil {
-		return errors.Wrap(err, "exec bindata for empty dir")
+		return fmt.Errorf("exec bindata for empty dir: %w", err)
 	}
 
 	binaryTargets := []string{ // binaries that are autoupdated.
@@ -382,7 +386,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	notaryConfigDir := filepath.Join(filepath.Dir(myFilename), "..", "..", "tools", "notary", "config")
 	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
 	if err != nil {
-		return errors.Wrap(err, "opening notary config file")
+		return fmt.Errorf("opening notary config file: %w", err)
 	}
 	defer notaryConfigFile.Close()
 	var conf struct {
@@ -391,7 +395,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		} `json:"remote_server"`
 	}
 	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
-		return errors.Wrap(err, "decoding notary config file")
+		return fmt.Errorf("decoding notary config file: %w", err)
 	}
 
 	for _, t := range binaryTargets {
@@ -399,16 +403,16 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		gun := path.Join("kolide", t)
 		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
 		if err := os.MkdirAll(localRepo, 0755); err != nil {
-			return errors.Wrapf(err, "make autoupdate dir %s", localRepo)
+			return fmt.Errorf("make autoupdate dir %s: %w", localRepo, err)
 		}
 
 		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun); err != nil {
-			return errors.Wrapf(err, "bootstrap notary GUN %s", gun)
+			return fmt.Errorf("bootstrap notary GUN %s: %w", gun, err)
 		}
 	}
 
 	if err := b.execBindata(ctx, "pkg/autoupdate/assets/..."); err != nil {
-		return errors.Wrap(err, "exec bindata for autoupdate assets")
+		return fmt.Errorf("exec bindata for autoupdate assets: %w", err)
 	}
 
 	return nil
@@ -427,7 +431,12 @@ func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	)
 	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
 	out, err := cmd.CombinedOutput()
-	return errors.Wrapf(err, "run bindata for dir %s, output=%s", dir, out)
+
+	if err != nil {
+		return fmt.Errorf("run bindata for dir %s, output=%s: %w", dir, out, err)
+	}
+
+	return nil
 }
 
 func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string) error {
@@ -449,17 +458,17 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		trustpinning.TrustPinConfig{},
 	)
 	if err != nil {
-		return errors.Wrap(err, "create an instance of the TUF repository")
+		return fmt.Errorf("create an instance of the TUF repository: %w", err)
 	}
 
 	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-		return errors.Wrap(err, "getting all target metadata")
+		return fmt.Errorf("getting all target metadata: %w", err)
 	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
 	if err := fsutil.CopyDir(source, localRepo); err != nil {
-		return errors.Wrap(err, "copying TUF repo metadata")
+		return fmt.Errorf("copying TUF repo metadata: %w", err)
 	}
 
 	return nil
@@ -500,10 +509,15 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-w -s")
 		}
 
+		if b.os == "windows" {
+			// this prevents a cmd prompt opening up when desktop is launched
+			ldFlags = append(ldFlags, "-H windowsgui")
+		}
+
 		if b.stampVersion {
 			v, err := b.getVersion(ctx)
 			if err != nil {
-				return errors.Wrap(err, "getVersion")
+				return fmt.Errorf("getVersion: %w", err)
 			}
 
 			if b.fakedata {
@@ -512,12 +526,12 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 			branch, err := b.execOut(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 			if err != nil {
-				return errors.Wrap(err, "git for branch")
+				return fmt.Errorf("git for branch: %w", err)
 			}
 
 			revision, err := b.execOut(ctx, "git", "rev-parse", "HEAD")
 			if err != nil {
-				return errors.Wrap(err, "git for revision")
+				return fmt.Errorf("git for revision: %w", err)
 			}
 
 			usr, err := user.Current()
@@ -578,6 +592,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			}
 			return os.Link(output, symlinkTarget)
 		}
+
 		return nil
 	}
 }
@@ -589,7 +604,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 func (b *Builder) getVersion(ctx context.Context) (string, error) {
 	gitVersion, err := b.execOut(ctx, "git", "describe", "--tags", "--always", "--dirty")
 	if err != nil {
-		return "", errors.Wrap(err, "git describe")
+		return "", fmt.Errorf("git describe: %w", err)
 	}
 
 	// The `-` is included in the "additional" part of the regex,
@@ -598,18 +613,18 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 	// change.
 	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))?(?:(-.+))?$`)
 	if err != nil {
-		return "", errors.Wrap(err, "bad regex")
+		return "", fmt.Errorf("bad regex: %w", err)
 	}
 
 	// regex match and check the results
 	matches := versionRegex.FindAllStringSubmatch(gitVersion, -1)
 
 	if len(matches) == 0 {
-		return "", errors.Errorf(`Version "%s" did not match expected format. Expect major.minor[.patch][-additional]`, gitVersion)
+		return "", fmt.Errorf(`Version "%s" did not match expected format. Expect major.minor[.patch][-additional]`, gitVersion)
 	}
 
 	if len(matches[0]) != 5 {
-		return "", errors.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), gitVersion)
+		return "", fmt.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), gitVersion)
 	}
 
 	major := matches[0][1]
@@ -631,7 +646,7 @@ func (b *Builder) execOut(ctx context.Context, argv0 string, args ...string) (st
 	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "run command %s %v, stderr=%s", argv0, args, stderr)
+		return "", fmt.Errorf("run command %s %v, stderr=%s: %w", argv0, args, stderr, err)
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

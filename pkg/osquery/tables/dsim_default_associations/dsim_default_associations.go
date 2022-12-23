@@ -6,7 +6,7 @@ package dsim_default_associations
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +20,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const dismCmd = "dism.exe"
@@ -72,9 +71,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	// dism.exe outputs xml, but with weird intermingled status. So
 	// instead, we dump it to a temp file.
-	dir, err := ioutil.TempDir("", "kolide_dism")
+	dir, err := os.MkdirTemp("", "kolide_dism")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_dism tmp dir")
+		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
@@ -95,12 +94,12 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	level.Debug(t.logger).Log("msg", "calling dism", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "calling dism. Got: %s", stderr.String())
+		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
 	}
 
-	data, err := ioutil.ReadFile(filepath.Join(dir, dstFile))
+	data, err := os.ReadFile(filepath.Join(dir, dstFile))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading dism output file: %s", err)
+		return nil, fmt.Errorf("error reading dism output file: %s: %w", err, err)
 	}
 
 	return data, nil

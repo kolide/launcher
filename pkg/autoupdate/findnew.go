@@ -2,10 +2,12 @@ package autoupdate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -13,7 +15,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/pkg/errors"
 )
 
 // defaultBuildTimestamp is used to set the _oldest_ allowed update. Eg, if
@@ -85,7 +86,7 @@ func FindNewestSelf(ctx context.Context, opts ...newestOption) (string, error) {
 
 	exPath, err := os.Executable()
 	if err != nil {
-		return "", errors.Wrap(err, "determine running executable path")
+		return "", fmt.Errorf("determine running executable path: %w", err)
 	}
 
 	if exPath == "" {
@@ -141,20 +142,12 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		"binaryName", binaryName,
 	)
 
-	// Find the possible updates. filepath.Glob returns a list of things
-	// that match the requested pattern. We sort the list to ensure that
-	// we can tell which ones are earlier or later (remember, these are
-	// timestamps). If no updates are found, the forloop is skipped, and
-	// we return eithier the seed fullBinaryPath or ""
-	fileGlob := filepath.Join(updateDir, "*", binaryName)
-
-	possibleUpdates, err := filepath.Glob(fileGlob)
+	// If no updates are found, the forloop is skipped, and we return either the seed fullBinaryPath or ""
+	possibleUpdates, err := getPossibleUpdates(ctx, updateDir, binaryName)
 	if err != nil {
-		level.Error(logger).Log("msg", "globbing for updates", "err", err)
+		level.Error(logger).Log("msg", "could not find possible updates", "err", err)
 		return fullBinaryPath
 	}
-
-	sort.Strings(possibleUpdates)
 
 	// iterate backwards over files, looking for a suitable binary
 	foundCount := 0
@@ -163,6 +156,12 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		file := possibleUpdates[i]
 		basedir := filepath.Dir(file)
 		updateDownloadTime := filepath.Base(basedir)
+		foundExecutable := file
+		if strings.HasSuffix(file, ".app") {
+			// Add back the rest of the path to the binary that we'd stripped off to make
+			// timestamp comparison and old/broken updates cleanup easier.
+			foundExecutable = filepath.Join(file, "Contents", "MacOS", binaryName)
+		}
 
 		// We only want to consider updates with a download time _newer_
 		// than our build timestamp. Note that we're not comparing against
@@ -196,15 +195,15 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		// If the file is _not_ the running executable, sanity
 		// check that executions work. If the exec fails,
 		// there's clearly an issue and we should remove it.
-		if newestSettings.runningExecutable != file {
-			if err := checkExecutable(ctx, file, "--version"); err != nil {
+		if newestSettings.runningExecutable != foundExecutable {
+			if err := checkExecutable(ctx, foundExecutable, "--version"); err != nil {
 				if newestSettings.deleteCorrupt {
-					level.Error(logger).Log("msg", "not executable. Removing", "binary", file, "reason", err)
+					level.Error(logger).Log("msg", "not executable. Removing", "binary", foundExecutable, "reason", err)
 					if err := os.RemoveAll(basedir); err != nil {
 						level.Error(logger).Log("msg", "error deleting broken update dir", "dir", basedir, "err", err)
 					}
 				} else {
-					level.Error(logger).Log("msg", "not executable. Skipping", "binary", file, "reason", err)
+					level.Error(logger).Log("msg", "not executable. Skipping", "binary", foundExecutable, "reason", err)
 				}
 
 				continue
@@ -219,7 +218,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 
 		// Only set what we've found, if it's unset.
 		if foundFile == "" {
-			foundFile = file
+			foundFile = foundExecutable
 		}
 	}
 
@@ -266,12 +265,81 @@ func getUpdateDir(fullBinaryPath string) string {
 	return fmt.Sprintf("%s%s", components[0], updateDirSuffix)
 }
 
+// Find the possible updates. filepath.Glob returns a list of things
+// that match the requested pattern. We sort the list to ensure that
+// we can tell which ones are earlier or later (remember, these are
+// timestamps).
+func getPossibleUpdates(ctx context.Context, updateDir, binaryName string) ([]string, error) {
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
+	// If this is launcher running on macOS, then we should have app bundles available instead --
+	// check for those first.
+	if runtime.GOOS == "darwin" {
+		binarySuffix := filepath.Join("Contents", "MacOS", binaryName)
+		fileGlob := filepath.Join(updateDir, "*", "*.app", binarySuffix)
+		possibleUpdates, err := filepath.Glob(fileGlob)
+
+		if err == nil && len(possibleUpdates) > 0 {
+			appBundleNames := make([]string, len(possibleUpdates))
+			for i, binaryPath := range possibleUpdates {
+				// We trim the suffix here for compatibility with prior logic for timestamp
+				// comparison in the directory and cleanup for old/broken updates. The suffix
+				// is added back later by the caller.
+				appBundleNames[i] = strings.TrimSuffix(binaryPath, "/"+binarySuffix)
+			}
+			sort.Strings(appBundleNames)
+			return appBundleNames, nil
+		}
+
+		// If the error is non-nil, something has gone very wrong -- log and then ignore the
+		// error so that we can fall back to previous behavior below, so that launcher is
+		// still able to auto-update.
+		if err != nil {
+			level.Error(logger).Log("msg", "could not glob for app bundle binaries", "err", err)
+		}
+	}
+
+	// Either not macOS/launcher or no app bundles found. Fall back to searching for binaries.
+	fileGlob := filepath.Join(updateDir, "*", binaryName)
+
+	possibleUpdates, err := filepath.Glob(fileGlob)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(possibleUpdates)
+
+	return possibleUpdates, nil
+}
+
 // FindBaseDir takes a binary path, that may or may not include the
 // update directory, and returns the base directory. It's used by the
 // launcher runtime in finding the various binaries.
 func FindBaseDir(path string) string {
 	if path == "" {
 		return ""
+	}
+
+	// If this is an app bundle installation, we need to adjust the directory -- otherwise we end up with a library
+	// of updates at /usr/local/<identifier>/Kolide.app/Contents/MacOS/launcher-updates.
+	if strings.Contains(path, "Kolide.app") {
+		components := strings.SplitN(path, "Kolide.app", 2)
+		baseDir := filepath.Dir(components[0])
+
+		// If baseDir still contains an update directory (i.e. the original path was something like
+		// /usr/local/<identifier>/launcher-updates/<timestamp>/Kolide.app/Contents/MacOS/launcher),
+		// then strip the update directory out.
+		if strings.Contains(baseDir, updateDirSuffix) {
+			baseDirComponents := strings.SplitN(baseDir, updateDirSuffix, 2)
+			baseDir = filepath.Dir(baseDirComponents[0])
+		}
+
+		// We moved the Kolide.app installation out of the bin directory, but we want the bin directory
+		// here -- so put the "bin" suffix back on if needed.
+		if !strings.HasSuffix(baseDir, "bin") {
+			baseDir = filepath.Join(baseDir, "bin")
+		}
+		return baseDir
 	}
 
 	components := strings.SplitN(path, updateDirSuffix, 2)

@@ -2,7 +2,7 @@ package firmwarepasswd
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -52,7 +52,7 @@ func TestParser(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			inputBytes, err := ioutil.ReadFile(filepath.Join("testdata", tt.input))
+			inputBytes, err := os.ReadFile(filepath.Join("testdata", tt.input))
 			require.NoError(t, err, "read file %s", tt.input)
 
 			inputBuffer := bytes.NewBuffer(inputBytes)

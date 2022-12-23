@@ -28,8 +28,6 @@
             "args": [
                 "--debug",
                 "--hostname=localhost:3443",
-                "--control",
-                "--control_hostname=localhost:3443",
                 "--enroll_secret_path=${workspaceFolder}/debug/k2_enroll_secret",
                 "--transport=osquery",
                 "--kolide_hosted",

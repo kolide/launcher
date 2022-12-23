@@ -12,6 +12,7 @@ package mdmclient
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -21,7 +22,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 const mdmclientPath = "/usr/libexec/mdmclient"
@@ -96,7 +96,7 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 	converted, err := t.transformOutput(systemOutput)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "converting mdmclient output", "err", err)
-		return nil, errors.Wrap(err, "converting")
+		return nil, fmt.Errorf("converting: %w", err)
 	}
 
 	flattenOpts := []dataflatten.FlattenOpts{

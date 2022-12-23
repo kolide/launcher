@@ -1,7 +1,7 @@
 package cryptsetup
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -113,7 +113,7 @@ func TestParseStatus(t *testing.T) {
 		t.Run(tt.infile, func(t *testing.T) {
 			t.Parallel()
 
-			input, err := ioutil.ReadFile(filepath.Join("testdata", tt.infile))
+			input, err := os.ReadFile(filepath.Join("testdata", tt.infile))
 			require.NoError(t, err, "read input file")
 
 			data, err := parseStatus(input)

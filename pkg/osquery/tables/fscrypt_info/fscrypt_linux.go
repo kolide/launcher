@@ -4,13 +4,13 @@
 package fscrypt_info
 
 import (
-	"io/ioutil"
+	"fmt"
+	"io"
 	"log"
 
 	"github.com/google/fscrypt/actions"
 	"github.com/google/fscrypt/keyring"
 	"github.com/google/fscrypt/metadata"
-	"github.com/pkg/errors"
 )
 
 type Info struct {
@@ -29,11 +29,11 @@ func GetInfo(dirpath string) (*Info, error) {
 	defer func() {
 		log.SetOutput(origLog)
 	}()
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 
 	fsctx, err := actions.NewContextFromPath(dirpath, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "new context")
+		return nil, fmt.Errorf("new context: %w", err)
 	}
 
 	pol, err := actions.GetPolicyFromPath(fsctx, dirpath)
@@ -43,7 +43,7 @@ func GetInfo(dirpath string) (*Info, error) {
 	case *metadata.ErrNotEncrypted:
 		return &Info{Path: dirpath, Encrypted: false}, nil
 	default:
-		return nil, errors.Wrapf(err, "get policy for %s", dirpath)
+		return nil, fmt.Errorf("get policy for %s: %w", dirpath, err)
 	}
 
 	return &Info{

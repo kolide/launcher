@@ -10,7 +10,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
-	"github.com/pkg/errors"
 )
 
 func triggerUpgrade(ctx context.Context, cancel func(), logger log.Logger) error {
@@ -25,23 +24,23 @@ func triggerUpgrade(ctx context.Context, cancel func(), logger log.Logger) error
 	// To emulate a new version, just copy the current binary to the staged location
 	level.Debug(logger).Log("msg", "fsutil.CopyFile")
 	if err := fsutil.CopyFile(ProcessNotes.Path, stagedFile); err != nil {
-		return (errors.Wrap(err, "fsutil.CopyFile"))
+		return (fmt.Errorf("fsutil.CopyFile: %w", err))
 	}
 
 	oldFile := fmt.Sprintf("%s-old", ProcessNotes.Path)
 	level.Debug(logger).Log("msg", "os.Rename cur to old")
 	if err := os.Rename(ProcessNotes.Path, oldFile); err != nil {
-		return errors.Wrap(err, "os.Rename cur top old")
+		return fmt.Errorf("os.Rename cur top old: %w", err)
 	}
 
 	level.Debug(logger).Log("msg", "os.Rename stage to cur")
 	if err := os.Rename(stagedFile, ProcessNotes.Path); err != nil {
-		return errors.Wrap(err, "os.Rename staged to cur")
+		return fmt.Errorf("os.Rename staged to cur: %w", err)
 	}
 
 	level.Debug(logger).Log("msg", "os.Chmod")
 	if err := os.Chmod(ProcessNotes.Path, 0755); err != nil {
-		return errors.Wrap(err, "os.Chmod")
+		return fmt.Errorf("os.Chmod: %w", err)
 	}
 
 	// Our normal process here is to exec the new binary. However, this
@@ -55,7 +54,7 @@ func triggerUpgrade(ctx context.Context, cancel func(), logger log.Logger) error
 	// For non-windows machine, exec the new version
 	level.Debug(logger).Log("msg", "syscall.Exec")
 	if err := syscall.Exec(ProcessNotes.Path, os.Args, os.Environ()); err != nil {
-		return errors.Wrap(err, "syscall.Exec")
+		return fmt.Errorf("syscall.Exec: %w", err)
 	}
 
 	// Getting here, means the exec call returned

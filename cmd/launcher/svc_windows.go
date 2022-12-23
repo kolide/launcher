@@ -20,7 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
-	"github.com/pkg/errors"
+
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -33,7 +33,7 @@ const serviceName = "launcher"
 func runWindowsSvc(args []string) error {
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
 	if err != nil {
-		return errors.Wrap(err, "create eventlog writer")
+		return fmt.Errorf("create eventlog writer: %w", err)
 	}
 	defer eventLogWriter.Close()
 
@@ -53,7 +53,8 @@ func runWindowsSvc(args []string) error {
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.log")))
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	// Now that we've parsed the options, let's set a filter on our logger

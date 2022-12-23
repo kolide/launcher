@@ -7,15 +7,15 @@
 package oleconv
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-ole/go-ole"
-	"github.com/pkg/errors"
 )
 
 func okToErr(ok bool, t string) error {
 	if !ok {
-		return errors.Errorf("Not a %s", t)
+		return fmt.Errorf("Not a %s", t)
 	}
 	return nil
 }

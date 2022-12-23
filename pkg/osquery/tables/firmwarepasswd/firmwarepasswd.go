@@ -7,7 +7,7 @@ package firmwarepasswd
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,7 +17,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 type Table struct {
@@ -97,14 +96,14 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 
 	cmd := exec.CommandContext(ctx, "/usr/sbin/firmwarepasswd", subcommand)
 
-	dir, err := ioutil.TempDir("", "osq-firmwarepasswd")
+	dir, err := os.MkdirTemp("", "osq-firmwarepasswd")
 	if err != nil {
-		return errors.Wrap(err, "mktemp")
+		return fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return errors.Wrap(err, "chmod")
+		return fmt.Errorf("chmod: %w", err)
 	}
 
 	cmd.Dir = dir
@@ -121,7 +120,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 			"stdout", strings.TrimSpace(output.String()),
 			"err", err,
 		)
-		return errors.Wrap(err, "running osquery")
+		return fmt.Errorf("running osquery: %w", err)
 	}
 	return nil
 }
@@ -129,7 +128,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 func modeValue(in string) (string, error) {
 	components := strings.SplitN(in, ":", 2)
 	if len(components) < 2 {
-		return "", errors.Errorf("Can't tell mode from %s", in)
+		return "", fmt.Errorf("Can't tell mode from %s", in)
 	}
 
 	return strings.TrimSpace(strings.ToLower(components[1])), nil
@@ -138,7 +137,7 @@ func modeValue(in string) (string, error) {
 func passwordValue(in string) (string, error) {
 	components := strings.SplitN(in, ":", 2)
 	if len(components) < 2 {
-		return "", errors.Errorf("Can't tell value from %s", in)
+		return "", fmt.Errorf("Can't tell value from %s", in)
 	}
 
 	t, err := discernValBool(components[1])
@@ -156,7 +155,7 @@ func optionRomValue(in string) (string, error) {
 	case "allowed":
 		return "1", nil
 	}
-	return "", errors.Errorf("Can't tell value from %s", in)
+	return "", fmt.Errorf("Can't tell value from %s", in)
 }
 
 func discernValBool(in string) (bool, error) {
@@ -167,5 +166,5 @@ func discernValBool(in string) (bool, error) {
 		return false, nil
 	}
 
-	return false, errors.Errorf("Can't discern boolean from string <%s>", in)
+	return false, fmt.Errorf("Can't discern boolean from string <%s>", in)
 }

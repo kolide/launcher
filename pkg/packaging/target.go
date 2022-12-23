@@ -2,9 +2,8 @@ package packaging
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Target is the platform being targeted by the build. As "platform"
@@ -56,7 +55,7 @@ var knownPackageFlavors = [...]PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman}
 func (t *Target) Parse(s string) error {
 	components := strings.Split(s, "-")
 	if len(components) != 3 {
-		return errors.Errorf("Unable to parse %s, should have exactly 3 components", s)
+		return fmt.Errorf("Unable to parse %s, should have exactly 3 components", s)
 	}
 
 	if err := t.PlatformFromString(components[0]); err != nil {
@@ -109,6 +108,15 @@ func (t *Target) PlatformBinaryName(input string) string {
 	return input
 }
 
+func (t *Target) PlatformLauncherPath(binDir string) string {
+	if t.Platform == Darwin {
+		// We want /usr/local/Kolide.app, not /usr/local/bin/Kolide.app, so we use Dir to strip out `bin`
+		return filepath.Join(filepath.Dir(binDir), "Kolide.app", "Contents", "MacOS", "launcher")
+	}
+
+	return filepath.Join(binDir, t.PlatformBinaryName("launcher"))
+}
+
 // InitFromString sets a target's init flavor from string representation
 func (t *Target) InitFromString(s string) error {
 	for _, testInit := range knownInitFlavors {
@@ -117,7 +125,7 @@ func (t *Target) InitFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown init %s", s)
+	return fmt.Errorf("Unknown init %s", s)
 }
 
 // PlatformFromString sets a target's platform flavor from string representation
@@ -128,7 +136,7 @@ func (t *Target) PlatformFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown platform %s", s)
+	return fmt.Errorf("Unknown platform %s", s)
 }
 
 // PackageFromString sets a target's package flavor from string representation
@@ -139,7 +147,7 @@ func (t *Target) PackageFromString(s string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("Unknown package %s", s)
+	return fmt.Errorf("Unknown package %s", s)
 
 }
 

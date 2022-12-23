@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/pkg/errors"
 )
 
 // the c# .Net code in the asset below came from
@@ -62,11 +61,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var output bytes.Buffer
 
 	if err := t.getBytes(ctx, &output); err != nil {
-		return results, errors.Wrap(err, "getting raw data")
+		return results, fmt.Errorf("getting raw data: %w", err)
 	}
 	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
 	if err != nil {
-		return results, errors.Wrap(err, "flattening json output")
+		return results, fmt.Errorf("flattening json output: %w", err)
 	}
 
 	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
@@ -82,20 +81,20 @@ func execPwsh(logger log.Logger) execer {
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe
-		dir, err := ioutil.TempDir("", "nativewifi")
+		dir, err := os.MkdirTemp("", "nativewifi")
 		if err != nil {
-			return errors.Wrap(err, "creating nativewifi tmp dir")
+			return fmt.Errorf("creating nativewifi tmp dir: %w", err)
 		}
 		defer os.RemoveAll(dir)
 
 		outputFile := filepath.Join(dir, "nativewificode.cs")
 		if err := os.WriteFile(outputFile, nativeCode, 0755); err != nil {
-			return errors.Wrap(err, "writing native wifi code")
+			return fmt.Errorf("writing native wifi code: %w", err)
 		}
 
 		pwsh, err := exec.LookPath("powershell.exe")
 		if err != nil {
-			return errors.Wrap(err, "finding powershell.exe path")
+			return fmt.Errorf("finding powershell.exe path: %w", err)
 		}
 
 		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
@@ -114,9 +113,9 @@ func execPwsh(logger log.Logger) execer {
 			level.Debug(logger).Log("msg", "error execing, inspecting stdout contents", "stdout", buf.String())
 
 			if err == nil {
-				err = errors.Errorf("exec succeeded, but emitted to stderr")
+				err = fmt.Errorf("exec succeeded, but emitted to stderr")
 			}
-			return errors.Wrapf(err, "execing powershell, got: %s", errOutput)
+			return fmt.Errorf("execing powershell, got: %s: %w", errOutput, err)
 		}
 
 		return nil

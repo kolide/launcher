@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
@@ -43,26 +42,26 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	dir, err := ioutil.TempDir("", "kolide_chrome_login_data_emails")
+	dir, err := os.MkdirTemp("", "kolide_chrome_login_data_emails")
 	if err != nil {
-		return nil, errors.Wrap(err, "creating kolide_chrome_login_data_emails tmp dir")
+		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	dst := filepath.Join(dir, "tmpfile")
 	if err := fsutil.CopyFile(file.path, dst); err != nil {
-		return nil, errors.Wrap(err, "copying sqlite file to tmp dir")
+		return nil, fmt.Errorf("copying sqlite file to tmp dir: %w", err)
 	}
 
 	db, err := sql.Open("sqlite3", dst)
 	if err != nil {
-		return nil, errors.Wrap(err, "connecting to sqlite db")
+		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
 	defer db.Close()
 
 	rows, err := db.Query("SELECT username_value, count(*) AS count FROM logins GROUP BY lower(username_value)")
 	if err != nil {
-		return nil, errors.Wrap(err, "query rows from chrome login keychain db")
+		return nil, fmt.Errorf("query rows from chrome login keychain db: %w", err)
 	}
 	defer rows.Close()
 
@@ -73,7 +72,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 		var username_value string
 		var username_count string
 		if err := rows.Scan(&username_value, &username_count); err != nil {
-			return nil, errors.Wrap(err, "scanning chrome login keychain db row")
+			return nil, fmt.Errorf("scanning chrome login keychain db row: %w", err)
 		}
 		// append anything that could be an email
 		if !strings.Contains(username_value, "@") {

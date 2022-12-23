@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
-	"github.com/pkg/errors"
 )
 
 func runInteractive(args []string) error {
@@ -35,12 +36,13 @@ func runInteractive(args []string) error {
 		if osquerydPath == "" {
 			return errors.New("Could not find osqueryd binary")
 		}
+		osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
 	}
 
 	// have to keep tempdir name short so we don't exceed socket length
 	rootDir, err := os.MkdirTemp("", "launcher-interactive")
 	if err != nil {
-		return errors.Wrap(err, "creating temp dir for interactive mode")
+		return fmt.Errorf("creating temp dir for interactive mode: %w", err)
 	}
 
 	defer func() {

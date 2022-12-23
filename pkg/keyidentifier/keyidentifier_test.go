@@ -2,7 +2,7 @@ package keyidentifier
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -36,7 +36,7 @@ func TestIdentifyFiles(t *testing.T) {
 
 func testIdentifyFile(t *testing.T, kIdentifer *KeyIdentifier, specFilePath string) {
 	// load the json file
-	data, err := ioutil.ReadFile(specFilePath)
+	data, err := os.ReadFile(specFilePath)
 	require.NoError(t, err, "reading spec file")
 	var expected spec
 	err = json.Unmarshal(data, &expected)

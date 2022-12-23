@@ -1,12 +1,12 @@
 package main
 
 import (
+	"errors"
 	"path/filepath"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/pkg/errors"
 )
 
 func runCompactDb(args []string) error {

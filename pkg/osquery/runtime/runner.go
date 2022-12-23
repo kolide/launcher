@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,7 +20,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
-	"github.com/pkg/errors"
 )
 
 // How long to wait before erroring because we cannot open the osquery
@@ -69,7 +69,7 @@ func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) *Runner {
 
 func (r *Runner) Start() error {
 	if err := r.launchOsqueryInstance(); err != nil {
-		return errors.Wrap(err, "starting instance")
+		return fmt.Errorf("starting instance: %w", err)
 	}
 	go func() {
 		// This loop waits for the completion of the async routines,
@@ -133,8 +133,8 @@ func (r *Runner) Shutdown() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	r.instance.cancel()
-	if err := r.instance.errgroup.Wait(); err != context.Canceled {
-		return errors.Wrap(err, "while shutting down instance")
+	if err := r.instance.errgroup.Wait(); err != context.Canceled && err != nil {
+		return fmt.Errorf("while shutting down instance: %w", err)
 	}
 	return nil
 }
@@ -175,7 +175,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	if o.opts.binaryPath == "" {
 		path, err := exec.LookPath(lookFor)
 		if err != nil {
-			return errors.Wrap(err, "osqueryd not supplied and not found")
+			return fmt.Errorf("osqueryd not supplied and not found: %w", err)
 		}
 		o.opts.binaryPath = path
 	}
@@ -185,7 +185,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	if o.opts.rootDirectory == "" {
 		rootDirectory, rmRootDirectory, err := osqueryTempDir()
 		if err != nil {
-			return errors.Wrap(err, "couldn't create temp directory for osquery instance")
+			return fmt.Errorf("couldn't create temp directory for osquery instance: %w", err)
 		}
 		o.opts.rootDirectory = rootDirectory
 		o.rmRootDirectory = rmRootDirectory
@@ -196,7 +196,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// required osquery artifact files.
 	paths, err := calculateOsqueryPaths(o.opts)
 	if err != nil {
-		return errors.Wrap(err, "could not calculate osquery file paths")
+		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
 	for _, path := range paths.extensionPaths {
@@ -214,11 +214,11 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Populate augeas lenses, if requested
 	if o.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
-			return errors.Wrap(err, "making augeas lenses directory")
+			return fmt.Errorf("making augeas lenses directory: %w", err)
 		}
 
 		if err := o.opts.augeasLensFunc(paths.augeasPath); err != nil {
-			return errors.Wrap(err, "setting up augeas lenses")
+			return fmt.Errorf("setting up augeas lenses: %w", err)
 		}
 	}
 
@@ -279,7 +279,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// the *exec.Cmd instance that will run osqueryd.
 	o.cmd, err = o.opts.createOsquerydCommand(currentOsquerydBinaryPath, paths)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create osqueryd command")
+		return fmt.Errorf("couldn't create osqueryd command: %w", err)
 	}
 
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
@@ -304,7 +304,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		)
 
 		level.Info(o.logger).Log(msgPairs...)
-		return errors.Wrap(err, "fatal error starting osqueryd process")
+		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
 	stats, err := history.NewInstance()
@@ -331,7 +331,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			)
 
 			level.Info(o.logger).Log(msgPairs...)
-			return errors.Wrap(err, "running osqueryd command")
+			return fmt.Errorf("running osqueryd command: %w", err)
 		}
 	})
 
@@ -370,13 +370,13 @@ func (r *Runner) launchOsqueryInstance() error {
 	if len(o.opts.extensionPlugins) > 0 {
 		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
-			return errors.Wrap(err, "could not create an extension server")
+			return fmt.Errorf("could not create an extension server: %w", err)
 		}
 	}
 
 	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
 	if err != nil {
-		return errors.Wrap(err, "could not create an extension client")
+		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 
 	if err := o.stats.Connected(o); err != nil {
@@ -399,7 +399,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, plugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create tables extension server. Stopping", "err", err)
-			return errors.Wrap(err, "could not create a table extension server")
+			return fmt.Errorf("could not create a table extension server: %w", err)
 		}
 		return nil
 	})
@@ -423,7 +423,7 @@ func (r *Runner) launchOsqueryInstance() error {
 					if err := o.Healthy(); err != nil {
 						if i == maxHealthChecks {
 							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
-							return errors.Wrap(err, "health check failed")
+							return fmt.Errorf("health check failed: %w", err)
 						}
 
 						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)

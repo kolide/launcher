@@ -6,11 +6,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
+	"errors"
+	"fmt"
+	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -59,14 +61,14 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 		"file", path,
 	)
 
-	keyBytes, err := ioutil.ReadFile(path)
+	keyBytes, err := os.ReadFile(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading file %s", path)
+		return nil, fmt.Errorf("reading file %s: %w", path, err)
 	}
 
 	ki, err := kIdentifer.Identify(keyBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "identifying key")
+		return nil, fmt.Errorf("identifying key: %w", err)
 	}
 
 	return ki, nil

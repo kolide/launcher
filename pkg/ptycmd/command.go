@@ -12,7 +12,6 @@ import (
 	"unsafe"
 
 	"github.com/kr/pty"
-	"github.com/pkg/errors"
 )
 
 // NewCmd creates a new command attached to a pty
@@ -23,7 +22,7 @@ func NewCmd(command string, argv []string, options ...Option) (*Cmd, error) {
 	// open a pty
 	pty, tty, err := pty.Open()
 	if err != nil {
-		return nil, errors.Wrap(err, "opening pty")
+		return nil, fmt.Errorf("opening pty: %w", err)
 	}
 	defer tty.Close()
 
@@ -34,7 +33,7 @@ func NewCmd(command string, argv []string, options ...Option) (*Cmd, error) {
 
 	// start the cmd, closing the PTY if there's an error
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrapf(err, "starting command  `%s`", command)
+		return nil, fmt.Errorf("starting command  `%s`: %w", command, err)
 	}
 
 	ptyClosed := make(chan struct{})
