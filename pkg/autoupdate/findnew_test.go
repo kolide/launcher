@@ -91,8 +91,13 @@ func TestFindBaseDir(t *testing.T) {
 		out string
 	}{
 		{in: "", out: ""},
-		{in: "/a/path/launcher", out: filepath.Clean("/a/path")},
-		{in: "/a/path/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path")},
+		{in: "/a/path/bin/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/launcher-updates/1569339163/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
+		{in: "/a/path/bin/Kolide.app/Contents/MacOS/launcher-updates/1569339163/Kolide.app/Contents/MacOS/launcher", out: filepath.Clean("/a/path/bin")},
 	}
 
 	for _, tt := range tests {

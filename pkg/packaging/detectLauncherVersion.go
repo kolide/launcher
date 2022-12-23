@@ -47,18 +47,19 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	return nil
 }
 
-// launcherLocation returns the location of the launcher binary within `rootDir`. For darwin,
+// launcherLocation returns the location of the launcher binary within `binDir`. For darwin,
 // it may be in an app bundle -- we check to see if the binary exists there first, and then
 // fall back to the common location if it doesn't.
-func (p *PackageOptions) launcherLocation(rootDir string) string {
+func (p *PackageOptions) launcherLocation(binDir string) string {
 	if p.target.Platform == Darwin {
-		appBundleBinaryPath := filepath.Join(rootDir, "Kolide.app", "Contents", "MacOS", "launcher")
+		// We want /usr/local/Kolide.app, not /usr/local/bin/Kolide.app, so we use Dir to strip out `bin`
+		appBundleBinaryPath := filepath.Join(filepath.Dir(binDir), "Kolide.app", "Contents", "MacOS", "launcher")
 		if info, err := os.Stat(appBundleBinaryPath); err == nil && !info.IsDir() {
 			return appBundleBinaryPath
 		}
 	}
 
-	return filepath.Join(rootDir, p.target.PlatformBinaryName("launcher"))
+	return filepath.Join(binDir, p.target.PlatformBinaryName("launcher"))
 }
 
 // formatVersion formats the version. This is specific to windows. It

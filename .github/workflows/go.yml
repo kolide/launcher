@@ -162,7 +162,9 @@ jobs:
         # Quick check that at least a couple of the files we expect now exist
         if [ ! -f /Library/LaunchDaemons/com.launcher.launcher.plist ]; then echo "missing launchd entry" && exit 1; fi
         if [ ! -f /usr/local/launcher/bin/osqueryd ]; then echo "missing osquery binary" && exit 1; fi
-        if [ ! -f /usr/local/launcher/bin/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
+        if [ ! -f /usr/local/launcher/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
+        if [ ! -L /usr/local/launcher/bin/launcher ]; then echo "missing launcher symlink" && exit 1; fi
+        if [ ! -e /usr/local/launcher/bin/launcher ]; then echo "launcher symlink is present but broken" && exit 1; fi
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
