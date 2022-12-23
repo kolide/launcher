@@ -45,7 +45,7 @@ func (c *HTTPClient) Get(hash string) (data io.Reader, err error) {
 
 	response, err := c.do(verb, path)
 	if err != nil {
-		level.Error(c.logger).Log(
+		level.Debug(c.logger).Log(
 			"msg", "error making request to control server endpoint",
 			"err", err,
 		)

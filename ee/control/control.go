@@ -72,7 +72,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
-			level.Error(cs.logger).Log(
+			level.Debug(cs.logger).Log(
 				"msg", "failed to fetch data from control server",
 				"err", err)
 		}
