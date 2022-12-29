@@ -67,6 +67,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		{
 			name: "new process started if old one gone",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
+				// in the current CI environment (GitHub Actions) the linux runner
+				// does not have a console user, so we don't expect any processes
+				// to be started.
+				if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+					return
+				}
 				user, err := user.Current()
 				require.NoError(t, err)
 				r.uidProcs[user.Uid] = processRecord{
@@ -124,12 +130,20 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			user, err := user.Current()
 			require.NoError(t, err)
-			assert.Contains(t, r.uidProcs, user.Uid)
-			assert.Len(t, r.uidProcs, 1)
 
-			if len(tt.logContains) > 0 {
-				for _, s := range tt.logContains {
-					assert.Contains(t, logBytes.String(), s)
+			// in the current CI environment (GitHub Actions) the linux runner
+			// does not have a console user, so we don't expect any processes
+			// to be started.
+			if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
+			} else {
+				assert.Contains(t, r.uidProcs, user.Uid)
+				assert.Len(t, r.uidProcs, 1)
+
+				if len(tt.logContains) > 0 {
+					for _, s := range tt.logContains {
+						assert.Contains(t, logBytes.String(), s)
+					}
 				}
 			}
 
