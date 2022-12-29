@@ -1,8 +1,6 @@
 package client
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -20,12 +18,6 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 type client struct {
 	base http.Client
-}
-
-// desktopUserStatus is all the device data sent to the desktop user process
-type DesktopUserStatus struct {
-	// TODO: Simple message format for v1, add device problem info, links to fix instructions, compliance actions...
-	Status string `json:"status"`
 }
 
 func New(authToken, socketPath string) client {
@@ -80,17 +72,8 @@ func (c *client) Ping() error {
 	return nil
 }
 
-func (c *client) SetStatus(st string) error {
-	params := &DesktopUserStatus{
-		Status: st,
-	}
-
-	bodyBytes, err := json.Marshal(params)
-	if err != nil {
-		return fmt.Errorf("marshaling json: %w", err)
-	}
-
-	resp, err := c.base.Post("http://unix/status", "application/json", bytes.NewBuffer(bodyBytes))
+func (c *client) Refresh() error {
+	resp, err := c.base.Get("http://unix/refresh")
 	if err != nil {
 		return err
 	}
