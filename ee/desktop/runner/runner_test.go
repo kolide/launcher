@@ -21,16 +21,13 @@ import (
 
 func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "linux" {
-		t.Skip("skipping linux test because it's not implemented")
-	}
 
 	// When running this using the golang test harness, it will leave behind process if you do not build the binary first.
 	// On mac os you can find these by setting the executable path to an empty string before running the tests, then search
 	// the processes in a terminal using: ps aux -o ppid | runtime.test after the tests have completed, you'll also see the
 	// CPU consumption go way up.
 
-	// To get around the issue mentioned above, build the binary first and set it's path as the executable path on the runner.
+	// To get around the issue mentioned above, build the binary first and set its path as the executable path on the runner.
 	executablePath := filepath.Join(t.TempDir(), "desktop-test")
 
 	if runtime.GOOS == "windows" {
@@ -70,6 +67,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		{
 			name: "new process started if old one gone",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
+				// in the current CI environment (GitHub Actions) the linux runner
+				// does not have a console user, so we don't expect any processes
+				// to be started.
+				if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+					return
+				}
 				user, err := user.Current()
 				require.NoError(t, err)
 				r.uidProcs[user.Uid] = processRecord{
@@ -127,12 +130,20 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			user, err := user.Current()
 			require.NoError(t, err)
-			assert.Contains(t, r.uidProcs, user.Uid)
-			assert.Len(t, r.uidProcs, 1)
 
-			if len(tt.logContains) > 0 {
-				for _, s := range tt.logContains {
-					assert.Contains(t, logBytes.String(), s)
+			// in the current CI environment (GitHub Actions) the linux runner
+			// does not have a console user, so we don't expect any processes
+			// to be started.
+			if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
+			} else {
+				assert.Contains(t, r.uidProcs, user.Uid)
+				assert.Len(t, r.uidProcs, 1)
+
+				if len(tt.logContains) > 0 {
+					for _, s := range tt.logContains {
+						assert.Contains(t, logBytes.String(), s)
+					}
 				}
 			}
 
