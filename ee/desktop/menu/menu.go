@@ -41,8 +41,9 @@ type MenuBuilder interface {
 }
 
 type menu struct {
-	logger   log.Logger
-	hostname string
+	logger    log.Logger
+	hostname  string
+	doneChans []chan bool
 }
 
 func New(logger log.Logger, hostname string) *menu {
@@ -55,12 +56,17 @@ func New(logger log.Logger, hostname string) *menu {
 }
 
 func (m *menu) Init(buildMenu func()) {
-	systray.Run(buildMenu, nil)
+	// buildMenu will be invoked after the systray has been initialized
+	// Before the systray exits, cleanup the goroutines
+	systray.Run(buildMenu, m.cleanup)
 }
 
 func (m *menu) Build(menu *MenuData) {
 	// Remove all menu items each time we rebuild the menu
 	systray.ResetMenu()
+
+	// Even though the menu items have been removed, we still have goroutines hanging around
+	m.cleanup()
 
 	parseMenuData(menu, m)
 }
@@ -108,23 +114,41 @@ func (m *menu) Shutdown() {
 	systray.Quit()
 }
 
+// Cleans up goroutines associated with menu items
+func (m *menu) cleanup() {
+	for _, done := range m.doneChans {
+		close(done)
+	}
+	m.doneChans = nil
+}
+
+// Returns true if launcher is running in production
 func (m *menu) isProd() bool {
 	return m.hostname == "k2device-preprod.kolide.com" || m.hostname == "k2device.kolide.com"
 }
 
+// addAction creates a handler to execute the desired action when a menu item is clicked
 func (m *menu) addAction(item *systray.MenuItem, action MenuItemAction) {
 	if action.URL == "" {
 		return
 	}
 
+	// Create and hold on to a done channel for each action, so we don't leak goroutines
+	done := make(chan bool)
+	m.doneChans = append(m.doneChans, done)
+
 	go func() {
 		for {
 			select {
 			case <-item.ClickedCh:
+				// Menu item was clicked
 				err := open(action.URL)
 				if err != nil {
 					level.Error(m.logger).Log("msg", "failed to open URL in browser", "err", err)
 				}
+			case <-done:
+				// Menu item is going away
+				return
 			}
 		}
 	}()
