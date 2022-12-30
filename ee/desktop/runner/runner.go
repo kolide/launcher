@@ -151,18 +151,14 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	f := func() {
-		if err := r.runConsoleUserDesktop(); err != nil {
-			level.Info(r.logger).Log("msg", "running console user desktop", "err", err)
-		}
-	}
-
 	ticker := time.NewTicker(r.updateInterval)
 	defer ticker.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
-		f()
+		if err := r.runConsoleUserDesktop(); err != nil {
+			level.Info(r.logger).Log("msg", "running console user desktop", "err", err)
+		}
 
 		select {
 		case <-ticker.C:
