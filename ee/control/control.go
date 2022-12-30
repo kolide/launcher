@@ -104,6 +104,10 @@ func (cs *ControlService) Fetch() error {
 		return fmt.Errorf("getting subsystems map: %w", err)
 	}
 
+	if data == nil {
+		return fmt.Errorf("subsystems map data is nil")
+	}
+
 	var subsystems map[string]string
 	if err := json.NewDecoder(data).Decode(&subsystems); err != nil {
 		return fmt.Errorf("decoding subsystems map: %w", err)
@@ -119,6 +123,10 @@ func (cs *ControlService) Fetch() error {
 		data, err := cs.fetcher.Get(hash)
 		if err != nil {
 			return fmt.Errorf("failed to get control data: %w", err)
+		}
+
+		if data == nil {
+			return fmt.Errorf("control data is nil")
 		}
 
 		// Consumer and subscriber(s) notified now
