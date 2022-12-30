@@ -141,7 +141,7 @@ func open(url string) error {
 		cmd = "cmd"
 		args = []string{"/c", "start"}
 	case "darwin":
-		cmd = "open"
+		cmd = "/usr/bin/open"
 	default: // "linux", "freebsd", "openbsd", "netbsd"
 		cmd = "xdg-open"
 	}
