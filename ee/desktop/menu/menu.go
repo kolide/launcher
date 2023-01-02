@@ -1,8 +1,9 @@
 package menu
 
 import (
-	"os/exec"
-	"runtime"
+	"encoding/json"
+	"os"
+	"sync"
 
 	"fyne.io/systray"
 
@@ -11,69 +12,101 @@ import (
 	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
-// MenuData encapsulates a systray icon and accessible menu items
+// MenuData encapsulates a menu bar icon and accessible menu items
 type MenuData struct {
 	Tooltip string         `json:"tooltip,omitempty"`
-	Items   []MenuItemData `json:"items"`
+	Items   []menuItemData `json:"items"`
 }
 
-// MenuItemData represents a menu item, optionally containing sub menu items
-type MenuItemData struct {
+// menuItemData represents a menu item, optionally containing sub menu items
+type menuItemData struct {
 	Label       string         `json:"label,omitempty"`
 	Tooltip     string         `json:"tooltip,omitempty"`
 	Disabled    bool           `json:"disabled,omitempty"`
 	NonProdOnly bool           `json:"nonProdOnly,omitempty"`
 	IsSeparator bool           `json:"isSeparator,omitempty"`
-	Action      MenuItemAction `json:"action,omitempty"`
-	Items       []MenuItemData `json:"items,omitempty"`
+	Action      actionData     `json:"action,omitempty"`
+	Items       []menuItemData `json:"items,omitempty"`
 }
 
-// MenuItemAction encapsulates what action should be performed when a menu item is invoked
-type MenuItemAction struct {
-	URL string `json:"url,omitempty"`
-}
-
-// MenuBuilder is an interface a menu parser can use to specify how the systray menu is built
+// MenuBuilder is an interface a menu parser can use to specify how the menu is built
 type MenuBuilder interface {
+	// SetIcon sets the menu bar icon
+	SetIcon()
+	// SetTooltip sets the menu tooltip
 	SetTooltip(tooltip string)
-	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action MenuItemAction, parent any) any
+	// AddMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
+	// created, it is returned. If parent is non-nil, the menu item will be created as a child of parent.
+	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action Action, parent any) any
+	// AddSeparator adds a separator to the menu
 	AddSeparator()
 }
 
 type menu struct {
-	logger    log.Logger
-	hostname  string
-	doneChans []chan bool
+	logger     log.Logger
+	hostname   string
+	filePath   string
+	buildMutex sync.Mutex
+	doneChans  []chan<- struct{}
 }
 
-func New(logger log.Logger, hostname string) *menu {
+func New(logger log.Logger, hostname, filePath string) *menu {
 	m := &menu{
 		logger:   logger,
 		hostname: hostname,
+		filePath: filePath,
 	}
 
 	return m
 }
 
-func (m *menu) Init(buildMenu func()) {
-	// buildMenu will be invoked after the systray has been initialized
-	// Before the systray exits, cleanup the goroutines
-	systray.Run(buildMenu, m.cleanup)
+// Init creates the menu bar & icon. It must be called on the main thread, and
+// blocks until Shutdown() is called.
+func (m *menu) Init() {
+	// Build will be invoked after the menu has been initialized
+	// Before the menu exits, cleanup the goroutines
+	systray.Run(m.Build, m.cleanup)
 }
 
-func (m *menu) Build(menu *MenuData) {
+// Build parses the menu file and constructs the menu. If a menu already exists,
+// all of its items will be removed before the new menu is built.
+func (m *menu) Build() {
+	// Lock so the menu is never being modified by more than one goroutine at a time
+	m.buildMutex.Lock()
+	defer m.buildMutex.Unlock()
+
 	// Remove all menu items each time we rebuild the menu
 	systray.ResetMenu()
 
 	// Even though the menu items have been removed, we still have goroutines hanging around
 	m.cleanup()
 
-	parseMenuData(menu, m)
+	// Reparse the menu file & rebuild the menu
+	menuData := m.getMenuData()
+	if menuData == nil {
+		// TODO: Fall back to default menu?
+	}
+	parseMenuData(menuData, m)
 }
 
-func (m *menu) SetTooltip(tooltip string) {
-	systray.SetTooltip(tooltip)
+func (m *menu) getMenuData() *MenuData {
+	statusFileBytes, err := os.ReadFile(m.filePath)
+	if err != nil {
+		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
+		return nil
+	}
 
+	var menu MenuData
+	if err := json.Unmarshal(statusFileBytes, &menu); err != nil {
+		level.Error(m.logger).Log("msg", "failed to unmarshal menu json")
+		return nil
+	}
+
+	return &menu
+}
+
+func (m *menu) SetIcon() {
+	// For now, icons are hard-coded
 	if m.isProd() {
 		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
 	} else {
@@ -81,7 +114,11 @@ func (m *menu) SetTooltip(tooltip string) {
 	}
 }
 
-func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action MenuItemAction, parent any) any {
+func (m *menu) SetTooltip(tooltip string) {
+	systray.SetTooltip(tooltip)
+}
+
+func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action Action, parent any) any {
 	if nonProdOnly && m.isProd() {
 		// This is prod environment, but the menu item is for non-prod only
 		return nil
@@ -100,8 +137,8 @@ func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ac
 		item.Disable()
 	}
 
-	// Menu items can have actions associated with them
-	m.addAction(item, action)
+	// Setup a handler to perform the menu item's action
+	m.makeActionHandler(item, action)
 
 	return item
 }
@@ -110,6 +147,7 @@ func (m *menu) AddSeparator() {
 	systray.AddSeparator()
 }
 
+// Shutdown quits the menu. It unblocks the Init() call.
 func (m *menu) Shutdown() {
 	systray.Quit()
 }
@@ -127,14 +165,10 @@ func (m *menu) isProd() bool {
 	return m.hostname == "k2device-preprod.kolide.com" || m.hostname == "k2device.kolide.com"
 }
 
-// addAction creates a handler to execute the desired action when a menu item is clicked
-func (m *menu) addAction(item *systray.MenuItem, action MenuItemAction) {
-	if action.URL == "" {
-		return
-	}
-
+// makeActionHandler creates a handler to execute the desired action when a menu item is clicked
+func (m *menu) makeActionHandler(item *systray.MenuItem, action Action) {
 	// Create and hold on to a done channel for each action, so we don't leak goroutines
-	done := make(chan bool)
+	done := make(chan struct{})
 	m.doneChans = append(m.doneChans, done)
 
 	go func() {
@@ -142,33 +176,11 @@ func (m *menu) addAction(item *systray.MenuItem, action MenuItemAction) {
 			select {
 			case <-item.ClickedCh:
 				// Menu item was clicked
-				err := open(action.URL)
-				if err != nil {
-					level.Error(m.logger).Log("msg", "failed to open URL in browser", "err", err)
-				}
+				action.Perform(m)
 			case <-done:
 				// Menu item is going away
 				return
 			}
 		}
 	}()
-}
-
-// open opens the specified URL in the default browser of the user
-// See https://stackoverflow.com/a/39324149/1705598
-func open(url string) error {
-	var cmd string
-	var args []string
-
-	switch runtime.GOOS {
-	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
-	case "darwin":
-		cmd = "/usr/bin/open"
-	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
-	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -17,7 +17,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
-	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
@@ -42,10 +41,10 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
-		flstatuspath = flagset.String(
-			"status_path",
+		flmenupath = flagset.String(
+			"menu_path",
 			"",
-			"path to read status data",
+			"path to read menu data",
 		)
 		fldebug = flagset.Bool(
 			"debug",
@@ -80,12 +79,8 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	if *flstatuspath == "" {
-		*flstatuspath = defaultStatusPath()
-		level.Info(logger).Log(
-			"msg", "using default status path since none was provided",
-			"status_path", *flstatuspath,
-		)
+	if *flmenupath == "" {
+		return errors.New("--menu_path must be defined")
 	}
 
 	var runGroup run.Group
@@ -108,13 +103,9 @@ func runDesktop(args []string) error {
 		return err
 	}
 
-	menu := menu.New(logger, *flhostname)
-	buildMenu := func() {
-		menu.Build(getMenuData(logger, *flstatuspath))
-	}
-
+	menu := menu.New(logger, *flhostname, *flmenupath)
 	server.RegisterRefreshListener(func() {
-		buildMenu()
+		menu.Build()
 	})
 
 	// start desktop server
@@ -149,7 +140,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init(buildMenu)
+	menu.Init()
 
 	return nil
 }
@@ -203,25 +194,4 @@ func defaultSocketPath() string {
 	}
 
 	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
-}
-
-func defaultStatusPath() string {
-	const statusBaseName = "desktop_status.json"
-
-	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", statusBaseName, os.Getpid()))
-}
-
-// Loads menu data from the desktop status file
-func getMenuData(logger log.Logger, statusPath string) *menu.MenuData {
-	statusFileBytes, err := os.ReadFile(statusPath)
-	if err != nil {
-		level.Error(logger).Log("msg", "failed to read desktop status file", "path", statusPath)
-	}
-
-	var desktopStatus runner.DesktopUserStatus
-	if err := json.Unmarshal(statusFileBytes, &desktopStatus); err != nil {
-		level.Error(logger).Log("msg", "failed to unmarshal desktop status json")
-	}
-
-	return &desktopStatus.Menu
 }

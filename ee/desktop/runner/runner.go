@@ -232,20 +232,14 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 // Update handles control server updates for the desktop subsystem
 // This includes data related to the runner itself, and the user processes
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
-	// Since the runner needs to interpret some of this data, as well as the user processes
-	// themselves, let's duplicate the stream so we can do more than one operation with it.
-	var buffer bytes.Buffer
-	tee := io.TeeReader(data, &buffer)
-
-	// Decode the data from the TeeReader first, so buffer gets a copy
 	var desktopStatus DesktopUserStatus
-	if err := json.NewDecoder(tee).Decode(&desktopStatus); err != nil {
+	if err := json.NewDecoder(data).Decode(&desktopStatus); err != nil {
 		return fmt.Errorf("failed to decode desktop user control data: %w", err)
 	}
 
-	// Regardless, we will write the buffer data out to a file that can be grabbed by
+	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	r.writeStatusFile(&buffer)
+	r.writeMenuFile(desktopStatus.Menu)
 
 	if r.processSpawningEnabled && !desktopStatus.Enabled {
 		// Desktop is currently enabled, control server is asking us to disable
@@ -292,16 +286,21 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
-// writeStatusFile copies desktop status data to a shared file for user processes to access
-func (r *DesktopUsersProcessesRunner) writeStatusFile(data io.Reader) error {
-	statusPath := r.statusPath()
-	statusFile, err := os.Create(statusPath)
+// writeMenuFile writes menu data to a shared file for user processes to access
+func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
+	menuBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal menu json: %w", err)
+	}
+
+	menuPath := r.menuPath()
+	statusFile, err := os.Create(menuPath)
 	if err != nil {
 		return fmt.Errorf("creating desktop status file: %w", err)
 	}
 
 	defer statusFile.Close()
-	_, err = io.Copy(statusFile, data)
+	_, err = io.Copy(statusFile, bytes.NewReader(menuBytes))
 	if err != nil {
 		return fmt.Errorf("writing desktop status file: %w", err)
 	}
@@ -338,9 +337,9 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		statusPath := r.statusPath()
+		menuPath := r.menuPath()
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, statusPath)
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath)
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
@@ -512,21 +511,21 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 	return path, nil
 }
 
-// statusPath returns the path to the status file
-func (r *DesktopUsersProcessesRunner) statusPath() string {
-	path := filepath.Join(r.usersFilesRoot, "desktop_status.json")
+// menuPath returns the path to the menu file
+func (r *DesktopUsersProcessesRunner) menuPath() string {
+	path := filepath.Join(r.usersFilesRoot, "menu.json")
 	return path
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, statusPath string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
-		fmt.Sprintf("STATUS_PATH=%s", statusPath),
+		fmt.Sprintf("MENU_PATH=%s", menuPath),
 	}
 
 	stdErr, err := cmd.StderrPipe()
