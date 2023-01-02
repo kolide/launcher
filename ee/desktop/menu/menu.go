@@ -84,7 +84,8 @@ func (m *menu) Build() {
 	// Reparse the menu file & rebuild the menu
 	menuData := m.getMenuData()
 	if menuData == nil {
-		// TODO: Fall back to default menu?
+		var defaultMenuData MenuData
+		menuData = &defaultMenuData
 	}
 	parseMenuData(menuData, m)
 }
