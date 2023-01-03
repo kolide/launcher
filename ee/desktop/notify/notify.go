@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 )
@@ -62,10 +60,7 @@ func (n *Notifier) Notify(title, body string) {
 		return
 	}
 
-	// We create a fyne app to be able to send the notification. The notification process doesn't
-	// actually require the app to be running.
-	tempApp := app.NewWithID("com.kolide.desktop")
-	tempApp.SendNotification(fyne.NewNotification(title, body))
+	n.sendNotification(title, body)
 
 	sentNotification := Notification{
 		Title: title,

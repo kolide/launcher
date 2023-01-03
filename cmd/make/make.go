@@ -80,7 +80,7 @@ func main() {
 	// appears current, at least with cgo. But, we need to use cgo
 	// on linux (for fscrypt)
 	optsMaybeCgo := opts
-	if *flBuildOS == "linux" || *flBuildOS == "windows" {
+	if *flBuildOS == "linux" {
 		// overwrite with append, since optsMaybyeCgo was a shallow clone
 		optsMaybeCgo = append(opts, make.WithCgo())
 	}

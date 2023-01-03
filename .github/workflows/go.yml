@@ -34,10 +34,6 @@ jobs:
       with:
         go-version: ${{env.GOVER}}
       id: go
-    
-    - name: Setup Fyne deps (Ubuntu)
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      run: sudo apt-get install libgl1-mesa-dev xorg-dev
 
     # use bash, because the powershell syntax is different and this is a cross platform workflow
     - id: go-cache-paths

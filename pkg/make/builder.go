@@ -144,8 +144,8 @@ func New(opts ...Option) *Builder {
 	// https://github.com/kolide/launcher/pull/776 has a theory
 	// that windows and cgo aren't friends. This might be wrong,
 	// but I don't want to change it yet.
-	// case b.cgo && b.os == "windows":
-	// panic("Windows and CGO are not friends")
+	case b.cgo && b.os == "windows":
+		panic("Windows and CGO are not friends")
 
 	// cgo is intentionally enabled
 	case b.cgo:
