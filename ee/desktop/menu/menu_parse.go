@@ -1,8 +1,12 @@
 package menu
 
 func parseMenuData(m *MenuData, builder MenuBuilder) {
+	if m == nil {
+		return
+	}
+
 	// Set top-level menu properties
-	builder.SetIcon()
+	builder.SetIcon(m.Icon)
 	builder.SetTooltip(m.Tooltip)
 
 	for _, child := range m.Items {

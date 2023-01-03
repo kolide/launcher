@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
+	"golang.org/x/exp/maps"
 )
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
@@ -209,6 +210,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	select {
 	case <-wgDone:
 		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
+		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")

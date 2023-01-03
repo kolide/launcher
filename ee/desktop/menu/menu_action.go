@@ -11,11 +11,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-// actionTypes are named string identifiers
+// actionTypes are named identifiers
 type actionType string
 
 const (
-	None        actionType = "" // Omitted action implies do nothing
+	DoNothing   actionType = "" // Omitted action implies do nothing
 	OpenURL                = "open-url"
 	OpenWindow             = "open-window"
 	Flare                  = "flare"
@@ -37,7 +37,7 @@ type Action interface {
 func (a actionData) Perform(m *menu) {
 	var err error
 	switch a.Type {
-	case None:
+	case DoNothing:
 		return
 	case OpenURL:
 		err = open(a.Data)

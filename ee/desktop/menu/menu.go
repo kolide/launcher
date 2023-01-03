@@ -12,8 +12,17 @@ import (
 	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
+// menuIcons are named identifiers
+type menuIcon string
+
+const (
+	KolideDesktopIcon      = "kolide-desktop"
+	KolideDebugDesktopIcon = "kolide-debug-desktop"
+)
+
 // MenuData encapsulates a menu bar icon and accessible menu items
 type MenuData struct {
+	Icon    menuIcon       `json:"icon"`
 	Tooltip string         `json:"tooltip,omitempty"`
 	Items   []menuItemData `json:"items"`
 }
@@ -32,7 +41,7 @@ type menuItemData struct {
 // MenuBuilder is an interface a menu parser can use to specify how the menu is built
 type MenuBuilder interface {
 	// SetIcon sets the menu bar icon
-	SetIcon()
+	SetIcon(icon menuIcon)
 	// SetTooltip sets the menu tooltip
 	SetTooltip(tooltip string)
 	// AddMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
@@ -106,7 +115,7 @@ func (m *menu) getMenuData() *MenuData {
 	return &menu
 }
 
-func (m *menu) SetIcon() {
+func (m *menu) SetIcon(icon menuIcon) {
 	// For now, icons are hard-coded
 	if m.isProd() {
 		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)

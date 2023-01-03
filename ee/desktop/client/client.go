@@ -39,41 +39,19 @@ func New(authToken, socketPath string) client {
 }
 
 func (c *client) Shutdown() error {
-	resp, err := c.base.Get("http://unix/shutdown")
-	if err != nil {
-		return err
-	}
-
-	if resp.Body != nil {
-		resp.Body.Close()
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
+	return c.get("shutdown")
 }
 
 func (c *client) Ping() error {
-	resp, err := c.base.Get("http://unix/ping")
-	if err != nil {
-		return err
-	}
-
-	if resp.Body != nil {
-		resp.Body.Close()
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
+	return c.get("ping")
 }
 
 func (c *client) Refresh() error {
-	resp, err := c.base.Get("http://unix/refresh")
+	return c.get("refresh")
+}
+
+func (c *client) get(path string) error {
+	resp, err := c.base.Get(fmt.Sprintf("http://unix/%s", path))
 	if err != nil {
 		return err
 	}

@@ -52,6 +52,60 @@ func TestClient_Shutdown(t *testing.T) {
 	}
 }
 
+func TestClient_Get(t *testing.T) {
+	t.Parallel()
+
+	const validAuthToken = "test-auth-header"
+	tests := []struct {
+		name          string
+		paths         []string
+		expectedError bool
+	}{
+		{
+			name:          "valid_paths",
+			paths:         []string{"ping", "shutdown", "refresh"},
+			expectedError: false,
+		},
+		{
+			name:          "invalid_paths",
+			paths:         []string{"", "never-a-real-path"},
+			expectedError: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			socketPath := testSocketPath(t)
+			shutdownChan := make(chan struct{})
+			server, err := server.New(log.NewNopLogger(), validAuthToken, socketPath, shutdownChan)
+			require.NoError(t, err)
+
+			go func() {
+				server.Serve()
+			}()
+
+			go func() {
+				<-shutdownChan
+			}()
+
+			client := New(validAuthToken, socketPath)
+			for _, path := range tt.paths {
+				err := client.get(path)
+
+				if tt.expectedError {
+					require.Error(t, err)
+					continue
+				}
+
+				require.NoError(t, err)
+			}
+			assert.NoError(t, server.Shutdown(context.Background()))
+		})
+	}
+}
+
 func testSocketPath(t *testing.T) string {
 	socketFileName := strings.Replace(t.Name(), "/", "_", -1)
 
