@@ -116,11 +116,16 @@ func (m *menu) getMenuData() *MenuData {
 }
 
 func (m *menu) SetIcon(icon menuIcon) {
-	// For now, icons are hard-coded
-	if m.isProd() {
+	switch icon {
+	case KolideDesktopIcon:
 		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
-	} else {
+	case KolideDebugDesktopIcon:
 		systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
+	default:
+		level.Debug(m.logger).Log(
+			"msg", "invalid icon",
+			"icon", icon)
+		return
 	}
 }
 
