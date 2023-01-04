@@ -14,13 +14,9 @@ import (
 	"fmt"
 	"os/exec"
 	"unsafe"
-
-	"github.com/go-kit/kit/log/level"
 )
 
 func (n *Notifier) sendNotification(title, body string) {
-	level.Debug(n.logger).Log("msg", "trying to send notification...", "title", title, "body", body)
-
 	titleCStr := C.CString(title)
 	defer C.free(unsafe.Pointer(titleCStr))
 	bodyCStr := C.CString(body)
