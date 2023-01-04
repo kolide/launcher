@@ -2,6 +2,7 @@ package menu
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
@@ -93,13 +95,16 @@ func (m *menu) Build() {
 	// Reparse the menu file & rebuild the menu
 	menuData := m.getMenuData()
 	if menuData == nil {
-		var defaultMenuData MenuData
-		menuData = &defaultMenuData
+		menuData = getDefaultMenu()
 	}
 	parseMenuData(menuData, m)
 }
 
 func (m *menu) getMenuData() *MenuData {
+	if m.filePath == "" {
+		return nil
+	}
+
 	statusFileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
 		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
@@ -113,6 +118,21 @@ func (m *menu) getMenuData() *MenuData {
 	}
 
 	return &menu
+}
+
+func getDefaultMenu() *MenuData {
+	data := &MenuData{
+		Icon:    KolideDesktopIcon,
+		Tooltip: "Kolide",
+		Items: []menuItemData{
+			{
+				Label:    fmt.Sprintf("Version %s", version.Version().Version),
+				Disabled: true,
+			},
+		},
+	}
+
+	return data
 }
 
 func (m *menu) SetIcon(icon menuIcon) {

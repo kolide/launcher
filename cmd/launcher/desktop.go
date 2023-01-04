@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -77,10 +76,6 @@ func runDesktop(args []string) error {
 			"msg", "using default socket path since none was provided",
 			"socket_path", *flsocketpath,
 		)
-	}
-
-	if *flmenupath == "" {
-		return errors.New("--menu_path must be defined")
 	}
 
 	var runGroup run.Group
