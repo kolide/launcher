@@ -509,11 +509,6 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-w -s")
 		}
 
-		if b.os == "windows" {
-			// this prevents a cmd prompt opening up when desktop is launched
-			ldFlags = append(ldFlags, "-H windowsgui")
-		}
-
 		if b.stampVersion {
 			v, err := b.getVersion(ctx)
 			if err != nil {

@@ -1,5 +1,5 @@
-//go:build darwin
-// +build darwin
+//go:build darwin || linux
+// +build darwin linux
 
 package runner
 
@@ -39,12 +39,12 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 
 	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
 	if err != nil {
-		return fmt.Errorf("converting uid to int: %w", err)
+		return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
 	}
 
 	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
 	if err != nil {
-		return fmt.Errorf("converting gid to int: %w", err)
+		return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
