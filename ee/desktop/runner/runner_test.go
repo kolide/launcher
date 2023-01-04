@@ -55,9 +55,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	require.NoError(t, err, string(out))
 
 	tests := []struct {
-		name        string
-		setup       func(*testing.T, *DesktopUsersProcessesRunner)
-		logContains []string
+		name          string
+		setup         func(*testing.T, *DesktopUsersProcessesRunner)
+		logContains   []string
+		cleanShutdown bool
 	}{
 		{
 			name: "happy path",
@@ -66,6 +67,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				"interrupt received, exiting desktop execute loop",
 				"all desktop processes shutdown successfully",
 			},
+			cleanShutdown: true,
 		},
 		{
 			name: "new process started if old one gone",
@@ -82,6 +84,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				"interrupt received, exiting desktop execute loop",
 				"all desktop processes shutdown successfully",
 			},
+			cleanShutdown: true,
 		},
 		{
 			name: "procs waitgroup times out",
@@ -127,8 +130,13 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			user, err := user.Current()
 			require.NoError(t, err)
-			assert.Contains(t, r.uidProcs, user.Uid)
-			assert.Len(t, r.uidProcs, 1)
+
+			if tt.cleanShutdown {
+				assert.Len(t, r.uidProcs, 0)
+			} else {
+				assert.Contains(t, r.uidProcs, user.Uid)
+				assert.Len(t, r.uidProcs, 1)
+			}
 
 			if len(tt.logContains) > 0 {
 				for _, s := range tt.logContains {
