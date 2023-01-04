@@ -241,9 +241,42 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	r.writeMenuFile(desktopStatus.Menu)
+	if err := r.writeMenuFile(desktopStatus.Menu); err != nil {
+		return err
+	}
 
-	if r.processSpawningEnabled && !desktopStatus.Enabled {
+	if desktopStatus.Enabled && r.processSpawningEnabled {
+		// Desktop is currently enabled, and control server wants it to remain enabled
+		// Tell any running desktop user processes that they should refresh the latest status data
+		for uid, proc := range r.uidProcs {
+			client := client.New(r.authToken, proc.socketPath)
+			if err := client.Refresh(); err != nil {
+				level.Error(r.logger).Log(
+					"msg", "error sending refresh command to desktop process",
+					"uid", uid,
+					"pid", proc.process.Pid,
+					"path", proc.path,
+					"err", err,
+				)
+			}
+		}
+		return nil
+	}
+
+	// Desktop may need to be toggled on or off
+	r.toggleDesktop(desktopStatus.Enabled)
+
+	return nil
+}
+
+// toggleDesktop configures the runner to enable/disable desktop, if necessary
+func (r *DesktopUsersProcessesRunner) toggleDesktop(enabled bool) {
+	if !r.processSpawningEnabled && !enabled {
+		// Desktop is currently disabled, and control server wants it to remain disabled
+		return
+	}
+
+	if r.processSpawningEnabled && !enabled {
 		// Desktop is currently enabled, control server is asking us to disable
 		level.Debug(r.logger).Log("msg", "runner is disabling desktop users processes")
 
@@ -252,40 +285,15 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 		// Kill any existing desktop user processes, and we're done here
 		r.killDesktopProcesses()
-		return nil
 	}
 
-	if !r.processSpawningEnabled && desktopStatus.Enabled {
+	if !r.processSpawningEnabled && enabled {
 		// Desktop is currently disabled, control server is asking us to enable
 		level.Debug(r.logger).Log("msg", "runner is enabling desktop users processes")
 
 		// Next execute loop tick will begin spawning desktop user processes
 		r.processSpawningEnabled = true
-		return nil
 	}
-
-	// If we're here:
-	// A) Desktop is currently disabled, and control server wants it to remain disabled
-	// B) Desktop is currently enabled, and control server wants it to remain enabled
-	//
-	// In case A), there will be no process records and thus no servers to talk to
-	// In case B), each process will have a record, and we can use that to talk to its server
-
-	// Tell any running desktop user processes that they should refresh the latest status data
-	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Refresh(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending refresh command to desktop process",
-				"uid", uid,
-				"pid", proc.process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
-		}
-	}
-
-	return nil
 }
 
 // writeMenuFile writes menu data to a shared file for user processes to access
