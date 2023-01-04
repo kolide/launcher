@@ -16,43 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClient_Shutdown(t *testing.T) {
-	t.Parallel()
-
-	const validAuthToken = "test-auth-header"
-	tests := []struct {
-		name string
-	}{
-		{
-			name: "happy_path",
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			socketPath := testSocketPath(t)
-			shutdownChan := make(chan struct{})
-			server, err := server.New(log.NewNopLogger(), validAuthToken, socketPath, shutdownChan)
-			require.NoError(t, err)
-
-			go func() {
-				server.Serve()
-			}()
-
-			go func() {
-				<-shutdownChan
-			}()
-
-			client := New(validAuthToken, socketPath)
-			assert.NoError(t, client.Shutdown())
-			assert.NoError(t, server.Shutdown(context.Background()))
-		})
-	}
-}
-
-func TestClient_Get(t *testing.T) {
+func TestClient_GetAndShutdown(t *testing.T) {
 	t.Parallel()
 
 	const validAuthToken = "test-auth-header"
