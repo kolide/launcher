@@ -144,7 +144,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			// in the current CI environment (GitHub Actions) the linux runner
 			// does not have a console user, so we don't expect any processes
 			// to be started.
-			if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+			if tt.cleanShutdown || (os.Getenv("CI") == "true" && runtime.GOOS == "linux") {
 				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
 			} else {
 				assert.Contains(t, r.uidProcs, user.Uid)
