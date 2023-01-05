@@ -170,6 +170,7 @@ func runVersion(args []string) error {
 	notifier := notify.New(
 		notify.WithLogger(logutil.NewServerLogger(true)),
 		notify.WithNotificationTtl(time.Second*5),
+		notify.WithDataDirectory("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"),
 	)
 	notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.")
 	time.Sleep(time.Second * 2)

@@ -1,5 +1,5 @@
-//go:build windows || linux
-// +build windows linux
+//go:build linux
+// +build linux
 
 package notify
 

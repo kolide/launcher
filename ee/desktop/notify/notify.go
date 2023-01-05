@@ -15,6 +15,7 @@ type Notifier struct {
 	lock              *sync.RWMutex
 	logger            log.Logger
 	notificationTtl   time.Duration
+	dataDirectory     string
 }
 
 type Notification struct {
@@ -36,6 +37,12 @@ func WithLogger(logger log.Logger) notifierOption {
 func WithNotificationTtl(ttl time.Duration) notifierOption {
 	return func(n *Notifier) {
 		n.notificationTtl = ttl
+	}
+}
+
+func WithDataDirectory(dataDir string) notifierOption {
+	return func(n *Notifier) {
+		n.dataDirectory = dataDir
 	}
 }
 
