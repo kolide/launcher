@@ -3,11 +3,14 @@ package notify
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
 type Notifier struct {
@@ -15,7 +18,7 @@ type Notifier struct {
 	lock              *sync.RWMutex
 	logger            log.Logger
 	notificationTtl   time.Duration
-	dataDirectory     string
+	iconFilepath      string
 }
 
 type Notification struct {
@@ -40,10 +43,31 @@ func WithNotificationTtl(ttl time.Duration) notifierOption {
 	}
 }
 
-func WithDataDirectory(dataDir string) notifierOption {
+func WithRootDirectory(rootDir string) notifierOption {
 	return func(n *Notifier) {
-		n.dataDirectory = dataDir
+		iconPath, err := setIconPath(rootDir)
+		if err != nil {
+			level.Error(n.logger).Log("msg", "could not set icon path for notifications", "err", err)
+		} else {
+			n.iconFilepath = iconPath
+		}
 	}
+}
+
+func setIconPath(rootDir string) (string, error) {
+	expectedLocation := filepath.Join(rootDir, assets.KolideIconFilename)
+
+	_, err := os.Stat(expectedLocation)
+
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(expectedLocation, assets.KolideDesktopIcon, 0644); err != nil {
+			return "", fmt.Errorf("notification icon did not exist; could not create it: %w", err)
+		}
+	} else if err != nil {
+		return "", fmt.Errorf("could not check if notification icon exists: %w", err)
+	}
+
+	return expectedLocation, nil
 }
 
 func New(opts ...notifierOption) *Notifier {

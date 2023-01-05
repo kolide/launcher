@@ -13,4 +13,6 @@ var (
 
 	//go:embed kolide-debug.png
 	KolideDebugDesktopIcon []byte
+
+	KolideIconFilename string = "kolide.png"
 )
