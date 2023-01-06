@@ -11,14 +11,12 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-func (n *Notifier) sendNotification(title, body string) {
+func (n *Notifier) sendNotification(title, body string) error {
 	if err := n.sendNotificationViaDbus(title, body); err == nil {
-		return
+		return nil
 	}
 
-	if err := n.sendNotificationViaNotifySend(title, body); err == nil {
-		return
-	}
+	return n.sendNotificationViaNotifySend(title, body)
 }
 
 // See: https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html

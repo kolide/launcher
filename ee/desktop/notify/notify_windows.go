@@ -4,11 +4,10 @@
 package notify
 
 import (
-	"github.com/go-kit/kit/log/level"
 	"gopkg.in/toast.v1"
 )
 
-func (n *Notifier) sendNotification(title, body string) {
+func (n *Notifier) sendNotification(title, body string) error {
 	notification := toast.Notification{
 		AppID:   "Kolide",
 		Title:   title,
@@ -20,7 +19,5 @@ func (n *Notifier) sendNotification(title, body string) {
 		notification.Icon = n.iconFilepath
 	}
 
-	if err := notification.Push(); err != nil {
-		level.Error(n.logger).Log("msg", "could not send toast", "title", title, "err", err)
-	}
+	return notification.Push()
 }

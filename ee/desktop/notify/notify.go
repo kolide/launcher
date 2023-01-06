@@ -103,7 +103,10 @@ func (n *Notifier) Notify(title, body, uuid string) {
 		return
 	}
 
-	n.sendNotification(title, body)
+	if err := n.sendNotification(title, body); err != nil {
+		level.Error(n.logger).Log("msg", "could not send notification", "title", title, "err", err)
+		return
+	}
 
 	n.markNotificationSent(sentNotification{
 		Title:  title,
