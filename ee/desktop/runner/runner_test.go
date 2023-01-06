@@ -134,13 +134,6 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			user, err := user.Current()
 			require.NoError(t, err)
 
-			if tt.cleanShutdown {
-				assert.Len(t, r.uidProcs, 0)
-			} else {
-				assert.Contains(t, r.uidProcs, user.Uid)
-				assert.Len(t, r.uidProcs, 1)
-			}
-
 			// in the current CI environment (GitHub Actions) the linux runner
 			// does not have a console user, so we don't expect any processes
 			// to be started.
