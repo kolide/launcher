@@ -2,10 +2,10 @@ package notify
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -23,9 +23,10 @@ type Notifier struct {
 }
 
 type sentNotification struct {
-	Title string
-	Body  string
-	Sent  time.Time
+	Title  string    `json:"title"`
+	Body   string    `json:"body"`
+	UUID   string    `json:"uuid"`
+	SentAt time.Time `json:"sent_at"`
 }
 
 type notifierOption func(*Notifier)
@@ -71,7 +72,18 @@ func setIconPath(rootDir string) (string, error) {
 	return expectedLocation, nil
 }
 
-func New(db *bbolt.DB, opts ...notifierOption) *Notifier {
+func New(db *bbolt.DB, opts ...notifierOption) (*Notifier, error) {
+	// Create the bucket if it doesn't exist
+	if err := db.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
+		if err != nil {
+			return fmt.Errorf("could not create bucket: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("cannot create notifier without db bucket: %w", err)
+	}
+
 	notifier := &Notifier{
 		db:              db,
 		logger:          log.NewNopLogger(),
@@ -82,10 +94,10 @@ func New(db *bbolt.DB, opts ...notifierOption) *Notifier {
 		opt(notifier)
 	}
 
-	return notifier
+	return notifier, nil
 }
 
-func (n *Notifier) Notify(title, body string) {
+func (n *Notifier) Notify(title, body, uuid string) {
 	if n.notificationAlreadySent(title, body) {
 		level.Debug(n.logger).Log("msg", "received duplicate notification", "title", title)
 		return
@@ -93,57 +105,62 @@ func (n *Notifier) Notify(title, body string) {
 
 	n.sendNotification(title, body)
 
-	s := sentNotification{
-		Title: title,
-		Body:  body,
-		Sent:  time.Now(),
-	}
-
-	n.markNotificationSent(s)
+	n.markNotificationSent(sentNotification{
+		Title:  title,
+		Body:   body,
+		UUID:   uuid,
+		SentAt: time.Now(),
+	})
 }
 
 func (n *Notifier) notificationAlreadySent(title, body string) bool {
-	sent := false
+	alreadySent := false
+
 	if err := n.db.View(func(tx *bbolt.Tx) error {
-		sentTimestampStr := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get(notificationKey(title, body))
-		if sentTimestampStr == nil {
+		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get(notificationKey(title, body))
+		if sentNotificationRaw == nil {
+			// No previous record -- notification has not been sent before
 			return nil
 		}
 
-		sentTimestampInt, err := strconv.ParseInt(string(sentTimestampStr), 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid timestamp %s: %w", sentTimestampStr, err)
+		var previouslySentNotification sentNotification
+		if err := json.Unmarshal(sentNotificationRaw, &previouslySentNotification); err != nil {
+			return fmt.Errorf("could not unmarshal previously sent notification: %w", err)
 		}
 
-		sentTime := time.Unix(sentTimestampInt, 0)
-		sentExpiredAt := sentTime.Add(n.notificationTtl)
-		sent = sentExpiredAt.After(time.Now())
+		// Check to see how long ago the previously-sent notification was sent -- if it's within the
+		// configured TTL, then we consider it a duplicate and will not re-send.
+		sentExpiredAt := previouslySentNotification.SentAt.Add(n.notificationTtl)
+		alreadySent = sentExpiredAt.After(time.Now())
 
 		return nil
 	}); err != nil {
 		level.Debug(n.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
 
-	return sent
+	return alreadySent
 }
 
-func (n *Notifier) markNotificationSent(s sentNotification) error {
+func (n *Notifier) markNotificationSent(s sentNotification) {
 	if err := n.db.Update(func(tx *bbolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
 		if err != nil {
 			return fmt.Errorf("could not create bucket: %w", err)
 		}
 
-		if err := b.Put(notificationKey(s.Title, s.Body), s.notificationValue()); err != nil {
+		rawNotification, err := json.Marshal(s)
+		if err != nil {
+			return fmt.Errorf("could not marshal sent notification: %w", err)
+		}
+
+		if err := b.Put(notificationKey(s.Title, s.Body), rawNotification); err != nil {
 			return fmt.Errorf("could not write to key: %w", err)
 		}
 
 		return nil
 	}); err != nil {
-		return fmt.Errorf("could not mark notification sent: %w", err)
+		level.Error(n.logger).Log("msg", "could not mark notification sent", "title", s.Title, "err", err)
 	}
-
-	return nil
 }
 
 func notificationKey(title string, body string) []byte {
@@ -152,9 +169,4 @@ func notificationKey(title string, body string) []byte {
 	h.Write([]byte(combined))
 	key := fmt.Sprintf("%x", h.Sum(nil))
 	return []byte(key)
-}
-
-func (s *sentNotification) notificationValue() []byte {
-	timeStr := strconv.Itoa(int(s.Sent.Unix()))
-	return []byte(timeStr)
 }
