@@ -306,13 +306,17 @@ func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
 	menuPath := r.menuPath()
 	statusFile, err := os.Create(menuPath)
 	if err != nil {
-		return fmt.Errorf("creating desktop status file: %w", err)
+		return fmt.Errorf("creating desktop menu file: %w", err)
+	}
+
+	if err := os.Chmod(menuPath, 0644); err != nil {
+		return fmt.Errorf("os.Chmod: %w", err)
 	}
 
 	defer statusFile.Close()
 	_, err = io.Copy(statusFile, bytes.NewReader(menuBytes))
 	if err != nil {
-		return fmt.Errorf("writing desktop status file: %w", err)
+		return fmt.Errorf("writing desktop menu file: %w", err)
 	}
 
 	return nil
@@ -523,8 +527,7 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 
 // menuPath returns the path to the menu file
 func (r *DesktopUsersProcessesRunner) menuPath() string {
-	path := filepath.Join(r.usersFilesRoot, "menu.json")
-	return path
+	return filepath.Join(r.usersFilesRoot, "menu.json")
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
