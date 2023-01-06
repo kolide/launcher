@@ -1,10 +1,6 @@
 package menu
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"runtime"
 
@@ -18,7 +14,6 @@ const (
 	DoNothing   actionType = "" // Omitted action implies do nothing
 	OpenURL                = "open-url"
 	OpenWindow             = "open-window"
-	Flare                  = "flare"
 	RefreshMenu            = "refresh-menu"
 )
 
@@ -41,8 +36,6 @@ func (a actionData) Perform(m *menu) {
 		return
 	case OpenURL:
 		err = open(a.Data)
-	case Flare:
-		m.flareCommand(a.Data)
 	case RefreshMenu:
 		m.Build()
 	default:
@@ -78,42 +71,4 @@ func open(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
-}
-
-// flareCommand invokes the launcher flare executable with the appropriate env vars
-func (m *menu) flareCommand(hostname string) (*exec.Cmd, error) {
-	executablePath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("error getting executable path: %w", err)
-	}
-
-	cmd := exec.Command(executablePath, "flare")
-	cmd.Env = []string{
-		fmt.Sprintf("HOSTNAME=%s", hostname),
-	}
-
-	stdErr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("getting stderr pipe: %w", err)
-	}
-
-	stdOut, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("getting stdout pipe: %w", err)
-	}
-
-	go func() {
-		combined := io.MultiReader(stdErr, stdOut)
-		scanner := bufio.NewScanner(combined)
-
-		for scanner.Scan() {
-			level.Info(m.logger).Log(
-				"uid", os.Getuid(),
-				"subprocess", "flare",
-				"msg", scanner.Text(),
-			)
-		}
-	}()
-
-	return cmd, nil
 }
