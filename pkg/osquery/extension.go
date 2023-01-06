@@ -75,6 +75,9 @@ const (
 	// the bucket which we push values into from server-backed tables
 	ServerProvidedDataBucket = "server_provided_data"
 
+	// the bucket where we hold sent notifications
+	SentNotificationsBucket = "sent_notifications"
+
 	// DB key for UUID
 	uuidKey = "uuid"
 	// DB key for node key

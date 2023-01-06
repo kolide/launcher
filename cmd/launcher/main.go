@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
@@ -166,21 +165,6 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 }
 
 func runVersion(args []string) error {
-	// Test out the notifier, just for fun!
-	notifier := notify.New(
-		notify.WithLogger(logutil.NewServerLogger(true)),
-		notify.WithNotificationTtl(time.Second*5),
-		notify.WithRootDirectory("/var/kolide-k2/k2device-preprod.kolide.com"),
-	)
-	notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.")
-	time.Sleep(time.Second * 2)
-	notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.")
-	time.Sleep(time.Second * 6)
-	notifier.Notify("Here's another notification from Kolide", "We've got more where this came from!")
-	time.Sleep(time.Second * 1)
-	notifier.Notify("Kolide again", "Oh boy, what's next?")
-	time.Sleep(time.Second * 1)
-
 	version.PrintFull()
 	os.Exit(0)
 	return nil

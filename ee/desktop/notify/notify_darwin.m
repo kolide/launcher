@@ -7,8 +7,6 @@
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
 
-extern void sendFallbackNotification(char *titleCStr, char *bodyCStr);
-
 void doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body) {
     UNMutableNotificationContent *content = [UNMutableNotificationContent new];
     [content autorelease];
@@ -27,7 +25,7 @@ void doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     }];
 }
 
-void sendNotificationWithFallback(char *cTitle, char *cBody) {
+void sendNotification(char *cTitle, char *cBody) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
@@ -39,7 +37,6 @@ void sendNotificationWithFallback(char *cTitle, char *cBody) {
             if (!granted) {
                 if (error != NULL) {
                     NSLog(@"Error asking for permission to send notifications %@", error);
-                    sendFallbackNotification((char *)[title UTF8String], (char *)[body UTF8String]);
                 } else {
                     NSLog(@"Unable to get permission to send notifications");
                 }

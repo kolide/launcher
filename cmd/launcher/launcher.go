@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -192,6 +193,24 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// serverDataBucketConsumer handles server data table updates
 		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
 		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+
+		// Run the notification service
+		notifier := notify.New(
+			db,
+			notify.WithLogger(logutil.NewServerLogger(true)),
+			notify.WithNotificationTtl(time.Second*5),
+			notify.WithRootDirectory(rootDirectory),
+		)
+
+		// Try it out, just for fun
+		notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.")
+		time.Sleep(time.Second * 2)
+		notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.")
+		time.Sleep(time.Second * 6)
+		notifier.Notify("Here's another notification from Kolide", "We've got more where this came from!")
+		time.Sleep(time.Second * 1)
+		notifier.Notify("Kolide again", "Oh boy, what's next?")
+		time.Sleep(time.Second * 1)
 
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
