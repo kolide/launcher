@@ -7,7 +7,7 @@ import (
 	"gopkg.in/toast.v1"
 )
 
-func (n *Notifier) sendNotification(title, body string) error {
+func (d *desktopNotifier) sendNotification(title, body string) error {
 	notification := toast.Notification{
 		AppID:   "Kolide",
 		Title:   title,
@@ -15,8 +15,8 @@ func (n *Notifier) sendNotification(title, body string) error {
 		Actions: []toast.Action{},
 	}
 
-	if n.iconFilepath != "" {
-		notification.Icon = n.iconFilepath
+	if d.iconFilepath != "" {
+		notification.Icon = d.iconFilepath
 	}
 
 	return notification.Push()

@@ -195,25 +195,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
 		// Run the notification service
-		notifier, err := notify.New(
+		notificationConsumer, err := notify.New(
 			db,
+			rootDirectory,
 			notify.WithLogger(logutil.NewServerLogger(true)),
 			notify.WithNotificationTtl(time.Second*5),
-			notify.WithRootDirectory(rootDirectory),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
 
-		// Try it out, just for fun
-		notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.", "abcd")
-		time.Sleep(time.Second * 2)
-		notifier.Notify("This is my first notification from Kolide", "Hey there! Welcome to getting notifications.", "abcd")
-		time.Sleep(time.Second * 6)
-		notifier.Notify("Here's another notification from Kolide", "We've got more where this came from!", "efgh")
-		time.Sleep(time.Second * 1)
-		notifier.Notify("Kolide again", "Oh boy, what's next?", "ijkl")
-		time.Sleep(time.Second * 1)
+		if controlService != nil {
+			controlService.RegisterConsumer(notify.NotificationSubsystem, notificationConsumer)
+		}
 
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),

@@ -17,7 +17,7 @@ import (
 	"unsafe"
 )
 
-func (n *Notifier) sendNotification(title, body string) error {
+func (d *desktopNotifier) sendNotification(title, body string) error {
 	if !isBundle() {
 		return fmt.Errorf("cannot send notification because this application is not bundled")
 	}
