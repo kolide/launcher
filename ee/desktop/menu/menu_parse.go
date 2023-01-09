@@ -28,7 +28,7 @@ func parseMenuItem(m *menuItemData, builder MenuBuilder, parent any) {
 	var item any
 	if m.Label != "" {
 		// A menu item must have a non-empty label
-		item = builder.AddMenuItem(m.Label, m.Tooltip, m.Disabled, m.NonProdOnly, m.Action, parent)
+		item = builder.AddMenuItem(m.Label, m.Tooltip, m.Disabled, m.NonProdOnly, m.Action.Performer, parent)
 	}
 
 	if item == nil {

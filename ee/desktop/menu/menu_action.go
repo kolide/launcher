@@ -1,6 +1,8 @@
 package menu
 
 import (
+	"encoding/json"
+	"fmt"
 	"os/exec"
 	"runtime"
 
@@ -13,43 +15,64 @@ type actionType string
 const (
 	DoNothing   actionType = "" // Omitted action implies do nothing
 	OpenURL                = "open-url"
-	OpenWindow             = "open-window"
 	RefreshMenu            = "refresh-menu"
 )
 
-// ActionData encapsulates what action should be performed when a menu item is invoked
-type actionData struct {
-	Type actionType `json:"type"`
-	Data string     `json:"data,omitempty"`
+// Action encapsulates what action should be performed when a menu item is invoked
+type Action struct {
+	Type      actionType      `json:"type"`
+	Action    json.RawMessage `json:"action"`
+	Performer ActionPerformer
 }
 
-// Action is an interface for performing actions in response to menu events
-type Action interface {
+// Performs the OpenURL action
+type actionOpenURL struct {
+	URL string `json:"url,omitempty"`
+}
+
+// Performs the RefreshMenu action
+type refreshMenuAction struct{}
+
+// ActionPerformer is an interface for performing actions in response to menu events
+type ActionPerformer interface {
 	// Perform executes the action
 	Perform(m *menu)
 }
 
-func (a actionData) Perform(m *menu) {
-	var err error
-	switch a.Type {
+// Used to avoid recursion in UnmarshalJSON
+type action Action
+
+func (a *Action) UnmarshalJSON(data []byte) error {
+	action := action{}
+	if err := json.Unmarshal(data, &action); err != nil {
+		return fmt.Errorf("failed to unmarshal Action: %w", err)
+	}
+	switch action.Type {
 	case DoNothing:
-		return
 	case OpenURL:
-		err = open(a.Data)
+		openURL := actionOpenURL{}
+		if err := json.Unmarshal(action.Action, &openURL); err != nil {
+			return fmt.Errorf("failed to unmarshal actionOpenURL: %w", err)
+		}
+		a.Performer = openURL
 	case RefreshMenu:
-		m.Build()
+		refreshMenu := refreshMenuAction{}
+		if err := json.Unmarshal(action.Action, &refreshMenu); err != nil {
+			return fmt.Errorf("failed to unmarshal refreshMenu: %w", err)
+		}
+		a.Performer = refreshMenu
 	default:
-		level.Debug(m.logger).Log(
-			"msg", "invalid action type",
-			"type", a.Type)
-		return
+		return fmt.Errorf("unknown action type: %s", action.Type)
 	}
 
-	if err != nil {
+	return nil
+}
+
+func (a actionOpenURL) Perform(m *menu) {
+	if err := open(a.URL); err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform action",
-			"type", a.Type,
-			"data", a.Data,
+			"URL", a.URL,
 			"err", err)
 	}
 }
@@ -71,4 +94,8 @@ func open(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+func (a refreshMenuAction) Perform(m *menu) {
+	m.Build()
 }

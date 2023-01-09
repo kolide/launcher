@@ -36,7 +36,7 @@ type menuItemData struct {
 	Disabled    bool           `json:"disabled,omitempty"`
 	NonProdOnly bool           `json:"nonProdOnly,omitempty"`
 	IsSeparator bool           `json:"isSeparator,omitempty"`
-	Action      actionData     `json:"action,omitempty"`
+	Action      Action         `json:"action,omitempty"`
 	Items       []menuItemData `json:"items,omitempty"`
 }
 
@@ -48,7 +48,7 @@ type MenuBuilder interface {
 	SetTooltip(tooltip string)
 	// AddMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
 	// created, it is returned. If parent is non-nil, the menu item will be created as a child of parent.
-	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action Action, parent any) any
+	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
 	// AddSeparator adds a separator to the menu
 	AddSeparator()
 }
@@ -153,7 +153,7 @@ func (m *menu) SetTooltip(tooltip string) {
 	systray.SetTooltip(tooltip)
 }
 
-func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action Action, parent any) any {
+func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
 	if nonProdOnly && m.isProd() {
 		// This is prod environment, but the menu item is for non-prod only
 		return nil
@@ -173,7 +173,7 @@ func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ac
 	}
 
 	// Setup a handler to perform the menu item's action
-	m.makeActionHandler(item, action)
+	m.makeActionHandler(item, ap)
 
 	return item
 }
@@ -201,7 +201,12 @@ func (m *menu) isProd() bool {
 }
 
 // makeActionHandler creates a handler to execute the desired action when a menu item is clicked
-func (m *menu) makeActionHandler(item *systray.MenuItem, action Action) {
+func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
+	if ap == nil {
+		// No action to handle
+		return
+	}
+
 	// Create and hold on to a done channel for each action, so we don't leak goroutines
 	done := make(chan struct{})
 	m.doneChans = append(m.doneChans, done)
@@ -211,7 +216,7 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, action Action) {
 			select {
 			case <-item.ClickedCh:
 				// Menu item was clicked
-				action.Perform(m)
+				ap.Perform(m)
 			case <-done:
 				// Menu item is going away
 				return
