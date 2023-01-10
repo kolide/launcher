@@ -212,6 +212,29 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	}
 }
 
+func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error {
+	errs := make([]error, 0)
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.authToken, proc.socketPath)
+		if err := client.Notify(title, body); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending notify command to desktop process",
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors sending notifications: %+v", errs)
+	}
+
+	return nil
+}
+
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	var desktopStatus client.DesktopUserStatus
 	if err := json.NewDecoder(data).Decode(&desktopStatus); err != nil {

@@ -1,4 +1,4 @@
-package notify
+package control
 
 import (
 	"crypto/sha256"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.etcd.io/bbolt"
 )
@@ -16,9 +17,13 @@ import (
 // Consumes notifications from control server, tracks when notifications are sent to end user
 type NotificationConsumer struct {
 	db              *bbolt.DB
-	notifier        notifier
+	runner          notifier
 	logger          log.Logger
 	notificationTtl time.Duration
+}
+
+type notifier interface {
+	SendNotification(title, body string) error
 }
 
 // Represents notification received from control server; SentAt is set by this consumer after sending.
@@ -48,7 +53,7 @@ func WithNotificationTtl(ttl time.Duration) notificationConsumerOption {
 	}
 }
 
-func New(db *bbolt.DB, rootDir string, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
+func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	// Create the bucket if it doesn't exist
 	if err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
@@ -62,6 +67,7 @@ func New(db *bbolt.DB, rootDir string, opts ...notificationConsumerOption) (*Not
 
 	nc := &NotificationConsumer{
 		db:              db,
+		runner:          runner,
 		logger:          log.NewNopLogger(),
 		notificationTtl: time.Hour * 1,
 	}
@@ -69,8 +75,6 @@ func New(db *bbolt.DB, rootDir string, opts ...notificationConsumerOption) (*Not
 	for _, opt := range opts {
 		opt(nc)
 	}
-
-	nc.notifier = newDesktopNotifier(nc.logger, rootDir)
 
 	return nc, nil
 }
@@ -94,7 +98,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 		return
 	}
 
-	if err := nc.notifier.sendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
+	if err := nc.runner.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
 		level.Error(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
 		return
 	}

@@ -7,7 +7,7 @@ import (
 	"gopkg.in/toast.v1"
 )
 
-func (d *desktopNotifier) sendNotification(title, body string) error {
+func (d *DesktopNotifier) SendNotification(title, body string) error {
 	notification := toast.Notification{
 		AppID:   "Kolide",
 		Title:   title,

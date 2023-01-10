@@ -11,7 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-func (d *desktopNotifier) sendNotification(title, body string) error {
+func (d *DesktopNotifier) SendNotification(title, body string) error {
 	if err := d.sendNotificationViaDbus(title, body); err == nil {
 		return nil
 	}
@@ -20,8 +20,8 @@ func (d *desktopNotifier) sendNotification(title, body string) error {
 }
 
 // See: https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html
-func (d *desktopNotifier) sendNotificationViaDbus(title, body string) error {
-	conn, err := dbus.SessionBus()
+func (d *DesktopNotifier) sendNotificationViaDbus(title, body string) error {
+	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "could not connect to dbus, will try alternate method of notification", "err", err)
 		return fmt.Errorf("could not connect to dbus: %w", err)
@@ -47,7 +47,7 @@ func (d *desktopNotifier) sendNotificationViaDbus(title, body string) error {
 	return nil
 }
 
-func (d *desktopNotifier) sendNotificationViaNotifySend(title, body string) error {
+func (d *DesktopNotifier) sendNotificationViaNotifySend(title, body string) error {
 	notifySend, err := exec.LookPath("notify-send")
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "notify-send not installed", "err", err)

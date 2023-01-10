@@ -23,7 +23,6 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/desktop/notify"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -194,21 +193,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
 		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
-		// Run the notification service
-		notificationConsumer, err := notify.New(
-			db,
-			rootDirectory,
-			notify.WithLogger(logutil.NewServerLogger(true)),
-			notify.WithNotificationTtl(time.Second*5),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to set up notifier: %w", err)
-		}
-
-		if controlService != nil {
-			controlService.RegisterConsumer(notify.NotificationSubsystem, notificationConsumer)
-		}
-
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
@@ -220,6 +204,21 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		if controlService != nil {
 			controlService.RegisterConsumer("desktop", runner)
+		}
+
+		// Run the notification service
+		notificationConsumer, err := control.NewNotifyConsumer(
+			db,
+			runner,
+			control.WithLogger(logutil.NewServerLogger(true)),
+			control.WithNotificationTtl(time.Second*5),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set up notifier: %w", err)
+		}
+
+		if controlService != nil {
+			controlService.RegisterConsumer(control.NotificationSubsystem, notificationConsumer)
 		}
 	}
 

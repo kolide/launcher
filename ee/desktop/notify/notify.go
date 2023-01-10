@@ -10,21 +10,22 @@ import (
 	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
-type notifier interface {
-	sendNotification(title, body string) error
-}
-
-type desktopNotifier struct {
+type DesktopNotifier struct {
 	logger       log.Logger
 	iconFilepath string
 }
 
-func newDesktopNotifier(logger log.Logger, rootDir string) *desktopNotifier {
-	notifier := &desktopNotifier{
+type Notification struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+func NewDesktopNotifier(logger log.Logger, iconDir string) *DesktopNotifier {
+	notifier := &DesktopNotifier{
 		logger: logger,
 	}
 
-	iconPath, err := setIconPath(rootDir)
+	iconPath, err := setIconPath(iconDir)
 	if err != nil {
 		level.Error(notifier.logger).Log("msg", "could not set icon path for notifications", "err", err)
 	} else {
@@ -34,8 +35,8 @@ func newDesktopNotifier(logger log.Logger, rootDir string) *desktopNotifier {
 	return notifier
 }
 
-func setIconPath(rootDir string) (string, error) {
-	expectedLocation := filepath.Join(rootDir, assets.KolideIconFilename)
+func setIconPath(iconDir string) (string, error) {
+	expectedLocation := filepath.Join(iconDir, assets.KolideIconFilename)
 
 	_, err := os.Stat(expectedLocation)
 

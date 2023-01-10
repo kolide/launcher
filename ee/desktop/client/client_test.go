@@ -34,7 +34,7 @@ func TestClient_Shutdown(t *testing.T) {
 
 			socketPath := testSocketPath(t)
 			shutdownChan := make(chan struct{})
-			server, err := server.New(log.NewNopLogger(), validAuthToken, socketPath, shutdownChan)
+			server, err := server.New(log.NewNopLogger(), validAuthToken, socketPath, t.TempDir(), shutdownChan)
 			require.NoError(t, err)
 
 			go func() {

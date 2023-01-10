@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/kolide/launcher/ee/desktop/notify"
 )
 
 type transport struct {
@@ -93,6 +95,32 @@ func (c *client) SetStatus(st string) error {
 	resp, err := c.base.Post("http://unix/status", "application/json", bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return err
+	}
+
+	if resp.Body != nil {
+		resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *client) Notify(title, body string) error {
+	notificationToSend := notify.Notification{
+		Title: title,
+		Body:  body,
+	}
+	bodyBytes, err := json.Marshal(notificationToSend)
+	if err != nil {
+		return fmt.Errorf("could not marshal notification: %w", err)
+	}
+
+	resp, err := c.base.Post("http://unix/notification", "application/json", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("could not send notification: %w", err)
 	}
 
 	if resp.Body != nil {
