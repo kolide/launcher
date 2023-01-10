@@ -22,7 +22,7 @@ func (m *testMenuBuilder) SetTooltip(tooltip string) {
 	m.menuCopy.Tooltip = tooltip
 }
 
-func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, action Action, parent any) any {
+func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
 	item := &menuItemData{
 		Label:       label,
 		Tooltip:     tooltip,
