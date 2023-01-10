@@ -55,7 +55,8 @@ func TestUpdate_HappyPath(t *testing.T) {
 	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
-	testNc.Update(testNotificationsData)
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
 	mockNotifier.AssertCalled(t, "SendNotification", testTitle, testBody)
 }
 
@@ -95,7 +96,8 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
-	testNc.Update(testNotificationsData)
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
 }
 
@@ -136,8 +138,67 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil).NotBefore(errorCall)
 
 	// Call update and assert our expectations about sent notifications
-	testNc.Update(testNotificationsData)
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 2)
+}
+
+func TestUpdate_ResendsOnceTTLExpires(t *testing.T) {
+	t.Parallel()
+
+	db := setUpDb(t)
+	mockNotifier := newNotifierMock()
+	testNc := &NotificationConsumer{
+		db:              db,
+		runner:          mockNotifier,
+		logger:          log.NewNopLogger(),
+		notificationTtl: time.Hour * 1,
+	}
+
+	// Queue up one notification
+	testTitle := fmt.Sprintf("Test title @ %d - 198c7d6c-f134-42ee-9091-3c5ba175cc5b", time.Now().UnixMicro())
+	testBody := fmt.Sprintf("Test body @ %d - 198c7d6c-f134-42ee-9091-3c5ba175cc5b", time.Now().UnixMicro())
+	testUUID := "198c7d6c-f134-42ee-9091-3c5ba175cc5b"
+	testNotifications := []notification{
+		{
+			Title: testTitle,
+			Body:  testBody,
+			UUID:  testUUID,
+		},
+	}
+
+	// Expect that the notifier is called once to send the one notification
+	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+
+	// Call update and assert our expectations about sent notifications
+	expectedCalls := 1
+	testNotificationsRaw1, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData1 := bytes.NewReader(testNotificationsRaw1)
+	err = testNc.Update(testNotificationsData1)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
+
+	// Try again and confirm that it isn't re-sent
+	testNotificationsRaw2, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData2 := bytes.NewReader(testNotificationsRaw2)
+	err = testNc.Update(testNotificationsData2)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
+
+	// Set the TTL to 0 so that the notification counts as expired
+	testNc.notificationTtl = time.Microsecond * 1
+	time.Sleep(5 * time.Microsecond) // wait, just to be sure
+
+	// Try to send the notificatio again and confirm it's re-sent
+	expectedCalls += 1
+	testNotificationsRaw3, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData3 := bytes.NewReader(testNotificationsRaw3)
+	err = testNc.Update(testNotificationsData3)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
 }
 
 func setUpDb(t *testing.T) *bbolt.DB {

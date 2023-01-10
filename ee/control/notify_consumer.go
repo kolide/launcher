@@ -19,9 +19,10 @@ type NotificationConsumer struct {
 	db              *bbolt.DB
 	runner          notifier
 	logger          log.Logger
-	notificationTtl time.Duration
+	notificationTtl time.Duration // How long until a notification expires -- i.e. how long until we can re-send that identical notification
 }
 
+// The desktop runner fullfils this interface -- it exists primarily for testing purposes.
 type notifier interface {
 	SendNotification(title, body string) error
 }
@@ -54,7 +55,7 @@ func WithNotificationTtl(ttl time.Duration) notificationConsumerOption {
 }
 
 func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
-	// Create the bucket if it doesn't exist
+	// Create the bucket to track sent notifications if it doesn't exist
 	if err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
 		if err != nil {
