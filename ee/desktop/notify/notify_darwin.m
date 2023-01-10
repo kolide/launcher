@@ -2,7 +2,6 @@
 // +build darwin
 
 // Draws from Fyne's implementation: https://github.com/fyne-io/fyne/blob/master/app/app_darwin.m
-// TODO: log format is not JSON
 
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
