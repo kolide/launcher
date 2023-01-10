@@ -130,7 +130,7 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 
 		return nil
 	}); err != nil {
-		level.Debug(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
+		level.Error(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
 
 	return alreadySent
