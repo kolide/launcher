@@ -218,7 +218,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		if controlService != nil {
-			controlService.RegisterConsumer(control.NotificationSubsystem, notificationConsumer)
+			if err := controlService.RegisterConsumer(control.NotificationSubsystem, notificationConsumer); err != nil {
+				return fmt.Errorf("failed to register notify consumer: %w", err)
+			}
 		}
 	}
 

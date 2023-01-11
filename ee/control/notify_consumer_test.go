@@ -57,7 +57,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
 	require.NoError(t, err)
-	mockNotifier.AssertCalled(t, "SendNotification", testTitle, testBody)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
 }
 
 func TestUpdate_HandlesDuplicates(t *testing.T) {
