@@ -1,4 +1,4 @@
-package control
+package notificationconsumer
 
 import (
 	"bytes"

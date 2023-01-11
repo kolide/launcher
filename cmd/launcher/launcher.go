@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -207,18 +208,18 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// Run the notification service
-		notificationConsumer, err := control.NewNotifyConsumer(
+		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			db,
 			runner,
-			control.WithLogger(logutil.NewServerLogger(true)),
-			control.WithNotificationTtl(time.Second*5),
+			notificationconsumer.WithLogger(logutil.NewServerLogger(true)),
+			notificationconsumer.WithNotificationTtl(time.Second*5),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
 
 		if controlService != nil {
-			if err := controlService.RegisterConsumer(control.NotificationSubsystem, notificationConsumer); err != nil {
+			if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 				return fmt.Errorf("failed to register notify consumer: %w", err)
 			}
 		}
