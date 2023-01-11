@@ -9,7 +9,7 @@ import (
 
 // Performs the OpenURL action
 type actionOpenURL struct {
-	URL string `json:"url,omitempty"`
+	URL string `json:"url"`
 }
 
 func (a actionOpenURL) Perform(m *menu) {
