@@ -22,7 +22,9 @@ type Notification struct {
 
 func NewDesktopNotifier(logger log.Logger, iconDir string) *DesktopNotifier {
 	notifier := &DesktopNotifier{
-		logger: logger,
+		logger: log.With(logger,
+			"component", "user_desktop_notifier",
+		),
 	}
 
 	iconPath, err := setIconPath(iconDir)
