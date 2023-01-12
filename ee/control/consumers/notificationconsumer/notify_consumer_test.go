@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,13 +39,14 @@ func TestUpdate_HappyPath(t *testing.T) {
 	}
 
 	// Send one notification that we haven't seen before
-	testTitle := fmt.Sprintf("Test title @ %d - 9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea", time.Now().UnixMicro())
-	testBody := fmt.Sprintf("Test body @ %d - 9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea", time.Now().UnixMicro())
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
 	testNotifications := []notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea",
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 	}
@@ -79,28 +81,28 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 		{
 			Title:      "",
 			Body:       "",
-			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
 		},
 		// Invalid because `ValidUntil` isn't a timestamp
 		{
 			Title:      "Test title 1",
 			Body:       "Test body 1",
-			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ID:         ulid.New(),
 			ValidUntil: "some time in the future",
 		},
 		// Invalid because `ValidUntil` is an unexpected format
 		{
 			Title:      "Test title 1",
 			Body:       "Test body 1",
-			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ID:         ulid.New(),
 			ValidUntil: time.Now().Add(1 * time.Hour).Format(time.RFC1123),
 		},
 		// Invalid because it's expired
 		{
 			Title:      "Test title 1",
 			Body:       "Test body 1",
-			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ID:         ulid.New(),
 			ValidUntil: time.Now().Add(-1 * time.Hour).Format(iso8601Format),
 		},
 	}
@@ -127,20 +129,20 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	}
 
 	// Queue up two duplicate notifications
-	testTitle := fmt.Sprintf("Test title @ %d - b4ea464c-58c1-4fa3-ada2-57fe9e3a057d", time.Now().UnixMicro())
-	testBody := fmt.Sprintf("Test body @ %d - b4ea464c-58c1-4fa3-ada2-57fe9e3a057d", time.Now().UnixMicro())
-	testUUID := "b4ea464c-58c1-4fa3-ada2-57fe9e3a057d"
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
 	testNotifications := []notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       testUUID,
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       testUUID,
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 	}
@@ -170,20 +172,20 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	}
 
 	// Queue up two duplicate notifications
-	testTitle := fmt.Sprintf("Test title @ %d - 071ef96d-c66a-4d3d-8143-74fe11e04bae", time.Now().UnixMicro())
-	testBody := fmt.Sprintf("Test body @ %d - 071ef96d-c66a-4d3d-8143-74fe11e04bae", time.Now().UnixMicro())
-	testUUID := "071ef96d-c66a-4d3d-8143-74fe11e04bae"
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
 	testNotifications := []notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       testUUID,
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       testUUID,
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 	}
@@ -214,14 +216,14 @@ func TestUpdate_ResendsOnceTTLExpires(t *testing.T) {
 	}
 
 	// Queue up one notification
-	testTitle := fmt.Sprintf("Test title @ %d - 198c7d6c-f134-42ee-9091-3c5ba175cc5b", time.Now().UnixMicro())
-	testBody := fmt.Sprintf("Test body @ %d - 198c7d6c-f134-42ee-9091-3c5ba175cc5b", time.Now().UnixMicro())
-	testUUID := "198c7d6c-f134-42ee-9091-3c5ba175cc5b"
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
 	testNotifications := []notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
-			UUID:       testUUID,
+			ID:         testId,
 			ValidUntil: getValidUntil(),
 		},
 	}

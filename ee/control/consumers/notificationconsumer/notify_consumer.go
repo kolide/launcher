@@ -31,7 +31,7 @@ type notifier interface {
 type notification struct {
 	Title      string    `json:"title"`
 	Body       string    `json:"body"`
-	UUID       string    `json:"uuid"`
+	ID         string    `json:"id"`
 	ValidUntil string    `json:"valid_until"` // ISO8601 format
 	SentAt     time.Time `json:"sent_at,omitempty"`
 }
@@ -138,7 +138,7 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 	alreadySent := false
 
 	if err := nc.db.View(func(tx *bbolt.Tx) error {
-		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationToCheck.UUID))
+		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationToCheck.ID))
 		if sentNotificationRaw == nil {
 			// No previous record -- notification has not been sent before
 			return nil
@@ -174,7 +174,7 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 			return fmt.Errorf("could not marshal sent notification: %w", err)
 		}
 
-		if err := b.Put([]byte(sentNotification.UUID), rawNotification); err != nil {
+		if err := b.Put([]byte(sentNotification.ID), rawNotification); err != nil {
 			return fmt.Errorf("could not write to key: %w", err)
 		}
 
