@@ -248,49 +248,59 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 			return fmt.Errorf("creating bucket: %w", err)
 		}
 
-		// This only checks the private key, but it should possibly check all the values we're setting.
-		if bucket.Get([]byte(privateKeyKey)) != nil {
-			return nil
-		}
-
-		key, err := rsaRandomKey()
-		if err != nil {
-			return fmt.Errorf("generating key: %w", err)
-		}
-
-		fingerprint, err := rsaFingerprint(key)
-		if err != nil {
-			return fmt.Errorf("generating fingerprint: %w", err)
-		}
-
-		var pub bytes.Buffer
-		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
-			return fmt.Errorf("marshalling pub: %w", err)
-		}
-
-		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-		if err != nil {
-			return fmt.Errorf("marshalling key: %w", err)
-		}
-
-		if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
-			return fmt.Errorf("storing key: %w", err)
-		}
-
-		if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
-			return fmt.Errorf("storing public key: %w", err)
-
-		}
-
-		if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
-			return fmt.Errorf("storing fingerprint: %w", err)
+		if err := ensureRsaKey(bucket); err != nil {
+			return fmt.Errorf("ensuring rsa key: %w", err)
 		}
 
 		return nil
 	})
 
 	return err
+}
 
+// ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
+func ensureRsaKey(bucket *bbolt.Bucket) error {
+	// If it exists, we're good
+	if bucket.Get([]byte(privateKeyKey)) != nil {
+		return nil
+	}
+
+	// Create a random key
+	key, err := rsaRandomKey()
+	if err != nil {
+		return fmt.Errorf("generating key: %w", err)
+	}
+
+	// Storing the finger print is probably bad idea, but we made that choice in the past and now we live with it.
+	fingerprint, err := rsaFingerprint(key)
+	if err != nil {
+		return fmt.Errorf("generating fingerprint: %w", err)
+	}
+
+	var pub bytes.Buffer
+	if err := RsaPrivateKeyToPem(key, &pub); err != nil {
+		return fmt.Errorf("marshalling pub: %w", err)
+	}
+
+	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("marshalling key: %w", err)
+	}
+
+	if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
+		return fmt.Errorf("storing key: %w", err)
+	}
+
+	if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
+		return fmt.Errorf("storing public key: %w", err)
+
+	}
+
+	if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
+		return fmt.Errorf("storing fingerprint: %w", err)
+	}
+
+	return nil
 }
 
 // PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
