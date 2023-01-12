@@ -204,6 +204,8 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 }
 
 func TestCleanup(t *testing.T) {
+	t.Parallel()
+
 	db := setUpDb(t)
 	testNc := &NotificationConsumer{
 		db:                          db,
