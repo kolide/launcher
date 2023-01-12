@@ -88,7 +88,8 @@ const (
 	// DB key for last retrieved config
 	configKey = "config"
 	// DB keys for the rsa keys
-	privateKeyKey = "privateKey"
+	privateKeyKey    = "privateKey"
+	privateEccKeyKey = "privateEccKey"
 
 	// Old things to delete
 	xPublicKeyKey      = "publicKey"
@@ -258,6 +259,11 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 			return fmt.Errorf("ensuring rsa key: %w", err)
 		}
 
+		// ECC keys. These are meant as launcher install keus
+		if err := ensureEccKey(bucket); err != nil {
+			return fmt.Errorf("ensuring ecc key: %w", err)
+		}
+
 		// Remove things we don't keep in the bucket any more
 		for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
 			if err := bucket.Delete([]byte(k)); err != nil {
@@ -277,13 +283,26 @@ func ensureHardwareKey(bucket *bbolt.Bucket) error {
 }
 
 func ensureEccKey(bucket *bbolt.Bucket) error {
+	// If it exists, we're good
+	if bucket.Get([]byte(privateEccKeyKey)) != nil {
+		return nil
+	}
+
 	// This should, maybe, move this generate into krypto. Not sure
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("generating ecc key: %w", err)
 	}
 
-	_ = key
+	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("marshalling key: %w", err)
+	}
+
+	if err := bucket.Put([]byte(privateEccKeyKey), keyDer); err != nil {
+		return fmt.Errorf("storing key: %w", err)
+	}
+
 	return nil
 }
 
