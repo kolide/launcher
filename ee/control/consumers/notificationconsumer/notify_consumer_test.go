@@ -32,10 +32,10 @@ func TestUpdate_HappyPath(t *testing.T) {
 	db := setUpDb(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:              db,
-		runner:          mockNotifier,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
 	// Send one notification that we haven't seen before
@@ -69,10 +69,10 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 	db := setUpDb(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:              db,
-		runner:          mockNotifier,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
 	// Queue up a bunch of invalid notifications
@@ -122,10 +122,10 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	db := setUpDb(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:              db,
-		runner:          mockNotifier,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
 	// Queue up two duplicate notifications
@@ -165,10 +165,10 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	db := setUpDb(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:              db,
-		runner:          mockNotifier,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
 	// Queue up two duplicate notifications
@@ -203,63 +203,57 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 2)
 }
 
-func TestUpdate_ResendsOnceTTLExpires(t *testing.T) {
-	t.Parallel()
-
+func TestCleanup(t *testing.T) {
 	db := setUpDb(t)
-	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:              db,
-		runner:          mockNotifier,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      newNotifierMock(),
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
-	// Queue up one notification
-	testId := ulid.New()
-	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
-	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
-	testNotifications := []notification{
-		{
-			Title:      testTitle,
-			Body:       testBody,
-			ID:         testId,
-			ValidUntil: getValidUntil(),
-		},
+	// Save two entries in the db -- one sent a year ago, and one sent now.
+	notificationIdToDelete := ulid.New()
+	testNc.markNotificationSent(notification{
+		Title:  "Some old test title",
+		Body:   "Some old test body",
+		ID:     notificationIdToDelete,
+		SentAt: time.Now().Add(-365 * 24 * time.Hour),
+	})
+	notificationIdToRetain := ulid.New()
+	testNc.markNotificationSent(notification{
+		Title:  "Some new test title",
+		Body:   "Some new test body",
+		ID:     notificationIdToRetain,
+		SentAt: time.Now(),
+	})
+
+	// Confirm we have both entries in the db.
+	if err := db.View(func(tx *bbolt.Tx) error {
+		oldNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToDelete))
+		require.NotNil(t, oldNotificationRecord, "old notification was not seeded in db")
+
+		newNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToRetain))
+		require.NotNil(t, newNotificationRecord, "new notification was not seeded in db")
+		return nil
+	}); err != nil {
+		require.NoError(t, err)
 	}
 
-	// Expect that the notifier is called once to send the one notification
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+	// Now, run cleanup.
+	testNc.cleanup()
 
-	// Call update and assert our expectations about sent notifications
-	expectedCalls := 1
-	testNotificationsRaw1, err := json.Marshal(testNotifications)
-	require.NoError(t, err)
-	testNotificationsData1 := bytes.NewReader(testNotificationsRaw1)
-	err = testNc.Update(testNotificationsData1)
-	require.NoError(t, err)
-	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
+	// Confirm that the old notification record was deleted, and the new one was not.
+	if err := db.View(func(tx *bbolt.Tx) error {
+		oldNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToDelete))
+		require.Nil(t, oldNotificationRecord, "old notification was not cleaned up but should have been")
 
-	// Try again and confirm that it isn't re-sent
-	testNotificationsRaw2, err := json.Marshal(testNotifications)
-	require.NoError(t, err)
-	testNotificationsData2 := bytes.NewReader(testNotificationsRaw2)
-	err = testNc.Update(testNotificationsData2)
-	require.NoError(t, err)
-	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
-
-	// Set the TTL to 0 so that the notification counts as expired
-	testNc.notificationTtl = time.Microsecond * 1
-	time.Sleep(5 * time.Microsecond) // wait, just to be sure
-
-	// Try to send the notificatio again and confirm it's re-sent
-	expectedCalls += 1
-	testNotificationsRaw3, err := json.Marshal(testNotifications)
-	require.NoError(t, err)
-	testNotificationsData3 := bytes.NewReader(testNotificationsRaw3)
-	err = testNc.Update(testNotificationsData3)
-	require.NoError(t, err)
-	mockNotifier.AssertNumberOfCalls(t, "SendNotification", expectedCalls)
+		newNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToRetain))
+		require.NotNil(t, newNotificationRecord, "new notification was cleaned up but should not have been")
+		return nil
+	}); err != nil {
+		require.NoError(t, err)
+	}
 }
 
 func setUpDb(t *testing.T) *bbolt.DB {

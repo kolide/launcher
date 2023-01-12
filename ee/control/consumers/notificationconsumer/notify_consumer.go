@@ -1,6 +1,7 @@
 package notificationconsumer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,10 +16,13 @@ import (
 
 // Consumes notifications from control server, tracks when notifications are sent to end user
 type NotificationConsumer struct {
-	db              *bbolt.DB
-	runner          notifier
-	logger          log.Logger
-	notificationTtl time.Duration // How long until a notification expires -- i.e. how long until we can re-send that identical notification
+	db                          *bbolt.DB
+	runner                      notifier
+	logger                      log.Logger
+	notificationRetentionPeriod time.Duration
+	cleanupInterval             time.Duration
+	ctx                         context.Context
+	cancel                      context.CancelFunc
 }
 
 // The desktop runner fullfils this interface -- it exists primarily for testing purposes.
@@ -36,10 +40,19 @@ type notification struct {
 	SentAt     time.Time `json:"sent_at,omitempty"`
 }
 
-// Identifier for this consumer.
-const NotificationSubsystem = "desktop_notifier"
+const (
+	// Identifier for this consumer.
+	NotificationSubsystem = "desktop_notifier"
 
-const iso8601Format = "2006-01-02T15:04:05-0700"
+	// ISO 8601 -- used for valid_until field
+	iso8601Format = "2006-01-02T15:04:05-0700"
+
+	// Approximately 6 months
+	defaultRetentionPeriod = time.Hour * 24 * 30 * 6
+
+	// How frequently to check for old notifications
+	defaultCleanupInterval = time.Hour * 12
+)
 
 type notificationConsumerOption func(*NotificationConsumer)
 
@@ -51,13 +64,19 @@ func WithLogger(logger log.Logger) notificationConsumerOption {
 	}
 }
 
-func WithNotificationTtl(ttl time.Duration) notificationConsumerOption {
+func WithNotificationRetentionPeriod(ttl time.Duration) notificationConsumerOption {
 	return func(nc *NotificationConsumer) {
-		nc.notificationTtl = ttl
+		nc.notificationRetentionPeriod = ttl
 	}
 }
 
-func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
+func WithCleanupInterval(cleanupInterval time.Duration) notificationConsumerOption {
+	return func(nc *NotificationConsumer) {
+		nc.cleanupInterval = cleanupInterval
+	}
+}
+
+func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	// Create the bucket to track sent notifications if it doesn't exist
 	if err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
@@ -70,10 +89,12 @@ func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcesses
 	}
 
 	nc := &NotificationConsumer{
-		db:              db,
-		runner:          runner,
-		logger:          log.NewNopLogger(),
-		notificationTtl: time.Hour * 1,
+		db:                          db,
+		runner:                      runner,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
+		cleanupInterval:             defaultCleanupInterval,
+		ctx:                         ctx,
 	}
 
 	for _, opt := range opts {
@@ -144,15 +165,7 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 			return nil
 		}
 
-		var previouslySentNotification notification
-		if err := json.Unmarshal(sentNotificationRaw, &previouslySentNotification); err != nil {
-			return fmt.Errorf("could not unmarshal previously sent notification: %w", err)
-		}
-
-		// Check to see how long ago the previously-sent notification was sent -- if it's within the
-		// configured TTL, then we consider it a duplicate and will not re-send.
-		sentExpiredAt := previouslySentNotification.SentAt.Add(nc.notificationTtl)
-		alreadySent = sentExpiredAt.After(time.Now())
+		alreadySent = true
 
 		return nil
 	}); err != nil {
@@ -181,5 +194,68 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 		return nil
 	}); err != nil {
 		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
+	}
+}
+
+// Runs cleanup job to periodically check for notifications we no longer need to retain and delete them
+func (nc *NotificationConsumer) Execute() error {
+	nc.runCleanup(nc.ctx)
+	return nil
+}
+
+// Stops cleanup job
+func (nc *NotificationConsumer) Interrupt(err error) {
+	nc.cancel()
+}
+
+func (nc *NotificationConsumer) runCleanup(ctx context.Context) {
+	ctx, nc.cancel = context.WithCancel(ctx)
+	t := time.NewTicker(nc.cleanupInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			nc.cleanup()
+		}
+	}
+}
+
+func (nc *NotificationConsumer) cleanup() {
+	// Read through all keys in bucket to determine which ones are old enough to be deleted
+	keysToDelete := make([][]byte, 0)
+	if err := nc.db.View(func(tx *bbolt.Tx) error {
+		if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).ForEach(func(k, v []byte) error {
+			var sentNotification notification
+			if err := json.Unmarshal(v, &sentNotification); err != nil {
+				return fmt.Errorf("error processing %s: %w", string(k), err)
+			}
+
+			if sentNotification.SentAt.Add(nc.notificationRetentionPeriod).Before(time.Now()) {
+				keysToDelete = append(keysToDelete, k)
+			}
+
+			return nil
+		}); err != nil {
+			return fmt.Errorf("error iterating over keys in bucket: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		level.Error(nc.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+	}
+
+	// Delete all old keys
+	if err := nc.db.Update(func(tx *bbolt.Tx) error {
+		for _, k := range keysToDelete {
+			if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Delete(k); err != nil {
+				// Log, but don't error, since we might be able to delete some others
+				level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
+			}
+		}
+
+		return nil
+	}); err != nil {
+		level.Error(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
 	}
 }

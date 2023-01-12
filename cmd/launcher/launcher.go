@@ -211,12 +211,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			db,
 			runner,
+			ctx,
 			notificationconsumer.WithLogger(logger),
-			notificationconsumer.WithNotificationTtl(time.Second*5),
+			notificationconsumer.WithNotificationRetentionPeriod(time.Second*5),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
+		// Runs the cleanup routine for old notification records
+		runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
 
 		if controlService != nil {
 			if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
