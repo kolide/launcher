@@ -1024,7 +1024,7 @@ func TestLauncherKeys(t *testing.T) {
 	_, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.NoError(t, err)
 
-	key, err := PrivateKeyFromDB(db)
+	key, err := PrivateRSAKeyFromDB(db)
 	require.NoError(t, err)
 
 	pubkeyPem, fingerprintStored, err := PublicKeyFromDB(db)

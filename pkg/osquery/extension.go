@@ -234,6 +234,12 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.db)
 }
 
+// SetupLauncherKeys configures the various keys used for communication.
+//
+// There are 3 keys:
+// 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
+// 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
+// 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
 func SetupLauncherKeys(db *bbolt.DB) error {
 	err := db.Update(func(tx *bbolt.Tx) error {
 
@@ -287,8 +293,8 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 
 }
 
-// PrivateKeyFromDB returns the private launcher key. This is used to authenticate various launcher communications.
-func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
+// PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
+func PrivateRSAKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	var privateKey []byte
 
 	if err := db.View(func(tx *bbolt.Tx) error {

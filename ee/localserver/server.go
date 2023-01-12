@@ -68,7 +68,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 
 	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateKeyFromDB(db)
+	privateKey, err := osquery.PrivateRSAKeyFromDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("fetching private key: %w", err)
 	}
