@@ -42,9 +42,10 @@ func TestUpdate_HappyPath(t *testing.T) {
 	testBody := fmt.Sprintf("Test body @ %d - 9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea", time.Now().UnixMicro())
 	testNotifications := []notification{
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  "9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea",
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934ea",
+			ValidUntil: getValidUntil(),
 		},
 	}
 	testNotificationsRaw, err := json.Marshal(testNotifications)
@@ -58,6 +59,59 @@ func TestUpdate_HappyPath(t *testing.T) {
 	err = testNc.Update(testNotificationsData)
 	require.NoError(t, err)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
+}
+
+func TestUpdate_ValidatesNotifications(t *testing.T) {
+	t.Parallel()
+
+	db := setUpDb(t)
+	mockNotifier := newNotifierMock()
+	testNc := &NotificationConsumer{
+		db:              db,
+		runner:          mockNotifier,
+		logger:          log.NewNopLogger(),
+		notificationTtl: time.Hour * 1,
+	}
+
+	// Queue up a bunch of invalid notifications
+	testNotifications := []notification{
+		// Invalid because the title and body are empty
+		{
+			Title:      "",
+			Body:       "",
+			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ValidUntil: getValidUntil(),
+		},
+		// Invalid because `ValidUntil` isn't a timestamp
+		{
+			Title:      "Test title 1",
+			Body:       "Test body 1",
+			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ValidUntil: "some time in the future",
+		},
+		// Invalid because `ValidUntil` is an unexpected format
+		{
+			Title:      "Test title 1",
+			Body:       "Test body 1",
+			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ValidUntil: time.Now().Add(1 * time.Hour).Format(time.RFC1123),
+		},
+		// Invalid because it's expired
+		{
+			Title:      "Test title 1",
+			Body:       "Test body 1",
+			UUID:       "9779e3b9-75e6-4b59-8ed6-5a2d6d2934eb",
+			ValidUntil: time.Now().Add(-1 * time.Hour).Format(iso8601Format),
+		},
+	}
+	testNotificationsRaw, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+
+	// Call update and assert our expectations about sent notifications
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 0)
 }
 
 func TestUpdate_HandlesDuplicates(t *testing.T) {
@@ -78,14 +132,16 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	testUUID := "b4ea464c-58c1-4fa3-ada2-57fe9e3a057d"
 	testNotifications := []notification{
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  testUUID,
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       testUUID,
+			ValidUntil: getValidUntil(),
 		},
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  testUUID,
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       testUUID,
+			ValidUntil: getValidUntil(),
 		},
 	}
 	testNotificationsRaw, err := json.Marshal(testNotifications)
@@ -119,14 +175,16 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	testUUID := "071ef96d-c66a-4d3d-8143-74fe11e04bae"
 	testNotifications := []notification{
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  testUUID,
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       testUUID,
+			ValidUntil: getValidUntil(),
 		},
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  testUUID,
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       testUUID,
+			ValidUntil: getValidUntil(),
 		},
 	}
 	testNotificationsRaw, err := json.Marshal(testNotifications)
@@ -161,9 +219,10 @@ func TestUpdate_ResendsOnceTTLExpires(t *testing.T) {
 	testUUID := "198c7d6c-f134-42ee-9091-3c5ba175cc5b"
 	testNotifications := []notification{
 		{
-			Title: testTitle,
-			Body:  testBody,
-			UUID:  testUUID,
+			Title:      testTitle,
+			Body:       testBody,
+			UUID:       testUUID,
+			ValidUntil: getValidUntil(),
 		},
 	}
 
@@ -221,4 +280,8 @@ func setUpDb(t *testing.T) *bbolt.DB {
 	require.NoError(t, err)
 
 	return db
+}
+
+func getValidUntil() string {
+	return time.Now().Add(1 * time.Hour).Format(iso8601Format)
 }

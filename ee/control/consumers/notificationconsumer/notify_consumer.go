@@ -29,14 +29,17 @@ type notifier interface {
 // Represents notification received from control server; SentAt is set by this consumer after sending.
 // For the time being, notifications are per-end user device and not per-user.
 type notification struct {
-	Title  string    `json:"title"`
-	Body   string    `json:"body"`
-	UUID   string    `json:"uuid"`
-	SentAt time.Time `json:"sent_at,omitempty"`
+	Title      string    `json:"title"`
+	Body       string    `json:"body"`
+	UUID       string    `json:"uuid"`
+	ValidUntil string    `json:"valid_until"` // ISO8601 format
+	SentAt     time.Time `json:"sent_at,omitempty"`
 }
 
 // Identifier for this consumer.
 const NotificationSubsystem = "desktop_notifier"
+
+const iso8601Format = "2006-01-02T15:04:05-0700"
 
 type notificationConsumerOption func(*NotificationConsumer)
 
@@ -94,6 +97,10 @@ func (nc *NotificationConsumer) Update(data io.Reader) error {
 }
 
 func (nc *NotificationConsumer) notify(notificationToSend notification) {
+	if !nc.notificationIsValid(notificationToSend) {
+		return
+	}
+
 	if nc.notificationAlreadySent(notificationToSend) {
 		return
 	}
@@ -105,6 +112,26 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 
 	notificationToSend.SentAt = time.Now()
 	nc.markNotificationSent(notificationToSend)
+}
+
+func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notification) bool {
+	// Check that the notification is not expired --
+	// Parse timestamp string as ISO 8601
+	validUntil, err := time.Parse(iso8601Format, notificationToCheck.ValidUntil)
+	if err != nil {
+		level.Error(nc.logger).Log("msg", "received invalid valid_until timestamp in notification", "valid_until", notificationToCheck.ValidUntil, "err", err)
+
+		// Assume that we should not send a notification containing a malformed field
+		return false
+	}
+
+	// Notification has expired
+	if validUntil.Before(time.Now()) {
+		return false
+	}
+
+	// Notification must not be blank
+	return notificationToCheck.Title != "" && notificationToCheck.Body != ""
 }
 
 func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck notification) bool {
