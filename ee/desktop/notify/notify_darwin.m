@@ -6,7 +6,7 @@
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
 
-void doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body) {
+BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body) {
     UNMutableNotificationContent *content = [UNMutableNotificationContent new];
     [content autorelease];
     content.title = title;
@@ -17,18 +17,25 @@ void doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:identifier
         content:content trigger:nil];
 
+    __block BOOL success = YES;
+
     [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
         if (error != nil) {
             NSLog(@"Could not send notification: %@", error);
+            success = NO;
         }
     }];
+
+    return success;
 }
 
-void sendNotification(char *cTitle, char *cBody) {
+BOOL sendNotification(char *cTitle, char *cBody) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
+
+    __block BOOL success = NO;
 
     UNAuthorizationOptions options = UNAuthorizationOptionAlert;
     [center requestAuthorizationWithOptions:options
@@ -40,7 +47,9 @@ void sendNotification(char *cTitle, char *cBody) {
                     NSLog(@"Unable to get permission to send notifications");
                 }
             } else {
-                doSendNotification(center, title, body);
+                success = doSendNotification(center, title, body);
             }
         }];
+
+    return success;
 }

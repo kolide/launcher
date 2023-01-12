@@ -7,7 +7,7 @@ package notify
 #include <stdbool.h>
 #include <stdlib.h>
 
-void sendNotification(char *title, char *content);
+bool sendNotification(char *title, char *content);
 */
 import "C"
 import (
@@ -29,7 +29,10 @@ func (d *DesktopNotifier) SendNotification(title, body string) error {
 	bodyCStr := C.CString(body)
 	defer C.free(unsafe.Pointer(bodyCStr))
 
-	C.sendNotification(titleCStr, bodyCStr)
+	success := C.sendNotification(titleCStr, bodyCStr)
+	if !success {
+		return fmt.Errorf("could not send notification %s", title)
+	}
 
 	return nil
 }
