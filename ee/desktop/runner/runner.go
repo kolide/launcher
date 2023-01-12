@@ -81,6 +81,12 @@ func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
 	}
 }
 
+func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.processSpawningEnabled = enabled
+	}
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -139,7 +145,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		procsWg:                &sync.WaitGroup{},
 		interruptTimeout:       time.Second * 10,
 		usersFilesRoot:         filepath.Join(os.TempDir(), "kolide-desktop"),
-		processSpawningEnabled: true,
+		processSpawningEnabled: false,
 	}
 
 	for _, opt := range opts {
@@ -245,7 +251,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return err
 	}
 
-	if desktopStatus.Enabled && r.processSpawningEnabled {
+	if desktopStatus.Enabled {
 		// Desktop is currently enabled, and control server wants it to remain enabled
 		// Tell any running desktop user processes that they should refresh the latest status data
 		for uid, proc := range r.uidProcs {
@@ -260,40 +266,12 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 				)
 			}
 		}
-		return nil
 	}
 
-	// Desktop may need to be toggled on or off
-	r.toggleDesktop(desktopStatus.Enabled)
+	r.processSpawningEnabled = desktopStatus.Enabled
+	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(desktopStatus.Enabled))
 
 	return nil
-}
-
-// toggleDesktop configures the runner to enable/disable desktop, if necessary
-func (r *DesktopUsersProcessesRunner) toggleDesktop(enabled bool) {
-	if !r.processSpawningEnabled && !enabled {
-		// Desktop is currently disabled, and control server wants it to remain disabled
-		return
-	}
-
-	if r.processSpawningEnabled && !enabled {
-		// Desktop is currently enabled, control server is asking us to disable
-		level.Debug(r.logger).Log("msg", "runner is disabling desktop users processes")
-
-		// Stop automatically spawning desktop user processes
-		r.processSpawningEnabled = false
-
-		// Kill any existing desktop user processes, and we're done here
-		r.killDesktopProcesses()
-	}
-
-	if !r.processSpawningEnabled && enabled {
-		// Desktop is currently disabled, control server is asking us to enable
-		level.Debug(r.logger).Log("msg", "runner is enabling desktop users processes")
-
-		// Next execute loop tick will begin spawning desktop user processes
-		r.processSpawningEnabled = true
-	}
 }
 
 // writeMenuFile writes menu data to a shared file for user processes to access
@@ -324,7 +302,8 @@ func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	if !r.processSpawningEnabled {
-		// Desktop is disabled, no processes need to be spawned and there is nothing to do here
+		// Desktop is disabled, kill any existing desktop user processes
+		r.killDesktopProcesses()
 		return nil
 	}
 

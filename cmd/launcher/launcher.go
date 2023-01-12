@@ -179,32 +179,28 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	var controlService *control.ControlService
-	var runner *desktopRunner.DesktopUsersProcessesRunner
-	if opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" {
-		// If the control server has been opted-in to, run the control service
-		controlService, err = createControlService(ctx, logger, opts)
-		if err != nil {
-			return fmt.Errorf("failed to setup control service: %w", err)
-		}
-		runGroup.Add(controlService.Execute, controlService.Interrupt)
+	controlService, err := createControlService(ctx, logger, opts)
+	if err != nil {
+		return fmt.Errorf("failed to setup control service: %w", err)
+	}
+	runGroup.Add(controlService.Execute, controlService.Interrupt)
 
-		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
-		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+	// serverDataBucketConsumer handles server data table updates
+	serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
+	controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
-		runner = desktopRunner.New(
-			desktopRunner.WithLogger(logger),
-			desktopRunner.WithUpdateInterval(time.Second*5),
-			desktopRunner.WithHostname(opts.KolideServerURL),
-			desktopRunner.WithAuthToken(ulid.New()),
-			desktopRunner.WithUsersFilesRoot(rootDirectory),
-		)
-		runGroup.Add(runner.Execute, runner.Interrupt)
+	runner := desktopRunner.New(
+		desktopRunner.WithLogger(logger),
+		desktopRunner.WithUpdateInterval(time.Second*5),
+		desktopRunner.WithHostname(opts.KolideServerURL),
+		desktopRunner.WithAuthToken(ulid.New()),
+		desktopRunner.WithUsersFilesRoot(rootDirectory),
+		desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443"),
+	)
+	runGroup.Add(runner.Execute, runner.Interrupt)
 
-		if controlService != nil {
-			controlService.RegisterConsumer("desktop", runner)
-		}
+	if controlService != nil {
+		controlService.RegisterConsumer("desktop", runner)
 	}
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
