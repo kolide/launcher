@@ -211,7 +211,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			db,
 			runner,
-			notificationconsumer.WithLogger(logutil.NewServerLogger(true)),
+			notificationconsumer.WithLogger(logger),
 			notificationconsumer.WithNotificationTtl(time.Second*5),
 		)
 		if err != nil {

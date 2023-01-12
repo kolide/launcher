@@ -45,7 +45,7 @@ func runDesktop(args []string) error {
 			false,
 			"enable debug logging",
 		)
-		fliconpath = flagset.String(
+		flIconPath = flagset.String(
 			"icon_path",
 			"",
 			"path to icon file",
@@ -78,11 +78,11 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	if *fliconpath == "" {
-		*fliconpath = defaultIconPath()
+	if *flIconPath == "" {
+		*flIconPath = defaultIconPath()
 		level.Info(logger).Log(
 			"msg", "using default icon path since none was provided",
-			"icon_path", *fliconpath,
+			"icon_path", *flIconPath,
 		)
 	}
 
@@ -101,7 +101,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, *fliconpath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
 	if err != nil {
 		return err
 	}

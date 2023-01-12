@@ -1,7 +1,6 @@
 package notificationconsumer
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +27,7 @@ type notifier interface {
 }
 
 // Represents notification received from control server; SentAt is set by this consumer after sending.
+// For the time being, notifications are per-end user device and not per-user.
 type notification struct {
 	Title  string    `json:"title"`
 	Body   string    `json:"body"`
@@ -95,7 +95,6 @@ func (nc *NotificationConsumer) Update(data io.Reader) error {
 
 func (nc *NotificationConsumer) notify(notificationToSend notification) {
 	if nc.notificationAlreadySent(notificationToSend) {
-		level.Debug(nc.logger).Log("msg", "received duplicate notification", "title", notificationToSend.Title)
 		return
 	}
 
@@ -112,7 +111,7 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 	alreadySent := false
 
 	if err := nc.db.View(func(tx *bbolt.Tx) error {
-		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get(notificationKey(notificationToCheck))
+		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationToCheck.UUID))
 		if sentNotificationRaw == nil {
 			// No previous record -- notification has not been sent before
 			return nil
@@ -148,7 +147,7 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 			return fmt.Errorf("could not marshal sent notification: %w", err)
 		}
 
-		if err := b.Put(notificationKey(sentNotification), rawNotification); err != nil {
+		if err := b.Put([]byte(sentNotification.UUID), rawNotification); err != nil {
 			return fmt.Errorf("could not write to key: %w", err)
 		}
 
@@ -156,12 +155,4 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 	}); err != nil {
 		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
 	}
-}
-
-func notificationKey(n notification) []byte {
-	combined := fmt.Sprintf("%d:%s #### %d:%s", len(n.Title), n.Title, len(n.Body), n.Body)
-	h := sha256.New()
-	h.Write([]byte(combined))
-	key := fmt.Sprintf("%x", h.Sum(nil))
-	return []byte(key)
 }
