@@ -89,7 +89,7 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 			Title:      "Test title 1",
 			Body:       "Test body 1",
 			ID:         ulid.New(),
-			ValidUntil: "some time in the future",
+			ValidUntil: "not a timestamp",
 		},
 		// Invalid because `ValidUntil` is an unexpected format
 		{
