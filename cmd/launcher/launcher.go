@@ -213,7 +213,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
-			notificationconsumer.WithNotificationRetentionPeriod(time.Second*5),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
