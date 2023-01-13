@@ -61,6 +61,32 @@ that this functionality seems broken and it did not work for me in test.) I orig
 this as a fallback option for macOS because that's what some other libraries do, but
 ultimately decided it was not ideal enough that it wasn't worth keeping.
 
+### Lifecycle of a notification
+
+```mermaid
+sequenceDiagram
+    opt K2
+        control server->>+control server: Determines a new notification should be sent,<br>new hash for "desktop_notifier" subsystem
+    end
+    opt Launcher root process
+        control service->>+control server: Request latest data for subsystem "desktop_notifier"<br>since the hash has changed
+        control server->>+control service: Return list of notifications
+        control service->>+notify consumer: Notify subscriber of updated data
+        notify consumer->>+notify consumer: Confirm that notification is valid, has not been sent before
+        notify consumer->>+desktop processes runner: Request to send notification
+        desktop processes runner->>+desktop server: Send notification
+    end
+    opt Launcher desktop (user) process
+        desktop server->>+notifier service: Send notification to end user
+        notifier service->>+desktop server: Return error, or nil if successful
+        desktop server->>+desktop processes runner: Return 500 with error if not successful<br>or 200 if successful
+    end
+    opt Launcher root process
+        desktop processes runner->>+notify consumer: Return error, or nil if successful
+        notify consumer->>+notify consumer: If successful, store record of sent notification in bucket
+    end
+```
+
 ## Consequences
 
 We are now able to send notifications on all OSes to end users. We may find that the current
