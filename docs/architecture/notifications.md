@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented, but not yet available to end users on the stable release channel.
+2023-01-13: implemented, but not yet available to end users on the stable release channel.
 
 ## Context
 
@@ -66,3 +66,8 @@ ultimately decided it was not ideal enough that it wasn't worth keeping.
 We are now able to send notifications on all OSes to end users. We may find that the current
 options do not support future improvements that we may want to make, such as custom icons
 per-notification, or action buttons.
+
+## Changelog
+
+2023-01-13. Added documentation for notification methods chosen for initial implementation,
+and notes on methods that were not deemed ideal at this time.
