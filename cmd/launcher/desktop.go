@@ -78,14 +78,6 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	if *flIconPath == "" {
-		*flIconPath = defaultIconPath()
-		level.Info(logger).Log(
-			"msg", "using default icon path since none was provided",
-			"icon_path", *flIconPath,
-		)
-	}
-
 	var runGroup run.Group
 
 	// listen for signals
@@ -192,9 +184,4 @@ func defaultSocketPath() string {
 	}
 
 	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
-}
-
-// TODO pick a more sensible default
-func defaultIconPath() string {
-	return os.TempDir()
 }

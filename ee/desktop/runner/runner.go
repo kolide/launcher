@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
@@ -132,6 +133,8 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	for _, opt := range opts {
 		opt(runner)
 	}
+
+	runner.writeIconFile()
 
 	return runner
 }
@@ -471,6 +474,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
+		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 	}
 
 	stdErr, err := cmd.StderrPipe()
@@ -497,4 +501,22 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	}()
 
 	return cmd, nil
+}
+
+func (r *DesktopUsersProcessesRunner) writeIconFile() {
+	expectedLocation := r.iconFileLocation()
+
+	_, err := os.Stat(expectedLocation)
+
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(expectedLocation, assets.KolideDesktopIcon, 0644); err != nil {
+			level.Error(r.logger).Log("msg", "icon file did not exist, could not create it", "err", err)
+		}
+	} else if err != nil {
+		level.Error(r.logger).Log("msg", "could not check if icon file exists", "err", err)
+	}
+}
+
+func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
+	return filepath.Join(r.usersFilesRoot, assets.KolideIconFilename)
 }
