@@ -1,6 +1,7 @@
 package table
 
 import (
+	"bytes"
 	"context"
 	"runtime"
 
@@ -23,6 +24,13 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
+
+		// Various identifying keys
+		table.TextColumn("launcher_public_key"),
+		table.TextColumn("hardware_public_key"),
+		table.TextColumn("combined_key"),
+
+		// Old RSA Key
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
@@ -42,7 +50,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 
-		publicKey, fingerprint, err := osquery.PublicKeyFromDB(db)
+		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(db)
 		if err != nil {
 			// No logger here, so we can't easily log. Move on with blank values
 			publicKey = ""
@@ -64,6 +72,14 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 				"fingerprint":         fingerprint,
 				"public_key":          publicKey,
 			},
+		}
+
+		// No logger, so just ignore errors. generate the pem encoding if we can.
+		if eccKey, err := osquery.PublicECCKeyFromDB(db); err == nil {
+			var pem bytes.Buffer
+			if err := osquery.PublicKeyToPem(eccKey, &pem); err == nil {
+				results[0]["launcher_public_key"] = pem.String()
+			}
 		}
 
 		return results, nil

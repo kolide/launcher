@@ -1014,7 +1014,7 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.Equal(t, expectedResults, gotResults)
 }
 
-func TestLauncherKeys(t *testing.T) {
+func TestLauncherRsaKeys(t *testing.T) {
 	t.Parallel()
 
 	m := &mock.KolideService{}
@@ -1027,7 +1027,7 @@ func TestLauncherKeys(t *testing.T) {
 	key, err := PrivateRSAKeyFromDB(db)
 	require.NoError(t, err)
 
-	pubkeyPem, fingerprintStored, err := PublicKeyFromDB(db)
+	pubkeyPem, fingerprintStored, err := PublicRSAKeyFromDB(db)
 	require.NoError(t, err)
 
 	fingerprint, err := rsaFingerprint(key)

@@ -3,6 +3,7 @@ package osquery
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -306,6 +307,39 @@ func ensureEccKey(bucket *bbolt.Bucket) error {
 	return nil
 }
 
+func PrivateECCKeyFromDB(db *bbolt.DB) (*ecdsa.PrivateKey, error) {
+	var privateKey []byte
+
+	if err := db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(configBucket))
+		privateKey = b.Get([]byte(privateEccKeyKey))
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("error reading private key info from db: %w", err)
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private key: %w", err)
+	}
+
+	ecckey, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("Private key is not an rsa key")
+	}
+
+	return ecckey, nil
+}
+
+func PublicECCKeyFromDB(db *bbolt.DB) (crypto.PublicKey, error) {
+	privateKey, err := PrivateECCKeyFromDB(db)
+	if err != nil {
+		return nil, fmt.Errorf("reading private key: %w", err)
+	}
+
+	return privateKey.Public(), nil
+}
+
 // ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
 func ensureRsaKey(bucket *bbolt.Bucket) error {
 	// If it exists, we're good
@@ -356,16 +390,16 @@ func PrivateRSAKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	return rsakey, nil
 }
 
-// PublicKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
+// PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
+func PublicRSAKeyFromDB(db *bbolt.DB) (string, string, error) {
 	privateKey, err := PrivateRSAKeyFromDB(db)
 	if err != nil {
-		return "", "", fmt.Errorf("error reading private key info from db: %w", err)
+		return "", "", fmt.Errorf("reading private key: %w", err)
 	}
 
 	fingerprint, err := rsaFingerprint(privateKey)
 	if err != nil {
-		return "", "", fmt.Errorf("error generating fingerprint: %w", err)
+		return "", "", fmt.Errorf("generating fingerprint: %w", err)
 	}
 
 	var publicKey bytes.Buffer
