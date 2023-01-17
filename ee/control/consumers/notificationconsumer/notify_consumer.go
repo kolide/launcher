@@ -17,7 +17,7 @@ import (
 // Consumes notifications from control server, tracks when notifications are sent to end user
 type NotificationConsumer struct {
 	db                          *bbolt.DB
-	runner                      notifier
+	runner                      userProcessesRunner
 	logger                      log.Logger
 	notificationRetentionPeriod time.Duration
 	cleanupInterval             time.Duration
@@ -25,8 +25,8 @@ type NotificationConsumer struct {
 	cancel                      context.CancelFunc
 }
 
-// The desktop runner fullfils this interface -- it exists primarily for testing purposes.
-type notifier interface {
+// The desktop runner fullfils this interface -- it exists for testing purposes.
+type userProcessesRunner interface {
 	SendNotification(title, body string) error
 }
 
