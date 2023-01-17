@@ -107,6 +107,15 @@ func Test_Updates(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.ElementsMatch(t, tt.want, kvps)
+
+			for _, row := range kvps {
+				k := row["key"]
+				v := row["value"]
+
+				g, err := bc.GetByKey([]byte(k))
+				assert.NoError(t, err)
+				assert.Equal(t, []byte(v), g)
+			}
 		})
 	}
 }
