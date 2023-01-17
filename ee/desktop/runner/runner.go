@@ -20,6 +20,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -81,9 +82,17 @@ func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
 	}
 }
 
+// WithProcessSpawningEnabled sets desktop GUI enablement
 func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.processSpawningEnabled = enabled
+	}
+}
+
+// WithStoredDataProvider sets the stored data provider used to query desktop flags
+func WithStoredDataProvider(storedData control.StoredDataProvider) desktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.storedData = storedData
 	}
 }
 
@@ -116,6 +125,8 @@ type DesktopUsersProcessesRunner struct {
 	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
+	// storedData provides access to desktop flags
+	storedData control.StoredDataProvider
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -127,12 +138,6 @@ type processRecord struct {
 	process    *os.Process
 	path       string
 	socketPath string
-}
-
-// desktopUserStatus is all the device data sent to the desktop user process
-type DesktopUserStatus struct {
-	Enabled bool          `json:"enabled"`
-	Menu    menu.MenuData `json:"menu"`
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
@@ -237,41 +242,49 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	}
 }
 
-// Update handles control server updates for the desktop subsystem
-// This includes data related to the runner itself, and the user processes
+// Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
-	var desktopStatus DesktopUserStatus
-	if err := json.NewDecoder(data).Decode(&desktopStatus); err != nil {
-		return fmt.Errorf("failed to decode desktop user control data: %w", err)
+	var menu menu.MenuData
+	if err := json.NewDecoder(data).Decode(&menu); err != nil {
+		return fmt.Errorf("failed to decode menu data: %w", err)
 	}
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeMenuFile(desktopStatus.Menu); err != nil {
+	if err := r.writeMenuFile(menu); err != nil {
 		return err
 	}
 
-	if desktopStatus.Enabled {
-		// Desktop is currently enabled, and control server wants it to remain enabled
-		// Tell any running desktop user processes that they should refresh the latest status data
-		for uid, proc := range r.uidProcs {
-			client := client.New(r.authToken, proc.socketPath)
-			if err := client.Refresh(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "error sending refresh command to desktop process",
-					"uid", uid,
-					"pid", proc.process.Pid,
-					"path", proc.path,
-					"err", err,
-				)
-			}
+	// Tell any running desktop user processes that they should refresh the latest menu data
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.authToken, proc.socketPath)
+		if err := client.Refresh(); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending refresh command to desktop process",
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
 		}
 	}
 
-	r.processSpawningEnabled = desktopStatus.Enabled
-	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(desktopStatus.Enabled))
-
 	return nil
+}
+
+func (r *DesktopUsersProcessesRunner) Ping() {
+	// kolide_desktop_flags bucket has been updated, query the flags to react to changes
+	enabledRaw, err := r.storedData.GetByKey([]byte("enabled"))
+	if err != nil {
+		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
+		return
+	}
+
+	// The presence of anything for this flag means desktop is enabled
+	enabled := enabledRaw != nil
+
+	r.processSpawningEnabled = enabled
+	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
 }
 
 // writeMenuFile writes menu data to a shared file for user processes to access

@@ -189,6 +189,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
 	controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
+	desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "kolide_desktop_flags")
+	controlService.RegisterConsumer("kolide_desktop_flags", desktopFlagsBucketConsumer)
+
 	runner := desktopRunner.New(
 		desktopRunner.WithLogger(logger),
 		desktopRunner.WithUpdateInterval(time.Second*5),
@@ -196,12 +199,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		desktopRunner.WithAuthToken(ulid.New()),
 		desktopRunner.WithUsersFilesRoot(rootDirectory),
 		desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443"),
+		desktopRunner.WithStoredDataProvider(desktopFlagsBucketConsumer),
 	)
 	runGroup.Add(runner.Execute, runner.Interrupt)
-
-	if controlService != nil {
-		controlService.RegisterConsumer("desktop", runner)
-	}
+	controlService.RegisterConsumer("kolide_desktop_menu", runner)
+	controlService.RegisterSubscriber("kolide_desktop_flags", runner)
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
 		opts.KolideServerURL == "k2device-preprod.kolide.com" ||

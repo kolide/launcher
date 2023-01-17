@@ -42,6 +42,11 @@ type dataProvider interface {
 	Get(hash string) (data io.Reader, err error)
 }
 
+// StoredDataProvider is an interface for querying data from a persistable data storage layer
+type StoredDataProvider interface {
+	GetByKey(key []byte) (value []byte, err error)
+}
+
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          logger,
