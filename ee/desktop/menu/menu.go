@@ -49,6 +49,7 @@ type MenuBuilder interface {
 	AddSeparator()
 }
 
+// menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
 type menu struct {
 	logger   log.Logger
 	hostname string
@@ -65,6 +66,38 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 	return m
 }
 
+// getMenuData ingests the shared menu.json file created by the desktop runner
+// It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
+// Here is an example of valid JSON
+/*
+  	{
+		"icon": "kolide-desktop",
+		"tooltip": "Kolide",
+		"items": [
+		{
+			"label": "Kolide Agent is running",
+			"disabled": true
+		},
+		{
+			"isSeparator": true
+		},
+		{
+			"label": "Failing checks",
+			"items": [
+			{
+				"label": "Ensure Kolide Agent Has Full Disk Access Entitlement",
+				"action": {
+				"type": "open-url",
+				"action": {
+					"url": "https://help.kolide.com/en/articles/3387759-how-to-grant-macos-full-disk-access-to-kolide"
+				}
+				}
+			},
+			]
+		}
+		]
+  	}
+*/
 func (m *menu) getMenuData() *MenuData {
 	if m.filePath == "" {
 		return nil
@@ -85,6 +118,7 @@ func (m *menu) getMenuData() *MenuData {
 	return &menu
 }
 
+// getDefaultMenu returns a static, hard-coded menu to be used in failure modes when the menu data can't be retrieved
 func getDefaultMenu() *MenuData {
 	data := &MenuData{
 		Icon:    KolideDesktopIcon,
