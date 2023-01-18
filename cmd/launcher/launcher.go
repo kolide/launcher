@@ -189,8 +189,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
 	controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
-	desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "kolide_desktop_flags")
-	controlService.RegisterConsumer("kolide_desktop_flags", desktopFlagsBucketConsumer)
+	desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
+	controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
 
 	runner := desktopRunner.New(
 		desktopRunner.WithLogger(logger),
