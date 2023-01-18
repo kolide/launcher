@@ -53,13 +53,13 @@ func Test_Unmarshal(t *testing.T) {
 
 			var a Action
 			err := json.Unmarshal([]byte(tt.data), &a)
-                        if tt.expectedErr {
-                          assert.Error(t, err)
-                          return
-                        }
-                        
-                        assert.NoError(t, err)
-                        assert.Equal(t, tt.action, a)
+			if tt.expectedErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.action, a)
 
 		})
 	}
