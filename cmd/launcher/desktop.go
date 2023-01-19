@@ -40,6 +40,11 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
+		flmenupath = flagset.String(
+			"menu_path",
+			"",
+			"path to read menu data",
+		)
 		fldebug = flagset.Bool(
 			"debug",
 			false,
@@ -98,6 +103,11 @@ func runDesktop(args []string) error {
 		return err
 	}
 
+	menu := menu.New(logger, *flhostname, *flmenupath)
+	server.RegisterRefreshListener(func() {
+		menu.Build()
+	})
+
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -130,7 +140,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init(*flhostname)
+	menu.Init()
 
 	return nil
 }

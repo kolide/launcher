@@ -16,15 +16,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClient_Shutdown(t *testing.T) {
+func TestClient_GetAndShutdown(t *testing.T) {
 	t.Parallel()
 
 	const validAuthToken = "test-auth-header"
 	tests := []struct {
-		name string
+		name          string
+		paths         []string
+		expectedError bool
 	}{
 		{
-			name: "happy_path",
+			name:          "valid_paths",
+			paths:         []string{"ping", "shutdown", "refresh"},
+			expectedError: false,
+		},
+		{
+			name:          "invalid_paths",
+			paths:         []string{"", "never-a-real-path"},
+			expectedError: true,
 		},
 	}
 	for _, tt := range tests {
@@ -46,7 +55,16 @@ func TestClient_Shutdown(t *testing.T) {
 			}()
 
 			client := New(validAuthToken, socketPath)
-			assert.NoError(t, client.Shutdown())
+			for _, path := range tt.paths {
+				err := client.get(path)
+
+				if tt.expectedError {
+					require.Error(t, err)
+					continue
+				}
+
+				require.NoError(t, err)
+			}
 			assert.NoError(t, server.Shutdown(context.Background()))
 		})
 	}

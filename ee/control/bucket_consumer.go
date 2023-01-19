@@ -89,3 +89,19 @@ func (bc *bucketConsumer) Update(data io.Reader) error {
 		return nil
 	})
 }
+
+func (bc *bucketConsumer) GetByKey(key []byte) (value []byte, err error) {
+	if err := bc.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bc.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket not found", bc.bucketName)
+		}
+
+		value = b.Get(key)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("fetching data: %w", err)
+	}
+
+	return value, nil
+}
