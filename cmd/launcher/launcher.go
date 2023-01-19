@@ -219,10 +219,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// Runs the cleanup routine for old notification records
 	runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
 
-	if controlService != nil {
-		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
-			return fmt.Errorf("failed to register notify consumer: %w", err)
-		}
+	if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
+		return fmt.Errorf("failed to register notify consumer: %w", err)
 	}
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
