@@ -52,9 +52,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	require.NoError(t, err, string(out))
 
 	tests := []struct {
-		name        string
-		setup       func(*testing.T, *DesktopUsersProcessesRunner)
-		logContains []string
+		name          string
+		setup         func(*testing.T, *DesktopUsersProcessesRunner)
+		logContains   []string
+		cleanShutdown bool
 	}{
 		{
 			name: "happy path",
@@ -63,6 +64,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				"interrupt received, exiting desktop execute loop",
 				"all desktop processes shutdown successfully",
 			},
+			cleanShutdown: true,
 		},
 		{
 			name: "new process started if old one gone",
@@ -85,6 +87,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				"interrupt received, exiting desktop execute loop",
 				"all desktop processes shutdown successfully",
 			},
+			cleanShutdown: true,
 		},
 		{
 			name: "procs waitgroup times out",
@@ -114,6 +117,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
 				WithUsersFilesRoot(launcherRootDir(t)),
+				WithProcessSpawningEnabled(true),
 			)
 
 			if tt.setup != nil {
@@ -134,7 +138,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			// in the current CI environment (GitHub Actions) the linux runner
 			// does not have a console user, so we don't expect any processes
 			// to be started.
-			if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+			if tt.cleanShutdown || (os.Getenv("CI") == "true" && runtime.GOOS == "linux") {
 				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
 			} else {
 				assert.Contains(t, r.uidProcs, user.Uid)

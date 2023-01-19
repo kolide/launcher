@@ -42,6 +42,11 @@ type dataProvider interface {
 	Get(hash string) (data io.Reader, err error)
 }
 
+// StoredDataProvider is an interface for querying data from a persistable data storage layer
+type StoredDataProvider interface {
+	GetByKey(key []byte) (value []byte, err error)
+}
+
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          logger,
@@ -104,6 +109,10 @@ func (cs *ControlService) Fetch() error {
 		return fmt.Errorf("getting subsystems map: %w", err)
 	}
 
+	if data == nil {
+		return fmt.Errorf("subsystems map data is nil")
+	}
+
 	var subsystems map[string]string
 	if err := json.NewDecoder(data).Decode(&subsystems); err != nil {
 		return fmt.Errorf("decoding subsystems map: %w", err)
@@ -119,6 +128,10 @@ func (cs *ControlService) Fetch() error {
 		data, err := cs.fetcher.Get(hash)
 		if err != nil {
 			return fmt.Errorf("failed to get control data: %w", err)
+		}
+
+		if data == nil {
+			return fmt.Errorf("control data is nil")
 		}
 
 		// Consumer and subscriber(s) notified now

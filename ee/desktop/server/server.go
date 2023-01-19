@@ -18,12 +18,13 @@ import (
 )
 
 type DesktopServer struct {
-	logger       log.Logger
-	server       *http.Server
-	listener     net.Listener
-	shutdownChan chan<- struct{}
-	authToken    string
-	socketPath   string
+	logger           log.Logger
+	server           *http.Server
+	listener         net.Listener
+	shutdownChan     chan<- struct{}
+	authToken        string
+	socketPath       string
+	refreshListeners []func()
 }
 
 func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
@@ -36,7 +37,8 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
-	authedMux.HandleFunc("/ping", pingHandler)
+	authedMux.HandleFunc("/ping", desktopServer.pingHandler)
+	authedMux.HandleFunc("/refresh", desktopServer.refreshHandler)
 
 	desktopServer.server = &http.Server{
 		Handler: desktopServer.authMiddleware(authedMux),
@@ -91,10 +93,28 @@ func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request
 	s.shutdownChan <- struct{}{}
 }
 
-func pingHandler(w http.ResponseWriter, req *http.Request) {
+func (s *DesktopServer) pingHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"pong": "Kolide"}` + "\n"))
+}
+
+func (s *DesktopServer) refreshHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	s.notifyRefreshListeners()
+}
+
+// Registers a listener to be notified when status data should be refreshed
+func (s *DesktopServer) RegisterRefreshListener(f func()) {
+	s.refreshListeners = append(s.refreshListeners, f)
+}
+
+// Notifies all listeners to refresh their status data
+func (s *DesktopServer) notifyRefreshListeners() {
+	for _, listener := range s.refreshListeners {
+		listener()
+	}
 }
 
 func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
