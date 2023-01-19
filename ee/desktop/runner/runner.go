@@ -300,7 +300,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 func (r *DesktopUsersProcessesRunner) Ping() {
 	// kolide_desktop_flags bucket has been updated, query the flags to react to changes
-	enabledRaw, err := r.storedData.GetByKey([]byte("enabled"))
+	enabledRaw, err := r.storedData.GetByKey([]byte("desktop_enabled"))
 	if err != nil {
 		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
 		return

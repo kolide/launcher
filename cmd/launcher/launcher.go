@@ -204,7 +204,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	)
 	runGroup.Add(runner.Execute, runner.Interrupt)
 	controlService.RegisterConsumer("kolide_desktop_menu", runner)
-	controlService.RegisterSubscriber("kolide_desktop_flags", runner)
+	controlService.RegisterSubscriber("agent_flags", runner)
 
 	// Run the notification service
 	notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
