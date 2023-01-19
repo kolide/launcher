@@ -75,45 +75,64 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 		notificationRetentionPeriod: defaultRetentionPeriod,
 	}
 
-	// Queue up a bunch of invalid notifications
-	testNotifications := []notification{
-		// Invalid because the title and body are empty
+	tests := []struct {
+		testNotification notification
+		name             string
+	}{
 		{
-			Title:      "",
-			Body:       "",
-			ID:         ulid.New(),
-			ValidUntil: getValidUntil(),
+			name: "Invalid because title and body are empty",
+			testNotification: notification{
+				Title:      "",
+				Body:       "",
+				ID:         ulid.New(),
+				ValidUntil: getValidUntil(),
+			},
 		},
-		// Invalid because `ValidUntil` isn't a timestamp
 		{
-			Title:      "Test title 1",
-			Body:       "Test body 1",
-			ID:         ulid.New(),
-			ValidUntil: "not a timestamp",
+			name: "Invalid because ValidUntil isn't a timestamp",
+			testNotification: notification{
+				Title:      "Not a timestamp notification",
+				Body:       "Not a timestamp notification body",
+				ID:         ulid.New(),
+				ValidUntil: "not a timestamp",
+			},
 		},
-		// Invalid because `ValidUntil` is an unexpected format
 		{
-			Title:      "Test title 1",
-			Body:       "Test body 1",
-			ID:         ulid.New(),
-			ValidUntil: time.Now().Add(1 * time.Hour).Format(time.RFC1123),
+			name: "Invalid because ValidUntil has an unexpected format",
+			testNotification: notification{
+				Title:      "Unexpected format notification",
+				Body:       "Unexpected format notification body",
+				ID:         ulid.New(),
+				ValidUntil: time.Now().Add(1 * time.Hour).Format(time.RFC1123),
+			},
 		},
-		// Invalid because it's expired
 		{
-			Title:      "Test title 1",
-			Body:       "Test body 1",
-			ID:         ulid.New(),
-			ValidUntil: time.Now().Add(-1 * time.Hour).Format(iso8601Format),
+			name: "Invalid because the notification is expired",
+			testNotification: notification{
+				Title:      "Expired notification",
+				Body:       "Expired notification body",
+				ID:         ulid.New(),
+				ValidUntil: time.Now().Add(-1 * time.Hour).Format(iso8601Format),
+			},
 		},
 	}
-	testNotificationsRaw, err := json.Marshal(testNotifications)
-	require.NoError(t, err)
-	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
-	// Call update and assert our expectations about sent notifications
-	err = testNc.Update(testNotificationsData)
-	require.NoError(t, err)
-	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 0)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			testNotifications := []notification{tt.testNotification}
+			testNotificationsRaw, err := json.Marshal(testNotifications)
+			require.NoError(t, err)
+			testNotificationsData := bytes.NewReader(testNotificationsRaw)
+
+			// Call update and assert our expectations about sent notifications
+			err = testNc.Update(testNotificationsData)
+			require.NoError(t, err)
+			mockNotifier.AssertNumberOfCalls(t, "SendNotification", 0)
+		})
+	}
 }
 
 func TestUpdate_HandlesDuplicates(t *testing.T) {
