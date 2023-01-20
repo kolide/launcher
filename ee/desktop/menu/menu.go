@@ -36,17 +36,24 @@ type menuItemData struct {
 	Items       []menuItemData `json:"items,omitempty"`
 }
 
-// MenuBuilder is an interface a menu parser can use to specify how the menu is built
-type MenuBuilder interface {
-	// SetIcon sets the menu bar icon
-	SetIcon(icon menuIcon)
-	// SetTooltip sets the menu tooltip
-	SetTooltip(tooltip string)
-	// AddMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
+// menuBuilder is an interface a menu parser can use to specify how the menu is built
+type menuBuilder interface {
+	// setIcon sets the menu bar icon
+	setIcon(icon menuIcon)
+	// setTooltip sets the menu tooltip
+	setTooltip(tooltip string)
+	// addMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
 	// created, it is returned. If parent is non-nil, the menu item will be created as a child of parent.
-	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
-	// AddSeparator adds a separator to the menu
-	AddSeparator()
+	addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
+	// addSeparator adds a separator to the menu
+	addSeparator()
+}
+
+// textParser is an interface that parses text used in menu item labels
+type textParser interface {
+	// parse parses text as a template body for the menu template data
+	// if an error occurs while parsing, an empty string is returned along with the error
+	parse(text string) (string, error)
 }
 
 // menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
@@ -54,13 +61,15 @@ type menu struct {
 	logger   log.Logger
 	hostname string
 	filePath string
+	parser   textParser
 }
 
-func New(logger log.Logger, hostname, filePath string) *menu {
+func New(logger log.Logger, hostname, filePath string, parser textParser) *menu {
 	m := &menu{
 		logger:   logger,
 		hostname: hostname,
 		filePath: filePath,
+		parser:   parser,
 	}
 
 	return m

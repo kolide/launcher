@@ -6,6 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type mockTextParser struct {
+	updates int
+}
+
+func (parser *mockTextParser) parse(text string) (string, error) {
+	return text, nil
+}
+
 type testMenuBuilder struct {
 	Icon     menuIcon
 	Tooltip  string
@@ -14,15 +22,15 @@ type testMenuBuilder struct {
 	menuCopy MenuData
 }
 
-func (m *testMenuBuilder) SetIcon(icon menuIcon) {
+func (m *testMenuBuilder) setIcon(icon menuIcon) {
 	m.menuCopy.Icon = icon
 }
 
-func (m *testMenuBuilder) SetTooltip(tooltip string) {
+func (m *testMenuBuilder) setTooltip(tooltip string) {
 	m.menuCopy.Tooltip = tooltip
 }
 
-func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
+func (m *testMenuBuilder) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
 	item := &menuItemData{
 		Label:       label,
 		Tooltip:     tooltip,
@@ -40,7 +48,7 @@ func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOn
 	return m.parent
 }
 
-func (m *testMenuBuilder) AddSeparator() {
+func (m *testMenuBuilder) addSeparator() {
 	m.itemCopy = &menuItemData{
 		IsSeparator: true,
 	}
@@ -74,7 +82,7 @@ func Test_ParseMenuData(t *testing.T) {
 			t.Parallel()
 
 			builder := &testMenuBuilder{}
-			parseMenuData(tt.data, builder)
+			parseMenuData(tt.data, builder, nil)
 			if tt.data != nil {
 				assert.Equal(t, *tt.data, builder.menuCopy)
 			}
@@ -124,7 +132,7 @@ func Test_ParseMenuItem(t *testing.T) {
 			t.Parallel()
 
 			builder := &testMenuBuilder{parent: menuItemData{Label: "parent item"}}
-			parseMenuItem(tt.data, builder, nil)
+			parseMenuItem(tt.data, builder, &mockTextParser{}, nil)
 			if tt.data == nil {
 				assert.Equal(t, tt.data, builder.itemCopy)
 			} else {

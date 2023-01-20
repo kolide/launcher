@@ -12,11 +12,20 @@ type actionOpenURL struct {
 	URL string `json:"url"`
 }
 
-func (a actionOpenURL) Perform(m *menu) {
-	if err := open(a.URL); err != nil {
+func (a actionOpenURL) Perform(m *menu, parser textParser) {
+	url, err := parser.parse(a.URL)
+	if err != nil {
+		level.Error(m.logger).Log(
+			"msg", "failed to parse URL",
+			"URL", a.URL,
+			"err", err)
+		return
+	}
+
+	if err := open(url); err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform action",
-			"URL", a.URL,
+			"URL", url,
 			"err", err)
 	}
 }

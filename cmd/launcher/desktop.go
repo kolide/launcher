@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
@@ -98,7 +99,14 @@ func runDesktop(args []string) error {
 		return err
 	}
 
-	menu := menu.New(logger, *flhostname, *flmenupath)
+	td := menu.NewTemplateData(
+		menu.WithVersion(version.Version()),
+		menu.WithOSQueryVersion("TODO"),
+		menu.WithHostname(*flhostname),
+		menu.WithLogFilePath("TODO"),
+		menu.WithLauncherFlagsFilePath("TODO"),
+	)
+	menu := menu.New(logger, *flhostname, *flmenupath, td)
 	server.RegisterRefreshListener(func() {
 		menu.Build()
 	})
