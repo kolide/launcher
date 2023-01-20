@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -204,6 +205,23 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add(runner.Execute, runner.Interrupt)
 	controlService.RegisterConsumer("kolide_desktop_menu", runner)
 	controlService.RegisterSubscriber("agent_flags", runner)
+
+	// Run the notification service
+	notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
+		db,
+		runner,
+		ctx,
+		notificationconsumer.WithLogger(logger),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to set up notifier: %w", err)
+	}
+	// Runs the cleanup routine for old notification records
+	runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
+
+	if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
+		return fmt.Errorf("failed to register notify consumer: %w", err)
+	}
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
 		opts.KolideServerURL == "k2device-preprod.kolide.com" ||

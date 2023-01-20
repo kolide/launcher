@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -157,6 +158,8 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		opt(runner)
 	}
 
+	runner.writeIconFile()
+
 	return runner
 }
 
@@ -240,6 +243,29 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 			}
 		}
 	}
+}
+
+func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error {
+	errs := make([]error, 0)
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.authToken, proc.socketPath)
+		if err := client.Notify(title, body); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending notify command to desktop process",
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors sending notifications: %+v", errs)
+	}
+
+	return nil
 }
 
 // Update handles control server updates for the desktop-menu subsystem
@@ -530,6 +556,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
+		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
 	}
 
@@ -557,4 +584,22 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	}()
 
 	return cmd, nil
+}
+
+func (r *DesktopUsersProcessesRunner) writeIconFile() {
+	expectedLocation := r.iconFileLocation()
+
+	_, err := os.Stat(expectedLocation)
+
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(expectedLocation, assets.KolideDesktopIcon, 0644); err != nil {
+			level.Error(r.logger).Log("msg", "icon file did not exist, could not create it", "err", err)
+		}
+	} else if err != nil {
+		level.Error(r.logger).Log("msg", "could not check if icon file exists", "err", err)
+	}
+}
+
+func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
+	return filepath.Join(r.usersFilesRoot, assets.KolideIconFilename)
 }

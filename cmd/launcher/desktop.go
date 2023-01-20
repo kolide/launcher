@@ -50,6 +50,11 @@ func runDesktop(args []string) error {
 			false,
 			"enable debug logging",
 		)
+		flIconPath = flagset.String(
+			"icon_path",
+			"",
+			"path to icon file",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
@@ -93,7 +98,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
 	if err != nil {
 		return err
 	}
