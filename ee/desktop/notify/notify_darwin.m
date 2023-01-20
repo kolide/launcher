@@ -33,11 +33,11 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
 
     // Wait for completion handler to complete so that we get a correct value for `success`
     dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
-    dispatch_semaphore_wait(semaphore, timeout);
-
-    // If we potentially timed out, remove the pending request
-    NSArray *requests_to_remove = [NSArray arrayWithObjects:identifier, nil];
-    [center removePendingNotificationRequestsWithIdentifiers:requests_to_remove];
+    intptr_t err = dispatch_semaphore_wait(semaphore, timeout);
+    if (err  != 0) {
+        // Timed out, remove the pending request
+        [center removePendingNotificationRequestsWithIdentifiers:@[identifier]];
+    }
 
     return success;
 }
