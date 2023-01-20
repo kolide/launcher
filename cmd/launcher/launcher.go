@@ -180,7 +180,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	controlService, err := createControlService(ctx, logger, opts)
+	controlService, err := createControlService(ctx, logger, db, opts)
 	if err != nil {
 		return fmt.Errorf("failed to setup control service: %w", err)
 	}
@@ -200,7 +200,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		desktopRunner.WithAuthToken(ulid.New()),
 		desktopRunner.WithUsersFilesRoot(rootDirectory),
 		desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443"),
-		desktopRunner.WithStoredDataProvider(desktopFlagsBucketConsumer),
+		desktopRunner.WithRetriever(desktopFlagsBucketConsumer),
 	)
 	runGroup.Add(runner.Execute, runner.Interrupt)
 	controlService.RegisterConsumer("kolide_desktop_menu", runner)
