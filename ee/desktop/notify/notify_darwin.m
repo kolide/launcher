@@ -17,21 +17,23 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:identifier
         content:content trigger:nil];
 
-    __block BOOL success = YES;
+    __block BOOL success = NO;
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
             if (error != nil) {
                 NSLog(@"Could not send notification: %@", error);
-                success = NO;
+            } else {
+                success = YES;
             }
             dispatch_semaphore_signal(semaphore);
         }];
     });
 
     // Wait for completion handler to complete so that we get a correct value for `success`
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
+    dispatch_semaphore_wait(semaphore, timeout);
 
     return success;
 }
@@ -63,7 +65,8 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     });
 
     // Wait for completion handler to complete so that we get a correct value for `success`
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
+    dispatch_semaphore_wait(semaphore, timeout);
 
     return success;
 }
