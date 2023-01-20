@@ -18,13 +18,20 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
         content:content trigger:nil];
 
     __block BOOL success = YES;
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
-    [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-        if (error != nil) {
-            NSLog(@"Could not send notification: %@", error);
-            success = NO;
-        }
-    }];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+            if (error != nil) {
+                NSLog(@"Could not send notification: %@", error);
+                success = NO;
+            }
+            dispatch_semaphore_signal(semaphore);
+        }];
+    });
+
+    // Wait for completion handler to complete so that we get a correct value for `success`
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 
     return success;
 }
@@ -36,9 +43,11 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     NSString *body = [NSString stringWithUTF8String:cBody];
 
     __block BOOL success = NO;
-
     UNAuthorizationOptions options = UNAuthorizationOptionAlert;
-    [center requestAuthorizationWithOptions:options
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [center requestAuthorizationWithOptions:options
         completionHandler:^(BOOL granted, NSError *_Nullable error) {
             if (!granted) {
                 if (error != NULL) {
@@ -49,7 +58,12 @@ BOOL sendNotification(char *cTitle, char *cBody) {
             } else {
                 success = doSendNotification(center, title, body);
             }
+            dispatch_semaphore_signal(semaphore);
         }];
+    });
+
+    // Wait for completion handler to complete so that we get a correct value for `success`
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 
     return success;
 }
