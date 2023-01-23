@@ -90,10 +90,10 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 	}
 }
 
-// WithRetriever sets the key/value store for agent flags
-func WithRetriever(storedData agent.Retriever) desktopUsersProcessesRunnerOption {
+// WithGetter sets the key/value getter for agent flags
+func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.flagsRetriever = storedData
+		r.flagsGetter = storedData
 	}
 }
 
@@ -126,8 +126,8 @@ type DesktopUsersProcessesRunner struct {
 	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
-	// flagsRetriever gets agent flags
-	flagsRetriever agent.Retriever
+	// flagsGetter gets agent flags
+	flagsGetter agent.Getter
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -300,7 +300,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 func (r *DesktopUsersProcessesRunner) Ping() {
 	// agent_flags bucket has been updated, query the flags to react to changes
-	enabledRaw, err := r.flagsRetriever.Get([]byte("desktop_enabled"))
+	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled"))
 	if err != nil {
 		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
 		return

@@ -42,7 +42,7 @@ func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, 
 
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
-		control.WithRetrieverStorer(storer),
+		control.WithGetterSetter(storer),
 	}
 	service := control.New(logger, ctx, client, controlOpts...)
 

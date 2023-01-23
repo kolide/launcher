@@ -20,7 +20,7 @@ type ControlService struct {
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
-	storer          agent.RetrieverStorer
+	storer          agent.GetterSetter
 	lastFetched     map[string]string
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber

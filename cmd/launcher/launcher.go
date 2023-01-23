@@ -200,7 +200,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		desktopRunner.WithAuthToken(ulid.New()),
 		desktopRunner.WithUsersFilesRoot(rootDirectory),
 		desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443"),
-		desktopRunner.WithRetriever(desktopFlagsBucketConsumer),
+		desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 	)
 	runGroup.Add(runner.Execute, runner.Interrupt)
 	controlService.RegisterConsumer("kolide_desktop_menu", runner)

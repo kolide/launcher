@@ -1,17 +1,17 @@
 package agent
 
-// Retriever is an interface for getting data from a persistent key/value store.
-type Retriever interface {
+// Getter is an interface for getting data from a persistent key/value store.
+type Getter interface {
 	Get(key []byte) (value []byte, err error)
 }
 
-// Storer is an interface for setting data in a persistent key/value store.
-type Storer interface {
+// Setter is an interface for setting data in a persistent key/value store.
+type Setter interface {
 	Set(key, value []byte) error
 }
 
-// RetrieverStorer is an interface that groups the Get and Set methods.
-type RetrieverStorer interface {
-	Retriever
-	Storer
+// GetterSetter is an interface that groups the Get and Set methods.
+type GetterSetter interface {
+	Getter
+	Setter
 }

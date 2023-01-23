@@ -15,8 +15,8 @@ func WithRequestInterval(interval time.Duration) Option {
 	}
 }
 
-// WithRetrieverStorer sets the key/value storer for control data
-func WithRetrieverStorer(storer agent.RetrieverStorer) Option {
+// WithGetterSetter sets the key/value storer for control data
+func WithGetterSetter(storer agent.GetterSetter) Option {
 	return func(c *ControlService) {
 		c.storer = storer
 	}

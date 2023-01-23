@@ -254,7 +254,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 			// Make several instances of control service
 			for j := 0; j < tt.instances; j++ {
 				data := &TestClient{tt.subsystems, tt.hashData}
-				controlOpts := []Option{WithRetrieverStorer(storer)}
+				controlOpts := []Option{WithGetterSetter(storer)}
 
 				cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
