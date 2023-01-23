@@ -4,8 +4,6 @@
 package agent
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"fmt"
 
 	"github.com/go-kit/kit/log"
@@ -22,25 +20,20 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) error {
 
 	if pubData == nil {
 		level.Info(logger).Log("Generating new keys")
-		pub, err := secureenclave.CreateKey()
+
+		var err error
+		pubData, err = secureenclave.CreateKey()
 		if err != nil {
 			return fmt.Errorf("creating key: %w", err)
 		}
 
-		if err := storeKeyData(db, nil, ecdsaToRaw(pub)); err != nil {
+		if err := storeKeyData(db, nil, pubData); err != nil {
+			clearKeyData(logger, db)
 			return fmt.Errorf("storing key: %w", err)
 		}
-
-		k, err := secureenclave.New(*pub)
-		if err != nil {
-			return fmt.Errorf("creating secureenclave signer:, from new key %w", err)
-		}
-
-		Keys = k
-		return nil
 	}
 
-	k, err := secureenclave.New(*rawToEcdsa(pubData))
+	k, err := secureenclave.New(pubData)
 	if err != nil {
 		return fmt.Errorf("creating secureenclave signer: %w", err)
 	}
@@ -49,6 +42,7 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) error {
 	return nil
 }
 
+/*
 // TODO: These raw functions should just move into secureenclave. There's some skew between Create and New
 
 func rawToEcdsa(raw []byte) *ecdsa.PublicKey {
@@ -61,3 +55,4 @@ func rawToEcdsa(raw []byte) *ecdsa.PublicKey {
 func ecdsaToRaw(key *ecdsa.PublicKey) []byte {
 	return elliptic.Marshal(elliptic.P256(), key.X, key.Y)
 }
+*/

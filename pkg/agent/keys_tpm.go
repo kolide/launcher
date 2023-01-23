@@ -21,12 +21,15 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) error {
 	if pubData == nil || priData == nil {
 		level.Info(logger).Log("Generating new keys")
 
-		priData, pubData, err := tpm.CreateKey()
+		var err error
+		priData, pubData, err = tpm.CreateKey()
 		if err != nil {
+			clearKeyData(logger, db)
 			return fmt.Errorf("creating key: %w", err)
 		}
 
 		if err := storeKeyData(db, priData, pubData); err != nil {
+			clearKeyData(logger, db)
 			return fmt.Errorf("storing key: %w", err)
 		}
 	}
