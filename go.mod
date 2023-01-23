@@ -18,8 +18,8 @@ require (
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
-	github.com/kolide/kit v0.0.0-20220920212810-17eca5d2e6d2
-	github.com/kolide/krypto v0.0.0-20220830180245-7cb3a3940071
+	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
+	github.com/kolide/krypto v0.0.0-20230123214238-2219d22c9a17
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
@@ -40,7 +40,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/crypto v0.4.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/image v0.3.0
 	golang.org/x/net v0.4.0
@@ -74,6 +74,7 @@ require (
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
+	github.com/google/go-tpm v0.3.3 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
