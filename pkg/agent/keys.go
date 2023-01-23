@@ -2,7 +2,9 @@ package agent
 
 import (
 	"crypto"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/go-kit/kit/log"
 	"go.etcd.io/bbolt"
@@ -14,7 +16,22 @@ type keyInt interface {
 	//Type() string // Not Yet Supported by Krypto
 }
 
-var Keys keyInt
+type noopKeys struct {
+}
+
+func (n noopKeys) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) (signature []byte, err error) {
+	return nil, errors.New("Can't sign. Unconfigured keys")
+}
+
+func (n noopKeys) Public() crypto.PublicKey {
+	return nil
+}
+
+func (n noopKeys) Type() string {
+	return "noop"
+}
+
+var Keys keyInt = noopKeys{}
 
 func SetupKeys(logger log.Logger, db *bbolt.DB) error {
 	// FIXME: How do we detect failure is _hardware_ and fallback to local keys?
