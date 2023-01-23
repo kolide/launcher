@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -25,10 +26,9 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
 
-		// Various identifying keys
-		table.TextColumn("launcher_public_key"),
-		table.TextColumn("hardware_public_key"),
-		table.TextColumn("combined_key"),
+		// New hardware keys
+		table.TextColumn("signing_key"),
+		table.TextColumn("signing_key_source"),
 
 		// Old RSA Key
 		table.TextColumn("fingerprint"),
@@ -75,10 +75,11 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 		}
 
 		// No logger, so just ignore errors. generate the pem encoding if we can.
-		if eccKey, err := osquery.PublicECCKeyFromDB(db); err == nil {
+		if eccKey := agent.Keys.Public(); eccKey != nil {
 			var pem bytes.Buffer
 			if err := osquery.PublicKeyToPem(eccKey, &pem); err == nil {
-				results[0]["launcher_public_key"] = pem.String()
+				results[0]["signing_key"] = pem.String()
+				results[0]["signing_key_source"] = "TBD"
 			}
 		}
 

@@ -3,10 +3,6 @@ package osquery
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
@@ -89,8 +85,7 @@ const (
 	// DB key for last retrieved config
 	configKey = "config"
 	// DB keys for the rsa keys
-	privateKeyKey    = "privateKey"
-	privateEccKeyKey = "privateEccKey"
+	privateKeyKey = "privateKey"
 
 	// Old things to delete
 	xPublicKeyKey      = "publicKey"
@@ -260,11 +255,6 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 			return fmt.Errorf("ensuring rsa key: %w", err)
 		}
 
-		// ECC keys. These are meant as launcher install keus
-		if err := ensureEccKey(bucket); err != nil {
-			return fmt.Errorf("ensuring ecc key: %w", err)
-		}
-
 		// Remove things we don't keep in the bucket any more
 		for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
 			if err := bucket.Delete([]byte(k)); err != nil {
@@ -277,67 +267,6 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 	})
 
 	return err
-}
-
-func ensureHardwareKey(bucket *bbolt.Bucket) error {
-	return nil
-}
-
-func ensureEccKey(bucket *bbolt.Bucket) error {
-	// If it exists, we're good
-	if bucket.Get([]byte(privateEccKeyKey)) != nil {
-		return nil
-	}
-
-	// This should, maybe, move this generate into krypto. Not sure
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return fmt.Errorf("generating ecc key: %w", err)
-	}
-
-	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("marshalling key: %w", err)
-	}
-
-	if err := bucket.Put([]byte(privateEccKeyKey), keyDer); err != nil {
-		return fmt.Errorf("storing key: %w", err)
-	}
-
-	return nil
-}
-
-func PrivateECCKeyFromDB(db *bbolt.DB) (*ecdsa.PrivateKey, error) {
-	var privateKey []byte
-
-	if err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		privateKey = b.Get([]byte(privateEccKeyKey))
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("error reading private key info from db: %w", err)
-	}
-
-	key, err := x509.ParsePKCS8PrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
-	}
-
-	ecckey, ok := key.(*ecdsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Private key is not an rsa key")
-	}
-
-	return ecckey, nil
-}
-
-func PublicECCKeyFromDB(db *bbolt.DB) (crypto.PublicKey, error) {
-	privateKey, err := PrivateECCKeyFromDB(db)
-	if err != nil {
-		return nil, fmt.Errorf("reading private key: %w", err)
-	}
-
-	return privateKey.Public(), nil
 }
 
 // ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
