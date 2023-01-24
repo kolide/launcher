@@ -38,11 +38,11 @@ func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, 
 		return nil, err
 	}
 
-	storer := control.NewBucketConsumer(logger, db, "control_service_data")
+	getset := control.NewBucketConsumer(logger, db, "control_service_data")
 
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
-		control.WithGetterSetter(storer),
+		control.WithGetterSetter(getset),
 	}
 	service := control.New(logger, ctx, client, controlOpts...)
 

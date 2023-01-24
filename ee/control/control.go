@@ -20,7 +20,7 @@ type ControlService struct {
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
-	storer          agent.GetterSetter
+	getset          agent.GetterSetter
 	lastFetched     map[string]string
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
@@ -117,8 +117,8 @@ func (cs *ControlService) Fetch() error {
 
 	for subsystem, hash := range subsystems {
 		lastHash, ok := cs.lastFetched[subsystem]
-		if !ok && cs.storer != nil {
-			storedHash, err := cs.storer.Get([]byte(subsystem))
+		if !ok && cs.getset != nil {
+			storedHash, err := cs.getset.Get([]byte(subsystem))
 			if err != nil {
 				level.Debug(cs.logger).Log(
 					"msg", "failed to get last fetched hash from stored data",
@@ -172,9 +172,9 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	// Remember the hash of the last fetched version of this subsystem's data
 	cs.lastFetched[subsystem] = hash
 
-	if cs.storer != nil {
+	if cs.getset != nil {
 		// Store the hash so we can persist the last fetched data across launcher restarts
-		err = cs.storer.Set([]byte(subsystem), []byte(hash))
+		err = cs.getset.Set([]byte(subsystem), []byte(hash))
 		if err != nil {
 			level.Error(cs.logger).Log(
 				"msg", "failed to store last fetched control data",

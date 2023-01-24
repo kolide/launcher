@@ -17,7 +17,7 @@ type (
 	mockSubscriber struct {
 		pings int
 	}
-	mockStorer struct {
+	mockGetSet struct {
 		keyValues map[string]string
 	}
 )
@@ -31,11 +31,11 @@ func (ms *mockSubscriber) Ping() {
 	ms.pings++
 }
 
-func (ms *mockStorer) Get(key []byte) (value []byte, err error) {
+func (ms *mockGetSet) Get(key []byte) (value []byte, err error) {
 	return []byte(ms.keyValues[string(key)]), nil
 }
 
-func (ms *mockStorer) Set(key, value []byte) error {
+func (ms *mockGetSet) Set(key, value []byte) error {
 	ms.keyValues[string(key)] = string(value)
 	return nil
 }
@@ -249,12 +249,12 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			storer := &mockStorer{keyValues: make(map[string]string)}
+			getset := &mockGetSet{keyValues: make(map[string]string)}
 
 			// Make several instances of control service
 			for j := 0; j < tt.instances; j++ {
 				data := &TestClient{tt.subsystems, tt.hashData}
-				controlOpts := []Option{WithGetterSetter(storer)}
+				controlOpts := []Option{WithGetterSetter(getset)}
 
 				cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)

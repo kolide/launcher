@@ -15,9 +15,9 @@ func WithRequestInterval(interval time.Duration) Option {
 	}
 }
 
-// WithGetterSetter sets the key/value storer for control data
-func WithGetterSetter(storer agent.GetterSetter) Option {
+// WithGetterSetter sets the key/value getset for control data
+func WithGetterSetter(getset agent.GetterSetter) Option {
 	return func(c *ControlService) {
-		c.storer = storer
+		c.getset = getset
 	}
 }
