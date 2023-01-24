@@ -1,0 +1,8 @@
+<plist version="1.0">
+<dict>
+    <key>keychain-access-groups</key>
+	<array>
+		<string>X98UFR7HA3.com.kolide.agent</string>
+	</array>
+</dict>
+</plist>
