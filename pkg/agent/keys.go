@@ -87,7 +87,7 @@ func storeKeyData(db *bbolt.DB, pri, pub []byte) error {
 	})
 }
 
-// clearKeyData is used to clear the keys as part of error handling around new keys. It is not intented to be called
+// clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
 func clearKeyData(logger log.Logger, db *bbolt.DB) {
 	level.Info(logger).Log("msg", "Clearing keys")
