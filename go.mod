@@ -19,7 +19,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.0.0-20230124061533-be5d5ab73444
+	github.com/kolide/krypto v0.0.0-20230124221144-7aa3e8026f19
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
@@ -91,7 +91,6 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v0.9.3 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.8.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
