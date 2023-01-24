@@ -15,25 +15,33 @@ type keyInt interface {
 	Type() string
 }
 
-var Keys keyInt = keys.Noop
-var LocalDbKeys keyInt = keys.Noop
+var hardwareKeys keyInt = keys.Noop
+var localDbKeys keyInt = keys.Noop
+
+func Keys() keyInt {
+	return hardwareKeys
+}
+
+func LocalDbKeys() keyInt {
+	return localDbKeys
+}
 
 func SetupKeys(logger log.Logger, db *bbolt.DB) error {
 	var err error
 
 	// Always setup a local key
-	LocalDbKeys, err = keys.SetupLocalDbKey(logger, db)
+	localDbKeys, err = keys.SetupLocalDbKey(logger, db)
 	if err != nil {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	Keys, err = setupHardwareKeys(logger, db)
+	hardwareKeys, err = setupHardwareKeys(logger, db)
 	if err != nil {
 		// Now this is a conundrum. What should we do if there's a hardware keying error?
 		// We could return the error, and abort, but that would block launcher for working in places
 		// without keys. Inatead, we log the error and set Keys to the localDb key.
 		level.Info(logger).Log("msg", "setting up hardware keys", "err", err)
-		Keys = LocalDbKeys
+		hardwareKeys = localDbKeys
 	}
 
 	return nil

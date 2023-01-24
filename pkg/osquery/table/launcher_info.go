@@ -76,15 +76,15 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 		}
 
 		// No logger, so just ignore errors. generate the pem encoding if we can.
-		if eccKey := agent.Keys.Public(); eccKey != nil {
+		if eccKey := agent.Keys().Public(); eccKey != nil {
 			var pem bytes.Buffer
 			if err := osquery.PublicKeyToPem(eccKey, &pem); err == nil {
 				results[0]["signing_key"] = pem.String()
-				results[0]["signing_key_source"] = agent.Keys.Type()
+				results[0]["signing_key_source"] = agent.Keys().Type()
 			}
 		}
 
-		if localKey := agent.LocalDbKeys.Public(); localKey != nil {
+		if localKey := agent.LocalDbKeys().Public(); localKey != nil {
 			var pem bytes.Buffer
 			if err := osquery.PublicKeyToPem(localKey, &pem); err == nil {
 				results[0]["local_key"] = pem.String()
