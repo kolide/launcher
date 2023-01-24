@@ -83,12 +83,21 @@ func storeKeyData(db *bbolt.DB, pri, pub []byte) error {
 			return fmt.Errorf("creating bucket: %w", err)
 		}
 
-		if err := b.Put([]byte(privateEccData), pri); err != nil {
-			return err
+		// It's not really clear what we should do if this is called with a nil pri or pub. We
+		// could delete the key data, but that feels like the wrong thing -- what if there's a
+		// weird caller error? So, in the event of nils, we skip the write. We may revisit this
+		// as we learn more
+
+		if pri != nil {
+			if err := b.Put([]byte(privateEccData), pri); err != nil {
+				return err
+			}
 		}
 
-		if err := b.Put([]byte(publicEccData), pub); err != nil {
-			return err
+		if pub != nil {
+			if err := b.Put([]byte(publicEccData), pub); err != nil {
+				return err
+			}
 		}
 
 		return nil
