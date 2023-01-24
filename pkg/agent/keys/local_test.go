@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -14,7 +13,7 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	db := setupDb(t)
-	logger := log.NewJSONLogger(os.Stderr) //log.NewNopLogger()
+	logger := log.NewNopLogger()
 
 	key, err := SetupLocalDbKey(logger, db)
 	require.NoError(t, err)

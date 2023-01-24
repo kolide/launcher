@@ -40,7 +40,7 @@ func SetupKeys(logger log.Logger, db *bbolt.DB) error {
 		// Now this is a conundrum. What should we do if there's a hardware keying error?
 		// We could return the error, and abort, but that would block launcher for working in places
 		// without keys. Inatead, we log the error and set Keys to the localDb key.
-		level.Info(logger).Log("msg", "setting up hardware keys", "err", err)
+		level.Info(logger).Log("msg", "Failed to setting up hardware keys, falling back to local DB keys", "err", err)
 		hardwareKeys = localDbKeys
 	}
 
