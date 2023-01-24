@@ -26,9 +26,10 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
 
-		// New hardware keys
+		// New hardware and local keys
 		table.TextColumn("signing_key"),
 		table.TextColumn("signing_key_source"),
+		table.TextColumn("local_key"),
 
 		// Old RSA Key
 		table.TextColumn("fingerprint"),
@@ -80,6 +81,13 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			if err := osquery.PublicKeyToPem(eccKey, &pem); err == nil {
 				results[0]["signing_key"] = pem.String()
 				results[0]["signing_key_source"] = "TBD"
+			}
+		}
+
+		if localKey := agent.LocalDbKeys.Public(); localKey != nil {
+			var pem bytes.Buffer
+			if err := osquery.PublicKeyToPem(localKey, &pem); err == nil {
+				results[0]["local_key"] = pem.String()
 			}
 		}
 

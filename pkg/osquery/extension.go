@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/mixer/clock"
@@ -181,6 +182,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
+	if err := agent.SetupKeys(opts.Logger, db); err != nil {
+		return nil, fmt.Errorf("setting up agent keys: %w", err)
+	}
+
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
@@ -263,7 +268,6 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 		}
 
 		return nil
-
 	})
 
 	return err
