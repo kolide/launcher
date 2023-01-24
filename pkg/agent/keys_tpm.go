@@ -12,10 +12,10 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func setupHardwareKeys(logger log.Logger, db *bbolt.DB) error {
+func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 	priData, pubData, err := fetchKeyData(db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if pubData == nil || priData == nil {
@@ -25,20 +25,19 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) error {
 		priData, pubData, err = tpm.CreateKey()
 		if err != nil {
 			clearKeyData(logger, db)
-			return fmt.Errorf("creating key: %w", err)
+			return nil, fmt.Errorf("creating key: %w", err)
 		}
 
 		if err := storeKeyData(db, priData, pubData); err != nil {
 			clearKeyData(logger, db)
-			return fmt.Errorf("storing key: %w", err)
+			return nil, fmt.Errorf("storing key: %w", err)
 		}
 	}
 
 	k, err := tpm.New(priData, pubData)
 	if err != nil {
-		return fmt.Errorf("creating tpm signer:, from new key %w", err)
+		return nil, fmt.Errorf("creating tpm signer:, from new key %w", err)
 	}
 
-	Keys = k
-	return nil
+	return k, nil
 }

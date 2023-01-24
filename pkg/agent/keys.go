@@ -2,12 +2,11 @@ package agent
 
 import (
 	"crypto"
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent/keys"
 	"go.etcd.io/bbolt"
 )
 
@@ -16,26 +15,28 @@ type keyInt interface {
 	//Type() string // Not Yet Supported by Krypto
 }
 
-type noopKeys struct {
-}
-
-func (n noopKeys) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) (signature []byte, err error) {
-	return nil, errors.New("Can't sign. Unconfigured keys")
-}
-
-func (n noopKeys) Public() crypto.PublicKey {
-	return nil
-}
-
-func (n noopKeys) Type() string {
-	return "noop"
-}
-
-var Keys keyInt = noopKeys{}
+var Keys keyInt = keys.Noop
+var LocalDbKeys keyInt = keys.Noop
 
 func SetupKeys(logger log.Logger, db *bbolt.DB) error {
-	// FIXME: How do we detect failure is _hardware_ and fallback to local keys?
-	return setupHardwareKeys(logger, db)
+	var err error
+
+	// Always setup a local key
+	LocalDbKeys, err = keys.SetupLocalDbKey(logger, db)
+	if err != nil {
+		return fmt.Errorf("setting up local db keys: %w", err)
+	}
+
+	Keys, err = setupHardwareKeys(logger, db)
+	if err != nil {
+		// Now this is a conundrum. What should we do if there's a hardware keying error?
+		// We could return the error, and abort, but that would block launcher for working in places
+		// without keys. Inatead, we log the error and set Keys to the localDb key.
+		level.Info(logger).Log("msg", "setting up hardware keys", "err", err)
+		Keys = LocalDbKeys
+	}
+
+	return nil
 }
 
 // This duplicates some of pkg/osquery/extension.go but that feels like the wrong place.
