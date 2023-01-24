@@ -36,7 +36,7 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 
 	k, err := tpm.New(priData, pubData)
 	if err != nil {
-		return nil, fmt.Errorf("creating tpm signer:, from new key %w", err)
+		return nil, fmt.Errorf("creating tpm signer: from new key: %w", err)
 	}
 
 	return k, nil
