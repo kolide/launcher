@@ -28,7 +28,8 @@ func (k dbKey) Type() string {
 }
 
 func SetupLocalDbKey(logger log.Logger, db *bbolt.DB) (*dbKey, error) {
-	if key, err := fetchKey(db); key != nil && err != nil {
+	if key, err := fetchKey(db); key != nil && err == nil {
+		level.Info(logger).Log("msg", "found local key in database")
 		return &dbKey{key}, nil
 	} else if err != nil {
 		level.Info(logger).Log("msg", "Failed to parse key, regenerating", "err", err)
@@ -73,7 +74,7 @@ func fetchKey(db *bbolt.DB) (*ecdsa.PrivateKey, error) {
 }
 
 func storeKey(db *bbolt.DB, key *ecdsa.PrivateKey) error {
-	raw, err := x509.MarshalPKIXPublicKey(key)
+	raw, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
 		return fmt.Errorf("marshaling key: %w", err)
 	}
