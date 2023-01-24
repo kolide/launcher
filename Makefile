@@ -65,6 +65,7 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 	cp tools/images/Kolide.icns $@/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
 	cp tools/packaging/embedded.provisionprofile $@/Contents/
+	cp tools/packaging/entitlements $@/Contents/
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
@@ -172,7 +173,7 @@ install-local-fake-update: build_launcher
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
 codesign-darwin:
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --timestamp ./build/darwin*/*
+	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --entitlements tools/packaging/entitlements.plist --timestamp ./build/darwin*/*
 
 notarize-darwin: codesign-darwin
 	rm -f build/notarization-upload.zip
