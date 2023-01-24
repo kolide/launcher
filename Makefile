@@ -65,7 +65,7 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 	cp tools/images/Kolide.icns $@/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
 	cp tools/packaging/embedded.provisionprofile $@/Contents/
-	cp tools/packaging/entitlements $@/Contents/
+	cp tools/packaging/entitlements.plist $@/../
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
@@ -86,6 +86,7 @@ github-build-no-cross: $(foreach t, $(GITHUB_TARGETS), build_$(t))
 github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
 github-launcherapp: $(foreach a, $(GITHUB_ARCHS) universal, build/darwin.$(a)/Kolide.app)
+
 
 ##
 ## Cross Build targets
