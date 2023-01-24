@@ -12,7 +12,7 @@ import (
 
 type keyInt interface {
 	crypto.Signer
-	//Type() string // Not Yet Supported by Krypto
+	Type() string
 }
 
 var Keys keyInt = keys.Noop

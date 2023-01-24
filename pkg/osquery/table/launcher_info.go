@@ -80,7 +80,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			var pem bytes.Buffer
 			if err := osquery.PublicKeyToPem(eccKey, &pem); err == nil {
 				results[0]["signing_key"] = pem.String()
-				results[0]["signing_key_source"] = "TBD"
+				results[0]["signing_key_source"] = agent.Keys.Type()
 			}
 		}
 
