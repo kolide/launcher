@@ -174,7 +174,7 @@ install-local-fake-update: build_launcher
 # required we add `library`. This was fixed in 10.15.4. (from
 # macadmins slack)
 codesign-darwin:
-	codesign --force -s "${CODESIGN_IDENTITY}" -v --options runtime,library --entitlements tools/packaging/entitlements.plist --timestamp ./build/darwin*/*
+	codesign --force -s "X98UFR7HA3" -v --options runtime,library --entitlements tools/packaging/entitlements.plist --timestamp ./build/darwin*/*
 
 notarize-darwin: codesign-darwin
 	rm -f build/notarization-upload.zip

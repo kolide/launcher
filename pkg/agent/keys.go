@@ -27,6 +27,8 @@ func LocalDbKeys() keyInt {
 }
 
 func SetupKeys(logger log.Logger, db *bbolt.DB) error {
+	logger = log.With(logger, "component", "agentkeys")
+
 	var err error
 
 	// Always setup a local key

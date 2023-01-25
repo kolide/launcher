@@ -19,7 +19,7 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 	}
 
 	if pubData == nil || priData == nil {
-		level.Info(logger).Log("Generating new keys")
+		level.Info(logger).Log("msg", "Generating new keys")
 
 		var err error
 		priData, pubData, err = tpm.CreateKey()
