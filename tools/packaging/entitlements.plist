@@ -1,8 +1,6 @@
 <plist version="1.0">
 <dict>
-    <key>keychain-access-groups</key>
-	<array>
-		<string>X98UFR7HA3.com.kolide.agent</string>
-	</array>
+    <key>com.apple.developer.team-identifier</key>
+    <string>X98UFR7HA3</string>
 </dict>
 </plist>
