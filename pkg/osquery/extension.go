@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/mixer/clock"
@@ -85,9 +86,11 @@ const (
 	// DB key for last retrieved config
 	configKey = "config"
 	// DB keys for the rsa keys
-	privateKeyKey     = "privateKey"
-	publicKeyKey      = "publicKey"
-	keyFingerprintKey = "keyFingerprint"
+	privateKeyKey = "privateKey"
+
+	// Old things to delete
+	xPublicKeyKey      = "publicKey"
+	xKeyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -179,6 +182,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
+	if err := agent.SetupKeys(opts.Logger, db); err != nil {
+		return nil, fmt.Errorf("setting up agent keys: %w", err)
+	}
+
 	identifier, err := IdentifierFromDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
@@ -234,6 +241,12 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.db)
 }
 
+// SetupLauncherKeys configures the various keys used for communication.
+//
+// There are 3 keys:
+// 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
+// 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
+// 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
 func SetupLauncherKeys(db *bbolt.DB) error {
 	err := db.Update(func(tx *bbolt.Tx) error {
 
@@ -242,53 +255,51 @@ func SetupLauncherKeys(db *bbolt.DB) error {
 			return fmt.Errorf("creating bucket: %w", err)
 		}
 
-		// This only checks the private key, but it should possibly check all the values we're setting.
-		if bucket.Get([]byte(privateKeyKey)) != nil {
-			return nil
+		// Soon-to-be-deprecated RSA keys
+		if err := ensureRsaKey(bucket); err != nil {
+			return fmt.Errorf("ensuring rsa key: %w", err)
 		}
 
-		key, err := rsaRandomKey()
-		if err != nil {
-			return fmt.Errorf("generating key: %w", err)
-		}
-
-		fingerprint, err := rsaFingerprint(key)
-		if err != nil {
-			return fmt.Errorf("generating fingerprint: %w", err)
-		}
-
-		var pub bytes.Buffer
-		if err := RsaPrivateKeyToPem(key, &pub); err != nil {
-			return fmt.Errorf("marshalling pub: %w", err)
-		}
-
-		keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-		if err != nil {
-			return fmt.Errorf("marshalling key: %w", err)
-		}
-
-		if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
-			return fmt.Errorf("storing key: %w", err)
-		}
-
-		if err := bucket.Put([]byte(publicKeyKey), pub.Bytes()); err != nil {
-			return fmt.Errorf("storing public key: %w", err)
-
-		}
-
-		if err := bucket.Put([]byte(keyFingerprintKey), []byte(fingerprint)); err != nil {
-			return fmt.Errorf("storing fingerprint: %w", err)
+		// Remove things we don't keep in the bucket any more
+		for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
+			if err := bucket.Delete([]byte(k)); err != nil {
+				return fmt.Errorf("deleting %s: %w", k, err)
+			}
 		}
 
 		return nil
 	})
 
 	return err
-
 }
 
-// PrivateKeyFromDB returns the private launcher key. This is used to authenticate various launcher communications.
-func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
+// ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
+func ensureRsaKey(bucket *bbolt.Bucket) error {
+	// If it exists, we're good
+	if bucket.Get([]byte(privateKeyKey)) != nil {
+		return nil
+	}
+
+	// Create a random key
+	key, err := rsaRandomKey()
+	if err != nil {
+		return fmt.Errorf("generating key: %w", err)
+	}
+
+	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("marshalling key: %w", err)
+	}
+
+	if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
+		return fmt.Errorf("storing key: %w", err)
+	}
+
+	return nil
+}
+
+// PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
+func PrivateRSAKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	var privateKey []byte
 
 	if err := db.View(func(tx *bbolt.Tx) error {
@@ -312,21 +323,24 @@ func PrivateKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 	return rsakey, nil
 }
 
-// PublicKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicKeyFromDB(db *bbolt.DB) (string, string, error) {
-	var publicKey []byte
-	var fingerprint []byte
-
-	if err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		publicKey = b.Get([]byte(publicKeyKey))
-		fingerprint = b.Get([]byte(keyFingerprintKey))
-		return nil
-	}); err != nil {
-		return "", "", fmt.Errorf("error reading public key info from db: %w", err)
+// PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
+func PublicRSAKeyFromDB(db *bbolt.DB) (string, string, error) {
+	privateKey, err := PrivateRSAKeyFromDB(db)
+	if err != nil {
+		return "", "", fmt.Errorf("reading private key: %w", err)
 	}
 
-	return string(publicKey), string(fingerprint), nil
+	fingerprint, err := rsaFingerprint(privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("generating fingerprint: %w", err)
+	}
+
+	var publicKey bytes.Buffer
+	if err := RsaPrivateKeyToPem(privateKey, &publicKey); err != nil {
+		return "", "", fmt.Errorf("marshalling pub: %w", err)
+	}
+
+	return publicKey.String(), fingerprint, nil
 }
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
