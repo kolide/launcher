@@ -3,7 +3,6 @@ package localserver
 import (
 	"encoding/base64"
 	"net/http"
-	"net/url"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -25,7 +24,7 @@ func NewKryptoDeterminerMiddleware(logger log.Logger, rsaMiddleware *kryptoBoxer
 	}
 }
 
-func (h *kryptoDeterminerMiddleware) determineKryptoUnwrap(next http.Handler) http.Handler {
+func (h *kryptoDeterminerMiddleware) determineKryptoUnwrap(nextRsa, nextEc http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
@@ -55,42 +54,79 @@ func (h *kryptoDeterminerMiddleware) determineKryptoUnwrap(next http.Handler) ht
 
 		// if we have these 2 fields, assume it's ec krypto
 		if outerChallenge.Sig != nil && outerChallenge.Msg != nil {
-			h.ecMiddleware.unwrap(next).ServeHTTP(w, r)
+			h.ecMiddleware.unwrap(nextEc).ServeHTTP(w, r)
 			return
 		}
 
-		h.rsaMiddleware.UnwrapV1Hander(next).ServeHTTP(w, r)
+		h.rsaMiddleware.UnwrapV1Hander(nextRsa).ServeHTTP(w, r)
 	})
 }
 
-func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isEcKryptoType(r.URL.Query()) {
-			h.ecMiddleware.wrapHandler(next).ServeHTTP(w, r)
-			return
-		}
+// func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		if isEcKryptoType(r.URL.Query()) {
+// 			h.ecMiddleware.wrapHandler(next).ServeHTTP(w, r)
+// 			return
+// 		}
 
-		h.rsaMiddleware.Wrap(next).ServeHTTP(w, r)
-		return
-	})
-}
+// 		h.rsaMiddleware.Wrap(next).ServeHTTP(w, r)
+// 		return
+// 	})
+// }
 
-func (h *kryptoDeterminerMiddleware) determineKryptoWrapPng(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isEcKryptoType(r.URL.Query()) {
-			h.ecMiddleware.wrapPngHandler(next).ServeHTTP(w, r)
-			return
-		}
+// func (h *kryptoDeterminerMiddleware) determineKryptoWrapPng(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		if isEcKryptoType(r.URL.Query()) {
+// 			h.ecMiddleware.wrapPngHandler(next).ServeHTTP(w, r)
+// 			return
+// 		}
 
-		h.rsaMiddleware.WrapPng(next).ServeHTTP(w, r)
-		return
-	})
-}
+// 		h.rsaMiddleware.WrapPng(next).ServeHTTP(w, r)
+// 		return
+// 	})
+// }
 
-func isEcKryptoType(urlValues url.Values) bool {
-	kryptoType := urlValues.Get("krypto-type")
-	if kryptoType == "ec" {
-		return true
-	}
-	return false
-}
+// func (e *kryptoEcMiddleware) wrap(next http.Handler, r *http.Request, w http.ResponseWriter, toPng bool) (string, error) {
+// 	bhr := &bufferedHttpResponse{}
+// 	next.ServeHTTP(bhr, r)
+
+// 	boxRaw := r.URL.Query().Get("box")
+// 	if boxRaw == "" {
+// 		return "", fmt.Errorf("no data in box query parameter")
+// 	}
+
+// 	challengeBytes, err := base64.StdEncoding.DecodeString(boxRaw)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	challengeBox, err := challenge.UnmarshalChallenge(challengeBytes)
+// 	if err != nil {
+// 		return "", fmt.Errorf("marshaling outer challenge: %w", err)
+// 	}
+
+// 	var responseBytes []byte
+// 	switch toPng {
+// 	case true:
+// 		responseBytes, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
+// 		if err != nil {
+// 			return "", fmt.Errorf("failed to create challenge response to png: %w", err)
+// 		}
+
+// 	case false:
+// 		responseBytes, err = challengeBox.Respond(e.signer, bhr.Bytes())
+// 		if err != nil {
+// 			return "", fmt.Errorf("failed to create challenge response: %w", err)
+// 		}
+// 	}
+
+// 	return base64.StdEncoding.EncodeToString(responseBytes), nil
+// }
+
+// func isEcKryptoType(urlValues url.Values) bool {
+// 	kryptoType := urlValues.Get("krypto-type")
+// 	if kryptoType == "ec" {
+// 		return true
+// 	}
+// 	return false
+// }

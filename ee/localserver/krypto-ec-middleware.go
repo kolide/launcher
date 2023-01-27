@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -75,9 +74,6 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 			v.Set("id", cmdReq.Id)
 		}
 
-		v.Set("box", boxRaw)
-		v.Set("krypto-type", "ec")
-
 		newReq := &http.Request{
 			Method: "GET",
 			URL: &url.URL{
@@ -88,69 +84,62 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 			},
 		}
 
-		next.ServeHTTP(w, newReq)
-	})
-}
+		bhr := &bufferedHttpResponse{}
+		next.ServeHTTP(bhr, newReq)
 
-func (e *kryptoEcMiddleware) wrapPngHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		result, err := e.wrap(next, r, w, true)
+		var response []byte
+
+		switch cmdReq.Cmd {
+		case "id":
+			response, err = challengeBox.Respond(e.signer, bhr.Bytes())
+		case "id.png":
+			// TODO: png stuff
+			response, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
+		}
+
 		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to wrap response to png", "err", err)
+			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		w.Write([]byte(result))
+		w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
 	})
 }
 
-func (e *kryptoEcMiddleware) wrapHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		result, err := e.wrap(next, r, w, false)
-		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to wrap response", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+// func (e *kryptoEcMiddleware) wrap(next http.Handler, r *http.Request, w http.ResponseWriter, toPng bool) (string, error) {
+// 	bhr := &bufferedHttpResponse{}
+// 	next.ServeHTTP(bhr, r)
 
-		w.Write([]byte(result))
-	})
-}
+// 	boxRaw := r.URL.Query().Get("box")
+// 	if boxRaw == "" {
+// 		return "", fmt.Errorf("no data in box query parameter")
+// 	}
 
-func (e *kryptoEcMiddleware) wrap(next http.Handler, r *http.Request, w http.ResponseWriter, toPng bool) (string, error) {
-	bhr := &bufferedHttpResponse{}
-	next.ServeHTTP(bhr, r)
+// 	challengeBytes, err := base64.StdEncoding.DecodeString(boxRaw)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	boxRaw := r.URL.Query().Get("box")
-	if boxRaw == "" {
-		return "", fmt.Errorf("no data in box query parameter")
-	}
+// 	challengeBox, err := challenge.UnmarshalChallenge(challengeBytes)
+// 	if err != nil {
+// 		return "", fmt.Errorf("marshaling outer challenge: %w", err)
+// 	}
 
-	challengeBytes, err := base64.StdEncoding.DecodeString(boxRaw)
-	if err != nil {
-		return "", err
-	}
+// 	var responseBytes []byte
+// 	switch toPng {
+// 	case true:
+// 		responseBytes, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
+// 		if err != nil {
+// 			return "", fmt.Errorf("failed to create challenge response to png: %w", err)
+// 		}
 
-	challengeBox, err := challenge.UnmarshalChallenge(challengeBytes)
-	if err != nil {
-		return "", fmt.Errorf("marshaling outer challenge: %w", err)
-	}
+// 	case false:
+// 		responseBytes, err = challengeBox.Respond(e.signer, bhr.Bytes())
+// 		if err != nil {
+// 			return "", fmt.Errorf("failed to create challenge response: %w", err)
+// 		}
+// 	}
 
-	var responseBytes []byte
-	switch toPng {
-	case true:
-		responseBytes, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
-		if err != nil {
-			return "", fmt.Errorf("failed to create challenge response to png: %w", err)
-		}
-
-	case false:
-		responseBytes, err = challengeBox.Respond(e.signer, bhr.Bytes())
-		if err != nil {
-			return "", fmt.Errorf("failed to create challenge response: %w", err)
-		}
-	}
-
-	return base64.StdEncoding.EncodeToString(responseBytes), nil
-}
+// 	return base64.StdEncoding.EncodeToString(responseBytes), nil
+// }

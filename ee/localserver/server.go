@@ -92,21 +92,26 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 
 	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(ls.logger, kbm, ecKryptoMiddleware)
 
-	authedMux := http.NewServeMux()
-	authedMux.HandleFunc("/", http.NotFound)
-	authedMux.HandleFunc("/ping", pongHandler)
-	authedMux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
-	authedMux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
+	rsaAuthedMux := http.NewServeMux()
+	rsaAuthedMux.HandleFunc("/", http.NotFound)
+	rsaAuthedMux.HandleFunc("/ping", pongHandler)
+	rsaAuthedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+	rsaAuthedMux.Handle("/id.png", kbm.Wrap(ls.requestIdHandler()))
+
+	ecAuthedMux := http.NewServeMux()
+	// ecAuthedMux.HandleFunc("/ping", pongHandler)
+	ecAuthedMux.Handle("/id", ls.requestIdHandler())
+	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware.determineKryptoUnwrap(ls.requestLoggingHandler(authedMux)))
+	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware.determineKryptoUnwrap(ls.requestLoggingHandler(rsaAuthedMux), ls.requestLoggingHandler(ecAuthedMux)))
 
 	// Generally we wouldn't run without auth in production. But some debugging usagemight enable it
 	if ls.allowNoAuth {
-		mux.HandleFunc("/ping", pongHandler)
-		mux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
-		mux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
+		// mux.HandleFunc("/ping", pongHandler)
+		// mux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
+		// mux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
 	}
 
 	srv := &http.Server{

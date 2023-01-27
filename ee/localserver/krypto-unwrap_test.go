@@ -105,7 +105,7 @@ func TestUnwrapV0(t *testing.T) {
 
 			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm, nil)
 
-			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(makeTestHandler(t))
+			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(makeTestHandler(t), nil)
 			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
