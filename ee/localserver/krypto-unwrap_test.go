@@ -102,7 +102,9 @@ func TestUnwrapV0(t *testing.T) {
 			kbm, err := NewKryptoBoxerMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyPub)
 			require.NoError(t, err)
 
-			h := kbm.UnwrapV1Hander(makeTestHandler(t))
+			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm, nil)
+
+			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(makeTestHandler(t))
 			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
@@ -143,7 +145,6 @@ func makeTestHandler(t *testing.T) http.Handler {
 }
 
 func makeRequest(t *testing.T, boxParameter string) *http.Request {
-
 	v := url.Values{}
 
 	if boxParameter != "" {

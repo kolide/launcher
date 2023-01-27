@@ -299,6 +299,8 @@ github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab h1:KVR7cs+oPyy85i+8t1Za
 github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/krypto v0.0.0-20230124221144-7aa3e8026f19 h1:b0FSwbglXVIGibJlRdQ9mDc37hBWomHNIk5/8AWJbR8=
 github.com/kolide/krypto v0.0.0-20230124221144-7aa3e8026f19/go.mod h1:PvKvoNvMWfyPXZN9/yXNrGtAasI2b+sc8RpwkCJGzzc=
+github.com/kolide/krypto v0.0.0-20230126211550-c8628ab4eb04 h1:Cg6Hx49kLGin2WR9h12Ptp9uzzzXY3jvQaU7+vpdVC0=
+github.com/kolide/krypto v0.0.0-20230126211550-c8628ab4eb04/go.mod h1:PvKvoNvMWfyPXZN9/yXNrGtAasI2b+sc8RpwkCJGzzc=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80/go.mod h1:x3dEGYbZovhD1t8OwEgdyu/4ZCvrn9QvkbPtOZnul8k=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

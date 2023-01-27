@@ -2,6 +2,8 @@ package localserver
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
@@ -15,6 +17,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
+	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.etcd.io/bbolt"
@@ -45,8 +49,14 @@ type localServer struct {
 	allowNoAuth  bool
 	kolideServer string
 
-	myKey     *rsa.PrivateKey
-	serverKey *rsa.PublicKey
+	myKey   *rsa.PrivateKey
+	myEcKey crypto.Signer
+
+	serverKey   *rsa.PublicKey
+	serverEcKey *ecdsa.PublicKey
+
+	// remove this when done testing
+	serverPrivateKeyForTest *ecdsa.PrivateKey
 }
 
 const (
@@ -59,6 +69,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 		logger:       log.With(logger, "component", "localserver"),
 		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer: kolideServer,
+		myEcKey:      agent.Keys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -80,21 +91,25 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
 
+	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
+
+	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(ls.logger, kbm, ecKryptoMiddleware)
+
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/", http.NotFound)
 	authedMux.HandleFunc("/ping", pongHandler)
-	authedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-	authedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
+	authedMux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
+	authedMux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", kbm.UnwrapV1Hander(ls.requestLoggingHandler(authedMux)))
+	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware.determineKryptoUnwrap(ls.requestLoggingHandler(authedMux)))
 
-	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
+	// Generally we wouldn't run without auth in production. But some debugging usagemight enable it
 	if ls.allowNoAuth {
 		mux.HandleFunc("/ping", pongHandler)
-		mux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-		mux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
+		mux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
+		mux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
 	}
 
 	srv := &http.Server{
@@ -138,6 +153,14 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	}
 
 	ls.serverKey = serverKey
+
+	testServerPrivateKey, err := echelper.GenerateEcdsaKey()
+	if err != nil {
+		return fmt.Errorf("generating test server private key: %w", err)
+	}
+
+	ls.serverEcKey = &testServerPrivateKey.PublicKey
+	ls.serverPrivateKeyForTest = testServerPrivateKey
 
 	return nil
 }
