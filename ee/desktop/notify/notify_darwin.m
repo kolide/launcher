@@ -49,7 +49,7 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     NSString *body = [NSString stringWithUTF8String:cBody];
 
     __block BOOL success = NO;
-    UNAuthorizationOptions options = UNAuthorizationOptionAlert;
+    UNAuthorizationOptions options = (UNAuthorizationOptionAlert | UNAuthorizationStatusProvisional);
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
