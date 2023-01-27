@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
@@ -27,55 +26,51 @@ func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
 	counterpartyKey, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
 
-	expectedCmd := ulid.New()
 	challengeId := []byte(ulid.New())
+	challengeData := []byte(ulid.New())
+	expectedCmd := ulid.New()
 	cmdReq := mustMarshal(t, cmdRequestType{Cmd: expectedCmd})
 
 	var tests = []struct {
 		name      string
-		boxParam  func() string
+		boxParam  func() []byte
 		loggedErr string
 	}{
 		{
 			name:      "no command",
-			boxParam:  func() string { return "" },
+			boxParam:  func() []byte { return []byte("") },
 			loggedErr: "no data in box query parameter",
 		},
 		{
-			name:      "bad base64",
-			boxParam:  func() string { return "This is not base64" },
-			loggedErr: "unable to base64 decode box",
-		},
-		{
 			name:      "no signature",
-			boxParam:  func() string { return "aGVsbG8gd29ybGQK" },
+			boxParam:  func() []byte { return []byte("aGVsbG8gd29ybGQK") },
 			loggedErr: "unable to verify box",
 		},
 		{
 			name: "malformed cmd",
-			boxParam: func() string {
-				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, []byte("malformed stuff"))
+			boxParam: func() []byte {
+				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, challengeData, []byte("malformed stuff"))
 				require.NoError(t, err)
-				return mustMarshallChallenge(t, challenge)
+				return challenge
 			},
 			loggedErr: "unable to unmarshal cmd request",
 		},
 		{
 			name: "wrong signature",
-			boxParam: func() string {
+			boxParam: func() []byte {
 				malloryKey, err := echelper.GenerateEcdsaKey()
 				require.NoError(t, err)
-				challenge, _, err := challenge.Generate(malloryKey, challengeId, cmdReq)
-				return mustMarshallChallenge(t, challenge)
+				challenge, _, err := challenge.Generate(malloryKey, challengeId, challengeData, cmdReq)
+				return challenge
 			},
 			loggedErr: "unable to verify signature",
 		},
 		{
 			name: "works",
-			boxParam: func() string {
-				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, cmdReq)
+			boxParam: func() []byte {
+				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
 				require.NoError(t, err)
-				return mustMarshallChallenge(t, challenge)
+				return challenge
 			},
 		},
 	}
@@ -92,7 +87,7 @@ func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
 
 			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware)
 
-			boxParam := tt.boxParam()
+			boxParam := base64.StdEncoding.EncodeToString(tt.boxParam())
 			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(makeTestHandler(t))
 			req := makeRequest(t, boxParam)
 
@@ -123,43 +118,30 @@ func TestKryptoEcMiddlewareWrap(t *testing.T) {
 
 	challengeData := []byte(ulid.New())
 	challengeId := []byte(ulid.New())
+	expectedCmd := ulid.New()
+	cmdReq := mustMarshal(t, cmdRequestType{Cmd: expectedCmd})
 
 	var tests = []struct {
 		name          string
-		challengeFunc func() (string, *[32]byte)
+		challengeFunc func() ([]byte, *[32]byte)
 		loggedErr     string
 	}{
 		{
 			name:          "no command",
-			challengeFunc: func() (string, *[32]byte) { return "", nil },
+			challengeFunc: func() ([]byte, *[32]byte) { return []byte(""), nil },
 			loggedErr:     "no data in box query parameter",
 		},
 		{
-			name:          "bad base64",
-			challengeFunc: func() (string, *[32]byte) { return "This is not base64", nil },
-			loggedErr:     "unable to base64 decode box",
-		},
-		{
 			name:          "no signature",
-			challengeFunc: func() (string, *[32]byte) { return "aGVsbG8gd29ybGQK", nil },
-			loggedErr:     "unable to marshall outer challenge",
-		},
-		{
-			name: "wrong signature",
-			challengeFunc: func() (string, *[32]byte) {
-				malloryKey, err := echelper.GenerateEcdsaKey()
-				require.NoError(t, err)
-				challenge, priv, err := challenge.Generate(malloryKey, challengeId, challengeData)
-				return mustMarshallChallenge(t, challenge), priv
-			},
-			loggedErr: "invalid signature",
+			challengeFunc: func() ([]byte, *[32]byte) { return []byte("aGVsbG8gd29ybGQK"), nil },
+			loggedErr:     "failed to wrap response",
 		},
 		{
 			name: "works",
-			challengeFunc: func() (string, *[32]byte) {
-				challenge, privKey, err := challenge.Generate(counterpartyKey, challengeId, challengeData)
+			challengeFunc: func() ([]byte, *[32]byte) {
+				challenge, privKey, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
 				require.NoError(t, err)
-				return mustMarshallChallenge(t, challenge), privKey
+				return challenge, privKey
 			},
 		},
 	}
@@ -178,7 +160,7 @@ func TestKryptoEcMiddlewareWrap(t *testing.T) {
 			generatedChallenge, privKey := tt.challengeFunc()
 
 			h := kryptoDeterminerMiddleware.determineKryptoWrap(makeTestHandler(t))
-			req := makeEcWrapRequest(t, generatedChallenge)
+			req := makeEcWrapRequest(t, base64.StdEncoding.EncodeToString(generatedChallenge))
 
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
@@ -195,17 +177,16 @@ func TestKryptoEcMiddlewareWrap(t *testing.T) {
 			resultBytes, err := base64.StdEncoding.DecodeString(b64string)
 			require.NoError(t, err)
 
-			var challengeResponse challenge.OuterResponse
-			require.NoError(t, msgpack.Unmarshal(resultBytes, &challengeResponse))
-			assert.Equal(t, challengeId, challengeResponse.ChallengeId)
+			challengeBox, err := challenge.UnmarshalResponse(resultBytes)
+			require.NoError(t, err)
 
-			opened, err := challenge.OpenResponse(*privKey, challengeResponse)
+			opened, err := challengeBox.Open(*privKey)
 			require.NoError(t, err)
 			assert.Equal(t, challengeData, opened.ChallengeData)
 
 			// now test png unwrap
 			h = kryptoDeterminerMiddleware.determineKryptoWrapPng(makeTestHandler(t))
-			req = makeEcWrapRequest(t, generatedChallenge)
+			req = makeEcWrapRequest(t, base64.StdEncoding.EncodeToString(generatedChallenge))
 
 			rr = httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
@@ -216,17 +197,12 @@ func TestKryptoEcMiddlewareWrap(t *testing.T) {
 			resultBytes, err = base64.StdEncoding.DecodeString(b64string)
 			require.NoError(t, err)
 
-			opened, err = challenge.OpenResponsePng(*privKey, resultBytes)
+			challengeBox, err = challenge.UnmarshalResponsePng(resultBytes)
+			opened, err = challengeBox.Open(*privKey)
 			require.NoError(t, err)
 			assert.Equal(t, challengeData, opened.ChallengeData)
 		})
 	}
-}
-
-func mustMarshallChallenge(t *testing.T, challenge *challenge.OuterChallenge) string {
-	challengeBytes, err := msgpack.Marshal(challenge)
-	require.NoError(t, err)
-	return base64.StdEncoding.EncodeToString(challengeBytes)
 }
 
 func makeEcWrapRequest(t *testing.T, boxParameter string) *http.Request {

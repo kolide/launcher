@@ -66,7 +66,7 @@ func (h *kryptoDeterminerMiddleware) determineKryptoUnwrap(next http.Handler) ht
 func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isEcKryptoType(r.URL.Query()) {
-			h.ecMiddleware.wrap(next).ServeHTTP(w, r)
+			h.ecMiddleware.wrapHandler(next).ServeHTTP(w, r)
 			return
 		}
 
@@ -78,7 +78,7 @@ func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http
 func (h *kryptoDeterminerMiddleware) determineKryptoWrapPng(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isEcKryptoType(r.URL.Query()) {
-			h.ecMiddleware.wrapPng(next).ServeHTTP(w, r)
+			h.ecMiddleware.wrapPngHandler(next).ServeHTTP(w, r)
 			return
 		}
 

@@ -54,9 +54,6 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
-
-	// remove this when done testing
-	serverPrivateKeyForTest *ecdsa.PrivateKey
 }
 
 const (
@@ -134,15 +131,18 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverCertPem := k2ServerCert
+	serverRsaCertPem := k2RsaServerCert
+	serverEccCertPem := k2EccServerCert
 	switch {
 	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"):
-		serverCertPem = localhostServerCert
+		serverRsaCertPem = localhostRsaServerCert
+		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
-		serverCertPem = reviewServerCert
+		serverRsaCertPem = reviewRsaServerCert
+		serverEccCertPem = reviewEccServerCert
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverCertPem))
+	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default public key: %w", err)
 	}
@@ -154,13 +154,10 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 
 	ls.serverKey = serverKey
 
-	testServerPrivateKey, err := echelper.GenerateEcdsaKey()
+	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
 	if err != nil {
-		return fmt.Errorf("generating test server private key: %w", err)
+		return fmt.Errorf("parsing default server ec key: %w", err)
 	}
-
-	ls.serverEcKey = &testServerPrivateKey.PublicKey
-	ls.serverPrivateKeyForTest = testServerPrivateKey
 
 	return nil
 }

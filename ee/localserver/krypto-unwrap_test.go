@@ -1,15 +1,16 @@
 package localserver
 
 import (
-	"bytes"
-	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"bytes"
+	"crypto/rsa"
+	"encoding/base64"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"

@@ -12,8 +12,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/challenge"
-	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type kryptoEcMiddleware struct {
@@ -44,28 +42,28 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 			return
 		}
 
-		outerChallenge, err := marshalOuterChallenge(boxRaw)
+		boxRawBytes, err := base64.StdEncoding.DecodeString(boxRaw)
 		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to marshal outer challenge", "err", err)
+			level.Debug(e.logger).Log("msg", "failed to b64 decode box", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		if err := echelper.VerifySignature(e.counterParty, outerChallenge.Msg, outerChallenge.Sig); err != nil {
+		challengeBox, err := challenge.UnmarshalChallenge(boxRawBytes)
+		if err != nil {
+			level.Debug(e.logger).Log("msg", "failed to unmarshal challenge", "err", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if err := challengeBox.Verify(e.counterParty); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to verify signature", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		var innerChallenge challenge.InnerChallenge
-		if err := msgpack.Unmarshal(outerChallenge.Msg, &innerChallenge); err != nil {
-			level.Debug(e.logger).Log("msg", "unable to marshall challenge.InnerChallenge", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
 		var cmdReq cmdRequestType
-		if err := json.Unmarshal(innerChallenge.ChallengeData, &cmdReq); err != nil {
+		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -94,9 +92,9 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 	})
 }
 
-func (e *kryptoEcMiddleware) wrapPng(next http.Handler) http.Handler {
+func (e *kryptoEcMiddleware) wrapPngHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		result, err := e.wrapImpl(next, r, w, true)
+		result, err := e.wrap(next, r, w, true)
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to wrap response to png", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -107,9 +105,9 @@ func (e *kryptoEcMiddleware) wrapPng(next http.Handler) http.Handler {
 	})
 }
 
-func (e *kryptoEcMiddleware) wrap(next http.Handler) http.Handler {
+func (e *kryptoEcMiddleware) wrapHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		result, err := e.wrapImpl(next, r, w, false)
+		result, err := e.wrap(next, r, w, false)
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to wrap response", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -120,59 +118,39 @@ func (e *kryptoEcMiddleware) wrap(next http.Handler) http.Handler {
 	})
 }
 
-func (e *kryptoEcMiddleware) wrapImpl(next http.Handler, r *http.Request, w http.ResponseWriter, toPng bool) (string, error) {
+func (e *kryptoEcMiddleware) wrap(next http.Handler, r *http.Request, w http.ResponseWriter, toPng bool) (string, error) {
 	bhr := &bufferedHttpResponse{}
 	next.ServeHTTP(bhr, r)
 
 	boxRaw := r.URL.Query().Get("box")
 	if boxRaw == "" {
-		// level.Debug(e.logger).Log("msg", "no data in box query parameter")
-		//	w.WriteHeader(http.StatusUnauthorized)
 		return "", fmt.Errorf("no data in box query parameter")
 	}
 
-	outerChallenge, err := marshalOuterChallenge(boxRaw)
+	challengeBytes, err := base64.StdEncoding.DecodeString(boxRaw)
 	if err != nil {
-		// level.Debug(e.logger).Log("msg", "failed to marshal outer challenge", "err", err)
-		// w.WriteHeader(http.StatusUnauthorized)
+		return "", err
+	}
+
+	challengeBox, err := challenge.UnmarshalChallenge(challengeBytes)
+	if err != nil {
 		return "", fmt.Errorf("marshaling outer challenge: %w", err)
 	}
 
 	var responseBytes []byte
 	switch toPng {
 	case true:
-		responseBytes, err = challenge.RespondPng(e.signer, e.counterParty, *outerChallenge, bhr.Bytes())
+		responseBytes, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
 		if err != nil {
-			// level.Debug(e.logger).Log("msg", "failed to create challenge response to png", "err", err)
 			return "", fmt.Errorf("failed to create challenge response to png: %w", err)
 		}
 
 	case false:
-		outerResponse, err := challenge.Respond(e.signer, e.counterParty, *outerChallenge, bhr.Bytes())
+		responseBytes, err = challengeBox.Respond(e.signer, bhr.Bytes())
 		if err != nil {
-			// level.Debug(e.logger).Log("msg", "failed to create challenge response to png", "err", err)
 			return "", fmt.Errorf("failed to create challenge response: %w", err)
-		}
-
-		responseBytes, err = msgpack.Marshal(outerResponse)
-		if err != nil {
-			// level.Debug(e.logger).Log("msg", "failed to create challenge response to msgpack", "err", err)
-			return "", fmt.Errorf("failed to marshal challenge response to msgpack: %w", err)
 		}
 	}
 
 	return base64.StdEncoding.EncodeToString(responseBytes), nil
-}
-
-func marshalOuterChallenge(boxRaw string) (*challenge.OuterChallenge, error) {
-	box, err := base64.StdEncoding.DecodeString(boxRaw)
-	if err != nil {
-		return nil, fmt.Errorf("unable to base64 decode box: %w", err)
-	}
-
-	var outerChallenge challenge.OuterChallenge
-	if err := msgpack.Unmarshal(box, &outerChallenge); err != nil {
-		return nil, fmt.Errorf("unable to marshall outer challenge: %w", err)
-	}
-	return &outerChallenge, nil
 }
