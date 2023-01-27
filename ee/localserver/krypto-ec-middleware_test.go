@@ -203,6 +203,7 @@ func TestKryptoEcMiddlewareWrap(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, challengeData, opened.ChallengeData)
 
+			// now test png unwrap
 			h = kryptoDeterminerMiddleware.determineKryptoWrapPng(makeTestHandler(t))
 			req = makeEcWrapRequest(t, generatedChallenge)
 
