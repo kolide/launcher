@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/desktop/client"
@@ -251,7 +252,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeMenuFile(menu); err != nil {
+	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
 		return err
 	}
 
@@ -287,27 +288,41 @@ func (r *DesktopUsersProcessesRunner) Ping() {
 	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
 }
 
-// writeMenuFile writes menu data to a shared file for user processes to access
-func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
+// writeSharedFile writes data to a shared file for user processes to access
+func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) error {
 	menuBytes, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("failed to marshal menu json: %w", err)
+		return fmt.Errorf("failed to marshal json: %w", err)
 	}
 
-	menuPath := r.menuPath()
-	statusFile, err := os.Create(menuPath)
+	file, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("creating desktop menu file: %w", err)
+		return fmt.Errorf("creating file: %w", err)
 	}
 
-	if err := os.Chmod(menuPath, 0644); err != nil {
+	if err := os.Chmod(path, 0644); err != nil {
 		return fmt.Errorf("os.Chmod: %w", err)
 	}
 
-	defer statusFile.Close()
-	_, err = io.Copy(statusFile, bytes.NewReader(menuBytes))
+	defer file.Close()
+	_, err = io.Copy(file, bytes.NewReader(menuBytes))
 	if err != nil {
-		return fmt.Errorf("writing desktop menu file: %w", err)
+		return fmt.Errorf("writing file: %w", err)
+	}
+
+	return nil
+}
+
+// writeTemplateFile generates and writes template data to a shared file
+func (r *DesktopUsersProcessesRunner) writeTemplateFile() error {
+	v := version.Version()
+	td := &menu.TemplateData{
+		LauncherVersion:  v.Version,
+		LauncherRevision: v.Revision,
+		GoVersion:        v.GoVersion,
+	}
+	if err := r.writeSharedFile(r.templatePath(), td); err != nil {
+		return err
 	}
 
 	return nil
@@ -343,9 +358,12 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		menuPath := r.menuPath()
+		r.writeTemplateFile()
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath)
+		menuPath := r.menuPath()
+		templatePath := r.templatePath()
+
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath, templatePath)
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
@@ -522,8 +540,12 @@ func (r *DesktopUsersProcessesRunner) menuPath() string {
 	return filepath.Join(r.usersFilesRoot, "menu.json")
 }
 
+func (r *DesktopUsersProcessesRunner) templatePath() string {
+	return filepath.Join(r.usersFilesRoot, "template.json")
+}
+
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath, templatePath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
@@ -531,6 +553,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
+		fmt.Sprintf("TEMPLATE_PATH=%s", templatePath),
 	}
 
 	stdErr, err := cmd.StderrPipe()

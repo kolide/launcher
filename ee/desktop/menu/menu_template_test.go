@@ -3,6 +3,7 @@ package menu
 import (
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,35 +13,32 @@ func Test_Parse(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		opts        []TemplateDataOption
+		td          *TemplateData
 		text        string
 		output      string
 		expectedErr bool
 	}{
 		{
-			name: "nil",
-		},
-		{
 			name:   "default",
-			opts:   []TemplateDataOption{},
+			td:     &TemplateData{},
 			text:   "Version: {{.LauncherVersion}}",
-			output: "Version: unknown",
+			output: "Version: ",
 		},
 		{
 			name:   "single option",
-			opts:   []TemplateDataOption{WithHostname("localhost")},
-			text:   "Hostname: {{.Hostname}}",
+			td:     &TemplateData{ServerHostname: "localhost"},
+			text:   "Hostname: {{.ServerHostname}}",
 			output: "Hostname: localhost",
 		},
 		{
 			name:   "multiple option",
-			opts:   []TemplateDataOption{WithHostname("localhost"), WithLauncherFlagsFilePath("/launcher.flags")},
-			text:   "Hostname: {{.Hostname}}, Launcher flags file: {{.LauncherFlagsFilePath}}",
-			output: "Hostname: localhost, Launcher flags file: /launcher.flags",
+			td:     &TemplateData{ServerHostname: "localhost", OsqueryVersion: "0.0.0"},
+			text:   "Hostname: {{.ServerHostname}}, Osquery version: {{.OsqueryVersion}}",
+			output: "Hostname: localhost, Osquery version: 0.0.0",
 		},
 		{
 			name:        "undefined",
-			opts:        []TemplateDataOption{},
+			td:          &TemplateData{},
 			text:        "Version: {{GARBAGE}}",
 			output:      "",
 			expectedErr: true,
@@ -51,8 +49,8 @@ func Test_Parse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			td := NewTemplateData(tt.opts...)
-			o, err := td.parse(tt.text)
+			tp := NewTemplateParser(log.NewNopLogger(), tt.td)
+			o, err := tp.parse(tt.text)
 			if !tt.expectedErr {
 				require.NoError(t, err)
 			}

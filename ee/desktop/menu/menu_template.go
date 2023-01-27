@@ -5,72 +5,36 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/kolide/kit/version"
+	"github.com/go-kit/kit/log"
 )
 
-type TemplateDataOption func(*templateData)
-
-func WithVersion(info version.Info) TemplateDataOption {
-	return func(td *templateData) {
-		td.LauncherVersion = info.Version
-		td.LauncherRevision = info.Revision
-		td.GoVersion = info.GoVersion
-	}
-}
-
-func WithOSQueryVersion(osqueryVersion string) TemplateDataOption {
-	return func(td *templateData) {
-		td.OSQueryVersion = osqueryVersion
-	}
-}
-
-func WithHostname(hostname string) TemplateDataOption {
-	return func(td *templateData) {
-		td.Hostname = hostname
-	}
-}
-
-func WithLogFilePath(logFilePath string) TemplateDataOption {
-	return func(td *templateData) {
-		td.LogFilePath = logFilePath
-	}
-}
-
-func WithLauncherFlagsFilePath(launcherFlagsFilePath string) TemplateDataOption {
-	return func(td *templateData) {
-		td.LauncherFlagsFilePath = launcherFlagsFilePath
-	}
-}
-
-type templateData struct {
+type TemplateData struct {
 	LauncherVersion       string
 	LauncherRevision      string
 	GoVersion             string
-	OSQueryVersion        string
-	Hostname              string
+	OsqueryVersion        string
+	ServerHostname        string
 	LogFilePath           string
 	LauncherFlagsFilePath string
 }
 
-func NewTemplateData(opts ...TemplateDataOption) *templateData {
-	template := &templateData{
-		LauncherVersion:       "unknown",
-		LauncherRevision:      "unknown",
-		OSQueryVersion:        "unknown",
-		Hostname:              "k2device.kolide.com",
-		LogFilePath:           "/var/kolide-k2/k2device-preprod.kolide.com/debug.json",
-		LauncherFlagsFilePath: "/etc/kolide-k2/launcher.flags",
-	}
-
-	for _, opt := range opts {
-		opt(template)
-	}
-
-	return template
+type templateParser struct {
+	logger   log.Logger
+	filePath string
+	td       *TemplateData
 }
 
-func (td *templateData) parse(text string) (string, error) {
-	if td == nil {
+func NewTemplateParser(logger log.Logger, td *TemplateData) *templateParser {
+	tp := &templateParser{
+		logger: logger,
+		td:     td,
+	}
+
+	return tp
+}
+
+func (tp *templateParser) parse(text string) (string, error) {
+	if tp == nil || tp.td == nil {
 		return "", fmt.Errorf("templateData is nil")
 	}
 
@@ -80,7 +44,7 @@ func (td *templateData) parse(text string) (string, error) {
 	}
 
 	var b strings.Builder
-	err = t.ExecuteTemplate(&b, "menu_template", td)
+	err = t.Execute(&b, tp.td)
 	if err != nil {
 		return "", fmt.Errorf("could not write menu template output: %w", err)
 	}

@@ -112,14 +112,14 @@ func (m *menu) getMenuData() *MenuData {
 		return nil
 	}
 
-	statusFileBytes, err := os.ReadFile(m.filePath)
+	menuFileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
 		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
 		return nil
 	}
 
 	var menu MenuData
-	if err := json.Unmarshal(statusFileBytes, &menu); err != nil {
+	if err := json.Unmarshal(menuFileBytes, &menu); err != nil {
 		level.Error(m.logger).Log("msg", "failed to unmarshal menu json")
 		return nil
 	}
