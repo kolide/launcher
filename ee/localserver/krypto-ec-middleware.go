@@ -8,11 +8,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+)
+
+const (
+	timestampValidityRange = 150
 )
 
 type v2CmdRequestType struct {
@@ -63,6 +68,15 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to verify signature", "err", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Check the timestamp, this prevents people from saving a challenge and then
+		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
+		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
+		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
+			level.Debug(e.logger).Log("msg", "timestamp is out of range", "delta", timestampDelta)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
