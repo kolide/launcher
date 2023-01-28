@@ -19,7 +19,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.0.0-20230128032426-052c6d0e7dfb
+	github.com/kolide/krypto v0.0.0-20230128164551-c54b78be5480
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
