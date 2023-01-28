@@ -7,11 +7,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 )
+
+type v2CmdRequestType struct {
+	Path string
+}
 
 type kryptoEcMiddleware struct {
 	signer       crypto.Signer
@@ -27,7 +33,7 @@ func newKryptoEcMiddleware(logger log.Logger, signer crypto.Signer, counteParty 
 	}
 }
 
-func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
+func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
@@ -61,7 +67,7 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 			return
 		}
 
-		var cmdReq cmdRequestType
+		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -70,16 +76,12 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 
 		v := url.Values{}
 
-		if cmdReq.Id != "" {
-			v.Set("id", cmdReq.Id)
-		}
-
 		newReq := &http.Request{
 			Method: "GET",
 			URL: &url.URL{
 				Scheme:   r.URL.Scheme,
 				Host:     r.Host,
-				Path:     cmdReq.Cmd,
+				Path:     cmdReq.Path,
 				RawQuery: v.Encode(),
 			},
 		}
@@ -87,23 +89,21 @@ func (e *kryptoEcMiddleware) unwrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		var response []byte
-
-		switch cmdReq.Cmd {
-		case "id":
-			response, err = challengeBox.Respond(e.signer, bhr.Bytes())
-		case "id.png":
-			// TODO: png stuff
-			response, err = challengeBox.RespondPng(e.signer, bhr.Bytes())
-		}
-
+		response, err := challengeBox.Respond(e.signer, bhr.Bytes())
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
+		// arguable the png things here should be their own handler. But doing that means another layer
+		// buffering the http response, so it feels a bit silly. When we ditch the v1/v2 switcher, we can
+		// be a bit more clever and move this.
+		if strings.HasSuffix(cmdReq.Path, ".png") {
+			krypto.ToPng(w, response)
+		} else {
+			w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
+		}
 	})
 }
 

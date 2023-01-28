@@ -46,7 +46,6 @@ type localServer struct {
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
 	querier      Querier
-	allowNoAuth  bool
 	kolideServer string
 
 	myKey   *rsa.PrivateKey
@@ -82,37 +81,34 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 	ls.myKey = privateKey
 
-	// Setup the krypto boxer middleware. This will be used for the http auth
+	// Setup the krypto boxer middleware. This will be used for the v1 protocol
 	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)
 	if err != nil {
 		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
-
-	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
-
-	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(ls.logger, kbm, ecKryptoMiddleware)
-
 	rsaAuthedMux := http.NewServeMux()
 	rsaAuthedMux.HandleFunc("/", http.NotFound)
 	rsaAuthedMux.HandleFunc("/ping", pongHandler)
 	rsaAuthedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
 	rsaAuthedMux.Handle("/id.png", kbm.Wrap(ls.requestIdHandler()))
 
+	// Setup the v2 protocol wraps
+	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
+
 	ecAuthedMux := http.NewServeMux()
-	// ecAuthedMux.HandleFunc("/ping", pongHandler)
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 
+	// While we're transitioning, we want to support both v1 and v2 protocols
+	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(
+		ls.logger,
+		kbm.UnwrapV1Hander(ls.requestLoggingHandler(rsaAuthedMux)),
+		ecKryptoMiddleware.Wrap(ecAuthedMux),
+	)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware.determineKryptoUnwrap(ls.requestLoggingHandler(rsaAuthedMux), ls.requestLoggingHandler(ecAuthedMux)))
-
-	// Generally we wouldn't run without auth in production. But some debugging usagemight enable it
-	if ls.allowNoAuth {
-		// mux.HandleFunc("/ping", pongHandler)
-		// mux.Handle("/id", kryptoDeterminerMiddleware.determineKryptoWrap(ls.requestIdHandler()))
-		// mux.Handle("/id.png", kryptoDeterminerMiddleware.determineKryptoWrapPng(ls.requestIdHandler()))
-	}
+	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware)
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),

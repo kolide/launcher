@@ -6,17 +6,16 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type kryptoDeterminerMiddleware struct {
-	rsaMiddleware *kryptoBoxerMiddleware
-	ecMiddleware  *kryptoEcMiddleware
+	rsaMiddleware http.Handler
+	ecMiddleware  http.Handler
 	logger        log.Logger
 }
 
-func NewKryptoDeterminerMiddleware(logger log.Logger, rsaMiddleware *kryptoBoxerMiddleware, ecMiddleware *kryptoEcMiddleware) *kryptoDeterminerMiddleware {
+func NewKryptoDeterminerMiddleware(logger log.Logger, rsaMiddleware http.Handler, ecMiddleware http.Handler) *kryptoDeterminerMiddleware {
 	return &kryptoDeterminerMiddleware{
 		rsaMiddleware: rsaMiddleware,
 		ecMiddleware:  ecMiddleware,
@@ -24,42 +23,38 @@ func NewKryptoDeterminerMiddleware(logger log.Logger, rsaMiddleware *kryptoBoxer
 	}
 }
 
-func (h *kryptoDeterminerMiddleware) determineKryptoUnwrap(nextRsa, nextEc http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
-			r.Body.Close()
-		}
+func (h *kryptoDeterminerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Extract the box from the URL query parameters
+	boxRaw := r.URL.Query().Get("box")
+	if boxRaw == "" {
+		level.Debug(h.logger).Log("msg", "no data in box query parameter")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-		// Extract the box from the URL query parameters
-		boxRaw := r.URL.Query().Get("box")
-		if boxRaw == "" {
-			level.Debug(h.logger).Log("msg", "no data in box query parameter")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+	box, err := base64.StdEncoding.DecodeString(boxRaw)
+	if err != nil {
+		level.Debug(h.logger).Log("msg", "unable to base64 decode box", "err", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-		box, err := base64.StdEncoding.DecodeString(boxRaw)
-		if err != nil {
-			level.Debug(h.logger).Log("msg", "unable to base64 decode box", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+	// Playing with msgpack, it will unmarshal to map[string]any, which makes it
+	// simpler enough for us to handle routing here.
+	var boxMap map[string]interface{}
+	if err := msgpack.Unmarshal(box, &boxMap); err != nil {
+		level.Debug(h.logger).Log("msg", "unable to unmarshal box", "err", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-		var outerChallenge challenge.OuterChallenge
-		if err := msgpack.Unmarshal(box, &outerChallenge); err != nil {
-			level.Debug(h.logger).Log("msg", "unable to verify box", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+	// if it's got the Sig key, then it's a v2 box
+	if _, ok := boxMap["Sig"]; ok {
+		h.ecMiddleware.ServeHTTP(w, r)
+		return
+	}
 
-		// if we have these 2 fields, assume it's ec krypto
-		if outerChallenge.Sig != nil && outerChallenge.Msg != nil {
-			h.ecMiddleware.unwrap(nextEc).ServeHTTP(w, r)
-			return
-		}
-
-		h.rsaMiddleware.UnwrapV1Hander(nextRsa).ServeHTTP(w, r)
-	})
+	h.rsaMiddleware.ServeHTTP(w, r)
 }
 
 // func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http.Handler {
