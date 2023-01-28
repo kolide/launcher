@@ -49,12 +49,20 @@ func (h *kryptoDeterminerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 	}
 
 	// if it's got the Sig key, then it's a v2 box
-	if _, ok := boxMap["Sig"]; ok {
+	if _, ok := boxMap["sig"]; ok {
 		h.ecMiddleware.ServeHTTP(w, r)
 		return
 	}
 
-	h.rsaMiddleware.ServeHTTP(w, r)
+	// Signature key is v1
+	if _, ok := boxMap["signature"]; ok {
+		h.rsaMiddleware.ServeHTTP(w, r)
+		return
+	}
+
+	// Eh, who knows
+	level.Debug(h.logger).Log("msg", "Unknown box type")
+	w.WriteHeader(http.StatusUnauthorized)
 }
 
 // func (h *kryptoDeterminerMiddleware) determineKryptoWrap(next http.Handler) http.Handler {

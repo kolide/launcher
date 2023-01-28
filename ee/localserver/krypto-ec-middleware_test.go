@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
+func TestKryptoEcMiddleware(t *testing.T) {
 	t.Parallel()
 
 	myKey, err := echelper.GenerateEcdsaKey()
@@ -42,7 +42,7 @@ func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
 		{
 			name:      "no signature",
 			challenge: func() ([]byte, *[32]byte) { return []byte("aGVsbG8gd29ybGQK"), nil },
-			loggedErr: "unable to verify box",
+			loggedErr: "unable to unmarshal box",
 		},
 		{
 			name: "malformed cmd",
@@ -83,25 +83,29 @@ func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
 			// set up middlewares
 			kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyKey.PublicKey)
 			require.NoError(t, err)
-			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware)
+
+			challengeBytes, privateEncryptionKey := tt.challenge()
 
 			// generate the response we want the handler to return
-			challengeBytes, privateEncryptionKey := tt.challenge()
-			outerChallenge, err := challenge.UnmarshalChallenge(challengeBytes)
-			require.NoError(t, err)
+			responseBytes := []byte{}
+			if tt.loggedErr == "" {
+				outerChallenge, err := challenge.UnmarshalChallenge(challengeBytes)
+				//require.NoError(t, err)
 
-			require.NoError(t, outerChallenge.Verify(counterpartyKey.PublicKey))
-			responseData := []byte(ulid.New())
+				require.NoError(t, outerChallenge.Verify(counterpartyKey.PublicKey))
+				responseData := []byte(ulid.New())
 
-			responseBytes, err := outerChallenge.Respond(myKey, responseData)
-			require.NoError(t, err)
+				responseBytes, err = outerChallenge.Respond(myKey, responseData)
+				require.NoError(t, err)
+			}
 
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(base64.StdEncoding.EncodeToString(responseBytes)))
 			})
 
 			// give our test handler to the determiner
-			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(nil, testHandler)
+			h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
+			//h := kryptoEcMiddleware.Wrap(testHandler)
 
 			// make the request
 			req := makeRequest(t, base64.StdEncoding.EncodeToString(challengeBytes))
@@ -114,8 +118,8 @@ func TestKryptoEcMiddlewareUnwrap(t *testing.T) {
 				return
 			}
 
-			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.NotEmpty(t, rr.Body.String())
+			require.Equal(t, http.StatusOK, rr.Code)
+			require.NotEmpty(t, rr.Body.String())
 
 			// try to open the response
 			returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())

@@ -72,7 +72,7 @@ func TestUnwrapV0(t *testing.T) {
 		{
 			name:      "no signature",
 			boxParam:  "aGVsbG8gd29ybGQK",
-			loggedErr: "unable to verify box",
+			loggedErr: "unable to unmarshal box",
 		},
 
 		{
@@ -103,13 +103,12 @@ func TestUnwrapV0(t *testing.T) {
 			kbm, err := NewKryptoBoxerMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyPub)
 			require.NoError(t, err)
 
-			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm, nil)
+			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm.UnwrapV1Hander(makeTestHandler(t)), nil)
 
-			h := kryptoDeterminerMiddleware.determineKryptoUnwrap(makeTestHandler(t), nil)
 			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
-			h.ServeHTTP(rr, req)
+			kryptoDeterminerMiddleware.ServeHTTP(rr, req)
 
 			if tt.loggedErr != "" {
 				assert.Equal(t, http.StatusUnauthorized, rr.Code)

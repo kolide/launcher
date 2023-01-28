@@ -1,5 +1,7 @@
 module github.com/kolide/launcher
 
+replace github.com/kolide/krypto => ../krypto
+
 require (
 	fyne.io/systray v1.10.1-0.20221115204952-d16a6177e6f1
 	github.com/Masterminds/semver v1.4.2
