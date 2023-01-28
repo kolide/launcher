@@ -34,7 +34,7 @@ func newKryptoEcMiddleware(logger log.Logger, signer crypto.Signer, counteParty 
 	return &kryptoEcMiddleware{
 		signer:       signer,
 		counterParty: counteParty,
-		logger:       logger,
+		logger:       log.With(logger, "keytype", "ec"),
 	}
 }
 
@@ -99,6 +99,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				RawQuery: v.Encode(),
 			},
 		}
+
+		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
 
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
