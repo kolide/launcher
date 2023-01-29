@@ -1,15 +1,16 @@
 package localserver
 
 import (
-	"bytes"
-	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"bytes"
+	"crypto/rsa"
+	"encoding/base64"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
@@ -71,7 +72,7 @@ func TestUnwrapV0(t *testing.T) {
 		{
 			name:      "no signature",
 			boxParam:  "aGVsbG8gd29ybGQK",
-			loggedErr: "unable to verify box",
+			loggedErr: "unable to unmarshal box",
 		},
 
 		{
@@ -102,11 +103,12 @@ func TestUnwrapV0(t *testing.T) {
 			kbm, err := NewKryptoBoxerMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyPub)
 			require.NoError(t, err)
 
-			h := kbm.UnwrapV1Hander(makeTestHandler(t))
+			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm.UnwrapV1Hander(makeTestHandler(t)), nil)
+
 			req := makeRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
-			h.ServeHTTP(rr, req)
+			kryptoDeterminerMiddleware.ServeHTTP(rr, req)
 
 			if tt.loggedErr != "" {
 				assert.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -143,7 +145,6 @@ func makeTestHandler(t *testing.T) http.Handler {
 }
 
 func makeRequest(t *testing.T, boxParameter string) *http.Request {
-
 	v := url.Values{}
 
 	if boxParameter != "" {

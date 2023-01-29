@@ -39,3 +39,5 @@ pkg/packagekit/wix/internal/assets.go
 scratch.*
 /scratch
 /debug
+
+go.work*
