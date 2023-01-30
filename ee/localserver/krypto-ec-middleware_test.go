@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
@@ -87,24 +88,16 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			challengeBytes, privateEncryptionKey := tt.challenge()
 
 			// generate the response we want the handler to return
-			responseBytes := []byte{}
+			responseData := []byte(ulid.New())
 
-			if tt.loggedErr == "" {
-				outerChallenge, err := challenge.UnmarshalChallenge(challengeBytes)
-				require.NoError(t, err)
-				require.NoError(t, outerChallenge.Verify(counterpartyKey.PublicKey))
-
-				responseData := []byte(ulid.New())
-
-				responseBytes, err = outerChallenge.Respond(myKey, responseData)
-				require.NoError(t, err)
-			}
-
+			// this handler is what will respond to the request made by the kryptoEcMiddleware.Wrap handler
+			// in this test we just want it to regurgitate the response data we defined above
+			// this should match the responseData in the opened response
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte(base64.StdEncoding.EncodeToString(responseBytes)))
+				w.Write(responseData)
 			})
 
-			// give our test handler to the determiner
+			// give our middleware with the test handler to the determiner
 			h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
 
 			// make the request
@@ -128,8 +121,13 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			require.NoError(t, err)
 
 			responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
-			_, err = responseUnmarshalled.Open(*privateEncryptionKey)
+			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
+
+			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 			require.NoError(t, err)
+			require.Equal(t, challengeData, opened.ChallengeData)
+			require.Equal(t, opened.ResponseData, responseData)
+			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
 }
