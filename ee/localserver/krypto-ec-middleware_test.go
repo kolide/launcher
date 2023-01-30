@@ -126,7 +126,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
-			require.Equal(t, opened.ResponseData, responseData)
+			require.Equal(t, responseData, opened.ResponseData)
 			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
