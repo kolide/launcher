@@ -17,7 +17,9 @@ import (
 )
 
 const (
-	timestampValidityRange = 150
+	timestampValidityRange             = 150
+	kolideKryptoEccHeader20230130Value = "2023-01-30"
+	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
 )
 
 type v2CmdRequestType struct {
@@ -111,6 +113,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+
+		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
 		// arguable the png things here should be their own handler. But doing that means another layer
 		// buffering the http response, so it feels a bit silly. When we ditch the v1/v2 switcher, we can
