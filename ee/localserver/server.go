@@ -90,7 +90,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	rsaAuthedMux.HandleFunc("/", http.NotFound)
 	rsaAuthedMux.HandleFunc("/ping", pongHandler)
 	rsaAuthedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-	rsaAuthedMux.Handle("/id.png", kbm.Wrap(ls.requestIdHandler()))
+	rsaAuthedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 
 	// Setup the v2 protocol wraps
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
