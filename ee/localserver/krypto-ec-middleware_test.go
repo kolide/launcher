@@ -121,6 +121,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			require.Equal(t, http.StatusOK, rr.Code)
 			require.NotEmpty(t, rr.Body.String())
 
+			require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
+
 			// try to open the response
 			returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
 			require.NoError(t, err)
