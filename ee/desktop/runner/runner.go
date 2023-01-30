@@ -320,6 +320,7 @@ func (r *DesktopUsersProcessesRunner) writeTemplateFile() error {
 		LauncherVersion:  v.Version,
 		LauncherRevision: v.Revision,
 		GoVersion:        v.GoVersion,
+		ServerHostname:   r.hostname,
 	}
 	if err := r.writeSharedFile(r.templatePath(), td); err != nil {
 		return err

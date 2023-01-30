@@ -105,7 +105,7 @@ func runDesktop(args []string) error {
 	}
 
 	td := getTemplateData(logger, *fltemplatepath)
-	tp := menu.NewTemplateParser(logger, td)
+	tp := menu.NewTemplateParser(td)
 	menu := menu.New(logger, *flhostname, *flmenupath, tp)
 	server.RegisterRefreshListener(func() {
 		menu.Build()

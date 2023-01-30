@@ -3,7 +3,6 @@ package menu
 import (
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,9 +31,9 @@ func Test_Parse(t *testing.T) {
 		},
 		{
 			name:   "multiple option",
-			td:     &TemplateData{ServerHostname: "localhost", OsqueryVersion: "0.0.0"},
-			text:   "Hostname: {{.ServerHostname}}, Osquery version: {{.OsqueryVersion}}",
-			output: "Hostname: localhost, Osquery version: 0.0.0",
+			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
+			text:   "Hostname: {{.ServerHostname}}, launcher version: {{.LauncherVersion}}",
+			output: "Hostname: localhost, launcher version: 0.0.0",
 		},
 		{
 			name:        "undefined",
@@ -49,7 +48,7 @@ func Test_Parse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tp := NewTemplateParser(log.NewNopLogger(), tt.td)
+			tp := NewTemplateParser(tt.td)
 			o, err := tp.parse(tt.text)
 			if !tt.expectedErr {
 				require.NoError(t, err)
