@@ -121,6 +121,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			require.NoError(t, err)
 
 			responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
+			require.NoError(t, err)
 			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
 
 			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
