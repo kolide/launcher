@@ -2,6 +2,8 @@ package localserver
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
@@ -15,6 +17,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
+	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.etcd.io/bbolt"
@@ -42,11 +46,13 @@ type localServer struct {
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
 	querier      Querier
-	allowNoAuth  bool
 	kolideServer string
 
-	myKey     *rsa.PrivateKey
-	serverKey *rsa.PublicKey
+	myKey   *rsa.PrivateKey
+	myEcKey crypto.Signer
+
+	serverKey   *rsa.PublicKey
+	serverEcKey *ecdsa.PublicKey
 }
 
 const (
@@ -59,6 +65,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 		logger:       log.With(logger, "component", "localserver"),
 		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer: kolideServer,
+		myEcKey:      agent.Keys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -74,28 +81,34 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 	ls.myKey = privateKey
 
-	// Setup the krypto boxer middleware. This will be used for the http auth
+	// Setup the krypto boxer middleware. This will be used for the v1 protocol
 	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)
 	if err != nil {
 		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
+	rsaAuthedMux := http.NewServeMux()
+	rsaAuthedMux.HandleFunc("/", http.NotFound)
+	rsaAuthedMux.HandleFunc("/ping", pongHandler)
+	rsaAuthedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
+	rsaAuthedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 
-	authedMux := http.NewServeMux()
-	authedMux.HandleFunc("/", http.NotFound)
-	authedMux.HandleFunc("/ping", pongHandler)
-	authedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-	authedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
+	// Setup the v2 protocol wraps
+	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
+
+	ecAuthedMux := http.NewServeMux()
+	ecAuthedMux.Handle("/id", ls.requestIdHandler())
+	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
+
+	// While we're transitioning, we want to support both v1 and v2 protocols
+	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(
+		ls.logger,
+		kbm.UnwrapV1Hander(ls.requestLoggingHandler(rsaAuthedMux)),
+		ecKryptoMiddleware.Wrap(ecAuthedMux),
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", kbm.UnwrapV1Hander(ls.requestLoggingHandler(authedMux)))
-
-	// Generally we wouldn't run without auth in production. But some debugging usage might enable it
-	if ls.allowNoAuth {
-		mux.HandleFunc("/ping", pongHandler)
-		mux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-		mux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
-	}
+	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware)
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
@@ -119,15 +132,18 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverCertPem := k2ServerCert
+	serverRsaCertPem := k2RsaServerCert
+	serverEccCertPem := k2EccServerCert
 	switch {
 	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"):
-		serverCertPem = localhostServerCert
+		serverRsaCertPem = localhostRsaServerCert
+		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
-		serverCertPem = reviewServerCert
+		serverRsaCertPem = reviewRsaServerCert
+		serverEccCertPem = reviewEccServerCert
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverCertPem))
+	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default public key: %w", err)
 	}
@@ -138,6 +154,11 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	}
 
 	ls.serverKey = serverKey
+
+	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
+	if err != nil {
+		return fmt.Errorf("parsing default server ec key: %w", err)
+	}
 
 	return nil
 }
