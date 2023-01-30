@@ -19,7 +19,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.0.0-20230124221144-7aa3e8026f19
+	github.com/kolide/krypto v0.0.0-20230128164551-c54b78be5480
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
@@ -54,6 +54,8 @@ require (
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
+
+require github.com/vmihailenco/msgpack/v5 v5.3.5
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
@@ -96,7 +98,6 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
-	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
