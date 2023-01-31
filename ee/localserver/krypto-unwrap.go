@@ -20,10 +20,6 @@ type cmdRequestType struct {
 //	limitation we have from js)
 func (kbm *kryptoBoxerMiddleware) UnwrapV1Hander(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
-			r.Body.Close()
-		}
-
 		// Extract the box from the URL query parameters
 		boxRaw := r.URL.Query().Get("box")
 		if boxRaw == "" {
