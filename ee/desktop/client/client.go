@@ -35,7 +35,7 @@ func New(authToken, socketPath string) client {
 	client := client{
 		base: http.Client{
 			Transport: transport,
-			Timeout:   1 * time.Second,
+			Timeout:   30 * time.Second,
 		},
 	}
 
@@ -69,9 +69,7 @@ func (c *client) Notify(title, body string) error {
 		return fmt.Errorf("could not send notification: %w", err)
 	}
 
-	if resp.Body != nil {
-		resp.Body.Close()
-	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)

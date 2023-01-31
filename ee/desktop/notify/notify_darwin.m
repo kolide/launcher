@@ -32,7 +32,7 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     });
 
     // Wait for completion handler to complete so that we get a correct value for `success`
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC);
     intptr_t err = dispatch_semaphore_wait(semaphore, timeout);
     if (err != 0) {
         // Timed out, remove the pending request
@@ -69,7 +69,7 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     });
 
     // Wait for completion handler to complete so that we get a correct value for `success`
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC);
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_SEC);
     dispatch_semaphore_wait(semaphore, timeout);
 
     return success;
