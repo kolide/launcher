@@ -104,6 +104,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
 
+		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
