@@ -12,8 +12,8 @@ type actionOpenURL struct {
 	URL string `json:"url"`
 }
 
-func (a actionOpenURL) Perform(m *menu, parser textParser) {
-	url, err := parser.parse(a.URL)
+func (a actionOpenURL) Perform(m *menu) {
+	url, err := m.parser.parse(a.URL)
 	if err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to parse URL",

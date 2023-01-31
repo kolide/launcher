@@ -24,7 +24,7 @@ type Action struct {
 // ActionPerformer is an interface for performing actions in response to menu events
 type ActionPerformer interface {
 	// Perform executes the action
-	Perform(m *menu, parser textParser)
+	Perform(m *menu)
 }
 
 // Used to avoid recursion in UnmarshalJSON

@@ -85,7 +85,7 @@ func (m *menu) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap
 	}
 
 	// Setup a handler to perform the menu item's action
-	m.makeActionHandler(item, ap, m.parser)
+	m.makeActionHandler(item, ap)
 
 	return item
 }
@@ -113,7 +113,7 @@ func (m *menu) isProd() bool {
 }
 
 // makeActionHandler creates a handler to execute the desired action when a menu item is clicked
-func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer, parser textParser) {
+func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 	if ap == nil {
 		// No action to handle
 		return
@@ -128,7 +128,7 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer, par
 			select {
 			case <-item.ClickedCh:
 				// Menu item was clicked
-				ap.Perform(m, parser)
+				ap.Perform(m)
 			case <-done:
 				// Menu item is going away
 				return
