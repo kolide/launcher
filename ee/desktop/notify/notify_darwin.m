@@ -69,7 +69,7 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     });
 
     // Wait for completion handler to complete so that we get a correct value for `canSendNotification`
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_SEC);
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC);
     dispatch_semaphore_wait(semaphore, timeout);
 
     if (canSendNotification) {
