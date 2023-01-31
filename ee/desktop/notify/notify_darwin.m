@@ -48,7 +48,7 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
 
-    __block BOOL success = NO;
+    __block BOOL canSendNotification = NO;
     UNAuthorizationOptions options = (UNAuthorizationOptionAlert | UNAuthorizationStatusProvisional);
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
@@ -62,15 +62,19 @@ BOOL sendNotification(char *cTitle, char *cBody) {
                     NSLog(@"Unable to get permission to send notifications");
                 }
             } else {
-                success = doSendNotification(center, title, body);
+                canSendNotification = YES;
             }
             dispatch_semaphore_signal(semaphore);
         }];
     });
 
-    // Wait for completion handler to complete so that we get a correct value for `success`
+    // Wait for completion handler to complete so that we get a correct value for `canSendNotification`
     dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_SEC);
     dispatch_semaphore_wait(semaphore, timeout);
 
-    return success;
+    if (canSendNotification) {
+        return doSendNotification(center, title, body);
+    }
+
+    return NO;
 }
