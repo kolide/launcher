@@ -37,20 +37,14 @@ func SetupKeys(logger log.Logger, db *bbolt.DB) error {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	// this is intended to be a temporary measure
-	// there is likely an issue where javascript is timing out
-	// while talking to the local server
-	// leaving commented code below until fix found
-	hardwareKeys = localDbKeys
-
-	// hardwareKeys, err = setupHardwareKeys(logger, db)
-	// if err != nil {
-	// 	// Now this is a conundrum. What should we do if there's a hardware keying error?
-	// 	// We could return the error, and abort, but that would block launcher for working in places
-	// 	// without keys. Inatead, we log the error and set Keys to the localDb key.
-	// 	level.Info(logger).Log("msg", "Failed to setting up hardware keys, falling back to local DB keys", "err", err)
-	// 	hardwareKeys = localDbKeys
-	// }
+	hardwareKeys, err = setupHardwareKeys(logger, db)
+	if err != nil {
+		// Now this is a conundrum. What should we do if there's a hardware keying error?
+		// We could return the error, and abort, but that would block launcher for working in places
+		// without keys. Inatead, we log the error and set Keys to the localDb key.
+		level.Info(logger).Log("msg", "Failed to setting up hardware keys, falling back to local DB keys", "err", err)
+		hardwareKeys = localDbKeys
+	}
 
 	return nil
 }
