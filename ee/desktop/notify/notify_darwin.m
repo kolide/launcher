@@ -45,11 +45,6 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
 BOOL sendNotification(char *cTitle, char *cBody) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
-    // To be removed later -- for troubleshooting purposes only
-    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
-        NSLog(@"Notification settings: %@", settings);
-    }];
-
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
 
