@@ -12,6 +12,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// nolint: deadcode
 func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 	_, pubData, err := fetchKeyData(db)
 	if err != nil {
