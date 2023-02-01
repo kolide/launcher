@@ -3,6 +3,7 @@ package notificationconsumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -106,7 +107,7 @@ func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcesses
 
 func (nc *NotificationConsumer) Update(data io.Reader) error {
 	if nc == nil {
-		return fmt.Errorf("NotificationConsumer is nil")
+		return errors.New("NotificationConsumer is nil")
 	}
 
 	var notificationsToProcess []notification

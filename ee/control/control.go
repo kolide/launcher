@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -107,7 +108,7 @@ func (cs *ControlService) Fetch() error {
 	}
 
 	if data == nil {
-		return fmt.Errorf("subsystems map data is nil")
+		return errors.New("subsystems map data is nil")
 	}
 
 	var subsystems map[string]string
@@ -154,7 +155,7 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	}
 
 	if data == nil {
-		return fmt.Errorf("control data is nil")
+		return errors.New("control data is nil")
 	}
 
 	// Consumer and subscriber(s) notified now

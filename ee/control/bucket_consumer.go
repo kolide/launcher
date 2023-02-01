@@ -2,6 +2,7 @@ package control
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -29,7 +30,7 @@ func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *buck
 
 func (bc *bucketConsumer) Update(data io.Reader) error {
 	if bc == nil {
-		return fmt.Errorf("bucketConsumer is nil")
+		return errors.New("bucketConsumer is nil")
 	}
 
 	var kvPairs map[string]string
@@ -96,7 +97,7 @@ func (bc *bucketConsumer) Update(data io.Reader) error {
 
 func (bc *bucketConsumer) Get(key []byte) (value []byte, err error) {
 	if bc == nil {
-		return nil, fmt.Errorf("bucketConsumer is nil")
+		return nil, errors.New("bucketConsumer is nil")
 	}
 
 	if err := bc.db.View(func(tx *bbolt.Tx) error {
@@ -116,7 +117,7 @@ func (bc *bucketConsumer) Get(key []byte) (value []byte, err error) {
 
 func (bc *bucketConsumer) Set(key, value []byte) error {
 	if bc == nil {
-		return fmt.Errorf("bucketConsumer is nil")
+		return errors.New("bucketConsumer is nil")
 	}
 
 	return bc.db.Update(func(tx *bbolt.Tx) error {
