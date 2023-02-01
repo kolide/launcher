@@ -3,12 +3,14 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 )
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
@@ -19,6 +21,7 @@ type ControlService struct {
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
+	getset          agent.GetterSetter
 	lastFetched     map[string]string
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
@@ -40,11 +43,6 @@ type subscriber interface {
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
 	Get(hash string) (data io.Reader, err error)
-}
-
-// StoredDataProvider is an interface for querying data from a persistable data storage layer
-type StoredDataProvider interface {
-	GetByKey(key []byte) (value []byte, err error)
 }
 
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
@@ -110,7 +108,7 @@ func (cs *ControlService) Fetch() error {
 	}
 
 	if data == nil {
-		return fmt.Errorf("subsystems map data is nil")
+		return errors.New("subsystems map data is nil")
 	}
 
 	var subsystems map[string]string
@@ -119,38 +117,73 @@ func (cs *ControlService) Fetch() error {
 	}
 
 	for subsystem, hash := range subsystems {
-		if hash == cs.lastFetched[subsystem] {
+		lastHash, ok := cs.lastFetched[subsystem]
+		if !ok && cs.getset != nil {
+			storedHash, err := cs.getset.Get([]byte(subsystem))
+			if err != nil {
+				level.Debug(cs.logger).Log(
+					"msg", "failed to get last fetched hash from stored data",
+					"subsystem", subsystem,
+					"err", err)
+				// This isn't a fatal error
+			} else {
+				lastHash = string(storedHash)
+			}
+		}
+
+		if hash == lastHash {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
 		}
 
-		data, err := cs.fetcher.Get(hash)
-		if err != nil {
-			return fmt.Errorf("failed to get control data: %w", err)
+		if err = cs.fetchAndUpdate(subsystem, hash); err != nil {
+			return err
 		}
-
-		if data == nil {
-			return fmt.Errorf("control data is nil")
-		}
-
-		// Consumer and subscriber(s) notified now
-		err = cs.update(subsystem, data)
-		if err != nil {
-			level.Error(cs.logger).Log(
-				"msg", "failed to update consumers and subscribers",
-				"subsystem", subsystem,
-				"err", err)
-			// Although we failed to update, the payload may be bad and there's no
-			// sense in repeatedly attempting to apply a bad update.
-			// A new update will have a new hash, so continue and remember this hash.
-		}
-
-		// Remember the hash of the last fetched version of this subsystem's data
-		cs.lastFetched[subsystem] = hash
 	}
 
 	level.Debug(cs.logger).Log("msg", "control data fetch complete")
+
+	return nil
+}
+
+// Fetches latest subsystem data, and notifies observers of updates.
+func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
+	data, err := cs.fetcher.Get(hash)
+	if err != nil {
+		return fmt.Errorf("failed to get control data: %w", err)
+	}
+
+	if data == nil {
+		return errors.New("control data is nil")
+	}
+
+	// Consumer and subscriber(s) notified now
+	err = cs.update(subsystem, data)
+	if err != nil {
+		level.Error(cs.logger).Log(
+			"msg", "failed to update consumers and subscribers",
+			"subsystem", subsystem,
+			"err", err)
+		// Although we failed to update, the payload may be bad and there's no
+		// sense in repeatedly attempting to apply a bad update.
+		// A new update will have a new hash, so continue and remember this hash.
+	}
+
+	// Remember the hash of the last fetched version of this subsystem's data
+	cs.lastFetched[subsystem] = hash
+
+	if cs.getset != nil {
+		// Store the hash so we can persist the last fetched data across launcher restarts
+		err = cs.getset.Set([]byte(subsystem), []byte(hash))
+		if err != nil {
+			level.Error(cs.logger).Log(
+				"msg", "failed to store last fetched control data",
+				"subsystem", subsystem,
+				"err", err)
+
+		}
+	}
 
 	return nil
 }
