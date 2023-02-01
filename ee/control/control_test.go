@@ -17,6 +17,9 @@ type (
 	mockSubscriber struct {
 		pings int
 	}
+	mockGetSet struct {
+		keyValues map[string]string
+	}
 )
 
 func (mc *mockConsumer) Update(io.Reader) error {
@@ -26,6 +29,15 @@ func (mc *mockConsumer) Update(io.Reader) error {
 
 func (ms *mockSubscriber) Ping() {
 	ms.pings++
+}
+
+func (ms *mockGetSet) Get(key []byte) (value []byte, err error) {
+	return []byte(ms.keyValues[string(key)]), nil
+}
+
+func (ms *mockGetSet) Set(key, value []byte) error {
+	ms.keyValues[string(key)] = string(value)
+	return nil
 }
 
 type nopDataProvider struct{}
@@ -142,11 +154,11 @@ func TestControlServiceUpdate(t *testing.T) {
 			require.NoError(t, err)
 
 			// Expect consumer to have gotten exactly one update
-			assert.Equal(t, tt.c.updates, tt.expectedUpdates)
+			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 
 			// Expect each subscriber to have gotten exactly one ping
 			for _, s := range tt.s {
-				assert.Equal(t, s.pings, tt.expectedUpdates)
+				assert.Equal(t, tt.expectedUpdates, s.pings)
 			}
 		})
 	}
@@ -199,13 +211,61 @@ func TestControlServiceFetch(t *testing.T) {
 				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
-				assert.Equal(t, tt.c.updates, tt.expectedUpdates)
+				assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 
 				// Expect each subscriber to have gotten exactly one ping
 				for _, s := range tt.s {
-					assert.Equal(t, s.pings, tt.expectedUpdates)
+					assert.Equal(t, tt.expectedUpdates, s.pings)
 				}
 			}
+		})
+	}
+}
+
+func TestControlServicePersistLastFetched(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		hashData        map[string]any
+		subsystems      map[string]string
+		subsystem       string
+		c               *mockConsumer
+		expectedUpdates int
+		instances       int
+	}{
+		{
+			name:            "one consumer",
+			subsystem:       "desktop",
+			subsystems:      map[string]string{"desktop": "502a42f0"},
+			hashData:        map[string]any{"502a42f0": "status"},
+			expectedUpdates: 1,
+			instances:       3,
+			c:               &mockConsumer{},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			getset := &mockGetSet{keyValues: make(map[string]string)}
+
+			// Make several instances of control service
+			for j := 0; j < tt.instances; j++ {
+				data := &TestClient{tt.subsystems, tt.hashData}
+				controlOpts := []Option{WithGetterSetter(getset)}
+
+				cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+				err := cs.RegisterConsumer(tt.subsystem, tt.c)
+				require.NoError(t, err)
+
+				err = cs.Fetch()
+				require.NoError(t, err)
+			}
+
+			// Expect consumer to have gotten exactly one update
+			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 		})
 	}
 }

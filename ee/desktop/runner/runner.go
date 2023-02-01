@@ -20,10 +20,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
@@ -90,10 +90,10 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 	}
 }
 
-// WithStoredDataProvider sets the stored data provider used to query desktop flags
-func WithStoredDataProvider(storedData control.StoredDataProvider) desktopUsersProcessesRunnerOption {
+// WithGetter sets the key/value getter for agent flags
+func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.storedData = storedData
+		r.flagsGetter = storedData
 	}
 }
 
@@ -126,8 +126,8 @@ type DesktopUsersProcessesRunner struct {
 	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
-	// storedData provides access to desktop flags
-	storedData control.StoredDataProvider
+	// flagsGetter gets agent flags
+	flagsGetter agent.Getter
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -299,8 +299,8 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 }
 
 func (r *DesktopUsersProcessesRunner) Ping() {
-	// kolide_desktop_flags bucket has been updated, query the flags to react to changes
-	enabledRaw, err := r.storedData.GetByKey([]byte("desktop_enabled"))
+	// agent_flags bucket has been updated, query the flags to react to changes
+	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled"))
 	if err != nil {
 		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
 		return
