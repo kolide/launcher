@@ -1,5 +1,5 @@
-//go:build darwin || linux
-// +build darwin linux
+//go:build darwin
+// +build darwin
 
 package runner
 
@@ -7,11 +7,16 @@ import (
 	"fmt"
 	"os/exec"
 	"os/user"
-	"strconv"
-	"syscall"
 )
 
+// For notifications to work, we must run in the user context with launchctl asuser.
 func runAsUser(uid string, cmd *exec.Cmd) error {
+	// Update command so that we're prepending `launchctl asuser $UID` to the launcher desktop command
+	cmd.Path = "/bin/launchctl"
+	updatedCmdArgs := append([]string{"/bin/launchctl", "asuser", uid}, cmd.Args...)
+	cmd.Args = updatedCmdArgs
+
+	// Ensure that we handle a non-root current user appropriately
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -36,23 +41,6 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	// the remaining code in this function is not covered by unit test since it requires root privileges
 	// We may be able to run passwordless sudo in GitHub actions, could possibly exec the tests as sudo.
 	// But we may not have a console user?
-
-	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
-	if err != nil {
-		return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
-	}
-
-	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
-	if err != nil {
-		return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
-	}
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: uint32(runningUserUid),
-			Gid: uint32(runningUserGid),
-		},
-	}
 
 	return cmd.Start()
 }

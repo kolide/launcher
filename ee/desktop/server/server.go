@@ -106,6 +106,7 @@ func (s *DesktopServer) pingHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
 		level.Error(s.logger).Log("msg", "could not read body of notification request", "err", err)
@@ -122,6 +123,7 @@ func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Req
 	}
 
 	if err := s.notifier.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
+		level.Error(s.logger).Log("msg", "could not send notification", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
