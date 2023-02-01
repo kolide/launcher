@@ -112,9 +112,50 @@ func Test_Updates(t *testing.T) {
 				k := row["key"]
 				v := row["value"]
 
-				g, err := bc.GetByKey([]byte(k))
+				g, err := bc.Get([]byte(k))
 				assert.NoError(t, err)
 				assert.Equal(t, []byte(v), g)
+			}
+		})
+	}
+}
+
+func Test_GetSet(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sets map[string]string
+		gets map[string]string
+	}{
+		{
+			name: "empty",
+			sets: map[string]string{},
+			gets: map[string]string{},
+		},
+		{
+			name: "multiple",
+			sets: map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			gets: map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := createDb(t)
+			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
+
+			for k, v := range tt.sets {
+				err := bc.Set([]byte(k), []byte(v))
+				require.NoError(t, err)
+			}
+
+			for k, v := range tt.gets {
+				val, err := bc.Get([]byte(k))
+				require.NoError(t, err)
+				assert.Equal(t, v, string(val))
 			}
 		})
 	}

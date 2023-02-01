@@ -2,6 +2,7 @@ package control
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -28,6 +29,10 @@ func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *buck
 }
 
 func (bc *bucketConsumer) Update(data io.Reader) error {
+	if bc == nil {
+		return errors.New("bucketConsumer is nil")
+	}
+
 	var kvPairs map[string]string
 	if err := json.NewDecoder(data).Decode(&kvPairs); err != nil {
 		return fmt.Errorf("failed to decode '%s' bucket consumer json: %w", bc.bucketName, err)
@@ -90,7 +95,11 @@ func (bc *bucketConsumer) Update(data io.Reader) error {
 	})
 }
 
-func (bc *bucketConsumer) GetByKey(key []byte) (value []byte, err error) {
+func (bc *bucketConsumer) Get(key []byte) (value []byte, err error) {
+	if bc == nil {
+		return nil, errors.New("bucketConsumer is nil")
+	}
+
 	if err := bc.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bc.bucketName))
 		if b == nil {
@@ -104,4 +113,24 @@ func (bc *bucketConsumer) GetByKey(key []byte) (value []byte, err error) {
 	}
 
 	return value, nil
+}
+
+func (bc *bucketConsumer) Set(key, value []byte) error {
+	if bc == nil {
+		return errors.New("bucketConsumer is nil")
+	}
+
+	return bc.db.Update(func(tx *bbolt.Tx) error {
+		// Either create the bucket, or retrieve the existing one
+		bucket, err := tx.CreateBucketIfNotExists([]byte(bc.bucketName))
+		if err != nil {
+			return fmt.Errorf("creating bucket: %w", err)
+		}
+
+		if err := bucket.Put(key, value); err != nil {
+			return fmt.Errorf("error putting key-value in bucket: %w", err)
+		}
+
+		return nil
+	})
 }

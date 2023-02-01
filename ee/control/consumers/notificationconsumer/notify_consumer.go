@@ -3,6 +3,7 @@ package notificationconsumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -105,6 +106,10 @@ func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcesses
 }
 
 func (nc *NotificationConsumer) Update(data io.Reader) error {
+	if nc == nil {
+		return errors.New("NotificationConsumer is nil")
+	}
+
 	var notificationsToProcess []notification
 	if err := json.NewDecoder(data).Decode(&notificationsToProcess); err != nil {
 		return fmt.Errorf("failed to decode notification data: %w", err)
