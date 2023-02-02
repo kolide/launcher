@@ -65,7 +65,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 		logger:       log.With(logger, "component", "localserver"),
 		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer: kolideServer,
-		myEcKey:      agent.Keys(),
+		myEcKey:      agent.LocalDbKeys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -102,7 +102,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	// While we're transitioning, we want to support both v1 and v2 protocols
 	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(
 		ls.logger,
-		kbm.UnwrapV1Hander(ls.requestLoggingHandler(rsaAuthedMux)),
+		kbm.UnwrapV1Hander(rsaAuthedMux),
 		ecKryptoMiddleware.Wrap(ecAuthedMux),
 	)
 
@@ -114,7 +114,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
-		WriteTimeout:      50 * time.Millisecond,
+		WriteTimeout:      5 * time.Second,
 		MaxHeaderBytes:    1024,
 	}
 
