@@ -11,6 +11,7 @@ bool sendNotification(char *title, char *content);
 */
 import "C"
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -21,7 +22,7 @@ func (d *DesktopNotifier) SendNotification(title, body string) error {
 	// Check if we're running inside a bundle -- if we aren't, we should not attempt to send
 	// a notification because it will cause a panic.
 	if !isBundle() {
-		return fmt.Errorf("cannot send notification because this application is not bundled")
+		return errors.New("cannot send notification because this application is not bundled")
 	}
 
 	titleCStr := C.CString(title)
@@ -31,7 +32,7 @@ func (d *DesktopNotifier) SendNotification(title, body string) error {
 
 	success := C.sendNotification(titleCStr, bodyCStr)
 	if !success {
-		return fmt.Errorf("could not send notification %s", title)
+		return fmt.Errorf("could not send notification: %s", title)
 	}
 
 	return nil
