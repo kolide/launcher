@@ -3,10 +3,12 @@ package agent
 import (
 	"crypto"
 	"fmt"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent/keys"
+	"github.com/kolide/launcher/pkg/backoff"
 	"go.etcd.io/bbolt"
 )
 
@@ -18,7 +20,7 @@ type keyInt interface {
 var hardwareKeys keyInt = keys.Noop
 var localDbKeys keyInt = keys.Noop
 
-func Keys() keyInt {
+func HardwareKeys() keyInt {
 	return hardwareKeys
 }
 
@@ -37,20 +39,19 @@ func SetupKeys(logger log.Logger, db *bbolt.DB) error {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	// this is intended to be a temporary measure
-	// there is likely an issue where javascript is timing out
-	// while talking to the local server
-	// leaving commented code below until fix found
-	hardwareKeys = localDbKeys
+	err = backoff.WaitFor(func() error {
+		hwKeys, err := setupHardwareKeys(logger, db)
+		if err != nil {
+			return err
+		}
+		hardwareKeys = hwKeys
+		return nil
+	}, 1*time.Second, 250*time.Millisecond)
 
-	// hardwareKeys, err = setupHardwareKeys(logger, db)
-	// if err != nil {
-	// 	// Now this is a conundrum. What should we do if there's a hardware keying error?
-	// 	// We could return the error, and abort, but that would block launcher for working in places
-	// 	// without keys. Inatead, we log the error and set Keys to the localDb key.
-	// 	level.Info(logger).Log("msg", "Failed to setting up hardware keys, falling back to local DB keys", "err", err)
-	// 	hardwareKeys = localDbKeys
-	// }
+	if err != nil {
+		// Use of hardware keys is not fully implemented as of 2023-02-01, so log an error and move on
+		level.Info(logger).Log("msg", "failed to setting up hardware keys", "err", err)
+	}
 
 	return nil
 }

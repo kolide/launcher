@@ -29,8 +29,10 @@
                 "--debug",
                 "--hostname=localhost:3443",
                 "--enroll_secret_path=${workspaceFolder}/debug/k2_enroll_secret",
-                "--transport=osquery",
-                "--kolide_hosted",
+                // the osquery transport stopped working for debug around 20230202, possible investigation to follow
+                // "--transport=osquery",
+                // "--kolide_hosted",
+                "--transport=jsonrpc",
                 "--root_directory=${workspaceFolder}/debug",
                 "--root_pem=${workspaceFolder}/debug/localhost.crt",
                 "--autoupdate",
