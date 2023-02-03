@@ -1,9 +1,13 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/kolide/launcher/ee/desktop/notify"
 )
 
 type transport struct {
@@ -31,7 +35,7 @@ func New(authToken, socketPath string) client {
 	client := client{
 		base: http.Client{
 			Transport: transport,
-			Timeout:   1 * time.Second,
+			Timeout:   30 * time.Second,
 		},
 	}
 
@@ -39,14 +43,33 @@ func New(authToken, socketPath string) client {
 }
 
 func (c *client) Shutdown() error {
-	resp, err := c.base.Get("http://unix/shutdown")
+	return c.get("shutdown")
+}
+
+func (c *client) Ping() error {
+	return c.get("ping")
+}
+
+func (c *client) Refresh() error {
+	return c.get("refresh")
+}
+
+func (c *client) Notify(title, body string) error {
+	notificationToSend := notify.Notification{
+		Title: title,
+		Body:  body,
+	}
+	bodyBytes, err := json.Marshal(notificationToSend)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not marshal notification: %w", err)
 	}
 
-	if resp.Body != nil {
-		resp.Body.Close()
+	resp, err := c.base.Post("http://unix/notification", "application/json", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("could not send notification: %w", err)
 	}
+
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -55,8 +78,8 @@ func (c *client) Shutdown() error {
 	return nil
 }
 
-func (c *client) Ping() error {
-	resp, err := c.base.Get("http://unix/ping")
+func (c *client) get(path string) error {
+	resp, err := c.base.Get(fmt.Sprintf("http://unix/%s", path))
 	if err != nil {
 		return err
 	}

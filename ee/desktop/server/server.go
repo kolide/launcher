@@ -5,6 +5,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -14,29 +16,35 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
 type DesktopServer struct {
-	logger       log.Logger
-	server       *http.Server
-	listener     net.Listener
-	shutdownChan chan<- struct{}
-	authToken    string
-	socketPath   string
+	logger           log.Logger
+	server           *http.Server
+	listener         net.Listener
+	shutdownChan     chan<- struct{}
+	authToken        string
+	socketPath       string
+	notifier         *notify.DesktopNotifier
+	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
+func New(logger log.Logger, authToken string, socketPath string, iconPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
 		logger:       log.With(logger, "component", "desktop_server"),
 		socketPath:   socketPath,
+		notifier:     notify.NewDesktopNotifier(log.With(logger, "component", "desktop_notifier"), iconPath),
 	}
 
 	authedMux := http.NewServeMux()
 	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
-	authedMux.HandleFunc("/ping", pingHandler)
+	authedMux.HandleFunc("/ping", desktopServer.pingHandler)
+	authedMux.HandleFunc("/notification", desktopServer.notificationHandler)
+	authedMux.HandleFunc("/refresh", desktopServer.refreshHandler)
 
 	desktopServer.server = &http.Server{
 		Handler: desktopServer.authMiddleware(authedMux),
@@ -91,17 +99,58 @@ func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request
 	s.shutdownChan <- struct{}{}
 }
 
-func pingHandler(w http.ResponseWriter, req *http.Request) {
+func (s *DesktopServer) pingHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"pong": "Kolide"}` + "\n"))
 }
 
+func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		level.Error(s.logger).Log("msg", "could not read body of notification request", "err", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer req.Body.Close()
+
+	var notificationToSend notify.Notification
+	if err := json.Unmarshal(b, &notificationToSend); err != nil {
+		level.Error(s.logger).Log("msg", "could not decode notification request", "err", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := s.notifier.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
+		level.Error(s.logger).Log("msg", "could not send notification", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *DesktopServer) refreshHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	s.notifyRefreshListeners()
+}
+
+// Registers a listener to be notified when status data should be refreshed
+func (s *DesktopServer) RegisterRefreshListener(f func()) {
+	s.refreshListeners = append(s.refreshListeners, f)
+}
+
+// Notifies all listeners to refresh their status data
+func (s *DesktopServer) notifyRefreshListeners() {
+	for _, listener := range s.refreshListeners {
+		listener()
+	}
+}
+
 func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
-			r.Body.Close()
-		}
 
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
 

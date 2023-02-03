@@ -3,7 +3,7 @@
 	<title>{{.Title}}</title>
 	<pkg-ref id="com.{{.Identifier}}.launcher">
 		<bundle-version>
-			<bundle CFBundleShortVersionString="{{.Version}}" CFBundleVersion="{{.Version}}" id="com.{{.Identifier}}.launcher" path="usr/local/kolide/Kolide.app"/>
+			<bundle CFBundleShortVersionString="{{.Version}}" CFBundleVersion="{{.Version}}" id="com.{{.Identifier}}.launcher" path="usr/local/{{.Identifier}}/Kolide.app"/>
 		</bundle-version>
 	</pkg-ref>
 	<options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>

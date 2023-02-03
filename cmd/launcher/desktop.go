@@ -40,10 +40,20 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
+		flmenupath = flagset.String(
+			"menu_path",
+			"",
+			"path to read menu data",
+		)
 		fldebug = flagset.Bool(
 			"debug",
 			false,
 			"enable debug logging",
+		)
+		flIconPath = flagset.String(
+			"icon_path",
+			"",
+			"path to icon file",
 		)
 	)
 
@@ -88,10 +98,15 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
 	if err != nil {
 		return err
 	}
+
+	menu := menu.New(logger, *flhostname, *flmenupath)
+	server.RegisterRefreshListener(func() {
+		menu.Build()
+	})
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
@@ -125,7 +140,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init(*flhostname)
+	menu.Init()
 
 	return nil
 }

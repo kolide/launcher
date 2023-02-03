@@ -27,7 +27,7 @@ func NewKryptoBoxerMiddleware(logger log.Logger, myKey *rsa.PrivateKey, serverKe
 
 	kbrw := &kryptoBoxerMiddleware{
 		boxer:  krypto.NewBoxer(myKey, serverKey),
-		logger: logger,
+		logger: log.With(logger, "keytype", "kbm"),
 	}
 
 	return kbrw, nil

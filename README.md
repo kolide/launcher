@@ -44,16 +44,6 @@ Notary](https://www.nccgroup.trust/us/our-research/docker-notary/) and
 [Osquery](https://www.nccgroup.trust/us/about-us/newsroom-and-events/blog/2016/march/ncc-group-reviews-osquery/)
 as well.
 
-### gRPC Server Specification and Implementation
-
-Osquery has a very extensible plugin architecture that allow it to be
-heavily customized with plugins. The included TLS plugins are used by
-many existing osquery management servers, but the design of the TLS
-API leaves much to be desired. The Launcher includes a set of gRPC
-plugins for remote communication with a gRPC server. The [server
-specification](https://github.com/kolide/launcher/tree/master/pkg/pb/launcher)
-is independently published and versioned.
-
 ### Additional Tables
 
 Osquery exposes a lot of information, but there is always

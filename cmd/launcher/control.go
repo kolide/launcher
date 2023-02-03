@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/pkg/launcher"
+	"go.etcd.io/bbolt"
 )
 
 func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Options) (*control.HTTPClient, error) {
@@ -22,7 +22,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	if opts.DisableControlTLS {
 		clientOpts = append(clientOpts, control.WithDisableTLS())
 	}
-	client, err := control.NewControlHTTPClient(opts.ControlServerURL, http.DefaultClient, clientOpts...)
+	client, err := control.NewControlHTTPClient(logger, opts.ControlServerURL, http.DefaultClient, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating control http client: %w", err)
 	}
@@ -30,7 +30,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, opts *launcher.Options) (*actor.Actor, error) {
+func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, opts *launcher.Options) (*control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
@@ -38,20 +38,13 @@ func createControlService(ctx context.Context, logger log.Logger, opts *launcher
 		return nil, err
 	}
 
+	getset := control.NewBucketConsumer(logger, db, "control_service_data")
+
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
+		control.WithGetterSetter(getset),
 	}
-	service := control.New(logger, client, controlOpts...)
+	service := control.New(logger, ctx, client, controlOpts...)
 
-	return &actor.Actor{
-		Execute: func() error {
-			level.Info(logger).Log("msg", "control service started")
-			service.Start(ctx)
-			return nil
-		},
-		Interrupt: func(err error) {
-			level.Info(logger).Log("msg", "control service interrupted", "err", err)
-			service.Stop()
-		},
-	}, nil
+	return service, nil
 }

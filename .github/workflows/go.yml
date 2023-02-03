@@ -79,6 +79,27 @@ jobs:
     - name: Test
       run: make test
 
+    # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
+    # check to ensure that launcher can update to this build.
+    - name: Test build - macOS and ubuntu
+      if: ${{ contains(matrix.os, 'macos') || contains(matrix.os, 'ubuntu') }}
+      run: |
+        if ! ./build/launcher --version; then
+          echo "launcher.exe --version failed"
+          exit 1
+        fi
+
+    # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
+    # check to ensure that launcher can update to this build.
+    - name: Test build - Windows
+      if: ${{ contains(matrix.os, 'windows') }}
+      shell: powershell
+      run: |
+        .\build\launcher.exe --version
+        if( !$? ) {
+          throw "launcher.exe --version failed"
+        }
+
     - name: Upload Build - Windows
       if: ${{ contains(matrix.os, 'windows') }}
       uses: actions/upload-artifact@v2
