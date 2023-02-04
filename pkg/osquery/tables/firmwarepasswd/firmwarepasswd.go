@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -96,7 +97,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 
 	cmd := exec.CommandContext(ctx, "/usr/sbin/firmwarepasswd", subcommand)
 
-	dir, err := os.MkdirTemp("", "osq-firmwarepasswd")
+	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-firmwarepasswd")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

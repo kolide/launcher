@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -126,7 +127,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		}
 	}
 
-	dir, err := os.MkdirTemp("", "osq-xrdb")
+	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-xrdb")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

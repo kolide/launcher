@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -76,7 +77,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					// for some subset of the profiles command. I've reported it
 					// to apple (feedback FB8962811), and while it may someday
 					// be fixed, we need to support it where it is.
-					dir, err := os.MkdirTemp("", "kolide_profiles")
+					dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_profiles")
 					if err != nil {
 						return nil, fmt.Errorf("creating kolide_profiles tmp dir: %w", err)
 					}

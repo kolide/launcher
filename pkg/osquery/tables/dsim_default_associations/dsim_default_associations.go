@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -71,7 +72,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	// dism.exe outputs xml, but with weird intermingled status. So
 	// instead, we dump it to a temp file.
-	dir, err := os.MkdirTemp("", "kolide_dism")
+	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_dism")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
@@ -40,7 +41,7 @@ func runInteractive(args []string) error {
 	}
 
 	// have to keep tempdir name short so we don't exceed socket length
-	rootDir, err := os.MkdirTemp("", "launcher-interactive")
+	rootDir, err := os.MkdirTemp(agent.TempPath(""), "launcher-interactive")
 	if err != nil {
 		return fmt.Errorf("creating temp dir for interactive mode: %w", err)
 	}

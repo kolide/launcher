@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go"
@@ -81,7 +82,7 @@ func execPwsh(logger log.Logger) execer {
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe
-		dir, err := os.MkdirTemp("", "nativewifi")
+		dir, err := os.MkdirTemp(agent.TempPath(""), "nativewifi")
 		if err != nil {
 			return fmt.Errorf("creating nativewifi tmp dir: %w", err)
 		}

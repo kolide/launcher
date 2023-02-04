@@ -15,6 +15,8 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
+
+	"github.com/kolide/launcher/pkg/agent"
 )
 
 var profileDirs = map[string][]string{
@@ -42,7 +44,7 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	dir, err := os.MkdirTemp("", "kolide_chrome_login_data_emails")
+	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_chrome_login_data_emails")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)
 	}

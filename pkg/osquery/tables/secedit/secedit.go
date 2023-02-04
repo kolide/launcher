@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -94,7 +95,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-	dir, err := os.MkdirTemp("", "kolide_secedit_config")
+	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_secedit_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_secedit_config tmp dir: %w", err)
 	}
