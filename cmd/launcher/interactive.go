@@ -41,7 +41,7 @@ func runInteractive(args []string) error {
 	}
 
 	// have to keep tempdir name short so we don't exceed socket length
-	rootDir, err := os.MkdirTemp(agent.TempPath(""), "launcher-interactive")
+	rootDir, err := agent.MkdirTemp("launcher-interactive")
 	if err != nil {
 		return fmt.Errorf("creating temp dir for interactive mode: %w", err)
 	}

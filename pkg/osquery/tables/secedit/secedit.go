@@ -95,7 +95,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.
-	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_secedit_config")
+	dir, err := agent.MkdirTemp("kolide_secedit_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_secedit_config tmp dir: %w", err)
 	}

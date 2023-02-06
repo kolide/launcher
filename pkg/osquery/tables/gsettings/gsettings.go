@@ -123,7 +123,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		}
 	}
 
-	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-gsettings")
+	dir, err := agent.MkdirTemp("osq-gsettings")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

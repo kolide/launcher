@@ -42,7 +42,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		query,
 	)
 
-	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-launchctl")
+	dir, err := agent.MkdirTemp("osq-launchctl")
 	if err != nil {
 		return nil, fmt.Errorf("mktemp: %w", err)
 	}

@@ -72,7 +72,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	// dism.exe outputs xml, but with weird intermingled status. So
 	// instead, we dump it to a temp file.
-	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_dism")
+	dir, err := agent.MkdirTemp("kolide_dism")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}

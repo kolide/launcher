@@ -82,7 +82,7 @@ func execPwsh(logger log.Logger) execer {
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe
-		dir, err := os.MkdirTemp(agent.TempPath(""), "nativewifi")
+		dir, err := agent.MkdirTemp("nativewifi")
 		if err != nil {
 			return fmt.Errorf("creating nativewifi tmp dir: %w", err)
 		}

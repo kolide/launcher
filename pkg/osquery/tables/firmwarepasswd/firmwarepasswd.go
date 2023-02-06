@@ -97,7 +97,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 
 	cmd := exec.CommandContext(ctx, "/usr/sbin/firmwarepasswd", subcommand)
 
-	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-firmwarepasswd")
+	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

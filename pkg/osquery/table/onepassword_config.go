@@ -54,7 +54,7 @@ type onePasswordAccountsTable struct {
 // generate the onepassword account info results given the path to a
 // onepassword sqlite DB
 func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
-	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_onepassword_accounts")
+	dir, err := agent.MkdirTemp("kolide_onepassword_accounts")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_onepassword_accounts tmp dir: %w", err)
 	}

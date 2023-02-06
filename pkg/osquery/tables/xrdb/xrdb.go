@@ -127,7 +127,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		}
 	}
 
-	dir, err := os.MkdirTemp(agent.TempPath(""), "osq-xrdb")
+	dir, err := agent.MkdirTemp("osq-xrdb")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

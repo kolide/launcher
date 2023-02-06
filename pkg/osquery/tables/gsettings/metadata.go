@@ -91,7 +91,7 @@ type keyDescription struct {
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
 	var descriptions []keyDescription
 
-	dir, err := os.MkdirTemp(agent.TempPath(""), fmt.Sprintf("osq-gsettings-metadata-%s", schema))
+	dir, err := agent.MkdirTemp(fmt.Sprintf("osq-gsettings-metadata-%s", schema))
 	if err != nil {
 		return descriptions, fmt.Errorf("mktemp: %w", err)
 	}

@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
@@ -49,11 +48,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
 	if rootDirectory == "" {
-		rootDirectory = agent.TempPath(defaultRootDirectory)
-		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
-				return fmt.Errorf("creating temporary root directory: %w", err)
-			}
+		rootDirectory, err := agent.MkdirTemp(defaultRootDirectory)
+		if err != nil {
+			return fmt.Errorf("creating temporary root directory: %w", err)
 		}
 		level.Info(logger).Log(
 			"msg", "using default system root directory",

@@ -77,9 +77,9 @@ func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 
 // WithUsersFilesRoot sets the launcher root dir with will be the parent dir
 // for kolide desktop files on a per user basis
-func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
+func WithUsersFilesRoot(usersFilesRoot string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.usersFilesRoot = token
+		r.usersFilesRoot = usersFilesRoot
 	}
 }
 

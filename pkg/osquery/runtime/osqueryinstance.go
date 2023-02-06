@@ -593,7 +593,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 }
 
 func osqueryTempDir() (string, func(), error) {
-	tempPath, err := os.MkdirTemp(agent.TempPath(), "")
+	tempPath, err := agent.MkdirTemp("")
 	if err != nil {
 		return "", func() {}, fmt.Errorf("could not make temp path: %w", err)
 	}

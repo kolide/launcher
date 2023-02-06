@@ -34,7 +34,7 @@ type gdrive struct {
 }
 
 func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := os.MkdirTemp(agent.TempPath(""), "kolide_gdrive_sync_config")
+	dir, err := agent.MkdirTemp("kolide_gdrive_sync_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_gdrive_sync_config tmp dir: %w", err)
 	}
