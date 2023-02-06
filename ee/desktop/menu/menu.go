@@ -14,8 +14,7 @@ import (
 type menuIcon string
 
 const (
-	KolideDesktopIcon      = "kolide-desktop"
-	KolideDebugDesktopIcon = "kolide-debug-desktop"
+	KolideDesktopIcon = "kolide-desktop"
 )
 
 // MenuData encapsulates a menu bar icon and accessible menu items
