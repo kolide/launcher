@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/pkg/backoff"
 )
 
 type identifiers struct {
@@ -78,6 +79,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 			"msg", "getting console users",
 			"err", err,
 		)
+		response.ConsoleUsers = []*user.User{}
 	} else {
 		response.ConsoleUsers = consoleUsers
 	}
@@ -92,24 +94,26 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 }
 
 func consoleUsers() ([]*user.User, error) {
-	context, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	const maxDuration = 1 * time.Second
+	context, cancel := context.WithTimeout(context.Background(), maxDuration)
 	defer cancel()
-
-	uids, err := consoleuser.CurrentUids(context)
-	if err != nil {
-		return nil, err
-	}
 
 	var users []*user.User
 
-	for _, uid := range uids {
-		user, err := user.LookupId(uid)
+	return users, backoff.WaitFor(func() error {
+		uids, err := consoleuser.CurrentUids(context)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		users = append(users, user)
-	}
+		for _, uid := range uids {
+			user, err := user.LookupId(uid)
+			if err != nil {
+				return err
+			}
 
-	return users, nil
+			users = append(users, user)
+		}
+		return nil
+	}, maxDuration, 250*time.Millisecond)
 }
