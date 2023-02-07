@@ -71,7 +71,7 @@ func Test_ParseMenuData(t *testing.T) {
 		{
 			name: "happy path",
 			data: &MenuData{
-				Icon:    KolideDebugDesktopIcon,
+				Icon:    KolideDesktopIcon,
 				Tooltip: "Kolide",
 			},
 		},
