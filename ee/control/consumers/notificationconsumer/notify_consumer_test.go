@@ -21,12 +21,51 @@ type notifierMock struct{ mock.Mock }
 
 func newNotifierMock() *notifierMock { return &notifierMock{} }
 
-func (nm *notifierMock) SendNotification(title, body string) error {
-	args := nm.Called(title, body)
+func (nm *notifierMock) SendNotification(title, body, actionUri string) error {
+	args := nm.Called(title, body, actionUri)
 	return args.Error(0)
 }
 
 func TestUpdate_HappyPath(t *testing.T) {
+	t.Parallel()
+
+	db := setUpDb(t)
+	mockNotifier := newNotifierMock()
+	testNc := &NotificationConsumer{
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
+	}
+
+	// Send one notification that we haven't seen before
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
+	testActionUri := "https://www.kolide.com"
+	testNotifications := []notification{
+		{
+			Title:      testTitle,
+			Body:       testBody,
+			ID:         testId,
+			ValidUntil: getValidUntil(),
+			ActionUri:  testActionUri,
+		},
+	}
+	testNotificationsRaw, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+
+	// Expect that the notifier is called once to send the one notification successfully
+	mockNotifier.On("SendNotification", testTitle, testBody, testActionUri).Return(nil)
+
+	// Call update and assert our expectations about sent notifications
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
+}
+
+func TestUpdate_HappyPath_NoAction(t *testing.T) {
 	t.Parallel()
 
 	db := setUpDb(t)
@@ -55,7 +94,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called once to send the one notification successfully
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+	mockNotifier.On("SendNotification", testTitle, testBody, "").Return(nil)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
@@ -170,7 +209,7 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called only once, to send the first notification
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+	mockNotifier.On("SendNotification", testTitle, testBody, "").Return(nil)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
@@ -213,8 +252,8 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called twice: once to unsuccessfully send the first notification, and again to send the duplicate successfully
-	errorCall := mockNotifier.On("SendNotification", testTitle, testBody).Return(errors.New("test error"))
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil).NotBefore(errorCall)
+	errorCall := mockNotifier.On("SendNotification", testTitle, testBody, "").Return(errors.New("test error"))
+	mockNotifier.On("SendNotification", testTitle, testBody, "").Return(nil).NotBefore(errorCall)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)

@@ -28,7 +28,7 @@ type NotificationConsumer struct {
 
 // The desktop runner fullfils this interface -- it exists for testing purposes.
 type userProcessesRunner interface {
-	SendNotification(title, body string) error
+	SendNotification(title, body, actionUri string) error
 }
 
 // Represents notification received from control server; SentAt is set by this consumer after sending.
@@ -36,6 +36,7 @@ type userProcessesRunner interface {
 type notification struct {
 	Title      string    `json:"title"`
 	Body       string    `json:"body"`
+	ActionUri  string    `json:"action_uri,omitempty"`
 	ID         string    `json:"id"`
 	ValidUntil string    `json:"valid_until"` // ISO8601 format
 	SentAt     time.Time `json:"sent_at,omitempty"`
@@ -131,7 +132,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 		return
 	}
 
-	if err := nc.runner.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
+	if err := nc.runner.SendNotification(notificationToSend.Title, notificationToSend.Body, notificationToSend.ActionUri); err != nil {
 		level.Error(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
 		return
 	}

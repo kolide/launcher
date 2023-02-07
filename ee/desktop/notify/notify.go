@@ -10,8 +10,9 @@ type DesktopNotifier struct {
 }
 
 type Notification struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	ActionUri string `json:"action_uri,omitempty"`
 }
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) *DesktopNotifier {

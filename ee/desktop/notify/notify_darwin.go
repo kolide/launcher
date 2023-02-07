@@ -18,7 +18,7 @@ import (
 	"unsafe"
 )
 
-func (d *DesktopNotifier) SendNotification(title, body string) error {
+func (d *DesktopNotifier) SendNotification(title, body, actionUri string) error {
 	// Check if we're running inside a bundle -- if we aren't, we should not attempt to send
 	// a notification because it will cause a panic.
 	if !isBundle() {

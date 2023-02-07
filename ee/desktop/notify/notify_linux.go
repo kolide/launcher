@@ -11,20 +11,25 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-func (d *DesktopNotifier) SendNotification(title, body string) error {
-	if err := d.sendNotificationViaDbus(title, body); err == nil {
+func (d *DesktopNotifier) SendNotification(title, body, actionUri string) error {
+	if err := d.sendNotificationViaDbus(title, body, actionUri); err == nil {
 		return nil
 	}
 
-	return d.sendNotificationViaNotifySend(title, body)
+	return d.sendNotificationViaNotifySend(title, body, actionUri)
 }
 
 // See: https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html
-func (d *DesktopNotifier) sendNotificationViaDbus(title, body string) error {
+func (d *DesktopNotifier) sendNotificationViaDbus(title, body, actionUri string) error {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "could not connect to dbus, will try alternate method of notification", "err", err)
 		return fmt.Errorf("could not connect to dbus: %w", err)
+	}
+
+	actions := []string{}
+	if actionUri != "" {
+		actions = append(actions, "default", actionUri)
 	}
 
 	notificationsService := conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
@@ -35,7 +40,7 @@ func (d *DesktopNotifier) sendNotificationViaDbus(title, body string) error {
 		d.iconFilepath,            // app_icon
 		title,                     // summary
 		body,                      // body
-		[]string{},                // actions
+		actions,                   // actions
 		map[string]dbus.Variant{}, // hints
 		int32(0))                  // expire_timeout -- 0 means the notification will not expire
 
@@ -47,11 +52,16 @@ func (d *DesktopNotifier) sendNotificationViaDbus(title, body string) error {
 	return nil
 }
 
-func (d *DesktopNotifier) sendNotificationViaNotifySend(title, body string) error {
+func (d *DesktopNotifier) sendNotificationViaNotifySend(title, body, actionUri string) error {
 	notifySend, err := exec.LookPath("notify-send")
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "notify-send not installed", "err", err)
 		return fmt.Errorf("notify-send not installed: %w", err)
+	}
+
+	// notify-send doesn't support actions, but URLs in notifications are clickable.
+	if actionUri != "" {
+		body += " See more: " + actionUri
 	}
 
 	args := []string{title, body}

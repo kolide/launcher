@@ -245,11 +245,11 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	}
 }
 
-func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error {
+func (r *DesktopUsersProcessesRunner) SendNotification(title, body, actionUri string) error {
 	errs := make([]error, 0)
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Notify(title, body); err != nil {
+		if err := client.Notify(title, body, actionUri); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending notify command to desktop process",
 				"uid", uid,
