@@ -2,12 +2,10 @@ package menu
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/version"
 )
 
 // menuIcons are named identifiers
@@ -133,8 +131,34 @@ func getDefaultMenu() *MenuData {
 		Tooltip: "Kolide",
 		Items: []menuItemData{
 			{
-				Label:    fmt.Sprintf("Version %s", version.Version().Version),
+				Label:    "Version: {{.LauncherVersion}}",
 				Disabled: true,
+			},
+			{
+				IsSeparator: true,
+				NonProdOnly: true,
+			},
+			{
+				Label:       "Debug",
+				NonProdOnly: true,
+				Items: []menuItemData{
+					{
+						Label:    "Launcher Version: {{.LauncherVersion}}",
+						Disabled: true,
+					},
+					{
+						Label:    "Launcher Revision: {{.LauncherRevision}}",
+						Disabled: true,
+					},
+					{
+						Label:    "Go Version: {{.GoVersion}}",
+						Disabled: true,
+					},
+					{
+						Label:    "Hostname: {{.ServerHostname}}",
+						Disabled: true,
+					},
+				},
 			},
 		},
 	}
