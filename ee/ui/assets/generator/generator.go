@@ -16,21 +16,6 @@ import (
 	"github.com/serenize/snaker"
 )
 
-/*
-var iconNames = []string{
-	"menubar-blocked-color-dark",
-	"menubar-blocked-color-light",
-	"menubar-blocked-monochrome",
-	"menubar-default-dark",
-	"menubar-default-light",
-	"menubar-missing-registration-dark",
-	"menubar-missing-registration-light",
-	"menubar-will-block-color-dark",
-	"menubar-will-block-color-light",
-	"menubar-will-block-monochrome",
-}
-*/
-
 // icoSizes are the ico sizes we generate. It's a tradeoff between size and quality.
 var icoSizes = []string{
 	"16",
