@@ -64,68 +64,40 @@ const (
 	publicEccData  = "publicEccData"
 )
 
-func fetchKeyData(db *bbolt.DB) ([]byte, []byte, error) {
-	var pri []byte
-	var pub []byte
+func fetchKeyData(getter Getter) ([]byte, []byte, error) {
+	pri, err := getter.Get([]byte(privateEccData))
+	if err != nil {
+		return nil, nil, err
+	}
 
-	if err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		if b == nil {
-			return nil
-		}
-
-		pri = b.Get([]byte(privateEccData))
-		pub = b.Get([]byte(publicEccData))
-
-		return nil
-	}); err != nil {
+	pub, err := getter.Get([]byte(publicEccData))
+	if err != nil {
 		return nil, nil, err
 	}
 
 	return pri, pub, nil
 }
 
-func storeKeyData(db *bbolt.DB, pri, pub []byte) error {
-	return db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+func storeKeyData(setter Setter, pri, pub []byte) error {
+	if pri != nil {
+		if err := setter.Set([]byte(privateEccData), pri); err != nil {
+			return err
 		}
+	}
 
-		// It's not really clear what we should do if this is called with a nil pri or pub. We
-		// could delete the key data, but that feels like the wrong thing -- what if there's a
-		// weird caller error? So, in the event of nils, we skip the write. We may revisit this
-		// as we learn more
-
-		if pri != nil {
-			if err := b.Put([]byte(privateEccData), pri); err != nil {
-				return err
-			}
+	if pub != nil {
+		if err := setter.Set([]byte(publicEccData), pub); err != nil {
+			return err
 		}
+	}
 
-		if pub != nil {
-			if err := b.Put([]byte(publicEccData), pub); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	return nil
 }
 
 // clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
-func clearKeyData(logger log.Logger, db *bbolt.DB) {
+func clearKeyData(logger log.Logger, deleter Deleter) {
 	level.Info(logger).Log("msg", "Clearing keys")
-	_ = db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		if b == nil {
-			return nil
-		}
-
-		_ = b.Delete([]byte(privateEccData))
-		_ = b.Delete([]byte(publicEccData))
-
-		return nil
-	})
+	_ = deleter.Delete([]byte(privateEccData))
+	_ = deleter.Delete([]byte(publicEccData))
 }
