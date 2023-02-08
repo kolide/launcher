@@ -21,16 +21,16 @@ func NewControlTestClient(subsystemMap map[string]string, hashData map[string]an
 	return c, nil
 }
 
-func (c *TestClient) Get(hash string) (data io.Reader, err error) {
-	if hash == "" {
-		bodyBytes, err := json.Marshal(c.subsystemMap)
-		if err != nil {
-			return nil, fmt.Errorf("marshaling json: %w", err)
-		}
-
-		return bytes.NewReader(bodyBytes), nil
+func (c *TestClient) GetConfig() (data io.Reader, err error) {
+	bodyBytes, err := json.Marshal(c.subsystemMap)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling json: %w", err)
 	}
 
+	return bytes.NewReader(bodyBytes), nil
+}
+
+func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
 	bodyBytes, err := json.Marshal(c.hashData[hash])
 	if err != nil {
 		return nil, fmt.Errorf("marshaling json: %w", err)

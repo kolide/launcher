@@ -42,7 +42,8 @@ type subscriber interface {
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
-	Get(hash string) (data io.Reader, err error)
+	GetConfig() (io.Reader, error)
+	GetSubsystemData(hash string) (io.Reader, error)
 }
 
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
@@ -102,7 +103,7 @@ func (cs *ControlService) Stop() {
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
 	// Empty hash means get the map of subsystems & hashes
-	data, err := cs.fetcher.Get("")
+	data, err := cs.fetcher.GetConfig()
 	if err != nil {
 		return fmt.Errorf("getting subsystems map: %w", err)
 	}
@@ -149,7 +150,7 @@ func (cs *ControlService) Fetch() error {
 
 // Fetches latest subsystem data, and notifies observers of updates.
 func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
-	data, err := cs.fetcher.Get(hash)
+	data, err := cs.fetcher.GetSubsystemData(hash)
 	if err != nil {
 		return fmt.Errorf("failed to get control data: %w", err)
 	}
