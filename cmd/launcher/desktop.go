@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
@@ -119,6 +120,17 @@ func runDesktop(args []string) error {
 			)
 		}
 	})
+
+	// Listen for notification actions (i.e. a user clicking on a notification)
+	listener, err := notify.NewListener(logger)
+	if err != nil {
+		level.Error(logger).Log(
+			"msg", "could not create new listener",
+			"err", err,
+		)
+	} else {
+		runGroup.Add(listener.Listen, listener.Interrupt)
+	}
 
 	// listen on shutdown channel
 	runGroup.Add(func() error {

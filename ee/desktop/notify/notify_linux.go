@@ -29,10 +29,10 @@ func (d *DesktopNotifier) sendNotificationViaDbus(title, body, actionUri string)
 
 	actions := []string{}
 	if actionUri != "" {
-		actions = append(actions, "default", actionUri)
+		actions = append(actions, actionUri, "Open")
 	}
 
-	notificationsService := conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
 	call := notificationsService.Call("org.freedesktop.Notifications.Notify",
 		0,                         // no flags
 		"Kolide",                  // app_name
@@ -61,7 +61,7 @@ func (d *DesktopNotifier) sendNotificationViaNotifySend(title, body, actionUri s
 
 	// notify-send doesn't support actions, but URLs in notifications are clickable.
 	if actionUri != "" {
-		body += " See more: " + actionUri
+		body += " Open: " + actionUri
 	}
 
 	args := []string{title, body}
