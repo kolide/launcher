@@ -84,7 +84,6 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
 		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
 		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
-		flDisableControlTLS = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
 		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 
@@ -92,6 +91,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
 		_ = flagset.Bool("control", false, "DEPRECATED")
 		_ = flagset.String("control_hostname", "", "DEPRECATED")
+		_ = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -181,7 +181,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	// Set control server URL and control server TLS settings based on Kolide server URL, defaulting to local server
 	controlServerURL := "localhost:3000"
 	insecureTLS := *flInsecureTLS
-	disableControlTLS := *flDisableControlTLS
+	disableControlTLS := false
 	if *flKolideServerURL == "k2device.kolide.com" {
 		controlServerURL = "k2control.kolide.com"
 	} else if *flKolideServerURL == "k2device-preprod.kolide.com" {
@@ -323,7 +323,6 @@ func developerUsage(flagset *flag.FlagSet) {
 	printOpt("notary_prefix")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
-	printOpt("disable_control_tls")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("osquery_flag")
 	fmt.Fprintf(os.Stderr, "\n")
