@@ -178,6 +178,24 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		return nil, err
 	}
 
+	// Set control server URL and control server TLS settings based on Kolide server URL, defaulting to local server
+	controlServerURL := "localhost:3000"
+	insecureTLS := *flInsecureTLS
+	disableControlTLS := *flDisableControlTLS
+	if *flKolideServerURL == "k2device.kolide.com" {
+		controlServerURL = "k2control.kolide.com"
+	} else if *flKolideServerURL == "k2device-preprod.kolide.com" {
+		controlServerURL = "k2control-preprod.kolide.com"
+	} else if strings.HasSuffix(*flKolideServerURL, "herokuapp.com") {
+		controlServerURL = *flKolideServerURL
+	} else if *flKolideServerURL == "localhost:3443" {
+		controlServerURL = *flKolideServerURL
+		insecureTLS = true
+	} else if *flKolideServerURL == "localhost:3000" {
+		controlServerURL = *flKolideServerURL
+		disableControlTLS = true
+	}
+
 	opts := &launcher.Options{
 		Autoupdate:                         *flAutoupdate,
 		AutoupdateInterval:                 *flAutoupdateInterval,
@@ -185,15 +203,15 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		CertPins:                           certPins,
 		CompactDbMaxTx:                     *flCompactDbMaxTx,
 		Control:                            false,
-		ControlServerURL:                   "localhost:3000",
+		ControlServerURL:                   controlServerURL,
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
-		DisableControlTLS:                  *flDisableControlTLS,
+		DisableControlTLS:                  disableControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		AutoloadedExtensions:               flAutoloadedExtensions,
-		InsecureTLS:                        *flInsecureTLS,
+		InsecureTLS:                        insecureTLS,
 		InsecureTransport:                  *flInsecureTransport,
 		KolideHosted:                       *flKolideHosted,
 		KolideServerURL:                    *flKolideServerURL,

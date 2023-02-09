@@ -86,6 +86,74 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	require.Equal(t, expectedOpts, opts)
 }
 
+func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
+	testCases := []struct {
+		testName                  string
+		testFlags                 []string
+		expectedControlServer     string
+		expectedInsecureTLS       bool
+		expectedDisableControlTLS bool
+	}{
+		{
+			testName: "k2-prod",
+			testFlags: []string{
+				"--hostname", "k2device.kolide.com",
+			},
+			expectedControlServer:     "k2control.kolide.com",
+			expectedInsecureTLS:       false,
+			expectedDisableControlTLS: false,
+		},
+		{
+			testName: "k2-preprod",
+			testFlags: []string{
+				"--hostname", "k2device-preprod.kolide.com",
+			},
+			expectedControlServer:     "k2control-preprod.kolide.com",
+			expectedInsecureTLS:       false,
+			expectedDisableControlTLS: false,
+		},
+		{
+			testName: "heroku",
+			testFlags: []string{
+				"--hostname", "test.herokuapp.com",
+			},
+			expectedControlServer:     "test.herokuapp.com",
+			expectedInsecureTLS:       false,
+			expectedDisableControlTLS: false,
+		},
+		{
+			testName: "localhost with TLS",
+			testFlags: []string{
+				"--hostname", "localhost:3443",
+			},
+			expectedControlServer:     "localhost:3443",
+			expectedInsecureTLS:       true,
+			expectedDisableControlTLS: false,
+		},
+		{
+			testName: "localhost without TLS",
+			testFlags: []string{
+				"--hostname", "localhost:3000",
+			},
+			expectedControlServer:     "localhost:3000",
+			expectedInsecureTLS:       false,
+			expectedDisableControlTLS: true,
+		},
+	}
+
+	for _, tt := range testCases { // nolint:paralleltest
+		tt := tt
+		os.Clearenv()
+		t.Run(tt.testName, func(t *testing.T) {
+			opts, err := parseOptions(tt.testFlags)
+			require.NoError(t, err, "could not parse options")
+			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
+			require.Equal(t, tt.expectedInsecureTLS, opts.InsecureTLS, "incorrect insecure TLS")
+			require.Equal(t, tt.expectedDisableControlTLS, opts.DisableControlTLS, "incorrect disable control TLS")
+		})
+	}
+}
+
 func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	randomHostname := fmt.Sprintf("%s.example.com", stringutil.RandomString(8))
 	randomInt := rand.Intn(1024)
