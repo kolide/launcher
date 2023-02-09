@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -35,7 +36,7 @@ type ChromeLoginKeychain struct {
 }
 
 func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := os.MkdirTemp("", "kolide_chrome_login_keychain")
+	dir, err := agent.MkdirTemp("kolide_chrome_login_keychain")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_keychain tmp dir: %w", err)
 	}
