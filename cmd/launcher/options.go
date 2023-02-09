@@ -190,6 +190,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		controlServerURL = *flKolideServerURL
 	} else if *flKolideServerURL == "localhost:3443" {
 		controlServerURL = *flKolideServerURL
+		// We don't plumb flRootPEM through to the control server, just disable TLS for now
 		insecureTLS = true
 	} else if *flKolideServerURL == "localhost:3000" {
 		controlServerURL = *flKolideServerURL
