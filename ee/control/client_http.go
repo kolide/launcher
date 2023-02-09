@@ -85,18 +85,19 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 
 	// Calculate first signature
 	localDbKeys := agent.LocalDbKeys()
-	if localDbKeys.Type() != "noop" {
-		key1, err := keyHeaderValue(localDbKeys)
-		if err != nil {
-			return nil, fmt.Errorf("could not get key header from local db keys: %w", err)
-		}
-		sig1, err := signatureHeaderValue(localDbKeys, challenge)
-		if err != nil {
-			return nil, fmt.Errorf("could not get signature header from local db keys: %w", err)
-		}
-		configReq.Header.Set(HeaderKey, key1)
-		configReq.Header.Set(HeaderSignature, sig1)
+	if localDbKeys.Type() == "noop" {
+		return nil, errors.New("cannot request control data without local keys")
 	}
+	key1, err := keyHeaderValue(localDbKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not get key header from local db keys: %w", err)
+	}
+	sig1, err := signatureHeaderValue(localDbKeys, challenge)
+	if err != nil {
+		return nil, fmt.Errorf("could not get signature header from local db keys: %w", err)
+	}
+	configReq.Header.Set(HeaderKey, key1)
+	configReq.Header.Set(HeaderSignature, sig1)
 
 	// Calculate second signature if available
 	hardwareKeys := agent.HardwareKeys()
