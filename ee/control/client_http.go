@@ -10,10 +10,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/backoff"
 )
 
 // HTTPClient handles retrieving control data via HTTP
@@ -191,7 +193,17 @@ func keyHeaderValue(k crypto.Signer) (string, error) {
 }
 
 func signatureHeaderValue(k crypto.Signer, challenge []byte) (string, error) {
-	sig, err := echelper.Sign(k, challenge)
+	var (
+		sig []byte
+		err error
+	)
+
+	// Add a timeout/retry because TPM operations can be slow
+	err = backoff.WaitFor(func() error {
+		sig, err = echelper.Sign(k, challenge)
+		return err
+	}, 1*time.Second, 250*time.Millisecond)
+
 	if err != nil {
 		return "", fmt.Errorf("could not sign challenge: %w", err)
 	}
