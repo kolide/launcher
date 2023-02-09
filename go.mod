@@ -1,7 +1,6 @@
 module github.com/kolide/launcher
 
 require (
-	fyne.io/systray v1.10.1-0.20221115204952-d16a6177e6f1
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/clbanning/mxj v1.8.4
@@ -55,7 +54,10 @@ require (
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
 
-require github.com/vmihailenco/msgpack/v5 v5.3.5
+require (
+	github.com/kolide/systray v1.10.2
+	github.com/vmihailenco/msgpack/v5 v5.3.5
+)
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
