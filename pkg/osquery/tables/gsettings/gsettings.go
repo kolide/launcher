@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -122,7 +123,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		}
 	}
 
-	dir, err := os.MkdirTemp("", "osq-gsettings")
+	dir, err := agent.MkdirTemp("osq-gsettings")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
 	}

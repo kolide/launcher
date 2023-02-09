@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -37,7 +38,7 @@ type GDriveSyncHistory struct {
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	dir, err := os.MkdirTemp("", "kolide_gdrive_sync_history")
+	dir, err := agent.MkdirTemp("kolide_gdrive_sync_history")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_gdrive_sync_history tmp dir: %w", err)
 	}

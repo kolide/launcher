@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/desktop/server"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/process"
@@ -205,5 +205,5 @@ func defaultSocketPath() string {
 		return fmt.Sprintf(`\\.\pipe\%s_%d_%s`, socketBaseName, os.Getpid(), ulid.New())
 	}
 
-	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
+	return agent.TempPath(fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
 }
