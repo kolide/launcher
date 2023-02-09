@@ -98,6 +98,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			testName: "k2-prod",
 			testFlags: []string{
 				"--hostname", "k2device.kolide.com",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
 			expectedControlServer:     "k2control.kolide.com",
 			expectedInsecureTLS:       false,
@@ -107,6 +108,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			testName: "k2-preprod",
 			testFlags: []string{
 				"--hostname", "k2device-preprod.kolide.com",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
 			expectedControlServer:     "k2control-preprod.kolide.com",
 			expectedInsecureTLS:       false,
@@ -116,6 +118,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			testName: "heroku",
 			testFlags: []string{
 				"--hostname", "test.herokuapp.com",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
 			expectedControlServer:     "test.herokuapp.com",
 			expectedInsecureTLS:       false,
@@ -125,6 +128,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			testName: "localhost with TLS",
 			testFlags: []string{
 				"--hostname", "localhost:3443",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
 			expectedControlServer:     "localhost:3443",
 			expectedInsecureTLS:       true,
@@ -134,6 +138,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			testName: "localhost without TLS",
 			testFlags: []string{
 				"--hostname", "localhost:3000",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
 			expectedControlServer:     "localhost:3000",
 			expectedInsecureTLS:       false,
