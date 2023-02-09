@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -131,10 +132,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 
 func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	if c.token == "" {
-		_, err := c.GetConfig()
-		if err != nil {
-			return nil, fmt.Errorf("no token set; could not make request to get one: %w", err)
-		}
+		return nil, errors.New("token is nil, cannot request subsystem data")
 	}
 
 	dataReq, err := http.NewRequest(http.MethodGet, c.url(fmt.Sprintf("/api/agent/object/%s", hash)).String(), nil)
@@ -142,7 +140,7 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 		return nil, fmt.Errorf("could not create subsystem data request: %w", err)
 	}
 
-	dataReq.Header.Set("Authorization", "Bearer "+c.token)
+	dataReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 	dataReq.Header.Set("Content-Type", "application/json")
 	dataReq.Header.Set("Accept", "application/json")
 
