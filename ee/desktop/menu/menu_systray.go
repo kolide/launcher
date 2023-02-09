@@ -46,9 +46,12 @@ func (m *menu) Build() {
 func (m *menu) SetIcon(icon menuIcon) {
 	switch icon {
 	case KolideDesktopIcon:
-		systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
-	case KolideDebugDesktopIcon:
-		systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
+		// Allow launcher to conditionally choose the launcher icon based on whether we're running in production or not
+		if m.isProd() {
+			systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
+		} else {
+			systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
+		}
 	default:
 		level.Debug(m.logger).Log(
 			"msg", "invalid icon",
