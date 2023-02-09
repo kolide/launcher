@@ -5,7 +5,7 @@ of the Desktop UI.
 
 They originals from Fritz are in `source/`, and there's a generator to convert
 them into the desired formats and setup the embed. (In other versions, I've done
-this with make, or even shell snippets, but let's sometimes I try to stick with
+this with make, or even shell snippets, but sometimes I try to stick with
 pure go. Of course, this shells to `convert`, but at least there's no make?)
 
 # Icons
