@@ -42,7 +42,11 @@ func (ms *mockGetSet) Set(key, value []byte) error {
 
 type nopDataProvider struct{}
 
-func (dp nopDataProvider) Get(hash string) (data io.Reader, err error) {
+func (dp nopDataProvider) GetConfig() (io.Reader, error) {
+	return nil, nil
+}
+
+func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
 	return nil, nil
 }
 

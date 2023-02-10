@@ -128,30 +128,12 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 			},
 		},
 		{
-			name: "Invalid because ValidUntil isn't a timestamp",
-			testNotification: notification{
-				Title:      "Not a timestamp notification",
-				Body:       "Not a timestamp notification body",
-				ID:         ulid.New(),
-				ValidUntil: "not a timestamp",
-			},
-		},
-		{
-			name: "Invalid because ValidUntil has an unexpected format",
-			testNotification: notification{
-				Title:      "Unexpected format notification",
-				Body:       "Unexpected format notification body",
-				ID:         ulid.New(),
-				ValidUntil: time.Now().Add(1 * time.Hour).Format(time.RFC1123),
-			},
-		},
-		{
 			name: "Invalid because the notification is expired",
 			testNotification: notification{
 				Title:      "Expired notification",
 				Body:       "Expired notification body",
 				ID:         ulid.New(),
-				ValidUntil: time.Now().Add(-1 * time.Hour).Format(iso8601Format),
+				ValidUntil: time.Now().Add(-1 * time.Hour).Unix(),
 			},
 		},
 	}
@@ -338,6 +320,6 @@ func setUpDb(t *testing.T) *bbolt.DB {
 	return db
 }
 
-func getValidUntil() string {
-	return time.Now().Add(1 * time.Hour).Format(iso8601Format)
+func getValidUntil() int64 {
+	return time.Now().Add(1 * time.Hour).Unix()
 }
