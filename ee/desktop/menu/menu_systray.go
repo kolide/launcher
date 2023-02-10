@@ -37,10 +37,7 @@ func (m *menu) Build() {
 
 	// Reparse the menu file & rebuild the menu
 	menuData := m.getMenuData()
-	if menuData == nil {
-		menuData = getDefaultMenu()
-	}
-	parseMenuData(menuData, m, m.parser)
+	parseMenuData(menuData, m)
 }
 
 func (m *menu) setIcon(icon menuIcon) {

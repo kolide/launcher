@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -160,6 +161,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	}
 
 	runner.writeIconFile()
+	runner.writeDefaultMenuFile()
 
 	return runner
 }
@@ -271,14 +273,7 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error
 
 // Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
-	var menu menu.MenuData
-	if err := json.NewDecoder(data).Decode(&menu); err != nil {
-		return fmt.Errorf("failed to decode menu data: %w", err)
-	}
-
-	// Regardless, we will write the menu data out to a file that can be grabbed by
-	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
+	if err := r.generateMenuFile(data); err != nil {
 		return err
 	}
 
@@ -339,8 +334,9 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) err
 	return nil
 }
 
-// writeTemplateFile generates and writes template data to a shared file
-func (r *DesktopUsersProcessesRunner) writeTemplateFile() error {
+// generateMenuFile generates and writes menu data to a shared file
+func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
+	// First generate fresh template data to use for parsing
 	v := version.Version()
 	td := &menu.TemplateData{
 		LauncherVersion:  v.Version,
@@ -348,11 +344,91 @@ func (r *DesktopUsersProcessesRunner) writeTemplateFile() error {
 		GoVersion:        v.GoVersion,
 		ServerHostname:   r.hostname,
 	}
-	if err := r.writeSharedFile(r.templatePath(), td); err != nil {
+
+	menuDataBytes, err := io.ReadAll(data)
+	if err != nil {
+		return fmt.Errorf("failed to read menu data: %w", err)
+	}
+
+	// Convert the raw JSON to a string and feed it to the parser for template expansion
+	parser := menu.NewTemplateParser(td)
+	parsedMenuDataStr, err := parser.Parse(string(menuDataBytes))
+	if err != nil {
+		return fmt.Errorf("failed to parse menu data: %w", err)
+	}
+
+	// Convert the parsed string back to bytes, which can now be decoded per usual
+	parsedMenuDataBytes := []byte(parsedMenuDataStr)
+
+	var menu menu.MenuData
+	if err := json.NewDecoder(bytes.NewReader(parsedMenuDataBytes)).Decode(&menu); err != nil {
+		return fmt.Errorf("failed to decode menu data: %w", err)
+	}
+
+	// Regardless, we will write the menu data out to a file that can be grabbed by
+	// any desktop user processes, either when they refresh, or when they are spawned.
+	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// writeDefaultMenuFile will create the menu file, if it does not already exist
+func (r *DesktopUsersProcessesRunner) writeDefaultMenuFile() {
+	menuPath := r.menuPath()
+	_, err := os.Stat(menuPath)
+
+	if os.IsNotExist(err) {
+		defaultMenuJSON := `{
+			"icon": "kolide-desktop",
+			"tooltip": "Kolide",
+			"items": [
+			  {
+				"label": "Version: {{.LauncherVersion}}",
+				"disabled": true
+			  },
+			  {
+				"isSeparator": true,
+				"nonProdOnly": true
+			  },
+			  {
+				"label": "Debug",
+				"nonProdOnly": true,
+				"items": [
+				  {
+					"label": "Launcher Version: {{.LauncherVersion}}",
+					"disabled": true
+				  },
+				  {
+					"label": "Launcher Revision: {{.LauncherRevision}}",
+					"disabled": true
+				  },
+				  {
+					"label": "Go Version: {{.GoVersion}}",
+					"disabled": true
+				  },
+				  {
+					"label": "Hostname: {{.ServerHostname}}",
+					"disabled": true
+				  },
+				  {
+					"label": "Refresh Menu",
+					"action": {
+					  "type": "refresh-menu"
+					}
+				  }
+				]
+			  }
+			]
+		  }`
+
+		if err := r.generateMenuFile(strings.NewReader(defaultMenuJSON)); err != nil {
+			level.Error(r.logger).Log("msg", "menu file did not exist, could not create it", "err", err)
+		}
+	} else if err != nil {
+		level.Error(r.logger).Log("msg", "could not check if menu file exists", "err", err)
+	}
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
@@ -385,12 +461,9 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		r.writeTemplateFile()
-
 		menuPath := r.menuPath()
-		templatePath := r.templatePath()
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath, templatePath)
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath)
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
@@ -567,12 +640,8 @@ func (r *DesktopUsersProcessesRunner) menuPath() string {
 	return filepath.Join(r.usersFilesRoot, "menu.json")
 }
 
-func (r *DesktopUsersProcessesRunner) templatePath() string {
-	return filepath.Join(r.usersFilesRoot, "template.json")
-}
-
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath, templatePath string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
@@ -581,7 +650,6 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
-		fmt.Sprintf("TEMPLATE_PATH=%s", templatePath),
 	}
 
 	stdErr, err := cmd.StderrPipe()

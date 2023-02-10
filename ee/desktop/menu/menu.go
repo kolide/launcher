@@ -46,27 +46,18 @@ type menuBuilder interface {
 	addSeparator()
 }
 
-// textParser is an interface that parses text used in menu item labels
-type textParser interface {
-	// parse parses text as a template body for the menu template data
-	// if an error occurs while parsing, an empty string is returned along with the error
-	parse(text string) (string, error)
-}
-
 // menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
 type menu struct {
 	logger   log.Logger
 	hostname string
 	filePath string
-	parser   textParser
 }
 
-func New(logger log.Logger, hostname, filePath string, parser textParser) *menu {
+func New(logger log.Logger, hostname, filePath string) *menu {
 	m := &menu{
 		logger:   logger,
 		hostname: hostname,
 		filePath: filePath,
-		parser:   parser,
 	}
 
 	return m
@@ -122,46 +113,4 @@ func (m *menu) getMenuData() *MenuData {
 	}
 
 	return &menu
-}
-
-// getDefaultMenu returns a static, hard-coded menu to be used in failure modes when the menu data can't be retrieved
-func getDefaultMenu() *MenuData {
-	data := &MenuData{
-		Icon:    KolideDesktopIcon,
-		Tooltip: "Kolide",
-		Items: []menuItemData{
-			{
-				Label:    "Version: {{.LauncherVersion}}",
-				Disabled: true,
-			},
-			{
-				IsSeparator: true,
-				NonProdOnly: true,
-			},
-			{
-				Label:       "Debug",
-				NonProdOnly: true,
-				Items: []menuItemData{
-					{
-						Label:    "Launcher Version: {{.LauncherVersion}}",
-						Disabled: true,
-					},
-					{
-						Label:    "Launcher Revision: {{.LauncherRevision}}",
-						Disabled: true,
-					},
-					{
-						Label:    "Go Version: {{.GoVersion}}",
-						Disabled: true,
-					},
-					{
-						Label:    "Hostname: {{.ServerHostname}}",
-						Disabled: true,
-					},
-				},
-			},
-		},
-	}
-
-	return data
 }

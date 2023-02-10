@@ -6,14 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type mockTextParser struct {
-	updates int
-}
-
-func (parser *mockTextParser) parse(text string) (string, error) {
-	return text, nil
-}
-
 type testMenuBuilder struct {
 	Icon     menuIcon
 	Tooltip  string
@@ -82,7 +74,7 @@ func Test_ParseMenuData(t *testing.T) {
 			t.Parallel()
 
 			builder := &testMenuBuilder{}
-			parseMenuData(tt.data, builder, nil)
+			parseMenuData(tt.data, builder)
 			if tt.data != nil {
 				assert.Equal(t, *tt.data, builder.menuCopy)
 			}
@@ -132,7 +124,7 @@ func Test_ParseMenuItem(t *testing.T) {
 			t.Parallel()
 
 			builder := &testMenuBuilder{parent: menuItemData{Label: "parent item"}}
-			parseMenuItem(tt.data, builder, &mockTextParser{}, nil)
+			parseMenuItem(tt.data, builder, nil)
 			if tt.data == nil {
 				assert.Equal(t, tt.data, builder.itemCopy)
 			} else {

@@ -49,7 +49,7 @@ func Test_Parse(t *testing.T) {
 			t.Parallel()
 
 			tp := NewTemplateParser(tt.td)
-			o, err := tp.parse(tt.text)
+			o, err := tp.Parse(tt.text)
 			if !tt.expectedErr {
 				require.NoError(t, err)
 			}

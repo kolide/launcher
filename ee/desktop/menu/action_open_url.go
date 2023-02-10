@@ -13,19 +13,10 @@ type actionOpenURL struct {
 }
 
 func (a actionOpenURL) Perform(m *menu) {
-	url, err := m.parser.parse(a.URL)
-	if err != nil {
-		level.Error(m.logger).Log(
-			"msg", "failed to parse URL",
-			"URL", a.URL,
-			"err", err)
-		return
-	}
-
-	if err := open(url); err != nil {
+	if err := open(a.URL); err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform action",
-			"URL", url,
+			"URL", a.URL,
 			"err", err)
 	}
 }

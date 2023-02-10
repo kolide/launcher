@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -45,11 +44,6 @@ func runDesktop(args []string) error {
 			"menu_path",
 			"",
 			"path to read menu data",
-		)
-		fltemplatepath = flagset.String(
-			"template_path",
-			"",
-			"path to read template data",
 		)
 		fldebug = flagset.Bool(
 			"debug",
@@ -109,9 +103,7 @@ func runDesktop(args []string) error {
 		return err
 	}
 
-	td := getTemplateData(logger, *fltemplatepath)
-	tp := menu.NewTemplateParser(td)
-	menu := menu.New(logger, *flhostname, *flmenupath, tp)
+	menu := menu.New(logger, *flhostname, *flmenupath)
 	server.RegisterRefreshListener(func() {
 		menu.Build()
 	})
@@ -202,24 +194,4 @@ func defaultSocketPath() string {
 	}
 
 	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
-}
-
-func getTemplateData(logger log.Logger, path string) *menu.TemplateData {
-	if path == "" {
-		return nil
-	}
-
-	templateFileBytes, err := os.ReadFile(path)
-	if err != nil {
-		level.Error(logger).Log("msg", "failed to read file", "path", path)
-		return nil
-	}
-
-	var td menu.TemplateData
-	if err := json.Unmarshal(templateFileBytes, &td); err != nil {
-		level.Error(logger).Log("msg", "failed to unmarshal json")
-		return nil
-	}
-
-	return &td
 }
