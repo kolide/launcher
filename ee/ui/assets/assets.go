@@ -7,12 +7,6 @@ import (
 )
 
 
-//go:embed menubar-blocked-monochrome.ico
-var MenubarBlockedMonochromeIco []byte
-
-//go:embed menubar-blocked-monochrome.png
-var MenubarBlockedMonochromePng []byte
-
 //go:embed menubar-circle-x-darkmode.ico
 var MenubarCircleXDarkmodeIco []byte
 
@@ -24,6 +18,12 @@ var MenubarCircleXLightmodeIco []byte
 
 //go:embed menubar-circle-x-lightmode.png
 var MenubarCircleXLightmodePng []byte
+
+//go:embed menubar-circle-x-monochrome.ico
+var MenubarCircleXMonochromeIco []byte
+
+//go:embed menubar-circle-x-monochrome.png
+var MenubarCircleXMonochromePng []byte
 
 //go:embed menubar-default-darkmode.ico
 var MenubarDefaultDarkmodeIco []byte
@@ -61,9 +61,9 @@ var MenubarTriangleExclamationLightmodeIco []byte
 //go:embed menubar-triangle-exclamation-lightmode.png
 var MenubarTriangleExclamationLightmodePng []byte
 
-//go:embed menubar-will-block-monochrome.ico
-var MenubarWillBlockMonochromeIco []byte
+//go:embed menubar-triangle-exclamation-monochrome.ico
+var MenubarTriangleExclamationMonochromeIco []byte
 
-//go:embed menubar-will-block-monochrome.png
-var MenubarWillBlockMonochromePng []byte
+//go:embed menubar-triangle-exclamation-monochrome.png
+var MenubarTriangleExclamationMonochromePng []byte
 
