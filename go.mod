@@ -1,7 +1,6 @@
 module github.com/kolide/launcher
 
 require (
-	fyne.io/systray v1.10.1-0.20221115204952-d16a6177e6f1
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/clbanning/mxj v1.8.4
@@ -19,7 +18,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.0.0-20230128164551-c54b78be5480
+	github.com/kolide/krypto v0.0.0-20230209233022-9fce3e429899
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
@@ -55,7 +54,10 @@ require (
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
 
-require github.com/vmihailenco/msgpack/v5 v5.3.5
+require (
+	github.com/kolide/systray v1.10.2
+	github.com/vmihailenco/msgpack/v5 v5.3.5
+)
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect

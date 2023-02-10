@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
@@ -26,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -48,11 +48,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
 	if rootDirectory == "" {
-		rootDirectory = filepath.Join(os.TempDir(), defaultRootDirectory)
-		if _, err := os.Stat(rootDirectory); os.IsNotExist(err) {
-			if err := os.Mkdir(rootDirectory, fsutil.DirMode); err != nil {
-				return fmt.Errorf("creating temporary root directory: %w", err)
-			}
+		rootDirectory, err := agent.MkdirTemp(defaultRootDirectory)
+		if err != nil {
+			return fmt.Errorf("creating temporary root directory: %w", err)
 		}
 		level.Info(logger).Log(
 			"msg", "using default system root directory",
@@ -180,47 +178,53 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	controlService, err := createControlService(ctx, logger, db, opts)
-	if err != nil {
-		return fmt.Errorf("failed to setup control service: %w", err)
-	}
-	runGroup.Add(controlService.Execute, controlService.Interrupt)
+	// Create the control service and services that depend on it
+	var runner *desktopRunner.DesktopUsersProcessesRunner
+	if opts.ControlServerURL == "" {
+		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
+	} else {
+		controlService, err := createControlService(ctx, logger, db, opts)
+		if err != nil {
+			return fmt.Errorf("failed to setup control service: %w", err)
+		}
+		runGroup.Add(controlService.Execute, controlService.Interrupt)
 
-	// serverDataBucketConsumer handles server data table updates
-	serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
-	controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+		// serverDataBucketConsumer handles server data table updates
+		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
+		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
-	desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
-	controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
+		desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
+		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
 
-	runner := desktopRunner.New(
-		desktopRunner.WithLogger(logger),
-		desktopRunner.WithUpdateInterval(time.Second*5),
-		desktopRunner.WithHostname(opts.KolideServerURL),
-		desktopRunner.WithAuthToken(ulid.New()),
-		desktopRunner.WithUsersFilesRoot(rootDirectory),
-		desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")),
-		desktopRunner.WithGetter(desktopFlagsBucketConsumer),
-	)
-	runGroup.Add(runner.Execute, runner.Interrupt)
-	controlService.RegisterConsumer("kolide_desktop_menu", runner)
-	controlService.RegisterSubscriber("agent_flags", runner)
+		runner = desktopRunner.New(
+			desktopRunner.WithLogger(logger),
+			desktopRunner.WithUpdateInterval(time.Second*5),
+			desktopRunner.WithHostname(opts.KolideServerURL),
+			desktopRunner.WithAuthToken(ulid.New()),
+			desktopRunner.WithUsersFilesRoot(rootDirectory),
+			desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")),
+			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
+		)
+		runGroup.Add(runner.Execute, runner.Interrupt)
+		controlService.RegisterConsumer("kolide_desktop_menu", runner)
+		controlService.RegisterSubscriber("agent_flags", runner)
 
-	// Run the notification service
-	notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-		db,
-		runner,
-		ctx,
-		notificationconsumer.WithLogger(logger),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to set up notifier: %w", err)
-	}
-	// Runs the cleanup routine for old notification records
-	runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
+		// Run the notification service
+		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
+			db,
+			runner,
+			ctx,
+			notificationconsumer.WithLogger(logger),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set up notifier: %w", err)
+		}
+		// Runs the cleanup routine for old notification records
+		runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
 
-	if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
-		return fmt.Errorf("failed to register notify consumer: %w", err)
+		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
+			return fmt.Errorf("failed to register notify consumer: %w", err)
+		}
 	}
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||

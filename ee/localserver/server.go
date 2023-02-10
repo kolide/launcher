@@ -48,8 +48,9 @@ type localServer struct {
 	querier      Querier
 	kolideServer string
 
-	myKey   *rsa.PrivateKey
-	myEcKey crypto.Signer
+	myKey                 *rsa.PrivateKey
+	myLocalDbSigner       crypto.Signer
+	myLocalHardwareSigner crypto.Signer
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
@@ -62,10 +63,11 @@ const (
 
 func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, error) {
 	ls := &localServer{
-		logger:       log.With(logger, "component", "localserver"),
-		limiter:      rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer: kolideServer,
-		myEcKey:      agent.LocalDbKeys(),
+		logger:                log.With(logger, "component", "localserver"),
+		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer:          kolideServer,
+		myLocalDbSigner:       agent.LocalDbKeys(),
+		myLocalHardwareSigner: agent.HardwareKeys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -93,7 +95,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	rsaAuthedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
 
 	// Setup the v2 protocol wraps
-	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myEcKey, *ls.serverEcKey)
+	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())

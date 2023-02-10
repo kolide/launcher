@@ -37,16 +37,13 @@ type notification struct {
 	Title      string    `json:"title"`
 	Body       string    `json:"body"`
 	ID         string    `json:"id"`
-	ValidUntil string    `json:"valid_until"` // ISO8601 format
+	ValidUntil int64     `json:"valid_until"` // timestamp
 	SentAt     time.Time `json:"sent_at,omitempty"`
 }
 
 const (
 	// Identifier for this consumer.
 	NotificationSubsystem = "desktop_notifier"
-
-	// ISO 8601 -- used for valid_until field
-	iso8601Format = "2006-01-02T15:04:05-0700"
 
 	// Approximately 6 months
 	defaultRetentionPeriod = time.Hour * 24 * 30 * 6
@@ -142,14 +139,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 
 func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notification) bool {
 	// Check that the notification is not expired --
-	// Parse timestamp string as ISO 8601
-	validUntil, err := time.Parse(iso8601Format, notificationToCheck.ValidUntil)
-	if err != nil {
-		level.Error(nc.logger).Log("msg", "received invalid valid_until timestamp in notification", "valid_until", notificationToCheck.ValidUntil, "err", err)
-
-		// Assume that we should not send a notification containing a malformed field
-		return false
-	}
+	validUntil := time.Unix(notificationToCheck.ValidUntil, 0)
 
 	// Notification has expired
 	if validUntil.Before(time.Now()) {
