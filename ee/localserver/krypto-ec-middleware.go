@@ -32,11 +32,11 @@ type kryptoEcMiddleware struct {
 	logger                        log.Logger
 }
 
-func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner crypto.Signer, counteParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:  localDbSigner,
 		hardwareSigner: hardwareSigner,
-		counterParty:   counteParty,
+		counterParty:   counterParty,
 		logger:         log.With(logger, "keytype", "ec"),
 	}
 }
