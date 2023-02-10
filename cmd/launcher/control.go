@@ -16,7 +16,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	level.Debug(logger).Log("msg", "creating control http client")
 
 	clientOpts := []control.HTTPClientOption{}
-	if opts.InsecureTLS {
+	if opts.InsecureControlTLS {
 		clientOpts = append(clientOpts, control.WithInsecureSkipVerify())
 	}
 	if opts.DisableControlTLS {

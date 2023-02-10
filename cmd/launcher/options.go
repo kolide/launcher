@@ -180,7 +180,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 
 	// Set control server URL and control server TLS settings based on Kolide server URL, defaulting to local server
 	controlServerURL := ""
-	insecureTLS := *flInsecureTLS
+	insecureControlTLS := false
 	disableControlTLS := false
 	if *flKolideServerURL == "k2device.kolide.com" {
 		controlServerURL = "k2control.kolide.com"
@@ -191,7 +191,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	} else if *flKolideServerURL == "localhost:3443" {
 		controlServerURL = *flKolideServerURL
 		// We don't plumb flRootPEM through to the control server, just disable TLS for now
-		insecureTLS = true
+		insecureControlTLS = true
 	} else if *flKolideServerURL == "localhost:3000" {
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
@@ -208,11 +208,12 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
 		DisableControlTLS:                  disableControlTLS,
+		InsecureControlTLS:                 insecureControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		AutoloadedExtensions:               flAutoloadedExtensions,
-		InsecureTLS:                        insecureTLS,
+		InsecureTLS:                        *flInsecureTLS,
 		InsecureTransport:                  *flInsecureTransport,
 		KolideHosted:                       *flKolideHosted,
 		KolideServerURL:                    *flKolideServerURL,

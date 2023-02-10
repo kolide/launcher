@@ -88,11 +88,11 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	testCases := []struct {
-		testName                  string
-		testFlags                 []string
-		expectedControlServer     string
-		expectedInsecureTLS       bool
-		expectedDisableControlTLS bool
+		testName                   string
+		testFlags                  []string
+		expectedControlServer      string
+		expectedInsecureControlTLS bool
+		expectedDisableControlTLS  bool
 	}{
 		{
 			testName: "k2-prod",
@@ -100,9 +100,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "k2device.kolide.com",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "k2control.kolide.com",
-			expectedInsecureTLS:       false,
-			expectedDisableControlTLS: false,
+			expectedControlServer:      "k2control.kolide.com",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  false,
 		},
 		{
 			testName: "k2-preprod",
@@ -110,9 +110,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "k2device-preprod.kolide.com",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "k2control-preprod.kolide.com",
-			expectedInsecureTLS:       false,
-			expectedDisableControlTLS: false,
+			expectedControlServer:      "k2control-preprod.kolide.com",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  false,
 		},
 		{
 			testName: "heroku",
@@ -120,9 +120,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "test.herokuapp.com",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "test.herokuapp.com",
-			expectedInsecureTLS:       false,
-			expectedDisableControlTLS: false,
+			expectedControlServer:      "test.herokuapp.com",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  false,
 		},
 		{
 			testName: "localhost with TLS",
@@ -130,9 +130,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "localhost:3443",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "localhost:3443",
-			expectedInsecureTLS:       true,
-			expectedDisableControlTLS: false,
+			expectedControlServer:      "localhost:3443",
+			expectedInsecureControlTLS: true,
+			expectedDisableControlTLS:  false,
 		},
 		{
 			testName: "localhost without TLS",
@@ -140,9 +140,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "localhost:3000",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "localhost:3000",
-			expectedInsecureTLS:       false,
-			expectedDisableControlTLS: true,
+			expectedControlServer:      "localhost:3000",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  true,
 		},
 		{
 			testName: "unknown host option",
@@ -150,9 +150,9 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 				"--hostname", "example.com",
 				"--osqueryd_path", windowsAddExe("/dev/null"),
 			},
-			expectedControlServer:     "",
-			expectedInsecureTLS:       false,
-			expectedDisableControlTLS: false,
+			expectedControlServer:      "",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  false,
 		},
 	}
 
@@ -163,7 +163,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			opts, err := parseOptions(tt.testFlags)
 			require.NoError(t, err, "could not parse options")
 			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
-			require.Equal(t, tt.expectedInsecureTLS, opts.InsecureTLS, "incorrect insecure TLS")
+			require.Equal(t, tt.expectedInsecureControlTLS, opts.InsecureControlTLS, "incorrect insecure TLS")
 			require.Equal(t, tt.expectedDisableControlTLS, opts.DisableControlTLS, "incorrect disable control TLS")
 		})
 	}
