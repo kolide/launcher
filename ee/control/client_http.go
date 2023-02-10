@@ -3,7 +3,7 @@ package control
 import (
 	"bytes"
 	"crypto"
-	"crypto/x509"
+	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -16,7 +16,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/backoff"
 )
 
 // HTTPClient handles retrieving control data via HTTP
@@ -88,7 +87,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 	if localDbKeys.Type() == "noop" {
 		return nil, errors.New("cannot request control data without local keys")
 	}
-	key1, err := keyHeaderValue(localDbKeys)
+	key1, err := echelper.PublicEcdsaToB64Der(localDbKeys.Public().(*ecdsa.PublicKey))
 	if err != nil {
 		return nil, fmt.Errorf("could not get key header from local db keys: %w", err)
 	}
@@ -96,13 +95,13 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get signature header from local db keys: %w", err)
 	}
-	configReq.Header.Set(HeaderKey, key1)
+	configReq.Header.Set(HeaderKey, string(key1))
 	configReq.Header.Set(HeaderSignature, sig1)
 
 	// Calculate second signature if available
 	hardwareKeys := agent.HardwareKeys()
 	if hardwareKeys.Type() != "noop" {
-		key2, err := keyHeaderValue(hardwareKeys)
+		key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
 		if err != nil {
 			return nil, fmt.Errorf("could not get key header from hardware keys: %w", err)
 		}
@@ -110,7 +109,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not get signature header from hardware keys: %w", err)
 		}
-		configReq.Header.Set(HeaderKey2, key2)
+		configReq.Header.Set(HeaderKey2, string(key2))
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
@@ -182,27 +181,8 @@ func (c *HTTPClient) url(path string) *url.URL {
 	return &u
 }
 
-func keyHeaderValue(k crypto.Signer) (string, error) {
-	keyDer, err := x509.MarshalPKIXPublicKey(k.Public())
-	if err != nil {
-		return "", fmt.Errorf("could not marshal public key: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(keyDer), nil
-}
-
 func signatureHeaderValue(k crypto.Signer, challenge []byte) (string, error) {
-	var (
-		sig []byte
-		err error
-	)
-
-	// Add a timeout/retry because TPM operations can be slow
-	err = backoff.WaitFor(func() error {
-		sig, err = echelper.Sign(k, challenge)
-		return err
-	}, 1*time.Second, 250*time.Millisecond)
-
+	sig, err := echelper.SignWithTimeout(k, challenge, 1*time.Second, 250*time.Millisecond)
 	if err != nil {
 		return "", fmt.Errorf("could not sign challenge: %w", err)
 	}

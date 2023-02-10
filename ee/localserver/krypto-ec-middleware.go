@@ -108,7 +108,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		response, err := challengeBox.Respond(e.signer, bhr.Bytes())
+		response, err := challengeBox.Respond(e.signer, nil, bhr.Bytes())
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
