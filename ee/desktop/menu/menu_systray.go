@@ -3,7 +3,7 @@ package menu
 import (
 	"sync"
 
-	"fyne.io/systray"
+	"github.com/kolide/systray"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/desktop/assets"

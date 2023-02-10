@@ -77,9 +77,9 @@ func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 
 // WithUsersFilesRoot sets the launcher root dir with will be the parent dir
 // for kolide desktop files on a per user basis
-func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
+func WithUsersFilesRoot(usersFilesRoot string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.usersFilesRoot = token
+		r.usersFilesRoot = usersFilesRoot
 	}
 }
 
@@ -150,7 +150,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		updateInterval:         time.Second * 5,
 		procsWg:                &sync.WaitGroup{},
 		interruptTimeout:       time.Second * 10,
-		usersFilesRoot:         filepath.Join(os.TempDir(), "kolide-desktop"),
+		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: false,
 	}
 
@@ -553,6 +553,9 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
+		// without passing the temp var, the desktop icon will not appear on windows and emit the error:
+		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
+		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
