@@ -84,7 +84,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 
 	// Calculate first signature
 	localDbKeys := agent.LocalDbKeys()
-	if localDbKeys.Type() == "noop" {
+	if localDbKeys.Public() == nil {
 		return nil, errors.New("cannot request control data without local keys")
 	}
 	key1, err := echelper.PublicEcdsaToB64Der(localDbKeys.Public().(*ecdsa.PublicKey))
@@ -100,7 +100,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 
 	// Calculate second signature if available
 	hardwareKeys := agent.HardwareKeys()
-	if hardwareKeys.Type() != "noop" {
+	if hardwareKeys.Public() != nil {
 		key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
 		if err != nil {
 			return nil, fmt.Errorf("could not get key header from hardware keys: %w", err)
