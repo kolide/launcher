@@ -144,6 +144,16 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			expectedInsecureTLS:       false,
 			expectedDisableControlTLS: true,
 		},
+		{
+			testName: "unknown host option",
+			testFlags: []string{
+				"--hostname", "example.com",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
+			},
+			expectedControlServer:     "",
+			expectedInsecureTLS:       false,
+			expectedDisableControlTLS: false,
+		},
 	}
 
 	for _, tt := range testCases { // nolint:paralleltest
@@ -178,7 +188,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		AutoupdateInterval:     48 * time.Hour,
 		CompactDbMaxTx:         int64(65536),
 		Control:                false,
-		ControlServerURL:       "localhost:3000",
+		ControlServerURL:       "",
 		ControlRequestInterval: 60 * time.Second,
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,

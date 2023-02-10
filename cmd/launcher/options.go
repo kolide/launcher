@@ -179,7 +179,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	}
 
 	// Set control server URL and control server TLS settings based on Kolide server URL, defaulting to local server
-	controlServerURL := "localhost:3000"
+	controlServerURL := ""
 	insecureTLS := *flInsecureTLS
 	disableControlTLS := false
 	if *flKolideServerURL == "k2device.kolide.com" {
