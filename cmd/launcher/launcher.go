@@ -17,9 +17,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
@@ -175,9 +178,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	// Disable the control service until we are ready to point to K2
-	var runner *desktopRunner.DesktopUsersProcessesRunner
-	/**
 	controlService, err := createControlService(ctx, logger, db, opts)
 	if err != nil {
 		return fmt.Errorf("failed to setup control service: %w", err)
@@ -220,7 +220,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 		return fmt.Errorf("failed to register notify consumer: %w", err)
 	}
-	*/
 
 	if opts.KolideServerURL == "k2device.kolide.com" ||
 		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
