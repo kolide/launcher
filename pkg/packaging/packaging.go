@@ -44,7 +44,6 @@ type PackageOptions struct {
 	InsecureTransport bool
 	UpdateChannel     string
 	InitialRunner     bool
-	DisableControlTLS bool
 	Identifier        string
 	Title             string
 	OmitSecret        bool
@@ -144,10 +143,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.CertPins != "" {
 		launcherMapFlags["cert_pins"] = p.CertPins
-	}
-
-	if p.DisableControlTLS {
-		launcherBoolFlags = append(launcherBoolFlags, "disable_control_tls")
 	}
 
 	if p.Transport != "" {
