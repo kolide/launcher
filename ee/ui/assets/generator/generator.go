@@ -210,7 +210,6 @@ func constName(name string) string {
 		".", "_",
 		"/", "_",
 		"\\", "_",
-		"menubar", "kolide_menu",
 	)
 
 	return snaker.SnakeToCamel(r.Replace(name))
