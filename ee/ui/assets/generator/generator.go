@@ -152,7 +152,7 @@ func generatePng(ctx context.Context, logger log.Logger, name string) error {
 		return nil
 	}
 
-	// FIXME Does this need scaling?
+	// Scaling these doesn't seem to be a win for space or resolution. So leave them as is
 	cmd := exec.CommandContext(ctx, "cp", input, output)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("copy: %w", err)
