@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
@@ -37,7 +38,7 @@ func runFlare(args []string) error {
 		serverURL         = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
 		insecureTLS       = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
 		insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
-		flareSocketPath   = env.String("FLARE_SOCKET_PATH", filepath.Join(os.TempDir(), "flare.sock"))
+		flareSocketPath   = env.String("FLARE_SOCKET_PATH", agent.TempPath("flare.sock"))
 
 		certPins [][]byte
 		rootPool *x509.CertPool

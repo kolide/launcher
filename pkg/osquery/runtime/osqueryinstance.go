@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -592,7 +593,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 }
 
 func osqueryTempDir() (string, func(), error) {
-	tempPath, err := os.MkdirTemp("", "")
+	tempPath, err := agent.MkdirTemp("")
 	if err != nil {
 		return "", func() {}, fmt.Errorf("could not make temp path: %w", err)
 	}
