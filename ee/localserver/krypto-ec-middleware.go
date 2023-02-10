@@ -108,7 +108,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
-
+    
 		var response []byte
 		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
@@ -118,7 +118,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		} else {
 			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
 		}
-
+    
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
