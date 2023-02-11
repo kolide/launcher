@@ -1,6 +1,7 @@
 package menu
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 )
+
+//go:embed initial_menu.json
+var initialMenu []byte
 
 // menuIcons are named identifiers
 type menuIcon string
@@ -28,7 +32,7 @@ type MenuData struct {
 type menuItemData struct {
 	Label       string         `json:"label,omitempty"`
 	Tooltip     string         `json:"tooltip,omitempty"`
-	Disabled    bool           `json:"disabled,omitempty"`
+	Disabled    bool           `json:"disabled,omitempty"` // Whether the item is grey text, or selectable
 	NonProdOnly bool           `json:"nonProdOnly,omitempty"`
 	IsSeparator bool           `json:"isSeparator,omitempty"`
 	Action      Action         `json:"action,omitempty"`
@@ -68,55 +72,44 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 // getMenuData ingests the shared menu.json file created by the desktop runner
 // It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
 // Here is an example of valid JSON
-/*
-  	{
-		"icon": "kolide-desktop",
-		"tooltip": "Kolide",
-		"items": [
-		{
-			"label": "Kolide Agent is running",
-			"disabled": true
-		},
-		{
-			"isSeparator": true
-		},
-		{
-			"label": "Failing checks",
-			"items": [
-			{
-				"label": "Ensure Kolide Agent Has Full Disk Access Entitlement",
-				"action": {
-				"type": "open-url",
-				"action": {
-					"url": "https://help.kolide.com/en/articles/3387759-how-to-grant-macos-full-disk-access-to-kolide"
-				}
-				}
-			},
-			]
-		}
-		]
-  	}
-*/
 func (m *menu) getMenuData() *MenuData {
 	if m.filePath == "" {
 		return nil
 	}
 
-	statusFileBytes, err := os.ReadFile(m.filePath)
+	fileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
 		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
 		return nil
 	}
 
-	var menu MenuData
-	if err := json.Unmarshal(statusFileBytes, &menu); err != nil {
-		level.Error(m.logger).Log("msg", "failed to unmarshal menu json")
+	md, err := newMenuDataFromBytes(fileBytes)
+	if err != nil {
+		level.Error(m.logger).Log("msg", "failed to parse menu file", "error", err)
 		return nil
 	}
 
-	menu.SetDefaults()
+	return md
+}
 
-	return &menu
+func newMenuDataFromBytes(menuBytes []byte) (*MenuData, error) {
+	var md MenuData
+	if err := json.Unmarshal(menuBytes, &md); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal menu json: %w", err)
+	}
+
+	md.SetDefaults()
+
+	return &md, nil
+}
+
+func newInitialMenuData() (*MenuData, error) {
+	md, err := newMenuDataFromBytes(initialMenu)
+	if err != nil {
+		return nil, fmt.Errorf("initial menu setup: %w", err)
+	}
+
+	return md, nil
 }
 
 // SetDefaults ensures we have the desired default values.
@@ -128,20 +121,15 @@ func (md *MenuData) SetDefaults() {
 	if md.Tooltip == "" {
 		md.Tooltip = "Kolide"
 	}
-}
 
-// getDefaultMenu returns a static, hard-coded menu to be used in failure modes when the menu data can't be retrieved
-func getDefaultMenu() *MenuData {
-	data := &MenuData{
-		Icon:    KolideDesktopIcon,
-		Tooltip: "Kolide",
-		Items: []menuItemData{
+	// It should be unheard of to have a menu with no items, but just in case...
+	if md.Items == nil {
+		md.Items = []menuItemData{
 			{
-				Label:    fmt.Sprintf("Version %s", version.Version().Version),
+				Label:    fmt.Sprintf("Kolide Agent Version %s", version.Version().Version),
 				Disabled: true,
 			},
-		},
-	}
+		}
 
-	return data
+	}
 }

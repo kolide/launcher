@@ -1,0 +1,14 @@
+{
+    "icon": "kolide-desktop",
+    "tooltip": "Kolide",
+    "items": [
+        {
+            "label": "Kolide Agent is running",
+            "disabled": true
+        },
+        {
+            "label": "Version {{.Version}}",
+            "disabled": true
+        }
+    ]
+}
