@@ -64,7 +64,7 @@ func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...O
 }
 
 // ExecuteWithContext returns an Execute function suitable for rungroup. It's a
-// wrapper over the Execute function, which takes a context.Context.
+// wrapper over the Start function, which takes a context.Context.
 func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
 	return func() error {
 		cs.Start(ctx)

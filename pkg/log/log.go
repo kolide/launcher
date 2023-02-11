@@ -62,7 +62,6 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	if bytes.Contains(p, []byte("Accelerating distributed query checkins")) {
 		lf = level.Debug
-                return 0, nil // seph skip this
 	}
 
 
