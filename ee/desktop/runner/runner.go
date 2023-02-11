@@ -271,7 +271,18 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error
 // Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	var menu menu.MenuData
-	if err := json.NewDecoder(data).Decode(&menu); err != nil {
+
+	var dataCopy bytes.Buffer
+	dataTee := io.TeeReader(data, &dataCopy)
+
+	if err := json.NewDecoder(dataTee).Decode(&menu); err != nil {
+		if agent.Flags.DebugServerData() {
+			level.Error(r.logger).Log(
+				"msg", "failed to decode menu data",
+				"error", err,
+				"data", dataCopy.String(),
+			)
+		}
 		return fmt.Errorf("failed to decode menu data: %w", err)
 	}
 
