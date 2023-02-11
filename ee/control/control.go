@@ -50,7 +50,7 @@ func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...O
 	cs := &ControlService{
 		logger:          logger,
 		ctx:             ctx,
-		requestInterval: 60 * time.Second,
+		requestInterval: 30 * time.Second,
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
 		consumers:       make(map[string]consumer),
@@ -77,7 +77,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
 			level.Debug(cs.logger).Log(
-				"msg", "failed to fetch data from control server",
+				"msg", "failed to fetch data from control server. Not fatal, moving on",
 				"err", err)
 		}
 
@@ -123,7 +123,7 @@ func (cs *ControlService) Fetch() error {
 			storedHash, err := cs.getset.Get([]byte(subsystem))
 			if err != nil {
 				level.Debug(cs.logger).Log(
-					"msg", "failed to get last fetched hash from stored data",
+					"msg", "failed to get last fetched hash from stored data. Moving on",
 					"subsystem", subsystem,
 					"err", err)
 				// This isn't a fatal error
