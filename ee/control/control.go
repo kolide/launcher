@@ -17,7 +17,6 @@ import (
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
 	logger          log.Logger
-	ctx             context.Context
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
