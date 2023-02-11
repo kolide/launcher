@@ -114,7 +114,20 @@ func (m *menu) getMenuData() *MenuData {
 		return nil
 	}
 
+	menu.SetDefaults()
+
 	return &menu
+}
+
+// SetDefaults ensures we have the desired default values.
+func (md *MenuData) SetDefaults() {
+	if md.Icon == "" {
+		md.Icon = KolideDesktopIcon
+	}
+
+	if md.Tooltip == "" {
+		md.Tooltip = "Kolide"
+	}
 }
 
 // getDefaultMenu returns a static, hard-coded menu to be used in failure modes when the menu data can't be retrieved
