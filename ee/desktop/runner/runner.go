@@ -326,7 +326,7 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) err
 	}
 
 	defer file.Close()
-	_, err = io.Copy(file, bytes.NewReader(menuBytes))
+	_, err = file.Write(menuBytes)
 	if err != nil {
 		return fmt.Errorf("writing file: %w", err)
 	}

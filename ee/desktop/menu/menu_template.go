@@ -38,7 +38,7 @@ func (tp *templateParser) Parse(text string) (string, error) {
 	}
 
 	var b strings.Builder
-	if err := t.Execute(&b, tp.td) && err != nil {
+	if err := t.Execute(&b, tp.td); err != nil {
 		return "", fmt.Errorf("could not write template output: %w", err)
 	}
 
