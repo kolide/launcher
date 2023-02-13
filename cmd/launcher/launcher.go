@@ -187,7 +187,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
-		runGroup.Add(controlService.Execute, controlService.Interrupt)
+		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
 		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)

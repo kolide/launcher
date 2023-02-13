@@ -30,7 +30,7 @@ type MenuData struct {
 type menuItemData struct {
 	Label       string         `json:"label,omitempty"`
 	Tooltip     string         `json:"tooltip,omitempty"`
-	Disabled    bool           `json:"disabled,omitempty"`
+	Disabled    bool           `json:"disabled,omitempty"` // Whether the item is grey text, or selectable
 	NonProdOnly bool           `json:"nonProdOnly,omitempty"`
 	IsSeparator bool           `json:"isSeparator,omitempty"`
 	Action      Action         `json:"action,omitempty"`
@@ -69,36 +69,6 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 
 // getMenuData ingests the shared menu.json file created by the desktop runner
 // It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
-// Here is an example of valid JSON
-/*
-  	{
-		"icon": "kolide-desktop",
-		"tooltip": "Kolide",
-		"items": [
-		{
-			"label": "Kolide Agent is running",
-			"disabled": true
-		},
-		{
-			"isSeparator": true
-		},
-		{
-			"label": "Failing checks",
-			"items": [
-			{
-				"label": "Ensure Kolide Agent Has Full Disk Access Entitlement",
-				"action": {
-				"type": "open-url",
-				"action": {
-					"url": "https://help.kolide.com/en/articles/3387759-how-to-grant-macos-full-disk-access-to-kolide"
-				}
-				}
-			},
-			]
-		}
-		]
-  	}
-*/
 func (m *menu) getMenuData() *MenuData {
 	if m.filePath == "" {
 		return nil

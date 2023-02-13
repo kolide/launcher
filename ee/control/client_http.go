@@ -153,6 +153,7 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	return reader, nil
 }
 
+// TODO: this should probably just return a io.Reader
 func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
