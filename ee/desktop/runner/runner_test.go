@@ -193,11 +193,13 @@ func (b *threadSafeBuffer) String() string {
 func launcherRootDir(t *testing.T) string {
 	safeTestName := fmt.Sprintf("%s_%s", "launcher_desktop_test", ulid.New())
 
-	path := filepath.Join(os.TempDir(), safeTestName)
+	path := filepath.Join(t.TempDir(), safeTestName)
 
 	if runtime.GOOS != "windows" {
 		path = filepath.Join("/tmp", safeTestName)
 	}
+
+	require.NoError(t, os.MkdirAll(path, 0700))
 
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(path))

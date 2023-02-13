@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
@@ -159,6 +160,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	}
 
 	runner.writeIconFile()
+	runner.writeDefaultMenuFile()
 
 	return runner
 }
@@ -288,7 +290,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeMenuFile(menu); err != nil {
+	if err := r.generateMenuFile(data); err != nil {
 		return err
 	}
 
@@ -324,30 +326,83 @@ func (r *DesktopUsersProcessesRunner) Ping() {
 	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
 }
 
-// writeMenuFile writes menu data to a shared file for user processes to access
-func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
+// writeSharedFile writes data to a shared file for user processes to access
+func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) error {
 	menuBytes, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("failed to marshal menu json: %w", err)
+		return fmt.Errorf("failed to marshal json: %w", err)
 	}
 
-	menuPath := r.menuPath()
-	statusFile, err := os.Create(menuPath)
+	file, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("creating desktop menu file: %w", err)
+		return fmt.Errorf("creating file: %w", err)
 	}
 
-	if err := os.Chmod(menuPath, 0644); err != nil {
+	if err := os.Chmod(path, 0644); err != nil {
 		return fmt.Errorf("os.Chmod: %w", err)
 	}
 
-	defer statusFile.Close()
-	_, err = io.Copy(statusFile, bytes.NewReader(menuBytes))
+	defer file.Close()
+	_, err = file.Write(menuBytes)
 	if err != nil {
-		return fmt.Errorf("writing desktop menu file: %w", err)
+		return fmt.Errorf("writing file: %w", err)
 	}
 
 	return nil
+}
+
+// generateMenuFile generates and writes menu data to a shared file
+func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
+	// First generate fresh template data to use for parsing
+	v := version.Version()
+	td := &menu.TemplateData{
+		LauncherVersion:  v.Version,
+		LauncherRevision: v.Revision,
+		GoVersion:        v.GoVersion,
+		ServerHostname:   r.hostname,
+	}
+
+	menuDataBytes, err := io.ReadAll(data)
+	if err != nil {
+		return fmt.Errorf("failed to read menu data: %w", err)
+	}
+
+	// Convert the raw JSON to a string and feed it to the parser for template expansion
+	parser := menu.NewTemplateParser(td)
+	parsedMenuDataStr, err := parser.Parse(string(menuDataBytes))
+	if err != nil {
+		return fmt.Errorf("failed to parse menu data: %w", err)
+	}
+
+	// Convert the parsed string back to bytes, which can now be decoded per usual
+	parsedMenuDataBytes := []byte(parsedMenuDataStr)
+
+	var menu menu.MenuData
+	if err := json.NewDecoder(bytes.NewReader(parsedMenuDataBytes)).Decode(&menu); err != nil {
+		return fmt.Errorf("failed to decode menu data: %w", err)
+	}
+
+	// Regardless, we will write the menu data out to a file that can be grabbed by
+	// any desktop user processes, either when they refresh, or when they are spawned.
+	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// writeDefaultMenuFile will create the menu file, if it does not already exist
+func (r *DesktopUsersProcessesRunner) writeDefaultMenuFile() {
+	menuPath := r.menuPath()
+	_, err := os.Stat(menuPath)
+
+	if os.IsNotExist(err) {
+		if err := r.generateMenuFile(bytes.NewReader(menu.InitialMenu)); err != nil {
+			level.Error(r.logger).Log("msg", "menu file did not exist, could not create it", "err", err)
+		}
+	} else if err != nil {
+		level.Error(r.logger).Log("msg", "could not check if menu file exists", "err", err)
+	}
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
