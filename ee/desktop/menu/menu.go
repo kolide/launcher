@@ -1,12 +1,16 @@
 package menu
 
 import (
+	_ "embed"
 	"encoding/json"
 	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 )
+
+//go:embed initial_menu.json
+var InitialMenu []byte
 
 // menuIcons are named identifiers
 type menuIcon string

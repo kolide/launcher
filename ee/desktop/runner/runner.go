@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -380,50 +379,7 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuFile() {
 	_, err := os.Stat(menuPath)
 
 	if os.IsNotExist(err) {
-		defaultMenuJSON := `{
-			"icon": "kolide-desktop",
-			"tooltip": "Kolide",
-			"items": [
-			  {
-				"label": "Version: {{.LauncherVersion}}",
-				"disabled": true
-			  },
-			  {
-				"isSeparator": true,
-				"nonProdOnly": true
-			  },
-			  {
-				"label": "Debug",
-				"nonProdOnly": true,
-				"items": [
-				  {
-					"label": "Launcher Version: {{.LauncherVersion}}",
-					"disabled": true
-				  },
-				  {
-					"label": "Launcher Revision: {{.LauncherRevision}}",
-					"disabled": true
-				  },
-				  {
-					"label": "Go Version: {{.GoVersion}}",
-					"disabled": true
-				  },
-				  {
-					"label": "Hostname: {{.ServerHostname}}",
-					"disabled": true
-				  },
-				  {
-					"label": "Refresh Menu",
-					"action": {
-					  "type": "refresh-menu"
-					}
-				  }
-				]
-			  }
-			]
-		  }`
-
-		if err := r.generateMenuFile(strings.NewReader(defaultMenuJSON)); err != nil {
+		if err := r.generateMenuFile(bytes.NewReader(menu.InitialMenu)); err != nil {
 			level.Error(r.logger).Log("msg", "menu file did not exist, could not create it", "err", err)
 		}
 	} else if err != nil {
