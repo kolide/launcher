@@ -17,7 +17,6 @@ import (
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
 	logger          log.Logger
-	ctx             context.Context
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
@@ -42,13 +41,13 @@ type subscriber interface {
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
-	Get(hash string) (data io.Reader, err error)
+	GetConfig() (io.Reader, error)
+	GetSubsystemData(hash string) (io.Reader, error)
 }
 
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		logger:          logger,
-		ctx:             ctx,
+		logger:          log.With(logger, "component", "control"),
 		requestInterval: 60 * time.Second,
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
@@ -63,20 +62,25 @@ func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...O
 	return cs
 }
 
-func (cs *ControlService) Execute() error {
-	level.Info(cs.logger).Log("msg", "control service started")
-	cs.Start(cs.ctx)
-	return nil
+// ExecuteWithContext returns an Execute function suitable for rungroup. It's a
+// wrapper over the Start function, which takes a context.Context.
+func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
+	return func() error {
+		cs.Start(ctx)
+		return nil
+	}
 }
 
+// Start is the main control service loop. It fetches control
 func (cs *ControlService) Start(ctx context.Context) {
+	level.Info(cs.logger).Log("msg", "control service started")
 	ctx, cs.cancel = context.WithCancel(ctx)
 	requestTicker := time.NewTicker(cs.requestInterval)
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
 			level.Debug(cs.logger).Log(
-				"msg", "failed to fetch data from control server",
+				"msg", "failed to fetch data from control server. Not fatal, moving on",
 				"err", err)
 		}
 
@@ -96,13 +100,16 @@ func (cs *ControlService) Interrupt(err error) {
 }
 
 func (cs *ControlService) Stop() {
-	cs.cancel()
+	level.Info(cs.logger).Log("msg", "control service stopping")
+	if cs.cancel != nil {
+		cs.cancel()
+	}
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
 	// Empty hash means get the map of subsystems & hashes
-	data, err := cs.fetcher.Get("")
+	data, err := cs.fetcher.GetConfig()
 	if err != nil {
 		return fmt.Errorf("getting subsystems map: %w", err)
 	}
@@ -117,16 +124,12 @@ func (cs *ControlService) Fetch() error {
 	}
 
 	for subsystem, hash := range subsystems {
+		logger := log.With(cs.logger, "subsystem", subsystem)
 		lastHash, ok := cs.lastFetched[subsystem]
 		if !ok && cs.getset != nil {
-			storedHash, err := cs.getset.Get([]byte(subsystem))
-			if err != nil {
-				level.Debug(cs.logger).Log(
-					"msg", "failed to get last fetched hash from stored data",
-					"subsystem", subsystem,
-					"err", err)
-				// This isn't a fatal error
-			} else {
+			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
+			// and we can just move on.
+			if storedHash, err := cs.getset.Get([]byte(subsystem)); err == nil {
 				lastHash = string(storedHash)
 			}
 		}
@@ -137,8 +140,9 @@ func (cs *ControlService) Fetch() error {
 			continue
 		}
 
-		if err = cs.fetchAndUpdate(subsystem, hash); err != nil {
-			return err
+		if err := cs.fetchAndUpdate(subsystem, hash); err != nil {
+			level.Debug(logger).Log("msg", "failed to fetch object. skipping...", "err", err)
+			continue
 		}
 	}
 
@@ -149,7 +153,8 @@ func (cs *ControlService) Fetch() error {
 
 // Fetches latest subsystem data, and notifies observers of updates.
 func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
-	data, err := cs.fetcher.Get(hash)
+	logger := log.With(cs.logger, "subsystem", subsystem)
+	data, err := cs.fetcher.GetSubsystemData(hash)
 	if err != nil {
 		return fmt.Errorf("failed to get control data: %w", err)
 	}
@@ -161,13 +166,10 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	// Consumer and subscriber(s) notified now
 	err = cs.update(subsystem, data)
 	if err != nil {
-		level.Error(cs.logger).Log(
-			"msg", "failed to update consumers and subscribers",
-			"subsystem", subsystem,
-			"err", err)
 		// Although we failed to update, the payload may be bad and there's no
 		// sense in repeatedly attempting to apply a bad update.
 		// A new update will have a new hash, so continue and remember this hash.
+		level.Debug(logger).Log("msg", "failed to update consumers and subscribers", "err", err)
 	}
 
 	// Remember the hash of the last fetched version of this subsystem's data
@@ -177,11 +179,7 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		// Store the hash so we can persist the last fetched data across launcher restarts
 		err = cs.getset.Set([]byte(subsystem), []byte(hash))
 		if err != nil {
-			level.Error(cs.logger).Log(
-				"msg", "failed to store last fetched control data",
-				"subsystem", subsystem,
-				"err", err)
-
+			level.Error(logger).Log("msg", "failed to store last fetched control data", "err", err)
 		}
 	}
 

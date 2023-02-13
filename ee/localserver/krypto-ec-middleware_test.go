@@ -2,6 +2,8 @@ package localserver
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -12,15 +14,13 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/pkg/agent/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestKryptoEcMiddleware(t *testing.T) {
 	t.Parallel()
-
-	myKey, err := echelper.GenerateEcdsaKey()
-	require.NoError(t, err)
 
 	counterpartyKey, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
@@ -39,22 +39,26 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	})
 
 	var tests = []struct {
-		name      string
-		challenge func() ([]byte, *[32]byte)
-		loggedErr string
+		name                    string
+		localDbKey, hardwareKey crypto.Signer
+		challenge               func() ([]byte, *[32]byte)
+		loggedErr               string
 	}{
 		{
-			name:      "no command",
-			challenge: func() ([]byte, *[32]byte) { return []byte(""), nil },
-			loggedErr: "no data in box query parameter",
+			name:       "no command",
+			localDbKey: ecdsaKey(t),
+			challenge:  func() ([]byte, *[32]byte) { return []byte(""), nil },
+			loggedErr:  "no data in box query parameter",
 		},
 		{
-			name:      "no signature",
-			challenge: func() ([]byte, *[32]byte) { return []byte("aGVsbG8gd29ybGQK"), nil },
-			loggedErr: "unable to unmarshal box",
+			name:       "no signature",
+			localDbKey: ecdsaKey(t),
+			challenge:  func() ([]byte, *[32]byte) { return []byte("aGVsbG8gd29ybGQK"), nil },
+			loggedErr:  "unable to unmarshal box",
 		},
 		{
-			name: "malformed cmd",
+			name:       "malformed cmd",
+			localDbKey: ecdsaKey(t),
 			challenge: func() ([]byte, *[32]byte) {
 				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, challengeData, []byte("malformed stuff"))
 				require.NoError(t, err)
@@ -63,7 +67,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			loggedErr: "unable to unmarshal cmd request",
 		},
 		{
-			name: "wrong signature",
+			name:       "wrong signature",
+			localDbKey: ecdsaKey(t),
 			challenge: func() ([]byte, *[32]byte) {
 				malloryKey, err := echelper.GenerateEcdsaKey()
 				require.NoError(t, err)
@@ -73,7 +78,28 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			loggedErr: "unable to verify signature",
 		},
 		{
-			name: "works",
+			name:        "works with hardware key",
+			localDbKey:  ecdsaKey(t),
+			hardwareKey: ecdsaKey(t),
+			challenge: func() ([]byte, *[32]byte) {
+				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
+				require.NoError(t, err)
+				return challenge, priv
+			},
+		},
+		{
+			name:       "works with nil hardware key",
+			localDbKey: ecdsaKey(t),
+			challenge: func() ([]byte, *[32]byte) {
+				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
+				require.NoError(t, err)
+				return challenge, priv
+			},
+		},
+		{
+			name:        "works with noop hardware key",
+			localDbKey:  ecdsaKey(t),
+			hardwareKey: keys.Noop,
 			challenge: func() ([]byte, *[32]byte) {
 				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
 				require.NoError(t, err)
@@ -90,7 +116,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			var logBytes bytes.Buffer
 
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), myKey, counterpartyKey.PublicKey)
+			kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
 			require.NoError(t, err)
 
 			challengeBytes, privateEncryptionKey := tt.challenge()
@@ -144,4 +170,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
+}
+
+func ecdsaKey(t *testing.T) *ecdsa.PrivateKey {
+	key, err := echelper.GenerateEcdsaKey()
+	require.NoError(t, err)
+	return key
 }
