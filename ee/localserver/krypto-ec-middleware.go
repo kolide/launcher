@@ -27,16 +27,17 @@ type v2CmdRequestType struct {
 }
 
 type kryptoEcMiddleware struct {
-	signer       crypto.Signer
-	counterParty ecdsa.PublicKey
-	logger       log.Logger
+	localDbSigner, hardwareSigner crypto.Signer
+	counterParty                  ecdsa.PublicKey
+	logger                        log.Logger
 }
 
-func newKryptoEcMiddleware(logger log.Logger, signer crypto.Signer, counteParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		signer:       signer,
-		counterParty: counteParty,
-		logger:       log.With(logger, "keytype", "ec"),
+		localDbSigner:  localDbSigner,
+		hardwareSigner: hardwareSigner,
+		counterParty:   counterParty,
+		logger:         log.With(logger, "keytype", "ec"),
 	}
 }
 
@@ -108,7 +109,16 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		response, err := challengeBox.Respond(e.signer, bhr.Bytes())
+		var response []byte
+		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
+		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
+		// pass nil to krypto
+		if e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
+			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
+		} else {
+			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
+		}
+
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
