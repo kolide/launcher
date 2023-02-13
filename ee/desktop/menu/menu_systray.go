@@ -38,7 +38,11 @@ func (m *menu) Build() {
 	// Reparse the menu file & rebuild the menu
 	menuData := m.getMenuData()
 	if menuData == nil {
-		menuData = getDefaultMenu()
+		var err error
+		menuData, err = newInitialMenuData()
+		if err != nil {
+			level.Error(m.logger).Log("msg", "failed to build initial menu", "err", err)
+		}
 	}
 	parseMenuData(menuData, m)
 }
