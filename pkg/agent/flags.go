@@ -9,5 +9,5 @@ var Flags flagInt = &initialFlagTest{}
 type initialFlagTest struct{}
 
 func (initialFlagTest) DebugServerData() bool {
-	return true
+	return false
 }
