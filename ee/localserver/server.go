@@ -86,6 +86,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	if err != nil {
 		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
 	}
+
 	rsaAuthedMux := http.NewServeMux()
 	rsaAuthedMux.HandleFunc("/", http.NotFound)
 	rsaAuthedMux.HandleFunc("/ping", pongHandler)
@@ -98,6 +99,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
+	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
+	ecAuthedMux.Handle("/query.png", ls.requestQueryHandler())
 
 	// While we're transitioning, we want to support both v1 and v2 protocols
 	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(
@@ -109,6 +112,9 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
 	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware)
+
+	// uncomment to test without going through middleware
+	// mux.Handle("/query", ls.requestQueryHandler())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),

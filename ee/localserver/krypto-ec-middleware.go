@@ -23,7 +23,8 @@ const (
 )
 
 type v2CmdRequestType struct {
-	Path string
+	Path          string
+	UrlParameters map[string]string
 }
 
 type kryptoEcMiddleware struct {
@@ -91,6 +92,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		v := url.Values{}
+		for key, val := range cmdReq.UrlParameters {
+			v.Add(key, val)
+		}
 
 		newReq := &http.Request{
 			Method: "GET",

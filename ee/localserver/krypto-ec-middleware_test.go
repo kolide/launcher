@@ -27,8 +27,16 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 	challengeId := []byte(ulid.New())
 	challengeData := []byte(ulid.New())
-	expectedCmd := "id"
-	cmdReq := mustMarshal(t, cmdRequestType{Cmd: expectedCmd})
+
+	cmdReqUrlParameters := map[string]string{
+		"blah_1": "blah",
+		"blah_2": "blah_and_blah",
+	}
+
+	cmdReq := mustMarshal(t, v2CmdRequestType{
+		Path:          "whatevs",
+		UrlParameters: cmdReqUrlParameters,
+	})
 
 	var tests = []struct {
 		name      string
@@ -94,6 +102,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			// in this test we just want it to regurgitate the response data we defined above
 			// this should match the responseData in the opened response
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// make sure url parameters are being passed along
+				for k, v := range cmdReqUrlParameters {
+					require.Equal(t, r.URL.Query().Get(k), v)
+				}
+
 				w.Write(responseData)
 			})
 
