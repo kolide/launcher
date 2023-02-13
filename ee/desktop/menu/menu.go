@@ -3,10 +3,12 @@ package menu
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 )
 
 //go:embed initial_menu.json
@@ -86,5 +88,29 @@ func (m *menu) getMenuData() *MenuData {
 		return nil
 	}
 
+	menu.SetDefaults()
+
 	return &menu
+}
+
+// SetDefaults ensures we have the desired default values.
+func (md *MenuData) SetDefaults() {
+	if md.Icon == "" {
+		md.Icon = KolideDesktopIcon
+	}
+
+	if md.Tooltip == "" {
+		md.Tooltip = "Kolide"
+	}
+
+	// It should be unheard of to have a menu with no items, but just in case...
+	if md.Items == nil {
+		md.Items = []menuItemData{
+			{
+				Label:    fmt.Sprintf("Kolide Agent Version %s", version.Version().Version),
+				Disabled: true,
+			},
+		}
+
+	}
 }
