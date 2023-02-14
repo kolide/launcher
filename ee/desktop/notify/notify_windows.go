@@ -22,12 +22,12 @@ type windowsNotifier struct {
 	interrupt    chan struct{}
 }
 
-func newOsSpecificNotifier(logger log.Logger, iconFilepath string) (*windowsNotifier, error) {
+func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
 		iconFilepath: iconFilepath,
 		logger:       logger,
 		interrupt:    make(chan struct{}),
-	}, nil
+	}
 }
 
 func (w *windowsNotifier) Listen() error {

@@ -93,10 +93,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	// Set up notification sending and listening
-	notifier, err := notify.NewDesktopNotifier(logger, *flIconPath)
-	if err != nil {
-		return err
-	}
+	notifier := notify.NewDesktopNotifier(logger, *flIconPath)
 	runGroup.Add(notifier.Listen, notifier.Interrupt)
 
 	// monitor parent

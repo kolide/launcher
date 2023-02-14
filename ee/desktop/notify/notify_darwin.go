@@ -25,11 +25,11 @@ type macNotifier struct {
 	interrupt chan struct{}
 }
 
-func newOsSpecificNotifier(logger log.Logger, _ string) (*macNotifier, error) {
+func newOsSpecificNotifier(logger log.Logger, _ string) *macNotifier {
 	return &macNotifier{
 		logger:    logger,
 		interrupt: make(chan struct{}),
-	}, nil
+	}
 }
 
 func (m *macNotifier) Listen() error {

@@ -1,8 +1,6 @@
 package notify
 
 import (
-	"fmt"
-
 	"github.com/go-kit/kit/log"
 )
 
@@ -18,11 +16,6 @@ type Notification struct {
 	ActionUri string `json:"action_uri,omitempty"`
 }
 
-func NewDesktopNotifier(logger log.Logger, iconFilepath string) (DesktopNotifier, error) {
-	n, err := newOsSpecificNotifier(logger, iconFilepath)
-	if err != nil {
-		return nil, fmt.Errorf("could not create notifier: %w", err)
-	}
-
-	return n, nil
+func NewDesktopNotifier(logger log.Logger, iconFilepath string) DesktopNotifier {
+	return newOsSpecificNotifier(logger, iconFilepath)
 }

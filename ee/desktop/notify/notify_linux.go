@@ -32,11 +32,10 @@ const (
 	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
 )
 
-func newOsSpecificNotifier(logger log.Logger, iconFilepath string) (*dbusNotifier, error) {
+func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		level.Error(logger).Log("msg", "couldn't connect to dbus to start notifier", "err", err)
-		return nil, fmt.Errorf("could not connect to dbus: %w", err)
+		level.Warn(logger).Log("msg", "couldn't connect to dbus to start notifier listener, proceeding without it", "err", err)
 	}
 
 	return &dbusNotifier{
@@ -47,18 +46,22 @@ func newOsSpecificNotifier(logger log.Logger, iconFilepath string) (*dbusNotifie
 		interrupt:           make(chan struct{}),
 		sentNotificationIds: make(map[uint32]bool),
 		lock:                sync.RWMutex{},
-	}, nil
+	}
 }
 
 func (d *dbusNotifier) Listen() error {
-	if err := d.conn.AddMatchSignal(
-		dbus.WithMatchObjectPath(notificationServiceObj),
-		dbus.WithMatchInterface(notificationServiceInterface),
-	); err != nil {
-		level.Error(d.logger).Log("msg", "couldn't add match signal", "err", err)
-		return fmt.Errorf("couldn't register to listen to signals in dbus: %w", err)
+	if d.conn != nil {
+		if err := d.conn.AddMatchSignal(
+			dbus.WithMatchObjectPath(notificationServiceObj),
+			dbus.WithMatchInterface(notificationServiceInterface),
+		); err != nil {
+			level.Error(d.logger).Log("msg", "couldn't add match signal", "err", err)
+			return fmt.Errorf("couldn't register to listen to signals in dbus: %w", err)
+		}
+		d.conn.Signal(d.signal)
+	} else {
+		level.Warn(d.logger).Log("msg", "cannot set up DBUS listener -- no connection to session bus")
 	}
-	d.conn.Signal(d.signal)
 
 	for {
 		select {
@@ -71,7 +74,7 @@ func (d *dbusNotifier) Listen() error {
 			notificationId := signal.Body[0].(uint32)
 			d.lock.RLock()
 			if _, found := d.sentNotificationIds[notificationId]; !found {
-				level.Debug(d.logger).Log("msg", "no notification ID match", "notification_id", notificationId)
+				// This notification didn't come from us -- ignore it
 				d.lock.RUnlock()
 				continue
 			}
@@ -91,7 +94,7 @@ func (d *dbusNotifier) Listen() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 				cmd := exec.CommandContext(ctx, provider, actionUri)
-				cmd.Env = append(cmd.Env, "DISPLAY=:10.0") // TODO RM
+				cmd.Env = append(cmd.Env, "DISPLAY=:10.0") // TODO RM - this is an xrdp workaround
 				if err := cmd.Start(); err != nil {
 					level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "provider", provider)
 				} else {
