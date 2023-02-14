@@ -4,11 +4,13 @@
 package notify
 
 import (
+	"context"
 	"fmt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/godbus/dbus/v5"
 	"os/exec"
+	"time"
 )
 
 type dbusListener struct {
@@ -59,14 +61,16 @@ func (d *dbusListener) Listen() error {
 			// TODO: can we add additional matches or checks to make sure that this is a Kolide-originated notification?
 
 			actionUri := signal.Body[1].(string)
-			providers := []string{"xdg-open", "x-www-browser", "www-browser"}
+			providers := []string{"/usr/bin/xdg-open", "/usr/bin/x-www-browser"}
 			for _, provider := range providers {
-				if executablePath, err := exec.LookPath(provider); err == nil {
-					cmd := exec.Command(executablePath, actionUri)
-					cmd.Start()
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, provider, actionUri)
+				cmd.Env = append(cmd.Env, "DISPLAY=:10.0")
+				if err := cmd.Start(); err != nil {
+					level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "provider", provider)
 				} else {
-					// TODO: lookup errors on all providers even when installed
-					level.Warn(d.logger).Log("msg", "couldn't look up path", "provider", provider)
+					break
 				}
 			}
 
