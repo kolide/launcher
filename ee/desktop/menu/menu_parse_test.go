@@ -14,15 +14,15 @@ type testMenuBuilder struct {
 	menuCopy MenuData
 }
 
-func (m *testMenuBuilder) SetIcon(icon menuIcon) {
+func (m *testMenuBuilder) setIcon(icon menuIcon) {
 	m.menuCopy.Icon = icon
 }
 
-func (m *testMenuBuilder) SetTooltip(tooltip string) {
+func (m *testMenuBuilder) setTooltip(tooltip string) {
 	m.menuCopy.Tooltip = tooltip
 }
 
-func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
+func (m *testMenuBuilder) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
 	item := &menuItemData{
 		Label:       label,
 		Tooltip:     tooltip,
@@ -40,7 +40,7 @@ func (m *testMenuBuilder) AddMenuItem(label, tooltip string, disabled, nonProdOn
 	return m.parent
 }
 
-func (m *testMenuBuilder) AddSeparator() {
+func (m *testMenuBuilder) addSeparator() {
 	m.itemCopy = &menuItemData{
 		IsSeparator: true,
 	}
