@@ -92,6 +92,13 @@ func runDesktop(args []string) error {
 		return nil
 	}, func(error) {})
 
+	// Set up notification sending and listening
+	notifier, err := notify.NewDesktopNotifier(logger, *flIconPath)
+	if err != nil {
+		return err
+	}
+	runGroup.Add(notifier.Listen, notifier.Interrupt)
+
 	// monitor parent
 	runGroup.Add(func() error {
 		monitorParentProcess(logger)
@@ -99,7 +106,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
@@ -120,17 +127,6 @@ func runDesktop(args []string) error {
 			)
 		}
 	})
-
-	// Listen for notification actions (i.e. a user clicking on a notification)
-	listener, err := notify.NewListener(logger)
-	if err != nil {
-		level.Error(logger).Log(
-			"msg", "could not create new listener",
-			"err", err,
-		)
-	} else {
-		runGroup.Add(listener.Listen, listener.Interrupt)
-	}
 
 	// listen on shutdown channel
 	runGroup.Add(func() error {

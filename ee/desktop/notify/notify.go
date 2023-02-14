@@ -1,12 +1,15 @@
 package notify
 
 import (
+	"fmt"
+
 	"github.com/go-kit/kit/log"
 )
 
-type DesktopNotifier struct {
-	logger       log.Logger
-	iconFilepath string
+type DesktopNotifier interface {
+	Listen() error
+	Interrupt(err error)
+	SendNotification(title, body, actionUri string) error
 }
 
 type Notification struct {
@@ -15,13 +18,11 @@ type Notification struct {
 	ActionUri string `json:"action_uri,omitempty"`
 }
 
-func NewDesktopNotifier(logger log.Logger, iconFilepath string) *DesktopNotifier {
-	notifier := &DesktopNotifier{
-		logger: log.With(logger,
-			"component", "user_desktop_notifier",
-		),
-		iconFilepath: iconFilepath,
+func NewDesktopNotifier(logger log.Logger, iconFilepath string) (DesktopNotifier, error) {
+	n, err := newOsSpecificNotifier(logger, iconFilepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not create notifier: %w", err)
 	}
 
-	return notifier
+	return n, nil
 }

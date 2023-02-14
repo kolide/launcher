@@ -16,7 +16,34 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 )
 
-func (d *DesktopNotifier) SendNotification(title, body, actionUri string) error {
+type windowsNotifier struct {
+	iconFilepath string
+	logger       log.Logger
+	interrupt    chan struct{}
+}
+
+func newOsSpecificNotifier(logger log.Logger, iconFilepath string) (*windowsNotifier, error) {
+	return &windowsNotifier{
+		iconFilepath: iconFilepath,
+		logger:       logger,
+		interrupt:    make(chan struct{}),
+	}, nil
+}
+
+func (w *windowsNotifier) Listen() error {
+	for {
+		select {
+		case <-w.interrupt:
+			return nil
+		}
+	}
+}
+
+func (w *windowsNotifier) Interrupt(err error) {
+	w.interrupt <- struct{}{}
+}
+
+func (w *windowsNotifier) SendNotification(title, body, actionUri string) error {
 	notification := struct {
 		Title               string
 		Body                string
@@ -27,7 +54,7 @@ func (d *DesktopNotifier) SendNotification(title, body, actionUri string) error 
 		Body:  body,
 	}
 
-	if d.iconFilepath != "" {
+	if w.iconFilepath != "" {
 		notification.Icon = d.iconFilepath
 	}
 

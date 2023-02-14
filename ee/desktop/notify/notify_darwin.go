@@ -16,9 +16,36 @@ import (
 	"os"
 	"strings"
 	"unsafe"
+
+	"github.com/go-kit/kit/log"
 )
 
-func (d *DesktopNotifier) SendNotification(title, body, actionUri string) error {
+type macNotifier struct {
+	logger    log.Logger
+	interrupt chan struct{}
+}
+
+func newOsSpecificNotifier(logger log.Logger, _ string) (*macNotifier, error) {
+	return &macNotifier{
+		logger:    logger,
+		interrupt: make(chan struct{}),
+	}, nil
+}
+
+func (m *macNotifier) Listen() error {
+	for {
+		select {
+		case <-m.interrupt:
+			return nil
+		}
+	}
+}
+
+func (m *macNotifier) Interrupt(err error) {
+	m.interrupt <- struct{}{}
+}
+
+func (m *macNotifier) SendNotification(title, body, actionUri string) error {
 	// Check if we're running inside a bundle -- if we aren't, we should not attempt to send
 	// a notification because it will cause a panic.
 	if !isBundle() {

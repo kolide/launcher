@@ -27,17 +27,17 @@ type DesktopServer struct {
 	shutdownChan     chan<- struct{}
 	authToken        string
 	socketPath       string
-	notifier         *notify.DesktopNotifier
+	notifier         notify.DesktopNotifier
 	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, iconPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
+func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notify.DesktopNotifier) (*DesktopServer, error) {
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
 		logger:       log.With(logger, "component", "desktop_server"),
 		socketPath:   socketPath,
-		notifier:     notify.NewDesktopNotifier(log.With(logger, "component", "desktop_notifier"), iconPath),
+		notifier:     notifier,
 	}
 
 	authedMux := http.NewServeMux()
