@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 
@@ -1038,7 +1039,6 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	if val, ok := resp[0]["hostname"]; ok {
 		details.Hostname = val
 	}
-
 	if val, ok := resp[0]["hardware_uuid"]; ok {
 		details.HardwareUUID = val
 	}
@@ -1048,6 +1048,21 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 	details.LauncherVersion = version.Version().Version
 	details.GOOS = runtime.GOOS
 	details.GOARCH = runtime.GOARCH
+
+	// Pull in some launcher key info. These depend on the agent package, and we'll need to check for nils
+	if agent.LocalDbKeys().Public() != nil {
+		if key, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public()); err == nil {
+			// der is a binary format, so convert to b64
+			details.LauncherLocalKey = base64.StdEncoding.EncodeToString(key)
+		}
+	}
+	if agent.HardwareKeys().Public() != nil {
+		if key, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+			// der is a binary format, so convert to b64
+			details.LauncherHardwareKey = base64.StdEncoding.EncodeToString(key)
+			details.LauncherHardwareKeySource = agent.HardwareKeys().Type()
+		}
+	}
 
 	return details, nil
 }
