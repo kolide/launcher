@@ -116,6 +116,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware)
 
 	// uncomment to test without going through middleware
+	// for example:
+	// curl localhost:40978/query --data-urlencode "query=select * from kolide_launcher_info"
 	// mux.Handle("/query", ls.requestQueryHandler())
 
 	srv := &http.Server{
