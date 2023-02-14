@@ -88,8 +88,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 		}
 
 		// going forward were using DER format
-		localKeyDer, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public())
-		if err == nil {
+		if localKeyDer, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public()); err == nil {
 			// der is a binary format, so convert to b64
 			results[0]["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
 		}
@@ -99,8 +98,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return results, nil
 		}
 
-		hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public())
-		if err == nil {
+		if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
 			// der is a binary format, so convert to b64
 			results[0]["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
 			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()
