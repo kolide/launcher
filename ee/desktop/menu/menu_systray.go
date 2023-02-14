@@ -37,17 +37,10 @@ func (m *menu) Build() {
 
 	// Reparse the menu file & rebuild the menu
 	menuData := m.getMenuData()
-	if menuData == nil {
-		var err error
-		menuData, err = newInitialMenuData()
-		if err != nil {
-			level.Error(m.logger).Log("msg", "failed to build initial menu", "err", err)
-		}
-	}
 	parseMenuData(menuData, m)
 }
 
-func (m *menu) SetIcon(icon menuIcon) {
+func (m *menu) setIcon(icon menuIcon) {
 	switch icon {
 	case KolideDesktopIcon:
 		// Allow launcher to conditionally choose the launcher icon based on whether we're running in production or not
@@ -64,13 +57,17 @@ func (m *menu) SetIcon(icon menuIcon) {
 	}
 }
 
-func (m *menu) SetTooltip(tooltip string) {
+func (m *menu) setTooltip(tooltip string) {
 	systray.SetTooltip(tooltip)
 }
 
-func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
+func (m *menu) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
 	if nonProdOnly && m.isProd() {
 		// This is prod environment, but the menu item is for non-prod only
+		return nil
+	}
+
+	if label == "" {
 		return nil
 	}
 
@@ -93,7 +90,7 @@ func (m *menu) AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap
 	return item
 }
 
-func (m *menu) AddSeparator() {
+func (m *menu) addSeparator() {
 	systray.AddSeparator()
 }
 

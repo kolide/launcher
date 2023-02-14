@@ -12,7 +12,7 @@ import (
 )
 
 //go:embed initial_menu.json
-var initialMenu []byte
+var InitialMenu []byte
 
 // menuIcons are named identifiers
 type menuIcon string
@@ -39,17 +39,17 @@ type menuItemData struct {
 	Items       []menuItemData `json:"items,omitempty"`
 }
 
-// MenuBuilder is an interface a menu parser can use to specify how the menu is built
-type MenuBuilder interface {
-	// SetIcon sets the menu bar icon
-	SetIcon(icon menuIcon)
-	// SetTooltip sets the menu tooltip
-	SetTooltip(tooltip string)
-	// AddMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
+// menuBuilder is an interface a menu parser can use to specify how the menu is built
+type menuBuilder interface {
+	// setIcon sets the menu bar icon
+	setIcon(icon menuIcon)
+	// setTooltip sets the menu tooltip
+	setTooltip(tooltip string)
+	// addMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
 	// created, it is returned. If parent is non-nil, the menu item will be created as a child of parent.
-	AddMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
-	// AddSeparator adds a separator to the menu
-	AddSeparator()
+	addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
+	// addSeparator adds a separator to the menu
+	addSeparator()
 }
 
 // menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
@@ -71,45 +71,26 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 
 // getMenuData ingests the shared menu.json file created by the desktop runner
 // It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
-// Here is an example of valid JSON
 func (m *menu) getMenuData() *MenuData {
 	if m.filePath == "" {
 		return nil
 	}
 
-	fileBytes, err := os.ReadFile(m.filePath)
+	menuFileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
 		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
 		return nil
 	}
 
-	md, err := newMenuDataFromBytes(fileBytes)
-	if err != nil {
-		level.Error(m.logger).Log("msg", "failed to parse menu file", "error", err)
+	var menu MenuData
+	if err := json.Unmarshal(menuFileBytes, &menu); err != nil {
+		level.Error(m.logger).Log("msg", "failed to unmarshal menu json")
 		return nil
 	}
 
-	return md
-}
+	menu.SetDefaults()
 
-func newMenuDataFromBytes(menuBytes []byte) (*MenuData, error) {
-	var md MenuData
-	if err := json.Unmarshal(menuBytes, &md); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal menu json: %w", err)
-	}
-
-	md.SetDefaults()
-
-	return &md, nil
-}
-
-func newInitialMenuData() (*MenuData, error) {
-	md, err := newMenuDataFromBytes(initialMenu)
-	if err != nil {
-		return nil, fmt.Errorf("initial menu setup: %w", err)
-	}
-
-	return md, nil
+	return &menu
 }
 
 // SetDefaults ensures we have the desired default values.
