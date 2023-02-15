@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"bytes"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,7 +26,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 	}{
 		{
 			name:  "happy path",
-			query: "select blah from blah_blah",
+			query: base64.StdEncoding.EncodeToString([]byte("select blah from blah_blah")),
 			mockQueryResult: []map[string]string{
 				{
 					"blah": "blah",
@@ -37,6 +38,11 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			name:   "no query",
 			errStr: "no query parameter found in url parameters",
 		},
+		{
+			name:   "no b64",
+			query:  "select blah from blah_blah",
+			errStr: "error decoding query from b64",
+		},
 	}
 
 	for _, tt := range tests {
@@ -46,7 +52,8 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 
 			mockQuerier := mocks.NewQuerier(t)
 			if tt.expectedQueryCount > 0 {
-				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, tt.mockQueryError).Times(tt.expectedQueryCount)
+				decodedQuery := mustDecodeB64ToString(t, tt.query)
+				mockQuerier.On("Query", decodedQuery).Return(tt.mockQueryResult, tt.mockQueryError).Times(tt.expectedQueryCount)
 			}
 
 			var logBytes bytes.Buffer
@@ -69,7 +76,13 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 				return
 			}
 
-			require.Contains(t, tt.errStr, rr.Body.String())
+			require.Contains(t, rr.Body.String(), tt.errStr)
 		})
 	}
+}
+
+func mustDecodeB64ToString(t *testing.T, s string) string {
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	require.NoError(t, err)
+	return string(decoded)
 }

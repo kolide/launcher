@@ -94,7 +94,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		v := url.Values{}
 		for key, val := range cmdReq.UrlParameters {
-			v.Add(key, val)
+			v.Add(key, base64.StdEncoding.EncodeToString([]byte(val)))
 		}
 
 		newReq := &http.Request{

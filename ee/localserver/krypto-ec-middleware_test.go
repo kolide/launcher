@@ -135,7 +135,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// make sure url parameters are being passed along
 				for k, v := range cmdReqUrlParameters {
-					require.Equal(t, r.URL.Query().Get(k), v)
+					// ec middlemiddleware b64 encodes the parameters
+					require.Equal(t, r.URL.Query().Get(k), base64.StdEncoding.EncodeToString([]byte(v)))
 				}
 
 				w.Write(responseData)
