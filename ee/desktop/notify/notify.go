@@ -17,5 +17,5 @@ type Notification struct {
 }
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) DesktopNotifier {
-	return newOsSpecificNotifier(logger, iconFilepath)
+	return newOsSpecificNotifier(log.With(logger, "component", "desktop_notifier"), iconFilepath)
 }

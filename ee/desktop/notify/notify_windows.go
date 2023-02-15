@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"text/template"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent"
 )
@@ -55,7 +56,7 @@ func (w *windowsNotifier) SendNotification(title, body, actionUri string) error 
 	}
 
 	if w.iconFilepath != "" {
-		notification.Icon = d.iconFilepath
+		notification.Icon = w.iconFilepath
 	}
 
 	if actionUri != "" {
@@ -109,10 +110,11 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
 	bomUtf8 := []byte{0xEF, 0xBB, 0xBF}
 	out := append(bomUtf8, scriptBytes.Bytes()...)
 	if err := os.WriteFile(tmpScriptFile, out, 0600); err != nil {
-		return fmt.Errorf("could not write temporary powershel script to %s: %w", tmpScriptFile, err)
+		return fmt.Errorf("could not write temporary powershell script to %s: %w", tmpScriptFile, err)
 	}
 
-	cmd := exec.Command("PowerShell", "-ExecutionPolicy", "Bypass", "-File", tmpScriptFile)
+	// TODO: fix PATH so we don't have to hardcode powershell's location
+	cmd := exec.Command("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Bypass", "-File", tmpScriptFile)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("could not run powershell to create notification: %w", err)
