@@ -134,7 +134,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash { // && !agent.Flags.ForceControlSubsystems() {
+		if hash == lastHash && !agent.Flags.ForceControlSubsystems() {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
