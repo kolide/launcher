@@ -618,7 +618,11 @@ func (r *DesktopUsersProcessesRunner) menuPath() string {
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
-	cmd.Env = append(cmd.Environ(), // get the default env variables for the command, specifically so that we can have PATH
+	cmd.Env = []string{
+		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
+		// when running the command. We need PATH (e.g. to be able to look up powershell and xdg-open) in the
+		// desktop process, so we set it explicitly here.
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 		// without passing the temp var, the desktop icon will not appear on windows and emit the error:
 		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
 		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
@@ -627,7 +631,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
-	)
+	}
 
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
