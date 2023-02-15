@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -83,6 +84,11 @@ import (
 //
 // tested on M1 Monterey 12.6
 
+const (
+	// minConsoleUserUid is the minimum UID for human console users
+	minConsoleUserUid = 501
+)
+
 func CurrentUids(ctx context.Context) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "scutil")
 	cmd.Stdin = strings.NewReader("show State:/Users/ConsoleUser")
@@ -131,6 +137,12 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		if kCGSSessionOnConsole == "" || kCGSSessionUserID == "" {
+			continue
+		}
+
+		// We only care about human console users (UID 501 or greater)
+		uidInt, err := strconv.Atoi(kCGSSessionUserID)
+		if err != nil || uidInt < minConsoleUserUid {
 			continue
 		}
 
