@@ -42,7 +42,7 @@ type subscriber interface {
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
 	GetConfig() (io.Reader, error)
-	GetSubsystemData(hash string) (io.Reader, error)
+	GetSubsystemData(hash string) (io.ReadCloser, error)
 }
 
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
@@ -134,7 +134,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash {
+		if hash == lastHash { // && !agent.Flags.ForceControlSubsystems() {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
@@ -162,6 +162,8 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	if data == nil {
 		return errors.New("control data is nil")
 	}
+
+	defer data.Close()
 
 	// Consumer and subscriber(s) notified now
 	err = cs.update(subsystem, data)

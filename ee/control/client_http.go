@@ -69,9 +69,15 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(challengeReq)
+	challengeReader, err := c.do(challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
+	}
+	defer challengeReader.Close()
+
+	challenge, err := io.ReadAll(challengeReader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read challenge from reader: %w", err)
 	}
 
 	configReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/config").String(), nil)
@@ -113,9 +119,15 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
-	configAndAuthKeyRaw, err := c.do(configReq)
+	configAndAuthKeyRawReader, err := c.do(configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
+	}
+	defer configAndAuthKeyRawReader.Close()
+
+	configAndAuthKeyRaw, err := io.ReadAll(configAndAuthKeyRawReader)
+	if err != nil {
+		return nil, fmt.Errorf("could not read config from reader: %w", err)
 	}
 
 	var cfgResp configResponse
@@ -130,7 +142,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 	return reader, nil
 }
 
-func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
+func (c *HTTPClient) GetSubsystemData(hash string) (io.ReadCloser, error) {
 	if c.token == "" {
 		return nil, errors.New("token is nil, cannot request subsystem data")
 	}
@@ -144,17 +156,15 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	dataReq.Header.Set("Content-Type", "application/json")
 	dataReq.Header.Set("Accept", "application/json")
 
-	dataRaw, err := c.do(dataReq)
+	reader, err := c.do(dataReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make subsystem data request: %w", err)
 	}
-
-	reader := bytes.NewReader(dataRaw)
 	return reader, nil
 }
 
 // TODO: this should probably just return a io.Reader
-func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
+func (c *HTTPClient) do(req *http.Request) (io.ReadCloser, error) {
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
 
@@ -162,18 +172,13 @@ func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error making http request: %w", err)
 	}
-	defer resp.Body.Close()
+	//defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("got non-200 status code %d from control server at %s", resp.StatusCode, resp.Request.URL)
 	}
 
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("could not read response body from control server at %s: %w", resp.Request.URL, err)
-	}
-
-	return respBytes, nil
+	return resp.Body, nil
 }
 
 func (c *HTTPClient) url(path string) *url.URL {
