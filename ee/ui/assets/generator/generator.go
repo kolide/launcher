@@ -69,7 +69,7 @@ func main() {
 
 	// Find input icon names
 	iconNames := make(map[string]bool)
-	files, err := filepath.Glob(inDir + "/*")
+	files, err := filepath.Glob(inDir + "/*.png")
 	if err != nil {
 		level.Error(logger).Log("msg", "error globbing input files", "error", err)
 		os.Exit(1)
@@ -77,7 +77,6 @@ func main() {
 	for _, file := range files {
 		file = filepath.Base(file)
 		file = strings.TrimSuffix(file, ".png")
-		file = strings.TrimSuffix(file, ".svg")
 		iconNames[file] = true
 	}
 
@@ -164,7 +163,7 @@ func generatePng(ctx context.Context, logger log.Logger, name string) error {
 // generateIco generates an ico file from source. It uses imagemagick's convert, and implements the
 // timestamp behavior from make.
 func generateIco(ctx context.Context, logger log.Logger, name string) error {
-	input := fmt.Sprintf("%s/%s.svg", inDir, name)
+	input := fmt.Sprintf("%s/%s.png", inDir, name)
 	output := fmt.Sprintf("%s/%s.ico", outDir, name)
 
 	// append output. If we throw an error, we're going to ignore it anyhow.
