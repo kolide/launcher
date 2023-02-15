@@ -89,7 +89,7 @@ func (d *dbusNotifier) Listen() error {
 			}
 
 			// Attempt to open a browser to the given URL
-			providers := []string{"/usr/bin/xdg-open", "/usr/bin/x-www-browser"}
+			providers := []string{"xdg-open", "x-www-browser"}
 			for _, provider := range providers {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()

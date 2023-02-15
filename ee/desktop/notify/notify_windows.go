@@ -31,6 +31,8 @@ func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *windowsNotif
 	}
 }
 
+// Listen doesn't do anything on Windows -- the `launch` variable in the notification XML
+// automatically handles opening URLs for us.
 func (w *windowsNotifier) Listen() error {
 	for {
 		select {
@@ -113,8 +115,7 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
 		return fmt.Errorf("could not write temporary powershell script to %s: %w", tmpScriptFile, err)
 	}
 
-	// TODO: fix PATH so we don't have to hardcode powershell's location
-	cmd := exec.Command("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-ExecutionPolicy", "Bypass", "-File", tmpScriptFile)
+	cmd := exec.Command("powershell.exe", "-ExecutionPolicy", "Bypass", "-File", tmpScriptFile)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("could not run powershell to create notification: %w", err)
