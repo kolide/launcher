@@ -21,9 +21,9 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
@@ -661,7 +661,7 @@ func (r *DesktopUsersProcessesRunner) writeIconFile() {
 	_, err := os.Stat(expectedLocation)
 
 	if os.IsNotExist(err) {
-		if err := os.WriteFile(expectedLocation, assets.KolideDesktopIcon, 0644); err != nil {
+		if err := os.WriteFile(expectedLocation, assets.MenubarDefaultLightmodeIco, 0644); err != nil {
 			level.Error(r.logger).Log("msg", "icon file did not exist, could not create it", "err", err)
 		}
 	} else if err != nil {
@@ -669,6 +669,13 @@ func (r *DesktopUsersProcessesRunner) writeIconFile() {
 	}
 }
 
+func iconFilename() string {
+	if runtime.GOOS == "windows" {
+		return "kolide.ico"
+	}
+	return "kolide.png"
+}
+
 func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
-	return filepath.Join(r.usersFilesRoot, assets.KolideIconFilename)
+	return filepath.Join(r.usersFilesRoot, iconFilename())
 }
