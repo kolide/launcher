@@ -37,6 +37,12 @@ var MenubarDefaultLightmodeIco []byte
 //go:embed menubar-default-lightmode.png
 var MenubarDefaultLightmodePng []byte
 
+//go:embed menubar-default-monochrome.ico
+var MenubarDefaultMonochromeIco []byte
+
+//go:embed menubar-default-monochrome.png
+var MenubarDefaultMonochromePng []byte
+
 //go:embed menubar-translucent-darkmode.ico
 var MenubarTranslucentDarkmodeIco []byte
 
@@ -48,6 +54,12 @@ var MenubarTranslucentLightmodeIco []byte
 
 //go:embed menubar-translucent-lightmode.png
 var MenubarTranslucentLightmodePng []byte
+
+//go:embed menubar-translucent-monochrome.ico
+var MenubarTranslucentMonochromeIco []byte
+
+//go:embed menubar-translucent-monochrome.png
+var MenubarTranslucentMonochromePng []byte
 
 //go:embed menubar-triangle-exclamation-darkmode.ico
 var MenubarTriangleExclamationDarkmodeIco []byte
