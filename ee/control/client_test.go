@@ -30,11 +30,11 @@ func (c *TestClient) GetConfig() (data io.Reader, err error) {
 	return bytes.NewReader(bodyBytes), nil
 }
 
-func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
+func (c *TestClient) GetSubsystemData(hash string) (data io.ReadCloser, err error) {
 	bodyBytes, err := json.Marshal(c.hashData[hash])
 	if err != nil {
 		return nil, fmt.Errorf("marshaling json: %w", err)
 	}
 
-	return bytes.NewReader(bodyBytes), nil
+	return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 }

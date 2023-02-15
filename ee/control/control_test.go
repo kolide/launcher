@@ -46,7 +46,7 @@ func (dp nopDataProvider) GetConfig() (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
+func (dp nopDataProvider) GetSubsystemData(hash string) (io.ReadCloser, error) {
 	return nil, nil
 }
 
