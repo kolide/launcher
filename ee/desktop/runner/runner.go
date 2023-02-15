@@ -272,26 +272,20 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error
 
 // Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
-	var menu menu.MenuData
-
 	var dataCopy bytes.Buffer
 	dataTee := io.TeeReader(data, &dataCopy)
 
-	if err := json.NewDecoder(dataTee).Decode(&menu); err != nil {
-		if agent.Flags.DebugServerData() {
+	// Regardless, we will write the menu data out to a file that can be grabbed by
+	// any desktop user processes, either when they refresh, or when they are spawned.
+	if err := r.generateMenuFile(dataTee); err != nil {
+		if agent.Flags.DebugServerData() || true {
 			level.Error(r.logger).Log(
-				"msg", "failed to decode menu data",
+				"msg", "failed to generate menu file",
 				"error", err,
 				"data", dataCopy.String(),
 			)
 		}
-		return fmt.Errorf("failed to decode menu data: %w", err)
-	}
-
-	// Regardless, we will write the menu data out to a file that can be grabbed by
-	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.generateMenuFile(data); err != nil {
-		return err
+		return fmt.Errorf("failed to generate menu file: %w", err)
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
@@ -379,10 +373,10 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
 
 	var menu menu.MenuData
 	if err := json.NewDecoder(bytes.NewReader(parsedMenuDataBytes)).Decode(&menu); err != nil {
-		return fmt.Errorf("failed to decode menu data: %w", err)
+		return fmt.Errorf("failed to decode menu data post processing: %w", err)
 	}
 
-	// Regardless, we will write the menu data out to a file that can be grabbed by
+	// Write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
 	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
 		return err
