@@ -2,7 +2,7 @@ package menu
 
 import (
 	"fmt"
-	"strings"
+	"io"
 	"text/template"
 )
 
@@ -27,20 +27,19 @@ func NewTemplateParser(td *TemplateData) *templateParser {
 
 // Parse parses text as a template body for the menu template data
 // if an error occurs while parsing, an empty string is returned along with the error
-func (tp *templateParser) Parse(text string) (string, error) {
+func (tp *templateParser) Parse(text string, w io.Writer) error {
 	if tp == nil || tp.td == nil {
-		return "", fmt.Errorf("templateData is nil")
+		return fmt.Errorf("templateData is nil")
 	}
 
 	t, err := template.New("menu_template").Parse(text)
 	if err != nil {
-		return "", fmt.Errorf("could not parse template: %w", err)
+		return fmt.Errorf("could not parse template: %w", err)
 	}
 
-	var b strings.Builder
-	if err := t.Execute(&b, tp.td); err != nil {
-		return "", fmt.Errorf("could not write template output: %w", err)
+	if err := t.Execute(w, tp.td); err != nil {
+		return fmt.Errorf("could not write template output: %w", err)
 	}
 
-	return b.String(), nil
+	return nil
 }

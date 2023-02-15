@@ -361,18 +361,15 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
 		return fmt.Errorf("failed to read menu data: %w", err)
 	}
 
-	// Convert the raw JSON to a string and feed it to the parser for template expansion
+	// run the raw menu string through our template parser, and then json unmarshal it
 	parser := menu.NewTemplateParser(td)
-	parsedMenuDataStr, err := parser.Parse(string(menuDataBytes))
-	if err != nil {
+	var parsedMenuData bytes.Buffer
+	if err := parser.Parse(string(menuDataBytes), &parsedMenuData); err != nil {
 		return fmt.Errorf("failed to parse menu data: %w", err)
 	}
 
-	// Convert the parsed string back to bytes, which can now be decoded per usual
-	parsedMenuDataBytes := []byte(parsedMenuDataStr)
-
 	var menu menu.MenuData
-	if err := json.NewDecoder(bytes.NewReader(parsedMenuDataBytes)).Decode(&menu); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(parsedMenuData.Bytes())).Decode(&menu); err != nil {
 		return fmt.Errorf("failed to decode menu data post processing: %w", err)
 	}
 
