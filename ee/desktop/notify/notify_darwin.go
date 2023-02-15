@@ -7,7 +7,7 @@ package notify
 #include <stdbool.h>
 #include <stdlib.h>
 
-bool sendNotification(char *title, char *content);
+bool sendNotification(char *cTitle, char *cBody, char *cActionUri);
 */
 import "C"
 import (
@@ -56,8 +56,10 @@ func (m *macNotifier) SendNotification(title, body, actionUri string) error {
 	defer C.free(unsafe.Pointer(titleCStr))
 	bodyCStr := C.CString(body)
 	defer C.free(unsafe.Pointer(bodyCStr))
+	actionUriCStr := C.CString(actionUri)
+	defer C.free(unsafe.Pointer(actionUriCStr))
 
-	success := C.sendNotification(titleCStr, bodyCStr)
+	success := C.sendNotification(titleCStr, bodyCStr, actionUriCStr)
 	if !success {
 		return fmt.Errorf("could not send notification: %s", title)
 	}

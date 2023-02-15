@@ -6,11 +6,12 @@
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
 
-BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body) {
+BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body, NSString *actionUri) {
     UNMutableNotificationContent *content = [UNMutableNotificationContent new];
     [content autorelease];
     content.title = title;
     content.body = body;
+    content.userInfo = @{@"action_uri": actionUri};
 
     NSString *uuid = [[NSUUID UUID] UUIDString];
     NSString *identifier = [NSString stringWithFormat:@"kolide-notify-%@", uuid];
@@ -42,11 +43,12 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     return success;
 }
 
-BOOL sendNotification(char *cTitle, char *cBody) {
+BOOL sendNotification(char *cTitle, char *cBody, char *cActionUri) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
+    NSString *actionUri = [NSString stringWithUTF8String:cActionUri];
 
     __block BOOL canSendNotification = NO;
     UNAuthorizationOptions options = (UNAuthorizationOptionAlert | UNAuthorizationStatusProvisional);
@@ -73,7 +75,7 @@ BOOL sendNotification(char *cTitle, char *cBody) {
     dispatch_semaphore_wait(semaphore, timeout);
 
     if (canSendNotification) {
-        return doSendNotification(center, title, body);
+        return doSendNotification(center, title, body, actionUri);
     }
 
     return NO;

@@ -79,7 +79,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
-			level.Debug(cs.logger).Log(
+			level.Warn(cs.logger).Log(
 				"msg", "failed to fetch data from control server. Not fatal, moving on",
 				"err", err)
 		}
@@ -141,12 +141,12 @@ func (cs *ControlService) Fetch() error {
 		}
 
 		if err := cs.fetchAndUpdate(subsystem, hash); err != nil {
-			level.Debug(logger).Log("msg", "failed to fetch object. skipping...", "err", err)
+			level.Warn(logger).Log("msg", "failed to fetch object. skipping...", "err", err)
 			continue
 		}
 	}
 
-	level.Debug(cs.logger).Log("msg", "control data fetch complete")
+	level.Info(cs.logger).Log("msg", "control data fetch complete")
 
 	return nil
 }
@@ -169,7 +169,7 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		// Although we failed to update, the payload may be bad and there's no
 		// sense in repeatedly attempting to apply a bad update.
 		// A new update will have a new hash, so continue and remember this hash.
-		level.Debug(logger).Log("msg", "failed to update consumers and subscribers", "err", err)
+		level.Warn(logger).Log("msg", "failed to update consumers and subscribers", "err", err)
 	}
 
 	// Remember the hash of the last fetched version of this subsystem's data
