@@ -136,6 +136,16 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 				ValidUntil: time.Now().Add(-1 * time.Hour).Unix(),
 			},
 		},
+		{
+			name: "Invalid because the action URI is not a real URI",
+			testNotification: notification{
+				Title:      "Test notification",
+				Body:       "This notification has an action URI that is not valid",
+				ID:         ulid.New(),
+				ValidUntil: getValidUntil(),
+				ActionUri:  "some_thing:foo/bar",
+			},
+		},
 	}
 
 	for _, tt := range tests {

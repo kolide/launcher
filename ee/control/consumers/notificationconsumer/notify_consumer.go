@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -145,6 +146,19 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notifica
 	// Notification has expired
 	if validUntil.Before(time.Now()) {
 		return false
+	}
+
+	// If action URI is set, it must be a valid URI
+	if notificationToCheck.ActionUri != "" {
+		_, err := url.Parse(notificationToCheck.ActionUri)
+		if err != nil {
+			level.Warn(nc.logger).Log(
+				"msg", "received invalid action_uri from K2",
+				"notification_id", notificationToCheck.ID,
+				"action_uri", notificationToCheck.ActionUri,
+				"err", err)
+			return false
+		}
 	}
 
 	// Notification must not be blank
