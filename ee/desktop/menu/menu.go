@@ -18,7 +18,10 @@ var InitialMenu []byte
 type menuIcon string
 
 const (
-	KolideDesktopIcon = "kolide-desktop"
+	TranslucentIcon         menuIcon = "translucent"
+	DefaultIcon             menuIcon = "default"
+	TriangleExclamationIcon menuIcon = "triangle-exclamation"
+	CircleXIcon             menuIcon = "circle-x"
 )
 
 // MenuData encapsulates a menu bar icon and accessible menu items
@@ -96,7 +99,7 @@ func (m *menu) getMenuData() *MenuData {
 // SetDefaults ensures we have the desired default values.
 func (md *MenuData) SetDefaults() {
 	if md.Icon == "" {
-		md.Icon = KolideDesktopIcon
+		md.Icon = DefaultIcon
 	}
 
 	if md.Tooltip == "" {

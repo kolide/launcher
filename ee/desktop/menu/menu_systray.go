@@ -4,9 +4,6 @@ import (
 	"sync"
 
 	"github.com/kolide/systray"
-
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/ee/desktop/assets"
 )
 
 // Init creates the menu bar & icon. It must be called on the main thread, and
@@ -41,19 +38,9 @@ func (m *menu) Build() {
 }
 
 func (m *menu) setIcon(icon menuIcon) {
-	switch icon {
-	case KolideDesktopIcon:
-		// Allow launcher to conditionally choose the launcher icon based on whether we're running in production or not
-		if m.isProd() {
-			systray.SetTemplateIcon(assets.KolideDesktopIcon, assets.KolideDesktopIcon)
-		} else {
-			systray.SetTemplateIcon(assets.KolideDebugDesktopIcon, assets.KolideDebugDesktopIcon)
-		}
-	default:
-		level.Debug(m.logger).Log(
-			"msg", "invalid icon",
-			"icon", icon)
-		return
+	iconBytes := getIcon(icon)
+	if iconBytes != nil {
+		systray.SetTemplateIcon(iconBytes, iconBytes)
 	}
 }
 
