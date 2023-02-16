@@ -49,13 +49,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			name:       "no command",
 			localDbKey: ecdsaKey(t),
 			challenge:  func() ([]byte, *[32]byte) { return []byte(""), nil },
-			loggedErr:  "no data in box query parameter",
-		},
-		{
-			name:       "no signature",
-			localDbKey: ecdsaKey(t),
-			challenge:  func() ([]byte, *[32]byte) { return []byte("aGVsbG8gd29ybGQK"), nil },
-			loggedErr:  "unable to unmarshal box",
+			loggedErr:  "failed to extract box from request",
 		},
 		{
 			name:       "malformed cmd",
@@ -114,14 +108,6 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes bytes.Buffer
-
-			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
-			require.NoError(t, err)
-
-			challengeBytes, privateEncryptionKey := tt.challenge()
-
 			// generate the response we want the handler to return
 			responseData := []byte(ulid.New())
 
@@ -137,14 +123,22 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				w.Write(responseData)
 			})
 
-			// give our middleware with the test handler to the determiner
-			h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
+			challengeBytes, privateEncryptionKey := tt.challenge()
 
 			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
 			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge), makePostRequest(t, encodedChallenge)} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
+
+					var logBytes bytes.Buffer
+
+					// set up middlewares
+					kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
+					require.NoError(t, err)
+
+					// give our middleware with the test handler to the determiner
+					h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
 
 					rr := httptest.NewRecorder()
 					h.ServeHTTP(rr, req)

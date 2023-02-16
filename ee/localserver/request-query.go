@@ -11,7 +11,6 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(res http.ResponseWriter, r *http.Request) {
-	// now check body
 	if r.Body == nil {
 		res.Write([]byte("request body is nil"))
 		return

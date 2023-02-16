@@ -1,6 +1,8 @@
 package localserver
 
 import (
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +10,6 @@ import (
 	"testing"
 
 	"bytes"
-	"crypto/rsa"
-	"encoding/base64"
 	"fmt"
 
 	"github.com/go-kit/kit/log"
@@ -58,11 +58,6 @@ func TestUnwrapV0(t *testing.T) {
 		boxParam  string
 		loggedErr string
 	}{
-		{
-			name:      "no command",
-			boxParam:  "",
-			loggedErr: "no data in box query parameter",
-		},
 		{
 			name:      "bad base64",
 			boxParam:  "This is not base64",

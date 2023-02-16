@@ -45,6 +45,8 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			//go:generate mockery --name Querier
+			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
 			mockQuerier := mocks.NewQuerier(t)
 			if tt.expectedQueryCount > 0 {
 				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, tt.mockQueryError).Times(tt.expectedQueryCount)

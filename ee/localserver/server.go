@@ -35,7 +35,6 @@ var portList = []int{
 	22322,
 }
 
-//go:generate mockery --name Querier
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
