@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -31,16 +32,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	challengeId := []byte(ulid.New())
 	challengeData := []byte(ulid.New())
 
-	cmdReqUrlParameters := map[string]string{
-		"blah_1":                       "blah",
-		"blah_2":                       "blah_and_blah",
-		"big_sql":                      bigSql,
-		"random_string_with_sql_chars": randomStringWithSqlCharacters(t, 100000),
-	}
+	cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
 
 	cmdReq := mustMarshal(t, v2CmdRequestType{
-		Path:          "whatevs",
-		UrlParameters: cmdReqUrlParameters,
+		Path: "whatevs",
+		Body: cmdReqBody,
 	})
 
 	var tests = []struct {
@@ -133,47 +129,52 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			// in this test we just want it to regurgitate the response data we defined above
 			// this should match the responseData in the opened response
 			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// make sure url parameters are being passed along
-				for k, v := range cmdReqUrlParameters {
-					// ec middlemiddleware b64 encodes the parameters
-					require.Equal(t, r.URL.Query().Get(k), base64.StdEncoding.EncodeToString([]byte(v)))
-				}
+				reqBodyRaw, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				defer r.Body.Close()
 
+				require.Equal(t, cmdReqBody, reqBodyRaw)
 				w.Write(responseData)
 			})
 
 			// give our middleware with the test handler to the determiner
 			h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
 
-			// make the request
-			req := makeRequest(t, base64.StdEncoding.EncodeToString(challengeBytes))
-			rr := httptest.NewRecorder()
-			h.ServeHTTP(rr, req)
+			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
+			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge), makePostRequest(t, encodedChallenge)} {
+				req := req
+				t.Run(req.Method, func(t *testing.T) {
+					t.Parallel()
 
-			if tt.loggedErr != "" {
-				assert.Equal(t, http.StatusUnauthorized, rr.Code)
-				assert.Contains(t, logBytes.String(), tt.loggedErr)
-				return
+					rr := httptest.NewRecorder()
+					h.ServeHTTP(rr, req)
+
+					if tt.loggedErr != "" {
+						assert.Equal(t, http.StatusUnauthorized, rr.Code)
+						assert.Contains(t, logBytes.String(), tt.loggedErr)
+						return
+					}
+
+					require.Equal(t, http.StatusOK, rr.Code)
+					require.NotEmpty(t, rr.Body.String())
+
+					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
+
+					// try to open the response
+					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
+					require.NoError(t, err)
+
+					responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
+					require.NoError(t, err)
+					require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
+
+					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
+					require.NoError(t, err)
+					require.Equal(t, challengeData, opened.ChallengeData)
+					require.Equal(t, responseData, opened.ResponseData)
+					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+				})
 			}
-
-			require.Equal(t, http.StatusOK, rr.Code)
-			require.NotEmpty(t, rr.Body.String())
-
-			require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
-
-			// try to open the response
-			returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
-			require.NoError(t, err)
-
-			responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
-			require.NoError(t, err)
-			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
-
-			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
-			require.NoError(t, err)
-			require.Equal(t, challengeData, opened.ChallengeData)
-			require.Equal(t, responseData, opened.ResponseData)
-			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
 }

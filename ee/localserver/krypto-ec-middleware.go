@@ -1,10 +1,13 @@
 package localserver
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -23,8 +26,8 @@ const (
 )
 
 type v2CmdRequestType struct {
-	Path          string
-	UrlParameters map[string]string
+	Path string
+	Body []byte
 }
 
 type kryptoEcMiddleware struct {
@@ -44,28 +47,14 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil {
-			r.Body.Close()
-		}
-
 		// Extract the box from the URL query parameters
-		boxRaw := r.URL.Query().Get("box")
-		if boxRaw == "" {
-			level.Debug(e.logger).Log("msg", "no data in box query parameter")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
+		if r.Body != nil {
+			defer r.Body.Close()
 		}
 
-		boxRawBytes, err := base64.StdEncoding.DecodeString(boxRaw)
+		challengeBox, err := extractChallenge(r)
 		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to b64 decode box", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		challengeBox, err := challenge.UnmarshalChallenge(boxRawBytes)
-		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to unmarshal challenge", "err", err)
+			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -92,19 +81,17 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		v := url.Values{}
-		for key, val := range cmdReq.UrlParameters {
-			v.Add(key, base64.StdEncoding.EncodeToString([]byte(val)))
+		newReq := &http.Request{
+			Method: http.MethodPost,
+			URL: &url.URL{
+				Scheme: r.URL.Scheme,
+				Host:   r.Host,
+				Path:   cmdReq.Path,
+			},
 		}
 
-		newReq := &http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				Scheme:   r.URL.Scheme,
-				Host:     r.Host,
-				Path:     cmdReq.Path,
-				RawQuery: v.Encode(),
-			},
+		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
+			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 		}
 
 		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
@@ -140,4 +127,39 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
 		}
 	})
+}
+
+func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
+	// first check query parmeters
+	rawBox := r.URL.Query().Get("box")
+	if rawBox != "" {
+		decoded, err := base64.StdEncoding.DecodeString(rawBox)
+		if err != nil {
+			return nil, fmt.Errorf("decoding b64 box from url param: %w", err)
+		}
+
+		return challenge.UnmarshalChallenge(decoded)
+	}
+
+	// now check body
+	if r.Body == nil {
+		return nil, fmt.Errorf("no box found in url params or request body: body nil")
+	}
+
+	var body map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("unmarshalling request body to json: %w", err)
+	}
+
+	val, ok := body["box"]
+	if !ok {
+		return nil, fmt.Errorf("no box key found in request body json")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(val)
+	if err != nil {
+		return nil, fmt.Errorf("decoding b64 box from request body: %w", err)
+	}
+
+	return challenge.UnmarshalChallenge(decoded)
 }

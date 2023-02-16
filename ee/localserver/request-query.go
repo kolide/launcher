@@ -1,7 +1,6 @@
 package localserver
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,20 +10,29 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 	return http.HandlerFunc(ls.requestQueryHanlderFunc)
 }
 
-func (ls *localServer) requestQueryHanlderFunc(res http.ResponseWriter, req *http.Request) {
-	queryRaw := req.URL.Query().Get("query")
-	if queryRaw == "" {
-		res.Write([]byte("no query parameter found in url parameters"))
+func (ls *localServer) requestQueryHanlderFunc(res http.ResponseWriter, r *http.Request) {
+	// now check body
+	if r.Body == nil {
+		res.Write([]byte("request body is nil"))
 		return
 	}
 
-	queryDecoded, err := base64.StdEncoding.DecodeString(req.URL.Query().Get("query"))
-	if err != nil {
-		res.Write([]byte(fmt.Sprintf("error decoding query from b64: %s", err)))
+	var body map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		res.Write([]byte(fmt.Sprintf("error unmarshaling request body: %s", err)))
 		return
 	}
 
-	query := string(queryDecoded)
+	query, ok := body["query"]
+	if !ok {
+		res.Write([]byte("no query key found in request body json"))
+		return
+	}
+
+	if query == "" {
+		res.Write([]byte("empty query"))
+		return
+	}
 
 	results, err := ls.querier.Query(query)
 	if err != nil {

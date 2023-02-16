@@ -2,7 +2,7 @@ package localserver
 
 import (
 	"bytes"
-	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,7 +26,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 	}{
 		{
 			name:  "happy path",
-			query: base64.StdEncoding.EncodeToString([]byte("select blah from blah_blah")),
+			query: "select blah from blah_blah",
 			mockQueryResult: []map[string]string{
 				{
 					"blah": "blah",
@@ -36,12 +36,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 		},
 		{
 			name:   "no query",
-			errStr: "no query parameter found in url parameters",
-		},
-		{
-			name:   "no b64",
-			query:  "select blah from blah_blah",
-			errStr: "error decoding query from b64",
+			errStr: "empty query",
 		},
 	}
 
@@ -52,15 +47,17 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 
 			mockQuerier := mocks.NewQuerier(t)
 			if tt.expectedQueryCount > 0 {
-				decodedQuery := mustDecodeB64ToString(t, tt.query)
-				mockQuerier.On("Query", decodedQuery).Return(tt.mockQueryResult, tt.mockQueryError).Times(tt.expectedQueryCount)
+				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, tt.mockQueryError).Times(tt.expectedQueryCount)
 			}
 
 			var logBytes bytes.Buffer
 			server := testServer(t, &logBytes)
 			server.querier = mockQuerier
 
-			req, err := http.NewRequest("", "", nil)
+			jsonBytes, err := json.Marshal(map[string]string{
+				"query": tt.query,
+			})
+			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
 			require.NoError(t, err)
 
 			queryParams := req.URL.Query()
@@ -79,10 +76,4 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			require.Contains(t, rr.Body.String(), tt.errStr)
 		})
 	}
-}
-
-func mustDecodeB64ToString(t *testing.T, s string) string {
-	decoded, err := base64.StdEncoding.DecodeString(s)
-	require.NoError(t, err)
-	return string(decoded)
 }
