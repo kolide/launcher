@@ -35,18 +35,27 @@ func newOsSpecificNotifier(logger log.Logger, _ string) *macNotifier {
 }
 
 func (m *macNotifier) Listen() error {
-	go func() {
+	if isBundle() {
+		go func() {
+			for {
+				select {
+				case <-m.interrupt:
+					C.stopNotificationListenerApp()
+					return
+				}
+			}
+		}()
+
+		C.runNotificationListenerApp()
+		return nil
+	} else {
 		for {
 			select {
 			case <-m.interrupt:
-				C.stopNotificationListenerApp()
-				return
+				return nil
 			}
 		}
-	}()
-
-	C.runNotificationListenerApp()
-	return nil
+	}
 }
 
 func (m *macNotifier) Interrupt(err error) {
