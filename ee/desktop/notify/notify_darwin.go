@@ -2,12 +2,14 @@ package notify
 
 /*
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
-#cgo darwin LDFLAGS: -framework Foundation -framework UserNotifications
+#cgo darwin LDFLAGS: -framework Foundation -framework UserNotifications -framework AppKit
 
 #include <stdbool.h>
 #include <stdlib.h>
 
 bool sendNotification(char *cTitle, char *cBody, char *cActionUri);
+void runNotificationListenerApp(void);
+void stopNotificationListenerApp(void);
 */
 import "C"
 import (
@@ -33,12 +35,18 @@ func newOsSpecificNotifier(logger log.Logger, _ string) *macNotifier {
 }
 
 func (m *macNotifier) Listen() error {
-	for {
-		select {
-		case <-m.interrupt:
-			return nil
+	go func() {
+		for {
+			select {
+			case <-m.interrupt:
+				C.stopNotificationListenerApp()
+				return
+			}
 		}
-	}
+	}()
+
+	C.runNotificationListenerApp()
+	return nil
 }
 
 func (m *macNotifier) Interrupt(err error) {

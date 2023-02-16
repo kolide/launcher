@@ -1,10 +1,39 @@
 //go:build darwin
 // +build darwin
 
-// Draws from Fyne's implementation: https://github.com/fyne-io/fyne/blob/master/app/app_darwin.m
+// sendNotification draws from Fyne's implementation: https://github.com/fyne-io/fyne/blob/master/app/app_darwin.m
 
-#import <Foundation/Foundation.h>
-#import <UserNotifications/UserNotifications.h>
+#import "notify_darwin.h"
+
+@implementation NotificationDelegate
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))completionHandler {
+    NSDictionary *userInfo = response.notification.request.content.userInfo;
+
+    NSString *actionUri = userInfo[@"action_uri"];
+    if ([actionUri length] != 0) {
+        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:actionUri]];
+    }
+
+    completionHandler();
+}
+@end
+
+void runNotificationListenerApp(void) {
+    [NSAutoreleasePool new];
+    [NSApplication sharedApplication];
+
+    if ([UNUserNotificationCenter class]) {
+        NotificationDelegate *notificationDelegate = [NotificationDelegate new];
+        [notificationDelegate autorelease];
+        [[UNUserNotificationCenter currentNotificationCenter] setDelegate:notificationDelegate];
+    }
+
+    [NSApp run];
+}
+
+void stopNotificationListenerApp(void) {
+	[NSApp terminate:nil];
+}
 
 BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body, NSString *actionUri) {
     UNMutableNotificationContent *content = [UNMutableNotificationContent new];
