@@ -15,7 +15,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -221,6 +220,6 @@ func Test_writeIconPath(t *testing.T) {
 
 	// Test that if the icon doesn't exist in the root dir, the runner will create it.
 	r.writeIconFile()
-	_, err := os.Stat(filepath.Join(rootDir, assets.KolideIconFilename))
+	_, err := os.Stat(filepath.Join(rootDir, iconFilename()))
 	require.NoError(t, err, "icon file not created")
 }

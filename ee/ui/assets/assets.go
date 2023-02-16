@@ -7,6 +7,18 @@ import (
 )
 
 
+//go:embed kolide-debug.ico
+var KolideDebugIco []byte
+
+//go:embed kolide-debug.png
+var KolideDebugPng []byte
+
+//go:embed kolide.ico
+var KolideIco []byte
+
+//go:embed kolide.png
+var KolidePng []byte
+
 //go:embed menubar-circle-x-darkmode.ico
 var MenubarCircleXDarkmodeIco []byte
 
