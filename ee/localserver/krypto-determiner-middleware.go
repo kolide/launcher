@@ -27,7 +27,7 @@ func (h *kryptoDeterminerMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 	// Extract the box from the URL query parameters
 	boxRaw := r.URL.Query().Get("box")
 	if boxRaw == "" {
-		// if we dont box param, assume it's a post
+		// if we dont have a box param, assume it's a post
 		// posts were added after v1 (rsaKrypto) was depreciated, so it must be v2 (ecMiddleware) request
 		h.ecMiddleware.ServeHTTP(w, r)
 		return
