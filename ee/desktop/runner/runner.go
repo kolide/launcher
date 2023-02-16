@@ -283,7 +283,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
 	if err := r.generateMenuFile(dataTee); err != nil {
-		if agent.Flags.DebugServerData() || true {
+		if agent.Flags.DebugServerData() {
 			level.Error(r.logger).Log(
 				"msg", "failed to generate menu file",
 				"error", err,
