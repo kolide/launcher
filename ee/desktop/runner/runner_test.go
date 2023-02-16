@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -222,4 +224,62 @@ func Test_writeIconPath(t *testing.T) {
 	r.writeIconFile()
 	_, err := os.Stat(filepath.Join(rootDir, iconFilename()))
 	require.NoError(t, err, "icon file not created")
+}
+
+func TestUpdate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    io.Reader
+		err      bool
+		contains []string
+	}{
+		{
+			name:     "works",
+			input:    strings.NewReader(`{"items":[{"label":"one","tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":false},{"label":null,"tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":true},{"label":"two","tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":false}],"icon":null,"tooltip":"Kolide"}`),
+			contains: []string{"Kolide", "one", "two"},
+		},
+		{
+			name:  "empty",
+			input: strings.NewReader(""),
+			err:   true,
+		},
+		{
+			name:  "nil",
+			input: nil,
+			err:   true,
+		},
+		{
+			name:  "bad json",
+			input: strings.NewReader("hello"),
+			err:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			r := New(WithUsersFilesRoot(dir))
+
+			if tt.err {
+				require.Error(t, r.Update(tt.input))
+				return
+			}
+			require.NoError(t, r.Update(tt.input))
+
+			menuFH, err := os.Open(r.menuPath())
+			require.NoError(t, err)
+			defer menuFH.Close()
+
+			menuContents, err := io.ReadAll(menuFH)
+			require.NoError(t, err)
+			for _, str := range tt.contains {
+				assert.Contains(t, string(menuContents), str)
+			}
+		})
+	}
 }

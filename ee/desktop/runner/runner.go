@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -272,6 +273,10 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error
 
 // Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
+	if data == nil {
+		return errors.New("data is nil")
+	}
+
 	var dataCopy bytes.Buffer
 	dataTee := io.TeeReader(data, &dataCopy)
 
