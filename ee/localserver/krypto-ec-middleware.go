@@ -47,7 +47,6 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract the box from the URL query parameters
 		if r.Body != nil {
 			defer r.Body.Close()
 		}
