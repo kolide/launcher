@@ -4,11 +4,12 @@
 package runner
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -55,7 +56,18 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 		},
 	}
 
-	cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", os.Getenv("DISPLAY")))
+	// Get the user's session so we can get their display -- this is needed only for handling notifications
+	// at the moment, so we ignore any errors
+	ctx := context.Background()
+	sessionOutput, _ := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
+	session := strings.Trim(string(sessionOutput), "\n")
+	if session != "" {
+		displayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+		display := strings.Trim(string(displayOutput), "\n")
+		if display != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", display))
+		}
+	}
 
 	return cmd.Start()
 }
