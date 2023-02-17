@@ -48,12 +48,7 @@ func (m *menu) setTooltip(tooltip string) {
 	systray.SetTooltip(tooltip)
 }
 
-func (m *menu) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
-	if nonProdOnly && m.isProd() {
-		// This is prod environment, but the menu item is for non-prod only
-		return nil
-	}
-
+func (m *menu) addMenuItem(label, tooltip string, disabled bool, ap ActionPerformer, parent any) any {
 	if label == "" {
 		return nil
 	}
