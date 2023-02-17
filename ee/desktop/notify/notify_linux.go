@@ -155,7 +155,8 @@ func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) er
 		return fmt.Errorf("could not send notification via dbus: %w", call.Err)
 	}
 
-	// Save the notification ID from the response
+	// Save the notification ID from the response -- notifications don't appear to persist on reboot
+	// so we should be fine to only store these here.
 	var notificationId uint32
 	if err := call.Store(&notificationId); err != nil {
 		level.Warn(d.logger).Log("msg", "could not get notification ID from dbus call", "err", err)
@@ -175,7 +176,8 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(title, body, actionUri stri
 		return fmt.Errorf("notify-send not installed: %w", err)
 	}
 
-	// notify-send doesn't support actions, but URLs in notifications are clickable.
+	// notify-send doesn't support actions, but URLs in notifications are clickable in at least
+	// some desktop environments.
 	if actionUri != "" {
 		body += " Open: " + actionUri
 	}
