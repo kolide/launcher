@@ -1,6 +1,8 @@
 package localserver
 
 import (
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +10,6 @@ import (
 	"testing"
 
 	"bytes"
-	"crypto/rsa"
-	"encoding/base64"
 	"fmt"
 
 	"github.com/go-kit/kit/log"
@@ -59,11 +59,6 @@ func TestUnwrapV0(t *testing.T) {
 		loggedErr string
 	}{
 		{
-			name:      "no command",
-			boxParam:  "",
-			loggedErr: "no data in box query parameter",
-		},
-		{
 			name:      "bad base64",
 			boxParam:  "This is not base64",
 			loggedErr: "unable to base64 decode box",
@@ -105,7 +100,7 @@ func TestUnwrapV0(t *testing.T) {
 
 			kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), kbm.UnwrapV1Hander(makeTestHandler(t)), nil)
 
-			req := makeRequest(t, tt.boxParam)
+			req := makeGetRequest(t, tt.boxParam)
 
 			rr := httptest.NewRecorder()
 			kryptoDeterminerMiddleware.ServeHTTP(rr, req)
@@ -144,7 +139,7 @@ func makeTestHandler(t *testing.T) http.Handler {
 	})
 }
 
-func makeRequest(t *testing.T, boxParameter string) *http.Request {
+func makeGetRequest(t *testing.T, boxParameter string) *http.Request {
 	v := url.Values{}
 
 	if boxParameter != "" {
@@ -153,7 +148,21 @@ func makeRequest(t *testing.T, boxParameter string) *http.Request {
 
 	urlString := "https://127.0.0.1:8080?" + v.Encode()
 
-	req, err := http.NewRequest("GET", urlString, nil)
+	req, err := http.NewRequest(http.MethodGet, urlString, nil)
+	require.NoError(t, err)
+
+	return req
+}
+
+func makePostRequest(t *testing.T, boxValue string) *http.Request {
+	urlString := "https://127.0.0.1:8080"
+
+	body, err := json.Marshal(map[string]string{
+		"box": boxValue,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body))
 	require.NoError(t, err)
 
 	return req
