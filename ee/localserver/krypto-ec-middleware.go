@@ -169,3 +169,25 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 
 	return challenge.UnmarshalChallenge(decoded)
 }
+
+type bufferedHttpResponse struct {
+	header http.Header
+	code   int
+	buf    bytes.Buffer
+}
+
+func (bhr *bufferedHttpResponse) Header() http.Header {
+	return bhr.header
+}
+
+func (bhr *bufferedHttpResponse) Write(in []byte) (int, error) {
+	return bhr.buf.Write(in)
+}
+
+func (bhr *bufferedHttpResponse) WriteHeader(code int) {
+	bhr.code = code
+}
+
+func (bhr *bufferedHttpResponse) Bytes() []byte {
+	return bhr.buf.Bytes()
+}
