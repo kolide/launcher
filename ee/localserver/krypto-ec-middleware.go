@@ -89,6 +89,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			},
 		}
 
+		// the body of the cmdReq become the body of the next http request
 		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
 			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 		}
@@ -128,6 +129,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+// extractChallenge finds the challenge in an http request. It prefers the GET parameter, but will fall back to POST data.
 func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 	// first check query parmeters
 	rawBox := r.URL.Query().Get("box")
@@ -145,7 +147,7 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 		return nil, fmt.Errorf("no box found in url params or request body: body nil")
 	}
 
-	var body map[string]string
+	var body map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("unmarshalling request body to json: %w", err)
 	}
@@ -155,7 +157,12 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 		return nil, fmt.Errorf("no box key found in request body json")
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(val)
+	valStr, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf("box value is not a string")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(valStr)
 	if err != nil {
 		return nil, fmt.Errorf("decoding b64 box from request body: %w", err)
 	}
