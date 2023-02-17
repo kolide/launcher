@@ -5,6 +5,7 @@ package runner
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
@@ -53,6 +54,8 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 			Gid: uint32(runningUserGid),
 		},
 	}
+
+	cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", os.Getenv("DISPLAY")))
 
 	return cmd.Start()
 }

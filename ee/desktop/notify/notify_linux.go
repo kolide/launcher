@@ -94,7 +94,6 @@ func (d *dbusNotifier) Listen() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 				cmd := exec.CommandContext(ctx, provider, actionUri)
-				cmd.Env = append(cmd.Env, "DISPLAY=:10.0") // TODO RM - this is an xrdp workaround
 				if err := cmd.Start(); err != nil {
 					level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "provider", provider)
 				} else {

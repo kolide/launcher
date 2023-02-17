@@ -16,10 +16,6 @@ the JSON configuration file.
 You will need to comment out the empty seat check in `ee/consoleuser/consoleuser_linux.go` --
 otherwise launcher will not start a desktop process for your user.
 
-If you want to test notifications opening browser windows, you will need to set the `DISPLAY`
-environment variable in `ee/desktop/notify/listener_linux.go` when running the command to
-open the browser. (In the VM, run `echo $DISPLAY` to find the correct value.)
-
 ## Usage
 
 Use the provided script `multipass.sh` to start a Multipass VM, specifying the VM name
@@ -42,6 +38,14 @@ Access the VM via Microsoft Remote Desktop, open a terminal window, and start la
 ```
 sudo LAUNCHER_SKIP_UPDATES=true ./launcher --root_directory /var/kolide-k2/localhost \
     --hostname localhost:3000 --transport jsonrpc --enroll_secret secret --debug
+```
+
+Once you have an already-running VM, you can rebuild launcher and update it in your VM any time
+by running the following:
+
+```
+go run cmd/make/make.go -targets=launcher -linkstamp --os linux --arch arm64
+multipass transfer ./build/linux.arm64/launcher <your-vm-name-here>:.
 ```
 
 ## Caveats and troubleshooting
