@@ -10,6 +10,9 @@ If using Mockoon, [install Mockoon](https://mockoon.com/download/).
 
 ## Caveats
 
+If commands to multipass (like `launch`) are timing out, you may need to disable your
+firewall and log out/log back in again.
+
 You will need to comment out the empty seat check in `ee/consoleuser/consoleuser_linux.go`.
 
 If you want to test notifications opening browser windows, you will need to set the `DISPLAY`
