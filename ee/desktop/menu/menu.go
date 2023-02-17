@@ -33,13 +33,12 @@ type MenuData struct {
 
 // menuItemData represents a menu item, optionally containing sub menu items
 type menuItemData struct {
-	Label       string         `json:"label,omitempty"`
-	Tooltip     string         `json:"tooltip,omitempty"`
-	Disabled    bool           `json:"disabled,omitempty"` // Whether the item is grey text, or selectable
-	NonProdOnly bool           `json:"nonProdOnly,omitempty"`
-	IsSeparator bool           `json:"isSeparator,omitempty"`
-	Action      Action         `json:"action,omitempty"`
-	Items       []menuItemData `json:"items,omitempty"`
+	Label     string         `json:"label,omitempty"`
+	Tooltip   string         `json:"tooltip,omitempty"`
+	Disabled  bool           `json:"disabled,omitempty"` // Whether the item is grey text, or selectable
+	Separator bool           `json:"separator,omitempty"`
+	Action    Action         `json:"action,omitempty"`
+	Items     []menuItemData `json:"items,omitempty"`
 }
 
 // menuBuilder is an interface a menu parser can use to specify how the menu is built
@@ -50,7 +49,7 @@ type menuBuilder interface {
 	setTooltip(tooltip string)
 	// addMenuItem creates a menu item with the supplied attributes. If the menu item is successfully
 	// created, it is returned. If parent is non-nil, the menu item will be created as a child of parent.
-	addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any
+	addMenuItem(label, tooltip string, disabled bool, ap ActionPerformer, parent any) any
 	// addSeparator adds a separator to the menu
 	addSeparator()
 }
