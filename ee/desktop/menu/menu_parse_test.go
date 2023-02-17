@@ -22,12 +22,11 @@ func (m *testMenuBuilder) setTooltip(tooltip string) {
 	m.menuCopy.Tooltip = tooltip
 }
 
-func (m *testMenuBuilder) addMenuItem(label, tooltip string, disabled, nonProdOnly bool, ap ActionPerformer, parent any) any {
+func (m *testMenuBuilder) addMenuItem(label, tooltip string, disabled bool, ap ActionPerformer, parent any) any {
 	item := &menuItemData{
-		Label:       label,
-		Tooltip:     tooltip,
-		Disabled:    disabled,
-		NonProdOnly: nonProdOnly,
+		Label:    label,
+		Tooltip:  tooltip,
+		Disabled: disabled,
 	}
 
 	if parent != nil {
@@ -42,7 +41,7 @@ func (m *testMenuBuilder) addMenuItem(label, tooltip string, disabled, nonProdOn
 
 func (m *testMenuBuilder) addSeparator() {
 	m.itemCopy = &menuItemData{
-		IsSeparator: true,
+		Separator: true,
 	}
 }
 
@@ -101,12 +100,8 @@ func Test_ParseMenuItem(t *testing.T) {
 			data: &menuItemData{Label: "first item"},
 		},
 		{
-			name: "non prod",
-			data: &menuItemData{Label: "non prod item", NonProdOnly: true},
-		},
-		{
 			name: "separator",
-			data: &menuItemData{IsSeparator: true},
+			data: &menuItemData{Separator: true},
 		},
 		{
 			name: "submenu",
