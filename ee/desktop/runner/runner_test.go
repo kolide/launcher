@@ -237,7 +237,7 @@ func TestUpdate(t *testing.T) {
 	}{
 		{
 			name:     "works",
-			input:    strings.NewReader(`{"items":[{"label":"one","tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":false},{"label":null,"tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":true},{"label":"two","tooltip":null,"action":null,"items":[],"disabled":true,"nonProdOnly":false,"isSeparator":false}],"icon":null,"tooltip":"Kolide"}`),
+			input:    strings.NewReader(`{"items":[{"label":"one","tooltip":null,"action":null,"items":[],"disabled":true,"separator":false},{"label":null,"tooltip":null,"action":null,"items":[],"disabled":true,"separator":true},{"label":"two","tooltip":null,"action":null,"items":[],"disabled":true,"separator":false}],"icon":null,"tooltip":"Kolide"}`),
 			contains: []string{"Kolide", "one", "two"},
 		},
 		{

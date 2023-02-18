@@ -19,7 +19,7 @@ func parseMenuItem(m *menuItemData, builder menuBuilder, parent any) {
 		return
 	}
 
-	if m.IsSeparator {
+	if m.Separator {
 		// If the item is a separator, nothing else matters
 		builder.addSeparator()
 		return
@@ -27,7 +27,7 @@ func parseMenuItem(m *menuItemData, builder menuBuilder, parent any) {
 
 	var item any
 	if m.Label != "" {
-		item = builder.addMenuItem(m.Label, m.Tooltip, m.Disabled, m.NonProdOnly, m.Action.Performer, parent)
+		item = builder.addMenuItem(m.Label, m.Tooltip, m.Disabled, m.Action.Performer, parent)
 	}
 
 	if item == nil {
