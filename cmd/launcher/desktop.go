@@ -103,10 +103,12 @@ func runDesktop(args []string) error {
 		return err
 	}
 
-	menu := menu.New(logger, *flhostname, *flmenupath)
-	server.RegisterRefreshListener(func() {
-		menu.Build()
-	})
+	m := menu.New(logger, *flhostname, *flmenupath)
+	refreshMenu := func() {
+		m.Build()
+	}
+	server.RegisterRefreshListener(refreshMenu)
+	menu.RegisterThemeChangeListener(refreshMenu)
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
@@ -125,7 +127,7 @@ func runDesktop(args []string) error {
 		<-shutdownChan
 		return nil
 	}, func(err error) {
-		menu.Shutdown()
+		m.Shutdown()
 	})
 
 	// run run group
@@ -140,7 +142,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init()
+	m.Init()
 
 	return nil
 }

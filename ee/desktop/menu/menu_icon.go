@@ -1,8 +1,6 @@
 package menu
 
 import (
-	"runtime"
-
 	"github.com/kolide/launcher/ee/ui/assets"
 )
 
@@ -52,11 +50,8 @@ func getIcon(icon menuIcon) []byte {
 
 // chooseIcon chooses the correct icon data, based on the current OS theme
 func chooseIcon(darkIco, darkPng, lightIco, lightPng, monochromeIco, monochromePng []byte) []byte {
-	// TODO: Ignoring dark/light modes at the moment
-	// Here is where we would attempt to detect light/dark mode and choose the right icon
-	// See https://github.com/kolide/launcher/issues/1028
-	if runtime.GOOS == "windows" {
-		return monochromeIco
+	if isDarkMode() {
+		return darkPng
 	}
-	return monochromePng
+	return lightPng
 }
