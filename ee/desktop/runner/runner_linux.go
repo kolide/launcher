@@ -62,10 +62,19 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	sessionOutput, _ := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
 	session := strings.Trim(string(sessionOutput), "\n")
 	if session != "" {
-		displayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
-		display := strings.Trim(string(displayOutput), "\n")
-		if display != "" {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", display))
+		typeOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+		sessionType := strings.Trim(string(typeOutput), "\n")
+
+		switch sessionType {
+		case "x11":
+			xDisplayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+			xDisplay := strings.Trim(string(xDisplayOutput), "\n")
+			if xDisplay != "" {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", xDisplay))
+			}
+		case "wayland":
+		default:
+			// TODO
 		}
 	}
 
