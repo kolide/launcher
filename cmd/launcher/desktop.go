@@ -17,7 +17,6 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/mitchellh/go-ps"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/process"
@@ -56,6 +55,11 @@ func runDesktop(args []string) error {
 			"",
 			"path to icon file",
 		)
+		flPpid = flagset.Int(
+			"ppid",
+			0,
+			"parent process ID to monitor",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
@@ -84,6 +88,18 @@ func runDesktop(args []string) error {
 		)
 	}
 
+	if *flPpid == 0 {
+		ppid, err := parentProcessId()
+		if err != nil {
+			return fmt.Errorf("ppid not included in flags and could not be looked up: %w", err)
+		}
+		if ppid <= 1 {
+			return fmt.Errorf("ppid not included in flags, found invalid ppid on lookup: %d", ppid)
+		}
+
+		*flPpid = ppid
+	}
+
 	var runGroup run.Group
 
 	// listen for signals
@@ -94,7 +110,7 @@ func runDesktop(args []string) error {
 
 	// monitor parent
 	runGroup.Add(func() error {
-		monitorParentProcess(logger)
+		monitorParentProcess(logger, *flPpid)
 		return nil
 	}, func(error) {})
 
@@ -160,22 +176,10 @@ func listenSignals(logger log.Logger) {
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger) {
+func monitorParentProcess(logger log.Logger, ppid int) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
-		ppid, err := parentProcessId()
-		if err != nil {
-			level.Error(logger).Log(
-				"msg", "could not look up parent process",
-				"err", err,
-			)
-		}
-
-		if ppid <= 1 {
-			break
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
 
@@ -193,22 +197,6 @@ func monitorParentProcess(logger log.Logger) {
 	}
 }
 
-func parentProcessId() (int, error) {
-	if runtime.GOOS != "darwin" {
-		return os.Getppid(), nil
-	}
-
-	// On macOS, we run desktop as `launchctl asuser <UID> sudo --preserve-env -u <username> launcher desktop`, which
-	// means the parent process of the current process is the sudo process. We need to monitor one level above that
-	// to be monitoring the launcher root process.
-	sudoProcess, err := ps.FindProcess(os.Getppid())
-	if err != nil {
-		return 0, fmt.Errorf("could not find sudo process for darwin: %w", err)
-	}
-
-	return sudoProcess.PPid(), nil
-}
-
 func defaultSocketPath() string {
 	const socketBaseName = "kolide_desktop.sock"
 
@@ -217,4 +205,26 @@ func defaultSocketPath() string {
 	}
 
 	return agent.TempPath(fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
+}
+
+// parentProcessId returns the parent process ID in the event that the desktop process does not pass in its PPID.
+func parentProcessId() (int, error) {
+	if runtime.GOOS != "darwin" {
+		return os.Getppid(), nil
+	}
+
+	// On macOS, we run desktop as `launchctl asuser <UID> sudo --preserve-env -u <username> launcher desktop`, which
+	// means the parent process of the current process is the sudo process. We need to monitor one level above that
+	// to be monitoring the launcher root process.
+	sudoProcess, err := process.NewProcess(int32(os.Getppid()))
+	if err != nil {
+		return 0, fmt.Errorf("could not find sudo process for darwin: %w", err)
+	}
+
+	parentProcess, err := sudoProcess.Parent()
+	if err != nil {
+		return 0, fmt.Errorf("could not find parent process for sudo launcher desktop: %w", err)
+	}
+
+	return int(parentProcess.Pid), nil
 }
