@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/mitchellh/go-ps"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/process"
@@ -163,7 +164,13 @@ func monitorParentProcess(logger log.Logger) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
-		ppid := os.Getppid()
+		ppid, err := parentProcessId()
+		if err != nil {
+			level.Error(logger).Log(
+				"msg", "could not look up parent process",
+				"err", err,
+			)
+		}
 
 		if ppid <= 1 {
 			break
@@ -184,6 +191,22 @@ func monitorParentProcess(logger log.Logger) {
 			break
 		}
 	}
+}
+
+func parentProcessId() (int, error) {
+	if runtime.GOOS != "darwin" {
+		return os.Getppid(), nil
+	}
+
+	// On macOS, we run desktop as `launchctl asuser <UID> sudo --preserve-env -u <username> launcher desktop`, which
+	// means the parent process of the current process is the sudo process. We need to monitor one level above that
+	// to be monitoring the launcher root process.
+	sudoProcess, err := ps.FindProcess(os.Getppid())
+	if err != nil {
+		return 0, fmt.Errorf("could not find sudo process for darwin: %w", err)
+	}
+
+	return sudoProcess.PPid(), nil
 }
 
 func defaultSocketPath() string {
