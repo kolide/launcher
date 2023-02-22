@@ -88,7 +88,7 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	if *flPpid == 0 {
+	if *flPpid <= 1 {
 		ppid, err := parentProcessId()
 		if err != nil {
 			return fmt.Errorf("ppid not included in flags and could not be looked up: %w", err)
