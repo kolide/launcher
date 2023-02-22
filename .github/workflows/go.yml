@@ -100,6 +100,18 @@ jobs:
           throw "launcher.exe --version failed"
         }
 
+    - name: Integration test (ubuntu only)
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      run: |
+        sudo apt-get -y install nodejs npm
+        sudo npm install -g n
+        sudo n lts
+        sudo npm install -g @mockoon/cli
+        mockoon-cli start ./docs/multipass/mockoon-control-server.json
+        cd ee/control && go test -v -run TestControlServerIntegration
+      env:
+        INTEGRATION_TEST: 1
+
     - name: Upload Build - Windows
       if: ${{ contains(matrix.os, 'windows') }}
       uses: actions/upload-artifact@v2

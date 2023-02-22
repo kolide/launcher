@@ -3,11 +3,17 @@ package control
 import (
 	"context"
 	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 type (
@@ -272,4 +278,65 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 		})
 	}
+}
+
+type testConsumer struct {
+	calls []io.Reader
+}
+
+func newTestConsumer() *testConsumer {
+	tc := testConsumer{
+		calls: make([]io.Reader, 0),
+	}
+	return &tc
+}
+
+func (t *testConsumer) Update(data io.Reader) error {
+	t.calls = append(t.calls, data)
+	return nil
+}
+
+func TestControlServerIntegration(t *testing.T) {
+	t.Parallel()
+
+	if os.Getenv("INTEGRATION_TEST") != "1" {
+		t.Skip("environment not set up for integration test")
+	}
+
+	// Setup
+	logger := log.NewNopLogger()
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := bbolt.Open(filepath.Join(dir, "db"), 0600, nil)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+
+	// Set up local keys
+	agent.SetupKeys(logger, db)
+
+	// Set up client
+	clientOpts := []HTTPClientOption{
+		WithInsecureSkipVerify(),
+		WithDisableTLS(),
+	}
+	client, err := NewControlHTTPClient(logger, "localhost:3000", http.DefaultClient, clientOpts...)
+	require.NoError(t, err, "could not create new control client")
+
+	// Set up control service
+	controlOpts := []Option{
+		WithRequestInterval(1 * time.Minute),
+	}
+	service := New(logger, ctx, client, controlOpts...)
+
+	// Register a fake desktop_notifier
+	testNotificationConsumer := newTestConsumer()
+	service.RegisterConsumer("desktop_notifier", testNotificationConsumer)
+
+	err = service.Fetch()
+	require.NoError(t, err, "unexpected error on fetch")
+
+	require.Equal(t, 1, len(testNotificationConsumer.calls))
 }
