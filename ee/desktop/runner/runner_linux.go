@@ -60,21 +60,25 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	// at the moment, so we ignore any errors
 	ctx := context.Background()
 	sessionOutput, _ := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
-	session := strings.Trim(string(sessionOutput), "\n")
-	if session != "" {
-		typeOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
-		sessionType := strings.Trim(string(typeOutput), "\n")
+	sessions := strings.Trim(string(sessionOutput), "\n")
+	if sessions != "" {
+		sessionList := strings.Split(sessions, " ")
+		for _, session := range sessionList {
+			typeOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+			sessionType := strings.Trim(string(typeOutput), "\n")
 
-		switch sessionType {
-		case "x11":
-			xDisplayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
-			xDisplay := strings.Trim(string(xDisplayOutput), "\n")
-			if xDisplay != "" {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", xDisplay))
+			switch sessionType {
+			case "x11":
+				xDisplayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+				xDisplay := strings.Trim(string(xDisplayOutput), "\n")
+				if xDisplay != "" {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", xDisplay))
+					break
+				}
+			case "wayland":
+			default:
+				// TODO
 			}
-		case "wayland":
-		default:
-			// TODO
 		}
 	}
 
