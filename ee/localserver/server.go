@@ -85,6 +85,7 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
+	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
