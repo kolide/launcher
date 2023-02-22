@@ -5,38 +5,6 @@
         {
             "label": "Kolide Agent Version: {{.LauncherVersion}}",
             "disabled": true
-        },
-        {
-            "isSeparator": true,
-            "nonProdOnly": true
-        },
-        {
-            "label": "Debug",
-            "nonProdOnly": true,
-            "items": [
-                {
-                    "label": "Launcher Version: {{.LauncherVersion}}",
-                    "disabled": true
-                },
-                {
-                    "label": "Launcher Revision: {{.LauncherRevision}}",
-                    "disabled": true
-                },
-                {
-                    "label": "Go Version: {{.GoVersion}}",
-                    "disabled": true
-                },
-                {
-                    "label": "Hostname: {{.ServerHostname}}",
-                    "disabled": true
-                },
-                {
-                    "label": "Refresh Menu",
-                    "action": {
-                        "type": "refresh-menu"
-                    }
-                }
-            ]
         }
     ]
 }
