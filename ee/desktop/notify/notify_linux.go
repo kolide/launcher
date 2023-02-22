@@ -42,7 +42,7 @@ func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *dbusNotifier
 		iconFilepath:        iconFilepath,
 		logger:              logger,
 		conn:                conn,
-		signal:              make(chan *dbus.Signal, 10),
+		signal:              make(chan *dbus.Signal),
 		interrupt:           make(chan struct{}),
 		sentNotificationIds: make(map[uint32]bool),
 		lock:                sync.RWMutex{},
