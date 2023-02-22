@@ -49,7 +49,17 @@ func (w *windowsNotifier) SendNotification(title, body, actionUri string) error 
 	}
 
 	if actionUri != "" {
+		// Set the default action when the user clicks on the notification
 		notification.ActivationArguments = actionUri
+
+		// Additionally, create a "Learn more" button that will open the same URL
+		notification.Actions = []toast.Action{
+			{
+				Type: "protocol",
+				Label: "Learn more",
+				Arguments: actionUri,
+			}
+		}
 	}
 
 	return notification.Push()

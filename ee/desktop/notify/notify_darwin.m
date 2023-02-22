@@ -22,17 +22,29 @@ void runNotificationListenerApp(void) {
     [NSAutoreleasePool new];
     [NSApplication sharedApplication];
 
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+
+    // Define our custom notification category with actions we will want to use on notifications later
+    UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
+        title:@"Learn more" options:UNNotificationActionOptionNone];
+
+    UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
+        actions:@[learnMoreAction] intentIdentifiers:@[]
+        options:UNNotificationCategoryOptionNone];
+    NSSet *categories = [NSSet setWithObject:category];
+    [center setNotificationCategories:categories];
+
     if ([UNUserNotificationCenter class]) {
         NotificationDelegate *notificationDelegate = [NotificationDelegate new];
         [notificationDelegate autorelease];
-        [[UNUserNotificationCenter currentNotificationCenter] setDelegate:notificationDelegate];
+        [center setDelegate:notificationDelegate];
     }
 
     [NSApp run];
 }
 
 void stopNotificationListenerApp(void) {
-	[NSApp terminate:nil];
+    [NSApp terminate:nil];
 }
 
 BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body, NSString *actionUri) {
@@ -40,6 +52,7 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     [content autorelease];
     content.title = title;
     content.body = body;
+    content.categoryIdentifier = @"KolideNotificationCategory";
     content.userInfo = @{@"action_uri": actionUri};
 
     NSString *uuid = [[NSUUID UUID] UUIDString];
