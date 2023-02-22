@@ -19,28 +19,29 @@
 @end
 
 void runNotificationListenerApp(void) {
-    [NSAutoreleasePool new];
-    [NSApplication sharedApplication];
+    @autoreleasepool {
+        [NSApplication sharedApplication];
 
-    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
-    // Define our custom notification category with actions we will want to use on notifications later
-    UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
-        title:@"Learn more" options:UNNotificationActionOptionNone];
+        // Define our custom notification category with actions we will want to use on notifications later
+        UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
+            title:@"Learn more" options:UNNotificationActionOptionNone];
 
-    UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
-        actions:@[learnMoreAction] intentIdentifiers:@[]
-        options:UNNotificationCategoryOptionNone];
-    NSSet *categories = [NSSet setWithObject:category];
-    [center setNotificationCategories:categories];
+        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
+            actions:@[learnMoreAction] intentIdentifiers:@[]
+            options:UNNotificationCategoryOptionNone];
+        NSSet *categories = [NSSet setWithObject:category];
+        [center setNotificationCategories:categories];
 
-    if ([UNUserNotificationCenter class]) {
-        NotificationDelegate *notificationDelegate = [NotificationDelegate new];
-        [notificationDelegate autorelease];
-        [center setDelegate:notificationDelegate];
+        if ([UNUserNotificationCenter class]) {
+            NotificationDelegate *notificationDelegate = [NotificationDelegate new];
+            [notificationDelegate autorelease];
+            [center setDelegate:notificationDelegate];
+        }
+
+        [NSApp run];
     }
-
-    [NSApp run];
 }
 
 void stopNotificationListenerApp(void) {
