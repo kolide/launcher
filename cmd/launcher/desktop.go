@@ -89,19 +89,7 @@ func runDesktop(args []string) error {
 	}
 
 	if *flPpid <= 1 {
-		level.Warn(logger).Log(
-			"msg", "expected PPID command-line flag for launcher desktop but did not receive it",
-			"fl_ppid", *flPpid,
-		)
-		ppid, err := parentProcessId()
-		if err != nil {
-			return fmt.Errorf("valid ppid not included in flags and could not be looked up: %w", err)
-		}
-		if ppid <= 1 {
-			return fmt.Errorf("valid ppid not included in flags, found invalid ppid on lookup: %d", ppid)
-		}
-
-		*flPpid = ppid
+		return fmt.Errorf("received invalid PPID command-line flag for launcher desktop: %d", *flPpid)
 	}
 
 	var runGroup run.Group
@@ -209,26 +197,4 @@ func defaultSocketPath() string {
 	}
 
 	return agent.TempPath(fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
-}
-
-// parentProcessId returns the parent process ID in the event that the desktop process does not pass in its PPID.
-func parentProcessId() (int, error) {
-	if runtime.GOOS != "darwin" {
-		return os.Getppid(), nil
-	}
-
-	// On macOS, we run desktop as `launchctl asuser <UID> sudo --preserve-env -u <username> launcher desktop`, which
-	// means the parent process of the current process is the sudo process. We need to monitor one level above that
-	// to be monitoring the launcher root process.
-	sudoProcess, err := process.NewProcess(int32(os.Getppid()))
-	if err != nil {
-		return 0, fmt.Errorf("could not find sudo process for darwin: %w", err)
-	}
-
-	parentProcess, err := sudoProcess.Parent()
-	if err != nil {
-		return 0, fmt.Errorf("could not find parent process for sudo launcher desktop: %w", err)
-	}
-
-	return int(parentProcess.Pid), nil
 }
