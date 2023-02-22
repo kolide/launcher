@@ -85,8 +85,6 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
-	ecAuthedMux.HandleFunc("/", http.NotFound)
-	ecAuthedMux.HandleFunc("/ping", pongHandler)
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
@@ -271,13 +269,6 @@ func (ls *localServer) startListener() (net.Listener, error) {
 	}
 
 	return nil, errors.New("unable to bind to a local port")
-}
-
-func pongHandler(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
-
-	data := []byte(`{"ping": "Kolide"}` + "\n")
-	res.Write(data)
 }
 
 func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
