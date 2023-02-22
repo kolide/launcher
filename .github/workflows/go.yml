@@ -107,7 +107,7 @@ jobs:
         sudo npm install -g n
         sudo n lts
         sudo npm install -g @mockoon/cli
-        mockoon-cli start ./docs/multipass/mockoon-control-server.json
+        mockoon-cli start --data ./docs/multipass/mockoon-control-server.json
         cd ee/control && go test -v -run TestControlServerIntegration
       env:
         INTEGRATION_TEST: 1
