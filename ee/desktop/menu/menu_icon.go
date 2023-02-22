@@ -1,6 +1,8 @@
 package menu
 
 import (
+	"runtime"
+
 	"github.com/kolide/launcher/ee/ui/assets"
 )
 
@@ -48,10 +50,18 @@ func getIcon(icon menuIcon) []byte {
 	}
 }
 
-// chooseIcon chooses the correct icon data, based on the current OS theme
+// chooseIcon chooses the appropriate icon data for the OS
 func chooseIcon(darkIco, darkPng, lightIco, lightPng, monochromeIco, monochromePng []byte) []byte {
-	if isDarkMode() {
-		return darkPng
+	if runtime.GOOS == "windows" {
+		return darkOrLight(darkIco, lightIco)
 	}
-	return lightPng
+	return darkOrLight(darkPng, lightPng)
+}
+
+// darkOrLight returns the dark icon data if the OS theme is dark, otherwise defaults to light
+func darkOrLight(dark, light []byte) []byte {
+	if isDarkMode() {
+		return dark
+	}
+	return light
 }
