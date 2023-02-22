@@ -55,10 +55,10 @@ func (w *windowsNotifier) SendNotification(title, body, actionUri string) error 
 		// Additionally, create a "Learn more" button that will open the same URL
 		notification.Actions = []toast.Action{
 			{
-				Type: "protocol",
-				Label: "Learn more",
+				Type:      "protocol",
+				Label:     "Learn more",
 				Arguments: actionUri,
-			}
+			},
 		}
 	}
 
