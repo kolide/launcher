@@ -249,6 +249,10 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(title, body, actionUri string) error {
+	if len(r.uidProcs) == 0 {
+		return errors.New("cannot send notification, no child desktop processes")
+	}
+
 	errs := make([]error, 0)
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)

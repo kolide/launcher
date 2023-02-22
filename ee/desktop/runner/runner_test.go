@@ -283,3 +283,14 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestSendNotification_NoProcessesYet(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	r := New(WithUsersFilesRoot(dir))
+
+	require.Equal(t, 0, len(r.uidProcs))
+	err := r.SendNotification("test title", "test body", "https://example.com")
+	require.Error(t, err, "should not be able to send notification when there are no child processes")
+}
