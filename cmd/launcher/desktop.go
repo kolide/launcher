@@ -89,12 +89,16 @@ func runDesktop(args []string) error {
 	}
 
 	if *flPpid <= 1 {
+		level.Warn(logger).Log(
+			"msg", "expected PPID command-line flag for launcher desktop but did not receive it",
+			"fl_ppid", *flPpid,
+		)
 		ppid, err := parentProcessId()
 		if err != nil {
-			return fmt.Errorf("ppid not included in flags and could not be looked up: %w", err)
+			return fmt.Errorf("valid ppid not included in flags and could not be looked up: %w", err)
 		}
 		if ppid <= 1 {
-			return fmt.Errorf("ppid not included in flags, found invalid ppid on lookup: %d", ppid)
+			return fmt.Errorf("valid ppid not included in flags, found invalid ppid on lookup: %d", ppid)
 		}
 
 		*flPpid = ppid
