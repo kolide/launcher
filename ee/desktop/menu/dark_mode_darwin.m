@@ -2,7 +2,6 @@
 // +build darwin
 
 extern void themeChanged();
-extern void keyFound(char*);
 
 #import <Foundation/Foundation.h>
 
