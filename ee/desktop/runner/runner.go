@@ -634,6 +634,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
+		fmt.Sprintf("PPID=%d", os.Getpid()),
 	}
 
 	stdErr, err := cmd.StderrPipe()
