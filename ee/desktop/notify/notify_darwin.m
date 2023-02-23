@@ -26,7 +26,7 @@ void runNotificationListenerApp(void) {
 
         // Define our custom notification category with actions we will want to use on notifications later
         UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
-            title:@"Learn more" options:UNNotificationActionOptionNone];
+            title:@"Learn More" options:UNNotificationActionOptionNone];
 
         UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
             actions:@[learnMoreAction] intentIdentifiers:@[]

@@ -135,7 +135,7 @@ func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) er
 
 	actions := []string{}
 	if actionUri != "" {
-		actions = append(actions, actionUri, "Learn more")
+		actions = append(actions, actionUri, "Learn More")
 	}
 
 	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
@@ -179,7 +179,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(title, body, actionUri stri
 	// notify-send doesn't support actions, but URLs in notifications are clickable in at least
 	// some desktop environments.
 	if actionUri != "" {
-		body += " Learn more: " + actionUri
+		body += " Learn More: " + actionUri
 	}
 
 	args := []string{title, body}

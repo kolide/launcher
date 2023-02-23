@@ -56,7 +56,7 @@ func (w *windowsNotifier) SendNotification(title, body, actionUri string) error 
 		notification.Actions = []toast.Action{
 			{
 				Type:      "protocol",
-				Label:     "Learn more",
+				Label:     "Learn More",
 				Arguments: actionUri,
 			},
 		}
