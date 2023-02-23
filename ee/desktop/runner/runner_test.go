@@ -161,8 +161,8 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 						continue
 					}
 					// intentionally ignoring the error here
-					// CI will intermittently fail with "wait: no child processes" likely due to some kind of race between the tests and the code
-					// runner.go also calls process.Wait() possibly racing with this code to remove the child process
+					// CI will intermittently fail with "wait: no child processes" due runner.go also calling process.Wait()
+					// racing with this code to remove the child process
 					p.process.Wait()
 				}
 			})
