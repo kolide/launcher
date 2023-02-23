@@ -55,6 +55,11 @@ func runDesktop(args []string) error {
 			"",
 			"path to icon file",
 		)
+		flPpid = flagset.Int(
+			"ppid",
+			0,
+			"parent process ID to monitor",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
@@ -83,6 +88,10 @@ func runDesktop(args []string) error {
 		)
 	}
 
+	if *flPpid <= 1 {
+		return fmt.Errorf("received invalid PPID command-line flag for launcher desktop: %d", *flPpid)
+	}
+
 	var runGroup run.Group
 
 	// listen for signals
@@ -93,7 +102,7 @@ func runDesktop(args []string) error {
 
 	// monitor parent
 	runGroup.Add(func() error {
-		monitorParentProcess(logger)
+		monitorParentProcess(logger, *flPpid)
 		return nil
 	}, func(error) {})
 
@@ -103,10 +112,12 @@ func runDesktop(args []string) error {
 		return err
 	}
 
-	menu := menu.New(logger, *flhostname, *flmenupath)
-	server.RegisterRefreshListener(func() {
-		menu.Build()
-	})
+	m := menu.New(logger, *flhostname, *flmenupath)
+	refreshMenu := func() {
+		m.Build()
+	}
+	server.RegisterRefreshListener(refreshMenu)
+	menu.RegisterThemeChangeListener(refreshMenu)
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
@@ -125,7 +136,7 @@ func runDesktop(args []string) error {
 		<-shutdownChan
 		return nil
 	}, func(err error) {
-		menu.Shutdown()
+		m.Shutdown()
 	})
 
 	// run run group
@@ -140,7 +151,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init()
+	m.Init()
 
 	return nil
 }
@@ -159,16 +170,10 @@ func listenSignals(logger log.Logger) {
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger) {
+func monitorParentProcess(logger log.Logger, ppid int) {
 	ticker := time.NewTicker(2 * time.Second)
 
 	for ; true; <-ticker.C {
-		ppid := os.Getppid()
-
-		if ppid <= 1 {
-			break
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
 
