@@ -6,10 +6,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -138,7 +140,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NoError(t, err)
 
 					// give our middleware with the test handler to the determiner
-					h := NewKryptoDeterminerMiddleware(log.NewLogfmtLogger(&logBytes), nil, kryptoEcMiddleware.Wrap(testHandler))
+					h := kryptoEcMiddleware.Wrap(testHandler)
 
 					rr := httptest.NewRecorder()
 					h.ServeHTTP(rr, req)
@@ -194,4 +196,39 @@ func randomStringWithSqlCharacters(t *testing.T, n int) string {
 		sb.WriteByte(randomStringCharsetForSqlEncoding[int(char.Int64())])
 	}
 	return sb.String()
+}
+
+func makeGetRequest(t *testing.T, boxParameter string) *http.Request {
+	v := url.Values{}
+
+	if boxParameter != "" {
+		v.Set("box", boxParameter)
+	}
+
+	urlString := "https://127.0.0.1:8080?" + v.Encode()
+
+	req, err := http.NewRequest(http.MethodGet, urlString, nil)
+	require.NoError(t, err)
+
+	return req
+}
+
+func makePostRequest(t *testing.T, boxValue string) *http.Request {
+	urlString := "https://127.0.0.1:8080"
+
+	body, err := json.Marshal(map[string]string{
+		"box": boxValue,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body))
+	require.NoError(t, err)
+
+	return req
+}
+
+func mustMarshal(t *testing.T, v interface{}) []byte {
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return b
 }

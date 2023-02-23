@@ -83,37 +83,17 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	}
 	ls.myKey = privateKey
 
-	// Setup the krypto boxer middleware. This will be used for the v1 protocol
-	kbm, err := NewKryptoBoxerMiddleware(ls.logger, ls.myKey, ls.serverKey)
-	if err != nil {
-		return nil, fmt.Errorf("creating krypto boxer middlware: %w", err)
-	}
-
-	rsaAuthedMux := http.NewServeMux()
-	rsaAuthedMux.HandleFunc("/", http.NotFound)
-	rsaAuthedMux.HandleFunc("/ping", pongHandler)
-	rsaAuthedMux.Handle("/id", kbm.Wrap(ls.requestIdHandler()))
-	rsaAuthedMux.Handle("/id.png", kbm.WrapPng(ls.requestIdHandler()))
-
-	// Setup the v2 protocol wraps
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
-
 	ecAuthedMux := http.NewServeMux()
+	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
 	ecAuthedMux.Handle("/query.png", ls.requestQueryHandler())
 
-	// While we're transitioning, we want to support both v1 and v2 protocols
-	kryptoDeterminerMiddleware := NewKryptoDeterminerMiddleware(
-		ls.logger,
-		kbm.UnwrapV1Hander(rsaAuthedMux),
-		ecKryptoMiddleware.Wrap(ecAuthedMux),
-	)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", kryptoDeterminerMiddleware)
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -290,13 +270,6 @@ func (ls *localServer) startListener() (net.Listener, error) {
 	}
 
 	return nil, errors.New("unable to bind to a local port")
-}
-
-func pongHandler(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Content-Type", "application/json")
-
-	data := []byte(`{"ping": "Kolide"}` + "\n")
-	res.Write(data)
 }
 
 func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
