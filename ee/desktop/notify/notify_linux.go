@@ -6,7 +6,6 @@ package notify
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os/exec"
 	"sync"
 	"time"
@@ -80,15 +79,8 @@ func (d *dbusNotifier) Listen() error {
 			}
 			d.lock.RUnlock()
 
-			// Confirm that the URI is legitimate
-			actionUri := signal.Body[1].(string)
-			_, err := url.Parse(actionUri)
-			if err != nil {
-				level.Error(d.logger).Log("msg", "received invalid action URI from dbus", "action_uri", actionUri, "parse_err", err)
-				continue
-			}
-
 			// Attempt to open a browser to the given URL
+			actionUri := signal.Body[1].(string)
 			providers := []string{"xdg-open", "x-www-browser"}
 			for _, provider := range providers {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
