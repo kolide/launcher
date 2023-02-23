@@ -157,10 +157,13 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
-					if processExists(p) {
-						state, err := p.process.Wait()
-						require.NoError(t, err, fmt.Sprintf("failed to wait for process: %v", state))
+					if !processExists(p) {
+						continue
 					}
+					// intentionally ignoring the error here
+					// CI will intermittently fail with "wait: no child processes" likely due to some kind of race between the tests and the code
+					// runner.go also calls process.Wait() possibly racing with this code to remove the child process
+					p.process.Wait()
 				}
 			})
 		})
