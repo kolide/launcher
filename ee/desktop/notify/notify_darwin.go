@@ -27,9 +27,9 @@ type macNotifier struct {
 	interrupt chan struct{}
 }
 
-func newOsSpecificNotifier(logger log.Logger, _ string) *macNotifier {
+func NewDesktopNotifier(logger log.Logger, _ string) *macNotifier {
 	return &macNotifier{
-		logger:    logger,
+		logger:    log.With(logger, "component", "desktop_notifier"),
 		interrupt: make(chan struct{}),
 	}
 }

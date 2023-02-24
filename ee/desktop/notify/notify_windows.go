@@ -14,10 +14,10 @@ type windowsNotifier struct {
 	interrupt    chan struct{}
 }
 
-func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(logger log.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
 		iconFilepath: iconFilepath,
-		logger:       logger,
+		logger:       log.With(logger, "component", "desktop_notifier"),
 		interrupt:    make(chan struct{}),
 	}
 }

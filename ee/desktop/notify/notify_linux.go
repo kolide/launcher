@@ -31,7 +31,7 @@ const (
 	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
 )
 
-func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
+func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		level.Warn(logger).Log("msg", "couldn't connect to dbus to start notifier listener, proceeding without it", "err", err)
@@ -39,7 +39,7 @@ func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *dbusNotifier
 
 	return &dbusNotifier{
 		iconFilepath:        iconFilepath,
-		logger:              logger,
+		logger:              log.With(logger, "component", "desktop_notifier"),
 		conn:                conn,
 		signal:              make(chan *dbus.Signal),
 		interrupt:           make(chan struct{}),

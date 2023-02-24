@@ -20,6 +20,10 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
+type notificationSender interface {
+	SendNotification(notify.Notification) error
+}
+
 type DesktopServer struct {
 	logger           log.Logger
 	server           *http.Server
@@ -27,11 +31,11 @@ type DesktopServer struct {
 	shutdownChan     chan<- struct{}
 	authToken        string
 	socketPath       string
-	notifier         notify.DesktopNotifier
+	notifier         notificationSender
 	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notify.DesktopNotifier) (*DesktopServer, error) {
+func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*DesktopServer, error) {
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
