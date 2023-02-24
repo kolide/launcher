@@ -76,3 +76,14 @@ Try the troubleshooting given in that section and/or recreate the VM.
 ### I want an image besides Ubuntu
 
 It looks like this may be supported in the future by Multipass -- see [this issue](https://github.com/canonical/multipass/issues/1260).
+
+## Other options besides RDP
+
+### VNC with TigerVNC
+
+Follow the instructions [here](https://bytexd.com/how-to-install-configure-vnc-server-on-ubuntu/)
+to install and configure TigerVNC in your Multipass VM. Note that you'll also want to copy your
+SSH key to the authorized keyfile in the Multipass VM for the SSH forwarding step.
+
+You can access the VM from your Mac by opening Finder, selecting "Go" from the top menu bar, selecting
+"Connect to Server" from the dropdown, and entering `vnc://localhost:59000`.

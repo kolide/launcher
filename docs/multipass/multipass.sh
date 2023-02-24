@@ -37,7 +37,7 @@ fi
 # Warn that MATE is a little less functional right now
 if [ "$desktopenv" = "mate" ]
 then
-    echo "MATE currently ends up with 'Oh no, something has gone wrong' error"
+    echo "MATE currently ends up with 'Oh no, something has gone wrong' error -- proceed at your own risk"
 fi
 
 # Check deps: make sure multipass is installed
