@@ -278,7 +278,6 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 		// https://stackoverflow.com/questions/12830095/setting-http-headers
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			fmt.Println("origin:, origin")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers",
