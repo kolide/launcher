@@ -25,12 +25,8 @@ func newOsSpecificNotifier(logger log.Logger, iconFilepath string) *windowsNotif
 // Listen doesn't do anything on Windows -- the `launch` variable in the notification XML
 // automatically handles opening URLs for us.
 func (w *windowsNotifier) Listen() error {
-	for {
-		select {
-		case <-w.interrupt:
-			return nil
-		}
-	}
+	<-w.interrupt
+	return nil
 }
 
 func (w *windowsNotifier) Interrupt(err error) {
