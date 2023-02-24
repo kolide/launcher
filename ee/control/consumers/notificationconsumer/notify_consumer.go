@@ -131,7 +131,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 	}
 
 	if err := nc.runner.SendNotification(notificationToSend.Title, notificationToSend.Body, notificationToSend.ActionUri); err != nil {
-		level.Error(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
+		level.Debug(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notifica
 	if notificationToCheck.ActionUri != "" {
 		_, err := url.Parse(notificationToCheck.ActionUri)
 		if err != nil {
-			level.Warn(nc.logger).Log(
+			level.Debug(nc.logger).Log(
 				"msg", "received invalid action_uri from K2",
 				"notification_id", notificationToCheck.ID,
 				"action_uri", notificationToCheck.ActionUri,
@@ -179,7 +179,7 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
 
 	return alreadySent
@@ -203,7 +203,7 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
+		level.Debug(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
 	}
 }
 
@@ -252,7 +252,7 @@ func (nc *NotificationConsumer) cleanup() {
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
 	}
 
 	// Delete all old keys
@@ -260,12 +260,12 @@ func (nc *NotificationConsumer) cleanup() {
 		for _, k := range keysToDelete {
 			if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Delete(k); err != nil {
 				// Log, but don't error, since we might be able to delete some others
-				level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
+				level.Debug(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
 			}
 		}
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
 	}
 }
