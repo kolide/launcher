@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func runAsUser(uid string, cmd *exec.Cmd) error {
@@ -56,9 +57,22 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 		},
 	}
 
-	// Get the user's session so we can get their display -- this is needed only for handling notifications
-	// at the moment, so we ignore any errors
-	ctx := context.Background()
+	// Set any necessary environment variables on the command (like DISPLAY)
+	envVars := userEnvVars(uid)
+	for k, v := range envVars {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return cmd.Start()
+}
+
+func userEnvVars(uid string) map[string]string {
+	envVars := make(map[string]string)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get the user's session so we can get their display.
 	sessionOutput, _ := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
 	sessions := strings.Trim(string(sessionOutput), "\n")
 	if sessions != "" {
@@ -69,18 +83,21 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 
 			switch sessionType {
 			case "x11":
+				// We need to set DISPLAY
 				xDisplayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
 				xDisplay := strings.Trim(string(xDisplayOutput), "\n")
 				if xDisplay != "" {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("DISPLAY=%s", xDisplay))
+					envVars["DISPLAY"] = xDisplay
 					break
 				}
 			case "wayland":
+				// TODO: tentatively, I think we need to set WAYLAND_DISPLAY and XDG_RUNTIME_DIR
 			default:
-				// TODO
+				// Not a graphical session -- continue
+				continue
 			}
 		}
 	}
 
-	return cmd.Start()
+	return envVars
 }
