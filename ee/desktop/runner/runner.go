@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -257,7 +258,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	}
 }
 
-func (r *DesktopUsersProcessesRunner) SendNotification(title, body, actionUri string) error {
+func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -265,7 +266,7 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body, actionUri st
 	errs := make([]error, 0)
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Notify(title, body, actionUri); err != nil {
+		if err := client.Notify(n); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending notify command to desktop process",
 				"uid", uid,

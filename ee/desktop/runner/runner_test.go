@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -292,6 +293,6 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	r := New(WithUsersFilesRoot(dir))
 
 	require.Equal(t, 0, len(r.uidProcs))
-	err := r.SendNotification("test title", "test body", "https://example.com")
+	err := r.SendNotification(notify.Notification{Title: "test", Body: "test"})
 	require.Error(t, err, "should not be able to send notification when there are no child processes")
 }
