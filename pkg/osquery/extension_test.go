@@ -559,7 +559,8 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
 	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
 
-	testutil.FatalAfterFunc(t, 2*time.Second, func() {
+	// long timeout is due to github actions runners IO slowness
+	testutil.FatalAfterFunc(t, 4*time.Second, func() {
 		err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	})
 	assert.Nil(t, err)
