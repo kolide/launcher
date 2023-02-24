@@ -109,16 +109,16 @@ func (d *dbusNotifier) Interrupt(err error) {
 	)
 }
 
-func (d *dbusNotifier) SendNotification(title, body, actionUri string) error {
-	if err := d.sendNotificationViaDbus(title, body, actionUri); err == nil {
+func (d *dbusNotifier) SendNotification(n Notification) error {
+	if err := d.sendNotificationViaDbus(n); err == nil {
 		return nil
 	}
 
-	return d.sendNotificationViaNotifySend(title, body, actionUri)
+	return d.sendNotificationViaNotifySend(n)
 }
 
 // See: https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html
-func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) error {
+func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "could not connect to dbus, will try alternate method of notification", "err", err)
@@ -126,8 +126,8 @@ func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) er
 	}
 
 	actions := []string{}
-	if actionUri != "" {
-		actions = append(actions, actionUri, "Learn More")
+	if n.ActionUri != "" {
+		actions = append(actions, n.ActionUri, "Learn More")
 	}
 
 	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
@@ -136,8 +136,8 @@ func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) er
 		"Kolide",                  // app_name
 		uint32(0),                 // replaces_id -- 0 means this notification won't replace any existing notifications
 		d.iconFilepath,            // app_icon
-		title,                     // summary
-		body,                      // body
+		n.Title,                   // summary
+		n.Body,                    // body
 		actions,                   // actions
 		map[string]dbus.Variant{}, // hints
 		int32(0))                  // expire_timeout -- 0 means the notification will not expire
@@ -161,7 +161,7 @@ func (d *dbusNotifier) sendNotificationViaDbus(title, body, actionUri string) er
 	return nil
 }
 
-func (d *dbusNotifier) sendNotificationViaNotifySend(title, body, actionUri string) error {
+func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 	notifySend, err := exec.LookPath("notify-send")
 	if err != nil {
 		level.Debug(d.logger).Log("msg", "notify-send not installed", "err", err)
@@ -170,11 +170,11 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(title, body, actionUri stri
 
 	// notify-send doesn't support actions, but URLs in notifications are clickable in at least
 	// some desktop environments.
-	if actionUri != "" {
-		body += " Learn More: " + actionUri
+	if n.ActionUri != "" {
+		n.Body += " Learn More: " + n.ActionUri
 	}
 
-	args := []string{title, body}
+	args := []string{n.Title, n.Body}
 	if d.iconFilepath != "" {
 		args = append(args, "-i", d.iconFilepath)
 	}

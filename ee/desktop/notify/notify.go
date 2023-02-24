@@ -7,7 +7,7 @@ import (
 type DesktopNotifier interface {
 	Listen() error
 	Interrupt(err error)
-	SendNotification(title, body, actionUri string) error
+	SendNotification(n Notification) error
 }
 
 type Notification struct {

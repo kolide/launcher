@@ -122,7 +122,7 @@ func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	if err := s.notifier.SendNotification(notificationToSend.Title, notificationToSend.Body, notificationToSend.ActionUri); err != nil {
+	if err := s.notifier.SendNotification(notificationToSend); err != nil {
 		level.Error(s.logger).Log("msg", "could not send notification", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return

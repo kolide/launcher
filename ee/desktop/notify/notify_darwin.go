@@ -54,23 +54,23 @@ func (m *macNotifier) Interrupt(err error) {
 	m.interrupt <- struct{}{}
 }
 
-func (m *macNotifier) SendNotification(title, body, actionUri string) error {
+func (m *macNotifier) SendNotification(n Notification) error {
 	// Check if we're running inside a bundle -- if we aren't, we should not attempt to send
 	// a notification because it will cause a panic.
 	if !isBundle() {
 		return errors.New("cannot send notification because this application is not bundled")
 	}
 
-	titleCStr := C.CString(title)
+	titleCStr := C.CString(n.Title)
 	defer C.free(unsafe.Pointer(titleCStr))
-	bodyCStr := C.CString(body)
+	bodyCStr := C.CString(n.Body)
 	defer C.free(unsafe.Pointer(bodyCStr))
-	actionUriCStr := C.CString(actionUri)
+	actionUriCStr := C.CString(n.ActionUri)
 	defer C.free(unsafe.Pointer(actionUriCStr))
 
 	success := C.sendNotification(titleCStr, bodyCStr, actionUriCStr)
 	if !success {
-		return fmt.Errorf("could not send notification: %s", title)
+		return fmt.Errorf("could not send notification: %s", n.Title)
 	}
 
 	return nil

@@ -33,27 +33,27 @@ func (w *windowsNotifier) Interrupt(err error) {
 	w.interrupt <- struct{}{}
 }
 
-func (w *windowsNotifier) SendNotification(title, body, actionUri string) error {
+func (w *windowsNotifier) SendNotification(n Notification) error {
 	notification := toast.Notification{
 		AppID:   "Kolide",
-		Title:   title,
-		Message: body,
+		Title:   n.Title,
+		Message: n.Body,
 	}
 
 	if w.iconFilepath != "" {
 		notification.Icon = w.iconFilepath
 	}
 
-	if actionUri != "" {
+	if n.ActionUri != "" {
 		// Set the default action when the user clicks on the notification
-		notification.ActivationArguments = actionUri
+		notification.ActivationArguments = n.ActionUri
 
 		// Additionally, create a "Learn more" button that will open the same URL
 		notification.Actions = []toast.Action{
 			{
 				Type:      "protocol",
 				Label:     "Learn More",
-				Arguments: actionUri,
+				Arguments: n.ActionUri,
 			},
 		}
 	}
