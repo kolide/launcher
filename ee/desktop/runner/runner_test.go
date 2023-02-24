@@ -246,7 +246,6 @@ func TestUpdate(t *testing.T) {
 		{
 			name:  "empty",
 			input: strings.NewReader(""),
-			err:   true,
 		},
 		{
 			name:  "nil",
@@ -256,7 +255,6 @@ func TestUpdate(t *testing.T) {
 		{
 			name:  "bad json",
 			input: strings.NewReader("hello"),
-			err:   true,
 		},
 	}
 

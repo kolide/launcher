@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -161,7 +160,17 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	}
 
 	runner.writeIconFile()
-	runner.writeDefaultMenuFile()
+	runner.writeDefaultMenuTemplateFile()
+
+	// We re-generate the menu file each time launcher starts up, so it's always up-to-date
+	if err := runner.generateMenuFile(); err != nil {
+		if agent.Flags.DebugServerData() {
+			level.Error(runner.logger).Log(
+				"msg", "failed to generate menu file",
+				"error", err,
+			)
+		}
+	}
 
 	return runner
 }
@@ -284,9 +293,18 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	var dataCopy bytes.Buffer
 	dataTee := io.TeeReader(data, &dataCopy)
 
+	// Replace the menu template file
+	dataBytes, err := io.ReadAll(dataTee)
+	if err != nil {
+		return fmt.Errorf("error reading control data: %w", err)
+	}
+	if err := r.writeSharedFile(r.menuTemplatePath(), dataBytes); err != nil {
+		level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
+	}
+
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.generateMenuFile(dataTee); err != nil {
+	if err := r.generateMenuFile(); err != nil {
 		if agent.Flags.DebugServerData() {
 			level.Error(r.logger).Log(
 				"msg", "failed to generate menu file",
@@ -330,12 +348,7 @@ func (r *DesktopUsersProcessesRunner) Ping() {
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
-func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) error {
-	menuBytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal json: %w", err)
-	}
-
+func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("creating file: %w", err)
@@ -346,7 +359,7 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) err
 	}
 
 	defer file.Close()
-	_, err = file.Write(menuBytes)
+	_, err = file.Write(data)
 	if err != nil {
 		return fmt.Errorf("writing file: %w", err)
 	}
@@ -355,7 +368,7 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data any) err
 }
 
 // generateMenuFile generates and writes menu data to a shared file
-func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
+func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	// First generate fresh template data to use for parsing
 	v := version.Version()
 	td := &menu.TemplateData{
@@ -365,14 +378,14 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
 		ServerHostname:   r.hostname,
 	}
 
-	menuDataBytes, err := io.ReadAll(data)
+	menuTemplateFileBytes, err := os.ReadFile(r.menuTemplatePath())
 	if err != nil {
-		return fmt.Errorf("failed to read menu data: %w", err)
+		return fmt.Errorf("failed to read menu template file: %w", err)
 	}
 
 	// Convert the raw JSON to a string and feed it to the parser for template expansion
 	parser := menu.NewTemplateParser(td)
-	parsedMenuDataStr, err := parser.Parse(string(menuDataBytes))
+	parsedMenuDataStr, err := parser.Parse(string(menuTemplateFileBytes))
 	if err != nil {
 		return fmt.Errorf("failed to parse menu data: %w", err)
 	}
@@ -380,31 +393,26 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile(data io.Reader) error {
 	// Convert the parsed string back to bytes, which can now be decoded per usual
 	parsedMenuDataBytes := []byte(parsedMenuDataStr)
 
-	var menu menu.MenuData
-	if err := json.NewDecoder(bytes.NewReader(parsedMenuDataBytes)).Decode(&menu); err != nil {
-		return fmt.Errorf("failed to decode menu data post processing: %w", err)
-	}
-
 	// Write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeSharedFile(r.menuPath(), menu); err != nil {
+	if err := r.writeSharedFile(r.menuPath(), parsedMenuDataBytes); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// writeDefaultMenuFile will create the menu file, if it does not already exist
-func (r *DesktopUsersProcessesRunner) writeDefaultMenuFile() {
-	menuPath := r.menuPath()
-	_, err := os.Stat(menuPath)
+// writeDefaultMenuTemplateFile will create the menu template file, if it does not already exist
+func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
+	menuTemplatePath := r.menuTemplatePath()
+	_, err := os.Stat(menuTemplatePath)
 
 	if os.IsNotExist(err) {
-		if err := r.generateMenuFile(bytes.NewReader(menu.InitialMenu)); err != nil {
-			level.Error(r.logger).Log("msg", "menu file did not exist, could not create it", "err", err)
+		if err := r.writeSharedFile(menuTemplatePath, menu.InitialMenu); err != nil {
+			level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
 		}
 	} else if err != nil {
-		level.Error(r.logger).Log("msg", "could not check if menu file exists", "err", err)
+		level.Error(r.logger).Log("msg", "could not check if menu template file exists", "err", err)
 	}
 }
 
@@ -615,6 +623,11 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 // menuPath returns the path to the menu file
 func (r *DesktopUsersProcessesRunner) menuPath() string {
 	return filepath.Join(r.usersFilesRoot, "menu.json")
+}
+
+// menuTemplatePath returns the path to the menu template file
+func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
+	return filepath.Join(r.usersFilesRoot, "menu_template.json")
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
