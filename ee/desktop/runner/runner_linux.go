@@ -12,9 +12,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/go-kit/kit/log/level"
 )
 
-func runAsUser(uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -58,7 +60,7 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	}
 
 	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := userEnvVars(uid)
+	envVars := r.userEnvVars(uid)
 	for k, v := range envVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -66,25 +68,51 @@ func runAsUser(uid string, cmd *exec.Cmd) error {
 	return cmd.Start()
 }
 
-func userEnvVars(uid string) map[string]string {
+func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string {
 	envVars := make(map[string]string)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Get the user's session so we can get their display.
-	sessionOutput, _ := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
+	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not get user session",
+			"uid", uid,
+			"err", err,
+		)
+		return envVars
+	}
+
 	sessions := strings.Trim(string(sessionOutput), "\n")
 	if sessions != "" {
 		sessionList := strings.Split(sessions, " ")
 		for _, session := range sessionList {
-			typeOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
-			sessionType := strings.Trim(string(typeOutput), "\n")
+			typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+			if err != nil {
+				level.Debug(r.logger).Log(
+					"msg", "could not get session type",
+					"uid", uid,
+					"err", err,
+				)
+				continue
+			}
 
+			sessionType := strings.Trim(string(typeOutput), "\n")
 			switch sessionType {
 			case "x11":
 				// We need to set DISPLAY
-				xDisplayOutput, _ := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+				xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+				if err != nil {
+					level.Debug(r.logger).Log(
+						"msg", "could not get Display from user session",
+						"uid", uid,
+						"err", err,
+					)
+					continue
+				}
+
 				xDisplay := strings.Trim(string(xDisplayOutput), "\n")
 				if xDisplay != "" {
 					envVars["DISPLAY"] = xDisplay

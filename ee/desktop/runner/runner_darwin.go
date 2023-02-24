@@ -10,7 +10,7 @@ import (
 )
 
 // For notifications to work, we must run in the user context with launchctl asuser.
-func runAsUser(uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
 	// Ensure that we handle a non-root current user appropriately
 	currentUser, err := user.Current()
 	if err != nil {
