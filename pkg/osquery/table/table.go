@@ -8,6 +8,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
 	"github.com/kolide/launcher/pkg/osquery/tables/kolide_server_data"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
+	"github.com/kolide/launcher/pkg/osquery/tables/syft"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
@@ -44,6 +45,7 @@ func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		cryptoinfotable.TablePlugin(logger),
 		dev_table_tooling.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
+		syft.TablePlugin(logger),
 		dataflattentable.TablePluginExec(client, logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
 		dataflattentable.TablePluginExec(client, logger,
