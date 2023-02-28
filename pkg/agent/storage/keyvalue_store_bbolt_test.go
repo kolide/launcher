@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -93,8 +92,8 @@ func Test_Updates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := createDb(t)
-			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
+			db := setupDB(t)
+			bc := NewBBoltKeyValueStore(log.NewNopLogger(), db, tt.name)
 
 			for _, update := range tt.updates {
 				updateBytes, err := json.Marshal(update)
@@ -144,8 +143,8 @@ func Test_GetSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := createDb(t)
-			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
+			db := setupDB(t)
+			bc := NewBBoltKeyValueStore(log.NewNopLogger(), db, tt.name)
 
 			for k, v := range tt.sets {
 				err := bc.Set([]byte(k), []byte(v))
@@ -159,19 +158,6 @@ func Test_GetSet(t *testing.T) {
 			}
 		})
 	}
-}
-
-func createDb(t *testing.T) *bbolt.DB {
-	dir := t.TempDir()
-
-	db, err := bbolt.Open(filepath.Join(dir, "db"), 0600, nil)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	return db
 }
 
 func getKeyValueRows(db *bbolt.DB, bucketName string) ([]map[string]string, error) {

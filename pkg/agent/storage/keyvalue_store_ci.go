@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	dbFileName = "test.db"
+	dbTestFileName = "test.db"
 )
 
 func NewCIKeyValueStore(t *testing.T, logger log.Logger, bucketName string) types.GetterSetterDeleterIterator {
@@ -27,7 +27,7 @@ func setupDB(t *testing.T) *bbolt.DB {
 	dbDir := t.TempDir()
 
 	// Create database; ensure we clean it up after the test
-	db, err := bbolt.Open(filepath.Join(dbDir, dbFileName), 0600, nil)
+	db, err := bbolt.Open(filepath.Join(dbDir, dbTestFileName), 0600, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

@@ -42,3 +42,5 @@ type GetterSetterDeleterIterator interface {
 	Deleter
 	Iterator
 }
+
+type KVStore = GetterSetterDeleterIterator // TODO
