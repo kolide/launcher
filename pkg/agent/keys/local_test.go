@@ -12,9 +12,9 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	logger := log.NewNopLogger()
-	getset := storage.NewCIKeyValueStore(t, log.NewNopLogger(), bucketName)
+	store := storage.NewCIKeyValueStore(t, log.NewNopLogger(), bucketName)
 
-	key, err := SetupLocalDbKey(logger, getset)
+	key, err := SetupLocalDbKey(logger, store)
 	require.NoError(t, err)
 	require.NotNil(t, key)
 
@@ -22,7 +22,7 @@ func TestSetupLocalDbKey(t *testing.T) {
 	require.NotNil(t, key.Public())
 
 	// If we call this _again_ do we get the same key back?
-	key2, err := SetupLocalDbKey(logger, getset)
+	key2, err := SetupLocalDbKey(logger, store)
 	require.NoError(t, err)
 	require.Equal(t, key.Public(), key2.Public())
 

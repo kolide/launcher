@@ -13,8 +13,8 @@ import (
 )
 
 // nolint: deadcode
-func setupHardwareKeys(logger log.Logger, getset types.GetterSetterDeleter) (keyInt, error) {
-	priData, pubData, err := fetchKeyData(getset)
+func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyInt, error) {
+	priData, pubData, err := fetchKeyData(store)
 	if err != nil {
 		return nil, err
 	}
@@ -25,12 +25,12 @@ func setupHardwareKeys(logger log.Logger, getset types.GetterSetterDeleter) (key
 		var err error
 		priData, pubData, err = tpm.CreateKey()
 		if err != nil {
-			clearKeyData(logger, getset)
+			clearKeyData(logger, store)
 			return nil, fmt.Errorf("creating key: %w", err)
 		}
 
-		if err := storeKeyData(getset, priData, pubData); err != nil {
-			clearKeyData(logger, getset)
+		if err := storeKeyData(store, priData, pubData); err != nil {
+			clearKeyData(logger, store)
 			return nil, fmt.Errorf("storing key: %w", err)
 		}
 	}

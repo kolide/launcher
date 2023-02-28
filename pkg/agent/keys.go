@@ -28,19 +28,19 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(logger log.Logger, getset types.GetterSetterDeleter) error {
+func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 	logger = log.With(logger, "component", "agentkeys")
 
 	var err error
 
 	// Always setup a local key
-	localDbKeys, err = keys.SetupLocalDbKey(logger, getset)
+	localDbKeys, err = keys.SetupLocalDbKey(logger, store)
 	if err != nil {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
 	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(logger, getset)
+		hwKeys, err := setupHardwareKeys(logger, store)
 		if err != nil {
 			return err
 		}

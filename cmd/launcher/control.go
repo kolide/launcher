@@ -30,7 +30,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, getset types.GetterSetter, opts *launcher.Options) (*control.ControlService, error) {
+func createControlService(ctx context.Context, logger log.Logger, store types.GetterSetter, opts *launcher.Options) (*control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
@@ -40,7 +40,7 @@ func createControlService(ctx context.Context, logger log.Logger, getset types.G
 
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
-		control.WithGetterSetter(getset),
+		control.WithStore(store),
 	}
 	service := control.New(logger, ctx, client, controlOpts...)
 

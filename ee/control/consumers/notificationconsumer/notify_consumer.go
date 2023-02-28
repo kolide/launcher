@@ -16,7 +16,7 @@ import (
 
 // Consumes notifications from control server, tracks when notifications are sent to end user
 type NotificationConsumer struct {
-	getset                      types.GetterSetterDeleterIterator
+	store                       types.KVStore
 	runner                      userProcessesRunner
 	logger                      log.Logger
 	notificationRetentionPeriod time.Duration
@@ -73,9 +73,9 @@ func WithCleanupInterval(cleanupInterval time.Duration) notificationConsumerOpti
 	}
 }
 
-func NewNotifyConsumer(getset types.GetterSetterDeleterIterator, runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
+func NewNotifyConsumer(store types.KVStore, runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	nc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      runner,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -139,7 +139,7 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notifica
 }
 
 func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck notification) bool {
-	sentNotificationRaw, err := nc.getset.Get([]byte(notificationToCheck.ID))
+	sentNotificationRaw, err := nc.store.Get([]byte(notificationToCheck.ID))
 	if err != nil {
 		level.Error(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
@@ -159,7 +159,7 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 		return
 	}
 
-	if err := nc.getset.Set([]byte(sentNotification.ID), rawNotification); err != nil {
+	if err := nc.store.Set([]byte(sentNotification.ID), rawNotification); err != nil {
 		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
 	}
 }
@@ -191,7 +191,7 @@ func (nc *NotificationConsumer) runCleanup(ctx context.Context) {
 func (nc *NotificationConsumer) cleanup() {
 	// Read through all keys in bucket to determine which ones are old enough to be deleted
 	keysToDelete := make([][]byte, 0)
-	if err := nc.getset.ForEach(func(k, v []byte) error {
+	if err := nc.store.ForEach(func(k, v []byte) error {
 		var sentNotification notification
 		if err := json.Unmarshal(v, &sentNotification); err != nil {
 			return fmt.Errorf("error processing %s: %w", string(k), err)
@@ -208,7 +208,7 @@ func (nc *NotificationConsumer) cleanup() {
 
 	// Delete all old keys
 	for _, k := range keysToDelete {
-		if err := nc.getset.Delete(k); err != nil {
+		if err := nc.store.Delete(k); err != nil {
 			// Log, but don't error, since we might be able to delete some others
 			level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
 		}

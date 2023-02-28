@@ -15,7 +15,7 @@ const (
 	dbTestFileName = "test.db"
 )
 
-func NewCIKeyValueStore(t *testing.T, logger log.Logger, bucketName string) types.GetterSetterDeleterIterator {
+func NewCIKeyValueStore(t *testing.T, logger log.Logger, bucketName string) types.KVStore {
 	if os.Getenv("CI") == "true" {
 		return NewInMemoryKeyValueStore(logger)
 	}

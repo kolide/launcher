@@ -183,13 +183,13 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	// TODO: This should reference "agent.configBucketName" but it may be possible to
 	// avoid exporting configBucketName. This should be corrected when this extension.go
 	// is converted to using the storage layer instead of bbolt directly.
-	getset := storage.NewBBoltKeyValueStore(opts.Logger, db, "config")
+	store := storage.NewBBoltKeyValueStore(opts.Logger, db, "config")
 
 	if err := SetupLauncherKeys(db); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, getset); err != nil {
+	if err := agent.SetupKeys(opts.Logger, store); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 

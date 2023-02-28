@@ -29,10 +29,10 @@ func (nm *notifierMock) SendNotification(title, body string) error {
 func TestUpdate_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	getset := setupStorage(t)
+	store := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -66,10 +66,10 @@ func TestUpdate_HappyPath(t *testing.T) {
 func TestUpdate_ValidatesNotifications(t *testing.T) {
 	t.Parallel()
 
-	getset := setupStorage(t)
+	store := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -120,10 +120,10 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 func TestUpdate_HandlesDuplicates(t *testing.T) {
 	t.Parallel()
 
-	getset := setupStorage(t)
+	store := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -163,10 +163,10 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.T) {
 	t.Parallel()
 
-	getset := setupStorage(t)
+	store := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -207,9 +207,9 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 func TestCleanup(t *testing.T) {
 	t.Parallel()
 
-	getset := setupStorage(t)
+	store := setupStorage(t)
 	testNc := &NotificationConsumer{
-		getset:                      getset,
+		store:                       store,
 		runner:                      newNotifierMock(),
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -232,11 +232,11 @@ func TestCleanup(t *testing.T) {
 	})
 
 	// Confirm we have both entries in the db.
-	oldNotificationRecord, err := getset.Get([]byte(notificationIdToDelete))
+	oldNotificationRecord, err := store.Get([]byte(notificationIdToDelete))
 	require.NotNil(t, oldNotificationRecord, "old notification was not seeded in db")
 	require.NoError(t, err)
 
-	newNotificationRecord, err := getset.Get([]byte(notificationIdToRetain))
+	newNotificationRecord, err := store.Get([]byte(notificationIdToRetain))
 	require.NotNil(t, newNotificationRecord, "new notification was not seeded in db")
 	require.NoError(t, err)
 
@@ -244,16 +244,16 @@ func TestCleanup(t *testing.T) {
 	testNc.cleanup()
 
 	// Confirm that the old notification record was deleted, and the new one was not.
-	oldNotificationRecord, err = getset.Get([]byte(notificationIdToDelete))
+	oldNotificationRecord, err = store.Get([]byte(notificationIdToDelete))
 	require.Nil(t, oldNotificationRecord, "old notification was not cleaned up but should have been")
 	require.NoError(t, err)
 
-	newNotificationRecord, err = getset.Get([]byte(notificationIdToRetain))
+	newNotificationRecord, err = store.Get([]byte(notificationIdToRetain))
 	require.NotNil(t, newNotificationRecord, "new notification was cleaned up but should not have been")
 	require.NoError(t, err)
 }
 
-func setupStorage(t *testing.T) types.GetterSetterDeleterIterator {
+func setupStorage(t *testing.T) types.KVStore {
 	return storage.NewCIKeyValueStore(t, log.NewNopLogger(), osquery.SentNotificationsBucket)
 }
 

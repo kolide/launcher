@@ -52,4 +52,5 @@ type GetterSetterDeleterIterator interface {
 	Iterator
 }
 
+// Convenient alias for a key value store that supports all methods
 type KVStore = GetterSetterDeleterIterator

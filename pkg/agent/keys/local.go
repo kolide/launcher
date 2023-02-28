@@ -27,8 +27,8 @@ func (k dbKey) Type() string {
 	return "local"
 }
 
-func SetupLocalDbKey(logger log.Logger, getset types.GetterSetter) (*dbKey, error) {
-	if key, err := fetchKey(getset); key != nil && err == nil {
+func SetupLocalDbKey(logger log.Logger, store types.GetterSetter) (*dbKey, error) {
+	if key, err := fetchKey(store); key != nil && err == nil {
 		level.Info(logger).Log("msg", "found local key in database")
 		return &dbKey{key}, nil
 	} else if err != nil {
@@ -44,7 +44,7 @@ func SetupLocalDbKey(logger log.Logger, getset types.GetterSetter) (*dbKey, erro
 	}
 
 	// Store the key in the database.
-	if err := storeKey(getset, key); err != nil {
+	if err := storeKey(store, key); err != nil {
 		return nil, fmt.Errorf("storing new key: %w", err)
 	}
 
