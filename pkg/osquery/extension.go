@@ -34,6 +34,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	configBucketName = "config"
+)
+
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
@@ -180,10 +184,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
-	// TODO: This should reference "agent.configBucketName" but it may be possible to
-	// avoid exporting configBucketName. This should be corrected when this extension.go
-	// is converted to using the storage layer instead of bbolt directly.
-	store := storage.NewBBoltKeyValueStore(opts.Logger, db, "config")
+	store := storage.NewBBoltKeyValueStore(opts.Logger, db, configBucketName)
 
 	if err := SetupLauncherKeys(db); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)

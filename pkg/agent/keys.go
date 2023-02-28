@@ -59,9 +59,8 @@ func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 // This duplicates some of pkg/osquery/extension.go but that feels like the wrong place.
 // Really, we should have a simpler interface over a storage layer.
 const (
-	configBucketName = "config"
-	privateEccData   = "privateEccData"
-	publicEccData    = "publicEccData"
+	privateEccData = "privateEccData"
+	publicEccData  = "publicEccData"
 )
 
 func fetchKeyData(getter types.Getter) ([]byte, []byte, error) {

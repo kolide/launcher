@@ -79,7 +79,7 @@ func (s *bboltKeyValueStore) Delete(key []byte) error {
 			return fmt.Errorf("%s bucket not found", s.bucketName)
 		}
 
-		err := b.Delete([]byte(key))
+		err := b.Delete(key)
 		if err != nil {
 			return err
 		}
