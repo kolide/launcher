@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/launcher"
 	"go.etcd.io/bbolt"
 )
@@ -38,7 +39,7 @@ func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, 
 		return nil, err
 	}
 
-	getset := control.NewBucketConsumer(logger, db, "control_service_data")
+	getset := storage.NewBBoltKeyValueStore(logger, db, "control_service_data")
 
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),

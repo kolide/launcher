@@ -11,6 +11,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
+)
+
+const (
+	bucketName = "control_service_data"
 )
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
@@ -20,7 +25,7 @@ type ControlService struct {
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
-	getset          agent.GetterSetter
+	getset          types.GetterSetter
 	lastFetched     map[string]string
 	consumers       map[string]consumer
 	subscribers     map[string][]subscriber
@@ -126,7 +131,7 @@ func (cs *ControlService) Fetch() error {
 	for subsystem, hash := range subsystems {
 		logger := log.With(cs.logger, "subsystem", subsystem)
 		lastHash, ok := cs.lastFetched[subsystem]
-		if !ok && cs.getset != nil {
+		if !ok {
 			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
 			// and we can just move on.
 			if storedHash, err := cs.getset.Get([]byte(subsystem)); err == nil {

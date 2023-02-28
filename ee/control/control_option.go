@@ -3,7 +3,7 @@ package control
 import (
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 type Option func(*ControlService)
@@ -16,7 +16,7 @@ func WithRequestInterval(interval time.Duration) Option {
 }
 
 // WithGetterSetter sets the key/value getset for control data
-func WithGetterSetter(getset agent.GetterSetter) Option {
+func WithGetterSetter(getset types.GetterSetter) Option {
 	return func(c *ControlService) {
 		c.getset = getset
 	}

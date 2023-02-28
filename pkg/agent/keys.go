@@ -8,8 +8,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent/keys"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
-	"go.etcd.io/bbolt"
 )
 
 type keyInt interface {
@@ -28,19 +28,19 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(logger log.Logger, db *bbolt.DB) error {
+func SetupKeys(logger log.Logger, getset types.GetterSetterDeleter) error {
 	logger = log.With(logger, "component", "agentkeys")
 
 	var err error
 
 	// Always setup a local key
-	localDbKeys, err = keys.SetupLocalDbKey(logger, db)
+	localDbKeys, err = keys.SetupLocalDbKey(logger, getset)
 	if err != nil {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
 	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(logger, db)
+		hwKeys, err := setupHardwareKeys(logger, getset)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ const (
 	publicEccData  = "publicEccData"
 )
 
-func fetchKeyData(getter Getter) ([]byte, []byte, error) {
+func fetchKeyData(getter types.Getter) ([]byte, []byte, error) {
 	pri, err := getter.Get([]byte(privateEccData))
 	if err != nil {
 		return nil, nil, err
@@ -78,7 +78,7 @@ func fetchKeyData(getter Getter) ([]byte, []byte, error) {
 	return pri, pub, nil
 }
 
-func storeKeyData(setter Setter, pri, pub []byte) error {
+func storeKeyData(setter types.Setter, pri, pub []byte) error {
 	if pri != nil {
 		if err := setter.Set([]byte(privateEccData), pri); err != nil {
 			return err
@@ -96,7 +96,7 @@ func storeKeyData(setter Setter, pri, pub []byte) error {
 
 // clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
-func clearKeyData(logger log.Logger, deleter Deleter) {
+func clearKeyData(logger log.Logger, deleter types.Deleter) {
 	level.Info(logger).Log("msg", "Clearing keys")
 	_ = deleter.Delete([]byte(privateEccData))
 	_ = deleter.Delete([]byte(publicEccData))

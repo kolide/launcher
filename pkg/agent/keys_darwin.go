@@ -9,12 +9,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/secureenclave"
-	"go.etcd.io/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // nolint: deadcode
-func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
-	_, pubData, err := fetchKeyData(db)
+func setupHardwareKeys(logger log.Logger, getset types.GetterSetterDeleter) (keyInt, error) {
+	_, pubData, err := fetchKeyData(getset)
 	if err != nil {
 		return nil, err
 	}
@@ -28,8 +28,8 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 			return nil, fmt.Errorf("creating key: %w", err)
 		}
 
-		if err := storeKeyData(db, nil, pubData); err != nil {
-			clearKeyData(logger, db)
+		if err := storeKeyData(getset, nil, pubData); err != nil {
+			clearKeyData(logger, getset)
 			return nil, fmt.Errorf("storing key: %w", err)
 		}
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
@@ -92,9 +93,9 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 }
 
 // WithGetter sets the key/value getter for agent flags
-func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
+func WithGetter(getter types.Getter) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.flagsGetter = storedData
+		r.flagsGetter = getter
 	}
 }
 
@@ -128,7 +129,7 @@ type DesktopUsersProcessesRunner struct {
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
 	// flagsGetter gets agent flags
-	flagsGetter agent.Getter
+	flagsGetter types.Getter
 }
 
 // processRecord is used to track spawned desktop processes.

@@ -1,4 +1,4 @@
-package agent
+package types
 
 // Getter is an interface for getting data from a persistent key/value store.
 type Getter interface {

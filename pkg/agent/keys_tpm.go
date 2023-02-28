@@ -9,12 +9,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/tpm"
-	"go.etcd.io/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // nolint: deadcode
-func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
-	priData, pubData, err := fetchKeyData(db)
+func setupHardwareKeys(logger log.Logger, getset types.GetterSetterDeleter) (keyInt, error) {
+	priData, pubData, err := fetchKeyData(getset)
 	if err != nil {
 		return nil, err
 	}
@@ -25,12 +25,12 @@ func setupHardwareKeys(logger log.Logger, db *bbolt.DB) (keyInt, error) {
 		var err error
 		priData, pubData, err = tpm.CreateKey()
 		if err != nil {
-			clearKeyData(logger, db)
+			clearKeyData(logger, getset)
 			return nil, fmt.Errorf("creating key: %w", err)
 		}
 
-		if err := storeKeyData(db, priData, pubData); err != nil {
-			clearKeyData(logger, db)
+		if err := storeKeyData(getset, priData, pubData); err != nil {
+			clearKeyData(logger, getset)
 			return nil, fmt.Errorf("storing key: %w", err)
 		}
 	}

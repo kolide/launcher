@@ -13,15 +13,17 @@ import (
 
 // bucketConsumer processes control server updates for a named bucket
 type bucketConsumer struct {
-	logger     log.Logger
-	db         *bbolt.DB
+	logger log.Logger
+	db     *bbolt.DB
+	// getset     types.GetterSetter
 	bucketName string
 }
 
 func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *bucketConsumer {
 	bc := &bucketConsumer{
-		logger:     logger,
-		db:         db,
+		logger: logger,
+		db:     db,
+		// getset:     agent.NewBBoltKeyValueStore(logger, db, bucketName),
 		bucketName: bucketName,
 	}
 
@@ -29,7 +31,7 @@ func NewBucketConsumer(logger log.Logger, db *bbolt.DB, bucketName string) *buck
 }
 
 func (bc *bucketConsumer) Update(data io.Reader) error {
-	if bc == nil {
+	if bc == nil || bc.db == nil {
 		return errors.New("bucketConsumer is nil")
 	}
 
@@ -95,42 +97,48 @@ func (bc *bucketConsumer) Update(data io.Reader) error {
 	})
 }
 
-func (bc *bucketConsumer) Get(key []byte) (value []byte, err error) {
-	if bc == nil {
-		return nil, errors.New("bucketConsumer is nil")
-	}
+/*
 
-	if err := bc.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bc.bucketName))
-		if b == nil {
-			return fmt.Errorf("%s bucket not found", bc.bucketName)
-		}
+func (bc *bucketConsumer) Get(bucketName string, key []byte) (value []byte, err error) {
+	return bc.getset.Get(bucketName, key)
+	// if bc == nil {
+	// 	return nil, errors.New("bucketConsumer is nil")
+	// }
 
-		value = b.Get(key)
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("fetching data: %w", err)
-	}
+	// if err := bc.db.View(func(tx *bbolt.Tx) error {
+	// 	b := tx.Bucket([]byte(bc.bucketName))
+	// 	if b == nil {
+	// 		return fmt.Errorf("%s bucket not found", bc.bucketName)
+	// 	}
 
-	return value, nil
+	// 	value = b.Get(key)
+	// 	return nil
+	// }); err != nil {
+	// 	return nil, fmt.Errorf("fetching data: %w", err)
+	// }
+
+	// return value, nil
 }
 
-func (bc *bucketConsumer) Set(key, value []byte) error {
-	if bc == nil {
-		return errors.New("bucketConsumer is nil")
-	}
+func (bc *bucketConsumer) Set(bucketName string, key, value []byte) error {
+	return bc.getset.Set(bucketName, key, value)
+	// if bc == nil {
+	// 	return errors.New("bucketConsumer is nil")
+	// }
 
-	return bc.db.Update(func(tx *bbolt.Tx) error {
-		// Either create the bucket, or retrieve the existing one
-		bucket, err := tx.CreateBucketIfNotExists([]byte(bc.bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
-		}
+	// return bc.db.Update(func(tx *bbolt.Tx) error {
+	// 	// Either create the bucket, or retrieve the existing one
+	// 	bucket, err := tx.CreateBucketIfNotExists([]byte(bc.bucketName))
+	// 	if err != nil {
+	// 		return fmt.Errorf("creating bucket: %w", err)
+	// 	}
 
-		if err := bucket.Put(key, value); err != nil {
-			return fmt.Errorf("error putting key-value in bucket: %w", err)
-		}
+	// 	if err := bucket.Put(key, value); err != nil {
+	// 		return fmt.Errorf("error putting key-value in bucket: %w", err)
+	// 	}
 
-		return nil
-	})
+	// 	return nil
+	// })
 }
+
+*/

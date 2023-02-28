@@ -21,11 +21,11 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -36,6 +36,10 @@ import (
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
+)
+
+const (
+	agentFlagsBucketName = "agent_flags"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -190,10 +194,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
+		serverDataBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, osquery.ServerProvidedDataBucket)
 		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
 
-		desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
+		desktopFlagsBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, agentFlagsBucketName)
 		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
 
 		runner = desktopRunner.New(
