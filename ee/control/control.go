@@ -127,7 +127,7 @@ func (cs *ControlService) Fetch() error {
 	for subsystem, hash := range subsystems {
 		logger := log.With(cs.logger, "subsystem", subsystem)
 		lastHash, ok := cs.lastFetched[subsystem]
-		if !ok {
+		if !ok && cs.getset != nil {
 			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
 			// and we can just move on.
 			if storedHash, err := cs.getset.Get([]byte(subsystem)); err == nil {
