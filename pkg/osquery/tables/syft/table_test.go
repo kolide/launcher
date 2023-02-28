@@ -3,16 +3,28 @@ package syft
 import (
 	"bytes"
 	"context"
-	"os"
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 
+// leaving this in here as an example of the race issue
+// func TestRace(t *testing.T) {
+// 	src, _ := source.NewFromFile("/opt/homebrew/bin/git")
+// 	syft.CatalogPackages(&src, cataloger.DefaultConfig())
+// }
+
 func TestTable_generate(t *testing.T) {
 	t.Parallel()
+
+	launcherPath := buildLauncher(t)
 
 	tests := []struct {
 		name           string
@@ -22,7 +34,7 @@ func TestTable_generate(t *testing.T) {
 	}{
 		{
 			name:      "happy path",
-			filePaths: []string{executablePath(t)},
+			filePaths: []string{launcherPath},
 		},
 		{
 			name:      "no path",
@@ -54,9 +66,30 @@ func TestTable_generate(t *testing.T) {
 	}
 }
 
-func executablePath(t *testing.T) string {
-	// get the executable path
-	path, err := os.Executable()
-	require.NoError(t, err)
-	return path
+func buildLauncher(t *testing.T) string {
+	// To get around the issue mentioned above, build the binary first and set its path as the executable path on the runner.
+	executablePath := filepath.Join(t.TempDir(), "syft-test")
+
+	if runtime.GOOS == "windows" {
+		executablePath = fmt.Sprintf("%s.exe", executablePath)
+	}
+
+	// due to flakey tests we are tracking the time it takes to build and attempting emit a meaningful error if we time out
+	timeout := time.Second * 60
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../../cmd/launcher")
+	buildStartTime := time.Now()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("building launcher binary for desktop testing: %w", err)
+
+		if time.Since(buildStartTime) >= timeout {
+			err = fmt.Errorf("timeout (%v) met: %w", timeout, err)
+		}
+	}
+	require.NoError(t, err, string(out))
+
+	return executablePath
 }
