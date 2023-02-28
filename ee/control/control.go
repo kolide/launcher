@@ -14,10 +14,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
-const (
-	bucketName = "control_service_data"
-)
-
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {

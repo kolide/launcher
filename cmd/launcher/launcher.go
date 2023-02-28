@@ -39,7 +39,14 @@ import (
 )
 
 const (
-	agentFlagsBucketName = "agent_flags"
+	// Buckets used by launcher
+	agentFlagsBucketName     = "agent_flags"
+	controlServiceBucketName = "control_service_data"
+
+	// Subsystems that launcher listens for control server updates on
+	agentFlagsSubsystemName  = "agent_flags"
+	serverDataSubsystemName  = "kolide_server_data"
+	desktopMenuSubsystemName = "kolide_desktop_menu"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -187,7 +194,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		getset := storage.NewBBoltKeyValueStore(logger, db, "control_service_data")
+		getset := storage.NewBBoltKeyValueStore(logger, db, controlServiceBucketName)
 		controlService, err := createControlService(ctx, logger, getset, opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
@@ -196,10 +203,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// serverDataBucketConsumer handles server data table updates
 		serverDataBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, osquery.ServerProvidedDataBucket)
-		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
 
 		desktopFlagsBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, agentFlagsBucketName)
-		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
+		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
 
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
@@ -211,8 +218,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
-		controlService.RegisterConsumer("kolide_desktop_menu", runner)
-		controlService.RegisterSubscriber("agent_flags", runner)
+		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
+		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
 
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
