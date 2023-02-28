@@ -76,12 +76,31 @@ func (s *bboltKeyValueStore) Delete(key []byte) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return nil
+			return fmt.Errorf("%s bucket not found", s.bucketName)
 		}
 
 		err := b.Delete([]byte(key))
 		if err != nil {
 			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
+	if s == nil || s.db == nil {
+		return errors.New("db is nil")
+	}
+
+	return s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket not found", s.bucketName)
+		}
+
+		if err := b.ForEach(fn); err != nil {
+			return fmt.Errorf("error iterating over keys in bucket: %w", err)
 		}
 
 		return nil

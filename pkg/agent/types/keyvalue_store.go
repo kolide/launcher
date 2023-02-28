@@ -2,6 +2,7 @@ package types
 
 // Getter is an interface for getting data from a persistent key/value store.
 type Getter interface {
+	// TODO
 	Get(key []byte) (value []byte, err error)
 }
 
@@ -15,6 +16,12 @@ type Deleter interface {
 	Delete(key []byte) error
 }
 
+// Iterator is an interface for iterating data in a persistent key/value store.
+type Iterator interface {
+	// TODO
+	ForEach(fn func(k, v []byte) error) error
+}
+
 // GetterSetter is an interface that groups the Get and Set methods.
 type GetterSetter interface {
 	Getter
@@ -26,4 +33,12 @@ type GetterSetterDeleter interface {
 	Getter
 	Setter
 	Deleter
+}
+
+// GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and Iterator methods.
+type GetterSetterDeleterIterator interface {
+	Getter
+	Setter
+	Deleter
+	Iterator
 }

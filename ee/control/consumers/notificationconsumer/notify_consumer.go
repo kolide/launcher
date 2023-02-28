@@ -11,13 +11,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/pkg/osquery"
-	"go.etcd.io/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // Consumes notifications from control server, tracks when notifications are sent to end user
 type NotificationConsumer struct {
-	db                          *bbolt.DB
+	getset                      types.GetterSetterDeleterIterator
 	runner                      userProcessesRunner
 	logger                      log.Logger
 	notificationRetentionPeriod time.Duration
@@ -74,20 +73,9 @@ func WithCleanupInterval(cleanupInterval time.Duration) notificationConsumerOpti
 	}
 }
 
-func NewNotifyConsumer(db *bbolt.DB, runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
-	// Create the bucket to track sent notifications if it doesn't exist
-	if err := db.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
-		if err != nil {
-			return fmt.Errorf("could not create bucket: %w", err)
-		}
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("cannot create notifier without db bucket: %w", err)
-	}
-
+func NewNotifyConsumer(getset types.GetterSetterDeleterIterator, runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	nc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      runner,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -151,43 +139,27 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notifica
 }
 
 func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck notification) bool {
-	alreadySent := false
-
-	if err := nc.db.View(func(tx *bbolt.Tx) error {
-		sentNotificationRaw := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationToCheck.ID))
-		if sentNotificationRaw == nil {
-			// No previous record -- notification has not been sent before
-			return nil
-		}
-
-		alreadySent = true
-
-		return nil
-	}); err != nil {
+	sentNotificationRaw, err := nc.getset.Get([]byte(notificationToCheck.ID))
+	if err != nil {
 		level.Error(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
 
-	return alreadySent
+	if sentNotificationRaw == nil {
+		// No previous record -- notification has not been sent before
+		return false
+	}
+
+	return true
 }
 
 func (nc *NotificationConsumer) markNotificationSent(sentNotification notification) {
-	if err := nc.db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
-		if err != nil {
-			return fmt.Errorf("could not create bucket: %w", err)
-		}
+	rawNotification, err := json.Marshal(sentNotification)
+	if err != nil {
+		level.Error(nc.logger).Log("msg", "could not marshal sent notification", "title", sentNotification.Title, "err", err)
+		return
+	}
 
-		rawNotification, err := json.Marshal(sentNotification)
-		if err != nil {
-			return fmt.Errorf("could not marshal sent notification: %w", err)
-		}
-
-		if err := b.Put([]byte(sentNotification.ID), rawNotification); err != nil {
-			return fmt.Errorf("could not write to key: %w", err)
-		}
-
-		return nil
-	}); err != nil {
+	if err := nc.getset.Set([]byte(sentNotification.ID), rawNotification); err != nil {
 		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
 	}
 }
@@ -219,20 +191,14 @@ func (nc *NotificationConsumer) runCleanup(ctx context.Context) {
 func (nc *NotificationConsumer) cleanup() {
 	// Read through all keys in bucket to determine which ones are old enough to be deleted
 	keysToDelete := make([][]byte, 0)
-	if err := nc.db.View(func(tx *bbolt.Tx) error {
-		if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).ForEach(func(k, v []byte) error {
-			var sentNotification notification
-			if err := json.Unmarshal(v, &sentNotification); err != nil {
-				return fmt.Errorf("error processing %s: %w", string(k), err)
-			}
+	if err := nc.getset.ForEach(func(k, v []byte) error {
+		var sentNotification notification
+		if err := json.Unmarshal(v, &sentNotification); err != nil {
+			return fmt.Errorf("error processing %s: %w", string(k), err)
+		}
 
-			if sentNotification.SentAt.Add(nc.notificationRetentionPeriod).Before(time.Now()) {
-				keysToDelete = append(keysToDelete, k)
-			}
-
-			return nil
-		}); err != nil {
-			return fmt.Errorf("error iterating over keys in bucket: %w", err)
+		if sentNotification.SentAt.Add(nc.notificationRetentionPeriod).Before(time.Now()) {
+			keysToDelete = append(keysToDelete, k)
 		}
 
 		return nil
@@ -241,16 +207,10 @@ func (nc *NotificationConsumer) cleanup() {
 	}
 
 	// Delete all old keys
-	if err := nc.db.Update(func(tx *bbolt.Tx) error {
-		for _, k := range keysToDelete {
-			if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Delete(k); err != nil {
-				// Log, but don't error, since we might be able to delete some others
-				level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
-			}
+	for _, k := range keysToDelete {
+		if err := nc.getset.Delete(k); err != nil {
+			// Log, but don't error, since we might be able to delete some others
+			level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
 		}
-
-		return nil
-	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
 	}
 }

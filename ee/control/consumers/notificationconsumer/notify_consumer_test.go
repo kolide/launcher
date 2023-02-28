@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.etcd.io/bbolt"
 )
 
 type notifierMock struct{ mock.Mock }
@@ -29,10 +28,10 @@ func (nm *notifierMock) SendNotification(title, body string) error {
 func TestUpdate_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	db := setUpDb(t)
+	getset := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -66,10 +65,10 @@ func TestUpdate_HappyPath(t *testing.T) {
 func TestUpdate_ValidatesNotifications(t *testing.T) {
 	t.Parallel()
 
-	db := setUpDb(t)
+	getset := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -120,10 +119,10 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 func TestUpdate_HandlesDuplicates(t *testing.T) {
 	t.Parallel()
 
-	db := setUpDb(t)
+	getset := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -163,10 +162,10 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.T) {
 	t.Parallel()
 
-	db := setUpDb(t)
+	getset := setupStorage(t)
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      mockNotifier,
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -207,9 +206,9 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 func TestCleanup(t *testing.T) {
 	t.Parallel()
 
-	db := setUpDb(t)
+	getset := setupStorage(t)
 	testNc := &NotificationConsumer{
-		db:                          db,
+		getset:                      getset,
 		runner:                      newNotifierMock(),
 		logger:                      log.NewNopLogger(),
 		notificationRetentionPeriod: defaultRetentionPeriod,
@@ -232,54 +231,52 @@ func TestCleanup(t *testing.T) {
 	})
 
 	// Confirm we have both entries in the db.
-	if err := db.View(func(tx *bbolt.Tx) error {
-		oldNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToDelete))
-		require.NotNil(t, oldNotificationRecord, "old notification was not seeded in db")
+	oldNotificationRecord, err := getset.Get([]byte(notificationIdToDelete))
+	require.NotNil(t, oldNotificationRecord, "old notification was not seeded in db")
+	require.NoError(t, err)
 
-		newNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToRetain))
-		require.NotNil(t, newNotificationRecord, "new notification was not seeded in db")
-		return nil
-	}); err != nil {
-		require.NoError(t, err)
-	}
+	newNotificationRecord, err := getset.Get([]byte(notificationIdToRetain))
+	require.NotNil(t, newNotificationRecord, "new notification was not seeded in db")
+	require.NoError(t, err)
 
 	// Now, run cleanup.
 	testNc.cleanup()
 
 	// Confirm that the old notification record was deleted, and the new one was not.
-	if err := db.View(func(tx *bbolt.Tx) error {
-		oldNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToDelete))
-		require.Nil(t, oldNotificationRecord, "old notification was not cleaned up but should have been")
-
-		newNotificationRecord := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Get([]byte(notificationIdToRetain))
-		require.NotNil(t, newNotificationRecord, "new notification was cleaned up but should not have been")
-		return nil
-	}); err != nil {
-		require.NoError(t, err)
-	}
-}
-
-func setUpDb(t *testing.T) *bbolt.DB {
-	// Create a temp directory to hold our bbolt db
-	dbDir := t.TempDir()
-
-	// Create database; ensure we clean it up after the test
-	db, err := bbolt.Open(filepath.Join(dbDir, "notifier_test.db"), 0600, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	// Create the bucket
-	err = db.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
-		require.NoError(t, err)
-		return nil
-	})
+	oldNotificationRecord, err = getset.Get([]byte(notificationIdToDelete))
+	require.Nil(t, oldNotificationRecord, "old notification was not cleaned up but should have been")
 	require.NoError(t, err)
 
-	return db
+	newNotificationRecord, err = getset.Get([]byte(notificationIdToRetain))
+	require.NotNil(t, newNotificationRecord, "new notification was cleaned up but should not have been")
+	require.NoError(t, err)
 }
+
+func setupStorage(t *testing.T) types.GetterSetterDeleterIterator {
+	return storage.NewInMemoryKeyValueStore(log.NewNopLogger())
+}
+
+// func setUpStore(t *testing.T) GetterSetterDeleterIterator {
+// 	// Create a temp directory to hold our bbolt db
+// 	dbDir := t.TempDir()
+
+// 	// Create database; ensure we clean it up after the test
+// 	db, err := bbolt.Open(filepath.Join(dbDir, "notifier_test.db"), 0600, nil)
+// 	require.NoError(t, err)
+// 	t.Cleanup(func() {
+// 		require.NoError(t, db.Close())
+// 	})
+
+// 	// Create the bucket
+// 	err = db.Update(func(tx *bbolt.Tx) error {
+// 		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
+// 		require.NoError(t, err)
+// 		return nil
+// 	})
+// 	require.NoError(t, err)
+
+// 	return db
+// }
 
 func getValidUntil() int64 {
 	return time.Now().Add(1 * time.Hour).Unix()

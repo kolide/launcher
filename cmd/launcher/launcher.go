@@ -187,7 +187,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, db, opts)
+		getset := storage.NewBBoltKeyValueStore(logger, db, "control_service_data")
+		controlService, err := createControlService(ctx, logger, getset, opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -215,7 +216,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			db,
+			storage.NewBBoltKeyValueStore(logger, db, osquery.SentNotificationsBucket),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),

@@ -8,9 +8,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/pkg/agent/storage"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
-	"go.etcd.io/bbolt"
 )
 
 func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Options) (*control.HTTPClient, error) {
@@ -31,15 +30,13 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, opts *launcher.Options) (*control.ControlService, error) {
+func createControlService(ctx context.Context, logger log.Logger, getset types.GetterSetter, opts *launcher.Options) (*control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	getset := storage.NewBBoltKeyValueStore(logger, db, "control_service_data")
 
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
