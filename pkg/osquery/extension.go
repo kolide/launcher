@@ -180,7 +180,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
-	getset := storage.NewBBoltKeyValueStore(opts.Logger, db, "config") // TODO bucke tname should be defined somewhere else
+	// TODO: This should reference "agent.configBucketName" but it may be possible to
+	// avoid exporting configBucketName. This should be corrected when this extension.go
+	// is converted to using the storage layer instead of bbolt directly.
+	getset := storage.NewBBoltKeyValueStore(opts.Logger, db, "config")
 
 	if err := SetupLauncherKeys(db); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)

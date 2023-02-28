@@ -1,24 +1,33 @@
 package types
 
-// Getter is an interface for getting data from a persistent key/value store.
+// Getter is an interface for getting data from a key/value store.
 type Getter interface {
-	// TODO
+	// Get retrieves the value for a key.
+	// Returns a nil value if the key does not exist.
 	Get(key []byte) (value []byte, err error)
 }
 
-// Setter is an interface for setting data in a persistent key/value store.
+// Setter is an interface for setting data in a key/value store.
 type Setter interface {
+	// Set sets the value for a key.
+	// If the key exist then its previous value will be overwritten.
+	// Returns an error if the key is blank, if the key is too large, or if the value is too large.
 	Set(key, value []byte) error
 }
 
-// Deleter is an interface for deleting data in a persistent key/value store.
+// Deleter is an interface for deleting data in a key/value store.
 type Deleter interface {
+	// Delete removes a key.
+	// If the key does not exist then nothing is done and a nil error is returned.
 	Delete(key []byte) error
 }
 
-// Iterator is an interface for iterating data in a persistent key/value store.
+// Iterator is an interface for iterating data in a key/value store.
 type Iterator interface {
-	// TODO
+	// ForEach executes a function for each key/value pair in a store.
+	// If the provided function returns an error then the iteration is stopped and
+	// the error is returned to the caller. The provided function must not modify
+	// the store; this will result in undefined behavior.
 	ForEach(fn func(k, v []byte) error) error
 }
 
@@ -43,4 +52,4 @@ type GetterSetterDeleterIterator interface {
 	Iterator
 }
 
-type KVStore = GetterSetterDeleterIterator // TODO
+type KVStore = GetterSetterDeleterIterator
