@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -253,30 +254,8 @@ func TestCleanup(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.GetterSetterDeleterIterator {
-	return storage.NewInMemoryKeyValueStore(log.NewNopLogger())
+	return storage.NewCIKeyValueStore(t, log.NewNopLogger(), osquery.SentNotificationsBucket)
 }
-
-// func setUpStore(t *testing.T) GetterSetterDeleterIterator {
-// 	// Create a temp directory to hold our bbolt db
-// 	dbDir := t.TempDir()
-
-// 	// Create database; ensure we clean it up after the test
-// 	db, err := bbolt.Open(filepath.Join(dbDir, "notifier_test.db"), 0600, nil)
-// 	require.NoError(t, err)
-// 	t.Cleanup(func() {
-// 		require.NoError(t, db.Close())
-// 	})
-
-// 	// Create the bucket
-// 	err = db.Update(func(tx *bbolt.Tx) error {
-// 		_, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
-// 		require.NoError(t, err)
-// 		return nil
-// 	})
-// 	require.NoError(t, err)
-
-// 	return db
-// }
 
 func getValidUntil() int64 {
 	return time.Now().Add(1 * time.Hour).Unix()

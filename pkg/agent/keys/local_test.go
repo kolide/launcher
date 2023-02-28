@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/storage"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +12,7 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	logger := log.NewNopLogger()
-	getset := setupStorage(t, logger)
+	getset := storage.NewCIKeyValueStore(t, log.NewNopLogger(), bucketName)
 
 	key, err := SetupLocalDbKey(logger, getset)
 	require.NoError(t, err)
@@ -27,8 +26,4 @@ func TestSetupLocalDbKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, key.Public(), key2.Public())
 
-}
-
-func setupStorage(t *testing.T, logger log.Logger) types.GetterSetter {
-	return storage.NewInMemoryKeyValueStore(logger)
 }
