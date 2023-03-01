@@ -90,6 +90,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
 	ecAuthedMux.Handle("/query.png", ls.requestQueryHandler())
+	ecAuthedMux.Handle("/runscheduledquery", ls.requestQueryHandler())
+	ecAuthedMux.Handle("/runscheduledquery.png", ls.requestQueryHandler())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
@@ -99,6 +101,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'
 	// mux.Handle("/query", ls.requestQueryHandler())
+	// curl localhost:40978/runscheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
+	// mux.Handle("/runscheduledquery", ls.requestRunScheduledQueryHandler())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
