@@ -1,26 +1,14 @@
 package notify
 
-import (
-	"github.com/go-kit/kit/log"
-)
+import "time"
 
-type DesktopNotifier struct {
-	logger       log.Logger
-	iconFilepath string
-}
-
+// Represents notification received from control server; SentAt is set by this consumer after sending.
+// For the time being, notifications are per-end user device and not per-user.
 type Notification struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-}
-
-func NewDesktopNotifier(logger log.Logger, iconFilepath string) *DesktopNotifier {
-	notifier := &DesktopNotifier{
-		logger: log.With(logger,
-			"component", "user_desktop_notifier",
-		),
-		iconFilepath: iconFilepath,
-	}
-
-	return notifier
+	Title      string    `json:"title"`
+	Body       string    `json:"body"`
+	ActionUri  string    `json:"action_uri,omitempty"`
+	ID         string    `json:"id"`
+	ValidUntil int64     `json:"valid_until"` // timestamp
+	SentAt     time.Time `json:"sent_at,omitempty"`
 }

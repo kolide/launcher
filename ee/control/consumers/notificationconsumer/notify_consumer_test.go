@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,8 +22,8 @@ type notifierMock struct{ mock.Mock }
 
 func newNotifierMock() *notifierMock { return &notifierMock{} }
 
-func (nm *notifierMock) SendNotification(title, body string) error {
-	args := nm.Called(title, body)
+func (nm *notifierMock) SendNotification(n notify.Notification) error {
+	args := nm.Called(n)
 	return args.Error(0)
 }
 
@@ -42,7 +43,46 @@ func TestUpdate_HappyPath(t *testing.T) {
 	testId := ulid.New()
 	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
 	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
-	testNotifications := []notification{
+	testActionUri := "https://www.kolide.com"
+	testNotifications := []notify.Notification{
+		{
+			Title:      testTitle,
+			Body:       testBody,
+			ID:         testId,
+			ValidUntil: getValidUntil(),
+			ActionUri:  testActionUri,
+		},
+	}
+	testNotificationsRaw, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+
+	// Expect that the notifier is called once to send the one notification successfully
+	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
+
+	// Call update and assert our expectations about sent notifications
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
+}
+
+func TestUpdate_HappyPath_NoAction(t *testing.T) {
+	t.Parallel()
+
+	db := setUpDb(t)
+	mockNotifier := newNotifierMock()
+	testNc := &NotificationConsumer{
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
+	}
+
+	// Send one notification that we haven't seen before
+	testId := ulid.New()
+	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
+	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
+	testNotifications := []notify.Notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
@@ -55,7 +95,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called once to send the one notification successfully
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
@@ -76,12 +116,12 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 	}
 
 	tests := []struct {
-		testNotification notification
+		testNotification notify.Notification
 		name             string
 	}{
 		{
 			name: "Invalid because title and body are empty",
-			testNotification: notification{
+			testNotification: notify.Notification{
 				Title:      "",
 				Body:       "",
 				ID:         ulid.New(),
@@ -90,11 +130,21 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 		},
 		{
 			name: "Invalid because the notification is expired",
-			testNotification: notification{
+			testNotification: notify.Notification{
 				Title:      "Expired notification",
 				Body:       "Expired notification body",
 				ID:         ulid.New(),
 				ValidUntil: time.Now().Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
+			name: "Invalid because the action URI is not a real URI",
+			testNotification: notify.Notification{
+				Title:      "Test notification",
+				Body:       "This notification has an action URI that is not valid",
+				ID:         ulid.New(),
+				ValidUntil: getValidUntil(),
+				ActionUri:  "some_thing:foo/bar",
 			},
 		},
 	}
@@ -104,7 +154,7 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			testNotifications := []notification{tt.testNotification}
+			testNotifications := []notify.Notification{tt.testNotification}
 			testNotificationsRaw, err := json.Marshal(testNotifications)
 			require.NoError(t, err)
 			testNotificationsData := bytes.NewReader(testNotificationsRaw)
@@ -133,7 +183,7 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	testId := ulid.New()
 	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
 	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
-	testNotifications := []notification{
+	testNotifications := []notify.Notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
@@ -152,7 +202,7 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called only once, to send the first notification
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil)
+	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
@@ -176,7 +226,7 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	testId := ulid.New()
 	testTitle := fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId)
 	testBody := fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId)
-	testNotifications := []notification{
+	testNotifications := []notify.Notification{
 		{
 			Title:      testTitle,
 			Body:       testBody,
@@ -195,8 +245,8 @@ func TestUpdate_HandlesDuplicatesWhenFirstNotificationCouldNotBeSent(t *testing.
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is called twice: once to unsuccessfully send the first notification, and again to send the duplicate successfully
-	errorCall := mockNotifier.On("SendNotification", testTitle, testBody).Return(errors.New("test error"))
-	mockNotifier.On("SendNotification", testTitle, testBody).Return(nil).NotBefore(errorCall)
+	errorCall := mockNotifier.On("SendNotification", mock.Anything).Return(errors.New("test error"))
+	mockNotifier.On("SendNotification", mock.Anything).Return(nil).NotBefore(errorCall)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
@@ -217,14 +267,14 @@ func TestCleanup(t *testing.T) {
 
 	// Save two entries in the db -- one sent a year ago, and one sent now.
 	notificationIdToDelete := ulid.New()
-	testNc.markNotificationSent(notification{
+	testNc.markNotificationSent(notify.Notification{
 		Title:  "Some old test title",
 		Body:   "Some old test body",
 		ID:     notificationIdToDelete,
 		SentAt: time.Now().Add(-365 * 24 * time.Hour),
 	})
 	notificationIdToRetain := ulid.New()
-	testNc.markNotificationSent(notification{
+	testNc.markNotificationSent(notify.Notification{
 		Title:  "Some new test title",
 		Body:   "Some new test body",
 		ID:     notificationIdToRetain,

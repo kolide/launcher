@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 )
 
-func runAsUser(uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 

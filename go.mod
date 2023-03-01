@@ -49,7 +49,6 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.38.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/toast.v1 v1.0.0-20180812000517-0a84660828b2
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
 )
@@ -57,6 +56,7 @@ require (
 require (
 	github.com/kolide/systray v1.10.2
 	github.com/vmihailenco/msgpack/v5 v5.3.5
+	gopkg.in/toast.v1 v1.0.0-20180812000517-0a84660828b2
 )
 
 require (
