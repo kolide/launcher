@@ -15,7 +15,7 @@ then
     exit 1
 fi
 
-foundvm=$({ multipass info $vmname || true; }) &>/dev/null
+foundvm=$(multipass info $vmname 2>/dev/null)
 if [[ $foundvm == *"State"* ]]
 then
     echo "VM already exists with name $vmname -- choose a new name or run: multipass delete $vmname && multipass purge"
@@ -37,7 +37,7 @@ fi
 # Warn that MATE is a little less functional right now
 if [ "$desktopenv" = "mate" ]
 then
-    echo "MATE currently ends up with 'Oh no, something has gone wrong' error"
+    echo "MATE currently ends up with 'Oh no, something has gone wrong' error -- proceed at your own risk"
 fi
 
 # Check deps: make sure multipass is installed

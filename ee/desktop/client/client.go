@@ -54,10 +54,11 @@ func (c *client) Refresh() error {
 	return c.get("refresh")
 }
 
-func (c *client) Notify(title, body string) error {
+func (c *client) Notify(n notify.Notification) error {
 	notificationToSend := notify.Notification{
-		Title: title,
-		Body:  body,
+		Title:     n.Title,
+		Body:      n.Body,
+		ActionUri: n.ActionUri,
 	}
 	bodyBytes, err := json.Marshal(notificationToSend)
 	if err != nil {
