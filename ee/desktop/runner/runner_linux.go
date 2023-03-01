@@ -86,44 +86,47 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 	}
 
 	sessions := strings.Trim(string(sessionOutput), "\n")
-	if sessions != "" {
-		sessionList := strings.Split(sessions, " ")
-		for _, session := range sessionList {
-			typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+	if sessions == "" {
+		return envVars
+	}
+
+	sessionList := strings.Split(sessions, " ")
+	for _, session := range sessionList {
+		// Figure out what type of graphical session the user has -- x11, wayland?
+		typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not get session type",
+				"uid", uid,
+				"err", err,
+			)
+			continue
+		}
+
+		sessionType := strings.Trim(string(typeOutput), "\n")
+		switch sessionType {
+		case "x11":
+			// We need to set DISPLAY
+			xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
 			if err != nil {
 				level.Debug(r.logger).Log(
-					"msg", "could not get session type",
+					"msg", "could not get Display from user session",
 					"uid", uid,
 					"err", err,
 				)
 				continue
 			}
 
-			sessionType := strings.Trim(string(typeOutput), "\n")
-			switch sessionType {
-			case "x11":
-				// We need to set DISPLAY
-				xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
-				if err != nil {
-					level.Debug(r.logger).Log(
-						"msg", "could not get Display from user session",
-						"uid", uid,
-						"err", err,
-					)
-					continue
-				}
-
-				xDisplay := strings.Trim(string(xDisplayOutput), "\n")
-				if xDisplay != "" {
-					envVars["DISPLAY"] = xDisplay
-					break
-				}
-			case "wayland":
-				// TODO: tentatively, I think we need to set WAYLAND_DISPLAY and XDG_RUNTIME_DIR
-			default:
-				// Not a graphical session -- continue
-				continue
+			xDisplay := strings.Trim(string(xDisplayOutput), "\n")
+			if xDisplay != "" {
+				envVars["DISPLAY"] = xDisplay
+				break
 			}
+		case "wayland":
+			// TODO: tentatively, I think we need to set WAYLAND_DISPLAY and XDG_RUNTIME_DIR
+		default:
+			// Not a graphical session -- continue
+			continue
 		}
 	}
 
