@@ -99,12 +99,19 @@ func (nc *NotificationConsumer) Update(data io.Reader) error {
 		return errors.New("NotificationConsumer is nil")
 	}
 
-	var notificationsToProcess []notify.Notification
-	if err := json.NewDecoder(data).Decode(&notificationsToProcess); err != nil {
+	// We want to unmarshal each notification separately, so that we don't fail to send all notifications
+	// if only some are malformed.
+	var rawNotificationsToProcess []json.RawMessage
+	if err := json.NewDecoder(data).Decode(&rawNotificationsToProcess); err != nil {
 		return fmt.Errorf("failed to decode notification data: %w", err)
 	}
 
-	for _, notificationToProcess := range notificationsToProcess {
+	for _, rawNotification := range rawNotificationsToProcess {
+		var notificationToProcess notify.Notification
+		if err := json.Unmarshal(rawNotification, &notificationToProcess); err != nil {
+			level.Debug(nc.logger).Log("msg", "received notification in unexpected format from K2, discarding", "err", err)
+			continue
+		}
 		nc.notify(notificationToProcess)
 	}
 
