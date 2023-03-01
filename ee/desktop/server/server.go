@@ -20,6 +20,10 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
+type notificationSender interface {
+	SendNotification(notify.Notification) error
+}
+
 type DesktopServer struct {
 	logger           log.Logger
 	server           *http.Server
@@ -27,17 +31,17 @@ type DesktopServer struct {
 	shutdownChan     chan<- struct{}
 	authToken        string
 	socketPath       string
-	notifier         *notify.DesktopNotifier
+	notifier         notificationSender
 	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, iconPath string, shutdownChan chan<- struct{}) (*DesktopServer, error) {
+func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*DesktopServer, error) {
 	desktopServer := &DesktopServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
 		logger:       log.With(logger, "component", "desktop_server"),
 		socketPath:   socketPath,
-		notifier:     notify.NewDesktopNotifier(log.With(logger, "component", "desktop_notifier"), iconPath),
+		notifier:     notifier,
 	}
 
 	authedMux := http.NewServeMux()
@@ -122,7 +126,7 @@ func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	if err := s.notifier.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
+	if err := s.notifier.SendNotification(notificationToSend); err != nil {
 		level.Error(s.logger).Log("msg", "could not send notification", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return

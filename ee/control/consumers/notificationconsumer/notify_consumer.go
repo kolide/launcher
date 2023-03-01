@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.etcd.io/bbolt"
@@ -28,17 +30,7 @@ type NotificationConsumer struct {
 
 // The desktop runner fullfils this interface -- it exists for testing purposes.
 type userProcessesRunner interface {
-	SendNotification(title, body string) error
-}
-
-// Represents notification received from control server; SentAt is set by this consumer after sending.
-// For the time being, notifications are per-end user device and not per-user.
-type notification struct {
-	Title      string    `json:"title"`
-	Body       string    `json:"body"`
-	ID         string    `json:"id"`
-	ValidUntil int64     `json:"valid_until"` // timestamp
-	SentAt     time.Time `json:"sent_at,omitempty"`
+	SendNotification(n notify.Notification) error
 }
 
 const (
@@ -107,19 +99,26 @@ func (nc *NotificationConsumer) Update(data io.Reader) error {
 		return errors.New("NotificationConsumer is nil")
 	}
 
-	var notificationsToProcess []notification
-	if err := json.NewDecoder(data).Decode(&notificationsToProcess); err != nil {
+	// We want to unmarshal each notification separately, so that we don't fail to send all notifications
+	// if only some are malformed.
+	var rawNotificationsToProcess []json.RawMessage
+	if err := json.NewDecoder(data).Decode(&rawNotificationsToProcess); err != nil {
 		return fmt.Errorf("failed to decode notification data: %w", err)
 	}
 
-	for _, notificationToProcess := range notificationsToProcess {
+	for _, rawNotification := range rawNotificationsToProcess {
+		var notificationToProcess notify.Notification
+		if err := json.Unmarshal(rawNotification, &notificationToProcess); err != nil {
+			level.Debug(nc.logger).Log("msg", "received notification in unexpected format from K2, discarding", "err", err)
+			continue
+		}
 		nc.notify(notificationToProcess)
 	}
 
 	return nil
 }
 
-func (nc *NotificationConsumer) notify(notificationToSend notification) {
+func (nc *NotificationConsumer) notify(notificationToSend notify.Notification) {
 	if !nc.notificationIsValid(notificationToSend) {
 		return
 	}
@@ -128,8 +127,8 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 		return
 	}
 
-	if err := nc.runner.SendNotification(notificationToSend.Title, notificationToSend.Body); err != nil {
-		level.Error(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
+	if err := nc.runner.SendNotification(notificationToSend); err != nil {
+		level.Debug(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
 		return
 	}
 
@@ -137,7 +136,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notification) {
 	nc.markNotificationSent(notificationToSend)
 }
 
-func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notification) bool {
+func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notify.Notification) bool {
 	// Check that the notification is not expired --
 	validUntil := time.Unix(notificationToCheck.ValidUntil, 0)
 
@@ -146,11 +145,24 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notifica
 		return false
 	}
 
+	// If action URI is set, it must be a valid URI
+	if notificationToCheck.ActionUri != "" {
+		_, err := url.Parse(notificationToCheck.ActionUri)
+		if err != nil {
+			level.Debug(nc.logger).Log(
+				"msg", "received invalid action_uri from K2",
+				"notification_id", notificationToCheck.ID,
+				"action_uri", notificationToCheck.ActionUri,
+				"err", err)
+			return false
+		}
+	}
+
 	// Notification must not be blank
 	return notificationToCheck.Title != "" && notificationToCheck.Body != ""
 }
 
-func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck notification) bool {
+func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck notify.Notification) bool {
 	alreadySent := false
 
 	if err := nc.db.View(func(tx *bbolt.Tx) error {
@@ -164,13 +176,13 @@ func (nc *NotificationConsumer) notificationAlreadySent(notificationToCheck noti
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not read sent notifications from bucket", "err", err)
 	}
 
 	return alreadySent
 }
 
-func (nc *NotificationConsumer) markNotificationSent(sentNotification notification) {
+func (nc *NotificationConsumer) markNotificationSent(sentNotification notify.Notification) {
 	if err := nc.db.Update(func(tx *bbolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(osquery.SentNotificationsBucket))
 		if err != nil {
@@ -188,7 +200,7 @@ func (nc *NotificationConsumer) markNotificationSent(sentNotification notificati
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
+		level.Debug(nc.logger).Log("msg", "could not mark notification sent", "title", sentNotification.Title, "err", err)
 	}
 }
 
@@ -221,7 +233,7 @@ func (nc *NotificationConsumer) cleanup() {
 	keysToDelete := make([][]byte, 0)
 	if err := nc.db.View(func(tx *bbolt.Tx) error {
 		if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).ForEach(func(k, v []byte) error {
-			var sentNotification notification
+			var sentNotification notify.Notification
 			if err := json.Unmarshal(v, &sentNotification); err != nil {
 				return fmt.Errorf("error processing %s: %w", string(k), err)
 			}
@@ -237,7 +249,7 @@ func (nc *NotificationConsumer) cleanup() {
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
 	}
 
 	// Delete all old keys
@@ -245,12 +257,12 @@ func (nc *NotificationConsumer) cleanup() {
 		for _, k := range keysToDelete {
 			if err := tx.Bucket([]byte(osquery.SentNotificationsBucket)).Delete(k); err != nil {
 				// Log, but don't error, since we might be able to delete some others
-				level.Error(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
+				level.Debug(nc.logger).Log("msg", "could not delete old notification from bucket", "key", string(k), "err", err)
 			}
 		}
 
 		return nil
 	}); err != nil {
-		level.Error(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
 	}
 }

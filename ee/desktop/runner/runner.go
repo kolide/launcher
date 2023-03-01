@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -257,11 +258,15 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	}
 }
 
-func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error {
+func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
+	if len(r.uidProcs) == 0 {
+		return errors.New("cannot send notification, no child desktop processes")
+	}
+
 	errs := make([]error, 0)
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Notify(title, body); err != nil {
+		if err := client.Notify(n); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending notify command to desktop process",
 				"uid", uid,
@@ -449,7 +454,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := runAsUser(uid, cmd); err != nil {
+		if err := r.runAsUser(uid, cmd); err != nil {
 			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
@@ -631,6 +636,10 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
+		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
+		// when running the command. We need PATH (e.g. to be able to look up powershell and xdg-open) in the
+		// desktop process, so we set it explicitly here.
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 		// without passing the temp var, the desktop icon will not appear on windows and emit the error:
 		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
 		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
