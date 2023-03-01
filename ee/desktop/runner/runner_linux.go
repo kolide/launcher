@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -124,6 +125,35 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 			}
 		case "wayland":
 			// TODO: tentatively, I think we need to set WAYLAND_DISPLAY and XDG_RUNTIME_DIR
+
+			// TODO: this appears to usually be correct for systems running systemd, but potentially
+			// not for others, so it should probably be set more thoughtfully.
+			xdgRuntimeDir := fmt.Sprintf("/run/user/%d", uid)
+
+			// Get wayland display by searching for the file -- seems like the only way to get it without relying
+			// on the environment variable.
+			matches, err := filepath.Glob(filepath.Join(xdgRuntimeDir, "wayland-*"))
+			if err != nil {
+				level.Debug(r.logger).Log(
+					"msg", "could not glob for WAYLAND_DISPLAY file",
+					"uid", uid,
+					"err", err,
+				)
+				continue
+			}
+			if len(matches) < 1 {
+				level.Debug(r.logger).Log(
+					"msg", "no wayland file found in XDG_RUNTIME_DIR",
+					"uid", uid,
+					"xdg_runtime_dir", xdgRuntimeDir,
+					"err", err,
+				)
+				continue
+			}
+
+			// Set 'em
+			envVars["XDG_RUNTIME_DIR"] = xdgRuntimeDir
+			envVars["WAYLAND_DISPLAY"] = filepath.Base(matches[0])
 		default:
 			// Not a graphical session -- continue
 			continue
