@@ -15,7 +15,7 @@ then
     exit 1
 fi
 
-foundvm=$({ multipass info $vmname || true; }) &>/dev/null
+foundvm=$(multipass info $vmname 2>/dev/null)
 if [[ $foundvm == *"State"* ]]
 then
     echo "VM already exists with name $vmname -- choose a new name or run: multipass delete $vmname && multipass purge"
