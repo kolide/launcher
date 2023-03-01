@@ -128,7 +128,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 
 			// TODO: this appears to usually be correct for systems running systemd, but potentially
 			// not for others, so it should probably be set more thoughtfully.
-			xdgRuntimeDir := fmt.Sprintf("/run/user/%d", uid)
+			xdgRuntimeDir := fmt.Sprintf("/run/user/%s", uid)
 
 			// Get wayland display by searching for the file -- seems like the only way to get it without relying
 			// on the environment variable.
