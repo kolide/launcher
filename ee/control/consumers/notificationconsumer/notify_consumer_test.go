@@ -346,11 +346,12 @@ func TestUpdate_HandlesMalformedNotifications(t *testing.T) {
 	testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 	// Expect that the notifier is still called once, to send the good notification
-	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
+	mockNotifier.On("SendNotification", goodNotification).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
 	err = testNc.Update(testNotificationsData)
 	require.NoError(t, err)
+	mockNotifier.AssertExpectations(t)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
 }
 
