@@ -53,11 +53,22 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 
 	w.Write(jsonBytes)
 }
-func (ls *localServer) requestRunScheduledQueryHandler() http.Handler {
-	return http.HandlerFunc(ls.requestRunScheduledQueryHanlderFunc)
+func (ls *localServer) requestScheduledQueryHandler() http.Handler {
+	return http.HandlerFunc(ls.requestScheduledQueryHandlerFunc)
 }
 
-func (ls *localServer) requestRunScheduledQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
+// requestScheduledQueryHandlerFunc uses the name field in the request body to look up
+// an existing osquery scheduled query execute it, returning the results.
+func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.
+	// This means there is a limit on the size of the query. This endpoint is intended to be a work around for that. It ought to work like this:
+	//
+	// 1. K2 looks up the name of a osquery scheduled query it want to be run. The same query should be available to launcher in the osquery_schedule table.
+	// 2. K2 calls `/scheduledquery`, with body `{ "name": "name_of_scheduled_query" }`
+	// 3. Launcher looks up the query's sql using the provided name
+	// 4. Launcher executes the query
+	// 5. Launcher returns results
+
 	if r.Body == nil {
 		sendClientError(w, "request body is nil")
 		return

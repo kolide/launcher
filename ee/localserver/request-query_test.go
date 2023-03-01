@@ -166,7 +166,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
 			require.NoError(t, err)
 
-			handler := http.HandlerFunc(server.requestRunScheduledQueryHanlderFunc)
+			handler := http.HandlerFunc(server.requestScheduledQueryHandlerFunc)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
 
