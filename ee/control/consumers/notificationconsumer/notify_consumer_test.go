@@ -309,6 +309,52 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+func TestUpdate_HandlesMalformedNotifications(t *testing.T) {
+	t.Parallel()
+
+	db := setUpDb(t)
+	mockNotifier := newNotifierMock()
+	testNc := &NotificationConsumer{
+		db:                          db,
+		runner:                      mockNotifier,
+		logger:                      log.NewNopLogger(),
+		notificationRetentionPeriod: defaultRetentionPeriod,
+	}
+
+	// Queue up two notifications -- one malformed, one correctly formed
+	testId := ulid.New()
+	goodNotification := notify.Notification{
+		Title:      fmt.Sprintf("Test title @ %d - %s", time.Now().UnixMicro(), testId),
+		Body:       fmt.Sprintf("Test body @ %d - %s", time.Now().UnixMicro(), testId),
+		ID:         testId,
+		ValidUntil: getValidUntil(),
+	}
+	goodNotificationRaw, err := json.Marshal(goodNotification)
+	require.NoError(t, err)
+	badNotification := struct {
+		AnUnknownField      string `json:"an_unknown_field"`
+		AnotherUnknownField bool   `json:"another_unknown_field"`
+	}{
+		AnUnknownField:      testId,
+		AnotherUnknownField: true,
+	}
+	badNotificationRaw, err := json.Marshal(badNotification)
+	require.NoError(t, err)
+	testNotifications := []json.RawMessage{goodNotificationRaw, badNotificationRaw}
+	testNotificationsRaw, err := json.Marshal(testNotifications)
+	require.NoError(t, err)
+	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+
+	// Expect that the notifier is still called once, to send the good notification
+	mockNotifier.On("SendNotification", goodNotification).Return(nil)
+
+	// Call update and assert our expectations about sent notifications
+	err = testNc.Update(testNotificationsData)
+	require.NoError(t, err)
+	mockNotifier.AssertExpectations(t)
+	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
+}
+
 func setUpDb(t *testing.T) *bbolt.DB {
 	// Create a temp directory to hold our bbolt db
 	dbDir := t.TempDir()
