@@ -21,26 +21,15 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var body map[string]any
+	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
-	queryRaw, ok := body["query"]
-	if !ok {
+	query, ok := body["query"]
+	if !ok || query == "" {
 		sendClientError(w, "no query key found in request body json")
-		return
-	}
-
-	query, ok := queryRaw.(string)
-	if !ok {
-		sendClientError(w, fmt.Sprintf("query value not a string: %s", query))
-		return
-	}
-
-	if query == "" {
-		sendClientError(w, "empty query")
 		return
 	}
 
@@ -74,26 +63,15 @@ func (ls *localServer) requestRunScheduledQueryHanlderFunc(w http.ResponseWriter
 		return
 	}
 
-	var body map[string]any
+	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
-	nameRaw, ok := body["name"]
-	if !ok {
+	name, ok := body["name"]
+	if !ok || name == "" {
 		sendClientError(w, "no name key found in request body json")
-		return
-	}
-
-	name, ok := nameRaw.(string)
-	if !ok {
-		sendClientError(w, fmt.Sprintf("name value not a string: %s", name))
-		return
-	}
-
-	if name == "" {
-		sendClientError(w, "empty name")
 		return
 	}
 
@@ -107,26 +85,16 @@ func (ls *localServer) requestRunScheduledQueryHanlderFunc(w http.ResponseWriter
 	}, 1*time.Second, 250*time.Millisecond)
 
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error executing query for scheduled query: %s, error: %s", scheduledQueryQuery, err))
+		sendClientError(w, fmt.Sprintf("error executing query for scheduled using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
 
 	if len(results) == 0 {
-		sendClientError(w, fmt.Sprintf("no query found with name '%s' using query %s", name, scheduledQueryQuery))
+		sendClientError(w, fmt.Sprintf("no scheduled query found using \"%s\"", scheduledQueryQuery))
 		return
 	}
 
-	query, ok := results[0]["query"]
-	if !ok {
-		sendClientError(w, fmt.Sprintf("no query found with name '%s' using query \"%s\"", name, scheduledQueryQuery))
-		return
-	}
-
-	newBody := map[string]string{
-		"query": query,
-	}
-
-	jsonBytes, err := json.Marshal(newBody)
+	jsonBytes, err := json.Marshal(results[0])
 	if err != nil {
 		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
 		return

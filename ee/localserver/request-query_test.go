@@ -34,7 +34,12 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 		},
 		{
 			name:   "no query",
-			errStr: "empty query",
+			errStr: "no query key found in request body json",
+		},
+		{
+			name:   "empty query",
+			query:  "",
+			errStr: "no query key found in request body json",
 		},
 	}
 
@@ -87,7 +92,6 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 		queryName string
 
 		// a successful test would have 2 queries
-
 		// mockScheduledQuerySqlFetchResults - the first one returns the sql from the scheduled query
 		mockScheduledQuerySqlFetchResults []map[string]string
 
@@ -111,26 +115,19 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			},
 		},
 		{
-			testName:  "no results",
-			queryName: "some_scheduled_query",
-			mockScheduledQuerySqlFetchResults: []map[string]string{
-				{},
-			},
-			errStr: "no query found",
-		},
-		{
-			testName:  "no query row",
-			queryName: "some_scheduled_query",
-			mockScheduledQuerySqlFetchResults: []map[string]string{
-				{
-					"foo": "bar",
-				},
-			},
-			errStr: "no query found",
+			testName:                          "no scheduled query found",
+			queryName:                         "some_scheduled_query",
+			mockScheduledQuerySqlFetchResults: []map[string]string{},
+			errStr:                            "no scheduled query found",
 		},
 		{
 			testName: "no query name",
 			errStr:   "no name key found in request body",
+		},
+		{
+			testName:  "empty query name",
+			errStr:    "no name key found in request body",
+			queryName: "",
 		},
 	}
 
