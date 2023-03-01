@@ -1,6 +1,7 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/pkg/agent"
 )
 
@@ -108,6 +111,21 @@ func (cs *ControlService) Stop() {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
+	// TODO RM: Hardcoded for testing only
+	testNotif := notify.Notification{
+		ID:         uuid.New().String(),
+		Title:      "Test notification",
+		Body:       "I'm a test notification",
+		ActionUri:  "https://kolide.com",
+		ValidUntil: time.Now().Unix() + 100000,
+	}
+	testNotifRaw, err := json.Marshal([]notify.Notification{testNotif})
+	if err != nil {
+		level.Debug(cs.logger).Log("msg", "could not marshal test notification", "err", err)
+	} else {
+		cs.update("desktop_notifier", bytes.NewReader(testNotifRaw))
+	}
+
 	// Empty hash means get the map of subsystems & hashes
 	data, err := cs.fetcher.GetConfig()
 	if err != nil {
