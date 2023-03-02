@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -99,6 +100,13 @@ func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
 	}
 }
 
+// WithGetter sets the key/value getter for agent flags
+func WithQuerier(querier localserver.Querier) desktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.querier = querier
+	}
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -130,6 +138,8 @@ type DesktopUsersProcessesRunner struct {
 	processSpawningEnabled bool
 	// flagsGetter gets agent flags
 	flagsGetter agent.Getter
+	// querier is an interface to send queries to osquery
+	querier localserver.Querier
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -376,6 +386,7 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 		LauncherVersion:  v.Version,
 		LauncherRevision: v.Revision,
 		GoVersion:        v.GoVersion,
+		OsqueryVersion:   r.getOsqueryVersion(),
 		ServerHostname:   r.hostname,
 	}
 
@@ -700,4 +711,30 @@ func iconFilename() string {
 
 func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
 	return filepath.Join(r.usersFilesRoot, iconFilename())
+}
+
+func (r *DesktopUsersProcessesRunner) getOsqueryVersion() string {
+	osqueryVersion := "unknown"
+
+	if r.querier == nil {
+		level.Error(r.logger).Log("msg", "can't get osquery version, nil querier")
+		return osqueryVersion
+	}
+
+	resp, err := r.querier.Query("SELECT osquery_info.version as osquery_version FROM osquery_info;")
+	if err != nil {
+		level.Error(r.logger).Log("msg", "could not get osquery version", "err", err)
+		return osqueryVersion
+	}
+
+	if len(resp) < 1 {
+		level.Error(r.logger).Log("msg", "expected at least one row from the osquery version query")
+		return osqueryVersion
+	}
+
+	if val, ok := resp[0]["osquery_version"]; ok {
+		osqueryVersion = val
+	}
+
+	return osqueryVersion
 }

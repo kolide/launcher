@@ -10,6 +10,7 @@ type TemplateData struct {
 	LauncherVersion  string `json:",omitempty"`
 	LauncherRevision string `json:",omitempty"`
 	GoVersion        string `json:",omitempty"`
+	OsqueryVersion   string `json:",omitempty"`
 	ServerHostname   string `json:",omitempty"`
 }
 
