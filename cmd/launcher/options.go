@@ -81,11 +81,12 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 
 		// Development & Debugging options
-		flDebug             = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
-		flOsqueryVerbose    = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
-		flDeveloperUsage    = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
-		flInsecureTransport = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
-		flInsecureTLS       = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flOsqueryVerbose       = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
+		flDeveloperUsage       = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options")
+		flInsecureTransport    = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
+		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+		flIAmBreakingEELicense = flagset.String("i-am-breaking-ee-license", "", "Skip license check before running localserver if value is 'yes' (default: '')")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -195,6 +196,8 @@ func parseOptions(args []string) (*launcher.Options, error) {
 	} else if *flKolideServerURL == "localhost:3000" {
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
+	} else if *flIAmBreakingEELicense == "yes" {
+		controlServerURL = *flKolideServerURL
 	}
 
 	opts := &launcher.Options{
@@ -214,6 +217,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		InsecureTLS:                        *flInsecureTLS,
+		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTransport:                  *flInsecureTransport,
 		KolideHosted:                       *flKolideHosted,
 		KolideServerURL:                    *flKolideServerURL,
