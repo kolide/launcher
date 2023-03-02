@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/shirou/gopsutil/process"
 )
 
 const defaultDisplay = ":0"
@@ -73,7 +74,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error
 func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string {
 	envVars := make(map[string]string)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Get the user's session so we can get their display.
@@ -127,9 +128,16 @@ CheckSessions:
 				break CheckSessions
 			}
 		case "wayland":
-			// For opening links with x-www-browser, we only need DISPLAY. For wayland, this is not included in
-			// loginctl show-session output -- in GNOME, Mutter spawns Xwayland and sets $DISPLAY at the same time.
-			envVars["DISPLAY"] = r.displayFromXwayland(uid)
+			// For opening links with x-www-browser, we only need DISPLAY.
+			runningUserUid, err := strconv.ParseInt(uid, 10, 32)
+			if err != nil {
+				level.Debug(r.logger).Log(
+					"msg", "could not convert uid to int32",
+					"err", err,
+				)
+				break CheckSessions
+			}
+			envVars["DISPLAY"] = r.displayFromXwayland(int32(runningUserUid))
 
 			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
 			// files to figure out what application to launch.
@@ -149,11 +157,62 @@ CheckSessions:
 	return envVars
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid string) string {
-	// TODO
-	// https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/wayland/meta-xwayland.c#L627
-	// https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/wayland/meta-xwayland.c#L292
-	// /tmp/.X%d-lock
+func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32) string {
+	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
+	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find DISPLAY by finding
+	// the Xwayland process and examining its args.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not query processes to find Xwayland process",
+			"err", err,
+		)
+		return defaultDisplay
+	}
+
+	for _, p := range processes {
+		cmdline, err := p.CmdlineWithContext(ctx)
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not get cmdline slice for process",
+				"err", err,
+			)
+			continue
+		}
+
+		if !strings.Contains(cmdline, "Xwayland") {
+			continue
+		}
+
+		// We have an Xwayland process -- check to make sure it's for our running user
+		uids, err := p.UidsWithContext(ctx)
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not get uids for process",
+				"err", err,
+			)
+			continue
+		}
+
+		for _, procUid := range uids {
+			if procUid != uid {
+				continue
+			}
+
+			// We have a match! Grab the display value. The xwayland process looks like:
+			// /usr/bin/Xwayland :0 -rootless -noreset -accessx -core -auth /run/user/1000/.mutter-Xwaylandauth.ROP401 -listen 4 -listen 5 -displayfd 6 -initfd 7
+			cmdlineArgs := strings.Split(cmdline, " ")
+			if len(cmdlineArgs) < 2 {
+				// Process is somehow malformed or not what we're looking for -- stop evaluating it
+				break
+			}
+
+			return cmdlineArgs[1]
+		}
+	}
 
 	return defaultDisplay
 }
