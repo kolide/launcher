@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/go-kit/kit/log"
@@ -22,6 +23,10 @@ func NewInMemoryKeyValueStore(logger log.Logger) *inMemoryKeyValueStore {
 }
 
 func (s *inMemoryKeyValueStore) Get(key []byte) (value []byte, err error) {
+	if s == nil {
+		return nil, errors.New("store is nil")
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if v, ok := s.items[string(key)]; ok {
@@ -31,6 +36,10 @@ func (s *inMemoryKeyValueStore) Get(key []byte) (value []byte, err error) {
 }
 
 func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
+	if s == nil {
+		return errors.New("store is nil")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[string(key)] = value
@@ -38,6 +47,10 @@ func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
 }
 
 func (s *inMemoryKeyValueStore) Delete(key []byte) error {
+	if s == nil {
+		return errors.New("store is nil")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, string(key))
@@ -45,6 +58,10 @@ func (s *inMemoryKeyValueStore) Delete(key []byte) error {
 }
 
 func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
+	if s == nil {
+		return errors.New("store is nil")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for k, v := range s.items {
