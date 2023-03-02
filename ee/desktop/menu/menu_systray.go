@@ -6,18 +6,32 @@ import (
 	"github.com/kolide/systray"
 )
 
+var (
+	buildMutex sync.Mutex
+	doneChans  []chan<- struct{}
+	// We rely on systray to notify us if it's appearance is dark mode or not
+	// systrayDarkMode caches this flag so we build the menu properly
+	systrayDarkMode bool
+	// systrayMenuIcon caches the icon type, so that we can re-set the icon when changing between dark & light modes
+	systrayMenuIcon menuIcon
+)
+
 // Init creates the menu bar & icon. It must be called on the main thread, and
 // blocks until Shutdown() is called.
 func (m *menu) Init() {
 	// Build will be invoked after the menu has been initialized
 	// Before the menu exits, cleanup the goroutines
-	systray.Run(m.Build, m.cleanup)
+	systray.Run(m.Build, m.cleanup, m.onAppearanceChanged)
 }
 
-var (
-	buildMutex sync.Mutex
-	doneChans  []chan<- struct{}
-)
+// onAppearanceChanged is called by systray when the menu bar's effective appearance changes between dark and light
+// In practice, this is only used on macOS
+func (m *menu) onAppearanceChanged(dark bool) {
+	systrayDarkMode = dark
+	// For some reason, macOS will send multiple notifications of effectiveAppearance changes, alternating back and forth between dark and light
+	// Since dark/light mode only affects the icon, just set the icon here instead of rebuilding the menu entirely
+	m.setIcon(systrayMenuIcon)
+}
 
 // Build parses the menu file and constructs the menu. If a menu already exists,
 // all of its items will be removed before the new menu is built.
@@ -38,6 +52,7 @@ func (m *menu) Build() {
 }
 
 func (m *menu) setIcon(icon menuIcon) {
+	systrayMenuIcon = icon
 	iconBytes := getIcon(icon)
 	if iconBytes != nil {
 		systray.SetTemplateIcon(iconBytes, iconBytes)
