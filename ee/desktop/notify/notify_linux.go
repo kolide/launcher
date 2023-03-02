@@ -81,7 +81,7 @@ func (d *dbusNotifier) Listen() error {
 
 			// Attempt to open a browser to the given URL
 			actionUri := signal.Body[1].(string)
-			providers := []string{"xdg-open", "x-www-browser"}
+			providers := []string{"xdg-open", "x-www-browser"} // TODO swap order: x-www-browser is a better default
 			for _, provider := range providers {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()

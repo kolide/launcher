@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os/exec"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -16,6 +15,8 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 )
+
+const defaultDisplay = ":0"
 
 func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
 	currentUser, err := user.Current()
@@ -92,6 +93,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 	}
 
 	sessionList := strings.Split(sessions, " ")
+
+CheckSessions:
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
 		typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
@@ -107,7 +110,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 		sessionType := strings.Trim(string(typeOutput), "\n")
 		switch sessionType {
 		case "x11":
-			// We need to set DISPLAY
+			// We need to set DISPLAY, which we can read from the session properties.
 			xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
 			if err != nil {
 				level.Debug(r.logger).Log(
@@ -121,39 +124,22 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 			xDisplay := strings.Trim(string(xDisplayOutput), "\n")
 			if xDisplay != "" {
 				envVars["DISPLAY"] = xDisplay
-				break
+				break CheckSessions
 			}
 		case "wayland":
-			// TODO: tentatively, I think we need to set WAYLAND_DISPLAY and XDG_RUNTIME_DIR
+			// For opening links with x-www-browser, we only need DISPLAY. For wayland, this is not included in
+			// loginctl show-session output -- in GNOME, Mutter spawns Xwayland and sets $DISPLAY at the same time.
+			envVars["DISPLAY"] = r.displayFromXwayland(uid)
 
-			// TODO: this appears to usually be correct for systems running systemd, but potentially
-			// not for others, so it should probably be set more thoughtfully.
-			xdgRuntimeDir := fmt.Sprintf("/run/user/%s", uid)
+			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
+			// files to figure out what application to launch.
 
-			// Get wayland display by searching for the file -- seems like the only way to get it without relying
-			// on the environment variable.
-			matches, err := filepath.Glob(filepath.Join(xdgRuntimeDir, "wayland-*"))
-			if err != nil {
-				level.Debug(r.logger).Log(
-					"msg", "could not glob for WAYLAND_DISPLAY file",
-					"uid", uid,
-					"err", err,
-				)
-				continue
-			}
-			if len(matches) < 1 {
-				level.Debug(r.logger).Log(
-					"msg", "no wayland file found in XDG_RUNTIME_DIR",
-					"uid", uid,
-					"xdg_runtime_dir", xdgRuntimeDir,
-					"err", err,
-				)
-				continue
-			}
+			// We take the default value according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html,
+			// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
+			// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
+			envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
 
-			// Set 'em
-			envVars["XDG_RUNTIME_DIR"] = xdgRuntimeDir
-			envVars["WAYLAND_DISPLAY"] = filepath.Base(matches[0])
+			break CheckSessions
 		default:
 			// Not a graphical session -- continue
 			continue
@@ -161,4 +147,13 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 	}
 
 	return envVars
+}
+
+func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid string) string {
+	// TODO
+	// https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/wayland/meta-xwayland.c#L627
+	// https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/wayland/meta-xwayland.c#L292
+	// /tmp/.X%d-lock
+
+	return defaultDisplay
 }
