@@ -184,18 +184,21 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32, ctx context
 			)
 			continue
 		}
-
+		uidMatch := false
 		for _, procUid := range uids {
-			if procUid != uid {
-				continue
+			if procUid == uid {
+				uidMatch = true
+				break
 			}
+		}
 
+		if uidMatch {
 			// We have a match! Grab the display value. The xwayland process looks like:
 			// /usr/bin/Xwayland :0 -rootless -noreset -accessx -core -auth /run/user/1000/.mutter-Xwaylandauth.ROP401 -listen 4 -listen 5 -displayfd 6 -initfd 7
 			cmdlineArgs := strings.Split(cmdline, " ")
 			if len(cmdlineArgs) < 2 {
-				// Process is somehow malformed or not what we're looking for -- stop evaluating it
-				break
+				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
+				continue
 			}
 
 			return cmdlineArgs[1]
