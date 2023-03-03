@@ -122,7 +122,6 @@ func runDesktop(args []string) error {
 		m.Build()
 	}
 	server.RegisterRefreshListener(refreshMenu)
-	menu.RegisterThemeChangeListener(refreshMenu)
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
