@@ -77,7 +77,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get the user's session so we can get their display.
+	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
 	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
 	if err != nil {
 		level.Debug(r.logger).Log(
@@ -159,7 +159,7 @@ CheckSessions:
 
 func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32) string {
 	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
-	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find DISPLAY by finding
+	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
 	// the Xwayland process and examining its args.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
