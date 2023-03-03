@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/shirou/gopsutil/process"
@@ -19,7 +18,7 @@ import (
 
 const defaultDisplay = ":0"
 
-func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx context.Context) error {
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -63,7 +62,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error
 	}
 
 	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := r.userEnvVars(uid)
+	envVars := r.userEnvVars(uid, ctx)
 	for k, v := range envVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -71,11 +70,8 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error
 	return cmd.Start()
 }
 
-func (r *DesktopUsersProcessesRunner) userEnvVars(uid string) map[string]string {
+func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Context) map[string]string {
 	envVars := make(map[string]string)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
 	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
@@ -137,7 +133,7 @@ CheckSessions:
 				)
 				break CheckSessions
 			}
-			envVars["DISPLAY"] = r.displayFromXwayland(int32(runningUserUid))
+			envVars["DISPLAY"] = r.displayFromXwayland(int32(runningUserUid), ctx)
 
 			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
 			// files to figure out what application to launch.
@@ -157,13 +153,10 @@ CheckSessions:
 	return envVars
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32) string {
+func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32, ctx context.Context) string {
 	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
 	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
 	// the Xwayland process and examining its args.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		level.Debug(r.logger).Log(
