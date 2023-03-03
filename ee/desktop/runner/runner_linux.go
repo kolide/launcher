@@ -18,7 +18,7 @@ import (
 
 const defaultDisplay = ":0"
 
-func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx context.Context) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -62,7 +62,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx c
 	}
 
 	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := r.userEnvVars(uid, ctx)
+	envVars := r.userEnvVars(ctx, uid)
 	for k, v := range envVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -70,7 +70,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx c
 	return cmd.Start()
 }
 
-func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Context) map[string]string {
+func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid string) map[string]string {
 	envVars := make(map[string]string)
 
 	uidInt, err := strconv.ParseInt(uid, 10, 32)
@@ -113,10 +113,11 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Contex
 
 		sessionType := strings.Trim(string(typeOutput), "\n")
 		if sessionType == "x11" {
-			envVars["DISPLAY"] = r.displayFromX11(session, ctx)
+			envVars["DISPLAY"] = r.displayFromX11(ctx, session)
+			break
 		} else if sessionType == "wayland" {
 			// For opening links with x-www-browser, we only need DISPLAY.
-			envVars["DISPLAY"] = r.displayFromXwayland(int32(uidInt), ctx)
+			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
 
 			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
 			// files to figure out what application to launch.
@@ -125,6 +126,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Contex
 			// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 			// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
 			envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+			break
 		} else {
 			// Not a graphical session
 			continue
@@ -134,7 +136,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Contex
 	return envVars
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromX11(session string, ctx context.Context) string {
+func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string) string {
 	// We can read $DISPLAY from the session properties
 	xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
 	if err != nil {
@@ -148,7 +150,7 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(session string, ctx context
 	return strings.Trim(string(xDisplayOutput), "\n")
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32, ctx context.Context) string {
+func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
 	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
 	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
 	// the Xwayland process and examining its args.

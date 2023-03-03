@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 )
 
-func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx context.Context) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)

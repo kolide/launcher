@@ -454,7 +454,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := r.runAsUser(uid, cmd, ctx); err != nil {
+		if err := r.runAsUser(ctx, uid, cmd); err != nil {
 			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
