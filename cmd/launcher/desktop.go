@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/oklog/run"
@@ -100,6 +101,10 @@ func runDesktop(args []string) error {
 		return nil
 	}, func(error) {})
 
+	// Set up notification sending and listening
+	notifier := notify.NewDesktopNotifier(logger, *flIconPath)
+	runGroup.Add(notifier.Listen, notifier.Interrupt)
+
 	// monitor parent
 	runGroup.Add(func() error {
 		monitorParentProcess(logger, *flPpid)
@@ -107,7 +112,7 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
@@ -117,7 +122,6 @@ func runDesktop(args []string) error {
 		m.Build()
 	}
 	server.RegisterRefreshListener(refreshMenu)
-	menu.RegisterThemeChangeListener(refreshMenu)
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {

@@ -21,8 +21,3 @@ func isDarkMode() bool {
 
 	return useLight == 0
 }
-
-// RegisterThemeChangeListener registers a listener to be notified when OS theme (dark/light) changes
-func RegisterThemeChangeListener(f func()) {
-	// no-op
-}
