@@ -75,31 +75,31 @@ func Test_Delete(t *testing.T) {
 	tests := []struct {
 		name                string
 		sets                map[string]string
-		deletes             []string
+		deletes             [][]byte
 		expectedRecordCount int
 		expectedErr         bool
 	}{
 		{
 			name:    "empty",
 			sets:    map[string]string{},
-			deletes: []string{},
+			deletes: [][]byte{},
 		},
 		{
 			name:                "delete nothing",
 			sets:                map[string]string{"key1": "value1"},
-			deletes:             []string{"nonexistent-key"},
+			deletes:             [][]byte{[]byte("nonexistent-key")},
 			expectedRecordCount: 1,
 		},
 		{
 			name:                "delete some",
 			sets:                map[string]string{"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"},
-			deletes:             []string{"key1", "key3"},
+			deletes:             [][]byte{[]byte("key1"), []byte("key3")},
 			expectedRecordCount: 2,
 		},
 		{
 			name:    "delete all",
 			sets:    map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
-			deletes: []string{"key1", "key2", "key3"},
+			deletes: [][]byte{[]byte("key1"), []byte("key2"), []byte("key3")},
 		},
 	}
 	for _, tt := range tests {
@@ -111,13 +111,11 @@ func Test_Delete(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				for _, k := range tt.deletes {
-					err := s.Delete([]byte(k))
-					if tt.expectedErr {
-						require.Error(t, err)
-					} else {
-						require.NoError(t, err)
-					}
+				err := s.Delete(tt.deletes...)
+				if tt.expectedErr {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
 				}
 
 				// There should be no records, count and verify

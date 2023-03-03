@@ -81,7 +81,7 @@ func (s *bboltKeyValueStore) Set(key, value []byte) error {
 	})
 }
 
-func (s *bboltKeyValueStore) Delete(key []byte) error {
+func (s *bboltKeyValueStore) Delete(keys ...[]byte) error {
 	if s == nil || s.db == nil {
 		return errors.New("db is nil")
 	}
@@ -92,9 +92,11 @@ func (s *bboltKeyValueStore) Delete(key []byte) error {
 			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
-		err := b.Delete(key)
-		if err != nil {
-			return err
+		for _, key := range keys {
+			err := b.Delete(key)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil

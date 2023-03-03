@@ -50,14 +50,16 @@ func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
 	return nil
 }
 
-func (s *inMemoryKeyValueStore) Delete(key []byte) error {
+func (s *inMemoryKeyValueStore) Delete(keys ...[]byte) error {
 	if s == nil {
 		return errors.New("store is nil")
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.items, string(key))
+	for _, key := range keys {
+		delete(s.items, string(key))
+	}
 	return nil
 }
 

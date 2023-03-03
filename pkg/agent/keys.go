@@ -97,6 +97,6 @@ func storeKeyData(setter types.Setter, pri, pub []byte) error {
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
 func clearKeyData(logger log.Logger, deleter types.Deleter) {
 	level.Info(logger).Log("msg", "Clearing keys")
-	_ = deleter.Delete([]byte(privateEccData))
-	_ = deleter.Delete([]byte(publicEccData))
+	keys := [][]byte{[]byte(privateEccData), []byte(publicEccData)}
+	_ = deleter.Delete(keys...)
 }

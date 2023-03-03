@@ -19,7 +19,7 @@ type Setter interface {
 type Deleter interface {
 	// Delete removes a key.
 	// If the key does not exist then nothing is done and a nil error is returned.
-	Delete(key []byte) error
+	Delete(keys ...[]byte) error
 }
 
 // Iterator is an interface for iterating data in a key/value store.
