@@ -40,6 +40,10 @@ func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
 		return errors.New("store is nil")
 	}
 
+	if string(key) == "" {
+		return errors.New("key is blank")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[string(key)] = value

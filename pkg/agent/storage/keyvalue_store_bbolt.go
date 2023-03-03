@@ -74,12 +74,12 @@ func (s *bboltKeyValueStore) Delete(key []byte) error {
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(s.bucketName))
-		if b == nil {
-			return fmt.Errorf("%s bucket not found", s.bucketName)
+		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
+		if err != nil {
+			return fmt.Errorf("creating bucket: %w", err)
 		}
 
-		err := b.Delete(key)
+		err = b.Delete(key)
 		if err != nil {
 			return err
 		}
@@ -93,10 +93,10 @@ func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 		return errors.New("db is nil")
 	}
 
-	return s.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(s.bucketName))
-		if b == nil {
-			return fmt.Errorf("%s bucket not found", s.bucketName)
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
+		if err != nil {
+			return fmt.Errorf("creating bucket: %w", err)
 		}
 
 		if err := b.ForEach(fn); err != nil {
@@ -118,14 +118,13 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	}
 
 	err := s.db.Update(func(tx *bbolt.Tx) error {
-		// Either create the bucket, or retrieve the existing one
-		bucket, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
+		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
 		if err != nil {
 			return fmt.Errorf("creating bucket: %w", err)
 		}
 
 		for key, value := range kvPairs {
-			if err := bucket.Put([]byte(key), []byte(value)); err != nil {
+			if err := b.Put([]byte(key), []byte(value)); err != nil {
 				// Log errors but continue processing the remaining key-values
 				level.Error(s.logger).Log(
 					"msg", "failed to store key-value in bucket",
@@ -147,12 +146,12 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	// This operation requires a new transaction
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		// Bucket should exist from the previous Update invocation
-		bucket := tx.Bucket([]byte(s.bucketName))
-		if bucket == nil {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
 			return fmt.Errorf("bucket does not exist: %w", err)
 		}
 
-		c := bucket.Cursor()
+		c := b.Cursor()
 		for key, _ := c.First(); key != nil; key, _ = c.Next() {
 			if _, ok := kvPairs[string(key)]; ok {
 				// Key exists in the bucket and kvPairs, move on
@@ -160,7 +159,7 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 			}
 
 			// Key exists in the bucket but not in kvPairs, delete it
-			if err := bucket.Delete(key); err != nil {
+			if err := b.Delete(key); err != nil {
 				// Log errors but ignore the failure
 				level.Error(s.logger).Log(
 					"msg", "failed to remove key from bucket",
