@@ -73,6 +73,15 @@ func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd, ctx c
 func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Context) map[string]string {
 	envVars := make(map[string]string)
 
+	uidInt, err := strconv.ParseInt(uid, 10, 32)
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not convert uid to int32",
+			"err", err,
+		)
+		return envVars
+	}
+
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
 	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
 	if err != nil {
@@ -90,8 +99,6 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(uid string, ctx context.Contex
 	}
 
 	sessionList := strings.Split(sessions, " ")
-
-CheckSessions:
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
 		typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
@@ -105,35 +112,11 @@ CheckSessions:
 		}
 
 		sessionType := strings.Trim(string(typeOutput), "\n")
-		switch sessionType {
-		case "x11":
-			// We need to set DISPLAY, which we can read from the session properties.
-			xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
-			if err != nil {
-				level.Debug(r.logger).Log(
-					"msg", "could not get Display from user session",
-					"uid", uid,
-					"err", err,
-				)
-				continue
-			}
-
-			xDisplay := strings.Trim(string(xDisplayOutput), "\n")
-			if xDisplay != "" {
-				envVars["DISPLAY"] = xDisplay
-				break CheckSessions
-			}
-		case "wayland":
+		if sessionType == "x11" {
+			envVars["DISPLAY"] = r.displayFromX11(session, ctx)
+		} else if sessionType == "wayland" {
 			// For opening links with x-www-browser, we only need DISPLAY.
-			runningUserUid, err := strconv.ParseInt(uid, 10, 32)
-			if err != nil {
-				level.Debug(r.logger).Log(
-					"msg", "could not convert uid to int32",
-					"err", err,
-				)
-				break CheckSessions
-			}
-			envVars["DISPLAY"] = r.displayFromXwayland(int32(runningUserUid), ctx)
+			envVars["DISPLAY"] = r.displayFromXwayland(int32(uidInt), ctx)
 
 			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
 			// files to figure out what application to launch.
@@ -142,15 +125,27 @@ CheckSessions:
 			// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 			// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
 			envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
-
-			break CheckSessions
-		default:
-			// Not a graphical session -- continue
+		} else {
+			// Not a graphical session
 			continue
 		}
 	}
 
 	return envVars
+}
+
+func (r *DesktopUsersProcessesRunner) displayFromX11(session string, ctx context.Context) string {
+	// We can read $DISPLAY from the session properties
+	xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not get Display from user session",
+			"err", err,
+		)
+		return defaultDisplay
+	}
+
+	return strings.Trim(string(xDisplayOutput), "\n")
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromXwayland(uid int32, ctx context.Context) string {
