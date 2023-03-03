@@ -12,9 +12,12 @@ import (
 func getStores(t *testing.T) []types.KVStore {
 	logger := log.NewNopLogger()
 	db := setupDB(t)
+	bboltStore, err := NewBBoltKeyValueStore(logger, db, "test_bucket")
+	require.NoError(t, err)
+
 	stores := []types.KVStore{
 		NewInMemoryKeyValueStore(logger),
-		NewBBoltKeyValueStore(logger, db, "test_bucket"),
+		bboltStore,
 	}
 	return stores
 }

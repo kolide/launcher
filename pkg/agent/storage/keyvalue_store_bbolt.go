@@ -17,14 +17,27 @@ type bboltKeyValueStore struct {
 	bucketName string
 }
 
-func NewBBoltKeyValueStore(logger log.Logger, db *bbolt.DB, bucketName string) *bboltKeyValueStore {
+func NewBBoltKeyValueStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+	err := db.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+		if err != nil {
+			return fmt.Errorf("creating bucket: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	m := &bboltKeyValueStore{
-		logger:     logger,
+		logger:     log.With(logger, "bucket", bucketName),
 		db:         db,
 		bucketName: bucketName,
 	}
 
-	return m
+	return m, nil
 }
 
 func (s *bboltKeyValueStore) Get(key []byte) (value []byte, err error) {
@@ -35,7 +48,7 @@ func (s *bboltKeyValueStore) Get(key []byte) (value []byte, err error) {
 	if err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket not found", s.bucketName)
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
 		value = b.Get(key)
@@ -53,9 +66,9 @@ func (s *bboltKeyValueStore) Set(key, value []byte) error {
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
 		if value != nil {
@@ -74,12 +87,12 @@ func (s *bboltKeyValueStore) Delete(key []byte) error {
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
-		err = b.Delete(key)
+		err := b.Delete(key)
 		if err != nil {
 			return err
 		}
@@ -94,9 +107,9 @@ func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
 		if err := b.ForEach(fn); err != nil {
@@ -118,9 +131,9 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	}
 
 	err := s.db.Update(func(tx *bbolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(s.bucketName))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
 		for key, value := range kvPairs {
@@ -145,10 +158,9 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	// Now prune stale keys from the bucket
 	// This operation requires a new transaction
 	return s.db.Update(func(tx *bbolt.Tx) error {
-		// Bucket should exist from the previous Update invocation
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("bucket does not exist: %w", err)
+			return fmt.Errorf("%s bucket does not exist", s.bucketName)
 		}
 
 		c := b.Cursor()

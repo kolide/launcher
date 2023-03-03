@@ -12,7 +12,8 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	logger := log.NewNopLogger()
-	store := storage.NewCIKeyValueStore(t, log.NewNopLogger(), bucketName)
+	store, err := storage.NewCIKeyValueStore(t, log.NewNopLogger(), bucketName)
+	require.NoError(t, err)
 
 	key, err := SetupLocalDbKey(logger, store)
 	require.NoError(t, err)

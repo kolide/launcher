@@ -350,7 +350,9 @@ func TestUpdate_HandlesMalformedNotifications(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	return storage.NewCIKeyValueStore(t, log.NewNopLogger(), osquery.SentNotificationsBucket)
+	s, err := storage.NewCIKeyValueStore(t, log.NewNopLogger(), osquery.SentNotificationsBucket)
+	require.NoError(t, err)
+	return s
 }
 
 func getValidUntil() int64 {

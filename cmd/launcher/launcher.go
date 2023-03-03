@@ -194,18 +194,28 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		store := storage.NewBBoltKeyValueStore(logger, db, controlServiceBucketName)
-		controlService, err := createControlService(ctx, logger, store, opts)
+		controlStore, err := storage.NewBBoltKeyValueStore(logger, db, controlServiceBucketName)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
+
+		controlService, err := createControlService(ctx, logger, controlStore, opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, osquery.ServerProvidedDataBucket)
+		serverDataBucketConsumer, err := storage.NewBBoltKeyValueStore(logger, db, osquery.ServerProvidedDataBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
 		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
 
-		desktopFlagsBucketConsumer := storage.NewBBoltKeyValueStore(logger, db, agentFlagsBucketName)
+		desktopFlagsBucketConsumer, err := storage.NewBBoltKeyValueStore(logger, db, agentFlagsBucketName)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
 		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
 
 		runner = desktopRunner.New(
@@ -221,9 +231,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
 
+		notificationStore, err := storage.NewBBoltKeyValueStore(logger, db, osquery.SentNotificationsBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
+
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			storage.NewBBoltKeyValueStore(logger, db, osquery.SentNotificationsBucket),
+			notificationStore,
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),

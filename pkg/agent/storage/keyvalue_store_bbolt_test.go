@@ -93,7 +93,8 @@ func Test_Updates(t *testing.T) {
 			t.Parallel()
 
 			db := setupDB(t)
-			bc := NewBBoltKeyValueStore(log.NewNopLogger(), db, tt.name)
+			bc, err := NewBBoltKeyValueStore(log.NewNopLogger(), db, tt.name)
+			require.NoError(t, err)
 
 			for _, update := range tt.updates {
 				updateBytes, err := json.Marshal(update)

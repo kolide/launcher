@@ -15,10 +15,11 @@ const (
 	dbTestFileName = "test.db"
 )
 
-func NewCIKeyValueStore(t *testing.T, logger log.Logger, bucketName string) types.KVStore {
+func NewCIKeyValueStore(t *testing.T, logger log.Logger, bucketName string) (types.KVStore, error) {
 	if os.Getenv("CI") == "true" {
-		return NewInMemoryKeyValueStore(logger)
+		return NewInMemoryKeyValueStore(logger), nil
 	}
+
 	return NewBBoltKeyValueStore(logger, setupDB(t), bucketName)
 }
 

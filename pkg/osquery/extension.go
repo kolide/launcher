@@ -184,7 +184,10 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
-	store := storage.NewBBoltKeyValueStore(opts.Logger, db, configBucketName)
+	store, err := storage.NewBBoltKeyValueStore(opts.Logger, db, configBucketName)
+	if err != nil {
+		return nil, fmt.Errorf("creating KVStore: %w", err)
+	}
 
 	if err := SetupLauncherKeys(db); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
