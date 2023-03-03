@@ -23,6 +23,8 @@ func getStores(t *testing.T) []types.KVStore {
 }
 
 func Test_GetSet(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		sets        map[string]string
@@ -49,6 +51,8 @@ func Test_GetSet(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, s := range getStores(t) {
 				for k, v := range tt.sets {
 					err := s.Set([]byte(k), []byte(v))
@@ -72,6 +76,8 @@ func Test_GetSet(t *testing.T) {
 }
 
 func Test_Delete(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                string
 		sets                map[string]string
@@ -105,6 +111,8 @@ func Test_Delete(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, s := range getStores(t) {
 				for k, v := range tt.sets {
 					err := s.Set([]byte(k), []byte(v))
