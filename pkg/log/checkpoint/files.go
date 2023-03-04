@@ -1,40 +1,35 @@
 package checkpoint
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 )
 
-func fileNamesInDirs(dirnames ...string) []string {
-	results := []string{}
-
-	isFilesFound := false
+func fileNamesInDirs(dirnames ...string) map[string]string {
+	results := make(map[string]string)
 
 	for _, dirname := range dirnames {
 		files, err := os.ReadDir(dirname)
 
 		switch {
+		case errors.Is(err, os.ErrNotExist):
+			results[dirname] = "not present"
 		case err != nil:
-			results = append(results, err.Error())
+			results[dirname] = err.Error()
 		case len(files) == 0:
-			results = append(results, emptyDirMsg(dirname))
+			results[dirname] = "present, but empty"
 		default:
-			isFilesFound = true
-			for _, file := range files {
-				results = append(results, filepath.Join(dirname, file.Name()))
+			fileToLog := make([]string, len(files))
+
+			for i, file := range files {
+				fileToLog[i] = file.Name()
 			}
+
+			results[dirname] = fmt.Sprintf("contains: %s", strings.Join(fileToLog, ", "))
 		}
 	}
 
-	if !isFilesFound {
-		return []string{"No extra osquery files detected"}
-	}
-
 	return results
-}
-
-// emptyDirMsg is a helper method to generate empty dir message, makes testing easier
-func emptyDirMsg(dirname string) string {
-	return fmt.Sprintf("%s is an empty directory", dirname)
 }

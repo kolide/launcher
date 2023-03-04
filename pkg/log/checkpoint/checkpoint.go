@@ -51,14 +51,13 @@ type checkPointer struct {
 	db      *bbolt.DB
 	opts    launcher.Options
 
-	lock          sync.RWMutex
-	queriedInfo   map[string]any
-	staticQueried bool
+	lock        sync.RWMutex
+	queriedInfo map[string]any
 }
 
 func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 	return &checkPointer{
-		logger: log.With(logger, "msg", "log checkpoint"),
+		logger: log.With(logger, "component", "log checkpoint"),
 		db:     db,
 		opts:   opts,
 
@@ -103,19 +102,6 @@ func (c *checkPointer) logCheckPoint() {
 	c.logConnections()
 	c.logIpLookups()
 	c.logNotaryVersions()
-}
-
-func (c *checkPointer) logQueriedInfo() {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	if !c.staticQueried {
-		return
-	}
-
-	for k, v := range c.queriedInfo {
-		c.logger.Log(k, v)
-	}
 }
 
 func (c *checkPointer) logDbSize() {

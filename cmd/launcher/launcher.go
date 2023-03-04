@@ -179,7 +179,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"build", versionInfo.Revision,
 	)
 
-	checkpointer.SetQuerier(extension)
+	go func() {
+		time.Sleep(30 * time.Second)
+		checkpointer.SetQuerier(extension)
+	}()
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner

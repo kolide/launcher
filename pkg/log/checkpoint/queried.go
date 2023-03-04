@@ -49,12 +49,21 @@ func (c *checkPointer) logOsqueryInfo() {
 	c.logger.Log("osquery_info", info)
 }
 
+func (c *checkPointer) logQueriedInfo() {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	for k, v := range c.queriedInfo {
+		c.logger.Log(k, v)
+	}
+}
+
 // queryStaticInfo usually the querier to add additional static info.
 func (c *checkPointer) queryStaticInfo() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if c.querier == nil || c.staticQueried {
+	if c.querier == nil {
 		return
 	}
 
@@ -71,8 +80,6 @@ func (c *checkPointer) queryStaticInfo() {
 	} else {
 		c.queriedInfo["system_info"] = info
 	}
-
-	c.staticQueried = true
 }
 
 func (c *checkPointer) query(sql string) (map[string]string, error) {
