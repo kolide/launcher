@@ -88,15 +88,16 @@ func (c *checkPointer) Run() {
 }
 
 func (c *checkPointer) logCheckPoint() {
-	// Attempt to populate anything
+	// populate and log the queried static info
 	c.queryStaticInfo()
+	c.logQueriedInfo()
 
 	c.logger.Log("runtime", runtimeInfo)
 	c.logger.Log("launcher", launcherInfo)
-	c.logQueriedInfo()
-	c.logOsqueryInfo()
 	c.logger.Log("hostname", hostName())
 	c.logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
+
+	c.logOsqueryInfo()
 	c.logDbSize()
 	c.logKolideServerVersion()
 	c.logConnections()
