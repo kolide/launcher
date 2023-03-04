@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -50,7 +51,9 @@ type checkPointer struct {
 	db      *bbolt.DB
 	opts    launcher.Options
 
-	staticInfo map[string]any
+	lock          sync.RWMutex
+	staticInfo    map[string]any
+	staticQueried bool
 }
 
 func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
@@ -58,6 +61,8 @@ func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 		logger: log.With(logger, "msg", "log checkpoint"),
 		db:     db,
 		opts:   opts,
+
+		lock: sync.RWMutex{},
 		staticInfo: map[string]any{
 			"launcher": launcherInfo,
 			"runtime":  runtimeInfo,
@@ -69,6 +74,7 @@ func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 // later in the startup sequencing.
 func (c *checkPointer) AddQuerier(querier querierInt) {
 	c.querier = querier
+	c.queryStaticInfo()
 }
 
 // Run starts a log checkpoint routine. The purpose of this is to
@@ -89,12 +95,18 @@ func (c *checkPointer) Run() {
 }
 
 func (c *checkPointer) logCheckPoint() {
+	// Attempt to populate anything
+	c.queryStaticInfo()
+
 	// Log static info
+	c.lock.RLock()
 	for k, v := range c.staticInfo {
 		c.logger.Log(k, v)
 	}
+	c.lock.RUnlock()
 
 	// This info is not status, but may changes over time. As such, it is regenerate
+	c.logOsqueryInfo()
 	c.logger.Log("hostname", hostName())
 	c.logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
 	logDbSize(c.logger, c.db)
