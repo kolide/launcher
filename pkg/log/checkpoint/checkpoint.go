@@ -40,35 +40,68 @@ type logger interface {
 	Log(keyvals ...interface{}) error
 }
 
+type querierInt interface {
+	Query(query string) ([]map[string]string, error)
+}
+
+type checkPointer struct {
+	logger  logger
+	querier querierInt
+	db      *bbolt.DB
+	opts    launcher.Options
+
+	staticInfo map[string]any
+}
+
+func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
+	return &checkPointer{
+		logger: log.With(logger, "msg", "log checkpoint"),
+		db:     db,
+		opts:   opts,
+		staticInfo: map[string]any{
+			"launcher": launcherInfo,
+			"runtime":  runtimeInfo,
+		},
+	}
+}
+
+// AddQuerier adds the querier into the checkpointer. It is done in a function, so it can happen
+// later in the startup sequencing.
+func (c *checkPointer) AddQuerier(querier querierInt) {
+	c.querier = querier
+}
+
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
-func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
+func (c *checkPointer) Run() {
 
 	// Things to add:
 	//  * invoke osquery for better hardware info
 	//  * runtime stats, like memory allocations
 
 	go func() {
-		logCheckPoint(logger, db, opts)
+		c.logCheckPoint()
 
 		for range time.Tick(time.Minute * 60) {
-			logCheckPoint(logger, db, opts)
+			c.logCheckPoint()
 		}
 	}()
 }
 
-func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
-	logger = log.With(logger, "msg", "log checkpoint")
+func (c *checkPointer) logCheckPoint() {
+	// Log static info
+	for k, v := range c.staticInfo {
+		c.logger.Log(k, v)
+	}
 
-	logger.Log("hostname", hostName())
-	logger.Log("runtime", runtimeInfo)
-	logger.Log("launcher", launcherInfo)
-	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
-	logDbSize(logger, db)
-	logConnections(logger, opts)
-	logIpLookups(logger, opts)
-	logKolideServerVersion(logger, opts)
-	logNotaryVersions(logger, opts)
+	// This info is not status, but may changes over time. As such, it is regenerate
+	c.logger.Log("hostname", hostName())
+	c.logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
+	logDbSize(c.logger, c.db)
+	logConnections(c.logger, c.opts)
+	logIpLookups(c.logger, c.opts)
+	logKolideServerVersion(c.logger, c.opts)
+	logNotaryVersions(c.logger, c.opts)
 }
 
 func logDbSize(logger log.Logger, db *bbolt.DB) {
