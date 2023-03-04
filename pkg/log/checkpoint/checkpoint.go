@@ -52,7 +52,7 @@ type checkPointer struct {
 	opts    launcher.Options
 
 	lock          sync.RWMutex
-	staticInfo    map[string]any
+	queriedInfo   map[string]any
 	staticQueried bool
 }
 
@@ -62,11 +62,8 @@ func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 		db:     db,
 		opts:   opts,
 
-		lock: sync.RWMutex{},
-		staticInfo: map[string]any{
-			"launcher": launcherInfo,
-			"runtime":  runtimeInfo,
-		},
+		lock:        sync.RWMutex{},
+		queriedInfo: make(map[string]any),
 	}
 }
 
@@ -75,6 +72,7 @@ func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 func (c *checkPointer) SetQuerier(querier querierInt) {
 	c.querier = querier
 	c.queryStaticInfo()
+	c.logQueriedInfo()
 }
 
 // Run starts a log checkpoint routine. The purpose of this is to
@@ -93,7 +91,9 @@ func (c *checkPointer) logCheckPoint() {
 	// Attempt to populate anything
 	c.queryStaticInfo()
 
-	c.logStaticValues()
+	c.logger.Log("runtime", runtimeInfo)
+	c.logger.Log("launcher", launcherInfo)
+	c.logQueriedInfo()
 	c.logOsqueryInfo()
 	c.logger.Log("hostname", hostName())
 	c.logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
@@ -104,12 +104,17 @@ func (c *checkPointer) logCheckPoint() {
 	c.logNotaryVersions()
 }
 
-func (c *checkPointer) logStaticValues() {
+func (c *checkPointer) logQueriedInfo() {
 	c.lock.RLock()
-	for k, v := range c.staticInfo {
+	defer c.lock.RUnlock()
+
+	if !c.staticQueried {
+		return
+	}
+
+	for k, v := range c.queriedInfo {
 		c.logger.Log(k, v)
 	}
-	c.lock.RUnlock()
 }
 
 func (c *checkPointer) logDbSize() {

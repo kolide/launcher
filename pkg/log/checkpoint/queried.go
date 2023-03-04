@@ -62,14 +62,14 @@ func (c *checkPointer) queryStaticInfo() {
 		c.logger.Log("msg", "failed to query os info", "err", err)
 		return
 	} else {
-		c.staticInfo["os_info"] = info
+		c.queriedInfo["os_info"] = info
 	}
 
 	if info, err := c.query(systemSqlQuery); err != nil {
 		c.logger.Log("msg", "failed to query os info", "err", err)
 		return
 	} else {
-		c.staticInfo["system_info"] = info
+		c.queriedInfo["system_info"] = info
 	}
 
 	c.staticQueried = true
