@@ -164,7 +164,7 @@ func (c *checkPointer) logConnections() {
 
 func (c *checkPointer) logIpLookups() {
 	ipLookuper := &net.Resolver{}
-	c.logger.Log("ip loook ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.opts)...))
+	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.opts)...))
 }
 
 func urlsToTest(opts launcher.Options) []*url.URL {
