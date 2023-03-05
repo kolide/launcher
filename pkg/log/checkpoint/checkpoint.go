@@ -1,6 +1,8 @@
 package checkpoint
 
 import (
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -95,7 +97,7 @@ func (c *checkPointer) logCheckPoint() {
 	c.logger.Log("launcher", launcherInfo)
 	c.logger.Log("hostname", hostName())
 	c.logger.Log("notableFiles", filesInDirs(notableFileDirs...))
-
+	c.logger.Log("keyinfo", agentKeyInfo())
 	c.logOsqueryInfo()
 	c.logDbSize()
 	c.logKolideServerVersion()
@@ -214,4 +216,34 @@ func hostName() string {
 	}
 
 	return hostname
+}
+
+func agentKeyInfo() map[string]string {
+	keyinfo := make(map[string]string, 3)
+
+	pub := agent.LocalDbKeys().Public()
+	if pub == nil {
+		keyinfo["local_key"] = "nil. Likely startup delay"
+		return keyinfo
+	}
+
+	if localKeyDer, err := x509.MarshalPKIXPublicKey(pub); err == nil {
+		// der is a binary format, so convert to b64
+		keyinfo["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
+	} else {
+		keyinfo["local_key"] = fmt.Sprintf("error marshalling local key (startup is sometimes weird): %s", err)
+	}
+
+	// We don't always have hardware keys. Move on if we don't
+	if agent.HardwareKeys().Public() == nil {
+		return keyinfo
+	}
+
+	if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+		// der is a binary format, so convert to b64
+		keyinfo["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
+		keyinfo["hardware_key_source"] = agent.HardwareKeys().Type()
+	}
+
+	return keyinfo
 }
