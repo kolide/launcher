@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func fileNamesInDirs(dirnames ...string) map[string]string {
+func filesInDirs(dirnames ...string) map[string]string {
 	results := make(map[string]string)
 
 	for _, dirname := range dirnames {

@@ -94,7 +94,7 @@ func (c *checkPointer) logCheckPoint() {
 	c.logger.Log("runtime", runtimeInfo)
 	c.logger.Log("launcher", launcherInfo)
 	c.logger.Log("hostname", hostName())
-	c.logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
+	c.logger.Log("notableFiles", filesInDirs(notableFileDirs...))
 
 	c.logOsqueryInfo()
 	c.logDbSize()
