@@ -180,6 +180,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	)
 
 	go func() {
+		// Sleep to give osquery time to startup before the checkpointer starts using it.
 		time.Sleep(30 * time.Second)
 		checkpointer.SetQuerier(extension)
 	}()
