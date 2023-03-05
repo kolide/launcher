@@ -104,6 +104,7 @@ func (c *checkPointer) logCheckPoint() {
 	c.logConnections()
 	c.logIpLookups()
 	c.logNotaryVersions()
+	c.logServerProvidedData()
 }
 
 func (c *checkPointer) logDbSize() {

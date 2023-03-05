@@ -9,6 +9,7 @@ var serverProvidedDataKeys = []string{
 	"munemo",
 	"organization_id",
 	"device_id",
+	"remote_ip",
 }
 
 // logServerProvidedData sends a subset of the server data into the checkpoint logs. This iterates over the
