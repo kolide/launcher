@@ -10,6 +10,7 @@ var serverProvidedDataKeys = []string{
 	"organization_id",
 	"device_id",
 	"remote_ip",
+	"tombstone_id",
 }
 
 // logServerProvidedData sends a subset of the server data into the checkpoint logs. This iterates over the
