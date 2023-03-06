@@ -185,6 +185,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
+	// figure out if we should spawn desktop processes, this is should get simpler in the future
+	desktopProcessSpawningEnabled :=
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+			opts.KolideServerURL == "localhost:3443" ||
+			opts.KolideServerURL == "localhost:3000" ||
+			strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") ||
+			opts.IAmBreakingEELicense
+
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if opts.ControlServerURL == "" {
@@ -209,7 +217,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || opts.KolideServerURL == "localhost:3000" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")),
+			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
 			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
@@ -234,11 +242,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	if opts.KolideServerURL == "k2device.kolide.com" ||
-		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
-		opts.KolideServerURL == "localhost:3443" ||
-		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
-
+	// at this moment, these values are the same. This variable is here to help humans parse what's happening
+	runLocalServer := desktopProcessSpawningEnabled
+	if runLocalServer {
 		ls, err := localserver.New(logger, db, opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
