@@ -15,6 +15,8 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarTranslucentDarkmodePng,
 			assets.MenubarTranslucentLightmodeIco,
 			assets.MenubarTranslucentLightmodePng,
+			assets.MenubarTranslucentLightmodeShadowIco,
+			assets.MenubarTranslucentLightmodeShadowPng,
 			assets.MenubarTranslucentMonochromeIco,
 			assets.MenubarTranslucentMonochromePng,
 		)
@@ -24,6 +26,8 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarDefaultDarkmodePng,
 			assets.MenubarDefaultLightmodeIco,
 			assets.MenubarDefaultLightmodePng,
+			assets.MenubarDefaultLightmodeShadowIco,
+			assets.MenubarDefaultLightmodeShadowPng,
 			assets.MenubarDefaultMonochromeIco,
 			assets.MenubarDefaultMonochromePng,
 		)
@@ -33,6 +37,8 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarTriangleExclamationDarkmodePng,
 			assets.MenubarTriangleExclamationLightmodeIco,
 			assets.MenubarTriangleExclamationLightmodePng,
+			assets.MenubarTriangleExclamationLightmodeShadowIco,
+			assets.MenubarTriangleExclamationLightmodeShadowPng,
 			assets.MenubarTriangleExclamationMonochromeIco,
 			assets.MenubarTriangleExclamationMonochromePng,
 		)
@@ -42,6 +48,8 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarCircleXDarkmodePng,
 			assets.MenubarCircleXLightmodeIco,
 			assets.MenubarCircleXLightmodePng,
+			assets.MenubarCircleXLightmodeShadowIco,
+			assets.MenubarCircleXLightmodeShadowPng,
 			assets.MenubarCircleXMonochromeIco,
 			assets.MenubarCircleXMonochromePng,
 		)
@@ -51,9 +59,9 @@ func getIcon(icon menuIcon) []byte {
 }
 
 // chooseIcon chooses the appropriate icon data for the OS
-func chooseIcon(darkIco, darkPng, lightIco, lightPng, monochromeIco, monochromePng []byte) []byte {
+func chooseIcon(darkIco, darkPng, lightIco, lightPng, shadowIco, shadowPng, monochromeIco, monochromePng []byte) []byte {
 	if runtime.GOOS == "windows" {
-		return darkOrLight(darkIco, lightIco)
+		return shadowIco
 	}
 	return darkOrLight(darkPng, lightPng)
 }
