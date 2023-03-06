@@ -4,6 +4,14 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
+
+	"github.com/xeonx/timeago"
+)
+
+const (
+	funcHasCapability = "hasCapability"
+	funcRelativeTime  = "relativeTime"
 )
 
 type TemplateData struct {
@@ -32,7 +40,26 @@ func (tp *templateParser) Parse(text string) (string, error) {
 		return "", fmt.Errorf("templateData is nil")
 	}
 
-	t, err := template.New("menu_template").Parse(text)
+	t, err := template.New("menu_template").Funcs(template.FuncMap{
+		// hasCapability enables interoperability between different versions of launcher
+		funcHasCapability: func(capability string) bool {
+			if capability == funcRelativeTime {
+				return true
+			}
+			return false
+		},
+		// relativeTime takes a RFC 339 formatted timestamp and returns a fuzzy timestamp
+		funcRelativeTime: func(timestamp string) string {
+			t, err := time.Parse(
+				time.RFC3339,
+				timestamp)
+			if err != nil {
+				return ""
+			}
+
+			return timeago.NoMax(timeago.English).Format(t)
+		},
+	}).Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("could not parse template: %w", err)
 	}

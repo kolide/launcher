@@ -101,6 +101,7 @@ require (
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/xeonx/timeago v1.0.0-rc5 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
