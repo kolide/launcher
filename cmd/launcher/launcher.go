@@ -185,6 +185,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
+	// Figure out if we should enable desktop process spawning by default:
+	// If we're in a Kolide test environment, process spawning should be enabled by default.
+	// For production, it is disabled by default.
+	// In both cases, process spawning can be overridden via control server interaction -- see agent_flags subsystem.
+	desktopProcessSpawningEnabled :=
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+			opts.KolideServerURL == "localhost:3443" ||
+			opts.KolideServerURL == "localhost:3000" ||
+			strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") ||
+			opts.IAmBreakingEELicense
+
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if opts.ControlServerURL == "" {
@@ -203,15 +214,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
 		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
 
-		isKolideTestEnvironment := opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || opts.KolideServerURL == "localhost:3000" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			// If we're in a Kolide test environment, process spawning should be enabled by default. For production, process spawning is set via control server interaction.
-			desktopRunner.WithProcessSpawningEnabled(isKolideTestEnvironment),
+			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
 			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
@@ -236,11 +245,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	if opts.KolideServerURL == "k2device.kolide.com" ||
-		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
-		opts.KolideServerURL == "localhost:3443" ||
-		strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") {
-
+	// at this moment, these values are the same. This variable is here to help humans parse what's happening
+	runLocalServer := desktopProcessSpawningEnabled
+	if runLocalServer {
 		ls, err := localserver.New(logger, db, opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
