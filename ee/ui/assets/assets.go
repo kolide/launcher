@@ -91,12 +91,6 @@ var MenubarTranslucentMonochromeIco []byte
 //go:embed menubar-translucent-monochrome.png
 var MenubarTranslucentMonochromePng []byte
 
-//go:embed menubar-transluscent-lightmode-shadow.ico
-var MenubarTransluscentLightmodeShadowIco []byte
-
-//go:embed menubar-transluscent-lightmode-shadow.png
-var MenubarTransluscentLightmodeShadowPng []byte
-
 //go:embed menubar-triangle-exclamation-darkmode.ico
 var MenubarTriangleExclamationDarkmodeIco []byte
 
