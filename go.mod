@@ -54,7 +54,7 @@ require (
 )
 
 require (
-	github.com/kolide/systray v1.10.2
+	github.com/kolide/systray v1.10.3
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	gopkg.in/toast.v1 v1.0.0-20180812000517-0a84660828b2
 )

@@ -129,7 +129,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 	switch {
-	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"):
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.HasSuffix(ls.kolideServer, ".ngrok.io"):
 		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):

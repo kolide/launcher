@@ -8,15 +8,11 @@ import (
 	"fmt"
 	"os/exec"
 	"syscall"
-	"time"
 
 	"github.com/kolide/launcher/ee/consoleuser"
 )
 
-func (r *DesktopUsersProcessesRunner) runAsUser(uid string, cmd *exec.Cmd) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)
