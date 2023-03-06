@@ -60,8 +60,12 @@ func getIcon(icon menuIcon) []byte {
 
 // chooseIcon chooses the appropriate icon data for the OS
 func chooseIcon(darkIco, darkPng, lightIco, lightPng, shadowIco, shadowPng, monochromeIco, monochromePng []byte) []byte {
+	// Windows and Linux don't observe dark/light modes and use the purple Kolide icons with shadows
 	if runtime.GOOS == "windows" {
 		return shadowIco
+	}
+	if runtime.GOOS == "linux" {
+		return shadowPng
 	}
 	return darkOrLight(darkPng, lightPng)
 }
