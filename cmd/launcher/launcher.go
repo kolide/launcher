@@ -178,20 +178,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
-  
+
 	go func() {
 		// Sleep to give osquery time to startup before the checkpointer starts using it.
 		time.Sleep(30 * time.Second)
 		checkpointer.SetQuerier(extension)
 	}()
-  
-  // figure out if we should spawn desktop processes, this is should get simpler in the future
-  desktopProcessSpawningEnabled :=
-    opts.KolideServerURL == "k2device-preprod.kolide.com" ||
-      opts.KolideServerURL == "localhost:3443" ||
-      opts.KolideServerURL == "localhost:3000" ||
-      strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") ||
-      opts.IAmBreakingEELicense
+
+	// figure out if we should spawn desktop processes, this is should get simpler in the future
+	desktopProcessSpawningEnabled :=
+		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
+			opts.KolideServerURL == "localhost:3443" ||
+			opts.KolideServerURL == "localhost:3000" ||
+			strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") ||
+			opts.IAmBreakingEELicense
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
