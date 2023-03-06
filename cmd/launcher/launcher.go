@@ -104,7 +104,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	internal.RecordLauncherVersion(rootDirectory)
 
 	// Try to ensure useful info in the logs
-	checkpoint.Run(logger, db, *opts)
+	checkpointer := checkpoint.New(logger, db, *opts)
+	checkpointer.Run()
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -177,6 +178,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
+
+	go func() {
+		// Sleep to give osquery time to startup before the checkpointer starts using it.
+		time.Sleep(30 * time.Second)
+		checkpointer.SetQuerier(extension)
+	}()
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner

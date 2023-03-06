@@ -1,26 +1,56 @@
 package checkpoint
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
-	"github.com/kolide/kit/ulid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilesFound(t *testing.T) {
+func TestFilesInDirs(t *testing.T) {
 	t.Parallel()
 
+	// setup various test directories
 	tempDir := t.TempDir()
+	doesntExistDir := filepath.Join(tempDir, "doesnt_exist")
+	emptyDir, err := os.MkdirTemp(tempDir, "empty_dir")
+	require.NoError(t, err)
+	dirWithFiles, err := os.MkdirTemp(tempDir, "dir_with_files")
+	require.NoError(t, err)
+
+	for j := 1; j < 3; j++ {
+		filePath := filepath.Join(dirWithFiles, fmt.Sprintf("file%d", j))
+		file, err := os.Create(filePath)
+		require.NoError(t, err, fmt.Errorf("creating file: %w:", err))
+		file.Close()
+	}
+
+	results := filesInDirs(doesntExistDir, emptyDir, dirWithFiles)
 
 	var tests = []struct {
-		name         string
-		dirsToCreate int
-		filesPerDir  int
+		name     string
+		dir      string
+		expected []string
 	}{
-		{name: "2_dirs_2_files", dirsToCreate: 2, filesPerDir: 2},
+		{
+			name:     "doesnt_exist",
+			dir:      doesntExistDir,
+			expected: []string{"not present"},
+		},
+		{
+			name:     "empty",
+			dir:      emptyDir,
+			expected: []string{"present, but empty"},
+		},
+
+		{
+			name:     "dir_with_files",
+			dir:      dirWithFiles,
+			expected: []string{"contains", "file1", "file2"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -28,68 +58,11 @@ func TestFilesFound(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			dirsToSearch, expectedPaths, err := createTestFiles(tempDir, tt.dirsToCreate, tt.filesPerDir)
-			require.NoError(t, err, "creating test files")
+			actual := results[tt.dir]
 
-			foundPaths := fileNamesInDirs(dirsToSearch...)
-			sort.Strings(foundPaths)
-			require.Equal(t, expectedPaths, foundPaths)
-			require.Equal(t, tt.dirsToCreate*tt.filesPerDir, len(foundPaths))
+			for _, expected := range tt.expected {
+				assert.Contains(t, actual, expected)
+			}
 		})
 	}
-
-}
-
-func TestDirNotFound(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	nonExistantDirs := []string{
-		filepath.Join(tempDir, ulid.New()),
-		filepath.Join(tempDir, ulid.New()),
-	}
-
-	expectedOutput := []string{"No extra osquery files detected"}
-	foundPaths := fileNamesInDirs(nonExistantDirs...)
-	require.Equal(t, expectedOutput, foundPaths)
-}
-
-func TestDirEmpty(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	dirs, _, err := createTestFiles(tempDir, 2, 0)
-	require.NoError(t, err, "creating test dirs")
-
-	expectedOutput := []string{"No extra osquery files detected"}
-	foundPaths := fileNamesInDirs(dirs...)
-
-	require.Equal(t, expectedOutput, foundPaths)
-}
-
-func createTestFiles(baseDir string, dirCount int, filesPerDir int) (dirs []string, files []string, err error) {
-	files = []string{}
-
-	for i := 0; i < dirCount; i++ {
-		dir, err := os.MkdirTemp(baseDir, "notable-files-unit-test")
-		if err != nil {
-			return nil, nil, err
-		}
-		dirs = append(dirs, dir)
-
-		for j := 0; j < filesPerDir; j++ {
-			filePath := filepath.Join(dir, ulid.New())
-			file, err := os.Create(filePath)
-			if err != nil {
-				return nil, nil, err
-			}
-			defer file.Close()
-			files = append(files, filePath)
-		}
-	}
-
-	sort.Strings(files)
-	return dirs, files, nil
 }
