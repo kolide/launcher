@@ -203,13 +203,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
 		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
 
+		isKolideTestEnvironment := opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || opts.KolideServerURL == "localhost:3000" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(opts.KolideServerURL == "k2device-preprod.kolide.com" || opts.KolideServerURL == "localhost:3443" || opts.KolideServerURL == "localhost:3000" || strings.HasSuffix(opts.KolideServerURL, "herokuapp.com")),
+			// If we're in a Kolide test environment, process spawning should be enabled by default. For production, process spawning is set via control server interaction.
+			desktopRunner.WithProcessSpawningEnabled(isKolideTestEnvironment),
 			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
