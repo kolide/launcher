@@ -345,7 +345,7 @@ func (r *DesktopUsersProcessesRunner) Ping() {
 	enabled := enabledRaw != nil
 
 	r.processSpawningEnabled = enabled
-	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
+	level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(enabled)))
 }
 
 // writeSharedFile writes data to a shared file for user processes to access

@@ -15,7 +15,7 @@
       "responses": [
         {
           "uuid": "ad702465-5e32-45df-97fb-271a8e9ff72b",
-          "body": "{\n  \"token\": \"{{guid}}\",\n  \"config\": {\n    \"desktop_notifier\": \"{{guid}}\",\n    \"kolide_desktop_menu\": \"7bc4256c-d0ac-4313-b9c5-f8a0ef1aa608\"\n  }\n}",
+          "body": "{\n  \"token\": \"{{guid}}\",\n  \"config\": {\n    \"desktop_notifier\": \"0a9d958c-6cd8-4c91-a797-96daebb03b47\",\n    \"kolide_desktop_menu\": \"7bc4256c-d0ac-4313-b9c5-f8a0ef1aa608\",\n    \"agent_flags\": \"8c3503bd-c9f7-4503-ba8e-a51215e3e565\"\n  }\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "Get subsystems and hashes",
@@ -38,7 +38,7 @@
       "uuid": "bdca29c0-1cb2-47ee-b677-c98a8b711b91",
       "documentation": "Get notifications",
       "method": "get",
-      "endpoint": "api/agent/object/:uuid",
+      "endpoint": "api/agent/object/0a9d958c-6cd8-4c91-a797-96daebb03b47",
       "responses": [
         {
           "uuid": "82bd0a45-5117-4039-8411-0269ac247d7b",
@@ -70,6 +70,33 @@
         {
           "uuid": "b33a891b-49ce-4c2a-b028-92b8790a07e3",
           "body": "{\n  \"icon\": \"default\",\n  \"tooltip\": \"Kolide\",\n  \"items\": [\n    {\n      \"label\": \"Kolide Agent is talking to a Mockoon server\",\n      \"tooltip\": \"Control server info\",\n      \"disabled\": true\n    }\n  ]\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "",
+          "headers": [],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true
+        }
+      ],
+      "enabled": true,
+      "responseMode": null
+    },
+    {
+      "uuid": "4b2d7036-cc27-4bd1-92c8-f401b32ecc26",
+      "documentation": "Get agent flags",
+      "method": "get",
+      "endpoint": "api/agent/object/8c3503bd-c9f7-4503-ba8e-a51215e3e565",
+      "responses": [
+        {
+          "uuid": "0500b242-61de-4a85-be62-28735fb760e9",
+          "body": "{\n  \"desktop_enabled\": \"1\"\n}",
           "latency": 0,
           "statusCode": 200,
           "label": "",
