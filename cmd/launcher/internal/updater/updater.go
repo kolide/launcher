@@ -46,7 +46,21 @@ func NewUpdater(
 	config.Logger = log.With(config.Logger, "updater", filepath.Base(binaryPath))
 
 	// create the updater
-	updater, err := autoupdate.NewUpdater(
+	updater, err := autoupdate.NewTufClient(
+		"https://tuf-devel.kolide.com",
+		config.MirrorURL,
+		binaryPath,
+		string(config.UpdateChannel),
+		config.RootDirectory,
+		config.SigChannel,
+		config.Logger,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// create the fallback updater
+	fallbackUpdater, err := autoupdate.NewUpdater(
 		binaryPath,
 		config.RootDirectory,
 		autoupdate.WithLogger(config.Logger),
@@ -64,6 +78,7 @@ func NewUpdater(
 
 	updateCmd := &updaterCmd{
 		updater:                 updater,
+		fallbackUpdater:         fallbackUpdater,
 		ctx:                     ctx,
 		stopChan:                make(chan bool),
 		config:                  config,
@@ -79,10 +94,13 @@ func NewUpdater(
 // updater allows us to mock *autoupdate.Updater during testing
 type updater interface {
 	Run(opts ...tuf.Option) (stop func(), err error)
+	ErrorCount() int
 }
 
 type updaterCmd struct {
 	updater                 updater
+	fallbackUpdater         updater
+	runFallback             bool
 	ctx                     context.Context
 	stopChan                chan bool
 	stopExecution           func()
@@ -100,13 +118,54 @@ func (u *updaterCmd) execute() error {
 
 	select {
 	case <-u.stopChan:
-		level.Debug(u.config.Logger).Log("msg", "updater stopped requested during initial delay, Breaking loop")
+		level.Debug(u.config.Logger).Log("msg", "updater stopped requested during initial delay, breaking loop")
 		return nil
 	case <-time.After(u.config.InitialDelay):
 		level.Debug(u.config.Logger).Log("msg", "updater initial delay complete")
 		break
 	}
 
+	timedOutErr := u.startUpdater()
+	if timedOutErr != nil {
+		<-u.ctx.Done()
+		return nil
+	}
+
+	go u.monitorUpdater()
+
+	level.Debug(u.config.Logger).Log("msg", "updater waiting ... just sitting until done signal")
+	<-u.ctx.Done()
+
+	return nil
+}
+
+func (u *updaterCmd) monitorUpdater() {
+	// monitor new updater, falling back to old one
+	errorThreshold := 5
+	for {
+		level.Debug(u.config.Logger).Log("msg", "monitoring logger for errors")
+
+		select {
+		case <-u.stopChan:
+			level.Debug(u.config.Logger).Log("msg", "updater stop requested")
+			return
+		case <-time.After(1 * time.Hour):
+			if u.runFallback {
+				continue
+			}
+
+			currentErrorCount := u.updater.ErrorCount()
+			if currentErrorCount > errorThreshold {
+				// Too many errors. Stop the new updater and fall back to the old one.
+				u.stopExecution()
+				u.runFallback = true
+				u.startUpdater()
+			}
+		}
+	}
+}
+
+func (u *updaterCmd) startUpdater() error {
 	// Failing to start the updater is not a fatal launcher
 	// error. If there's a problem, sleep and try
 	// again. Implementing this is a bit gnarly. In the event of a
@@ -114,30 +173,33 @@ func (u *updaterCmd) execute() error {
 	// see a simple way to ensure the updater is still running in
 	// the background.
 	for {
-		level.Debug(u.config.Logger).Log("msg", "updater starting")
+		level.Debug(u.config.Logger).Log("msg", "updater starting", "is_fallback", u.runFallback)
 
 		// run the updater and set the stop function so that the interrupt has access to it
-		stop, err := u.updater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
+		var stop func()
+		var err error
+		if u.runFallback {
+			stop, err = u.fallbackUpdater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
+		} else {
+			stop, err = u.updater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
+		}
+
 		u.stopExecution = stop
 		if err == nil {
-			break
+			// Successfully started
+			return nil
 		}
 
 		// err != nil, log it and loop again
 		level.Error(u.config.Logger).Log("msg", "error running updater", "err", err)
 		select {
 		case <-u.stopChan:
-			level.Debug(u.config.Logger).Log("msg", "updater stop requested, Breaking loop")
-			return nil
+			level.Debug(u.config.Logger).Log("msg", "updater stop requested, breaking loop")
+			return err
 		case <-time.After(u.runUpdaterRetryInterval):
-			break
+			continue
 		}
 	}
-
-	level.Debug(u.config.Logger).Log("msg", "updater waiting ... just sitting until done signal")
-	<-u.ctx.Done()
-
-	return nil
 }
 
 func (u *updaterCmd) interrupt(err error) {

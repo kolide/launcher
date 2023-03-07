@@ -18,7 +18,9 @@ func Test_updaterCmd_execute(t *testing.T) {
 	t.Parallel()
 
 	type fields struct {
+		// Mock generated with `mockery --name updater --exported`
 		updater                 *mocks.Updater
+		fallbackUpdater         *mocks.Updater
 		stopChan                chan bool
 		config                  *UpdaterConfig
 		runUpdaterRetryInterval time.Duration
@@ -36,7 +38,8 @@ func Test_updaterCmd_execute(t *testing.T) {
 		{
 			name: "success",
 			fields: fields{
-				updater: &mocks.Updater{},
+				updater:         &mocks.Updater{},
+				fallbackUpdater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -51,7 +54,8 @@ func Test_updaterCmd_execute(t *testing.T) {
 		{
 			name: "multiple_run_retries",
 			fields: fields{
-				updater: &mocks.Updater{},
+				updater:         &mocks.Updater{},
+				fallbackUpdater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -73,8 +77,9 @@ func Test_updaterCmd_execute(t *testing.T) {
 		{
 			name: "stop_during_initial_delay",
 			fields: fields{
-				updater:  &mocks.Updater{},
-				stopChan: make(chan bool),
+				updater:         &mocks.Updater{},
+				fallbackUpdater: &mocks.Updater{},
+				stopChan:        make(chan bool),
 				config: &UpdaterConfig{
 					Logger:       log.NewNopLogger(),
 					InitialDelay: 200 * time.Millisecond,
@@ -112,6 +117,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 
 			u := &updaterCmd{
 				updater:                 tt.fields.updater,
+				fallbackUpdater:         tt.fields.fallbackUpdater,
 				ctx:                     ctx,
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,

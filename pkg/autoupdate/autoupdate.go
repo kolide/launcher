@@ -171,6 +171,11 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	return &updater, nil
 }
 
+// Not in use
+func (u *Updater) ErrorCount() int {
+	return 0
+}
+
 // createLocalTufRepo bootstraps local TUF metadata from bindata
 // assets. (TUF requires an initial starting repo)
 func (u *Updater) createLocalTufRepo() error {
