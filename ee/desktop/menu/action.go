@@ -9,9 +9,8 @@ import (
 type actionType string
 
 const (
-	DoNothing   actionType = "" // Omitted action implies do nothing
-	OpenURL                = "open-url"
-	RefreshMenu            = "refresh-menu"
+	DoNothing actionType = "" // Omitted action implies do nothing
+	OpenURL              = "open-url"
 )
 
 // Action encapsulates what action should be performed when a menu item is invoked
@@ -49,9 +48,6 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("failed to unmarshal ActionOpenURL: %w", err)
 		}
 		a.Performer = openURL
-	case RefreshMenu:
-		refreshMenu := actionRefreshMenu{}
-		a.Performer = refreshMenu
 	default:
 		return fmt.Errorf("unknown action type: %s", action.Type)
 	}

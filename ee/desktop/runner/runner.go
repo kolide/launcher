@@ -57,6 +57,13 @@ func WithUpdateInterval(interval time.Duration) desktopUsersProcessesRunnerOptio
 	}
 }
 
+// WithMenuRefreshInterval sets the interval on which the runner will refresh the desktop menu
+func WithMenuRefreshInterval(interval time.Duration) desktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.menuRefreshInterval = interval
+	}
+}
+
 // WithExecutablePath sets the path to the executable that will be run for each desktop.
 func WithExecutablePath(path string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
@@ -105,9 +112,12 @@ func WithGetter(getter types.Getter) desktopUsersProcessesRunnerOption {
 // will create a new one.
 // Initialize with New().
 type DesktopUsersProcessesRunner struct {
-	logger         log.Logger
+	logger log.Logger
+	// updateInterval is the interval on which desktop processes will be spawned, if necessary
 	updateInterval time.Duration
-	interrupt      chan struct{}
+	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
+	menuRefreshInterval time.Duration
+	interrupt           chan struct{}
 	// uidProcs is a map of uid to desktop process
 	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
@@ -151,6 +161,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
 		updateInterval:         time.Second * 5,
+		menuRefreshInterval:    time.Minute * 15,
 		procsWg:                &sync.WaitGroup{},
 		interruptTimeout:       time.Second * 10,
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
@@ -163,16 +174,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 
 	runner.writeIconFile()
 	runner.writeDefaultMenuTemplateFile()
-
-	// We re-generate the menu file each time launcher starts up, so it's always up-to-date
-	if err := runner.generateMenuFile(); err != nil {
-		if agent.Flags.DebugServerData() {
-			level.Error(runner.logger).Log(
-				"msg", "failed to generate menu file",
-				"error", err,
-			)
-		}
-	}
+	runner.refreshMenu()
 
 	return runner
 }
@@ -180,8 +182,10 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	ticker := time.NewTicker(r.updateInterval)
-	defer ticker.Stop()
+	updateTicker := time.NewTicker(r.updateInterval)
+	defer updateTicker.Stop()
+	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
+	defer menuRefreshTicker.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
@@ -190,7 +194,10 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		}
 
 		select {
-		case <-ticker.C:
+		case <-updateTicker.C:
+			continue
+		case <-menuRefreshTicker.C:
+			r.refreshMenu()
 			continue
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
@@ -306,30 +313,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.generateMenuFile(); err != nil {
-		if agent.Flags.DebugServerData() {
-			level.Error(r.logger).Log(
-				"msg", "failed to generate menu file",
-				"error", err,
-				"data", dataCopy.String(),
-			)
-		}
-		return fmt.Errorf("failed to generate menu file: %w", err)
-	}
-
-	// Tell any running desktop user processes that they should refresh the latest menu data
-	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Refresh(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending refresh command to desktop process",
-				"uid", uid,
-				"pid", proc.process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
-		}
-	}
+	r.refreshMenu()
 
 	return nil
 }
@@ -367,6 +351,32 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 	}
 
 	return nil
+}
+
+// refreshMenu updates the menu file and tells desktop processes to refresh their menus
+func (r *DesktopUsersProcessesRunner) refreshMenu() {
+	if err := r.generateMenuFile(); err != nil {
+		if agent.Flags.DebugServerData() {
+			level.Error(r.logger).Log(
+				"msg", "failed to generate menu file",
+				"error", err,
+			)
+		}
+	}
+
+	// Tell any running desktop user processes that they should refresh the latest menu data
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.authToken, proc.socketPath)
+		if err := client.Refresh(); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "error sending refresh command to desktop process",
+				"uid", uid,
+				"pid", proc.process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
+		}
+	}
 }
 
 // generateMenuFile generates and writes menu data to a shared file
