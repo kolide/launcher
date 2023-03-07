@@ -73,7 +73,7 @@ func (s *bboltKeyValueStore) Set(key, value []byte) error {
 
 		if value != nil {
 			if err := b.Put(key, value); err != nil {
-				return err
+				return fmt.Errorf("error setting %s key: %w", string(key), err)
 			}
 		}
 
@@ -95,7 +95,7 @@ func (s *bboltKeyValueStore) Delete(keys ...[]byte) error {
 		for _, key := range keys {
 			err := b.Delete(key)
 			if err != nil {
-				return err
+				return fmt.Errorf("error deleting %s key: %w", string(key), err)
 			}
 		}
 
@@ -144,7 +144,6 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 				level.Error(s.logger).Log(
 					"msg", "failed to store key-value in bucket",
 					"key", key,
-					"value", value,
 					"err", err,
 				)
 			}

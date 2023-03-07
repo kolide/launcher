@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -54,21 +55,33 @@ func Test_GetSet(t *testing.T) {
 			t.Parallel()
 
 			for _, s := range getStores(t) {
+				wg := sync.WaitGroup{}
 				for k, v := range tt.sets {
-					err := s.Set([]byte(k), []byte(v))
-					if tt.expectedErr {
-						require.Error(t, err)
-					} else {
+					k, v := k, v
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						err := s.Set([]byte(k), []byte(v))
+						if tt.expectedErr {
+							require.Error(t, err)
+							return
+						}
 						require.NoError(t, err)
-					}
+					}()
 				}
-
+				wg.Wait()
 				if !tt.expectedErr {
 					for k, v := range tt.gets {
-						val, err := s.Get([]byte(k))
-						require.NoError(t, err)
-						assert.Equal(t, v, string(val))
+						k, v := k, v
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							val, err := s.Get([]byte(k))
+							require.NoError(t, err)
+							assert.Equal(t, v, string(val))
+						}()
 					}
+					wg.Wait()
 				}
 			}
 		})
