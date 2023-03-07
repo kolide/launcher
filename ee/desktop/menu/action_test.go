@@ -40,11 +40,6 @@ func Test_Unmarshal(t *testing.T) {
 			data:   `{"type":"open-url","action":{"url":"https://localhost:3443"}}`,
 			action: Action{Type: OpenURL, Action: json.RawMessage(`{"url":"https://localhost:3443"}`), Performer: actionOpenURL{URL: "https://localhost:3443"}},
 		},
-		{
-			name:   "refresh menu",
-			data:   `{"type":"refresh-menu"}`,
-			action: Action{Type: RefreshMenu, Performer: actionRefreshMenu{}},
-		},
 	}
 	for _, tt := range tests {
 		tt := tt
