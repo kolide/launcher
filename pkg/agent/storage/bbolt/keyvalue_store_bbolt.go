@@ -2,7 +2,6 @@ package agentbbolt
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -17,6 +16,25 @@ import (
 const (
 	dbTestFileName = "test.db"
 )
+
+// NoBucketError is an error type that represents a nil bbolt database
+type NoDbError struct{}
+
+func (e NoDbError) Error() string {
+	return "bbolt db is nil"
+}
+
+// NoBucketError is an error type that represents a nonexistent bucket
+type NoBucketError struct {
+	bucketName string
+}
+
+func (e NoBucketError) Error() string {
+	return fmt.Sprintf("%s bucket does not exist", e.bucketName)
+}
+func NewNoBucketError(bucketName string) NoBucketError {
+	return NoBucketError{bucketName: bucketName}
+}
 
 type bboltKeyValueStore struct {
 	logger     log.Logger
@@ -49,13 +67,13 @@ func NewStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValu
 
 func (s *bboltKeyValueStore) Get(key []byte) (value []byte, err error) {
 	if s == nil || s.db == nil {
-		return nil, errors.New("db is nil")
+		return nil, NoDbError{}
 	}
 
 	if err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		value = b.Get(key)
@@ -69,13 +87,13 @@ func (s *bboltKeyValueStore) Get(key []byte) (value []byte, err error) {
 
 func (s *bboltKeyValueStore) Set(key, value []byte) error {
 	if s == nil || s.db == nil {
-		return errors.New("db is nil")
+		return NoDbError{}
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		if value != nil {
@@ -90,13 +108,13 @@ func (s *bboltKeyValueStore) Set(key, value []byte) error {
 
 func (s *bboltKeyValueStore) Delete(keys ...[]byte) error {
 	if s == nil || s.db == nil {
-		return errors.New("db is nil")
+		return NoDbError{}
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		for _, key := range keys {
@@ -112,13 +130,13 @@ func (s *bboltKeyValueStore) Delete(keys ...[]byte) error {
 
 func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil || s.db == nil {
-		return errors.New("db is nil")
+		return NoDbError{}
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		if err := b.ForEach(fn); err != nil {
@@ -131,7 +149,7 @@ func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 
 func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	if s == nil || s.db == nil {
-		return errors.New("db is nil")
+		return NoDbError{}
 	}
 
 	var kvPairs map[string]string
@@ -142,7 +160,7 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	err := s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		for key, value := range kvPairs {
@@ -168,7 +186,7 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
-			return fmt.Errorf("%s bucket does not exist", s.bucketName)
+			return NewNoBucketError(s.bucketName)
 		}
 
 		c := b.Cursor()
