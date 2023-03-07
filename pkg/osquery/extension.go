@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/mixer/clock"
@@ -31,6 +32,10 @@ import (
 	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	configBucketName = "config"
 )
 
 // Extension is the implementation of the osquery extension
@@ -179,11 +184,16 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
+	store, err := agentbbolt.NewStore(opts.Logger, db, configBucketName)
+	if err != nil {
+		return nil, fmt.Errorf("creating KVStore: %w", err)
+	}
+
 	if err := SetupLauncherKeys(db); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, db); err != nil {
+	if err := agent.SetupKeys(opts.Logger, store); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
