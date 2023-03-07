@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/storage"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/mixer/clock"
@@ -184,7 +184,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating DB buckets: %w", err)
 	}
 
-	store, err := storage.NewBBoltKeyValueStore(opts.Logger, db, configBucketName)
+	store, err := agentbbolt.NewStore(opts.Logger, db, configBucketName)
 	if err != nil {
 		return nil, fmt.Errorf("creating KVStore: %w", err)
 	}

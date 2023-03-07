@@ -1,14 +1,21 @@
-package storage
+package agentbbolt
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
+)
+
+const (
+	dbTestFileName = "test.db"
 )
 
 type bboltKeyValueStore struct {
@@ -17,7 +24,7 @@ type bboltKeyValueStore struct {
 	bucketName string
 }
 
-func NewBBoltKeyValueStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+func NewStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
 	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
@@ -184,4 +191,19 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 
 		return nil
 	})
+}
+
+// SetupDB is used for creating bbolt databases for testing
+func SetupDB(t *testing.T) *bbolt.DB {
+	// Create a temp directory to hold our bbolt db
+	dbDir := t.TempDir()
+
+	// Create database; ensure we clean it up after the test
+	db, err := bbolt.Open(filepath.Join(dbDir, dbTestFileName), 0600, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+
+	return db
 }

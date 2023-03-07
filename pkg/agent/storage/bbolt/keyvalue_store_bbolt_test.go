@@ -1,4 +1,4 @@
-package storage
+package agentbbolt
 
 import (
 	"bytes"
@@ -92,8 +92,8 @@ func Test_Updates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := setupDB(t)
-			bc, err := NewBBoltKeyValueStore(log.NewNopLogger(), db, tt.name)
+			db := SetupDB(t)
+			bc, err := NewStore(log.NewNopLogger(), db, tt.name)
 			require.NoError(t, err)
 
 			for _, update := range tt.updates {

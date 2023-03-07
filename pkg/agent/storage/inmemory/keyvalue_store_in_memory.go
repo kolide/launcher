@@ -1,4 +1,4 @@
-package storage
+package inmemory
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ type inMemoryKeyValueStore struct {
 	items  map[string][]byte
 }
 
-func NewInMemoryKeyValueStore(logger log.Logger) *inMemoryKeyValueStore {
+func NewStore(logger log.Logger) *inMemoryKeyValueStore {
 	s := &inMemoryKeyValueStore{
 		logger: logger,
 		items:  make(map[string][]byte),

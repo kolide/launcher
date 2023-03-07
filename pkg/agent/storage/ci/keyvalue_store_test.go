@@ -1,10 +1,12 @@
-package storage
+package storageci
 
 import (
 	"sync"
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,12 +14,12 @@ import (
 
 func getStores(t *testing.T) []types.KVStore {
 	logger := log.NewNopLogger()
-	db := setupDB(t)
-	bboltStore, err := NewBBoltKeyValueStore(logger, db, "test_bucket")
+	db := agentbbolt.SetupDB(t)
+	bboltStore, err := agentbbolt.NewStore(logger, db, "test_bucket")
 	require.NoError(t, err)
 
 	stores := []types.KVStore{
-		NewInMemoryKeyValueStore(logger),
+		inmemory.NewStore(logger),
 		bboltStore,
 	}
 	return stores

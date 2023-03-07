@@ -25,7 +25,7 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/storage"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -194,7 +194,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlStore, err := storage.NewBBoltKeyValueStore(logger, db, controlServiceBucketName)
+		controlStore, err := agentbbolt.NewStore(logger, db, controlServiceBucketName)
 		if err != nil {
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
@@ -206,13 +206,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer, err := storage.NewBBoltKeyValueStore(logger, db, osquery.ServerProvidedDataBucket)
+		serverDataBucketConsumer, err := agentbbolt.NewStore(logger, db, osquery.ServerProvidedDataBucket)
 		if err != nil {
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
 		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
 
-		desktopFlagsBucketConsumer, err := storage.NewBBoltKeyValueStore(logger, db, agentFlagsBucketName)
+		desktopFlagsBucketConsumer, err := agentbbolt.NewStore(logger, db, agentFlagsBucketName)
 		if err != nil {
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
@@ -231,7 +231,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
 
-		notificationStore, err := storage.NewBBoltKeyValueStore(logger, db, osquery.SentNotificationsBucket)
+		notificationStore, err := agentbbolt.NewStore(logger, db, osquery.SentNotificationsBucket)
 		if err != nil {
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
