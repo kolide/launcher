@@ -4,6 +4,12 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
+)
+
+const (
+	funcHasCapability = "hasCapability"
+	funcRelativeTime  = "relativeTime"
 )
 
 type TemplateData struct {
@@ -32,7 +38,37 @@ func (tp *templateParser) Parse(text string) (string, error) {
 		return "", fmt.Errorf("templateData is nil")
 	}
 
-	t, err := template.New("menu_template").Parse(text)
+	t, err := template.New("menu_template").Funcs(template.FuncMap{
+		// hasCapability enables interoperability between different versions of launcher
+		funcHasCapability: func(capability string) bool {
+			if capability == funcRelativeTime {
+				return true
+			}
+			return false
+		},
+		// relativeTime takes a Unix timestamp and returns a fuzzy timestamp
+		funcRelativeTime: func(timestamp int64) string {
+			currentTime := time.Now().Unix()
+			diff := timestamp - currentTime
+
+			switch {
+			case diff < 60*10: // less than 10 minutes
+				return "very soon"
+			case diff < 60*50: // less than 50 minutes
+				return fmt.Sprintf("in %d minutes", diff/60)
+			case diff < 60*90: // less than 90 minutes
+				return "in about an hour"
+			case diff < 60*60*23: // less than 23 hours
+				return fmt.Sprintf("in %d hours", diff/3600)
+			case diff < 60*60*36: // less than 36 hours
+				return "in one day"
+			case diff < 60*60*24*14: // less than 14 days
+				return fmt.Sprintf("in %d days", diff/86400)
+			default: // 2 weeks or more
+				return fmt.Sprintf("in %d weeks", diff/604800)
+			}
+		},
+	}).Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("could not parse template: %w", err)
 	}
