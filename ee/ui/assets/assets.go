@@ -31,6 +31,12 @@ var MenubarCircleXLightmodeIco []byte
 //go:embed menubar-circle-x-lightmode.png
 var MenubarCircleXLightmodePng []byte
 
+//go:embed menubar-circle-x-lightmode-shadow.ico
+var MenubarCircleXLightmodeShadowIco []byte
+
+//go:embed menubar-circle-x-lightmode-shadow.png
+var MenubarCircleXLightmodeShadowPng []byte
+
 //go:embed menubar-circle-x-monochrome.ico
 var MenubarCircleXMonochromeIco []byte
 
@@ -48,6 +54,12 @@ var MenubarDefaultLightmodeIco []byte
 
 //go:embed menubar-default-lightmode.png
 var MenubarDefaultLightmodePng []byte
+
+//go:embed menubar-default-lightmode-shadow.ico
+var MenubarDefaultLightmodeShadowIco []byte
+
+//go:embed menubar-default-lightmode-shadow.png
+var MenubarDefaultLightmodeShadowPng []byte
 
 //go:embed menubar-default-monochrome.ico
 var MenubarDefaultMonochromeIco []byte
@@ -67,6 +79,12 @@ var MenubarTranslucentLightmodeIco []byte
 //go:embed menubar-translucent-lightmode.png
 var MenubarTranslucentLightmodePng []byte
 
+//go:embed menubar-translucent-lightmode-shadow.ico
+var MenubarTranslucentLightmodeShadowIco []byte
+
+//go:embed menubar-translucent-lightmode-shadow.png
+var MenubarTranslucentLightmodeShadowPng []byte
+
 //go:embed menubar-translucent-monochrome.ico
 var MenubarTranslucentMonochromeIco []byte
 
@@ -84,6 +102,12 @@ var MenubarTriangleExclamationLightmodeIco []byte
 
 //go:embed menubar-triangle-exclamation-lightmode.png
 var MenubarTriangleExclamationLightmodePng []byte
+
+//go:embed menubar-triangle-exclamation-lightmode-shadow.ico
+var MenubarTriangleExclamationLightmodeShadowIco []byte
+
+//go:embed menubar-triangle-exclamation-lightmode-shadow.png
+var MenubarTriangleExclamationLightmodeShadowPng []byte
 
 //go:embed menubar-triangle-exclamation-monochrome.ico
 var MenubarTriangleExclamationMonochromeIco []byte

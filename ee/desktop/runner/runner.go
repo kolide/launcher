@@ -346,7 +346,7 @@ func (r *DesktopUsersProcessesRunner) Ping() {
 	enabled := enabledRaw != nil
 
 	r.processSpawningEnabled = enabled
-	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
+	level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(enabled)))
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
@@ -455,7 +455,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := r.runAsUser(uid, cmd); err != nil {
+		if err := r.runAsUser(ctx, uid, cmd); err != nil {
 			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
