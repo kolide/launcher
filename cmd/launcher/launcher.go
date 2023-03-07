@@ -185,7 +185,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
-	// figure out if we should spawn desktop processes, this is should get simpler in the future
+	// Figure out if we should enable desktop process spawning by default:
+	// If we're in a Kolide test environment, process spawning should be enabled by default.
+	// For production, it is disabled by default.
+	// In both cases, process spawning can be overridden via control server interaction -- see agent_flags subsystem.
 	desktopProcessSpawningEnabled :=
 		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
 			opts.KolideServerURL == "localhost:3443" ||
