@@ -217,6 +217,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
+			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
