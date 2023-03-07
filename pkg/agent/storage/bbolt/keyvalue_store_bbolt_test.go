@@ -1,10 +1,9 @@
-package control
+package agentbbolt
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -93,8 +92,9 @@ func Test_Updates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := createDb(t)
-			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
+			db := SetupDB(t)
+			bc, err := NewStore(log.NewNopLogger(), db, tt.name)
+			require.NoError(t, err)
 
 			for _, update := range tt.updates {
 				updateBytes, err := json.Marshal(update)
@@ -118,60 +118,6 @@ func Test_Updates(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test_GetSet(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		sets map[string]string
-		gets map[string]string
-	}{
-		{
-			name: "empty",
-			sets: map[string]string{},
-			gets: map[string]string{},
-		},
-		{
-			name: "multiple",
-			sets: map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
-			gets: map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			db := createDb(t)
-			bc := NewBucketConsumer(log.NewNopLogger(), db, tt.name)
-
-			for k, v := range tt.sets {
-				err := bc.Set([]byte(k), []byte(v))
-				require.NoError(t, err)
-			}
-
-			for k, v := range tt.gets {
-				val, err := bc.Get([]byte(k))
-				require.NoError(t, err)
-				assert.Equal(t, v, string(val))
-			}
-		})
-	}
-}
-
-func createDb(t *testing.T) *bbolt.DB {
-	dir := t.TempDir()
-
-	db, err := bbolt.Open(filepath.Join(dir, "db"), 0600, nil)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	return db
 }
 
 func getKeyValueRows(db *bbolt.DB, bucketName string) ([]map[string]string, error) {

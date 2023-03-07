@@ -21,11 +21,11 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -36,6 +36,17 @@ import (
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
+)
+
+const (
+	// Buckets used by launcher
+	agentFlagsBucketName     = "agent_flags"
+	controlServiceBucketName = "control_service_data"
+
+	// Subsystems that launcher listens for control server updates on
+	agentFlagsSubsystemName  = "agent_flags"
+	serverDataSubsystemName  = "kolide_server_data"
+	desktopMenuSubsystemName = "kolide_desktop_menu"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -201,18 +212,29 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, db, opts)
+		controlStore, err := agentbbolt.NewStore(logger, db, controlServiceBucketName)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
+
+		controlService, err := createControlService(ctx, logger, controlStore, opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer := control.NewBucketConsumer(logger, db, osquery.ServerProvidedDataBucket)
-		controlService.RegisterConsumer("kolide_server_data", serverDataBucketConsumer)
+		serverDataBucketConsumer, err := agentbbolt.NewStore(logger, db, osquery.ServerProvidedDataBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
+		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
 
-		desktopFlagsBucketConsumer := control.NewBucketConsumer(logger, db, "agent_flags")
-		controlService.RegisterConsumer("agent_flags", desktopFlagsBucketConsumer)
+		desktopFlagsBucketConsumer, err := agentbbolt.NewStore(logger, db, agentFlagsBucketName)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
+		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
 
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
@@ -225,12 +247,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
-		controlService.RegisterConsumer("kolide_desktop_menu", runner)
-		controlService.RegisterSubscriber("agent_flags", runner)
+		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
+		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
+
+		notificationStore, err := agentbbolt.NewStore(logger, db, osquery.SentNotificationsBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore: %w", err)
+		}
 
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			db,
+			notificationStore,
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
