@@ -3,12 +3,14 @@ package localserver
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
 )
 
@@ -87,95 +89,168 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		testName  string
-		queryName string
+	type queryReturn struct {
+		results []map[string]string
+		err     error
+	}
 
-		// a successful test would have 2 queries
-		// mockScheduledQuerySqlFetchResults - the first one returns the sql from the scheduled query
-		mockScheduledQuerySqlFetchResults []map[string]string
-
-		// mockQueryResults -the second one returns the results of the sql fetched in previous query
-		mockQueryResults []map[string]string
-
-		errStr string
+	test := []struct {
+		testName                         string
+		scheduledQueriesQueryNamePattern string
+		scheduledQueriesQueryResults     []map[string]string
+		scheduledQueriesQueryError       error
+		queryReturns                     []queryReturn
+		expectedResult                   []distributed.Result
 	}{
 		{
-			testName:  "happy path",
-			queryName: "some_scheduled_query",
-			mockScheduledQuerySqlFetchResults: []map[string]string{
+			testName:                         "no scheduled queries",
+			scheduledQueriesQueryNamePattern: "%does_not_exist%",
+			scheduledQueriesQueryResults:     []map[string]string{},
+			expectedResult:                   []distributed.Result{},
+		},
+		{
+			testName:                         "one scheduled query",
+			scheduledQueriesQueryNamePattern: "%one_query_found%",
+			scheduledQueriesQueryResults: []map[string]string{
 				{
-					"query": "select * from some_table",
+					"query": "select * from one",
+					"name":  "one",
 				},
 			},
-			mockQueryResults: []map[string]string{
+			queryReturns: []queryReturn{
 				{
-					"results (could be anything)": "results of query",
+					results: []map[string]string{
+						{
+							"one": "one",
+						},
+					},
+				},
+			},
+			expectedResult: []distributed.Result{
+				{
+					QueryName: "one",
+					Status:    0,
+					Rows: []map[string]string{
+						{
+							"one": "one",
+						},
+					},
 				},
 			},
 		},
 		{
-			testName:                          "no scheduled query found",
-			queryName:                         "some_scheduled_query",
-			mockScheduledQuerySqlFetchResults: []map[string]string{},
-			errStr:                            "no scheduled query found",
+			testName:                         "multiple scheduled queries with error",
+			scheduledQueriesQueryNamePattern: "%three_queries_found%",
+			scheduledQueriesQueryResults: []map[string]string{
+				{
+					"query": "select * from one",
+					"name":  "one",
+				},
+				{
+					"query": "select * from two",
+					"name":  "two",
+				},
+				{
+					"query": "select * from three",
+					"name":  "three",
+				},
+			},
+			queryReturns: []queryReturn{
+				{
+					results: []map[string]string{
+						{
+							"one": "one",
+						},
+					},
+				},
+				{
+					err: errors.New("error two"),
+				},
+				{
+					results: []map[string]string{
+						{
+							"three": "three",
+						},
+					},
+				},
+			},
+			expectedResult: []distributed.Result{
+				{
+					QueryName: "one",
+					Status:    0,
+					Rows: []map[string]string{
+						{
+							"one": "one",
+						},
+					},
+				},
+				{
+					QueryName: "two",
+					Status:    1,
+				},
+				{
+					QueryName: "three",
+					Status:    0,
+					Rows: []map[string]string{
+						{
+							"three": "three",
+						},
+					},
+				},
+			},
 		},
 		{
-			testName: "no query name",
-			errStr:   "no name key found in request body",
-		},
-		{
-			testName:  "empty query name",
-			errStr:    "no name key found in request body",
-			queryName: "",
+			testName:                         "scheduled queries query error",
+			scheduledQueriesQueryNamePattern: "%scheduled_queries_query_error%",
+			scheduledQueriesQueryError:       errors.New("scheduled query error"),
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range test {
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
-			//go:generate mockery --name Querier
-			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
+			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
+			scheduledQueryQuery := fmt.Sprintf("select name, query from osquery_schedule where name like '%s'", tt.scheduledQueriesQueryNamePattern)
 
-			if tt.mockScheduledQuerySqlFetchResults != nil {
-				// first query to get the sql of the scheduled query
-				mockQuerier.On("Query", fmt.Sprintf("select query from osquery_schedule where name = '%s'", tt.queryName)).Return(tt.mockScheduledQuerySqlFetchResults, nil).Once()
+			// the query for the scheduled queries
+			mockQuerier.On("Query", scheduledQueryQuery).Return(tt.scheduledQueriesQueryResults, tt.scheduledQueriesQueryError)
+
+			// the results of each scheduled query
+			for i, queryResult := range tt.queryReturns {
+				mockQuerier.On("Query", tt.scheduledQueriesQueryResults[i]["query"]).Return(queryResult.results, queryResult.err)
 			}
 
-			if tt.mockQueryResults != nil {
-				// second query to get the results of the sql fetched in previous query
-				mockQuerier.On("Query", tt.mockScheduledQuerySqlFetchResults[0]["query"]).Return(tt.mockQueryResults, nil).Once()
-			}
-
+			// set up test server
 			var logBytes bytes.Buffer
 			server := testServer(t, &logBytes)
 			server.querier = mockQuerier
 
+			// make request body
 			body := make(map[string]string)
-
-			if tt.queryName != "" {
-				body["name"] = tt.queryName
-			}
-
+			body["name"] = tt.scheduledQueriesQueryNamePattern
 			jsonBytes, err := json.Marshal(body)
 			require.NoError(t, err)
 
+			// set up request
 			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
 			require.NoError(t, err)
 
+			// set up handler
 			handler := http.HandlerFunc(server.requestScheduledQueryHandlerFunc)
 			rr := httptest.NewRecorder()
+
+			// server request
 			handler.ServeHTTP(rr, req)
 
-			if tt.errStr != "" {
-				require.Contains(t, rr.Body.String(), tt.errStr)
+			if tt.scheduledQueriesQueryError != nil {
+				require.Contains(t, rr.Body.String(), tt.scheduledQueriesQueryError.Error())
 				return
 			}
 
-			require.Equal(t, mustMarshal(t, tt.mockQueryResults), rr.Body.Bytes())
+			require.Equal(t, mustMarshal(t, tt.expectedResult), rr.Body.Bytes())
 			return
 		})
 	}

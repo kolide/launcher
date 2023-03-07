@@ -1,14 +1,14 @@
 package localserver
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
 func (ls *localServer) requestQueryHandler() http.Handler {
@@ -33,13 +33,7 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var results []map[string]string
-	var err error
-	backoff.WaitFor(func() error {
-		results, err = ls.querier.Query(query)
-		return err
-	}, 1*time.Second, 250*time.Millisecond)
-
+	results, err := queryWithRetries(ls.querier, query)
 	if err != nil {
 		sendClientError(w, fmt.Sprintf("error executing query: %s", err))
 		return
@@ -86,38 +80,60 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 		return
 	}
 
-	scheduledQueryQuery := fmt.Sprintf("select query from osquery_schedule where name = '%s'", name)
+	scheduledQueryQuery := fmt.Sprintf("select name, query from osquery_schedule where name like '%s'", name)
 
-	var results []map[string]string
-	var err error
-	backoff.WaitFor(func() error {
-		results, err = ls.querier.Query(scheduledQueryQuery)
-		return err
-	}, 1*time.Second, 250*time.Millisecond)
-
+	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error executing query for scheduled using \"%s\": %s", scheduledQueryQuery, err))
+		sendClientError(w, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
 
-	if len(results) == 0 {
-		sendClientError(w, fmt.Sprintf("no scheduled query found using \"%s\"", scheduledQueryQuery))
-		return
+	results := make([]distributed.Result, len(scheduledQueriesQueryResults))
+
+	for i, scheduledQuery := range scheduledQueriesQueryResults {
+		results[i] = distributed.Result{
+			QueryName: scheduledQuery["name"],
+		}
+
+		scheduledQueryResult, err := queryWithRetries(ls.querier, scheduledQuery["query"])
+		if err != nil {
+			level.Error(ls.logger).Log(
+				"msg", "running scheduled query on demand",
+				"err", err,
+				"query", scheduledQuery["query"],
+				"query_name", scheduledQuery["name"],
+			)
+
+			results[i].Status = 1
+			continue
+		}
+
+		// no error
+		results[i].Rows = scheduledQueryResult
 	}
 
-	jsonBytes, err := json.Marshal(results[0])
+	jsonBytes, err := json.Marshal(results)
 	if err != nil {
 		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
 		return
 	}
 
-	// update the request body with the sql from the scheduled query and pass along to query handler
-	r.Body = io.NopCloser(bytes.NewBuffer(jsonBytes))
-
-	ls.requestQueryHanlderFunc(w, r)
+	w.Write(jsonBytes)
 }
 
 func sendClientError(w http.ResponseWriter, msg string) {
 	w.Write([]byte(msg))
 	w.WriteHeader(http.StatusBadRequest)
+}
+
+func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {
+	var results []map[string]string
+	var err error
+
+	backoff.WaitFor(func() error {
+		results, err = querier.Query(query)
+		return err
+	}, 1*time.Second, 250*time.Millisecond)
+
+	return results, err
 }
