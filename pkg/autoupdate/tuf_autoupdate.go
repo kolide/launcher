@@ -31,15 +31,16 @@ const (
 )
 
 type TufAutoupdater struct {
-	metadataClient *client.Client
-	mirrorClient   *http.Client
-	mirrorUrl      string
-	binary         string
-	channel        UpdateChannel
-	checkInterval  time.Duration
-	errorCounter   []int64
-	interrupt      chan struct{}
-	logger         log.Logger
+	metadataClient  *client.Client
+	mirrorClient    *http.Client
+	mirrorUrl       string
+	binary          string
+	operatingSystem string
+	channel         UpdateChannel
+	checkInterval   time.Duration
+	errorCounter    []int64
+	interrupt       chan struct{}
+	logger          log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -67,7 +68,7 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 
 	// Set up the local TUF directory for our TUF client
 	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-new", strings.TrimSuffix(binaryName, ".exe")))
-	if err := os.MkdirAll(localTufDirectory, 0755); err != nil {
+	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
 
@@ -92,15 +93,16 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 	}
 
 	ta := &TufAutoupdater{
-		metadataClient: metadataClient,
-		mirrorClient:   http.DefaultClient,
-		mirrorUrl:      mirrorUrl,
-		binary:         binaryName,
-		channel:        Stable,
-		interrupt:      make(chan struct{}),
-		checkInterval:  60 * time.Second,
-		errorCounter:   make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
-		logger:         log.NewNopLogger(),
+		metadataClient:  metadataClient,
+		mirrorClient:    http.DefaultClient,
+		mirrorUrl:       mirrorUrl,
+		binary:          binaryName,
+		operatingSystem: runtime.GOOS,
+		channel:         Stable,
+		interrupt:       make(chan struct{}),
+		checkInterval:   60 * time.Second,
+		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
+		logger:          log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -162,7 +164,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), runtime.GOOS, ta.channel)
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -196,7 +198,7 @@ func (ta *TufAutoupdater) versionFromTarget(target string) string {
 	strippedBinary := strings.TrimSuffix(ta.binary, ".exe")
 
 	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, runtime.GOOS, strippedBinary)
+	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, ta.operatingSystem, strippedBinary)
 
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
