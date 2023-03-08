@@ -112,6 +112,8 @@ type updaterCmd struct {
 	monitorInterval         time.Duration
 }
 
+const allowableDailyErrorCountThreshold = 4
+
 func (u *updaterCmd) execute() error {
 	// When launcher first starts, we'd like the
 	// server to start receiving data
@@ -145,7 +147,6 @@ func (u *updaterCmd) execute() error {
 
 func (u *updaterCmd) monitorUpdater() {
 	// monitor new updater, falling back to old one
-	errorThreshold := 5
 	for {
 		level.Debug(u.config.Logger).Log("msg", "monitoring logger for errors")
 
@@ -159,7 +160,7 @@ func (u *updaterCmd) monitorUpdater() {
 			}
 
 			currentErrorCount := u.updater.ErrorCount()
-			if currentErrorCount > errorThreshold {
+			if currentErrorCount > allowableDailyErrorCountThreshold {
 				// Too many errors. Stop the new updater and fall back to the old one.
 				u.stopExecution()
 				u.runFallback = true

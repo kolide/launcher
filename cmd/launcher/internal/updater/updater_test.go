@@ -270,7 +270,7 @@ func Test_updaterCmd_fallback(t *testing.T) {
 
 	// Expect that the updater cmd initially works, and then reports many errors
 	updaterMock.On("ErrorCount").Return(0).Once()
-	updaterMock.On("ErrorCount").Return(10000000).Once()
+	updaterMock.On("ErrorCount").Return(allowableDailyErrorCountThreshold + 1).Once()
 
 	// Expect that the updater cmd runs the fallback updater
 	fallbackUpdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(fallbackStopFunc, nil).Once()
