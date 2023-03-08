@@ -31,6 +31,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 
 	"github.com/theupdateframework/notary/client"
@@ -417,7 +418,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	if err := os.MkdirAll(localRepo, 0755); err != nil {
 		return fmt.Errorf("make autoupdate dir %s: %w", localRepo, err)
 	}
-	if err := bootstrapFromTUF("https://tuf-devel.kolide.com", localRepo); err != nil {
+	if err := bootstrapFromTUF(autoupdate.DefaultTufServer, localRepo); err != nil {
 		return fmt.Errorf("bootstrap TUF: %w", err)
 	}
 

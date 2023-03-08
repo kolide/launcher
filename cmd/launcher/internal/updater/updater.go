@@ -23,6 +23,7 @@ type UpdaterConfig struct {
 	UpdateChannel      autoupdate.UpdateChannel
 	InitialDelay       time.Duration // start delay, to avoid whomping critical early data
 	NotaryURL          string
+	TufServerURL       string
 	MirrorURL          string
 	NotaryPrefix       string
 	HTTPClient         *http.Client
@@ -47,7 +48,7 @@ func NewUpdater(
 
 	// create the updater
 	updater, err := autoupdate.NewTufClient(
-		"https://tuf-devel.kolide.com",
+		config.TufServerURL,
 		config.MirrorURL,
 		binaryPath,
 		string(config.UpdateChannel),

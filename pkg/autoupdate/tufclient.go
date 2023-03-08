@@ -29,7 +29,8 @@ import (
 var rootJson []byte
 
 const (
-	errorCounterKey = "tuf_errors"
+	DefaultTufServer = "https://tuf-devel.kolide.com"
+	errorCounterKey  = "tuf_errors"
 )
 
 type tufClient struct {
