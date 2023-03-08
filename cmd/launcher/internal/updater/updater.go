@@ -51,10 +51,11 @@ func NewUpdater(
 		config.TufServerURL,
 		config.MirrorURL,
 		binaryPath,
-		string(config.UpdateChannel),
 		config.RootDirectory,
 		config.SigChannel,
-		config.Logger,
+		autoupdate.WithTufLogger(config.Logger),
+		autoupdate.WithChannel(config.UpdateChannel),
+		autoupdate.WithUpdateCheckInterval(config.AutoupdateInterval),
 	)
 	if err != nil {
 		return nil, err

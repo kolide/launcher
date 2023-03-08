@@ -41,7 +41,7 @@ type TufAutoupdater struct {
 	mirrorClient     *http.Client
 	mirrorUrl        string
 	binary           string
-	channel          string
+	channel          UpdateChannel
 	stagingDirectory string
 	updatesDirectory string
 	checkInterval    time.Duration
@@ -52,7 +52,27 @@ type TufAutoupdater struct {
 	logger           log.Logger
 }
 
-func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, channel, rootDirectory string, restartChannel chan os.Signal, logger log.Logger) (*TufAutoupdater, error) {
+type TufAutoupdaterOption func(*TufAutoupdater)
+
+func WithTufLogger(logger log.Logger) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		ta.logger = log.With(logger, "component", "tuf_autoupdater")
+	}
+}
+
+func WithChannel(channel UpdateChannel) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		ta.channel = channel
+	}
+}
+
+func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		ta.checkInterval = checkInterval
+	}
+}
+
+func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, restartChannel chan os.Signal, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	// Ensure that the staging directory exists, creating it if not
 	binaryName := filepath.Base(binaryPath)
 	stagingDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-staging", binaryName))
@@ -94,22 +114,28 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, channel, rootDirector
 
 	// Set up our error tracker -- holds error counts per hour for the last 24 hours
 	errorCounter := metrics.NewInmemSink(1*time.Hour, 24*time.Hour)
-	metrics.NewGlobal(metrics.DefaultConfig("tuf_client"), errorCounter)
+	metrics.NewGlobal(metrics.DefaultConfig("tuf_autoupdater"), errorCounter)
 
-	return &TufAutoupdater{
+	ta := &TufAutoupdater{
 		metadataClient:   metadataClient,
 		mirrorClient:     http.DefaultClient,
 		mirrorUrl:        mirrorUrl,
 		binary:           binaryName,
-		channel:          channel,
+		channel:          Stable,
 		stagingDirectory: stagingDirectory,
 		updatesDirectory: updatesDirectory,
 		interrupt:        make(chan struct{}),
 		restartChannel:   restartChannel,
 		checkInterval:    60 * time.Second,
 		errorCounter:     errorCounter,
-		logger:           log.With(logger, "component", "tuf_client"),
-	}, nil
+		logger:           log.NewNopLogger(),
+	}
+
+	for _, opt := range opts {
+		opt(ta)
+	}
+
+	return ta, nil
 }
 
 func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error) {
