@@ -1,5 +1,8 @@
 package autoupdate
 
+// This new autoupdater points to our new TUF infrastructure, and will eventually supersede
+// the legacy `Updater` in autoupdate.go that points to Notary.
+
 import (
 	"context"
 	"crypto/sha512"
@@ -33,7 +36,7 @@ const (
 	errorCounterKey  = "tuf_errors"
 )
 
-type tufClient struct {
+type TufAutoupdater struct {
 	metadataClient   *client.Client
 	mirrorClient     *http.Client
 	mirrorUrl        string
@@ -49,7 +52,7 @@ type tufClient struct {
 	logger           log.Logger
 }
 
-func NewTufClient(metadataUrl, mirrorUrl, binaryPath, channel, rootDirectory string, restartChannel chan os.Signal, logger log.Logger) (*tufClient, error) {
+func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, channel, rootDirectory string, restartChannel chan os.Signal, logger log.Logger) (*TufAutoupdater, error) {
 	// Ensure that the staging directory exists, creating it if not
 	binaryName := filepath.Base(binaryPath)
 	stagingDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-staging", binaryName))
@@ -89,11 +92,11 @@ func NewTufClient(metadataUrl, mirrorUrl, binaryPath, channel, rootDirectory str
 		return nil, fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
 	}
 
-	// Set up our error tracker
+	// Set up our error tracker -- holds error counts per hour for the last 24 hours
 	errorCounter := metrics.NewInmemSink(1*time.Hour, 24*time.Hour)
 	metrics.NewGlobal(metrics.DefaultConfig("tuf_client"), errorCounter)
 
-	return &tufClient{
+	return &TufAutoupdater{
 		metadataClient:   metadataClient,
 		mirrorClient:     http.DefaultClient,
 		mirrorUrl:        mirrorUrl,
@@ -109,14 +112,14 @@ func NewTufClient(metadataUrl, mirrorUrl, binaryPath, channel, rootDirectory str
 	}, nil
 }
 
-func (tc *tufClient) Run(opts ...legacytuf.Option) (stop func(), err error) {
-	go tc.loop()
+func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error) {
+	go ta.loop()
 
-	return tc.stop, nil
+	return ta.stop, nil
 }
 
-func (tc *tufClient) ErrorCount() int {
-	intervalMetrics := tc.errorCounter.Data()
+func (ta *TufAutoupdater) ErrorCount() int {
+	intervalMetrics := ta.errorCounter.Data()
 
 	errorCount := 0
 	for _, m := range intervalMetrics {
@@ -128,34 +131,34 @@ func (tc *tufClient) ErrorCount() int {
 	return errorCount
 }
 
-func (tc *tufClient) loop() error {
-	checkTicker := time.NewTicker(tc.checkInterval)
+func (ta *TufAutoupdater) loop() error {
+	checkTicker := time.NewTicker(ta.checkInterval)
 
 	for {
 		select {
 		case <-checkTicker.C:
-			if err := tc.checkForUpdate(); err != nil {
-				tc.errorCounter.IncrCounter([]string{errorCounterKey}, 1)
-				level.Debug(tc.logger).Log("msg", "error checking for update", "err", err)
+			if err := ta.checkForUpdate(); err != nil {
+				ta.errorCounter.IncrCounter([]string{errorCounterKey}, 1)
+				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
-		case <-tc.interrupt:
-			level.Debug(tc.logger).Log("msg", "received interrupt, stopping")
+		case <-ta.interrupt:
+			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
 			return nil
 		}
 	}
 }
 
-func (tc *tufClient) stop() {
-	tc.interrupt <- struct{}{}
+func (ta *TufAutoupdater) stop() {
+	ta.interrupt <- struct{}{}
 }
 
-func (tc *tufClient) checkForUpdate() error {
-	targets, err := tc.metadataClient.Update()
+func (ta *TufAutoupdater) checkForUpdate() error {
+	targets, err := ta.metadataClient.Update()
 	if err != nil {
 		return fmt.Errorf("could not update metadata: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(tc.binary, ".exe"), runtime.GOOS, tc.channel)
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), runtime.GOOS, ta.channel)
 	var newTarget string
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
@@ -173,7 +176,7 @@ func (tc *tufClient) checkForUpdate() error {
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		newTargetVersion := tc.versionFromTarget(custom.Target)
+		newTargetVersion := ta.versionFromTarget(custom.Target)
 		if newTargetVersion != version.Version().Version {
 			newTarget = custom.Target
 		}
@@ -186,25 +189,25 @@ func (tc *tufClient) checkForUpdate() error {
 		return nil
 	}
 
-	if err := tc.stageDownload(newTarget); err != nil {
+	if err := ta.stageDownload(newTarget); err != nil {
 		return fmt.Errorf("could not stage download: %w", err)
 	}
 
-	if err := tc.verifyStagedDownload(newTarget); err != nil {
+	if err := ta.verifyStagedDownload(newTarget); err != nil {
 		return fmt.Errorf("could not verify staged download: %w", err)
 	}
 
-	if err := tc.moveVerifiedUpdate(newTarget); err != nil {
+	if err := ta.moveVerifiedUpdate(newTarget); err != nil {
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
-	tc.finalizeUpdate()
+	ta.finalizeUpdate()
 
 	return nil
 }
 
-func (tc *tufClient) versionFromTarget(target string) string {
-	strippedBinary := strings.TrimSuffix(tc.binary, ".exe")
+func (ta *TufAutoupdater) versionFromTarget(target string) string {
+	strippedBinary := strings.TrimSuffix(ta.binary, ".exe")
 
 	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
 	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, runtime.GOOS, strippedBinary)
@@ -212,15 +215,15 @@ func (tc *tufClient) versionFromTarget(target string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
 
-func (tc *tufClient) stageDownload(target string) error {
-	stagedDownloadLocation := tc.downloadLocation(target)
+func (ta *TufAutoupdater) stageDownload(target string) error {
+	stagedDownloadLocation := ta.downloadLocation(target)
 	out, err := os.Create(stagedDownloadLocation)
 	if err != nil {
 		return fmt.Errorf("could not create file at %s: %w", stagedDownloadLocation, err)
 	}
 	defer out.Close()
 
-	resp, err := tc.mirrorClient.Get(tc.mirrorUrl + fmt.Sprintf("/kolide/%s", target))
+	resp, err := ta.mirrorClient.Get(ta.mirrorUrl + fmt.Sprintf("/kolide/%s", target))
 	if err != nil {
 		return fmt.Errorf("could not make request to download target %s: %w", target, err)
 	}
@@ -234,8 +237,8 @@ func (tc *tufClient) stageDownload(target string) error {
 	return nil
 }
 
-func (tc *tufClient) verifyStagedDownload(target string) error {
-	stagedDownloadLocation := tc.downloadLocation(target)
+func (ta *TufAutoupdater) verifyStagedDownload(target string) error {
+	stagedDownloadLocation := ta.downloadLocation(target)
 	digest, err := sha512Digest(stagedDownloadLocation)
 	if err != nil {
 		return fmt.Errorf("could not compute digest for target %s to verify it: %w", target, err)
@@ -246,23 +249,23 @@ func (tc *tufClient) verifyStagedDownload(target string) error {
 		return fmt.Errorf("could not get info for downloaded file at %s: %w", stagedDownloadLocation, err)
 	}
 
-	tufRepoPath := filepath.Join(tc.binary, runtime.GOOS, target)
-	if err := tc.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), tufRepoPath); err != nil {
+	tufRepoPath := filepath.Join(ta.binary, runtime.GOOS, target)
+	if err := ta.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), tufRepoPath); err != nil {
 		return fmt.Errorf("digest verification failed for target %s downloaded to %s: %w", target, stagedDownloadLocation, err)
 	}
 
 	return nil
 }
 
-func (tc *tufClient) moveVerifiedUpdate(target string) error {
-	newUpdateDirectoryPath := filepath.Join(tc.updatesDirectory, strconv.FormatInt(time.Now().Unix(), 10))
+func (ta *TufAutoupdater) moveVerifiedUpdate(target string) error {
+	newUpdateDirectoryPath := filepath.Join(ta.updatesDirectory, strconv.FormatInt(time.Now().Unix(), 10))
 	if err := os.MkdirAll(newUpdateDirectoryPath, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectoryPath, err)
 	}
 
 	removeBrokenUpdateDir := func() {
 		if err := os.RemoveAll(newUpdateDirectoryPath); err != nil {
-			level.Debug(tc.logger).Log(
+			level.Debug(ta.logger).Log(
 				"msg", "could not remove broken update directory",
 				"update_dir", newUpdateDirectoryPath,
 				"err", err,
@@ -270,14 +273,14 @@ func (tc *tufClient) moveVerifiedUpdate(target string) error {
 		}
 	}
 
-	fileToUntarAndMove := tc.downloadLocation(target)
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectoryPath, tc.binary), fileToUntarAndMove); err != nil {
+	fileToUntarAndMove := ta.downloadLocation(target)
+	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectoryPath, ta.binary), fileToUntarAndMove); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not untar update %s to %s: %w", fileToUntarAndMove, newUpdateDirectoryPath, err)
 	}
 
 	// Make sure that the binary is executable
-	outputBinary := filepath.Join(newUpdateDirectoryPath, tc.binary)
+	outputBinary := filepath.Join(newUpdateDirectoryPath, ta.binary)
 	if err := os.Chmod(outputBinary, 0755); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
@@ -292,26 +295,26 @@ func (tc *tufClient) moveVerifiedUpdate(target string) error {
 	return nil
 }
 
-func (tc *tufClient) downloadLocation(target string) string {
-	return filepath.Join(tc.stagingDirectory, runtime.GOOS, target)
+func (ta *TufAutoupdater) downloadLocation(target string) string {
+	return filepath.Join(ta.stagingDirectory, runtime.GOOS, target)
 }
 
-func (tc *tufClient) finalizeUpdate() {
-	err := tc.finalizer()
+func (ta *TufAutoupdater) finalizeUpdate() {
+	err := ta.finalizer()
 	if err == nil {
 		// All set, no restart needed
 		return
 	}
 
 	if IsLauncherRestartNeededErr(err) {
-		level.Debug(tc.logger).Log("msg", "signaling for a full restart")
-		tc.restartChannel <- os.Interrupt
+		level.Debug(ta.logger).Log("msg", "signaling for a full restart")
+		ta.restartChannel <- os.Interrupt
 		return
 	}
 
 	// Unexpected error -- trigger a restart
-	level.Debug(tc.logger).Log("unexpected error when finalizing update, signaling for a full restart", "err", err)
-	tc.restartChannel <- os.Interrupt
+	level.Debug(ta.logger).Log("unexpected error when finalizing update, signaling for a full restart", "err", err)
+	ta.restartChannel <- os.Interrupt
 }
 
 func sha512Digest(filename string) (string, error) {

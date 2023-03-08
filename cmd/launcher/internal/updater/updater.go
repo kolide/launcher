@@ -47,7 +47,7 @@ func NewUpdater(
 	config.Logger = log.With(config.Logger, "updater", filepath.Base(binaryPath))
 
 	// create the updater
-	updater, err := autoupdate.NewTufClient(
+	updater, err := autoupdate.NewTufAutoupdater(
 		config.TufServerURL,
 		config.MirrorURL,
 		binaryPath,
