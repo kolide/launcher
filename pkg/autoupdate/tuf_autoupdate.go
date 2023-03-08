@@ -4,25 +4,17 @@ package autoupdate
 // the legacy `Updater` in autoupdate.go that points to Notary.
 
 import (
-	"context"
-	"crypto/sha512"
 	_ "embed"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/armon/go-metrics"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/version"
 	legacytuf "github.com/kolide/updater/tuf"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -47,8 +39,6 @@ type TufAutoupdater struct {
 	checkInterval    time.Duration
 	errorCounter     *metrics.InmemSink
 	interrupt        chan struct{}
-	finalizer        UpdateFinalizer
-	restartChannel   chan os.Signal
 	logger           log.Logger
 }
 
@@ -72,7 +62,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, restartChannel chan os.Signal, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	// Ensure that the staging directory exists, creating it if not
 	binaryName := filepath.Base(binaryPath)
 	stagingDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-staging", binaryName))
@@ -125,7 +115,6 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 		stagingDirectory: stagingDirectory,
 		updatesDirectory: updatesDirectory,
 		interrupt:        make(chan struct{}),
-		restartChannel:   restartChannel,
 		checkInterval:    60 * time.Second,
 		errorCounter:     errorCounter,
 		logger:           log.NewNopLogger(),
@@ -179,181 +168,10 @@ func (ta *TufAutoupdater) stop() {
 }
 
 func (ta *TufAutoupdater) checkForUpdate() error {
-	targets, err := ta.metadataClient.Update()
+	_, err := ta.metadataClient.Update()
 	if err != nil {
 		return fmt.Errorf("could not update metadata: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), runtime.GOOS, ta.channel)
-	var newTarget string
-	for targetName, target := range targets {
-		if targetName != targetReleaseFile {
-			continue
-		}
-
-		// We found the release file that matches our OS and binary. Evaluate it
-		// to see if we have a new release to download.
-		type releaseFileCustomMetadata struct {
-			Target string `json:"target"`
-		}
-
-		var custom releaseFileCustomMetadata
-		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
-			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
-		}
-
-		newTargetVersion := ta.versionFromTarget(custom.Target)
-		if newTargetVersion != version.Version().Version {
-			newTarget = custom.Target
-		}
-
-		break
-	}
-
-	if newTarget == "" {
-		// Nothing to do
-		return nil
-	}
-
-	if err := ta.stageDownload(newTarget); err != nil {
-		return fmt.Errorf("could not stage download: %w", err)
-	}
-
-	if err := ta.verifyStagedDownload(newTarget); err != nil {
-		return fmt.Errorf("could not verify staged download: %w", err)
-	}
-
-	if err := ta.moveVerifiedUpdate(newTarget); err != nil {
-		return fmt.Errorf("could not move verified update: %w", err)
-	}
-
-	ta.finalizeUpdate()
-
 	return nil
-}
-
-func (ta *TufAutoupdater) versionFromTarget(target string) string {
-	strippedBinary := strings.TrimSuffix(ta.binary, ".exe")
-
-	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, runtime.GOOS, strippedBinary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
-}
-
-func (ta *TufAutoupdater) stageDownload(target string) error {
-	stagedDownloadLocation := ta.downloadLocation(target)
-	out, err := os.Create(stagedDownloadLocation)
-	if err != nil {
-		return fmt.Errorf("could not create file at %s: %w", stagedDownloadLocation, err)
-	}
-	defer out.Close()
-
-	resp, err := ta.mirrorClient.Get(ta.mirrorUrl + fmt.Sprintf("/kolide/%s", target))
-	if err != nil {
-		return fmt.Errorf("could not make request to download target %s: %w", target, err)
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return fmt.Errorf("could not write downloaded target %s to file %s: %w", target, stagedDownloadLocation, err)
-	}
-
-	return nil
-}
-
-func (ta *TufAutoupdater) verifyStagedDownload(target string) error {
-	stagedDownloadLocation := ta.downloadLocation(target)
-	digest, err := sha512Digest(stagedDownloadLocation)
-	if err != nil {
-		return fmt.Errorf("could not compute digest for target %s to verify it: %w", target, err)
-	}
-
-	fileInfo, err := os.Stat(stagedDownloadLocation)
-	if err != nil {
-		return fmt.Errorf("could not get info for downloaded file at %s: %w", stagedDownloadLocation, err)
-	}
-
-	tufRepoPath := filepath.Join(ta.binary, runtime.GOOS, target)
-	if err := ta.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), tufRepoPath); err != nil {
-		return fmt.Errorf("digest verification failed for target %s downloaded to %s: %w", target, stagedDownloadLocation, err)
-	}
-
-	return nil
-}
-
-func (ta *TufAutoupdater) moveVerifiedUpdate(target string) error {
-	newUpdateDirectoryPath := filepath.Join(ta.updatesDirectory, strconv.FormatInt(time.Now().Unix(), 10))
-	if err := os.MkdirAll(newUpdateDirectoryPath, 0755); err != nil {
-		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectoryPath, err)
-	}
-
-	removeBrokenUpdateDir := func() {
-		if err := os.RemoveAll(newUpdateDirectoryPath); err != nil {
-			level.Debug(ta.logger).Log(
-				"msg", "could not remove broken update directory",
-				"update_dir", newUpdateDirectoryPath,
-				"err", err,
-			)
-		}
-	}
-
-	fileToUntarAndMove := ta.downloadLocation(target)
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectoryPath, ta.binary), fileToUntarAndMove); err != nil {
-		removeBrokenUpdateDir()
-		return fmt.Errorf("could not untar update %s to %s: %w", fileToUntarAndMove, newUpdateDirectoryPath, err)
-	}
-
-	// Make sure that the binary is executable
-	outputBinary := filepath.Join(newUpdateDirectoryPath, ta.binary)
-	if err := os.Chmod(outputBinary, 0755); err != nil {
-		removeBrokenUpdateDir()
-		return fmt.Errorf("could not set +x permissions on executable: %w", err)
-	}
-
-	// One final check
-	if err := checkExecutable(context.TODO(), outputBinary, "--version"); err != nil {
-		removeBrokenUpdateDir()
-		return fmt.Errorf("executable check failed for %s (target %s): %w", outputBinary, target, err)
-	}
-
-	return nil
-}
-
-func (ta *TufAutoupdater) downloadLocation(target string) string {
-	return filepath.Join(ta.stagingDirectory, runtime.GOOS, target)
-}
-
-func (ta *TufAutoupdater) finalizeUpdate() {
-	err := ta.finalizer()
-	if err == nil {
-		// All set, no restart needed
-		return
-	}
-
-	if IsLauncherRestartNeededErr(err) {
-		level.Debug(ta.logger).Log("msg", "signaling for a full restart")
-		ta.restartChannel <- os.Interrupt
-		return
-	}
-
-	// Unexpected error -- trigger a restart
-	level.Debug(ta.logger).Log("unexpected error when finalizing update, signaling for a full restart", "err", err)
-	ta.restartChannel <- os.Interrupt
-}
-
-func sha512Digest(filename string) (string, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return "", fmt.Errorf("could not open file %s to calculate digest: %w", filename, err)
-	}
-	defer f.Close()
-
-	h := sha512.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("could not compute checksum for file %s: %w", filename, err)
-	}
-
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }

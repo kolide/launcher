@@ -21,7 +21,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 	type fields struct {
 		// Mock generated with `mockery --name updater --exported`
 		updater                 *mocks.Updater
-		fallbackUpdater         *mocks.Updater
+		tufAutoupdater          *mocks.Updater
 		stopChan                chan bool
 		config                  *UpdaterConfig
 		runUpdaterRetryInterval time.Duration
@@ -33,14 +33,15 @@ func Test_updaterCmd_execute(t *testing.T) {
 		// leave this field empty and the test will fail if there is a call to run function made
 		// add 3 funcs here and the test will expect updater.Run() to be called 3 times
 		updaterRunReturns []func(opts ...tuf.Option) (stop func(), err error)
+		runSucceeds       bool
 		callStopChanAfter time.Duration
 		assertion         assert.ErrorAssertionFunc
 	}{
 		{
 			name: "success",
 			fields: fields{
-				updater:         &mocks.Updater{},
-				fallbackUpdater: &mocks.Updater{},
+				updater:        &mocks.Updater{},
+				tufAutoupdater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -50,13 +51,14 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return func() {}, nil
 				},
 			},
-			assertion: assert.NoError,
+			runSucceeds: true,
+			assertion:   assert.NoError,
 		},
 		{
 			name: "multiple_run_retries",
 			fields: fields{
-				updater:         &mocks.Updater{},
-				fallbackUpdater: &mocks.Updater{},
+				updater:        &mocks.Updater{},
+				tufAutoupdater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -73,19 +75,21 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return func() {}, nil
 				},
 			},
-			assertion: assert.NoError,
+			runSucceeds: true,
+			assertion:   assert.NoError,
 		},
 		{
 			name: "stop_during_initial_delay",
 			fields: fields{
-				updater:         &mocks.Updater{},
-				fallbackUpdater: &mocks.Updater{},
-				stopChan:        make(chan bool),
+				updater:        &mocks.Updater{},
+				tufAutoupdater: &mocks.Updater{},
+				stopChan:       make(chan bool),
 				config: &UpdaterConfig{
 					Logger:       log.NewNopLogger(),
 					InitialDelay: 200 * time.Millisecond,
 				},
 			},
+			runSucceeds:       false,
 			callStopChanAfter: time.Millisecond,
 			assertion:         assert.NoError,
 		},
@@ -104,6 +108,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return nil, errors.New("some error")
 				},
 			},
+			runSucceeds:       false,
 			callStopChanAfter: 5 * time.Millisecond,
 			assertion:         assert.NoError,
 		},
@@ -118,7 +123,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 
 			u := &updaterCmd{
 				updater:                 tt.fields.updater,
-				fallbackUpdater:         tt.fields.fallbackUpdater,
+				tufAutoupdater:          tt.fields.tufAutoupdater,
 				ctx:                     ctx,
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,
@@ -140,6 +145,10 @@ func Test_updaterCmd_execute(t *testing.T) {
 				for _, returnFunc := range tt.updaterRunReturns {
 					tt.fields.updater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(returnFunc()).Once()
 				}
+			}
+			if tt.runSucceeds {
+				tt.fields.tufAutoupdater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(func() {}, nil).Once()
+				tt.fields.tufAutoupdater.On("ErrorCount").Return(0)
 			}
 
 			tt.assertion(t, u.execute())
@@ -233,47 +242,43 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 	}
 }
 
-func Test_updaterCmd_fallback(t *testing.T) {
+func Test_updaterCmd_monitor(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 0)
 	defer cancelCtx()
 
 	updaterMock := &mocks.Updater{}
-	fallbackUpdaterMock := &mocks.Updater{}
+	tufAutoupdaterMock := &mocks.Updater{}
 
 	u := &updaterCmd{
-		updater:         updaterMock,
-		fallbackUpdater: fallbackUpdaterMock,
-		ctx:             ctx,
-		stopChan:        make(chan bool),
+		updater:        updaterMock,
+		tufAutoupdater: tufAutoupdaterMock,
+		ctx:            ctx,
+		stopChan:       make(chan bool),
 		config: &UpdaterConfig{
-			Logger:       log.NewNopLogger(),
-			InitialDelay: 200 * time.Millisecond,
+			Logger: log.NewNopLogger(),
 		},
 		runUpdaterRetryInterval: 1 * time.Second,
 		monitorInterval:         1 * time.Second,
 	}
 
+	// Expect that we run the old autoupdater
 	updaterStopFuncCalled := false
 	updaterStopFunc := func() {
 		updaterStopFuncCalled = true
 	}
-
-	fallbackStopFuncCalled := false
-	fallbackStopFunc := func() {
-		fallbackStopFuncCalled = true
-	}
-
-	// Expect that we start with the new updater
 	updaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(updaterStopFunc, nil).Once()
 
-	// Expect that the updater cmd initially works, and then reports many errors
-	updaterMock.On("ErrorCount").Return(0).Once()
-	updaterMock.On("ErrorCount").Return(allowableDailyErrorCountThreshold + 1).Once()
+	// Expect that we start running and monitoring the new autoupdater
+	tufAutoupdaterStopFuncCalled := false
+	tufAutoupdaterStopFunc := func() {
+		tufAutoupdaterStopFuncCalled = true
+	}
+	tufAutoupdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(tufAutoupdaterStopFunc, nil).Once()
 
-	// Expect that the updater cmd runs the fallback updater
-	fallbackUpdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(fallbackStopFunc, nil).Once()
+	// Expect that the monitoring routine queries the error count at least once
+	tufAutoupdaterMock.On("ErrorCount").Return(allowableDailyErrorCountThreshold + 1)
 
 	// Call `execute`, then sleep 3 seconds to give the monitor a chance to check for errors
 	require.NoError(t, u.execute())
@@ -281,9 +286,12 @@ func Test_updaterCmd_fallback(t *testing.T) {
 
 	// Assert above expectations
 	updaterMock.AssertExpectations(t)
-	fallbackUpdaterMock.AssertExpectations(t)
+	tufAutoupdaterMock.AssertExpectations(t)
 
-	// Confirm that the new updater was stopped but that the fallback wasn't
+	// Confirm that after interrupt, both updaters were stopped
+	u.interrupt(nil)
+	time.Sleep(5 * time.Millisecond)
+
 	require.True(t, updaterStopFuncCalled)
-	require.False(t, fallbackStopFuncCalled)
+	require.True(t, tufAutoupdaterStopFuncCalled)
 }
