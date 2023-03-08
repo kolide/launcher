@@ -5,15 +5,18 @@ package autoupdate
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 	legacytuf "github.com/kolide/updater/tuf"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -28,17 +31,15 @@ const (
 )
 
 type TufAutoupdater struct {
-	metadataClient   *client.Client
-	mirrorClient     *http.Client
-	mirrorUrl        string
-	binary           string
-	channel          UpdateChannel
-	stagingDirectory string
-	updatesDirectory string
-	checkInterval    time.Duration
-	errorCounter     []int64
-	interrupt        chan struct{}
-	logger           log.Logger
+	metadataClient *client.Client
+	mirrorClient   *http.Client
+	mirrorUrl      string
+	binary         string
+	channel        UpdateChannel
+	checkInterval  time.Duration
+	errorCounter   []int64
+	interrupt      chan struct{}
+	logger         log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -62,18 +63,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 }
 
 func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
-	// Ensure that the staging directory exists, creating it if not
 	binaryName := filepath.Base(binaryPath)
-	stagingDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-staging", binaryName))
-	if err := os.MkdirAll(stagingDirectory, 0755); err != nil {
-		return nil, fmt.Errorf("could not make staging directory %s: %w", stagingDirectory, err)
-	}
-
-	// Ensure that the updates directory exists, creating it if not
-	updatesDirectory := filepath.Join(FindBaseDir(binaryPath), fmt.Sprintf("%s-updates", binaryName))
-	if err := os.MkdirAll(updatesDirectory, 0755); err != nil {
-		return nil, fmt.Errorf("could not make updates directory %s: %w", updatesDirectory, err)
-	}
 
 	// Set up the local TUF directory for our TUF client
 	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-new", strings.TrimSuffix(binaryName, ".exe")))
@@ -102,17 +92,15 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 	}
 
 	ta := &TufAutoupdater{
-		metadataClient:   metadataClient,
-		mirrorClient:     http.DefaultClient,
-		mirrorUrl:        mirrorUrl,
-		binary:           binaryName,
-		channel:          Stable,
-		stagingDirectory: stagingDirectory,
-		updatesDirectory: updatesDirectory,
-		interrupt:        make(chan struct{}),
-		checkInterval:    60 * time.Second,
-		errorCounter:     make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
-		logger:           log.NewNopLogger(),
+		metadataClient: metadataClient,
+		mirrorClient:   http.DefaultClient,
+		mirrorUrl:      mirrorUrl,
+		binary:         binaryName,
+		channel:        Stable,
+		interrupt:      make(chan struct{}),
+		checkInterval:  60 * time.Second,
+		errorCounter:   make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
+		logger:         log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -168,5 +156,47 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not update metadata: %w", err)
 	}
 
+	// Find the newest release for our channel -- right now for logging purposes only
+	targets, err := ta.metadataClient.Targets()
+	if err != nil {
+		return fmt.Errorf("could not get complete list of targets: %w", err)
+	}
+
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), runtime.GOOS, ta.channel)
+	for targetName, target := range targets {
+		if targetName != targetReleaseFile {
+			continue
+		}
+
+		// We found the release file that matches our OS and binary. Evaluate it
+		// to see if we're on this latest version.
+		type releaseFileCustomMetadata struct {
+			Target string `json:"target"`
+		}
+
+		var custom releaseFileCustomMetadata
+		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
+			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+		}
+
+		level.Debug(ta.logger).Log(
+			"msg", "checked most up-to-date release from TUF",
+			"launcher_version", version.Version().Version,
+			"release_version", ta.versionFromTarget(custom.Target),
+			"channel", ta.channel,
+		)
+
+		break
+	}
+
 	return nil
+}
+
+func (ta *TufAutoupdater) versionFromTarget(target string) string {
+	strippedBinary := strings.TrimSuffix(ta.binary, ".exe")
+
+	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
+	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, runtime.GOOS, strippedBinary)
+
+	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
