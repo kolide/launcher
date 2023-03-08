@@ -12,8 +12,8 @@ type Updater struct {
 	mock.Mock
 }
 
-// ErrorCount provides a mock function with given fields:
-func (_m *Updater) ErrorCount() int {
+// RollingErrorCount provides a mock function with given fields:
+func (_m *Updater) RollingErrorCount() int {
 	ret := _m.Called()
 
 	var r0 int

@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/armon/go-metrics"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	legacytuf "github.com/kolide/updater/tuf"
@@ -37,7 +36,7 @@ type TufAutoupdater struct {
 	stagingDirectory string
 	updatesDirectory string
 	checkInterval    time.Duration
-	errorCounter     *metrics.InmemSink
+	errorCounter     []int64
 	interrupt        chan struct{}
 	logger           log.Logger
 }
@@ -102,10 +101,6 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 		return nil, fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
 	}
 
-	// Set up our error tracker -- holds error counts per hour for the last 24 hours
-	errorCounter := metrics.NewInmemSink(1*time.Hour, 24*time.Hour)
-	metrics.NewGlobal(metrics.DefaultConfig("tuf_autoupdater"), errorCounter)
-
 	ta := &TufAutoupdater{
 		metadataClient:   metadataClient,
 		mirrorClient:     http.DefaultClient,
@@ -116,7 +111,7 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 		updatesDirectory: updatesDirectory,
 		interrupt:        make(chan struct{}),
 		checkInterval:    60 * time.Second,
-		errorCounter:     errorCounter,
+		errorCounter:     make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
 		logger:           log.NewNopLogger(),
 	}
 
@@ -133,14 +128,14 @@ func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error)
 	return ta.stop, nil
 }
 
-func (ta *TufAutoupdater) ErrorCount() int {
-	intervalMetrics := ta.errorCounter.Data()
-
+func (ta *TufAutoupdater) RollingErrorCount() int {
+	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
 	errorCount := 0
-	for _, m := range intervalMetrics {
-		if val, ok := m.Counters[errorCounterKey]; ok {
-			errorCount += val.Count
+	for _, errorTimestamp := range ta.errorCounter {
+		if errorTimestamp < oneDayAgo {
+			continue
 		}
+		errorCount += 1
 	}
 
 	return errorCount
@@ -153,7 +148,7 @@ func (ta *TufAutoupdater) loop() error {
 		select {
 		case <-checkTicker.C:
 			if err := ta.checkForUpdate(); err != nil {
-				ta.errorCounter.IncrCounter([]string{errorCounterKey}, 1)
+				ta.errorCounter = append(ta.errorCounter, time.Now().Unix())
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
 		case <-ta.interrupt:

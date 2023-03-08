@@ -96,7 +96,7 @@ func NewUpdater(
 // updater allows us to mock *autoupdate.Updater during testing
 type updater interface {
 	Run(opts ...tuf.Option) (stop func(), err error)
-	ErrorCount() int
+	RollingErrorCount() int
 }
 
 type updaterCmd struct {
@@ -181,7 +181,7 @@ func (u *updaterCmd) runAndMonitorTufAutoupdater() {
 			stop()
 			return
 		case <-time.After(u.monitorInterval):
-			currentErrorCount := u.tufAutoupdater.ErrorCount()
+			currentErrorCount := u.tufAutoupdater.RollingErrorCount()
 			if currentErrorCount > allowableDailyErrorCountThreshold {
 				// Error count over threshold -- log
 				level.Debug(u.config.Logger).Log("msg", "TUF autoupdater error count over threshold", "error_count", currentErrorCount)

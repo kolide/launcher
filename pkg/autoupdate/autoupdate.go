@@ -171,8 +171,8 @@ func NewUpdater(binaryPath, rootDirectory string, opts ...UpdaterOption) (*Updat
 	return &updater, nil
 }
 
-// Not in use
-func (u *Updater) ErrorCount() int {
+// Not in use, here to fulfill updater.updater interface
+func (u *Updater) RollingErrorCount() int {
 	return 0
 }
 
