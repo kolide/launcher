@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/updater/tuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_updaterCmd_execute(t *testing.T) {
@@ -122,6 +123,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,
 				runUpdaterRetryInterval: tt.fields.runUpdaterRetryInterval,
+				monitorInterval:         1 * time.Hour,
 			}
 
 			var wg sync.WaitGroup
@@ -229,4 +231,59 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 			wg.Wait()
 		})
 	}
+}
+
+func Test_updaterCmd_fallback(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancelCtx := context.WithTimeout(context.Background(), 0)
+	defer cancelCtx()
+
+	updaterMock := &mocks.Updater{}
+	fallbackUpdaterMock := &mocks.Updater{}
+
+	u := &updaterCmd{
+		updater:         updaterMock,
+		fallbackUpdater: fallbackUpdaterMock,
+		ctx:             ctx,
+		stopChan:        make(chan bool),
+		config: &UpdaterConfig{
+			Logger:       log.NewNopLogger(),
+			InitialDelay: 200 * time.Millisecond,
+		},
+		runUpdaterRetryInterval: 1 * time.Second,
+		monitorInterval:         1 * time.Second,
+	}
+
+	updaterStopFuncCalled := false
+	updaterStopFunc := func() {
+		updaterStopFuncCalled = true
+	}
+
+	fallbackStopFuncCalled := false
+	fallbackStopFunc := func() {
+		fallbackStopFuncCalled = true
+	}
+
+	// Expect that we start with the new updater
+	updaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(updaterStopFunc, nil).Once()
+
+	// Expect that the updater cmd initially works, and then reports many errors
+	updaterMock.On("ErrorCount").Return(0).Once()
+	updaterMock.On("ErrorCount").Return(10000000).Once()
+
+	// Expect that the updater cmd runs the fallback updater
+	fallbackUpdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(fallbackStopFunc, nil).Once()
+
+	// Call `execute`, then sleep 3 seconds to give the monitor a chance to check for errors
+	require.NoError(t, u.execute())
+	time.Sleep(time.Second * 3)
+
+	// Assert above expectations
+	updaterMock.AssertExpectations(t)
+	fallbackUpdaterMock.AssertExpectations(t)
+
+	// Confirm that the new updater was stopped but that the fallback wasn't
+	require.True(t, updaterStopFuncCalled)
+	require.False(t, fallbackStopFuncCalled)
 }

@@ -83,6 +83,7 @@ func NewUpdater(
 		stopChan:                make(chan bool),
 		config:                  config,
 		runUpdaterRetryInterval: 30 * time.Minute,
+		monitorInterval:         1 * time.Hour,
 	}
 
 	return &actor.Actor{
@@ -106,6 +107,7 @@ type updaterCmd struct {
 	stopExecution           func()
 	config                  *UpdaterConfig
 	runUpdaterRetryInterval time.Duration
+	monitorInterval         time.Duration
 }
 
 func (u *updaterCmd) execute() error {
@@ -149,7 +151,7 @@ func (u *updaterCmd) monitorUpdater() {
 		case <-u.stopChan:
 			level.Debug(u.config.Logger).Log("msg", "updater stop requested")
 			return
-		case <-time.After(1 * time.Hour):
+		case <-time.After(u.monitorInterval):
 			if u.runFallback {
 				continue
 			}
