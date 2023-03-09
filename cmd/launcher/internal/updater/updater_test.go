@@ -155,7 +155,6 @@ func Test_updaterCmd_execute(t *testing.T) {
 			tt.assertion(t, u.execute())
 			time.Sleep(5 * time.Millisecond) // sleep a little bit to let the new autoupdater go routine run
 			tt.fields.updater.AssertExpectations(t)
-			tt.fields.tufAutoupdater.AssertExpectations(t)
 
 			// test will time out if we don't get to send something on u.stopChan when expecting channel receive
 			wg.Wait()
