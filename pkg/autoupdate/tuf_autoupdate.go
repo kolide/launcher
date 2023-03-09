@@ -27,7 +27,6 @@ var rootJson []byte
 
 const (
 	DefaultTufServer = "https://tuf-devel.kolide.com"
-	errorCounterKey  = "tuf_errors"
 )
 
 type TufAutoupdater struct {
