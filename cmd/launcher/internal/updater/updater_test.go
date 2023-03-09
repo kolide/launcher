@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/updater/tuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_updaterCmd_execute(t *testing.T) {
@@ -96,8 +95,9 @@ func Test_updaterCmd_execute(t *testing.T) {
 		{
 			name: "stop_during_retry_loop",
 			fields: fields{
-				updater:  &mocks.Updater{},
-				stopChan: make(chan bool),
+				updater:        &mocks.Updater{},
+				tufAutoupdater: &mocks.Updater{},
+				stopChan:       make(chan bool),
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -128,7 +128,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,
 				runUpdaterRetryInterval: tt.fields.runUpdaterRetryInterval,
-				monitorInterval:         1 * time.Hour,
+				monitorInterval:         1 * time.Millisecond,
 			}
 
 			var wg sync.WaitGroup
@@ -146,13 +146,16 @@ func Test_updaterCmd_execute(t *testing.T) {
 					tt.fields.updater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(returnFunc()).Once()
 				}
 			}
+			// If we expect that `Run` succeeds, then updater should spawn a goroutine to start monitoring the new autoupdater
 			if tt.runSucceeds {
 				tt.fields.tufAutoupdater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(func() {}, nil).Once()
 				tt.fields.tufAutoupdater.On("RollingErrorCount").Return(0)
 			}
 
 			tt.assertion(t, u.execute())
+			time.Sleep(5 * time.Millisecond) // sleep a little bit to let the new autoupdater go routine run
 			tt.fields.updater.AssertExpectations(t)
+			tt.fields.tufAutoupdater.AssertExpectations(t)
 
 			// test will time out if we don't get to send something on u.stopChan when expecting channel receive
 			wg.Wait()
@@ -240,60 +243,6 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 			wg.Wait()
 		})
 	}
-}
-
-func Test_updaterCmd_monitor(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancelCtx := context.WithTimeout(context.Background(), 0)
-	defer cancelCtx()
-
-	updaterMock := &mocks.Updater{}
-	tufAutoupdaterMock := &mocks.Updater{}
-
-	u := &updaterCmd{
-		updater:        updaterMock,
-		tufAutoupdater: tufAutoupdaterMock,
-		ctx:            ctx,
-		stopChan:       make(chan bool),
-		config: &UpdaterConfig{
-			Logger: log.NewNopLogger(),
-		},
-		runUpdaterRetryInterval: 1 * time.Second,
-		monitorInterval:         1 * time.Second,
-	}
-
-	// Expect that we run the old autoupdater
-	updaterStopFuncCalled := false
-	updaterStopFunc := func() {
-		updaterStopFuncCalled = true
-	}
-	updaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(updaterStopFunc, nil).Once()
-
-	// Expect that we start running and monitoring the new autoupdater
-	tufAutoupdaterStopFuncCalled := false
-	tufAutoupdaterStopFunc := func() {
-		tufAutoupdaterStopFuncCalled = true
-	}
-	tufAutoupdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(tufAutoupdaterStopFunc, nil).Once()
-
-	// Expect that the monitoring routine queries the error count at least once
-	tufAutoupdaterMock.On("RollingErrorCount").Return(allowableDailyErrorCountThreshold + 1)
-
-	// Call `execute`, then sleep 3 seconds to give the monitor a chance to check for errors
-	require.NoError(t, u.execute())
-	time.Sleep(time.Second * 3)
-
-	// Assert above expectations
-	updaterMock.AssertExpectations(t)
-	tufAutoupdaterMock.AssertExpectations(t)
-
-	// Confirm that after interrupt, both updaters were stopped
-	u.interrupt(nil)
-	time.Sleep(5 * time.Millisecond)
-
-	require.True(t, updaterStopFuncCalled)
-	require.True(t, tufAutoupdaterStopFuncCalled)
 }
 
 func Test_updaterCmd_monitor_nilautoupdater(t *testing.T) {

@@ -180,11 +180,11 @@ func (u *updaterCmd) runAndMonitorTufAutoupdater() {
 
 	// Check the new autoupdater periodically for errors
 	for {
-		level.Debug(u.config.Logger).Log("msg", "monitoring TUF autoupdater for errors")
+		level.Debug(u.config.Logger).Log("msg", "checking TUF autoupdater for errors")
 
 		select {
 		case <-u.stopChan:
-			level.Debug(u.config.Logger).Log("msg", "updater stop requested")
+			level.Debug(u.config.Logger).Log("msg", "TUF autoupdater stop requested")
 			stop()
 			return
 		case <-time.After(u.monitorInterval):
