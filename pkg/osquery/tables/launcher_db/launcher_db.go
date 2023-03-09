@@ -1,31 +1,28 @@
-package kolide_server_data
+package launcher_db
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
 
 	"go.etcd.io/bbolt"
 )
 
-const tableName = "kolide_server_data"
-
 // TablePlugin provides an osquery table plugin that exposes data found in the server_provided_data launcher.db bucket.
 // This data is intended to be updated by the control server.
-func TablePlugin(db *bbolt.DB) *table.Plugin {
+func TablePlugin(db *bbolt.DB, tableName, bucketName string) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
 	}
 
-	return table.NewPlugin(tableName, columns, generateServerDataTable(db))
+	return table.NewPlugin(tableName, columns, generateLauncherDbTable(db, bucketName))
 }
 
-func generateServerDataTable(db *bbolt.DB) table.GenerateFunc {
+func generateLauncherDbTable(db *bbolt.DB, bucket string) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		return dbKeyValueRows(osquery.ServerProvidedDataBucket, db)
+		return dbKeyValueRows(bucket, db)
 	}
 }
 
