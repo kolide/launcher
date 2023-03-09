@@ -412,8 +412,8 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		}
 	}
 
-	// Bootstrap new TUF also
-	localRepo := filepath.Join("pkg", "autoupdate", "assets", "tuf-new")
+	// Bootstrap new TUF also -- for now, using the dev TUF repo until the production one is available
+	localRepo := filepath.Join("pkg", "autoupdate", "assets", "tuf-dev")
 	if err := os.MkdirAll(localRepo, 0755); err != nil {
 		return fmt.Errorf("make autoupdate dir %s: %w", localRepo, err)
 	}

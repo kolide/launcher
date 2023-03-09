@@ -27,10 +27,10 @@ func TestNewTufAutoupdater(t *testing.T) {
 	_, err := NewTufAutoupdater("https://example.com", "https://example.com", binaryPath, testRootDir)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-new"))
+	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-dev"))
 	require.NoError(t, err, "could not stat TUF directory that should have been initialized in test")
 
-	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-new", "root.json"))
+	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-dev", "root.json"))
 	require.NoError(t, err, "could not stat root.json that should have been created in test")
 }
 

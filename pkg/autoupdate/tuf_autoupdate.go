@@ -23,7 +23,7 @@ import (
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 )
 
-//go:embed assets/tuf-new/root.json
+//go:embed assets/tuf-dev/root.json
 var rootJson []byte
 
 const (
@@ -67,8 +67,8 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	binaryName := filepath.Base(binaryPath)
 
-	// Set up the local TUF directory for our TUF client
-	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-new", strings.TrimSuffix(binaryName, ".exe")))
+	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
+	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", strings.TrimSuffix(binaryName, ".exe")))
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
