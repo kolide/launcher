@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -196,16 +195,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
-	// Figure out if we should enable desktop process spawning by default:
-	// If we're in a Kolide test environment, process spawning should be enabled by default.
-	// For production, it is disabled by default.
-	// In both cases, process spawning can be overridden via control server interaction -- see agent_flags subsystem.
-	desktopProcessSpawningEnabled :=
-		opts.KolideServerURL == "k2device-preprod.kolide.com" ||
-			opts.KolideServerURL == "localhost:3443" ||
-			opts.KolideServerURL == "localhost:3000" ||
-			strings.HasSuffix(opts.KolideServerURL, "herokuapp.com") ||
-			opts.IAmBreakingEELicense
+	// For now, while we're in transition from K2 to device trust, we want to default to _not_ running
+	// the desktop process. This can be overridden via control server interaction -- see agent_flags
+	// subsystem.
+	desktopProcessSpawningEnabled := false
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
@@ -273,8 +266,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
+	// runEECode feels like it should move up to the opts level.
+	// We have some stuff there that sets `controlServerURL`
+	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense
+
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
-	runLocalServer := desktopProcessSpawningEnabled
+	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(logger, db, opts.KolideServerURL)
 		if err != nil {
