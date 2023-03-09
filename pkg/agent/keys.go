@@ -63,13 +63,13 @@ const (
 	publicEccData  = "publicEccData"
 )
 
-func fetchKeyData(getter types.Getter) ([]byte, []byte, error) {
-	pri, err := getter.Get([]byte(privateEccData))
+func fetchKeyData(store types.Getter) ([]byte, []byte, error) {
+	pri, err := store.Get([]byte(privateEccData))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pub, err := getter.Get([]byte(publicEccData))
+	pub, err := store.Get([]byte(publicEccData))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,15 +77,15 @@ func fetchKeyData(getter types.Getter) ([]byte, []byte, error) {
 	return pri, pub, nil
 }
 
-func storeKeyData(setter types.Setter, pri, pub []byte) error {
+func storeKeyData(store types.Setter, pri, pub []byte) error {
 	if pri != nil {
-		if err := setter.Set([]byte(privateEccData), pri); err != nil {
+		if err := store.Set([]byte(privateEccData), pri); err != nil {
 			return err
 		}
 	}
 
 	if pub != nil {
-		if err := setter.Set([]byte(publicEccData), pub); err != nil {
+		if err := store.Set([]byte(publicEccData), pub); err != nil {
 			return err
 		}
 	}

@@ -14,15 +14,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/osquery/osquery-go"
+	"go.etcd.io/bbolt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.etcd.io/bbolt"
 )
 
 var testOsqueryBinaryDirectory string
@@ -35,6 +36,8 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	defer rmBinDirectory()
+
+	s, err := storageci.NewStore(nil, log.NewNopLogger())
 
 	db, err := bbolt.Open(filepath.Join(binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,

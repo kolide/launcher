@@ -1,6 +1,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
@@ -13,16 +14,15 @@ import (
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
-	"go.etcd.io/bbolt"
 )
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(store types.KVStore, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(db),
-		LauncherDbInfo(db),
-		LauncherInfoTable(db),
+		LauncherConfigTable(store),
+		LauncherDbInfo(store),
+		LauncherInfoTable(store),
 		launcher_db.TablePlugin(db, "kolide_server_data", "server_provided_data"),
 		launcher_db.TablePlugin(db, "kolide_control_flags", "agent_flags"),
 		LauncherAutoupdateConfigTable(opts),

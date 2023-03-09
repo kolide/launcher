@@ -77,3 +77,13 @@ func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	}
 	return nil
 }
+
+func (s *inMemoryKeyValueStore) NumKeys() (int, error) {
+	if s == nil {
+		return 0, errors.New("store is nil")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.items), nil
+}

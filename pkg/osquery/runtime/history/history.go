@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 const maxInstances = 10
@@ -16,7 +16,7 @@ var currentHistory *History = &History{}
 type History struct {
 	sync.Mutex
 	instances []*Instance
-	db        *bbolt.DB
+	store     types.GetterSetter
 }
 
 type NoInstancesError struct{}
@@ -26,16 +26,11 @@ func (c NoInstancesError) Error() string {
 }
 
 // InitHistory loads the osquery instance history from bbolt DB if exists, sets up bucket if it does not
-func InitHistory(db *bbolt.DB) error {
+func InitHistory(store types.GetterSetter) error {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
-	err := createBboltBucketIfNotExists(db)
-	if err != nil {
-		return err
-	}
-
-	currentHistory.db = db
+	currentHistory.store = store
 
 	if err := currentHistory.load(); err != nil {
 		return fmt.Errorf("error loading osquery_instance_history: %w", err)

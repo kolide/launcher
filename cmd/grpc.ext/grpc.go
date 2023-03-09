@@ -20,7 +20,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquery_logger "github.com/osquery/osquery-go/plugin/logger"
-
 	"go.etcd.io/bbolt"
 )
 

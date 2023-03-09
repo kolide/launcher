@@ -3,21 +3,21 @@ package table
 import (
 	"context"
 
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
-	"go.etcd.io/bbolt"
 )
 
-func LauncherConfigTable(db *bbolt.DB) *table.Plugin {
+func LauncherConfigTable(store types.Getter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("config"),
 	}
 	return table.NewPlugin("kolide_launcher_config", columns, generateLauncherConfig(db))
 }
 
-func generateLauncherConfig(db *bbolt.DB) table.GenerateFunc {
+func generateLauncherConfig(store types.Getter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		config, err := osquery.ConfigFromDB(db)
+		config, err := osquery.Config(store)
 		if err != nil {
 			return nil, err
 		}
