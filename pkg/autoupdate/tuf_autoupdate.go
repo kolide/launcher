@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -38,6 +39,7 @@ type TufAutoupdater struct {
 	channel         UpdateChannel
 	checkInterval   time.Duration
 	errorCounter    []int64
+	lock            sync.RWMutex
 	interrupt       chan struct{}
 	logger          log.Logger
 }
@@ -118,6 +120,9 @@ func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error)
 }
 
 func (ta *TufAutoupdater) RollingErrorCount() int {
+	ta.lock.RLock()
+	defer ta.lock.RUnlock()
+
 	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
 	errorCount := 0
 	for _, errorTimestamp := range ta.errorCounter {
@@ -137,7 +142,10 @@ func (ta *TufAutoupdater) loop() error {
 		select {
 		case <-checkTicker.C:
 			if err := ta.checkForUpdate(); err != nil {
+				ta.lock.Lock()
 				ta.errorCounter = append(ta.errorCounter, time.Now().Unix())
+				ta.lock.Unlock()
+
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
 		case <-ta.interrupt:

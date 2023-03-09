@@ -111,10 +111,11 @@ func TestRollingErrorCount(t *testing.T) {
 	// Start the autoupdater going
 	stop, err := autoupdater.Run()
 	require.NoError(t, err, "could not run TUF autoupdater")
-	defer stop()
 
-	// Wait 5 seconds to accumulate errors
+	// Wait 5 seconds to accumulate errors, stop it, and give it a second to shut down
 	time.Sleep(5 * time.Second)
+	stop()
+	time.Sleep(1 * time.Second)
 
 	// Confirm that we saved the errors with correct timestamps
 	require.Greater(t, autoupdater.RollingErrorCount(), 0, "TUF autoupdater did not record error counts")
