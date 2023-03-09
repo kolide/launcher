@@ -77,6 +77,10 @@ func TestRun(t *testing.T) {
 			// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
 			logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
+			for _, l := range logLines {
+				fmt.Println(l)
+			}
+
 			// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
 			// only the first and last, so just make sure there are at least 2
 			require.GreaterOrEqual(t, len(logLines), 2)
