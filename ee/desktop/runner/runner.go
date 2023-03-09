@@ -320,7 +320,10 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 
 func (r *DesktopUsersProcessesRunner) Ping() {
 	// agent_flags bucket has been updated, query the flags to react to changes
-	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled"))
+	// This has a `v1` appended, because the menu data format went from v0 to v1 -- we
+	// added `hasCapability`. Doing this cleanly required a flag day. Future work will
+	// need to do something else, probably something where the menu data is versioned.
+	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled_v1"))
 	if err != nil {
 		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
 		return
