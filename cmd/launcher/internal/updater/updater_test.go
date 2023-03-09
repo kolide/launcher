@@ -148,7 +148,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 			}
 			if tt.runSucceeds {
 				tt.fields.tufAutoupdater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(func() {}, nil).Once()
-				tt.fields.tufAutoupdater.On("ErrorCount").Return(0)
+				tt.fields.tufAutoupdater.On("RollingErrorCount").Return(0)
 			}
 
 			tt.assertion(t, u.execute())
@@ -278,7 +278,7 @@ func Test_updaterCmd_monitor(t *testing.T) {
 	tufAutoupdaterMock.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(tufAutoupdaterStopFunc, nil).Once()
 
 	// Expect that the monitoring routine queries the error count at least once
-	tufAutoupdaterMock.On("ErrorCount").Return(allowableDailyErrorCountThreshold + 1)
+	tufAutoupdaterMock.On("RollingErrorCount").Return(allowableDailyErrorCountThreshold + 1)
 
 	// Call `execute`, then sleep 3 seconds to give the monitor a chance to check for errors
 	require.NoError(t, u.execute())
@@ -294,4 +294,18 @@ func Test_updaterCmd_monitor(t *testing.T) {
 
 	require.True(t, updaterStopFuncCalled)
 	require.True(t, tufAutoupdaterStopFuncCalled)
+}
+
+func Test_updaterCmd_monitor_nilautoupdater(t *testing.T) {
+	t.Parallel()
+
+	u := &updaterCmd{
+		tufAutoupdater: nil,
+		config: &UpdaterConfig{
+			Logger: log.NewNopLogger(),
+		},
+	}
+
+	// Make the call to run and monitor -- we would see a panic if the nil autoupdater were called anyway
+	u.runAndMonitorTufAutoupdater()
 }

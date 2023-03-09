@@ -74,7 +74,8 @@ func NewUpdater(
 		autoupdate.WithUpdateCheckInterval(config.AutoupdateInterval),
 	)
 	if err != nil {
-		return nil, err
+		// Log the error, but don't return it -- the new TUF autoupdater is not critical
+		level.Debug(config.Logger).Log("msg", "could not create TUF autoupdater", "err", err)
 	}
 
 	updateCmd := &updaterCmd{
@@ -165,6 +166,12 @@ func (u *updaterCmd) execute() error {
 }
 
 func (u *updaterCmd) runAndMonitorTufAutoupdater() {
+	if u.tufAutoupdater == nil {
+		level.Debug(u.config.Logger).Log("msg", "TUF autoupdater was not initialized, cannot run and monitor it")
+		return
+	}
+
+	// All the TUF autoupdater does right now is maintain a local TUF repo; it does not download and stage updates yet.
 	stop, err := u.tufAutoupdater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
 	if err != nil {
 		level.Debug(u.config.Logger).Log("msg", "could not run new TUF autoupdater", "err", err)
@@ -173,7 +180,7 @@ func (u *updaterCmd) runAndMonitorTufAutoupdater() {
 
 	// Check the new autoupdater periodically for errors
 	for {
-		level.Debug(u.config.Logger).Log("msg", "monitoring logger for errors")
+		level.Debug(u.config.Logger).Log("msg", "monitoring TUF autoupdater for errors")
 
 		select {
 		case <-u.stopChan:
