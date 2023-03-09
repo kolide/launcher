@@ -108,11 +108,11 @@ func (c *checkPointer) logCheckPoint() {
 }
 
 func (c *checkPointer) logDbSize() {
-	boltStats, err := agent.GetStats(c.db) // TODO Stats
+	dbSize, err := c.store.Size()
 	if err != nil {
 		c.logger.Log("bbolt db size", err.Error())
 	} else {
-		c.logger.Log("bbolt db size", boltStats.DB.Size)
+		c.logger.Log("bbolt db size", dbSize)
 	}
 }
 

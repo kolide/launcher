@@ -33,8 +33,10 @@ type Iterator interface {
 
 // Stats is an interface getting statistical data from a key/value store.
 type Stats interface {
-	// NumKeys gets number of key/value pairs.
+	// NumKeys returns the number of key/value pairs.
 	NumKeys() (int, error)
+	// Size returns current size in bytes.
+	Size() (int64, error)
 }
 
 // GetterSetter is an interface that groups the Get and Set methods.

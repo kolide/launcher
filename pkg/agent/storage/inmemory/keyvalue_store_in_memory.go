@@ -87,3 +87,8 @@ func (s *inMemoryKeyValueStore) NumKeys() (int, error) {
 	defer s.mu.Unlock()
 	return len(s.items), nil
 }
+
+func (s *inMemoryKeyValueStore) Size() (int64, error) {
+	// TODO: We could estimate the memory size, perhaps using unsafe.SizeOf()
+	return 0, nil
+}

@@ -1,13 +1,9 @@
 package agent
 
 import (
-	"fmt"
-
+	"github.com/kolide/launcher/pkg/agent/types"
 	"go.etcd.io/bbolt"
 )
-
-// KeyN is the number of keys
-// LeafAlloc is pretty close the number of bytes uses
 
 type bucketStatsHolder struct {
 	Stats        bbolt.BucketStats
@@ -26,22 +22,22 @@ type Stats struct {
 	Buckets map[string]bucketStatsHolder
 }
 
-func GetStats(db *bbolt.DB) (*Stats, error) {
+func GetStats(store types.KVStore) (*Stats, error) {
 	stats := &Stats{
 		Buckets: make(map[string]bucketStatsHolder),
 	}
+	/*
+		if err := db.View(func(tx *bbolt.Tx) error {
+			stats.DB.Stats = tx.Stats()
+			stats.DB.Size = tx.Size()
 
-	if err := db.View(func(tx *bbolt.Tx) error {
-		stats.DB.Stats = tx.Stats()
-		stats.DB.Size = tx.Size()
-
-		if err := tx.ForEach(bucketStatsFunc(stats)); err != nil {
-			return fmt.Errorf("dumping bucket: %w", err)
-		}
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("creating view tx: %w", err)
-	}
+			if err := tx.ForEach(bucketStatsFunc(stats)); err != nil {
+				return fmt.Errorf("dumping bucket: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("creating view tx: %w", err)
+		}*/ // TODO Stats
 
 	return stats, nil
 }
@@ -49,6 +45,9 @@ func GetStats(db *bbolt.DB) (*Stats, error) {
 func bucketStatsFunc(stats *Stats) func([]byte, *bbolt.Bucket) error {
 	return func(name []byte, b *bbolt.Bucket) error {
 		bstats := b.Stats()
+
+		// KeyN is the number of keys
+		// LeafAlloc is pretty close the number of bytes used
 		stats.Buckets[string(name)] = bucketStatsHolder{
 			Stats:        bstats,
 			FillPercent:  b.FillPercent,

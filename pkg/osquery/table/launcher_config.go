@@ -12,7 +12,7 @@ func LauncherConfigTable(store types.Getter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("config"),
 	}
-	return table.NewPlugin("kolide_launcher_config", columns, generateLauncherConfig(db))
+	return table.NewPlugin("kolide_launcher_config", columns, generateLauncherConfig(store))
 }
 
 func generateLauncherConfig(store types.Getter) table.GenerateFunc {

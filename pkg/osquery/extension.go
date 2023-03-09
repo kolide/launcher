@@ -648,78 +648,80 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.
 func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
-	store, err := e.storeFromLogType(typ)
-	if err != nil {
-		return err
-	}
+	/*
+		store, err := e.storeFromLogType(typ)
+		if err != nil {
+			return err
+		}
 
-	// Collect up logs to be sent
-	var logs []string
-	var logIDs [][]byte
-	err = e.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
+			// Collect up logs to be sent
+			var logs []string
+			var logIDs [][]byte
+			err = e.db.View(func(tx *bbolt.Tx) error {
+				b := tx.Bucket([]byte(bucketName))
 
-		c := b.Cursor()
-		k, v := c.First()
-		for totalBytes := 0; k != nil; {
-			// A somewhat cumbersome if block...
-			//
-			// 1. If the log is too big, skip it and mark for deletion.
-			// 2. If the buffer would be too big with the log, break for
-			// 3. Else append it
-			//
-			// Note that (1) must come first, otherwise (2) will always trigger.
-			if len(v) > e.Opts.MaxBytesPerBatch {
-				// Discard logs that are too big
-				logheadSize := minInt(len(v), 100)
-				level.Info(e.Opts.Logger).Log(
-					"msg", "dropped log",
-					"logID", k,
-					"size", len(v),
-					"limit", e.Opts.MaxBytesPerBatch,
-					"loghead", string(v)[0:logheadSize],
-				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled. Break the loop and come back later.
-				break
-			} else {
-				logs = append(logs, string(v))
-				totalBytes += len(v)
+				c := b.Cursor()
+				k, v := c.First()
+				for totalBytes := 0; k != nil; {
+					// A somewhat cumbersome if block...
+					//
+					// 1. If the log is too big, skip it and mark for deletion.
+					// 2. If the buffer would be too big with the log, break for
+					// 3. Else append it
+					//
+					// Note that (1) must come first, otherwise (2) will always trigger.
+					if len(v) > e.Opts.MaxBytesPerBatch {
+						// Discard logs that are too big
+						logheadSize := minInt(len(v), 100)
+						level.Info(e.Opts.Logger).Log(
+							"msg", "dropped log",
+							"logID", k,
+							"size", len(v),
+							"limit", e.Opts.MaxBytesPerBatch,
+							"loghead", string(v)[0:logheadSize],
+						)
+					} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+						// Buffer is filled. Break the loop and come back later.
+						break
+					} else {
+						logs = append(logs, string(v))
+						totalBytes += len(v)
+					}
+
+					// Note the logID for deletion. We do this by
+					// making a copy of k. It is retained in
+					// logIDs after the transaction is closed,
+					// when the goroutine ticks it zeroes out some
+					// of the IDs to delete below, causing logs to
+					// remain in the buffer and be sent again to
+					// the server.
+					logID := make([]byte, len(k))
+					copy(logID, k)
+					logIDs = append(logIDs, logID)
+
+					k, v = c.Next()
+				}
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("reading buffered logs: %w", err)
 			}
 
-			// Note the logID for deletion. We do this by
-			// making a copy of k. It is retained in
-			// logIDs after the transaction is closed,
-			// when the goroutine ticks it zeroes out some
-			// of the IDs to delete below, causing logs to
-			// remain in the buffer and be sent again to
-			// the server.
-			logID := make([]byte, len(k))
-			copy(logID, k)
-			logIDs = append(logIDs, logID)
+			if len(logs) == 0 {
+				// Nothing to send
+				return nil
+			}
 
-			k, v = c.Next()
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("reading buffered logs: %w", err)
-	}
+			err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+			if err != nil {
+				return fmt.Errorf("writing logs: %w", err)
+			}
 
-	if len(logs) == 0 {
-		// Nothing to send
-		return nil
-	}
-
-	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
-	if err != nil {
-		return fmt.Errorf("writing logs: %w", err)
-	}
-
-	// Delete logs that were successfully sent
-	for _, k := range logIDs {
-		_ = store.Delete(k)
-	}
+			// Delete logs that were successfully sent
+			for _, k := range logIDs {
+				_ = store.Delete(k)
+			}
+	*/ // TODO Stats
 
 	return nil
 }
@@ -757,39 +759,41 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
 // ensuring that at most Opts.MaxBufferedLogs logs remain.
 func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
-	store, err := e.storeFromLogType(typ)
-	if err != nil {
-		return err
-	}
-	err = e.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
+	/*
+		store, err := e.storeFromLogType(typ)
+		if err != nil {
+			return err
+		}
+		err = e.db.Update(func(tx *bbolt.Tx) error {
+			b := tx.Bucket([]byte(bucketName))
 
-		logCount := b.Stats().KeyN
-		deleteCount := logCount - e.Opts.MaxBufferedLogs
+			logCount := b.Stats().KeyN
+			deleteCount := logCount - e.Opts.MaxBufferedLogs
 
-		if deleteCount <= 0 {
-			// Limit not exceeded
+			if deleteCount <= 0 {
+				// Limit not exceeded
+				return nil
+			}
+
+			level.Info(e.Opts.Logger).Log(
+				"msg", "Buffered logs limit exceeded. Purging excess.",
+				"limit", e.Opts.MaxBufferedLogs,
+				"purge_count", deleteCount,
+			)
+
+			c := b.Cursor()
+			k, _ := c.First()
+			for total := 0; k != nil && total < deleteCount; total++ {
+				c.Delete() // Note: This advances the cursor
+				k, _ = c.First()
+			}
+
 			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("deleting overflowed logs: %w", err)
 		}
-
-		level.Info(e.Opts.Logger).Log(
-			"msg", "Buffered logs limit exceeded. Purging excess.",
-			"limit", e.Opts.MaxBufferedLogs,
-			"purge_count", deleteCount,
-		)
-
-		c := b.Cursor()
-		k, _ := c.First()
-		for total := 0; k != nil && total < deleteCount; total++ {
-			c.Delete() // Note: This advances the cursor
-			k, _ = c.First()
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("deleting overflowed logs: %w", err)
-	}
+	*/ // TODO Stats
 	return nil
 }
 
@@ -803,33 +807,35 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return nil
 	}
 
-	store, err := e.storeFromLogType(typ)
-	if err != nil {
-		level.Info(e.Opts.Logger).Log(
-			"msg", "Received unknown log type",
-			"log_type", typ,
-		)
-		return fmt.Errorf("unknown log type: %w", err)
-	}
-
-	// Buffer the log for sending later in a batch
-	err = e.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-
-		// Log keys are generated with the auto-incrementing sequence
-		// number provided by BoltDB. These must be converted to []byte
-		// (which we do with byteKeyFromUint64 function).
-		key, err := b.NextSequence()
+	/*
+		store, err := e.storeFromLogType(typ)
 		if err != nil {
-			return fmt.Errorf("generating key: %w", err)
+			level.Info(e.Opts.Logger).Log(
+				"msg", "Received unknown log type",
+				"log_type", typ,
+			)
+			return fmt.Errorf("unknown log type: %w", err)
 		}
 
-		return b.Put(byteKeyFromUint64(key), []byte(logText))
-	})
+		// Buffer the log for sending later in a batch
+		err = e.db.Update(func(tx *bbolt.Tx) error {
+			b := tx.Bucket([]byte(bucketName))
 
-	if err != nil {
-		return fmt.Errorf("buffering log: %w", err)
-	}
+			// Log keys are generated with the auto-incrementing sequence
+			// number provided by BoltDB. These must be converted to []byte
+			// (which we do with byteKeyFromUint64 function).
+			key, err := b.NextSequence()
+			if err != nil {
+				return fmt.Errorf("generating key: %w", err)
+			}
+
+			return b.Put(byteKeyFromUint64(key), []byte(logText))
+		})
+
+		if err != nil {
+			return fmt.Errorf("buffering log: %w", err)
+		}
+	*/ // TODO Stats
 
 	return nil
 }
