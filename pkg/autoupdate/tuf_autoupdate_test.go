@@ -289,5 +289,5 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	require.Contains(t, metadata, "root.json")
 	rootJson = metadata["root.json"]
 
-	return
+	return tufServerURL, rootJson
 }
