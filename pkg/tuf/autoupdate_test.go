@@ -37,7 +37,12 @@ func TestNewTufAutoupdater(t *testing.T) {
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	for _, binary := range []string{"launcher", "osqueryd"} {
+	binaries := []string{"launcher", "osqueryd"}
+	if runtime.GOOS == "windows" {
+		binaries = []string{"launcher.exe", "osqueryd.exe"}
+	}
+
+	for _, binary := range binaries {
 		binary := binary
 		t.Run(fmt.Sprintf("TestRun: %s", binary), func(t *testing.T) {
 			t.Parallel()
@@ -75,11 +80,6 @@ func TestRun(t *testing.T) {
 			// 1. We were able to successfully pull updates from TUF and identified the expected release version
 			// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
 			logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-
-			// TODO RM - just for debugging tests
-			for _, l := range logLines {
-				fmt.Println(l)
-			}
 
 			// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
 			// only the first and last, so just make sure there are at least 2
