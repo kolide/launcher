@@ -1,4 +1,4 @@
-package autoupdate
+package tuf
 
 // This new autoupdater points to our new TUF infrastructure, and will eventually supersede
 // the legacy `Updater` in autoupdate.go that points to Notary.
@@ -28,13 +28,14 @@ var rootJson []byte
 
 const (
 	DefaultTufServer = "https://tuf-devel.kolide.com"
+	DefaultChannel   = "stable"
 )
 
 type TufAutoupdater struct {
 	metadataClient  *client.Client
 	binary          string
 	operatingSystem string
-	channel         UpdateChannel
+	channel         string
 	checkInterval   time.Duration
 	errorCounter    []int64
 	lock            sync.RWMutex
@@ -44,13 +45,13 @@ type TufAutoupdater struct {
 
 type TufAutoupdaterOption func(*TufAutoupdater)
 
-func WithTufLogger(logger log.Logger) TufAutoupdaterOption {
+func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	return func(ta *TufAutoupdater) {
 		ta.logger = log.With(logger, "component", "tuf_autoupdater")
 	}
 }
 
-func WithChannel(channel UpdateChannel) TufAutoupdaterOption {
+func WithChannel(channel string) TufAutoupdaterOption {
 	return func(ta *TufAutoupdater) {
 		ta.channel = channel
 	}
@@ -95,7 +96,7 @@ func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, opts ...Tu
 		metadataClient:  metadataClient,
 		binary:          binaryName,
 		operatingSystem: runtime.GOOS,
-		channel:         Stable,
+		channel:         "stable",
 		interrupt:       make(chan struct{}),
 		checkInterval:   60 * time.Second,
 		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred

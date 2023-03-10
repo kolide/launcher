@@ -1,4 +1,4 @@
-package autoupdate
+package tuf
 
 import (
 	"fmt"
@@ -76,6 +76,7 @@ func TestRun(t *testing.T) {
 			// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
 			logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
+			// TODO RM - just for debugging tests
 			for _, l := range logLines {
 				fmt.Println(l)
 			}

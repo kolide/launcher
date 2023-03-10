@@ -26,6 +26,7 @@ pkg/autoupdate/assets/
 pkg/autoupdate/bindata.go
 tools/notary/config/private
 tools/notary/config/tuf
+pkg/tuf/assets/
 
 # Generated assets
 pkg/packagekit/internal/assets.go

@@ -11,7 +11,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/kolide/updater/tuf"
+	"github.com/kolide/launcher/pkg/tuf"
+	legacytuf "github.com/kolide/updater/tuf"
 )
 
 // UpdaterConfig is a struct of update related options. It's used to
@@ -63,14 +64,14 @@ func NewUpdater(
 		return nil, err
 	}
 
-	// create the new updater
-	tufAutoupdater, err := autoupdate.NewTufAutoupdater(
+	// create the new tuf
+	tufAutoupdater, err := tuf.NewTufAutoupdater(
 		config.TufServerURL,
 		binaryPath,
 		config.RootDirectory,
-		autoupdate.WithTufLogger(config.Logger),
-		autoupdate.WithChannel(config.UpdateChannel),
-		autoupdate.WithUpdateCheckInterval(config.AutoupdateInterval),
+		tuf.WithLogger(config.Logger),
+		tuf.WithChannel(tuf.DefaultChannel),
+		tuf.WithUpdateCheckInterval(config.AutoupdateInterval),
 	)
 	if err != nil {
 		// Log the error, but don't return it -- the new TUF autoupdater is not critical
@@ -95,7 +96,7 @@ func NewUpdater(
 
 // updater allows us to mock *autoupdate.Updater during testing
 type updater interface {
-	Run(opts ...tuf.Option) (stop func(), err error)
+	Run(opts ...legacytuf.Option) (stop func(), err error)
 	RollingErrorCount() int
 }
 
@@ -139,7 +140,7 @@ func (u *updaterCmd) execute() error {
 		level.Debug(u.config.Logger).Log("msg", "updater starting")
 
 		// run the updater and set the stop function so that the interrupt has access to it
-		stop, err := u.updater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
+		stop, err := u.updater.Run(legacytuf.WithFrequency(u.config.AutoupdateInterval), legacytuf.WithLogger(u.config.Logger))
 		u.stopExecution = stop
 		if err == nil {
 			break
@@ -171,7 +172,7 @@ func (u *updaterCmd) runAndMonitorTufAutoupdater() {
 	}
 
 	// All the TUF autoupdater does right now is maintain a local TUF repo; it does not download and stage updates yet.
-	stop, err := u.tufAutoupdater.Run(tuf.WithFrequency(u.config.AutoupdateInterval), tuf.WithLogger(u.config.Logger))
+	stop, err := u.tufAutoupdater.Run(legacytuf.WithFrequency(u.config.AutoupdateInterval), legacytuf.WithLogger(u.config.Logger))
 	if err != nil {
 		level.Debug(u.config.Logger).Log("msg", "could not run new TUF autoupdater", "err", err)
 		return
