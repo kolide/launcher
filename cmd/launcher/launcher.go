@@ -224,7 +224,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
 
-		desktopEnabledRaw, err := controlStore.Get([]byte("desktop_enabled_v1"))
+		desktopEnabledRaw, err := desktopFlagsBucketConsumer.Get([]byte("desktop_enabled_v1"))
 		if err != nil {
 			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
 		}
