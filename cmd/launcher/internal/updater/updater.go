@@ -66,7 +66,6 @@ func NewUpdater(
 	// create the new updater
 	tufAutoupdater, err := autoupdate.NewTufAutoupdater(
 		config.TufServerURL,
-		config.MirrorURL,
 		binaryPath,
 		config.RootDirectory,
 		autoupdate.WithTufLogger(config.Logger),

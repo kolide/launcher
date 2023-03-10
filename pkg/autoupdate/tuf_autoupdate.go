@@ -32,8 +32,6 @@ const (
 
 type TufAutoupdater struct {
 	metadataClient  *client.Client
-	mirrorClient    *http.Client
-	mirrorUrl       string
 	binary          string
 	operatingSystem string
 	channel         UpdateChannel
@@ -64,7 +62,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	binaryName := filepath.Base(binaryPath)
 
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
@@ -95,8 +93,6 @@ func NewTufAutoupdater(metadataUrl, mirrorUrl, binaryPath, rootDirectory string,
 
 	ta := &TufAutoupdater{
 		metadataClient:  metadataClient,
-		mirrorClient:    http.DefaultClient,
-		mirrorUrl:       mirrorUrl,
 		binary:          binaryName,
 		operatingSystem: runtime.GOOS,
 		channel:         Stable,
