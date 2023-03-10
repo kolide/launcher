@@ -195,11 +195,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
-	// For now, while we're in transition from K2 to device trust, we want to default to _not_ running
-	// the desktop process. This can be overridden via control server interaction -- see agent_flags
-	// subsystem.
-	desktopProcessSpawningEnabled := false
-
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if opts.ControlServerURL == "" {
@@ -228,6 +223,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
 		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
+
+		desktopEnabledRaw, err := desktopFlagsBucketConsumer.Get([]byte("desktop_enabled_v1"))
+		if err != nil {
+			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
+		}
+
+		// For now, while we're in transition from K2 to device trust, we want to default to _not_ running
+		// the desktop process. This can be overridden via control server interaction -- if the desktop_enabled_v1
+		// flag is present (regardless of it's value), this indicates control server has told launcher to enable desktop.
+		desktopProcessSpawningEnabled := desktopEnabledRaw != nil
 
 		runner = desktopRunner.New(
 			desktopRunner.WithLogger(logger),

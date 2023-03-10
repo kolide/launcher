@@ -90,6 +90,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
 	ecAuthedMux.Handle("/query.png", ls.requestQueryHandler())
+	ecAuthedMux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
+	ecAuthedMux.Handle("/scheduledquery.png", ls.requestScheduledQueryHandler())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
@@ -99,13 +101,16 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'
 	// mux.Handle("/query", ls.requestQueryHandler())
+	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
+	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
-		WriteTimeout:      5 * time.Second,
-		MaxHeaderBytes:    1024,
+		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
+		WriteTimeout:   30 * time.Second,
+		MaxHeaderBytes: 1024,
 	}
 
 	ls.srv = srv
