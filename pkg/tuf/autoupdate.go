@@ -63,9 +63,33 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	binaryName := filepath.Base(binaryPath)
 
+	ta := &TufAutoupdater{
+		binary:          binaryName,
+		operatingSystem: runtime.GOOS,
+		channel:         DefaultChannel,
+		interrupt:       make(chan struct{}),
+		checkInterval:   60 * time.Second,
+		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
+		logger:          log.NewNopLogger(),
+	}
+
+	for _, opt := range opts {
+		opt(ta)
+	}
+
+	var err error
+	ta.metadataClient, err = initMetadataClient(binaryName, rootDirectory, metadataUrl, metadataHttpClient)
+	if err != nil {
+		return nil, fmt.Errorf("could not init metadata client: %w", err)
+	}
+
+	return ta, nil
+}
+
+func initMetadataClient(binaryName, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
 	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", strings.TrimSuffix(binaryName, ".exe")))
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
@@ -82,7 +106,7 @@ func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, opts ...Tu
 	remoteOpts := client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}
-	remoteStore, err := client.HTTPRemoteStore(metadataUrl, &remoteOpts, http.DefaultClient)
+	remoteStore, err := client.HTTPRemoteStore(metadataUrl, &remoteOpts, metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize remote TUF store: %w", err)
 	}
@@ -92,22 +116,7 @@ func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, opts ...Tu
 		return nil, fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
 	}
 
-	ta := &TufAutoupdater{
-		metadataClient:  metadataClient,
-		binary:          binaryName,
-		operatingSystem: runtime.GOOS,
-		channel:         "stable",
-		interrupt:       make(chan struct{}),
-		checkInterval:   60 * time.Second,
-		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
-		logger:          log.NewNopLogger(),
-	}
-
-	for _, opt := range opts {
-		opt(ta)
-	}
-
-	return ta, nil
+	return metadataClient, nil
 }
 
 func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error) {

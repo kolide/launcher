@@ -23,7 +23,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	binaryPath := "some/path/to/launcher"
 	testRootDir := t.TempDir()
 
-	_, err := NewTufAutoupdater("https://example.com", binaryPath, testRootDir)
+	_, err := NewTufAutoupdater("https://example.com", binaryPath, testRootDir, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-dev"))
@@ -47,7 +47,7 @@ func TestRun(t *testing.T) {
 			metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 
 			// Right now, we do not talk to the mirror at all
-			autoupdater, err := NewTufAutoupdater(metadataServerUrl, binaryPath, testRootDir)
+			autoupdater, err := NewTufAutoupdater(metadataServerUrl, binaryPath, testRootDir, http.DefaultClient)
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 			// Update the metadata client with our test root JSON
@@ -105,7 +105,7 @@ func TestRollingErrorCount(t *testing.T) {
 	}))
 	defer testMetadataServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, binaryPath, testRootDir)
+	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, binaryPath, testRootDir, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set the check interval to something short so we can accumulate some errors

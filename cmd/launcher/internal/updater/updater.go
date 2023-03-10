@@ -64,11 +64,14 @@ func NewUpdater(
 		return nil, err
 	}
 
-	// create the new tuf
+	// create the new tuf autoupdater
+	metadataClient := http.DefaultClient
+	metadataClient.Timeout = 1 * time.Minute
 	tufAutoupdater, err := tuf.NewTufAutoupdater(
 		config.TufServerURL,
 		binaryPath,
 		config.RootDirectory,
+		metadataClient,
 		tuf.WithLogger(config.Logger),
 		tuf.WithChannel(tuf.DefaultChannel),
 		tuf.WithUpdateCheckInterval(config.AutoupdateInterval),
