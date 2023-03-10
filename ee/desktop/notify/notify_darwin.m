@@ -3,8 +3,12 @@
 
 // sendNotification draws from Fyne's implementation: https://github.com/fyne-io/fyne/blob/master/app/app_darwin.m
 
-#import "notify_darwin.h"
+#import <Foundation/Foundation.h>
+#import <UserNotifications/UserNotifications.h>
+#import <AppKit/AppKit.h>
 
+@interface NotificationDelegate: NSObject <UNUserNotificationCenterDelegate>
+@end
 @implementation NotificationDelegate
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))completionHandler {
     NSDictionary *userInfo = response.notification.request.content.userInfo;
@@ -17,6 +21,8 @@
     completionHandler();
 }
 @end
+
+NotificationDelegate *notificationDelegate;
 
 void runNotificationListenerApp(void) {
     @autoreleasepool {
@@ -34,18 +40,9 @@ void runNotificationListenerApp(void) {
         NSSet *categories = [NSSet setWithObject:category];
         [center setNotificationCategories:categories];
 
-        if ([UNUserNotificationCenter class]) {
-            NotificationDelegate *notificationDelegate = [NotificationDelegate new];
-            [notificationDelegate autorelease];
-            [center setDelegate:notificationDelegate];
-        }
-
-        [NSApp run];
+        notificationDelegate = [[NotificationDelegate alloc] init];
+        [center setDelegate:notificationDelegate];
     }
-}
-
-void stopNotificationListenerApp(void) {
-    [NSApp terminate:nil];
 }
 
 BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body, NSString *actionUri) {
