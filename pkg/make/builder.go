@@ -424,9 +424,6 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 	if err := bootstrapFromTUF("https://tuf-devel.kolide.com", localRepo); err != nil {
 		return fmt.Errorf("bootstrap TUF: %w", err)
 	}
-	if err := b.execBindata(ctx, "pkg/tuf/assets/..."); err != nil {
-		return fmt.Errorf("exec bindata for TUF autoupdate assets: %w", err)
-	}
 
 	return nil
 }
