@@ -1,4 +1,4 @@
-package kolide_server_data
+package launcher_db
 
 import (
 	"path/filepath"
@@ -10,7 +10,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func Test_generateServerDataTable(t *testing.T) {
+func Test_generateLauncherDbTable(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

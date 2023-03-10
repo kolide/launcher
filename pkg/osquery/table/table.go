@@ -6,7 +6,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
 	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
-	"github.com/kolide/launcher/pkg/osquery/tables/kolide_server_data"
+	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
@@ -23,7 +23,8 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 		LauncherConfigTable(db),
 		LauncherDbInfo(db),
 		LauncherInfoTable(db),
-		kolide_server_data.TablePlugin(db),
+		launcher_db.TablePlugin(db, "kolide_server_data", "server_provided_data"),
+		launcher_db.TablePlugin(db, "kolide_control_flags", "agent_flags"),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
 	}
