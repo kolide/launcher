@@ -239,13 +239,19 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				"path", proc.path,
 				"err", err,
 			)
+			continue
 		}
 	}
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
-		maps.Clear(r.uidProcs)
+		if len(r.uidProcs) > 0 {
+			level.Debug(r.logger).Log(
+				"msg", "all desktop processes shutdown successfully",
+				"desktop_process_count", len(r.uidProcs),
+			)
+			maps.Clear(r.uidProcs)
+		}
 		return
 	case <-time.After(r.interruptTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
