@@ -239,7 +239,6 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				"path", proc.path,
 				"err", err,
 			)
-			continue
 		}
 	}
 
