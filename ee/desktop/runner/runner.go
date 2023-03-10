@@ -229,6 +229,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		r.procsWg.Wait()
 	}()
 
+	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
@@ -239,12 +240,20 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				"path", proc.path,
 				"err", err,
 			)
+			continue
 		}
+		shutdownRequestCount++
 	}
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
+		if shutdownRequestCount > 0 {
+			level.Debug(r.logger).Log(
+				"msg", "successfully completed desktop process shutdown requests",
+				"count", shutdownRequestCount,
+			)
+		}
+
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
