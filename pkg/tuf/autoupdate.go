@@ -143,6 +143,7 @@ func (ta *TufAutoupdater) RollingErrorCount() int {
 
 func (ta *TufAutoupdater) loop() error {
 	checkTicker := time.NewTicker(ta.checkInterval)
+	cleanupTicker := time.NewTicker(12 * time.Hour)
 
 	for {
 		select {
@@ -154,11 +155,30 @@ func (ta *TufAutoupdater) loop() error {
 
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
+		case <-cleanupTicker.C:
+			ta.cleanUpOldErrorCounts()
 		case <-ta.interrupt:
 			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
 			return nil
 		}
 	}
+}
+
+func (ta *TufAutoupdater) cleanUpOldErrorCounts() {
+	ta.lock.Lock()
+	defer ta.lock.Unlock()
+
+	errorsWithinLastDay := make([]int64, 0)
+
+	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
+	for _, errorTimestamp := range ta.errorCounter {
+		if errorTimestamp < oneDayAgo {
+			continue
+		}
+		errorsWithinLastDay = append(errorsWithinLastDay, errorTimestamp)
+	}
+
+	ta.errorCounter = errorsWithinLastDay
 }
 
 func (ta *TufAutoupdater) stop() {

@@ -143,6 +143,26 @@ func TestRollingErrorCount_Respects24HourWindow(t *testing.T) {
 	require.Equal(t, 1, autoupdater.RollingErrorCount(), "TUF autoupdater did not correctly determine which timestamps to include for error count")
 }
 
+func Test_cleanUpOldErrorCounts(t *testing.T) {
+	t.Parallel()
+
+	autoupdater := &TufAutoupdater{
+		errorCounter: make([]int64, 0),
+	}
+
+	// Add one legitimate timestamp
+	autoupdater.errorCounter = append(autoupdater.errorCounter, time.Now().Add(-1*time.Hour).Unix())
+
+	// Add some old timestamps
+	autoupdater.errorCounter = append(autoupdater.errorCounter, time.Now().Add(-28*time.Hour).Unix())
+	autoupdater.errorCounter = append(autoupdater.errorCounter, time.Now().Add(-48*time.Hour).Unix())
+
+	// Call the cleanup function
+	autoupdater.cleanUpOldErrorCounts()
+
+	require.Equal(t, 1, len(autoupdater.errorCounter), "cleanup routine did not clean up correct number of old errors")
+}
+
 func Test_versionFromTarget(t *testing.T) {
 	t.Parallel()
 
