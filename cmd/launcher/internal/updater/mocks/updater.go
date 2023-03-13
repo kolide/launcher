@@ -12,20 +12,6 @@ type Updater struct {
 	mock.Mock
 }
 
-// RollingErrorCount provides a mock function with given fields:
-func (_m *Updater) RollingErrorCount() int {
-	ret := _m.Called()
-
-	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-
-	return r0
-}
-
 // Run provides a mock function with given fields: opts
 func (_m *Updater) Run(opts ...tuf.Option) (func(), error) {
 	_va := make([]interface{}, len(opts))

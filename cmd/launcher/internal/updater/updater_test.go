@@ -20,7 +20,6 @@ func Test_updaterCmd_execute(t *testing.T) {
 	type fields struct {
 		// Mock generated with `mockery --name updater --exported`
 		updater                 *mocks.Updater
-		tufAutoupdater          *mocks.Updater
 		stopChan                chan bool
 		config                  *UpdaterConfig
 		runUpdaterRetryInterval time.Duration
@@ -32,15 +31,13 @@ func Test_updaterCmd_execute(t *testing.T) {
 		// leave this field empty and the test will fail if there is a call to run function made
 		// add 3 funcs here and the test will expect updater.Run() to be called 3 times
 		updaterRunReturns []func(opts ...tuf.Option) (stop func(), err error)
-		runSucceeds       bool
 		callStopChanAfter time.Duration
 		assertion         assert.ErrorAssertionFunc
 	}{
 		{
 			name: "success",
 			fields: fields{
-				updater:        &mocks.Updater{},
-				tufAutoupdater: &mocks.Updater{},
+				updater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -50,14 +47,12 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return func() {}, nil
 				},
 			},
-			runSucceeds: true,
-			assertion:   assert.NoError,
+			assertion: assert.NoError,
 		},
 		{
 			name: "multiple_run_retries",
 			fields: fields{
-				updater:        &mocks.Updater{},
-				tufAutoupdater: &mocks.Updater{},
+				updater: &mocks.Updater{},
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -74,30 +69,26 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return func() {}, nil
 				},
 			},
-			runSucceeds: true,
-			assertion:   assert.NoError,
+			assertion: assert.NoError,
 		},
 		{
 			name: "stop_during_initial_delay",
 			fields: fields{
-				updater:        &mocks.Updater{},
-				tufAutoupdater: &mocks.Updater{},
-				stopChan:       make(chan bool),
+				updater:  &mocks.Updater{},
+				stopChan: make(chan bool),
 				config: &UpdaterConfig{
 					Logger:       log.NewNopLogger(),
 					InitialDelay: 200 * time.Millisecond,
 				},
 			},
-			runSucceeds:       false,
 			callStopChanAfter: time.Millisecond,
 			assertion:         assert.NoError,
 		},
 		{
 			name: "stop_during_retry_loop",
 			fields: fields{
-				updater:        &mocks.Updater{},
-				tufAutoupdater: &mocks.Updater{},
-				stopChan:       make(chan bool),
+				updater:  &mocks.Updater{},
+				stopChan: make(chan bool),
 				config: &UpdaterConfig{
 					Logger: log.NewNopLogger(),
 				},
@@ -108,7 +99,6 @@ func Test_updaterCmd_execute(t *testing.T) {
 					return nil, errors.New("some error")
 				},
 			},
-			runSucceeds:       false,
 			callStopChanAfter: 5 * time.Millisecond,
 			assertion:         assert.NoError,
 		},
@@ -123,12 +113,10 @@ func Test_updaterCmd_execute(t *testing.T) {
 
 			u := &updaterCmd{
 				updater:                 tt.fields.updater,
-				tufAutoupdater:          tt.fields.tufAutoupdater,
 				ctx:                     ctx,
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,
 				runUpdaterRetryInterval: tt.fields.runUpdaterRetryInterval,
-				monitorInterval:         1 * time.Millisecond,
 			}
 
 			var wg sync.WaitGroup
@@ -146,14 +134,8 @@ func Test_updaterCmd_execute(t *testing.T) {
 					tt.fields.updater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(returnFunc()).Once()
 				}
 			}
-			// If we expect that `Run` succeeds, then updater should spawn a goroutine to start monitoring the new autoupdater
-			if tt.runSucceeds {
-				tt.fields.tufAutoupdater.On("Run", mock.AnythingOfType("tuf.Option"), mock.AnythingOfType("tuf.Option")).Return(func() {}, nil).Once()
-				tt.fields.tufAutoupdater.On("RollingErrorCount").Return(0)
-			}
 
 			tt.assertion(t, u.execute())
-			time.Sleep(5 * time.Millisecond) // sleep a little bit to let the new autoupdater go routine run
 			tt.fields.updater.AssertExpectations(t)
 
 			// test will time out if we don't get to send something on u.stopChan when expecting channel receive
@@ -242,18 +224,4 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 			wg.Wait()
 		})
 	}
-}
-
-func Test_updaterCmd_monitor_nilautoupdater(t *testing.T) {
-	t.Parallel()
-
-	u := &updaterCmd{
-		tufAutoupdater: nil,
-		config: &UpdaterConfig{
-			Logger: log.NewNopLogger(),
-		},
-	}
-
-	// Make the call to run and monitor -- we would see a panic if the nil autoupdater were called anyway
-	u.runAndMonitorTufAutoupdater()
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
-	legacytuf "github.com/kolide/updater/tuf"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 )
@@ -117,30 +116,9 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 	return metadataClient, nil
 }
 
-func (ta *TufAutoupdater) Run(opts ...legacytuf.Option) (stop func(), err error) {
-	go ta.loop()
-
-	return ta.stop, nil
-}
-
-func (ta *TufAutoupdater) RollingErrorCount() int {
-	ta.lock.RLock()
-	defer ta.lock.RUnlock()
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	errorCount := 0
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
-		}
-		errorCount += 1
-	}
-
-	return errorCount
-}
-
-func (ta *TufAutoupdater) loop() error {
+func (ta *TufAutoupdater) Execute() (err error) {
 	checkTicker := time.NewTicker(ta.checkInterval)
+	errorCheckTicker := time.NewTicker(1 * time.Hour)
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 
 	for {
@@ -153,6 +131,9 @@ func (ta *TufAutoupdater) loop() error {
 
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
+		case <-errorCheckTicker.C:
+			rollingErrorCount := ta.rollingErrorCount()
+			level.Debug(ta.logger).Log("msg", "checked rolling error count for TUF updater", "err_count", rollingErrorCount, "binary", ta.binary)
 		case <-cleanupTicker.C:
 			ta.cleanUpOldErrorCounts()
 		case <-ta.interrupt:
@@ -162,24 +143,7 @@ func (ta *TufAutoupdater) loop() error {
 	}
 }
 
-func (ta *TufAutoupdater) cleanUpOldErrorCounts() {
-	ta.lock.Lock()
-	defer ta.lock.Unlock()
-
-	errorsWithinLastDay := make([]int64, 0)
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
-		}
-		errorsWithinLastDay = append(errorsWithinLastDay, errorTimestamp)
-	}
-
-	ta.errorCounter = errorsWithinLastDay
-}
-
-func (ta *TufAutoupdater) stop() {
+func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
 }
 
@@ -230,4 +194,37 @@ func (ta *TufAutoupdater) versionFromTarget(target string) string {
 	prefixToTrim := fmt.Sprintf("%s/%s/%s-", ta.binary, ta.operatingSystem, ta.binary)
 
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
+}
+
+func (ta *TufAutoupdater) rollingErrorCount() int {
+	ta.lock.RLock()
+	defer ta.lock.RUnlock()
+
+	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
+	errorCount := 0
+	for _, errorTimestamp := range ta.errorCounter {
+		if errorTimestamp < oneDayAgo {
+			continue
+		}
+		errorCount += 1
+	}
+
+	return errorCount
+}
+
+func (ta *TufAutoupdater) cleanUpOldErrorCounts() {
+	ta.lock.Lock()
+	defer ta.lock.Unlock()
+
+	errorsWithinLastDay := make([]int64, 0)
+
+	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
+	for _, errorTimestamp := range ta.errorCounter {
+		if errorTimestamp < oneDayAgo {
+			continue
+		}
+		errorsWithinLastDay = append(errorsWithinLastDay, errorTimestamp)
+	}
+
+	ta.errorCounter = errorsWithinLastDay
 }

@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +35,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 }
 
 // Tests running as well as shutdown
-func TestRun(t *testing.T) {
+func TestExecute(t *testing.T) {
 	t.Parallel()
 
 	binaries := []string{"launcher", "osqueryd"}
@@ -62,12 +63,11 @@ func TestRun(t *testing.T) {
 			autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 			// Let the autoupdater run for a bit
-			stop, err := autoupdater.Run()
-			require.NoError(t, err, "could not run TUF autoupdater")
+			go autoupdater.Execute()
 			time.Sleep(5 * time.Second)
 
 			// Shut down autoupdater
-			stop()
+			autoupdater.Interrupt(errors.New("test error"))
 
 			// Wait one second to let autoupdater shut down
 			time.Sleep(1 * time.Second)
@@ -90,7 +90,7 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestRollingErrorCount(t *testing.T) {
+func Test_rollingErrorCount(t *testing.T) {
 	t.Parallel()
 
 	binaryName := "launcher"
@@ -108,19 +108,18 @@ func TestRollingErrorCount(t *testing.T) {
 	autoupdater.checkInterval = 1 * time.Second
 
 	// Start the autoupdater going
-	stop, err := autoupdater.Run()
-	require.NoError(t, err, "could not run TUF autoupdater")
+	go autoupdater.Execute()
 
 	// Wait 5 seconds to accumulate errors, stop it, and give it a second to shut down
 	time.Sleep(5 * time.Second)
-	stop()
+	autoupdater.Interrupt(errors.New("test error"))
 	time.Sleep(1 * time.Second)
 
 	// Confirm that we saved the errors with correct timestamps
-	require.Greater(t, autoupdater.RollingErrorCount(), 0, "TUF autoupdater did not record error counts")
+	require.Greater(t, autoupdater.rollingErrorCount(), 0, "TUF autoupdater did not record error counts")
 }
 
-func TestRollingErrorCount_Respects24HourWindow(t *testing.T) {
+func Test_rollingErrorCount_Respects24HourWindow(t *testing.T) {
 	t.Parallel()
 
 	autoupdater := &TufAutoupdater{
@@ -136,7 +135,7 @@ func TestRollingErrorCount_Respects24HourWindow(t *testing.T) {
 	autoupdater.errorCounter = append(autoupdater.errorCounter, time.Now().Add(-49*time.Hour).Unix())
 	autoupdater.errorCounter = append(autoupdater.errorCounter, time.Now().Add(-50*time.Hour).Unix())
 
-	require.Equal(t, 1, autoupdater.RollingErrorCount(), "TUF autoupdater did not correctly determine which timestamps to include for error count")
+	require.Equal(t, 1, autoupdater.rollingErrorCount(), "TUF autoupdater did not correctly determine which timestamps to include for error count")
 }
 
 func Test_cleanUpOldErrorCounts(t *testing.T) {
