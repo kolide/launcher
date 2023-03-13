@@ -247,7 +247,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
 				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
 				require.NoError(t, err, "could not write test target binary to temp dir")
-				require.NoError(t, repo.AddTarget(filepath.Join(b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
+				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
 
 				// Commit
 				require.NoError(t, repo.Snapshot(), "could not take snapshot")
@@ -263,7 +263,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c, "release.json"), []byte("{}"), 0777)
 				require.NoError(t, err, "could not write test target release file to temp dir")
 				customMetadata := fmt.Sprintf("{\"target\":\"%s/%s/%s\"}", b, runtime.GOOS, binaryFileName)
-				require.NoError(t, repo.AddTarget(filepath.Join(b, runtime.GOOS, c, "release.json"), []byte(customMetadata)), "could not add test target release file to tuf")
+				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s/release.json", b, runtime.GOOS, c), []byte(customMetadata)), "could not add test target release file to tuf")
 
 				// Commit
 				require.NoError(t, repo.Snapshot(), "could not take snapshot")
