@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -69,7 +70,7 @@ func NewUpdater(
 	metadataClient.Timeout = 1 * time.Minute
 	tufAutoupdater, err := tuf.NewTufAutoupdater(
 		config.TufServerURL,
-		filepath.Base(binaryPath),
+		strings.TrimSuffix(filepath.Base(binaryPath), ".exe"),
 		config.RootDirectory,
 		metadataClient,
 		tuf.WithLogger(config.Logger),

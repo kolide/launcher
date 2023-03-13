@@ -38,9 +38,6 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 
 	binaries := []string{"launcher", "osqueryd"}
-	if runtime.GOOS == "windows" {
-		binaries = []string{"launcher.exe", "osqueryd.exe"}
-	}
 
 	for _, binary := range binaries {
 		binary := binary
@@ -179,7 +176,7 @@ func Test_versionFromTarget(t *testing.T) {
 		},
 		{
 			target:          "launcher/windows/launcher-1.13.5.tar.gz",
-			binary:          "launcher.exe",
+			binary:          "launcher",
 			operatingSystem: "windows",
 			version:         "1.13.5",
 		},
@@ -197,7 +194,7 @@ func Test_versionFromTarget(t *testing.T) {
 		},
 		{
 			target:          "osqueryd/windows/osqueryd-0.8.1.tar.gz",
-			binary:          "osqueryd.exe",
+			binary:          "osqueryd",
 			operatingSystem: "windows",
 			version:         "0.8.1",
 		},

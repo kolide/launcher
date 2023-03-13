@@ -63,9 +63,9 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binaryName, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		binary:          binaryName,
+		binary:          binary,
 		operatingSystem: runtime.GOOS,
 		channel:         DefaultChannel,
 		interrupt:       make(chan struct{}),
@@ -79,7 +79,7 @@ func NewTufAutoupdater(metadataUrl, binaryName, rootDirectory string, metadataHt
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(binaryName, rootDirectory, metadataUrl, metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(binary, rootDirectory, metadataUrl, metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
@@ -87,9 +87,9 @@ func NewTufAutoupdater(metadataUrl, binaryName, rootDirectory string, metadataHt
 	return ta, nil
 }
 
-func initMetadataClient(binaryName, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
-	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", strings.TrimSuffix(binaryName, ".exe")))
+	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", binary))
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
@@ -195,7 +195,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", strings.TrimSuffix(ta.binary, ".exe"), ta.operatingSystem, ta.channel)
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", ta.binary, ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -226,10 +226,8 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 }
 
 func (ta *TufAutoupdater) versionFromTarget(target string) string {
-	strippedBinary := strings.TrimSuffix(ta.binary, ".exe")
-
 	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", strippedBinary, ta.operatingSystem, strippedBinary)
+	prefixToTrim := fmt.Sprintf("%s/%s/%s-", ta.binary, ta.operatingSystem, ta.binary)
 
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
