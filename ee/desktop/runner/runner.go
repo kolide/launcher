@@ -281,16 +281,9 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 	}
 
 	errs := make([]error, 0)
-	for uid, proc := range r.uidProcs {
+	for _, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending notify command to desktop process",
-				"uid", uid,
-				"pid", proc.process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
 			errs = append(errs, err)
 		}
 	}

@@ -34,7 +34,7 @@ void runNotificationListenerApp(void) {
         UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
             title:@"Learn More" options:UNNotificationActionOptionNone];
 
-        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
+        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationWithButtonCategory"
             actions:@[learnMoreAction] intentIdentifiers:@[]
             options:UNNotificationCategoryOptionNone];
         NSSet *categories = [NSSet setWithObject:category];
@@ -50,8 +50,12 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     [content autorelease];
     content.title = title;
     content.body = body;
-    content.categoryIdentifier = @"KolideNotificationCategory";
-    content.userInfo = @{@"action_uri": actionUri};
+
+    if (actionUri != (id)[NSNull null] && actionUri.length > 0) {
+        // Only create "Learn more" button if we have an action URI to go with it
+        content.categoryIdentifier = @"KolideNotificationWithButtonCategory";
+        content.userInfo = @{@"action_uri": actionUri};
+    }
 
     NSString *uuid = [[NSUUID UUID] UUIDString];
     NSString *identifier = [NSString stringWithFormat:@"kolide-notify-%@", uuid];
@@ -85,6 +89,11 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
 
 BOOL sendNotification(char *cTitle, char *cBody, char *cActionUri) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+
+    // To be removed later -- for troubleshooting purposes only
+    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+        NSLog(@"desktop_notifier: Notification settings: %@", settings);
+    }];
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
