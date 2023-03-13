@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func (ls *localServer) requestControlServiceFetchHanlder() http.Handler {
+func (ls *localServer) requestControlServiceFetchHandler() http.Handler {
 	return http.HandlerFunc(ls.requestControlServiceFetchFunc)
 }
 
