@@ -116,7 +116,7 @@ func (nc *NotificationConsumer) notify(notificationToSend notify.Notification) {
 	}
 
 	if err := nc.runner.SendNotification(notificationToSend); err != nil {
-		level.Debug(nc.logger).Log("msg", "could not send notification", "title", notificationToSend.Title, "err", err)
+		// Already logged on desktop side, no need to log again
 		return
 	}
 
