@@ -36,7 +36,7 @@ var portList = []int{
 }
 
 type controlServer interface {
-	UpdateRequestInterval(time.Duration) error
+	Fetch() error
 }
 
 type Querier interface {
@@ -127,8 +127,8 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	// mux.Handle("/query", ls.requestQueryHandler())
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
-	// curl localhost:40978/controlserverfetchinterval --data '{"interval":"5s"}'
-	mux.Handle("/controlserverfetchinterval", ls.requestControlServerFetchInterval())
+	// curl localhost:40978/controlserverfetch
+	mux.Handle("/controlserverfetch", ls.requestControlServerFetch())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
