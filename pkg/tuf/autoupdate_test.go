@@ -20,10 +20,10 @@ import (
 func TestNewTufAutoupdater(t *testing.T) {
 	t.Parallel()
 
-	binaryPath := "some/path/to/launcher"
+	binaryName := "launcher"
 	testRootDir := t.TempDir()
 
-	_, err := NewTufAutoupdater("https://example.com", binaryPath, testRootDir, http.DefaultClient)
+	_, err := NewTufAutoupdater("https://example.com", binaryName, testRootDir, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	_, err = os.Stat(filepath.Join(testRootDir, "launcher-tuf-dev"))
@@ -46,13 +46,12 @@ func TestRun(t *testing.T) {
 		binary := binary
 		t.Run(fmt.Sprintf("TestRun: %s", binary), func(t *testing.T) {
 			t.Parallel()
-			binaryPath := filepath.Join("some", "path", "to", binary)
 			testRootDir := t.TempDir()
 			testReleaseVersion := "1.2.3"
 			metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 
 			// Right now, we do not talk to the mirror at all
-			autoupdater, err := NewTufAutoupdater(metadataServerUrl, binaryPath, testRootDir, http.DefaultClient)
+			autoupdater, err := NewTufAutoupdater(metadataServerUrl, binary, testRootDir, http.DefaultClient)
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 			// Update the metadata client with our test root JSON
@@ -97,7 +96,7 @@ func TestRun(t *testing.T) {
 func TestRollingErrorCount(t *testing.T) {
 	t.Parallel()
 
-	binaryPath := "some/path/to/launcher"
+	binaryName := "launcher"
 	testRootDir := t.TempDir()
 	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulates TUF server being down
@@ -105,7 +104,7 @@ func TestRollingErrorCount(t *testing.T) {
 	}))
 	defer testMetadataServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, binaryPath, testRootDir, http.DefaultClient)
+	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, binaryName, testRootDir, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set the check interval to something short so we can accumulate some errors

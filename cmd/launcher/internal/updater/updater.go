@@ -69,7 +69,7 @@ func NewUpdater(
 	metadataClient.Timeout = 1 * time.Minute
 	tufAutoupdater, err := tuf.NewTufAutoupdater(
 		config.TufServerURL,
-		binaryPath,
+		filepath.Base(binaryPath),
 		config.RootDirectory,
 		metadataClient,
 		tuf.WithLogger(config.Logger),

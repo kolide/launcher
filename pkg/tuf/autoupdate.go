@@ -63,9 +63,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binaryPath, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
-	binaryName := filepath.Base(binaryPath)
-
+func NewTufAutoupdater(metadataUrl, binaryName, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		binary:          binaryName,
 		operatingSystem: runtime.GOOS,
