@@ -3,8 +3,12 @@
 
 // sendNotification draws from Fyne's implementation: https://github.com/fyne-io/fyne/blob/master/app/app_darwin.m
 
-#import "notify_darwin.h"
+#import <Foundation/Foundation.h>
+#import <UserNotifications/UserNotifications.h>
+#import <AppKit/AppKit.h>
 
+@interface NotificationDelegate: NSObject <UNUserNotificationCenterDelegate>
+@end
 @implementation NotificationDelegate
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))completionHandler {
     NSDictionary *userInfo = response.notification.request.content.userInfo;
@@ -18,6 +22,8 @@
 }
 @end
 
+NotificationDelegate *notificationDelegate;
+
 void runNotificationListenerApp(void) {
     @autoreleasepool {
         [NSApplication sharedApplication];
@@ -28,24 +34,15 @@ void runNotificationListenerApp(void) {
         UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
             title:@"Learn More" options:UNNotificationActionOptionNone];
 
-        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationCategory"
+        UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationWithButtonCategory"
             actions:@[learnMoreAction] intentIdentifiers:@[]
             options:UNNotificationCategoryOptionNone];
         NSSet *categories = [NSSet setWithObject:category];
         [center setNotificationCategories:categories];
 
-        if ([UNUserNotificationCenter class]) {
-            NotificationDelegate *notificationDelegate = [NotificationDelegate new];
-            [notificationDelegate autorelease];
-            [center setDelegate:notificationDelegate];
-        }
-
-        [NSApp run];
+        notificationDelegate = [[NotificationDelegate alloc] init];
+        [center setDelegate:notificationDelegate];
     }
-}
-
-void stopNotificationListenerApp(void) {
-    [NSApp terminate:nil];
 }
 
 BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSString *body, NSString *actionUri) {
@@ -53,8 +50,12 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     [content autorelease];
     content.title = title;
     content.body = body;
-    content.categoryIdentifier = @"KolideNotificationCategory";
-    content.userInfo = @{@"action_uri": actionUri};
+
+    if (actionUri != (id)[NSNull null] && actionUri.length > 0) {
+        // Only create "Learn more" button if we have an action URI to go with it
+        content.categoryIdentifier = @"KolideNotificationWithButtonCategory";
+        content.userInfo = @{@"action_uri": actionUri};
+    }
 
     NSString *uuid = [[NSUUID UUID] UUIDString];
     NSString *identifier = [NSString stringWithFormat:@"kolide-notify-%@", uuid];
@@ -88,6 +89,11 @@ BOOL doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
 
 BOOL sendNotification(char *cTitle, char *cBody, char *cActionUri) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+
+    // To be removed later -- for troubleshooting purposes only
+    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+        NSLog(@"desktop_notifier: Notification settings: %@", settings);
+    }];
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
