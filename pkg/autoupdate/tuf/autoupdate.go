@@ -180,6 +180,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 			"msg", "checked most up-to-date release from TUF",
 			"launcher_version", version.Version().Version,
 			"release_version", ta.versionFromTarget(custom.Target),
+			"binary", ta.binary,
 			"channel", ta.channel,
 		)
 
