@@ -10,23 +10,22 @@ import (
 
 // TablePlugin provides an osquery table plugin that exposes data found in the server_provided_data launcher.db bucket.
 // This data is intended to be updated by the control server.
-func TablePlugin(db *bbolt.DB, tableName, bucketName string) *table.Plugin {
-func TablePlugin(iterator types.Iterator) *table.Plugin {
+func TablePlugin(tableName string, iterator types.Iterator) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
 	}
 
-	return table.NewPlugin(tableName, columns, generateServerDataTable(iterator))
+	return table.NewPlugin(tableName, columns, generateServerDataTable(tableName, iterator))
 }
 
-func generateServerDataTable(iterator types.Iterator) table.GenerateFunc {
+func generateServerDataTable(tableName string, iterator types.Iterator) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		return dbKeyValueRows(osquery.ServerProvidedDataBucket, iterator)
+		return dbKeyValueRows(tableName, iterator)
 	}
 }
 
-func dbKeyValueRows(bucketName string, iterator types.Iterator) ([]map[string]string, error) {
+func dbKeyValueRows(tableName string, iterator types.Iterator) ([]map[string]string, error) {
 	results := make([]map[string]string, 0)
 
 	if err := iterator.ForEach(func(k, v []byte) error {
