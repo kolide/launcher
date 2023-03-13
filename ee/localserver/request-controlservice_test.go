@@ -45,7 +45,7 @@ func Test_localServer_requestControlServiceFetch(t *testing.T) {
 			req, err := http.NewRequest("", "", nil)
 			require.NoError(t, err)
 
-			handler := http.HandlerFunc(server.requestControlSericeFetchFunc)
+			handler := http.HandlerFunc(server.requestControlServiceFetchFunc)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
 

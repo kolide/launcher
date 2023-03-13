@@ -6,10 +6,10 @@ import (
 )
 
 func (ls *localServer) requestControlServiceFetchHanlder() http.Handler {
-	return http.HandlerFunc(ls.requestControlSericeFetchFunc)
+	return http.HandlerFunc(ls.requestControlServiceFetchFunc)
 }
 
-func (ls *localServer) requestControlSericeFetchFunc(w http.ResponseWriter, r *http.Request) {
+func (ls *localServer) requestControlServiceFetchFunc(w http.ResponseWriter, r *http.Request) {
 	if ls.controlService == nil {
 		sendClientError(w, fmt.Sprintf("control service not configured"))
 		return
