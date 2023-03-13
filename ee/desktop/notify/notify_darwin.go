@@ -9,7 +9,6 @@ package notify
 
 bool sendNotification(char *cTitle, char *cBody, char *cActionUri);
 void runNotificationListenerApp(void);
-void stopNotificationListenerApp(void);
 */
 import "C"
 import (
@@ -35,18 +34,11 @@ func NewDesktopNotifier(logger log.Logger, _ string) *macNotifier {
 }
 
 func (m *macNotifier) Listen() error {
-	if !isBundle() {
-		<-m.interrupt
-		return nil
+	if isBundle() {
+		C.runNotificationListenerApp()
 	}
 
-	// isBundle
-	go func() {
-		<-m.interrupt
-		C.stopNotificationListenerApp()
-	}()
-
-	C.runNotificationListenerApp()
+	<-m.interrupt
 	return nil
 }
 
