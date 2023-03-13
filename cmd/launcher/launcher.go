@@ -284,7 +284,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		ls, err := localserver.New(db,
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
-			localserver.WithControlServer(controlService),
+			localserver.WithControlService(controlService),
 		)
 
 		if err != nil {

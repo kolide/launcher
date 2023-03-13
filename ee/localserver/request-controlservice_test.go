@@ -11,22 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_localServer_requestControlServerFetch(t *testing.T) {
+func Test_localServer_requestControlServiceFetch(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                string
-		expectedCode        int
-		controlServerReturn error
+		name                 string
+		expectedCode         int
+		controlServiceReturn error
 	}{
 		{
 			name:         "happy path",
 			expectedCode: http.StatusOK,
 		},
 		{
-			name:                "err",
-			expectedCode:        http.StatusBadRequest,
-			controlServerReturn: errors.New("error"),
+			name:                 "err",
+			expectedCode:         http.StatusBadRequest,
+			controlServiceReturn: errors.New("error"),
 		},
 	}
 
@@ -35,17 +35,17 @@ func Test_localServer_requestControlServerFetch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockControlServer := mocks.NewControlServer(t)
-			mockControlServer.On("Fetch").Return(tt.controlServerReturn).Once()
+			mockControlService := mocks.NewControlService(t)
+			mockControlService.On("Fetch").Return(tt.controlServiceReturn).Once()
 
 			var logBytes bytes.Buffer
 			server := testServer(t, &logBytes)
-			server.controlServer = mockControlServer
+			server.controlService = mockControlService
 
 			req, err := http.NewRequest("", "", nil)
 			require.NoError(t, err)
 
-			handler := http.HandlerFunc(server.requestControlServerFetchFunc)
+			handler := http.HandlerFunc(server.requestControlSericeFetchFunc)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
 

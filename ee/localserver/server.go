@@ -35,7 +35,7 @@ var portList = []int{
 	22322,
 }
 
-type controlServer interface {
+type controlService interface {
 	Fetch() error
 }
 
@@ -59,7 +59,7 @@ type localServer struct {
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
 
-	controlServer controlServer
+	controlService controlService
 }
 
 const (
@@ -75,9 +75,9 @@ func WithLogger(logger log.Logger) LocalServerOption {
 	}
 }
 
-func WithControlServer(cs controlServer) LocalServerOption {
+func WithControlService(cs controlService) LocalServerOption {
 	return func(s *localServer) {
-		s.controlServer = cs
+		s.controlService = cs
 	}
 }
 
@@ -110,8 +110,8 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
-	ecAuthedMux.Handle("/controlserverfetch", ls.requestControlServerFetchHanlder())
-	ecAuthedMux.Handle("/controlserverfetch.png", ls.requestControlServerFetchHanlder())
+	ecAuthedMux.Handle("/controlservicefetch", ls.requestControlServiceFetchHanlder())
+	ecAuthedMux.Handle("/controlservicefetch.png", ls.requestControlServiceFetchHanlder())
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
@@ -129,8 +129,8 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	// mux.Handle("/query", ls.requestQueryHandler())
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
-	// curl localhost:40978/controlserverfetch
-	// mux.Handle("/controlserverfetch", ls.requestControlServerFetch())
+	// curl localhost:40978/controlservicefetch
+	// mux.Handle("/controlservicefetch", ls.requestControlServiceFetch())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
