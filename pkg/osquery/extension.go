@@ -784,41 +784,39 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
 // ensuring that at most Opts.MaxBufferedLogs logs remain.
 func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
-	/*
-		store, err := e.storeFromLogType(typ)
-		if err != nil {
-			return err
-		}
-		err = e.db.Update(func(tx *bbolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return err
+	}
+	err = e.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
 
-			logCount := b.Stats().KeyN
-			deleteCount := logCount - e.Opts.MaxBufferedLogs
+		logCount := b.Stats().KeyN
+		deleteCount := logCount - e.Opts.MaxBufferedLogs
 
-			if deleteCount <= 0 {
-				// Limit not exceeded
-				return nil
-			}
-
-			level.Info(e.Opts.Logger).Log(
-				"msg", "Buffered logs limit exceeded. Purging excess.",
-				"limit", e.Opts.MaxBufferedLogs,
-				"purge_count", deleteCount,
-			)
-
-			c := b.Cursor()
-			k, _ := c.First()
-			for total := 0; k != nil && total < deleteCount; total++ {
-				c.Delete() // Note: This advances the cursor
-				k, _ = c.First()
-			}
-
+		if deleteCount <= 0 {
+			// Limit not exceeded
 			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("deleting overflowed logs: %w", err)
 		}
-	*/ // TODO Stats
+
+		level.Info(e.Opts.Logger).Log(
+			"msg", "Buffered logs limit exceeded. Purging excess.",
+			"limit", e.Opts.MaxBufferedLogs,
+			"purge_count", deleteCount,
+		)
+
+		c := b.Cursor()
+		k, _ := c.First()
+		for total := 0; k != nil && total < deleteCount; total++ {
+			c.Delete() // Note: This advances the cursor
+			k, _ = c.First()
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("deleting overflowed logs: %w", err)
+	}
 	return nil
 }
 
@@ -832,35 +830,33 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return nil
 	}
 
-	/*
-		store, err := e.storeFromLogType(typ)
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		level.Info(e.Opts.Logger).Log(
+			"msg", "Received unknown log type",
+			"log_type", typ,
+		)
+		return fmt.Errorf("unknown log type: %w", err)
+	}
+
+	// Buffer the log for sending later in a batch
+	err = e.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+
+		// Log keys are generated with the auto-incrementing sequence
+		// number provided by BoltDB. These must be converted to []byte
+		// (which we do with byteKeyFromUint64 function).
+		key, err := b.NextSequence()
 		if err != nil {
-			level.Info(e.Opts.Logger).Log(
-				"msg", "Received unknown log type",
-				"log_type", typ,
-			)
-			return fmt.Errorf("unknown log type: %w", err)
+			return fmt.Errorf("generating key: %w", err)
 		}
 
-		// Buffer the log for sending later in a batch
-		err = e.db.Update(func(tx *bbolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
+		return b.Put(byteKeyFromUint64(key), []byte(logText))
+	})
 
-			// Log keys are generated with the auto-incrementing sequence
-			// number provided by BoltDB. These must be converted to []byte
-			// (which we do with byteKeyFromUint64 function).
-			key, err := b.NextSequence()
-			if err != nil {
-				return fmt.Errorf("generating key: %w", err)
-			}
-
-			return b.Put(byteKeyFromUint64(key), []byte(logText))
-		})
-
-		if err != nil {
-			return fmt.Errorf("buffering log: %w", err)
-		}
-	*/ // TODO Stats
+	if err != nil {
+		return fmt.Errorf("buffering log: %w", err)
+	}
 
 	return nil
 }
