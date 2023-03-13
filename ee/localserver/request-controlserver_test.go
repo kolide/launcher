@@ -36,7 +36,7 @@ func Test_localServer_requestControlServerFetch(t *testing.T) {
 			t.Parallel()
 
 			mockControlServer := mocks.NewControlServer(t)
-			mockControlServer.On("Fetch").Return(tt.controlServerReturn)
+			mockControlServer.On("Fetch").Return(tt.controlServerReturn).Once()
 
 			var logBytes bytes.Buffer
 			server := testServer(t, &logBytes)
