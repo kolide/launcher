@@ -1,7 +1,7 @@
 package tuf
 
 // This new autoupdater points to our new TUF infrastructure, and will eventually supersede
-// the legacy `Updater` in autoupdate.go that points to Notary.
+// the legacy `Updater` in pkg/autoupdate that points to Notary.
 
 import (
 	_ "embed"

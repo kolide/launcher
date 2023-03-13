@@ -14,8 +14,8 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/tuf"
 	"github.com/peterbourgon/ff/v3"
 )
 

@@ -12,7 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/kolide/launcher/pkg/tuf"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	legacytuf "github.com/kolide/updater/tuf"
 )
 
