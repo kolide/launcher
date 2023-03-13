@@ -35,6 +35,10 @@ var portList = []int{
 	22322,
 }
 
+type controlServer interface {
+	UpdateRequestInterval(time.Duration) error
+}
+
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
@@ -54,6 +58,8 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
+
+	controlServer controlServer
 }
 
 const (
@@ -61,13 +67,31 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, error) {
+type LocalServerOption func(*localServer)
+
+func WithLogger(logger log.Logger) LocalServerOption {
+	return func(s *localServer) {
+		s.logger = log.With(logger, "component", "localserver")
+	}
+}
+
+func WithControlServer(cs controlServer) LocalServerOption {
+	return func(s *localServer) {
+		s.controlServer = cs
+	}
+}
+
+func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
-		logger:                log.With(logger, "component", "localserver"),
+		logger:                log.NewNopLogger(),
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:          kolideServer,
 		myLocalDbSigner:       agent.LocalDbKeys(),
 		myLocalHardwareSigner: agent.HardwareKeys(),
+	}
+
+	for _, o := range opts {
+		o(ls)
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -103,6 +127,8 @@ func New(logger log.Logger, db *bbolt.DB, kolideServer string) (*localServer, er
 	// mux.Handle("/query", ls.requestQueryHandler())
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
+	// curl localhost:40978/controlserverfetchinterval --data '{"interval":"5s"}'
+	mux.Handle("/controlserverfetchinterval", ls.requestControlServerFetchInterval())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),

@@ -19,7 +19,7 @@ import (
 type ControlService struct {
 	logger          log.Logger
 	cancel          context.CancelFunc
-	requestInterval time.Duration
+	requestInterval *time.Ticker
 	fetcher         dataProvider
 	store           types.GetterSetter
 	lastFetched     map[string]string
@@ -49,7 +49,7 @@ type dataProvider interface {
 func New(logger log.Logger, ctx context.Context, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          log.With(logger, "component", "control"),
-		requestInterval: 60 * time.Second,
+		requestInterval: time.NewTicker(60 * time.Second),
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
 		consumers:       make(map[string]consumer),
@@ -72,23 +72,32 @@ func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
 	}
 }
 
+func (cs *ControlService) UpdateRequestInterval(interval time.Duration) error {
+	if interval <= 0 {
+		return fmt.Errorf("duration must be great than zero, was set to %d", interval)
+	}
+
+	cs.requestInterval.Reset(interval)
+	return nil
+}
+
 // Start is the main control service loop. It fetches control
 func (cs *ControlService) Start(ctx context.Context) {
 	level.Info(cs.logger).Log("msg", "control service started")
 	ctx, cs.cancel = context.WithCancel(ctx)
-	requestTicker := time.NewTicker(cs.requestInterval)
+
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
 			level.Debug(cs.logger).Log(
 				"msg", "failed to fetch data from control server. Not fatal, moving on",
-				"err", err)
+				"err", err,
+			)
 		}
-
 		select {
 		case <-ctx.Done():
 			return
-		case <-requestTicker.C:
+		case <-cs.requestInterval.C:
 			// Go fetch!
 			continue
 		}

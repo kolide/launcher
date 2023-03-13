@@ -47,6 +47,7 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 
 	w.Write(jsonBytes)
 }
+
 func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 	return http.HandlerFunc(ls.requestScheduledQueryHandlerFunc)
 }
