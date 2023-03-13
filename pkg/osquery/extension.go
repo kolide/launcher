@@ -43,6 +43,7 @@ type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
 	stores        map[string]types.KVStore
+	db            *bbolt.DB
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -69,7 +70,7 @@ type Querier interface {
 
 const (
 	// Bucket name to use for launcher configuration.
-	configBucket         = "config"
+	ConfigBucket         = "config"
 	initialResultsBucket = "initial_results"
 	// Bucket name to use for buffered status logs.
 	statusLogsBucket = "status_logs"
@@ -168,20 +169,20 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		return nil, fmt.Errorf("creating storage: %w", err)
 	}
 
-	if err := SetupLauncherKeys(stores[configBucket]); err != nil {
+	if err := SetupLauncherKeys(stores[ConfigBucket]); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, stores[configBucket]); err != nil {
+	if err := agent.SetupKeys(opts.Logger, stores[ConfigBucket]); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
-	identifier, err := IdentifierFromDB(stores[configBucket])
+	identifier, err := IdentifierFromDB(stores[ConfigBucket])
 	if err != nil {
 		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
 	}
 
-	nodekey, err := NodeKey(stores[configBucket])
+	nodekey, err := NodeKey(stores[ConfigBucket])
 	if err != nil {
 		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
@@ -228,7 +229,7 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.stores[configBucket])
+	return IdentifierFromDB(e.stores[ConfigBucket])
 }
 
 // SetupLauncherKeys configures the various keys used for communication.
@@ -406,7 +407,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.stores[configBucket])
+	key, err := NodeKey(e.stores[ConfigBucket])
 	if err != nil {
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
@@ -450,7 +451,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.stores[configBucket].Set([]byte(nodeKeyKey), []byte(keyString))
+	err = e.stores[ConfigBucket].Set([]byte(nodeKeyKey), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -466,7 +467,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.stores[configBucket].Delete([]byte(nodeKeyKey))
+	e.stores[ConfigBucket].Delete([]byte(nodeKeyKey))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -482,7 +483,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.stores[configBucket].Get([]byte(configKey))
+		confBytes, _ = e.stores[ConfigBucket].Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
@@ -490,7 +491,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.stores[configBucket].Set([]byte(configKey), []byte(config))
+		e.stores[ConfigBucket].Set([]byte(configKey), []byte(config))
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.
@@ -561,7 +562,7 @@ func makeStores(logger log.Logger, db *bbolt.DB) (map[string]types.KVStore, erro
 
 	// bucketNames contains the names of buckets that should be created when the
 	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
+	var bucketNames = []string{ConfigBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
 	for _, bucketName := range bucketNames {
 		store, err := agentbbolt.NewStore(logger, db, bucketName)
 		if err != nil {
@@ -584,6 +585,20 @@ func (e *Extension) storeFromLogType(typ logger.LogType) (types.KVStore, error) 
 		return e.stores[statusLogsBucket], nil
 	default:
 		return nil, fmt.Errorf("unknown log type: %v", typ)
+	}
+}
+
+// bucketNameFromLogType returns the Bolt bucket name that stores logs of the
+// provided type.
+func bucketNameFromLogType(typ logger.LogType) (string, error) {
+	switch typ {
+	case logger.LogTypeString, logger.LogTypeSnapshot:
+		return resultLogsBucket, nil
+	case logger.LogTypeStatus:
+		return statusLogsBucket, nil
+	default:
+		return "", fmt.Errorf("unknown log type: %v", typ)
+
 	}
 }
 
@@ -631,12 +646,17 @@ func (e *Extension) writeLogsLoopRunner() {
 
 // numberOfBufferedLogs returns the number of logs buffered for a given type.
 func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
-	store, err := e.storeFromLogType(typ)
+	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
 		return 0, err
 	}
 
-	count, err := store.NumKeys()
+	var count int
+	err = e.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		count = b.Stats().KeyN
+		return nil
+	})
 	if err != nil {
 		return 0, fmt.Errorf("counting buffered logs: %w", err)
 	}
@@ -648,80 +668,85 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.
 func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
-	/*
-		store, err := e.storeFromLogType(typ)
-		if err != nil {
-			return err
+	bucketName, err := bucketNameFromLogType(typ)
+	if err != nil {
+		return err
+	}
+
+	// Collect up logs to be sent
+	var logs []string
+	var logIDs [][]byte
+	err = e.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+
+		c := b.Cursor()
+		k, v := c.First()
+		for totalBytes := 0; k != nil; {
+			// A somewhat cumbersome if block...
+			//
+			// 1. If the log is too big, skip it and mark for deletion.
+			// 2. If the buffer would be too big with the log, break for
+			// 3. Else append it
+			//
+			// Note that (1) must come first, otherwise (2) will always trigger.
+			if len(v) > e.Opts.MaxBytesPerBatch {
+				// Discard logs that are too big
+				logheadSize := minInt(len(v), 100)
+				level.Info(e.Opts.Logger).Log(
+					"msg", "dropped log",
+					"logID", k,
+					"size", len(v),
+					"limit", e.Opts.MaxBytesPerBatch,
+					"loghead", string(v)[0:logheadSize],
+				)
+			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+				// Buffer is filled. Break the loop and come back later.
+				break
+			} else {
+				logs = append(logs, string(v))
+				totalBytes += len(v)
+			}
+
+			// Note the logID for deletion. We do this by
+			// making a copy of k. It is retained in
+			// logIDs after the transaction is closed,
+			// when the goroutine ticks it zeroes out some
+			// of the IDs to delete below, causing logs to
+			// remain in the buffer and be sent again to
+			// the server.
+			logID := make([]byte, len(k))
+			copy(logID, k)
+			logIDs = append(logIDs, logID)
+
+			k, v = c.Next()
 		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("reading buffered logs: %w", err)
+	}
 
-			// Collect up logs to be sent
-			var logs []string
-			var logIDs [][]byte
-			err = e.db.View(func(tx *bbolt.Tx) error {
-				b := tx.Bucket([]byte(bucketName))
+	if len(logs) == 0 {
+		// Nothing to send
+		return nil
+	}
 
-				c := b.Cursor()
-				k, v := c.First()
-				for totalBytes := 0; k != nil; {
-					// A somewhat cumbersome if block...
-					//
-					// 1. If the log is too big, skip it and mark for deletion.
-					// 2. If the buffer would be too big with the log, break for
-					// 3. Else append it
-					//
-					// Note that (1) must come first, otherwise (2) will always trigger.
-					if len(v) > e.Opts.MaxBytesPerBatch {
-						// Discard logs that are too big
-						logheadSize := minInt(len(v), 100)
-						level.Info(e.Opts.Logger).Log(
-							"msg", "dropped log",
-							"logID", k,
-							"size", len(v),
-							"limit", e.Opts.MaxBytesPerBatch,
-							"loghead", string(v)[0:logheadSize],
-						)
-					} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-						// Buffer is filled. Break the loop and come back later.
-						break
-					} else {
-						logs = append(logs, string(v))
-						totalBytes += len(v)
-					}
+	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+	if err != nil {
+		return fmt.Errorf("writing logs: %w", err)
+	}
 
-					// Note the logID for deletion. We do this by
-					// making a copy of k. It is retained in
-					// logIDs after the transaction is closed,
-					// when the goroutine ticks it zeroes out some
-					// of the IDs to delete below, causing logs to
-					// remain in the buffer and be sent again to
-					// the server.
-					logID := make([]byte, len(k))
-					copy(logID, k)
-					logIDs = append(logIDs, logID)
-
-					k, v = c.Next()
-				}
-				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("reading buffered logs: %w", err)
-			}
-
-			if len(logs) == 0 {
-				// Nothing to send
-				return nil
-			}
-
-			err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
-			if err != nil {
-				return fmt.Errorf("writing logs: %w", err)
-			}
-
-			// Delete logs that were successfully sent
-			for _, k := range logIDs {
-				_ = store.Delete(k)
-			}
-	*/ // TODO Stats
+	// Delete logs that were successfully sent
+	err = e.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		for _, k := range logIDs {
+			b.Delete(k)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("deleting sent logs: %w", err)
+	}
 
 	return nil
 }

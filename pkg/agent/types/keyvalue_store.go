@@ -31,14 +31,6 @@ type Iterator interface {
 	ForEach(fn func(k, v []byte) error) error
 }
 
-// Stats is an interface getting statistical data from a key/value store.
-type Stats interface {
-	// NumKeys returns the number of key/value pairs.
-	NumKeys() (int, error)
-	// Size returns current size in bytes.
-	Size() (int64, error)
-}
-
 // GetterSetter is an interface that groups the Get and Set methods.
 type GetterSetter interface {
 	Getter
@@ -60,14 +52,5 @@ type GetterSetterDeleterIterator interface {
 	Iterator
 }
 
-// GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and Iterator methods.
-type GetterSetterDeleterIteratorStats interface {
-	Getter
-	Setter
-	Deleter
-	Iterator
-	Stats
-}
-
 // Convenient alias for a key value store that supports all methods
-type KVStore = GetterSetterDeleterIteratorStats
+type KVStore = GetterSetterDeleterIterator

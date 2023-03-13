@@ -113,7 +113,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 
 	// Put garbage UUID in DB
 	err = db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
+		b := tx.Bucket([]byte(ConfigBucket))
 		return b.Put([]byte(uuidKey), []byte("garbage_uuid"))
 	})
 	require.Nil(t, err)

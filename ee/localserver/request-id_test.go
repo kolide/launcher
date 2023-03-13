@@ -47,7 +47,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 }
 
 func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.configBucket)
+	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.ConfigBucket)
 	require.NoError(t, err)
 
 	require.NoError(t, osquery.SetupLauncherKeys(s))

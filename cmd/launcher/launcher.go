@@ -171,7 +171,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
+	if err := osqueryInstanceHistory.InitHistory(store); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
@@ -214,13 +214,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// serverDataBucketConsumer handles server data table updates
 		serverDataBucketConsumer, err := agentbbolt.NewStore(logger, db, osquery.ServerProvidedDataBucket)
 		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
+			return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.ServerProvidedDataBucket, err)
 		}
 		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
 
 		desktopFlagsBucketConsumer, err := agentbbolt.NewStore(logger, db, agentFlagsBucketName)
 		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
+			return fmt.Errorf("failed to create '%s' KVStore: %w", agentFlagsBucketName, err)
 		}
 		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
 
@@ -250,7 +250,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		notificationStore, err := agentbbolt.NewStore(logger, db, osquery.SentNotificationsBucket)
 		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
+			return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.SentNotificationsBucket, err)
 		}
 
 		// Run the notification service
@@ -278,7 +278,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
-		ls, err := localserver.New(logger, db, opts.KolideServerURL)
+		configStore, err := agentbbolt.NewStore(logger, db, osquery.ConfigBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.ConfigBucket, err)
+		}
+
+		ls, err := localserver.New(logger, configStore, opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)

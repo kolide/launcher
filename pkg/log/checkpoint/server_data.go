@@ -1,5 +1,10 @@
 package checkpoint
 
+import (
+	"github.com/kolide/launcher/pkg/osquery"
+	"go.etcd.io/bbolt"
+)
+
 var serverProvidedDataKeys = []string{
 	"munemo",
 	"organization_id",
@@ -13,15 +18,25 @@ var serverProvidedDataKeys = []string{
 func (c *checkPointer) logServerProvidedData() {
 	data := make(map[string]string, len(serverProvidedDataKeys))
 
-	for _, key := range serverProvidedDataKeys {
-		val, err := c.store.Get([]byte(key))
-		if err != nil {
-			c.logger.Log("server_data", "error fetching data", "err", err)
-		}
-		if val == nil {
-			continue
+	if err := c.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(osquery.ServerProvidedDataBucket))
+		if b == nil {
+			return nil
 		}
 
-		data[key] = string(val)
+		for _, key := range serverProvidedDataKeys {
+			val := b.Get([]byte(key))
+			if val == nil {
+				continue
+			}
+
+			data[key] = string(val)
+		}
+
+		return nil
+	}); err != nil {
+		c.logger.Log("server_data", "error fetching data", "err", err)
 	}
+
+	c.logger.Log("server_data", data)
 }

@@ -16,8 +16,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
+	"go.etcd.io/bbolt"
 )
 
 // defines time out for all http, dns, connectivity requests
@@ -50,17 +50,17 @@ type querierInt interface {
 type checkPointer struct {
 	logger  logger
 	querier querierInt
-	store   types.KVStore
+	db      *bbolt.DB
 	opts    launcher.Options
 
 	lock        sync.RWMutex
 	queriedInfo map[string]any
 }
 
-func New(logger logger, store types.KVStore, opts launcher.Options) *checkPointer {
+func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
 	return &checkPointer{
 		logger: log.With(logger, "component", "log checkpoint"),
-		store:  store,
+		db:     db,
 		opts:   opts,
 
 		lock:        sync.RWMutex{},
@@ -108,11 +108,11 @@ func (c *checkPointer) logCheckPoint() {
 }
 
 func (c *checkPointer) logDbSize() {
-	dbSize, err := c.store.Size()
+	boltStats, err := agent.GetStats(c.db)
 	if err != nil {
 		c.logger.Log("bbolt db size", err.Error())
 	} else {
-		c.logger.Log("bbolt db size", dbSize)
+		c.logger.Log("bbolt db size", boltStats.DB.Size)
 	}
 }
 

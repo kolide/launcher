@@ -7,21 +7,21 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
+	"go.etcd.io/bbolt"
 )
 
-func LauncherDbInfo(store types.KVStore) *table.Plugin {
+func LauncherDbInfo(db *bbolt.DB) *table.Plugin {
 	columns := dataflattentable.Columns()
-	return table.NewPlugin("kolide_launcher_db_info", columns, generateLauncherDbInfo(store))
+	return table.NewPlugin("kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
 }
 
-func generateLauncherDbInfo(store types.KVStore) table.GenerateFunc {
+func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		stats, err := agent.GetStats(store)
+		stats, err := agent.GetStats(db)
 		if err != nil {
 			return nil, err
 		}
