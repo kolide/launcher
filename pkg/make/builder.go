@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -416,15 +415,6 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 		return fmt.Errorf("exec bindata for autoupdate assets: %w", err)
 	}
 
-	// Bootstrap new TUF also -- for now, using the dev TUF repo until the production one is available
-	localRepo := filepath.Join("pkg", "tuf", "assets", "tuf-dev")
-	if err := os.MkdirAll(localRepo, 0755); err != nil {
-		return fmt.Errorf("make TUF autoupdate dir %s: %w", localRepo, err)
-	}
-	if err := bootstrapFromTUF("https://tuf-devel.kolide.com", localRepo); err != nil {
-		return fmt.Errorf("bootstrap TUF: %w", err)
-	}
-
 	return nil
 }
 
@@ -481,41 +471,6 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		return fmt.Errorf("copying TUF repo metadata: %w", err)
 	}
 
-	return nil
-}
-
-func bootstrapFromTUF(remoteServerURL string, localRepo string) error {
-	req, err := http.NewRequest(http.MethodGet, remoteServerURL+"/repository/root.json", nil)
-	if err != nil {
-		return fmt.Errorf("could not create request to TUF: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("could not make request to %s: %w", req.URL.String(), err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("received non-2xx status code %d from request to %s", resp.StatusCode, req.URL.String())
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("could not read response body from TUF: %w", err)
-	}
-
-	fileToWrite := filepath.Join(localRepo, "root.json")
-	f, err := os.Create(fileToWrite)
-	if err != nil {
-		return fmt.Errorf("could not create file %s: %w", fileToWrite, err)
-	}
-	defer f.Close()
-
-	_, err = f.Write(body)
-	if err != nil {
-		return fmt.Errorf("could not write root.json to %s: %w", fileToWrite, err)
-	}
 	return nil
 }
 
