@@ -45,7 +45,7 @@ func runSocket(args []string) error {
 	}
 
 	if *flLauncherTables {
-		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil, nil)...))
+		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil, nil, nil, nil, nil)...))
 	}
 
 	runner, err := runtime.LaunchInstance(opts...)
