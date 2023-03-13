@@ -110,6 +110,8 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
+	ecAuthedMux.Handle("/controlserverfetch", ls.requestControlServerFetchHanlder())
+	ecAuthedMux.Handle("/controlserverfetch.png", ls.requestControlServerFetchHanlder())
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
@@ -128,7 +130,7 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/controlserverfetch
-	mux.Handle("/controlserverfetch", ls.requestControlServerFetch())
+	// mux.Handle("/controlserverfetch", ls.requestControlServerFetch())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
