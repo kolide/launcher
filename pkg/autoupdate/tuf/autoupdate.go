@@ -29,7 +29,7 @@ var rootJson []byte
 
 const (
 	DefaultTufServer       = "https://tuf-devel.kolide.com"
-	DefaultChannel         = "stable"
+	defaultChannel         = "stable"
 	AutoupdateErrorBucket  = "tuf_autoupdate_errors"
 	tufDirectoryNameFormat = "%s-tuf-dev"
 )
@@ -80,7 +80,7 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 	ta := &TufAutoupdater{
 		binary:          binary,
 		operatingSystem: runtime.GOOS,
-		channel:         DefaultChannel,
+		channel:         defaultChannel,
 		interrupt:       make(chan struct{}),
 		checkInterval:   60 * time.Second,
 		store:           store,
