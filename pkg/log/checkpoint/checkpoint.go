@@ -160,7 +160,7 @@ func urlsToTest(opts launcher.Options) []*url.URL {
 	addrsToTest := []string{opts.KolideServerURL}
 
 	if opts.Autoupdate {
-		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL)
+		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL, opts.TufServerURL)
 	}
 
 	if opts.Control {
