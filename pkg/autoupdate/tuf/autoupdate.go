@@ -26,8 +26,9 @@ import (
 var rootJson []byte
 
 const (
-	DefaultTufServer = "https://tuf-devel.kolide.com"
-	DefaultChannel   = "stable"
+	DefaultTufServer       = "https://tuf-devel.kolide.com"
+	DefaultChannel         = "stable"
+	tufDirectoryNameFormat = "%s-tuf-dev"
 )
 
 type ReleaseFileCustomMetadata struct {
@@ -40,7 +41,7 @@ type TufAutoupdater struct {
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
-	errorCounter    []int64
+	errorCounter    []int64 // to be used for tracking metrics about how the new autoupdater is performing
 	lock            sync.RWMutex
 	interrupt       chan struct{}
 	logger          log.Logger
@@ -121,7 +122,7 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 }
 
 func LocalTufDirectory(rootDirectory string, binary string) string {
-	return filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", binary))
+	return filepath.Join(rootDirectory, fmt.Sprintf(tufDirectoryNameFormat, binary))
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
