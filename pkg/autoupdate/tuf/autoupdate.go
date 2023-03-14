@@ -26,8 +26,9 @@ import (
 var rootJson []byte
 
 const (
-	DefaultTufServer = "https://tuf-devel.kolide.com"
-	DefaultChannel   = "stable"
+	DefaultTufServer       = "https://tuf-devel.kolide.com"
+	DefaultChannel         = "stable"
+	tufDirectoryNameFormat = "%s-tuf-dev"
 )
 
 type TufAutoupdater struct {
@@ -36,7 +37,7 @@ type TufAutoupdater struct {
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
-	errorCounter    []int64
+	errorCounter    []int64 // to be used for tracking metrics about how the new autoupdater is performing
 	lock            sync.RWMutex
 	interrupt       chan struct{}
 	logger          log.Logger
@@ -88,7 +89,7 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 
 func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
-	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", binary))
+	localTufDirectory := LocalTufDirectory(rootDirectory, binary)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
@@ -114,6 +115,10 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 	}
 
 	return metadataClient, nil
+}
+
+func LocalTufDirectory(rootDirectory string, binary string) string {
+	return filepath.Join(rootDirectory, fmt.Sprintf(tufDirectoryNameFormat, binary))
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
