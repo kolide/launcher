@@ -212,43 +212,6 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 	})
 }
 
-func (s *bboltKeyValueStore) NumKeys() (int, error) {
-	if s == nil || s.db == nil {
-		return 0, NoDbError{}
-	}
-
-	var count int
-	if err := s.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(s.bucketName))
-		if b == nil {
-			return NewNoBucketError(s.bucketName)
-		}
-
-		count = b.Stats().KeyN
-		return nil
-	}); err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
-func (s *bboltKeyValueStore) Size() (int64, error) {
-	if s == nil || s.db == nil {
-		return 0, NoDbError{}
-	}
-
-	var dbSize int64
-	if err := s.db.View(func(tx *bbolt.Tx) error {
-		dbSize = tx.Size()
-		return nil
-	}); err != nil {
-		return 0, err
-	}
-
-	return dbSize, nil
-}
-
 // SetupDB is used for creating bbolt databases for testing
 func SetupDB(t *testing.T) *bbolt.DB {
 	// Create a temp directory to hold our bbolt db
