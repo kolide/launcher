@@ -283,9 +283,7 @@ func ensureRsaKey(configStore types.GetterSetter) error {
 
 // PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
 func PrivateRSAKeyFromDB(configStore types.Getter) (*rsa.PrivateKey, error) {
-	var privateKey []byte
-
-	_, err := configStore.Get([]byte(privateKeyKey))
+	privateKey, err := configStore.Get([]byte(privateKeyKey))
 	if err != nil {
 		return nil, fmt.Errorf("error reading private key info from db: %w", err)
 	}

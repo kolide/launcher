@@ -17,8 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/testutil"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
 	"github.com/mixer/clock"
@@ -991,19 +990,20 @@ func TestExtensionWriteResults(t *testing.T) {
 }
 
 func TestLauncherRsaKeys(t *testing.T) {
-
 	m := &mock.KolideService{}
-	store := setupStorage(t)
 
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	_, err := NewExtension(m, db, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.NoError(t, err)
 
-	key, err := PrivateRSAKeyFromDB(store)
+	configStore, err := agentbbolt.NewStore(log.NewNopLogger(), db, "config")
 	require.NoError(t, err)
 
-	pubkeyPem, fingerprintStored, err := PublicRSAKeyFromDB(store)
+	key, err := PrivateRSAKeyFromDB(configStore)
+	require.NoError(t, err)
+
+	pubkeyPem, fingerprintStored, err := PublicRSAKeyFromDB(configStore)
 	require.NoError(t, err)
 
 	fingerprint, err := rsaFingerprint(key)
@@ -1014,10 +1014,4 @@ func TestLauncherRsaKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, &key.PublicKey, pubkey)
-}
-
-func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), "config")
-	require.NoError(t, err)
-	return s
 }
