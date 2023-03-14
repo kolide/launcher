@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
@@ -251,14 +253,32 @@ func (s *bboltKeyValueStore) Size() (int64, error) {
 // SetupDB is used for creating bbolt databases for testing
 func SetupDB(t *testing.T) *bbolt.DB {
 	// Create a temp directory to hold our bbolt db
-	dbDir := t.TempDir()
+	var dbDir string
+	if t != nil {
+		dbDir = t.TempDir()
+	} else {
+		var err error
+		dbDir, err = agent.MkdirTemp("storage-bbolt")
+		if err != nil {
+			fmt.Println("Failed to create temp dir for bbolt test")
+			os.Exit(1)
+		}
+	}
 
 	// Create database; ensure we clean it up after the test
 	db, err := bbolt.Open(filepath.Join(dbDir, dbTestFileName), 0600, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
+
+	if t != nil {
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, db.Close())
+		})
+	} else {
+		if err != nil {
+			fmt.Println("Falied to create bolt db")
+			os.Exit(1)
+		}
+	}
 
 	return db
 }

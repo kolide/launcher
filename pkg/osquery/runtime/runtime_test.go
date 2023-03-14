@@ -17,10 +17,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/osquery/osquery-go"
-	"go.etcd.io/bbolt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,16 +37,8 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	s, err := storageci.NewStore(nil, log.NewNopLogger())
-
-	db, err := bbolt.Open(filepath.Join(binDirectory, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
-		Timeout: 1 * time.Second,
-	})
-	if err != nil {
-		fmt.Println("Falied to create bolt db")
-		os.Exit(1)
-	}
-	if err := history.InitHistory(db); err != nil {
+	s, err := storageci.NewStore(nil, log.NewNopLogger(), history.OsqueryHistoryInstanceKey)
+	if err := history.InitHistory(s); err != nil {
 		fmt.Println("Failed to init history")
 		os.Exit(1)
 	}

@@ -12,7 +12,7 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	logger := log.NewNopLogger()
-	store, err := storageci.NewStore(t, log.NewNopLogger(), bucketName)
+	store, err := storageci.NewStore(t, log.NewNopLogger(), "config")
 	require.NoError(t, err)
 
 	key, err := SetupLocalDbKey(logger, store)
