@@ -9,6 +9,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
+	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
@@ -27,6 +28,7 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 		launcher_db.TablePlugin(db, "kolide_control_flags", "agent_flags"),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
+		tufinfo.TufReleaseVersionTable(opts),
 	}
 }
 

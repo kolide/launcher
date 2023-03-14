@@ -30,6 +30,10 @@ const (
 	DefaultChannel   = "stable"
 )
 
+type ReleaseFileCustomMetadata struct {
+	Target string `json:"target"`
+}
+
 type TufAutoupdater struct {
 	metadataClient  *client.Client
 	binary          string
@@ -88,7 +92,7 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 
 func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
-	localTufDirectory := filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", binary))
+	localTufDirectory := LocalTufDirectory(rootDirectory, binary)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
@@ -114,6 +118,10 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 	}
 
 	return metadataClient, nil
+}
+
+func LocalTufDirectory(rootDirectory string, binary string) string {
+	return filepath.Join(rootDirectory, fmt.Sprintf("%s-tuf-dev", binary))
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
@@ -167,11 +175,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 		// We found the release file that matches our OS and binary. Evaluate it
 		// to see if we're on this latest version.
-		type releaseFileCustomMetadata struct {
-			Target string `json:"target"`
-		}
-
-		var custom releaseFileCustomMetadata
+		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
