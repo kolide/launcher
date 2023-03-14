@@ -202,6 +202,7 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	return &Extension{
 		logger:        opts.Logger,
 		serviceClient: client,
+		db:            db,
 		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
