@@ -52,7 +52,7 @@ func TestInstance_Connected(t *testing.T) { // nolint:paralleltest
 	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, InitHistory(newTestBoltDb(t)))
+			require.NoError(t, InitHistory(setupStorage(t)))
 
 			i := &Instance{}
 			querier := &mocks.Querier{}
@@ -96,7 +96,7 @@ func TestInstance_Exited(t *testing.T) { // nolint:paralleltest
 	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, InitHistory(newTestBoltDb(t)))
+			require.NoError(t, InitHistory(setupStorage(t)))
 
 			i := &Instance{}
 			i.Exited(tt.args.exitError)

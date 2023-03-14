@@ -17,7 +17,7 @@ const (
 	dbTestFileName = "test.db"
 )
 
-// NoBucketError is an error type that represents a nil bbolt database
+// NoDbError is an error type that represents a nil bbolt database
 type NoDbError struct{}
 
 func (e NoDbError) Error() string {

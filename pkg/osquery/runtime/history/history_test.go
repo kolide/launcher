@@ -175,17 +175,6 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestNoDbError(t *testing.T) { // nolint:paralleltest
-	err := InitHistory(nil)
-	assert.ErrorIs(t, err, NoDbError{}) // TODO
-
-	err = currentHistory.load()
-	assert.ErrorIs(t, err, NoDbError{})
-
-	err = currentHistory.save()
-	assert.ErrorIs(t, err, NoDbError{})
-}
-
 // setupStorage creates storage and seeds it with the given instances.
 func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
 	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.ServerProvidedDataBucket)
@@ -194,7 +183,7 @@ func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
 	json, err := json.Marshal(seedInstances)
 	require.NoError(t, err, "expect no error marshalling instances")
 
-	err = s.Set([]byte(osqueryHistoryInstanceKey), json)
+	err = s.Set([]byte(OsqueryHistoryInstanceKey), json)
 	require.NoError(t, err, "expect no error writing history to bucket")
 
 	return s
