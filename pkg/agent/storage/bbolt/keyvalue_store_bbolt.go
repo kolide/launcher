@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
@@ -258,7 +257,7 @@ func SetupDB(t *testing.T) *bbolt.DB {
 		dbDir = t.TempDir()
 	} else {
 		var err error
-		dbDir, err = agent.MkdirTemp("storage-bbolt")
+		dbDir, err = os.MkdirTemp(os.TempDir(), "storage-bbolt")
 		if err != nil {
 			fmt.Println("Failed to create temp dir for bbolt test")
 			os.Exit(1)

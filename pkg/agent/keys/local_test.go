@@ -26,5 +26,4 @@ func TestSetupLocalDbKey(t *testing.T) {
 	key2, err := SetupLocalDbKey(logger, store)
 	require.NoError(t, err)
 	require.Equal(t, key.Public(), key2.Public())
-
 }
