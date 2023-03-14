@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 )
@@ -28,11 +30,18 @@ var rootJson []byte
 const (
 	DefaultTufServer       = "https://tuf-devel.kolide.com"
 	DefaultChannel         = "stable"
+	AutoupdateErrorBucket  = "tuf_autoupdate_errors"
 	tufDirectoryNameFormat = "%s-tuf-dev"
 )
 
 type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
+}
+
+type AutoupdaterError struct {
+	Binary       string `json:"binary"`
+	ErrorMessage string `json:"error_message"`
+	Timestamp    string `json:"timestamp"`
 }
 
 type TufAutoupdater struct {
@@ -41,7 +50,7 @@ type TufAutoupdater struct {
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
-	errorCounter    []int64 // to be used for tracking metrics about how the new autoupdater is performing
+	store           types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	lock            sync.RWMutex
 	interrupt       chan struct{}
 	logger          log.Logger
@@ -67,14 +76,14 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		binary:          binary,
 		operatingSystem: runtime.GOOS,
 		channel:         DefaultChannel,
 		interrupt:       make(chan struct{}),
 		checkInterval:   60 * time.Second,
-		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
+		store:           store,
 		logger:          log.NewNopLogger(),
 	}
 
@@ -127,24 +136,17 @@ func LocalTufDirectory(rootDirectory string, binary string) string {
 
 func (ta *TufAutoupdater) Execute() (err error) {
 	checkTicker := time.NewTicker(ta.checkInterval)
-	errorCheckTicker := time.NewTicker(1 * time.Hour)
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 
 	for {
 		select {
 		case <-checkTicker.C:
 			if err := ta.checkForUpdate(); err != nil {
-				ta.lock.Lock()
-				ta.errorCounter = append(ta.errorCounter, time.Now().Unix())
-				ta.lock.Unlock()
-
+				ta.storeError(err)
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
-		case <-errorCheckTicker.C:
-			rollingErrorCount := ta.rollingErrorCount()
-			level.Debug(ta.logger).Log("msg", "checked rolling error count for TUF updater", "err_count", rollingErrorCount, "binary", ta.binary)
 		case <-cleanupTicker.C:
-			ta.cleanUpOldErrorCounts()
+			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
 			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
 			return nil
@@ -202,35 +204,70 @@ func (ta *TufAutoupdater) versionFromTarget(target string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
 
-func (ta *TufAutoupdater) rollingErrorCount() int {
-	ta.lock.RLock()
-	defer ta.lock.RUnlock()
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	errorCount := 0
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
-		}
-		errorCount += 1
-	}
-
-	return errorCount
-}
-
-func (ta *TufAutoupdater) cleanUpOldErrorCounts() {
+func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	ta.lock.Lock()
 	defer ta.lock.Unlock()
 
-	errorsWithinLastDay := make([]int64, 0)
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
-		}
-		errorsWithinLastDay = append(errorsWithinLastDay, errorTimestamp)
+	timestamp := strconv.Itoa(int(time.Now().Unix()))
+	autoupdaterError := AutoupdaterError{
+		Binary:       ta.binary,
+		ErrorMessage: autoupdateErr.Error(),
+		Timestamp:    timestamp,
 	}
 
-	ta.errorCounter = errorsWithinLastDay
+	autoupdaterErrorRaw, err := json.Marshal(autoupdaterError)
+	if err != nil {
+		level.Debug(ta.logger).Log("msg", "could not marshal autoupdater error to store it", "err", err)
+		return
+	}
+
+	id := []byte(fmt.Sprintf("%s/%s", ta.binary, timestamp))
+	if err := ta.store.Set(id, autoupdaterErrorRaw); err != nil {
+		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
+	}
+}
+
+func (ta *TufAutoupdater) cleanUpOldErrors() {
+	ta.lock.Lock()
+	defer ta.lock.Unlock()
+
+	// We want to delete all errors more than 1 week old
+	errorTtl := 7 * 24 * time.Hour
+
+	// Read through all keys in bucket to determine which ones are old enough to be deleted
+	keysToDelete := make([][]byte, 0)
+	if err := ta.store.ForEach(func(k, _ []byte) error {
+		// Key is in format binary/timestamp, e.g. launcher/1678814862
+		parts := strings.Split(string(k), "/")
+		if len(parts) != 2 {
+			// Malformed key -- delete it
+			keysToDelete = append(keysToDelete, k)
+			return fmt.Errorf("malformed key %s", string(k))
+		}
+		if parts[0] != ta.binary {
+			// Not responsible for this one -- don't process it
+			return nil
+		}
+
+		ts, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			// Delete the corrupted key
+			keysToDelete = append(keysToDelete, k)
+			return fmt.Errorf("parsing key %s as timestamp: %w", string(k), err)
+		}
+
+		errorTimestamp := time.Unix(ts, 0)
+		if errorTimestamp.Add(errorTtl).Before(time.Now()) {
+			keysToDelete = append(keysToDelete, k)
+		}
+
+		return nil
+	}); err != nil {
+		level.Debug(ta.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+	}
+
+	// Delete all old keys
+	if err := ta.store.Delete(keysToDelete...); err != nil {
+		level.Error(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
+	}
 }

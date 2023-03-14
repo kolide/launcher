@@ -1,6 +1,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
@@ -29,6 +30,7 @@ func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugi
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
 		tufinfo.TufReleaseVersionTable(opts),
+		launcher_db.TablePlugin(db, "kolide_tuf_autoupdater_errors", tuf.AutoupdateErrorBucket),
 	}
 }
 

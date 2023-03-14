@@ -346,6 +346,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 
+		// Set up the bucket for tracking new autoupdater errors
+		autoupdaterErrorStore, err := agentbbolt.NewStore(logger, db, tuf.AutoupdateErrorBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create KVStore %s: %w", tuf.AutoupdateErrorBucket, err)
+		}
+
 		// Create a new TUF autoupdater for osqueryd
 		osquerydMetadataClient := http.DefaultClient
 		osquerydMetadataClient.Timeout = 1 * time.Minute
@@ -354,6 +360,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			"osqueryd",
 			opts.RootDirectory,
 			osquerydMetadataClient,
+			autoupdaterErrorStore,
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
@@ -373,6 +380,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			"launcher",
 			opts.RootDirectory,
 			launcherMetadataClient,
+			autoupdaterErrorStore,
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
