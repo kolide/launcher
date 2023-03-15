@@ -242,11 +242,11 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	_, err = repo.GenKey("root")
 	require.NoError(t, err, "could not gen root key")
 	_, err = repo.GenKey("targets")
-	require.NoError(t, err, "could not gen root key")
+	require.NoError(t, err, "could not gen targets key")
 	_, err = repo.GenKey("snapshot")
-	require.NoError(t, err, "could not gen root key")
+	require.NoError(t, err, "could not gen snapshot key")
 	_, err = repo.GenKey("timestamp")
-	require.NoError(t, err, "could not gen root key")
+	require.NoError(t, err, "could not gen timestamp key")
 
 	// Sign the root metadata file
 	require.NoError(t, repo.Sign("root.json"), "could not sign root metadata file")
