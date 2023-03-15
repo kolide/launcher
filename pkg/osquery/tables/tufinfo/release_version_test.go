@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +18,8 @@ import (
 	"github.com/osquery/osquery-go/gen/osquery"
 	"github.com/stretchr/testify/require"
 	gotuf "github.com/theupdateframework/go-tuf"
+	"github.com/theupdateframework/go-tuf/client"
+	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 )
 
 type tufTarget struct {
@@ -76,12 +81,12 @@ func TestTufReleaseVersionTable(t *testing.T) {
 }
 
 func seedTufRepo(t *testing.T, testTargets []tufTarget, testRootDir string, binary string) {
-	// Create a TUF repo and seed it with the expected targets
-	tufDir := tuf.LocalTufDirectory(testRootDir, binary)
+	// Create a "remote" TUF repo and seed it with the expected targets
+	tufDir := t.TempDir()
 
-	// Initialize repo with store
-	localStore := gotuf.FileSystemStore(tufDir, nil)
-	repo, err := gotuf.NewRepo(localStore)
+	// Initialize remote repo with store
+	fsStore := gotuf.FileSystemStore(tufDir, nil)
+	repo, err := gotuf.NewRepo(fsStore)
 	require.NoError(t, err, "could not create new tuf repo")
 
 	// Gen keys
@@ -107,17 +112,45 @@ func seedTufRepo(t *testing.T, testTargets []tufTarget, testRootDir string, bina
 		require.NoError(t, repo.Commit(), "could not commit")
 	}
 
-	// Quick validation that we set up the repo properly: key and metadata files should exist
-	require.DirExists(t, filepath.Join(tufDir, "keys"))
-	require.FileExists(t, filepath.Join(tufDir, "keys", "root.json"))
-	require.FileExists(t, filepath.Join(tufDir, "keys", "snapshot.json"))
-	require.FileExists(t, filepath.Join(tufDir, "keys", "targets.json"))
-	require.FileExists(t, filepath.Join(tufDir, "keys", "timestamp.json"))
-	require.DirExists(t, filepath.Join(tufDir, "repository"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "root.json"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "snapshot.json"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "timestamp.json"))
+	// Quick validation that we set up the repo properly
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets.json"))
+
+	// Set up a httptest server to serve this data to our local repo
+	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathComponents := strings.Split(r.URL.Path, "/")
+		fileToServe := tufDir
+		for _, c := range pathComponents {
+			fileToServe = filepath.Join(fileToServe, c)
+		}
+		http.ServeFile(w, r, fileToServe)
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testMetadataServer.Close()
+	})
+
+	// Get metadata to initialize local store
+	metadata, err := repo.GetMeta()
+	require.NoError(t, err, "could not get metadata")
+
+	// Now set up local repo
+	localTufDir := tuf.LocalTufDirectory(testRootDir, binary)
+	localStore, err := filejsonstore.NewFileJSONStore(localTufDir)
+	require.NoError(t, err, "could not set up local store")
+
+	// Set up our remote store i.e. tuf-devel.kolide.com
+	remoteOpts := client.HTTPRemoteOptions{
+		MetadataPath: "/repository",
+	}
+	remoteStore, err := client.HTTPRemoteStore(testMetadataServer.URL, &remoteOpts, http.DefaultClient)
+	require.NoError(t, err, "could not set up remote store")
+
+	metadataClient := client.NewClient(localStore, remoteStore)
+	require.NoError(t, err, metadataClient.Init(metadata["root.json"]), "failed to initialze TUF client")
+
+	_, err = metadataClient.Update()
+	require.NoError(t, err, "could not update TUF client")
 }
 
 func randomSemver() string {
