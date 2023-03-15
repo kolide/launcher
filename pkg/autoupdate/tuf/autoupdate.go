@@ -39,11 +39,6 @@ type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
 }
 
-type AutoupdaterError struct {
-	ErrorMessage string `json:"error_message"`
-	Timestamp    string `json:"timestamp"`
-}
-
 type TufAutoupdater struct {
 	metadataClient  *client.Client
 	operatingSystem string
@@ -217,18 +212,7 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	defer ta.lock.Unlock()
 
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
-	autoupdaterError := AutoupdaterError{
-		ErrorMessage: autoupdateErr.Error(),
-		Timestamp:    timestamp,
-	}
-
-	autoupdaterErrorRaw, err := json.Marshal(autoupdaterError)
-	if err != nil {
-		level.Debug(ta.logger).Log("msg", "could not marshal autoupdater error to store it", "err", err)
-		return
-	}
-
-	if err := ta.store.Set([]byte(timestamp), autoupdaterErrorRaw); err != nil {
+	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
 		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
 	}
 }
