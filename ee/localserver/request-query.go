@@ -47,6 +47,7 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 
 	w.Write(jsonBytes)
 }
+
 func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 	return http.HandlerFunc(ls.requestScheduledQueryHandlerFunc)
 }
@@ -122,8 +123,8 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 }
 
 func sendClientError(w http.ResponseWriter, msg string) {
-	w.Write([]byte(msg))
 	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte(msg))
 }
 
 func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {

@@ -61,7 +61,7 @@ func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
 		require.NoError(t, db.Close())
 	})
 
-	server, err := New(log.NewLogfmtLogger(logBytes), db, "")
+	server, err := New(db, "", WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }
