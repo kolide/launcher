@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -21,6 +22,7 @@ type ControlService struct {
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	fetcher         dataProvider
+	fetchMutex      sync.Mutex
 	store           types.GetterSetter
 	lastFetched     map[string]string
 	consumers       map[string]consumer
@@ -77,14 +79,15 @@ func (cs *ControlService) Start(ctx context.Context) {
 	level.Info(cs.logger).Log("msg", "control service started")
 	ctx, cs.cancel = context.WithCancel(ctx)
 	requestTicker := time.NewTicker(cs.requestInterval)
+
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
 			level.Debug(cs.logger).Log(
 				"msg", "failed to fetch data from control server. Not fatal, moving on",
-				"err", err)
+				"err", err,
+			)
 		}
-
 		select {
 		case <-ctx.Done():
 			return
@@ -109,6 +112,9 @@ func (cs *ControlService) Stop() {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
+	cs.fetchMutex.Lock()
+	defer cs.fetchMutex.Unlock()
+
 	// Empty hash means get the map of subsystems & hashes
 	data, err := cs.fetcher.GetConfig()
 	if err != nil {

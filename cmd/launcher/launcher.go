@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
@@ -196,6 +197,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
+	var controlService *control.ControlService
+
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if opts.ControlServerURL == "" {
@@ -206,7 +209,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to create KVStore: %w", err)
 		}
 
-		controlService, err := createControlService(ctx, logger, controlStore, opts)
+		controlService, err = createControlService(ctx, logger, controlStore, opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -279,7 +282,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
-		ls, err := localserver.New(logger, db, opts.KolideServerURL)
+		ls, err := localserver.New(db,
+			opts.KolideServerURL,
+			localserver.WithLogger(logger),
+			localserver.WithControlService(controlService),
+		)
+
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
