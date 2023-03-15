@@ -22,16 +22,17 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 //go:embed assets/tuf-dev/root.json
 var rootJson []byte
 
 const (
-	DefaultTufServer       = "https://tuf-devel.kolide.com"
-	defaultChannel         = "stable"
-	AutoupdateErrorBucket  = "tuf_autoupdate_errors"
-	tufDirectoryNameFormat = "%s-tuf-dev"
+	DefaultTufServer      = "https://tuf-devel.kolide.com"
+	defaultChannel        = "stable"
+	AutoupdateErrorBucket = "tuf_autoupdate_errors"
+	tufDirectoryName      = "tuf-dev"
 )
 
 type ReleaseFileCustomMetadata struct {
@@ -39,14 +40,12 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type AutoupdaterError struct {
-	Binary       string `json:"binary"`
 	ErrorMessage string `json:"error_message"`
 	Timestamp    string `json:"timestamp"`
 }
 
 type TufAutoupdater struct {
 	metadataClient  *client.Client
-	binary          string
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
@@ -76,9 +75,8 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		binary:          binary,
 		operatingSystem: runtime.GOOS,
 		channel:         defaultChannel,
 		interrupt:       make(chan struct{}),
@@ -92,7 +90,7 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(binary, rootDirectory, metadataUrl, metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(rootDirectory, metadataUrl, metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
@@ -100,9 +98,9 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 	return ta, nil
 }
 
-func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
-	localTufDirectory := LocalTufDirectory(rootDirectory, binary)
+	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
@@ -130,8 +128,8 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 	return metadataClient, nil
 }
 
-func LocalTufDirectory(rootDirectory string, binary string) string {
-	return filepath.Join(rootDirectory, fmt.Sprintf(tufDirectoryNameFormat, binary))
+func LocalTufDirectory(rootDirectory string) string {
+	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
@@ -170,7 +168,17 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", ta.binary, ta.operatingSystem, ta.channel)
+	for _, binary := range []string{"launcher", "osqueryd"} {
+		if err := ta.findRelease(binary, targets); err != nil {
+			return fmt.Errorf("could not find release: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) error {
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -186,20 +194,20 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		level.Debug(ta.logger).Log(
 			"msg", "checked most up-to-date release from TUF",
 			"launcher_version", version.Version().Version,
-			"release_version", ta.versionFromTarget(custom.Target),
-			"binary", ta.binary,
+			"release_version", ta.versionFromTarget(custom.Target, binary),
+			"binary", binary,
 			"channel", ta.channel,
 		)
 
-		break
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
 }
 
-func (ta *TufAutoupdater) versionFromTarget(target string) string {
+func (ta *TufAutoupdater) versionFromTarget(target string, binary string) string {
 	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", ta.binary, ta.operatingSystem, ta.binary)
+	prefixToTrim := fmt.Sprintf("%s/%s/%s-", binary, ta.operatingSystem, binary)
 
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
@@ -210,7 +218,6 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	autoupdaterError := AutoupdaterError{
-		Binary:       ta.binary,
 		ErrorMessage: autoupdateErr.Error(),
 		Timestamp:    timestamp,
 	}
@@ -221,8 +228,7 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 		return
 	}
 
-	id := []byte(fmt.Sprintf("%s/%s", ta.binary, timestamp))
-	if err := ta.store.Set(id, autoupdaterErrorRaw); err != nil {
+	if err := ta.store.Set([]byte(timestamp), autoupdaterErrorRaw); err != nil {
 		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
 	}
 }
@@ -237,19 +243,8 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 	// Read through all keys in bucket to determine which ones are old enough to be deleted
 	keysToDelete := make([][]byte, 0)
 	if err := ta.store.ForEach(func(k, _ []byte) error {
-		// Key is in format binary/timestamp, e.g. launcher/1678814862
-		parts := strings.Split(string(k), "/")
-		if len(parts) != 2 {
-			// Malformed key -- delete it
-			keysToDelete = append(keysToDelete, k)
-			return fmt.Errorf("malformed key %s", string(k))
-		}
-		if parts[0] != ta.binary {
-			// Not responsible for this one -- don't process it
-			return nil
-		}
-
-		ts, err := strconv.ParseInt(parts[1], 10, 64)
+		// Key is a timestamp
+		ts, err := strconv.ParseInt(string(k), 10, 64)
 		if err != nil {
 			// Delete the corrupted key
 			keysToDelete = append(keysToDelete, k)

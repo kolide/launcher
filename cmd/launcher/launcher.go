@@ -360,14 +360,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to create KVStore %s: %w", tuf.AutoupdateErrorBucket, err)
 		}
 
-		// Create a new TUF autoupdater for osqueryd
-		osquerydMetadataClient := http.DefaultClient
-		osquerydMetadataClient.Timeout = 1 * time.Minute
-		osquerydAutoupdater, err := tuf.NewTufAutoupdater(
+		// Create a new TUF autoupdater
+		metadataClient := http.DefaultClient
+		metadataClient.Timeout = 1 * time.Minute
+		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			opts.TufServerURL,
-			"osqueryd",
 			opts.RootDirectory,
-			osquerydMetadataClient,
+			metadataClient,
 			autoupdaterErrorStore,
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
@@ -375,29 +374,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
-			level.Debug(logger).Log("msg", "could not create TUF autoupdater for osqueryd", "err", err)
+			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
 		} else {
-			runGroup.Add(osquerydAutoupdater.Execute, osquerydAutoupdater.Interrupt)
-		}
-
-		// Create a new TUF autoupdater for launcher
-		launcherMetadataClient := http.DefaultClient
-		launcherMetadataClient.Timeout = 1 * time.Minute
-		launcherAutoupdater, err := tuf.NewTufAutoupdater(
-			opts.TufServerURL,
-			"launcher",
-			opts.RootDirectory,
-			launcherMetadataClient,
-			autoupdaterErrorStore,
-			tuf.WithLogger(logger),
-			tuf.WithChannel(string(opts.UpdateChannel)),
-			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
-		)
-		if err != nil {
-			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
-			level.Debug(logger).Log("msg", "could not create TUF autoupdater for launcher", "err", err)
-		} else {
-			runGroup.Add(launcherAutoupdater.Execute, launcherAutoupdater.Interrupt)
+			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 		}
 	}
 

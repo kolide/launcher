@@ -33,7 +33,7 @@ func generateTufReleaseVersionTable(opts *launcher.Options) table.GenerateFunc {
 		results := []map[string]string{}
 
 		for _, binary := range []string{"launcher", "osqueryd"} {
-			tufTargetsFile := filepath.Join(tuf.LocalTufDirectory(opts.RootDirectory, binary), "targets.json")
+			tufTargetsFile := filepath.Join(tuf.LocalTufDirectory(opts.RootDirectory), "targets.json")
 
 			targetFileBytes, err := os.ReadFile(tufTargetsFile)
 			if err != nil {

@@ -135,7 +135,7 @@ func seedTufRepo(t *testing.T, testTargets []tufTarget, testRootDir string, bina
 	require.NoError(t, err, "could not get metadata")
 
 	// Now set up local repo
-	localTufDir := tuf.LocalTufDirectory(testRootDir, binary)
+	localTufDir := tuf.LocalTufDirectory(testRootDir)
 	localStore, err := filejsonstore.NewFileJSONStore(localTufDir)
 	require.NoError(t, err, "could not set up local store")
 

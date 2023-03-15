@@ -24,15 +24,14 @@ import (
 func TestNewTufAutoupdater(t *testing.T) {
 	t.Parallel()
 
-	binaryName := "launcher"
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 
-	_, err := NewTufAutoupdater("https://example.com", binaryName, testRootDir, http.DefaultClient, s)
+	_, err := NewTufAutoupdater("https://example.com", testRootDir, http.DefaultClient, s)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm that the TUF directory we expose is the one that we created
-	exposedRootDir := LocalTufDirectory(testRootDir, binaryName)
+	exposedRootDir := LocalTufDirectory(testRootDir)
 
 	_, err = os.Stat(exposedRootDir)
 	require.NoError(t, err, "could not stat TUF directory that should have been initialized in test")
@@ -45,63 +44,54 @@ func TestNewTufAutoupdater(t *testing.T) {
 func TestExecute(t *testing.T) {
 	t.Parallel()
 
-	binaries := []string{"launcher", "osqueryd"}
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.2.3"
+	metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
 
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(fmt.Sprintf("TestRun: %s", binary), func(t *testing.T) {
-			t.Parallel()
-			testRootDir := t.TempDir()
-			testReleaseVersion := "1.2.3"
-			metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
-			s := setupStorage(t)
+	// Right now, we do not talk to the mirror at all
+	autoupdater, err := NewTufAutoupdater(metadataServerUrl, testRootDir, http.DefaultClient, s)
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-			// Right now, we do not talk to the mirror at all
-			autoupdater, err := NewTufAutoupdater(metadataServerUrl, binary, testRootDir, http.DefaultClient, s)
-			require.NoError(t, err, "could not initialize new TUF autoupdater")
+	// Update the metadata client with our test root JSON
+	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
 
-			// Update the metadata client with our test root JSON
-			require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+	// Set the check interval to something short so we can make a couple requests to our test metadata server
+	autoupdater.checkInterval = 1 * time.Second
 
-			// Set the check interval to something short so we can make a couple requests to our test metadata server
-			autoupdater.checkInterval = 1 * time.Second
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
-			// Set logger so that we can capture output
-			var logBytes threadsafebuffer.ThreadSafeBuffer
-			autoupdater.logger = log.NewJSONLogger(&logBytes)
+	// Let the autoupdater run for a bit
+	go autoupdater.Execute()
+	time.Sleep(5 * time.Second)
 
-			// Let the autoupdater run for a bit
-			go autoupdater.Execute()
-			time.Sleep(5 * time.Second)
+	// Shut down autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
 
-			// Shut down autoupdater
-			autoupdater.Interrupt(errors.New("test error"))
+	// Wait one second to let autoupdater shut down
+	time.Sleep(1 * time.Second)
 
-			// Wait one second to let autoupdater shut down
-			time.Sleep(1 * time.Second)
+	// Check log lines to confirm that:
+	// 1. We were able to successfully pull updates from TUF and identified the expected release version
+	// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
+	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
-			// Check log lines to confirm that:
-			// 1. We were able to successfully pull updates from TUF and identified the expected release version
-			// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
-			logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
+	// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
+	// only the first and last, so just make sure there are at least 2
+	require.GreaterOrEqual(t, len(logLines), 2)
 
-			// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
-			// only the first and last, so just make sure there are at least 2
-			require.GreaterOrEqual(t, len(logLines), 2)
+	// Check that we got the expected release version
+	require.Contains(t, logLines[0], testReleaseVersion)
 
-			// Check that we got the expected release version
-			require.Contains(t, logLines[0], testReleaseVersion)
-
-			// Check that we shut down
-			require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
-		})
-	}
+	// Check that we shut down
+	require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
 }
 
 func Test_storeError(t *testing.T) {
 	t.Parallel()
 
-	binaryName := "launcher"
 	testRootDir := t.TempDir()
 	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulates TUF server being down
@@ -109,7 +99,7 @@ func Test_storeError(t *testing.T) {
 	}))
 	defer testMetadataServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, binaryName, testRootDir, http.DefaultClient, setupStorage(t))
+	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, testRootDir, http.DefaultClient, setupStorage(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set the check interval to something short so we can accumulate some errors
@@ -126,16 +116,9 @@ func Test_storeError(t *testing.T) {
 	// Confirm that we saved the errors
 	errorCount := 0
 	err = autoupdater.store.ForEach(func(k, _ []byte) error {
-		// Confirm we saved error with key in correct format
-		parts := strings.Split(string(k), "/")
-		require.Equal(t, 2, len(parts), "malformed error key")
-
-		// Confirm error is saved under correct binary
-		require.Equal(t, binaryName, parts[0])
-
 		// Confirm error is saved with reasonable timestamp
-		ts, err := strconv.ParseInt(parts[1], 10, 64)
-		require.NoError(t, err, "invalid timestamp in key: %s", parts[1])
+		ts, err := strconv.ParseInt(string(k), 10, 64)
+		require.NoError(t, err, "invalid timestamp in key: %s", string(k))
 		require.LessOrEqual(t, time.Now().Unix()-ts, int64(30), "error saved under timestamp not within last 30 seconds")
 
 		// Increment error count so we know we got something
@@ -150,20 +133,22 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	t.Parallel()
 
 	autoupdater := &TufAutoupdater{
-		binary: "launcher",
 		store:  setupStorage(t),
 		logger: log.NewNopLogger(),
 	}
 
 	// Add one legitimate timestamp
 	oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("launcher/%d", oneHourAgo)), []byte("{}")), "could not set recent timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", oneHourAgo)), []byte("{}")), "could not set recent timestamp for test")
 
 	// Add some old timestamps
 	eightDaysAgo := time.Now().Add(-8 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("launcher/%d", eightDaysAgo)), []byte("{}")), "could not set old timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", eightDaysAgo)), []byte("{}")), "could not set old timestamp for test")
 	twoWeeksAgo := time.Now().Add(-14 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("launcher/%d", twoWeeksAgo)), []byte("{}")), "could not set old timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", twoWeeksAgo)), []byte("{}")), "could not set old timestamp for test")
+
+	// Add a malformed entry
+	require.NoError(t, autoupdater.store.Set([]byte("not a timestamp"), []byte("{}")), "could not set old timestamp for test")
 
 	// Confirm we added them
 	keyCountBeforeCleanup := 0
@@ -172,7 +157,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "could not iterate over keys")
-	require.Equal(t, 3, keyCountBeforeCleanup, "did not correctly seed errors in bucket")
+	require.Equal(t, 4, keyCountBeforeCleanup, "did not correctly seed errors in bucket")
 
 	// Call the cleanup function
 	autoupdater.cleanUpOldErrors()
@@ -236,10 +221,9 @@ func Test_versionFromTarget(t *testing.T) {
 
 	for _, testLauncherVersion := range testLauncherVersions {
 		autoupdater := &TufAutoupdater{
-			binary:          testLauncherVersion.binary,
 			operatingSystem: testLauncherVersion.operatingSystem,
 		}
-		require.Equal(t, testLauncherVersion.version, autoupdater.versionFromTarget(testLauncherVersion.target))
+		require.Equal(t, testLauncherVersion.version, autoupdater.versionFromTarget(testLauncherVersion.target, testLauncherVersion.binary))
 	}
 }
 
