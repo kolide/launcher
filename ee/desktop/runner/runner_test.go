@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,13 +10,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,7 +109,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes threadSafeBuffer
+			var logBytes threadsafebuffer.ThreadSafeBuffer
 
 			r := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
@@ -169,30 +168,6 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			})
 		})
 	}
-}
-
-// thank you zupa https://stackoverflow.com/a/36226525
-type threadSafeBuffer struct {
-	b bytes.Buffer
-	m sync.Mutex
-}
-
-func (b *threadSafeBuffer) Read(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Read(p)
-}
-
-func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Write(p)
-}
-
-func (b *threadSafeBuffer) String() string {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.String()
 }
 
 func launcherRootDir(t *testing.T) string {
