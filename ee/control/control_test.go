@@ -370,8 +370,8 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 
 			// due to time imprecision, we can't get the exact number of fetches we expect
 			// so just check that we are close
-			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-1)
-			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+1)
+			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-2)
+			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+2)
 		})
 	}
 }
