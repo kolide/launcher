@@ -2,10 +2,13 @@ package control
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/control/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,7 +79,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -104,7 +107,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -147,7 +150,7 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -202,7 +205,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -260,7 +263,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				data := &TestClient{tt.subsystems, tt.hashData}
 				controlOpts := []Option{WithStore(store)}
 
-				cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+				cs := New(log.NewNopLogger(), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -272,4 +275,82 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 		})
 	}
+}
+
+func TestControlService_AccelerateRequestInterval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                                                      string
+		startInterval, accelerationInterval, accelerationDuration time.Duration
+	}{
+		{
+			name:                 "happy path",
+			startInterval:        2 * time.Second,
+			accelerationInterval: 250 * time.Millisecond,
+			accelerationDuration: 1 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Overly verbose way to figure out how many fetches we expect to make it more human readable (hopefully)
+			fetchOnControlServiceStart := 1
+			fetchOnFirstTick := 1
+			fetchOnFirstAccelerationCall := 1
+			fetchOnFirstAccelerationTick := 1
+			// after the first acceleration tick, we make 2 concurrent calls resetting the ticker
+			fetchOnSecondAcclerationCall := 2
+			// then we wait the full duration of the second acceleration call
+			fetchesDuringSecondAccleration := int(tt.accelerationDuration.Milliseconds() / tt.accelerationInterval.Milliseconds())
+			// then we wait for 2 ticks of the initial interval
+			fetchAfterDeceleration := 2
+
+			expectedFetches :=
+				fetchOnControlServiceStart +
+					fetchOnFirstTick +
+					fetchOnFirstAccelerationCall +
+					fetchOnFirstAccelerationTick +
+					fetchOnSecondAcclerationCall +
+					fetchesDuringSecondAccleration +
+					fetchAfterDeceleration
+
+			mockDataProvider := mocks.NewDataProvider(t)
+			mockDataProvider.On("GetConfig").Return(nil, errors.New("test")).Times(expectedFetches)
+
+			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval))
+
+			// expect 1 fetch on start
+			go cs.Start(context.Background())
+
+			// expect 1 fetch on initial interval
+			sleepWithBufDuration(tt.startInterval)
+
+			// expect 1 fetch on acceleration request
+			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+
+			// expect 1 fetch during single tick of acceleration
+			sleepWithBufDuration(tt.accelerationInterval)
+
+			// expect 1 fetch on acceleration request
+			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+			// expect 1 fetch on acceleration request
+			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+
+			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
+			sleepWithBufDuration(tt.accelerationDuration)
+
+			// expect 2 fetches after accleration interval has ended and start interval has passed
+			sleepWithBufDuration(tt.startInterval * 2)
+
+			cs.Interrupt(nil)
+		})
+	}
+}
+
+// adds a little buffer to the duration then sleeps to account for time imprecision
+func sleepWithBufDuration(d time.Duration) {
+	time.Sleep(d + (200 * time.Millisecond))
 }
