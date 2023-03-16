@@ -21,5 +21,6 @@ func (storeType Store) String() string {
 
 // Storage is an interface for accesing the underlying data stores
 type Storage interface {
+	// GetStore returns the KVStore associated with the storeType
 	GetStore(storeType Store) KVStore
 }

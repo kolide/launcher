@@ -210,8 +210,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, nil) //storage.GetStore(types.ServerProvidedDataStore))
-		controlService.RegisterConsumer(agentFlagsSubsystemName, nil) //storage.GetStore(types.AgentFlagsStore))
+		controlService.RegisterConsumer(serverDataSubsystemName, storage.GetStore(types.ServerProvidedDataStore))
+		controlService.RegisterConsumer(agentFlagsSubsystemName, storage.GetStore(types.AgentFlagsStore))
 
 		desktopEnabledRaw, err := storage.GetStore(types.AgentFlagsStore).Get([]byte("desktop_enabled_v1"))
 		if err != nil {

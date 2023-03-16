@@ -155,7 +155,7 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 
 	var kvPairs map[string]string
 	if err := json.NewDecoder(data).Decode(&kvPairs); err != nil {
-		return fmt.Errorf("failed to decode '%s' bucket consumer json: %w", s.bucketName, err)
+		return fmt.Errorf("failed to decode '%s' key-value json: %w", s.bucketName, err)
 	}
 
 	err := s.db.Update(func(tx *bbolt.Tx) error {

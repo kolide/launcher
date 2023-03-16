@@ -1,5 +1,7 @@
 package types
 
+import "io"
+
 // Getter is an interface for getting data from a key/value store.
 type Getter interface {
 	// Get retrieves the value for a key.
@@ -31,6 +33,14 @@ type Iterator interface {
 	ForEach(fn func(k, v []byte) error) error
 }
 
+// Updater is an interface for bulk replacing data in a key/value store.
+type Updater interface {
+	// Update decodes data as a JSON-encoded map of key-value pairs, and inserts
+	// these key-values into the store. Any preexisting keys in the store which
+	// do not exist in data will be deleted.
+	Update(data io.Reader) error
+}
+
 // GetterSetter is an interface that groups the Get and Set methods.
 type GetterSetter interface {
 	Getter
@@ -44,7 +54,7 @@ type GetterSetterDeleter interface {
 	Deleter
 }
 
-// GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and Iterator methods.
+// GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and ForEach methods.
 type GetterSetterDeleterIterator interface {
 	Getter
 	Setter
@@ -52,5 +62,14 @@ type GetterSetterDeleterIterator interface {
 	Iterator
 }
 
+// GetterSetterDeleterIteratorUpdater is an interface that groups the Get, Set, Delete, ForEach, and Update methods.
+type GetterSetterDeleterIteratorUpdater interface {
+	Getter
+	Setter
+	Deleter
+	Iterator
+	Updater
+}
+
 // Convenient alias for a key value store that supports all methods
-type KVStore = GetterSetterDeleterIterator
+type KVStore = GetterSetterDeleterIteratorUpdater
