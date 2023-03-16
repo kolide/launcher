@@ -119,8 +119,8 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 		level.Error(cs.logger).Log("msg", "failed to fetch data from control server. Not fatal, moving on", "err", err)
 	}
 
-	if duration <= 0 {
-		return fmt.Errorf("duration must be greater than zero, was %s", duration)
+	if interval <= 0 || duration <= 0 {
+		return fmt.Errorf("interval and duration must be greater than zero, interval was %s, duration was %s", interval, duration)
 	}
 
 	// stop existing timer

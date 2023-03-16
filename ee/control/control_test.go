@@ -278,6 +278,18 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 	}
 }
 
+func TestControlService_AccelerateRequestInterval_Error(t *testing.T) {
+	t.Parallel()
+
+	mockDataProvider := mocks.NewDataProvider(t)
+	mockDataProvider.On("GetConfig").Return(nil, nil)
+
+	cs := New(log.NewNopLogger(), mockDataProvider)
+	require.Error(t, cs.AccelerateRequestInterval(1*time.Second, 0))
+	require.Error(t, cs.AccelerateRequestInterval(0, 1*time.Second))
+	require.Error(t, cs.AccelerateRequestInterval(0, 0))
+}
+
 func TestControlService_AccelerateRequestInterval(t *testing.T) {
 	t.Parallel()
 
