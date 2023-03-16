@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -45,7 +44,6 @@ type TufAutoupdater struct {
 	channel         string
 	checkInterval   time.Duration
 	store           types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	lock            sync.RWMutex
 	interrupt       chan struct{}
 	logger          log.Logger
 }
@@ -208,9 +206,6 @@ func (ta *TufAutoupdater) versionFromTarget(target string, binary string) string
 }
 
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {
-	ta.lock.Lock()
-	defer ta.lock.Unlock()
-
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
 		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
@@ -218,9 +213,6 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 }
 
 func (ta *TufAutoupdater) cleanUpOldErrors() {
-	ta.lock.Lock()
-	defer ta.lock.Unlock()
-
 	// We want to delete all errors more than 1 week old
 	errorTtl := 7 * 24 * time.Hour
 
