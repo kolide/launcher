@@ -220,6 +220,6 @@ func (nc *NotificationConsumer) cleanup() {
 
 	// Delete all old keys
 	if err := nc.store.Delete(keysToDelete...); err != nil {
-		level.Error(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
+		level.Debug(nc.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
 	}
 }
