@@ -53,7 +53,7 @@ func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
 
 	require.NoError(t, osquery.SetupLauncherKeys(s))
 
-	server, err := New(log.NewLogfmtLogger(logBytes), s, "")
+	server, err := New(s, "", WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }

@@ -97,11 +97,11 @@ func (s *inMemoryKeyValueStore) Update(data io.Reader) error {
 	s.items = make(map[string][]byte)
 
 	for key, value := range kvPairs {
-		if string(key) == "" {
+		if key == "" {
 			return errors.New("key is blank")
 		}
 
-		s.items[string(key)] = []byte(value)
+		s.items[key] = []byte(value)
 	}
 
 	return nil
