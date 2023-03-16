@@ -266,7 +266,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
-		ls, err := localserver.New(logger, storage.GetStore(types.ConfigStore), opts.KolideServerURL)
+		ls, err := localserver.New(
+			storage.GetStore(types.ConfigStore),
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 			localserver.WithControlService(controlService),

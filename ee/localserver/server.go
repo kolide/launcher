@@ -81,7 +81,7 @@ func WithControlService(cs controlService) LocalServerOption {
 	}
 }
 
-func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(configStore types.Getter, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
