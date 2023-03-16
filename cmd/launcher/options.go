@@ -14,6 +14,7 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 )
@@ -74,6 +75,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
+		flTufServerURL           = flagset.String("tuf_url", tuf.DefaultTufServer, "TUF update server (default: https://tuf-devel.kolide.com)")
 		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
 		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
 		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
@@ -230,6 +232,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		MirrorServerURL:                    *flMirrorURL,
 		NotaryPrefix:                       *flNotaryPrefix,
 		NotaryServerURL:                    *flNotaryServerURL,
+		TufServerURL:                       *flTufServerURL,
 		OsqueryFlags:                       flOsqueryFlags,
 		OsqueryTlsConfigEndpoint:           *flOsqTlsConfig,
 		OsqueryTlsDistributedReadEndpoint:  *flOsqTlsDistRead,

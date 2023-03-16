@@ -20,12 +20,14 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -198,6 +200,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
+	var controlService *control.ControlService
+
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if opts.ControlServerURL == "" {
@@ -263,6 +267,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(logger, storage.GetStore(types.ConfigStore), opts.KolideServerURL)
+			opts.KolideServerURL,
+			localserver.WithLogger(logger),
+			localserver.WithControlService(controlService),
+		)
+
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
@@ -288,11 +297,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// create an updater for osquery
-		osqueryUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
+		osqueryLegacyUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
 		if err != nil {
 			return fmt.Errorf("create osquery updater: %w", err)
 		}
-		runGroup.Add(osqueryUpdater.Execute, osqueryUpdater.Interrupt)
+		runGroup.Add(osqueryLegacyUpdater.Execute, osqueryLegacyUpdater.Interrupt)
 
 		launcherUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
@@ -312,7 +321,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			logutil.Fatal(logger, "err", err)
 		}
-		launcherUpdater, err := updater.NewUpdater(
+		launcherLegacyUpdater, err := updater.NewUpdater(
 			ctx,
 			launcherPath,
 			updater.UpdateFinalizer(logger, func() error {
@@ -327,7 +336,45 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("create launcher updater: %w", err)
 		}
-		runGroup.Add(launcherUpdater.Execute, launcherUpdater.Interrupt)
+		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
+
+		// Create a new TUF autoupdater for osqueryd
+		osquerydMetadataClient := http.DefaultClient
+		osquerydMetadataClient.Timeout = 1 * time.Minute
+		osquerydAutoupdater, err := tuf.NewTufAutoupdater(
+			opts.TufServerURL,
+			"osqueryd",
+			opts.RootDirectory,
+			osquerydMetadataClient,
+			tuf.WithLogger(logger),
+			tuf.WithChannel(string(opts.UpdateChannel)),
+			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
+		)
+		if err != nil {
+			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
+			level.Debug(logger).Log("msg", "could not create TUF autoupdater for osqueryd", "err", err)
+		} else {
+			runGroup.Add(osquerydAutoupdater.Execute, osquerydAutoupdater.Interrupt)
+		}
+
+		// Create a new TUF autoupdater for launcher
+		launcherMetadataClient := http.DefaultClient
+		launcherMetadataClient.Timeout = 1 * time.Minute
+		launcherAutoupdater, err := tuf.NewTufAutoupdater(
+			opts.TufServerURL,
+			"launcher",
+			opts.RootDirectory,
+			launcherMetadataClient,
+			tuf.WithLogger(logger),
+			tuf.WithChannel(string(opts.UpdateChannel)),
+			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
+		)
+		if err != nil {
+			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
+			level.Debug(logger).Log("msg", "could not create TUF autoupdater for launcher", "err", err)
+		} else {
+			runGroup.Add(launcherAutoupdater.Execute, launcherAutoupdater.Interrupt)
+		}
 	}
 
 	if err := runGroup.Run(); err != nil {

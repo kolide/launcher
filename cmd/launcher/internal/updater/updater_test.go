@@ -18,6 +18,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 	t.Parallel()
 
 	type fields struct {
+		// Mock generated with `mockery --name updater --exported`
 		updater                 *mocks.Updater
 		stopChan                chan bool
 		config                  *UpdaterConfig
