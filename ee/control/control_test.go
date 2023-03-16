@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -318,21 +319,27 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 					fetchAfterDeceleration
 
 			mockDataProvider := mocks.NewDataProvider(t)
-			mockDataProvider.On("GetConfig").Return(nil, errors.New("test")).Times(expectedFetches)
+			mockDataProvider.On("GetConfig").Return(nil, errors.New("test"))
 
 			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval))
 
-			// expect 1 fetch on start
-			go cs.Start(context.Background())
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+				// expect 1 fetch on start
+				cs.Start(context.Background())
+			}()
 
 			// expect 1 fetch on initial interval
-			sleepWithBufDuration(tt.startInterval)
+			time.Sleep(tt.startInterval)
 
 			// expect 1 fetch on acceleration request
 			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
 
 			// expect 1 fetch during single tick of acceleration
-			sleepWithBufDuration(tt.accelerationInterval)
+			time.Sleep(tt.accelerationInterval)
 
 			// expect 1 fetch on acceleration request
 			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
@@ -340,17 +347,19 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
 
 			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
-			sleepWithBufDuration(tt.accelerationDuration)
+			time.Sleep(tt.accelerationDuration)
 
 			// expect 2 fetches after accleration interval has ended and start interval has passed
-			sleepWithBufDuration(tt.startInterval * 2)
+			time.Sleep(tt.startInterval * 2)
 
 			cs.Interrupt(nil)
+
+			wg.Wait()
+
+			// due to time imprecision, we can't get the exact number of fetches we expect
+			// so just check that we are close
+			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-1)
+			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+1)
 		})
 	}
-}
-
-// adds a little buffer to the duration then sleeps to account for time imprecision
-func sleepWithBufDuration(d time.Duration) {
-	time.Sleep(d + (200 * time.Millisecond))
 }

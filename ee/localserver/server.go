@@ -110,8 +110,8 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
-	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControl())
-	ecAuthedMux.Handle("/acceleratecontrol.png", ls.requestAccelerateControl())
+	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	ecAuthedMux.Handle("/acceleratecontrol.png", ls.requestAccelerateControlHandler())
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
@@ -130,7 +130,7 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
-	mux.Handle("/acceleratecontrol", ls.requestAccelerateControl())
+	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),

@@ -9,7 +9,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
-func (ls *localServer) requestAccelerateControl() http.Handler {
+func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 	return http.HandlerFunc(ls.requestAccelerateControlFunc)
 }
 
