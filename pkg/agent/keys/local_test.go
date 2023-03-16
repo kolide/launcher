@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +13,7 @@ func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
 	logger := log.NewNopLogger()
-	store, err := storageci.NewStore(t, log.NewNopLogger(), "config")
+	store, err := storageci.NewStore(t, log.NewNopLogger(), types.ConfigStore.String())
 	require.NoError(t, err)
 
 	key, err := SetupLocalDbKey(logger, store)

@@ -176,6 +176,7 @@ func NewExtension(client service.KolideService, ktx *types.Kontext, opts Extensi
 	initialRunner := &initialRunner{
 		logger:     opts.Logger,
 		identifier: identifier,
+		store:      ktx.Storage.GetStore(types.InitialResultsStore),
 		enabled:    opts.RunDifferentialQueriesImmediately,
 	}
 

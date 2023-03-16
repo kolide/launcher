@@ -14,11 +14,10 @@ type Kontext struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	BboltDB *bbolt.DB
 
-	// This struct is a work in progress, and will be added iteratively added to as needs arise
+	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
 	// Flags
 	// Querier
-	// Logging
 }
 
 func NewKontext(s Storage, db *bbolt.DB) *Kontext {
