@@ -9,7 +9,6 @@ import (
 	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -177,7 +176,7 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 
 // setupStorage creates storage and seeds it with the given instances.
 func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.ServerProvidedDataBucket)
+	s, err := storageci.NewStore(t, log.NewNopLogger(), types.OsqueryHistoryInstance.String())
 	require.NoError(t, err)
 
 	json, err := json.Marshal(seedInstances)

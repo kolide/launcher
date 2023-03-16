@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 }
 
 func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.ConfigBucket)
+	s, err := storageci.NewStore(t, log.NewNopLogger(), types.ConfigStore.String())
 	require.NoError(t, err)
 
 	require.NoError(t, osquery.SetupLauncherKeys(s))

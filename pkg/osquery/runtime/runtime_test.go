@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	osquery "github.com/osquery/osquery-go"
@@ -37,7 +38,7 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	s, err := storageci.NewStore(nil, log.NewNopLogger(), history.OsqueryHistoryInstanceKey)
+	s, err := storageci.NewStore(nil, log.NewNopLogger(), types.OsqueryHistoryInstance.String())
 	if err := history.InitHistory(s); err != nil {
 		fmt.Println("Failed to init history")
 		os.Exit(1)

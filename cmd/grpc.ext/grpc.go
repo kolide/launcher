@@ -14,6 +14,8 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/osquery/osquery-go"
@@ -90,7 +92,13 @@ func main() {
 	}
 	defer db.Close()
 
-	ext, err := grpcext.NewExtension(remote, db, extOpts)
+	storage, err := agentbbolt.NewStorage(logger, db)
+	if err != nil {
+		logutil.Fatal(logger, "err", fmt.Errorf("creating storage: %w", err), "stack", fmt.Sprintf("%+v", err))
+	}
+	ktx := types.NewKontext(storage, db)
+
+	ext, err := grpcext.NewExtension(remote, ktx, extOpts)
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("starting grpc extension: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}

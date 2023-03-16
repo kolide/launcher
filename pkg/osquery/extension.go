@@ -21,7 +21,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
@@ -42,8 +41,7 @@ import (
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	stores        map[string]types.KVStore
-	db            *bbolt.DB
+	ktx           *types.Kontext
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -69,20 +67,6 @@ type Querier interface {
 }
 
 const (
-	// Bucket name to use for launcher configuration.
-	ConfigBucket         = "config"
-	initialResultsBucket = "initial_results"
-	// Bucket name to use for buffered status logs.
-	statusLogsBucket = "status_logs"
-	// Bucket name to use for buffered result logs.
-	resultLogsBucket = "result_logs"
-
-	// the bucket which we push values into from server-backed tables
-	ServerProvidedDataBucket = "server_provided_data"
-
-	// the bucket where we hold sent notifications
-	SentNotificationsBucket = "sent_notifications"
-
 	// DB key for UUID
 	uuidKey = "uuid"
 	// DB key for node key
@@ -138,7 +122,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(client service.KolideService, ktx *types.Kontext, opts ExtensionOpts) (*Extension, error) {
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -164,25 +148,22 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
 
-	stores, err := makeStores(opts.Logger, db)
-	if err != nil {
-		return nil, fmt.Errorf("creating storage: %w", err)
-	}
+	configStore := ktx.Storage.GetStore(types.ConfigStore)
 
-	if err := SetupLauncherKeys(stores[ConfigBucket]); err != nil {
+	if err := SetupLauncherKeys(configStore); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, stores[ConfigBucket]); err != nil {
+	if err := agent.SetupKeys(opts.Logger, configStore); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
-	identifier, err := IdentifierFromDB(stores[ConfigBucket])
+	identifier, err := IdentifierFromDB(configStore)
 	if err != nil {
 		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
 	}
 
-	nodekey, err := NodeKey(stores[ConfigBucket])
+	nodekey, err := NodeKey(configStore)
 	if err != nil {
 		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
@@ -196,18 +177,16 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		logger:     opts.Logger,
 		identifier: identifier,
 		enabled:    opts.RunDifferentialQueriesImmediately,
-		store:      stores[initialResultsBucket],
 	}
 
 	return &Extension{
 		logger:        opts.Logger,
 		serviceClient: client,
-		db:            db,
+		ktx:           ktx,
 		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
 		initialRunner: initialRunner,
-		stores:        stores,
 	}, nil
 }
 
@@ -230,7 +209,7 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.stores[ConfigBucket])
+	return IdentifierFromDB(e.ktx.Storage.GetStore(types.ConfigStore))
 }
 
 // SetupLauncherKeys configures the various keys used for communication.
@@ -406,7 +385,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.stores[ConfigBucket])
+	key, err := NodeKey(e.ktx.Storage.GetStore(types.ConfigStore))
 	if err != nil {
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
@@ -450,7 +429,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.stores[ConfigBucket].Set([]byte(nodeKeyKey), []byte(keyString))
+	err = e.ktx.Storage.GetStore(types.ConfigStore).Set([]byte(nodeKeyKey), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -466,7 +445,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.stores[ConfigBucket].Delete([]byte(nodeKeyKey))
+	e.ktx.Storage.GetStore(types.ConfigStore).Delete([]byte(nodeKeyKey))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -482,7 +461,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.stores[ConfigBucket].Get([]byte(configKey))
+		confBytes, _ = e.ktx.Storage.GetStore(types.ConfigStore).Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
@@ -490,7 +469,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.stores[ConfigBucket].Set([]byte(configKey), []byte(config))
+		e.ktx.Storage.GetStore(types.ConfigStore).Set([]byte(configKey), []byte(config))
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.
@@ -556,45 +535,14 @@ func uint64FromByteKey(k []byte) uint64 {
 	return binary.BigEndian.Uint64(k)
 }
 
-func makeStores(logger log.Logger, db *bbolt.DB) (map[string]types.KVStore, error) {
-	stores := make(map[string]types.KVStore)
-
-	// bucketNames contains the names of buckets that should be created when the
-	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{ConfigBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
-	for _, bucketName := range bucketNames {
-		store, err := agentbbolt.NewStore(logger, db, bucketName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create KVStore: %w", err)
-		}
-
-		stores[bucketName] = store
-	}
-
-	return stores, nil
-}
-
-// storeFromLogType returns the key value store that stores logs of the
-// provided type.
-func (e *Extension) storeFromLogType(typ logger.LogType) (types.KVStore, error) {
-	switch typ {
-	case logger.LogTypeString, logger.LogTypeSnapshot:
-		return e.stores[resultLogsBucket], nil
-	case logger.LogTypeStatus:
-		return e.stores[statusLogsBucket], nil
-	default:
-		return nil, fmt.Errorf("unknown log type: %v", typ)
-	}
-}
-
 // bucketNameFromLogType returns the Bolt bucket name that stores logs of the
 // provided type.
 func bucketNameFromLogType(typ logger.LogType) (string, error) {
 	switch typ {
 	case logger.LogTypeString, logger.LogTypeSnapshot:
-		return resultLogsBucket, nil
+		return types.ResultLogsStore.String(), nil
 	case logger.LogTypeStatus:
-		return statusLogsBucket, nil
+		return types.StatusLogsStore.String(), nil
 	default:
 		return "", fmt.Errorf("unknown log type: %v", typ)
 
@@ -651,7 +599,7 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 	}
 
 	var count int
-	err = e.db.View(func(tx *bbolt.Tx) error {
+	err = e.ktx.BboltDB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		count = b.Stats().KeyN
 		return nil
@@ -675,7 +623,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	err = e.db.View(func(tx *bbolt.Tx) error {
+	err = e.ktx.BboltDB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		c := b.Cursor()
@@ -736,7 +684,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	// Delete logs that were successfully sent
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.ktx.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		for _, k := range logIDs {
 			b.Delete(k)
@@ -787,7 +735,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	if err != nil {
 		return err
 	}
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.ktx.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		logCount := b.Stats().KeyN
@@ -839,7 +787,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.ktx.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		// Log keys are generated with the auto-incrementing sequence

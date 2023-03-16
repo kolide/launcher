@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -38,10 +39,6 @@ import (
 )
 
 const (
-	// Buckets used by launcher
-	agentFlagsBucketName     = "agent_flags"
-	controlServiceBucketName = "control_service_data"
-
 	// Subsystems that launcher listens for control server updates on
 	agentFlagsSubsystemName  = "agent_flags"
 	serverDataSubsystemName  = "kolide_server_data"
@@ -108,6 +105,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
+	storage, err := agentbbolt.NewStorage(logger, db)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+	ktx := types.NewKontext(storage, db)
+
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
@@ -170,33 +173,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	configStore, err := agentbbolt.NewStore(logger, db, osquery.ConfigBucket)
-	if err != nil {
-		return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.ConfigBucket, err)
-	}
-
-	serverDataBucketConsumer, err := agentbbolt.NewStore(logger, db, osquery.ServerProvidedDataBucket)
-	if err != nil {
-		return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.ServerProvidedDataBucket, err)
-	}
-
-	desktopFlagsBucketConsumer, err := agentbbolt.NewStore(logger, db, agentFlagsBucketName)
-	if err != nil {
-		return fmt.Errorf("failed to create '%s' KVStore: %w", agentFlagsBucketName, err)
-	}
-
-	osqueryHistoryStore, err := agentbbolt.NewStore(logger, db, osqueryInstanceHistory.OsqueryHistoryInstanceKey)
-	if err != nil {
-		return fmt.Errorf("failed to create '%s' KVStore: %w", osqueryInstanceHistory.OsqueryHistoryInstanceKey, err)
-	}
-
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(osqueryHistoryStore); err != nil {
+	if err := osqueryInstanceHistory.InitHistory(storage.GetStore(types.OsqueryHistoryInstance)); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, configStore, serverDataBucketConsumer, desktopFlagsBucketConsumer, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, ktx, client, opts)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -220,22 +203,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlStore, err := agentbbolt.NewStore(logger, db, controlServiceBucketName)
-		if err != nil {
-			return fmt.Errorf("failed to create '%s' KVStore: %w", controlServiceBucketName, err)
-		}
-
-		controlService, err := createControlService(ctx, logger, controlStore, opts)
+		controlService, err := createControlService(ctx, logger, storage.GetStore(types.ControlStore), opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
-		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
+		controlService.RegisterConsumer(serverDataSubsystemName, nil) //storage.GetStore(types.ServerProvidedDataStore))
+		controlService.RegisterConsumer(agentFlagsSubsystemName, nil) //storage.GetStore(types.AgentFlagsStore))
 
-		desktopEnabledRaw, err := desktopFlagsBucketConsumer.Get([]byte("desktop_enabled_v1"))
+		desktopEnabledRaw, err := storage.GetStore(types.AgentFlagsStore).Get([]byte("desktop_enabled_v1"))
 		if err != nil {
 			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
 		}
@@ -253,20 +231,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
+			desktopRunner.WithGetter(storage.GetStore(types.AgentFlagsStore)),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
 
-		notificationStore, err := agentbbolt.NewStore(logger, db, osquery.SentNotificationsBucket)
-		if err != nil {
-			return fmt.Errorf("failed to create '%s' KVStore: %w", osquery.SentNotificationsBucket, err)
-		}
-
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			notificationStore,
+			storage.GetStore(types.SentNotificationsStore),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
@@ -289,7 +262,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
-		ls, err := localserver.New(logger, configStore, opts.KolideServerURL)
+		ls, err := localserver.New(logger, storage.GetStore(types.ConfigStore), opts.KolideServerURL)
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)

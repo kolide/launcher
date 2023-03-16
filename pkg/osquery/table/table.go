@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
-	"go.etcd.io/bbolt"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
@@ -19,13 +18,13 @@ import (
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(db *bbolt.DB, configStore, serverDataStore, agentFlagsStore types.KVStore, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(ktx *types.Kontext, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(configStore),
-		LauncherDbInfo(db),
-		LauncherInfoTable(configStore),
-		launcher_db.TablePlugin("kolide_server_data", serverDataStore),
-		launcher_db.TablePlugin("kolide_control_flags", agentFlagsStore),
+		LauncherConfigTable(ktx.Storage.GetStore(types.ConfigStore)),
+		LauncherDbInfo(ktx.BboltDB),
+		LauncherInfoTable(ktx.Storage.GetStore(types.ConfigStore)),
+		launcher_db.TablePlugin("kolide_server_data", ktx.Storage.GetStore(types.ServerProvidedDataStore)),
+		launcher_db.TablePlugin("kolide_control_flags", ktx.Storage.GetStore(types.AgentFlagsStore)),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
 	}

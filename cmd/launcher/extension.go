@@ -23,7 +23,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
-	"go.etcd.io/bbolt"
 )
 
 // actorQuerier is a type wrapper over kolide/kit/actor. This should
@@ -40,7 +39,7 @@ func (aq actorQuerier) Query(query string) ([]map[string]string, error) {
 
 // TODO: the extension, runtime, and client are all kind of entangled
 // here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, db *bbolt.DB, configStore, serverDataStore, agentFlagsStore types.KVStore, launcherClient service.KolideService, opts *launcher.Options) (
+func createExtensionRuntime(ctx context.Context, ktx *types.Kontext, launcherClient service.KolideService, opts *launcher.Options) (
 	run *actorQuerier,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
@@ -92,7 +91,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, configStore, serv
 	}
 
 	// create the extension
-	ext, err := osquery.NewExtension(launcherClient, db, extOpts)
+	ext, err := osquery.NewExtension(launcherClient, ktx, extOpts)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("starting grpc extension: %w", err)
 	}
@@ -101,12 +100,12 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, configStore, serv
 
 	if opts.Transport == "osquery" {
 		var err error
-		runnerOptions, err = osqueryRunnerOptions(logger, db, configStore, serverDataStore, agentFlagsStore, opts)
+		runnerOptions, err = osqueryRunnerOptions(logger, ktx, opts)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("creating osquery runner options: %w", err)
 		}
 	} else {
-		runnerOptions = grpcRunnerOptions(logger, db, configStore, serverDataStore, agentFlagsStore, opts, ext)
+		runnerOptions = grpcRunnerOptions(logger, ktx, opts, ext)
 	}
 
 	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
@@ -196,7 +195,7 @@ func createExtensionRuntime(ctx context.Context, db *bbolt.DB, configStore, serv
 }
 
 // commonRunnerOptions returns osquery runtime options common to all transports
-func commonRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDataStore, agentFlagsStore types.KVStore, opts *launcher.Options) []runtime.OsqueryInstanceOption {
+func commonRunnerOptions(logger log.Logger, ktx *types.Kontext, opts *launcher.Options) []runtime.OsqueryInstanceOption {
 	// create the logging adapters for osquery
 	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
 		logger,
@@ -214,7 +213,7 @@ func commonRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDat
 	return []runtime.OsqueryInstanceOption{
 		runtime.WithOsquerydBinary(opts.OsquerydPath),
 		runtime.WithRootDirectory(opts.RootDirectory),
-		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(db, configStore, serverDataStore, agentFlagsStore, opts)...),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(ktx, opts)...),
 		runtime.WithStdout(osqueryStdoutLogger),
 		runtime.WithStderr(osqueryStderrLogger),
 		runtime.WithLogger(logger),
@@ -226,7 +225,7 @@ func commonRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDat
 }
 
 // osqueryRunnerOptions returns the osquery runtime options when using native osquery transport
-func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDataStore, agentFlagsStore types.KVStore, opts *launcher.Options) ([]runtime.OsqueryInstanceOption, error) {
+func osqueryRunnerOptions(logger log.Logger, ktx *types.Kontext, opts *launcher.Options) ([]runtime.OsqueryInstanceOption, error) {
 	// As osquery requires TLS server certs, we'll  use our embedded defaults if not specified
 	caCertFile := opts.RootPEM
 	if caCertFile == "" {
@@ -238,7 +237,7 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDa
 	}
 
 	runtimeOptions := append(
-		commonRunnerOptions(logger, db, configStore, serverDataStore, agentFlagsStore, opts),
+		commonRunnerOptions(logger, ktx, opts),
 		runtime.WithConfigPluginFlag("tls"),
 		runtime.WithDistributedPluginFlag("tls"),
 		runtime.WithLoggerPluginFlag("tls"),
@@ -265,9 +264,9 @@ func osqueryRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDa
 }
 
 // grpcRunnerOptions returns the osquery runtime options when using launcher transports. (Eg: grpc or jsonrpc)
-func grpcRunnerOptions(logger log.Logger, db *bbolt.DB, configStore, serverDataStore, agentFlagsStore types.KVStore, opts *launcher.Options, ext *osquery.Extension) []runtime.OsqueryInstanceOption {
+func grpcRunnerOptions(logger log.Logger, ktx *types.Kontext, opts *launcher.Options, ext *osquery.Extension) []runtime.OsqueryInstanceOption {
 	return append(
-		commonRunnerOptions(logger, db, configStore, serverDataStore, agentFlagsStore, opts),
+		commonRunnerOptions(logger, ktx, opts),
 		runtime.WithConfigPluginFlag("kolide_grpc"),
 		runtime.WithLoggerPluginFlag("kolide_grpc"),
 		runtime.WithDistributedPluginFlag("kolide_grpc"),

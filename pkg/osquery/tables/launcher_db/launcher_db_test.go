@@ -6,7 +6,6 @@ import (
 	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +62,7 @@ func Test_generateLauncherDbTable(t *testing.T) {
 			t.Parallel()
 
 			store := setupStorage(t, tt.data)
-			kvps, err := dbKeyValueRows(osquery.ServerProvidedDataBucket, store)
+			kvps, err := dbKeyValueRows(types.ServerProvidedDataStore.String(), store)
 			require.NoError(t, err)
 
 			assert.ElementsMatch(t, tt.want, kvps)
@@ -72,7 +71,7 @@ func Test_generateLauncherDbTable(t *testing.T) {
 }
 
 func setupStorage(t *testing.T, values map[string]string) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.ServerProvidedDataBucket)
+	s, err := storageci.NewStore(t, log.NewNopLogger(), types.ServerProvidedDataStore.String())
 	require.NoError(t, err)
 
 	// add the values to the bucket
