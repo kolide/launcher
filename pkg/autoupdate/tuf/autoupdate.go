@@ -29,8 +29,8 @@ var rootJson []byte
 
 const (
 	DefaultTufServer      = "https://tuf-devel.kolide.com"
-	defaultChannel        = "stable"
 	AutoupdateErrorBucket = "tuf_autoupdate_errors"
+	defaultChannel        = "stable"
 	tufDirectoryName      = "tuf-dev"
 )
 
