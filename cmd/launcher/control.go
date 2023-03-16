@@ -42,7 +42,7 @@ func createControlService(ctx context.Context, logger log.Logger, store types.Ge
 		control.WithRequestInterval(opts.ControlRequestInterval),
 		control.WithStore(store),
 	}
-	service := control.New(logger, ctx, client, controlOpts...)
+	service := control.New(logger, client, controlOpts...)
 
 	return service, nil
 }
