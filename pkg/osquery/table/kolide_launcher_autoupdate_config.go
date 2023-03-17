@@ -14,6 +14,7 @@ func LauncherAutoupdateConfigTable(opts *launcher.Options) *table.Plugin {
 		table.TextColumn("autoupdate"),
 		table.TextColumn("notary_server_url"),
 		table.TextColumn("mirror_server_url"),
+		table.TextColumn("tuf_server_url"),
 		table.TextColumn("autoupdate_interval"),
 		table.TextColumn("update_channel"),
 	}
@@ -36,6 +37,7 @@ func generateLauncherAutoupdateConfigTable(opts *launcher.Options) table.Generat
 				"autoupdate":          boolToString(opts.Autoupdate),
 				"notary_server_url":   opts.NotaryServerURL,
 				"mirror_server_url":   opts.MirrorServerURL,
+				"tuf_server_url":      opts.TufServerURL,
 				"autoupdate_interval": opts.AutoupdateInterval.String(),
 				"update_channel":      string(opts.UpdateChannel),
 			},
