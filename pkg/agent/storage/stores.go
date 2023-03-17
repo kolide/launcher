@@ -5,6 +5,7 @@ type Store string
 
 const (
 	AgentFlagsStore             Store = "agent_flags"              // The store used for agent control flags.
+	AutoupdateErrorsStore       Store = "tuf_autoupdate_errors"    // The store used for tracking new autoupdater errors.
 	ConfigStore                 Store = "config"                   // The store used for launcher configuration.
 	ControlStore                Store = "control_service_data"     // The store used for control service caching data.
 	InitialResultsStore         Store = "initial_results"          // The store used for initial runner queries.

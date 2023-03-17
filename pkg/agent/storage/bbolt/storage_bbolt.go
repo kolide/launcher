@@ -25,6 +25,7 @@ func NewStorage(logger log.Logger, db *bbolt.DB) (*bboltStorage, error) {
 
 	var storeNames = []storage.Store{
 		storage.AgentFlagsStore,
+		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
 		storage.InitialResultsStore,
@@ -59,6 +60,10 @@ func (s *bboltStorage) getKVStore(storeType storage.Store) types.KVStore {
 
 func (s *bboltStorage) AgentFlagsStore() types.KVStore {
 	return s.getKVStore(storage.AgentFlagsStore)
+}
+
+func (s *bboltStorage) AutoupdateErrorsStore() types.KVStore {
+	return s.getKVStore(storage.AutoupdateErrorsStore)
 }
 
 func (s *bboltStorage) ConfigStore() types.KVStore {

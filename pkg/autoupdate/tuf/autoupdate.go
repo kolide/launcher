@@ -28,10 +28,9 @@ import (
 var rootJson []byte
 
 const (
-	DefaultTufServer      = "https://tuf-devel.kolide.com"
-	AutoupdateErrorBucket = "tuf_autoupdate_errors"
-	defaultChannel        = "stable"
-	tufDirectoryName      = "tuf-dev"
+	DefaultTufServer = "https://tuf-devel.kolide.com"
+	defaultChannel   = "stable"
+	tufDirectoryName = "tuf-dev"
 )
 
 type ReleaseFileCustomMetadata struct {

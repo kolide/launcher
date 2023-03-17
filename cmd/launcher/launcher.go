@@ -339,12 +339,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 
-		// Set up the bucket for tracking new autoupdater errors
-		autoupdaterErrorStore, err := agentbbolt.NewStore(logger, db, tuf.AutoupdateErrorBucket)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore %s: %w", tuf.AutoupdateErrorBucket, err)
-		}
-
 		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 1 * time.Minute
@@ -352,7 +346,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			opts.TufServerURL,
 			opts.RootDirectory,
 			metadataClient,
-			autoupdaterErrorStore,
+			k.Storage.AutoupdateErrorsStore(),
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
