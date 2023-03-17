@@ -346,7 +346,7 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			fetchOnFirstTick := 1
 			fetchOnFirstAccelerationCall := 1
 			fetchOnFirstAccelerationTick := 1
-			// after the first acceleration tick, we make 2 concurrent calls resetting the ticker
+			// after the first acceleration tick, we make 2 calls resetting the ticker
 			fetchOnSecondAcclerationCall := 2
 			// then we wait the full duration of the second acceleration call
 			fetchesDuringSecondAccleration := int(tt.accelerationDuration.Milliseconds() / tt.accelerationInterval.Milliseconds())
@@ -380,15 +380,15 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			time.Sleep(tt.startInterval)
 
 			// expect 1 fetch on acceleration request
-			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect 1 fetch during single tick of acceleration
 			time.Sleep(tt.accelerationInterval)
 
 			// expect 1 fetch on acceleration request
-			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 			// expect 1 fetch on acceleration request
-			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
 			time.Sleep(tt.accelerationDuration)
