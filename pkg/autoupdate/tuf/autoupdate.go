@@ -239,6 +239,6 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 
 	// Delete all old keys
 	if err := ta.store.Delete(keysToDelete...); err != nil {
-		level.Error(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
+		level.Debug(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
 	}
 }
