@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/service"
@@ -57,7 +58,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) *types.Knapsack {
 		BboltDB: db,
 	}
 
-	return ktx
+	return k
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
@@ -113,7 +114,7 @@ func TestGetHostIdentifier(t *testing.T) {
 
 	db, cleanup = makeTempDB(t)
 	defer cleanup()
-	k := makeKnapsack(t, db)
+	k = makeKnapsack(t, db)
 	e, err = NewExtension(&mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 
@@ -134,7 +135,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 
 	// Put garbage UUID in DB
 	err = db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(types.ConfigStore.String()))
+		b := tx.Bucket([]byte(storage.ConfigStore.String()))
 		return b.Put([]byte(uuidKey), []byte("garbage_uuid"))
 	})
 	require.Nil(t, err)
@@ -1040,7 +1041,7 @@ func TestLauncherRsaKeys(t *testing.T) {
 	_, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.NoError(t, err)
 
-	configStore, err := agentbbolt.NewStore(log.NewNopLogger(), db, types.ConfigStore.String())
+	configStore, err := agentbbolt.NewStore(log.NewNopLogger(), db, storage.ConfigStore.String())
 	require.NoError(t, err)
 
 	key, err := PrivateRSAKeyFromDB(configStore)

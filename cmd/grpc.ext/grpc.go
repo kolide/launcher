@@ -98,7 +98,7 @@ func main() {
 	}
 	k := types.NewKnapsack(storage, db)
 
-	ext, err := grpcext.NewExtension(remote, ktx, extOpts)
+	ext, err := grpcext.NewExtension(remote, k, extOpts)
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("starting grpc extension: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"go.etcd.io/bbolt"
 )
@@ -12,26 +13,26 @@ import (
 type bboltStorage struct {
 	logger log.Logger
 	db     *bbolt.DB
-	stores map[types.Store]*bboltKeyValueStore
+	stores map[storage.Store]*bboltKeyValueStore
 }
 
 func NewStorage(logger log.Logger, db *bbolt.DB) (*bboltStorage, error) {
 	s := &bboltStorage{
 		logger: logger,
 		db:     db,
-		stores: make(map[types.Store]*bboltKeyValueStore),
+		stores: make(map[storage.Store]*bboltKeyValueStore),
 	}
 
-	var storeNames = []types.Store{
-		types.AgentFlagsStore,
-		types.ConfigStore,
-		types.ControlStore,
-		types.InitialResultsStore,
-		types.ResultLogsStore,
-		types.OsqueryHistoryInstance,
-		types.SentNotificationsStore,
-		types.StatusLogsStore,
-		types.ServerProvidedDataStore,
+	var storeNames = []storage.Store{
+		storage.AgentFlagsStore,
+		storage.ConfigStore,
+		storage.ControlStore,
+		storage.InitialResultsStore,
+		storage.ResultLogsStore,
+		storage.OsqueryHistoryInstanceStore,
+		storage.SentNotificationsStore,
+		storage.StatusLogsStore,
+		storage.ServerProvidedDataStore,
 	}
 
 	for _, storeName := range storeNames {
@@ -46,7 +47,7 @@ func NewStorage(logger log.Logger, db *bbolt.DB) (*bboltStorage, error) {
 	return s, nil
 }
 
-func (s *bboltStorage) GetStore(storeType types.Store) types.KVStore {
+func (s *bboltStorage) getKVStore(storeType storage.Store) types.KVStore {
 	if s == nil {
 		return nil
 	}
@@ -54,4 +55,40 @@ func (s *bboltStorage) GetStore(storeType types.Store) types.KVStore {
 	// Ignoring ok value, this should only fail if an invalid storeType is provided
 	store, _ := s.stores[storeType]
 	return store
+}
+
+func (s *bboltStorage) AgentFlagsStore() types.KVStore {
+	return s.getKVStore(storage.AgentFlagsStore)
+}
+
+func (s *bboltStorage) ConfigStore() types.KVStore {
+	return s.getKVStore(storage.ConfigStore)
+}
+
+func (s *bboltStorage) ControlStore() types.KVStore {
+	return s.getKVStore(storage.ControlStore)
+}
+
+func (s *bboltStorage) InitialResultsStore() types.KVStore {
+	return s.getKVStore(storage.InitialResultsStore)
+}
+
+func (s *bboltStorage) ResultLogsStore() types.KVStore {
+	return s.getKVStore(storage.ResultLogsStore)
+}
+
+func (s *bboltStorage) OsqueryHistoryInstanceStore() types.KVStore {
+	return s.getKVStore(storage.OsqueryHistoryInstanceStore)
+}
+
+func (s *bboltStorage) SentNotificationsStore() types.KVStore {
+	return s.getKVStore(storage.SentNotificationsStore)
+}
+
+func (s *bboltStorage) StatusLogsStore() types.KVStore {
+	return s.getKVStore(storage.StatusLogsStore)
+}
+
+func (s *bboltStorage) ServerProvidedDataStore() types.KVStore {
+	return s.getKVStore(storage.ServerProvidedDataStore)
 }

@@ -176,12 +176,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(storage.GetStore(types.OsqueryHistoryInstance)); err != nil {
+	if err := osqueryInstanceHistory.InitHistory(storage.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, ktx, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client, opts)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -207,17 +207,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, storage.GetStore(types.ControlStore), opts)
+		controlService, err := createControlService(ctx, logger, storage.ControlStore(), opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, storage.GetStore(types.ServerProvidedDataStore))
-		controlService.RegisterConsumer(agentFlagsSubsystemName, storage.GetStore(types.AgentFlagsStore))
+		controlService.RegisterConsumer(serverDataSubsystemName, storage.ServerProvidedDataStore())
+		controlService.RegisterConsumer(agentFlagsSubsystemName, storage.AgentFlagsStore())
 
-		desktopEnabledRaw, err := storage.GetStore(types.AgentFlagsStore).Get([]byte("desktop_enabled_v1"))
+		desktopEnabledRaw, err := storage.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
 		if err != nil {
 			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
 		}
@@ -235,7 +235,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(storage.GetStore(types.AgentFlagsStore)),
+			desktopRunner.WithGetter(storage.AgentFlagsStore()),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
@@ -243,7 +243,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			storage.GetStore(types.SentNotificationsStore),
+			storage.SentNotificationsStore(),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
@@ -267,7 +267,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
-			storage.GetStore(types.ConfigStore),
+			storage.ConfigStore(),
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 			localserver.WithControlService(controlService),
