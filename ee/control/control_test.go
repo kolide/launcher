@@ -2,7 +2,7 @@ package control
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control/mocks"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -278,16 +279,47 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 	}
 }
 
-func TestControlService_AccelerateRequestInterval_Error(t *testing.T) {
+func TestControlService_AccelerateRequestInterval_MinInterval(t *testing.T) {
 	t.Parallel()
 
-	mockDataProvider := mocks.NewDataProvider(t)
-	mockDataProvider.On("GetConfig").Return(nil, nil)
+	tests := []struct {
+		name     string
+		interval time.Duration
+		errStr   string
+	}{
+		{
+			name:     "happy path",
+			interval: 30 * time.Second,
+		},
+		{
+			name:     "too small interval",
+			interval: 1 * time.Second,
+			errStr:   "control service acceleration interval too small, using minimum interval",
+		},
+	}
 
-	cs := New(log.NewNopLogger(), mockDataProvider)
-	require.Error(t, cs.AccelerateRequestInterval(1*time.Second, 0))
-	require.Error(t, cs.AccelerateRequestInterval(0, 1*time.Second))
-	require.Error(t, cs.AccelerateRequestInterval(0, 0))
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDataProvider := mocks.NewDataProvider(t)
+			mockDataProvider.On("GetConfig").Return(nil, nil)
+
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			cs := New(log.NewLogfmtLogger(&logBytes), mockDataProvider)
+
+			cs.AccelerateRequestInterval(tt.interval, 0)
+
+			if tt.errStr != "" {
+				assert.Contains(t, logBytes.String(), tt.errStr)
+				return
+			}
+
+			// ensure we accept legit intervals
+			assert.NotContains(t, logBytes.String(), "control service acceleration interval too small, using minimum interval")
+		})
+	}
 }
 
 func TestControlService_AccelerateRequestInterval(t *testing.T) {
@@ -331,9 +363,9 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 					fetchAfterDeceleration
 
 			mockDataProvider := mocks.NewDataProvider(t)
-			mockDataProvider.On("GetConfig").Return(nil, errors.New("test"))
+			mockDataProvider.On("GetConfig").Return(nil, nil)
 
-			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval))
+			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval), WithMinAcclerationInterval(1*time.Millisecond))
 
 			wg := sync.WaitGroup{}
 			wg.Add(1)
@@ -348,15 +380,15 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			time.Sleep(tt.startInterval)
 
 			// expect 1 fetch on acceleration request
-			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect 1 fetch during single tick of acceleration
 			time.Sleep(tt.accelerationInterval)
 
 			// expect 1 fetch on acceleration request
-			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 			// expect 1 fetch on acceleration request
-			go require.NoError(t, cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration))
+			go cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
 			time.Sleep(tt.accelerationDuration)
@@ -368,10 +400,15 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 
 			wg.Wait()
 
+			// make sure we didn't accidentally update the start interval
+			require.Equal(t, tt.startInterval, cs.requestInterval)
+
 			// due to time imprecision, we can't get the exact number of fetches we expect
 			// so just check that we are close
-			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-2)
-			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+2)
+			expectedFetchesBuffer := 2
+			expectedFetchesMsg := fmt.Sprintf("fetch should have been called %d (+/- %d) times during test", expectedFetches, expectedFetchesBuffer)
+			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-expectedFetchesBuffer, expectedFetchesMsg)
+			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+expectedFetchesBuffer, expectedFetchesMsg)
 		})
 	}
 }

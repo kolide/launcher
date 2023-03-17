@@ -22,3 +22,10 @@ func WithStore(store types.GetterSetter) Option {
 		c.store = store
 	}
 }
+
+// WithMinAcceleartionInterval sets the minimum interval between updates during request interval acceleration
+func WithMinAcclerationInterval(interval time.Duration) Option {
+	return func(c *ControlService) {
+		c.minAccelerationInterval = interval
+	}
+}

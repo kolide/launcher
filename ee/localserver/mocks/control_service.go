@@ -14,17 +14,8 @@ type ControlService struct {
 }
 
 // AccelerateRequestInterval provides a mock function with given fields: interval, duration
-func (_m *ControlService) AccelerateRequestInterval(interval time.Duration, duration time.Duration) error {
-	ret := _m.Called(interval, duration)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(time.Duration, time.Duration) error); ok {
-		r0 = rf(interval, duration)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *ControlService) AccelerateRequestInterval(interval time.Duration, duration time.Duration) {
+	_m.Called(interval, duration)
 }
 
 type mockConstructorTestingTNewControlService interface {

@@ -2,7 +2,6 @@ package localserver
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,23 +30,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			},
 			mockControlService: func() controlService {
 				m := mocks.NewControlService(t)
-				m.On("AccelerateRequestInterval", 250*time.Millisecond, 1*time.Second).Return(nil)
+				m.On("AccelerateRequestInterval", 250*time.Millisecond, 1*time.Second)
 				return m
 			},
-		},
-		{
-			name:               "acceleration failed",
-			expectedHttpStatus: http.StatusBadRequest,
-			body: map[string]string{
-				"interval": "250ms",
-				"duration": "1s",
-			},
-			mockControlService: func() controlService {
-				m := mocks.NewControlService(t)
-				m.On("AccelerateRequestInterval", 250*time.Millisecond, 1*time.Second).Return(errors.New("some acceleration error"))
-				return m
-			},
-			logErrStr: "some acceleration error",
 		},
 		{
 			name:               "no body",

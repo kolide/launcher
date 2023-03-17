@@ -23,6 +23,7 @@ type ControlService struct {
 	requestInterval          time.Duration
 	requestTicker            *time.Ticker
 	requestAccelerationTimer *time.Timer
+	minAccelerationInterval  time.Duration
 	fetcher                  dataProvider
 	fetchMutex               sync.Mutex
 	store                    types.GetterSetter
@@ -52,12 +53,13 @@ type dataProvider interface {
 
 func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		logger:          log.With(logger, "component", "control"),
-		requestInterval: 60 * time.Second,
-		fetcher:         fetcher,
-		lastFetched:     make(map[string]string),
-		consumers:       make(map[string]consumer),
-		subscribers:     make(map[string][]subscriber),
+		logger:                  log.With(logger, "component", "control"),
+		requestInterval:         60 * time.Second,
+		minAccelerationInterval: 5 * time.Second,
+		fetcher:                 fetcher,
+		lastFetched:             make(map[string]string),
+		consumers:               make(map[string]consumer),
+		subscribers:             make(map[string][]subscriber),
 	}
 
 	cs.requestTicker = time.NewTicker(cs.requestInterval)
@@ -112,15 +114,23 @@ func (cs *ControlService) Stop() {
 	}
 }
 
-func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) error {
-	// preform a fetch now
+func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
+	// perform a fetch now
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
-		level.Error(cs.logger).Log("msg", "failed to fetch data from control server. Not fatal, moving on", "err", err)
+		level.Debug(cs.logger).Log(
+			"msg", "failed to fetch data from control server. Not fatal, moving on",
+			"err", err,
+		)
 	}
 
-	if interval <= 0 || duration <= 0 {
-		return fmt.Errorf("interval and duration must be greater than zero, interval was %s, duration was %s", interval, duration)
+	if interval < cs.minAccelerationInterval {
+		level.Debug(cs.logger).Log(
+			"msg", "control service acceleration interval too small, using minimum interval",
+			"minimum_interval", cs.minAccelerationInterval,
+			"provided_interval", interval,
+		)
+		interval = cs.minAccelerationInterval
 	}
 
 	// stop existing timer
@@ -147,8 +157,6 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 
 	// restart the ticker on accelerated interval
 	cs.requestTicker.Reset(interval)
-
-	return nil
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.

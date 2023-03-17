@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/go-kit/kit/log/level"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {
@@ -42,15 +40,7 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := ls.controlService.AccelerateRequestInterval(interval, duration); err != nil {
-		level.Error(ls.logger).Log(
-			"msg", "accelerating control server request interval",
-			"err", err,
-		)
-
-		sendClientError(w, fmt.Sprintf("error accelerating control server request interval: %s", err))
-		return
-	}
+	ls.controlService.AccelerateRequestInterval(interval, duration)
 }
 
 func durationFromMap(key string, body map[string]string) (time.Duration, error) {

@@ -36,7 +36,7 @@ var portList = []int{
 }
 
 type controlService interface {
-	AccelerateRequestInterval(interval, duration time.Duration) error
+	AccelerateRequestInterval(interval, duration time.Duration)
 }
 
 type Querier interface {
