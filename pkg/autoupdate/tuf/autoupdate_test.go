@@ -152,7 +152,8 @@ func Test_cleanUpOldErrors(t *testing.T) {
 
 	// Confirm we added them
 	keyCountBeforeCleanup := 0
-	err := autoupdater.store.ForEach(func(_, _ []byte) error {
+	err := autoupdater.store.ForEach(func(k, _ []byte) error {
+		fmt.Printf("SEEDED KEY: %s\n", string(k))
 		keyCountBeforeCleanup += 1
 		return nil
 	})
@@ -163,7 +164,8 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	autoupdater.cleanUpOldErrors()
 
 	keyCount := 0
-	err = autoupdater.store.ForEach(func(_, _ []byte) error {
+	err = autoupdater.store.ForEach(func(k, _ []byte) error {
+		fmt.Printf("EXISTING KEY: %s\n", string(k))
 		keyCount += 1
 		return nil
 	})
