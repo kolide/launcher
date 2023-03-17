@@ -11,34 +11,39 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 //go:embed assets/tuf-dev/root.json
 var rootJson []byte
 
 const (
-	DefaultTufServer       = "https://tuf-devel.kolide.com"
-	defaultChannel         = "stable"
-	tufDirectoryNameFormat = "%s-tuf-dev"
+	DefaultTufServer      = "https://tuf-devel.kolide.com"
+	AutoupdateErrorBucket = "tuf_autoupdate_errors"
+	defaultChannel        = "stable"
+	tufDirectoryName      = "tuf-dev"
 )
+
+type ReleaseFileCustomMetadata struct {
+	Target string `json:"target"`
+}
 
 type TufAutoupdater struct {
 	metadataClient  *client.Client
-	binary          string
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
-	errorCounter    []int64 // to be used for tracking metrics about how the new autoupdater is performing
-	lock            sync.RWMutex
+	store           types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt       chan struct{}
 	logger          log.Logger
 }
@@ -63,14 +68,13 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		binary:          binary,
 		operatingSystem: runtime.GOOS,
 		channel:         defaultChannel,
 		interrupt:       make(chan struct{}),
 		checkInterval:   60 * time.Second,
-		errorCounter:    make([]int64, 0), // For now, the error counter is a simple list of timestamps when errors occurred
+		store:           store,
 		logger:          log.NewNopLogger(),
 	}
 
@@ -79,7 +83,7 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(binary, rootDirectory, metadataUrl, metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(rootDirectory, metadataUrl, metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
@@ -87,9 +91,9 @@ func NewTufAutoupdater(metadataUrl, binary, rootDirectory string, metadataHttpCl
 	return ta, nil
 }
 
-func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
-	localTufDirectory := LocalTufDirectory(rootDirectory, binary)
+	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
@@ -117,30 +121,23 @@ func initMetadataClient(binary, rootDirectory, metadataUrl string, metadataHttpC
 	return metadataClient, nil
 }
 
-func LocalTufDirectory(rootDirectory string, binary string) string {
-	return filepath.Join(rootDirectory, fmt.Sprintf(tufDirectoryNameFormat, binary))
+func LocalTufDirectory(rootDirectory string) string {
+	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
 	checkTicker := time.NewTicker(ta.checkInterval)
-	errorCheckTicker := time.NewTicker(1 * time.Hour)
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 
 	for {
 		select {
 		case <-checkTicker.C:
 			if err := ta.checkForUpdate(); err != nil {
-				ta.lock.Lock()
-				ta.errorCounter = append(ta.errorCounter, time.Now().Unix())
-				ta.lock.Unlock()
-
+				ta.storeError(err)
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
-		case <-errorCheckTicker.C:
-			rollingErrorCount := ta.rollingErrorCount()
-			level.Debug(ta.logger).Log("msg", "checked rolling error count for TUF updater", "err_count", rollingErrorCount, "binary", ta.binary)
 		case <-cleanupTicker.C:
-			ta.cleanUpOldErrorCounts()
+			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
 			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
 			return nil
@@ -164,7 +161,17 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", ta.binary, ta.operatingSystem, ta.channel)
+	for _, binary := range []string{"launcher", "osqueryd"} {
+		if err := ta.findRelease(binary, targets); err != nil {
+			return fmt.Errorf("could not find release: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) error {
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -172,11 +179,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 		// We found the release file that matches our OS and binary. Evaluate it
 		// to see if we're on this latest version.
-		type releaseFileCustomMetadata struct {
-			Target string `json:"target"`
-		}
-
-		var custom releaseFileCustomMetadata
+		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
@@ -184,53 +187,58 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		level.Debug(ta.logger).Log(
 			"msg", "checked most up-to-date release from TUF",
 			"launcher_version", version.Version().Version,
-			"release_version", ta.versionFromTarget(custom.Target),
-			"binary", ta.binary,
+			"release_version", ta.versionFromTarget(custom.Target, binary),
+			"binary", binary,
 			"channel", ta.channel,
 		)
 
-		break
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
 }
 
-func (ta *TufAutoupdater) versionFromTarget(target string) string {
+func (ta *TufAutoupdater) versionFromTarget(target string, binary string) string {
 	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", ta.binary, ta.operatingSystem, ta.binary)
+	prefixToTrim := fmt.Sprintf("%s/%s/%s-", binary, ta.operatingSystem, binary)
 
 	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
 }
 
-func (ta *TufAutoupdater) rollingErrorCount() int {
-	ta.lock.RLock()
-	defer ta.lock.RUnlock()
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	errorCount := 0
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
-		}
-		errorCount += 1
+func (ta *TufAutoupdater) storeError(autoupdateErr error) {
+	timestamp := strconv.Itoa(int(time.Now().Unix()))
+	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
+		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
 	}
-
-	return errorCount
 }
 
-func (ta *TufAutoupdater) cleanUpOldErrorCounts() {
-	ta.lock.Lock()
-	defer ta.lock.Unlock()
+func (ta *TufAutoupdater) cleanUpOldErrors() {
+	// We want to delete all errors more than 1 week old
+	errorTtl := 7 * 24 * time.Hour
 
-	errorsWithinLastDay := make([]int64, 0)
-
-	oneDayAgo := time.Now().Add(-24 * time.Hour).Unix()
-	for _, errorTimestamp := range ta.errorCounter {
-		if errorTimestamp < oneDayAgo {
-			continue
+	// Read through all keys in bucket to determine which ones are old enough to be deleted
+	keysToDelete := make([][]byte, 0)
+	if err := ta.store.ForEach(func(k, _ []byte) error {
+		// Key is a timestamp
+		ts, err := strconv.ParseInt(string(k), 10, 64)
+		if err != nil {
+			// Delete the corrupted key
+			keysToDelete = append(keysToDelete, k)
+			return fmt.Errorf("parsing key %s as timestamp: %w", string(k), err)
 		}
-		errorsWithinLastDay = append(errorsWithinLastDay, errorTimestamp)
+
+		errorTimestamp := time.Unix(ts, 0)
+		if errorTimestamp.Add(errorTtl).Before(time.Now()) {
+			keysToDelete = append(keysToDelete, k)
+		}
+
+		return nil
+	}); err != nil {
+		level.Debug(ta.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
 	}
 
-	ta.errorCounter = errorsWithinLastDay
+	// Delete all old keys
+	if err := ta.store.Delete(keysToDelete...); err != nil {
+		level.Debug(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
+	}
 }
