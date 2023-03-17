@@ -47,6 +47,10 @@ func NewStorage(logger log.Logger, db *bbolt.DB) (*bboltStorage, error) {
 }
 
 func (s *bboltStorage) GetStore(storeType types.Store) types.KVStore {
+	if s == nil {
+		return nil
+	}
+
 	// Ignoring ok value, this should only fail if an invalid storeType is provided
 	store, _ := s.stores[storeType]
 	return store
