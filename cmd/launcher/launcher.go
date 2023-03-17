@@ -111,7 +111,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}
-	ktx := types.NewKontext(storage, db)
+	k := types.NewKnapsack(storage, db)
 
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to

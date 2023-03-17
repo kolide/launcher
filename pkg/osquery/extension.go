@@ -41,7 +41,7 @@ import (
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	ktx           *types.Kontext
+	ktx           *types.Knapsack
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -122,7 +122,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, ktx *types.Kontext, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(client service.KolideService, ktx *types.Knapsack, opts ExtensionOpts) (*Extension, error) {
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}

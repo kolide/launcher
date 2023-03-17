@@ -2,9 +2,9 @@ package types
 
 import "go.etcd.io/bbolt"
 
-// Kontext ("Kolide context") holds references to data and structs which are used throughout
-// launcher code and are typically valid for the lifetime of the application instance.
-type Kontext struct {
+// Knapsack is an inventory of data and useful services which are used throughout
+// launcher code and are typically valid for the lifetime of the launcher application instance.
+type Knapsack struct {
 	Storage Storage
 
 	// BboltDB is the underlying bbolt database.
@@ -20,11 +20,11 @@ type Kontext struct {
 	// Querier
 }
 
-func NewKontext(s Storage, db *bbolt.DB) *Kontext {
-	ktx := &Kontext{
+func NewKnapsack(s Storage, db *bbolt.DB) *Knapsack {
+	k := &Knapsack{
 		Storage: s,
 		BboltDB: db,
 	}
 
-	return ktx
+	return k
 }

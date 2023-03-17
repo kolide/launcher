@@ -18,7 +18,7 @@ import (
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(ktx *types.Kontext, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(ktx *types.Knapsack, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(ktx.Storage.GetStore(types.ConfigStore)),
 		LauncherDbInfo(ktx.BboltDB),

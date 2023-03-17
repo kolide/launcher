@@ -96,7 +96,7 @@ func main() {
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("creating storage: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
-	ktx := types.NewKontext(storage, db)
+	k := types.NewKnapsack(storage, db)
 
 	ext, err := grpcext.NewExtension(remote, ktx, extOpts)
 	if err != nil {
