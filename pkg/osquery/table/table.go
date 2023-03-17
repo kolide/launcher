@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
@@ -10,6 +11,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
+	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
@@ -27,6 +29,8 @@ func LauncherTables(k *types.Knapsack, opts *launcher.Options) []osquery.Osquery
 		launcher_db.TablePlugin("kolide_control_flags", k.Storage.AgentFlagsStore()),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
+		tufinfo.TufReleaseVersionTable(opts),
+		launcher_db.TablePlugin(db, "kolide_tuf_autoupdater_errors", tuf.AutoupdateErrorBucket),
 	}
 }
 
