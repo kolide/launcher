@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	OsqueryHistoryInstanceKey = "osquery_instance_history"
+	osqueryHistoryInstanceKey = "osquery_instance_history"
 )
 
 func (h *History) load() error {
 	var instancesBytes []byte
 
-	instancesBytes, err := h.store.Get([]byte(OsqueryHistoryInstanceKey))
+	instancesBytes, err := h.store.Get([]byte(osqueryHistoryInstanceKey))
 	if err != nil {
 		return fmt.Errorf("error reading osquery_instance_history from db: %w", err)
 	}
@@ -37,7 +37,7 @@ func (h *History) save() error {
 		return fmt.Errorf("error marshalling osquery_instance_history: %w", err)
 	}
 
-	if err := h.store.Set([]byte(OsqueryHistoryInstanceKey), instancesBytes); err != nil {
+	if err := h.store.Set([]byte(osqueryHistoryInstanceKey), instancesBytes); err != nil {
 		return fmt.Errorf("error writing osquery_instance_history to storage: %w", err)
 	}
 

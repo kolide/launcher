@@ -182,7 +182,7 @@ func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
 	json, err := json.Marshal(seedInstances)
 	require.NoError(t, err, "expect no error marshalling instances")
 
-	err = s.Set([]byte(OsqueryHistoryInstanceKey), json)
+	err = s.Set([]byte(osqueryHistoryInstanceKey), json)
 	require.NoError(t, err, "expect no error writing history to bucket")
 
 	return s

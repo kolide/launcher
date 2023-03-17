@@ -989,7 +989,7 @@ type initialRunner struct {
 	enabled    bool
 	identifier string
 	client     Querier
-	store      types.GetterSetterDeleter
+	store      types.GetterSetter
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
