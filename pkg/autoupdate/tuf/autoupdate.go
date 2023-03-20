@@ -224,7 +224,7 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 		if err != nil {
 			// Delete the corrupted key
 			keysToDelete = append(keysToDelete, k)
-			return fmt.Errorf("parsing key %s as timestamp: %w", string(k), err)
+			return nil
 		}
 
 		errorTimestamp := time.Unix(ts, 0)
