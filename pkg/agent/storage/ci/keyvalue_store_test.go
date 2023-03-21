@@ -3,6 +3,7 @@ package storageci
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -258,6 +259,79 @@ func Test_Updates(t *testing.T) {
 					assert.NoError(t, err)
 					assert.Equal(t, []byte(v), g)
 				}
+			}
+		})
+	}
+}
+
+func Test_ForEach(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		sets            map[string]string
+		gets            map[string]string
+		fnFailsOnCall   int
+		expectedFnCalls int
+	}{
+		{
+			name: "empty",
+			sets: map[string]string{},
+			gets: map[string]string{},
+		},
+		{
+			name:            "three calls",
+			sets:            map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			gets:            map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			expectedFnCalls: 3,
+		},
+		{
+			name:            "second call fails",
+			sets:            map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			gets:            map[string]string{"key1": "value1", "key2": "value2", "key3": "value3"},
+			fnFailsOnCall:   2,
+			expectedFnCalls: 2,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, s := range getStores(t) {
+				wg := sync.WaitGroup{}
+				for k, v := range tt.sets {
+					k, v := k, v
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						err := s.Set([]byte(k), []byte(v))
+						require.NoError(t, err)
+					}()
+				}
+				wg.Wait()
+
+				var fnCalls int
+				fn := func(k, v []byte) error {
+					fnCalls = fnCalls + 1
+					if tt.fnFailsOnCall > 0 && fnCalls == tt.fnFailsOnCall {
+						return errors.New("for each call function failed")
+					}
+					return nil
+				}
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					err := s.ForEach(fn)
+					if tt.fnFailsOnCall > 0 && fnCalls == tt.fnFailsOnCall {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+						assert.Equal(t, tt.expectedFnCalls, fnCalls)
+					}
+				}()
+				wg.Wait()
 			}
 		})
 	}
