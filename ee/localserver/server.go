@@ -36,7 +36,7 @@ var portList = []int{
 }
 
 type controlService interface {
-	Fetch() error
+	AccelerateRequestInterval(interval, duration time.Duration)
 }
 
 type Querier interface {
@@ -110,8 +110,8 @@ func New(configStore types.Getter, kolideServer string, opts ...LocalServerOptio
 	ecKryptoMiddleware := newKryptoEcMiddleware(ls.logger, ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
-	ecAuthedMux.Handle("/controlservicefetch", ls.requestControlServiceFetchHandler())
-	ecAuthedMux.Handle("/controlservicefetch.png", ls.requestControlServiceFetchHandler())
+	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	ecAuthedMux.Handle("/acceleratecontrol.png", ls.requestAccelerateControlHandler())
 	ecAuthedMux.Handle("/id", ls.requestIdHandler())
 	ecAuthedMux.Handle("/id.png", ls.requestIdHandler())
 	ecAuthedMux.Handle("/query", ls.requestQueryHandler())
@@ -129,8 +129,8 @@ func New(configStore types.Getter, kolideServer string, opts ...LocalServerOptio
 	// mux.Handle("/query", ls.requestQueryHandler())
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
-	// curl localhost:40978/controlservicefetch
-	// mux.Handle("/controlservicefetch", ls.requestControlServiceFetch())
+	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
+	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
 	srv := &http.Server{
 		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),

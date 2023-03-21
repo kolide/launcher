@@ -2,10 +2,15 @@ package control
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/control/mocks"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,7 +81,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -104,7 +109,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -147,7 +152,7 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -202,7 +207,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -260,7 +265,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				data := &TestClient{tt.subsystems, tt.hashData}
 				controlOpts := []Option{WithStore(store)}
 
-				cs := New(log.NewNopLogger(), context.Background(), data, controlOpts...)
+				cs := New(log.NewNopLogger(), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -270,6 +275,140 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 			// Expect consumer to have gotten exactly one update
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
+		})
+	}
+}
+
+func TestControlService_AccelerateRequestInterval_MinInterval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		interval time.Duration
+		errStr   string
+	}{
+		{
+			name:     "happy path",
+			interval: 30 * time.Second,
+		},
+		{
+			name:     "too small interval",
+			interval: 1 * time.Second,
+			errStr:   "control service acceleration interval too small, using minimum interval",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDataProvider := mocks.NewDataProvider(t)
+			mockDataProvider.On("GetConfig").Return(nil, nil)
+
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			cs := New(log.NewLogfmtLogger(&logBytes), mockDataProvider)
+
+			cs.AccelerateRequestInterval(tt.interval, 0)
+
+			if tt.errStr != "" {
+				assert.Contains(t, logBytes.String(), tt.errStr)
+				return
+			}
+
+			// ensure we accept legit intervals
+			assert.NotContains(t, logBytes.String(), "control service acceleration interval too small, using minimum interval")
+		})
+	}
+}
+
+func TestControlService_AccelerateRequestInterval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                                                      string
+		startInterval, accelerationInterval, accelerationDuration time.Duration
+	}{
+		{
+			name:                 "happy path",
+			startInterval:        2 * time.Second,
+			accelerationInterval: 250 * time.Millisecond,
+			accelerationDuration: 1 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Overly verbose way to figure out how many fetches we expect to make it more human readable (hopefully)
+			fetchOnControlServiceStart := 1
+			fetchOnFirstTick := 1
+			fetchOnFirstAccelerationCall := 1
+			fetchOnFirstAccelerationTick := 1
+			// after the first acceleration tick, we make 2 calls resetting the ticker
+			fetchOnSecondAcclerationCall := 2
+			// then we wait the full duration of the second acceleration call
+			fetchesDuringSecondAccleration := int(tt.accelerationDuration.Milliseconds() / tt.accelerationInterval.Milliseconds())
+			// then we wait for 2 ticks of the initial interval
+			fetchAfterDeceleration := 2
+
+			expectedFetches :=
+				fetchOnControlServiceStart +
+					fetchOnFirstTick +
+					fetchOnFirstAccelerationCall +
+					fetchOnFirstAccelerationTick +
+					fetchOnSecondAcclerationCall +
+					fetchesDuringSecondAccleration +
+					fetchAfterDeceleration
+
+			mockDataProvider := mocks.NewDataProvider(t)
+			mockDataProvider.On("GetConfig").Return(nil, nil)
+
+			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval), WithMinAcclerationInterval(1*time.Millisecond))
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+				// expect 1 fetch on start
+				cs.Start(context.Background())
+			}()
+
+			// expect 1 fetch on initial interval
+			time.Sleep(tt.startInterval)
+
+			// expect 1 fetch on acceleration request
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+
+			// expect 1 fetch during single tick of acceleration
+			time.Sleep(tt.accelerationInterval)
+
+			// expect 1 fetch on acceleration request
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			// expect 1 fetch on acceleration request
+			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+
+			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
+			time.Sleep(tt.accelerationDuration)
+
+			// expect 2 fetches after accleration interval has ended and start interval has passed
+			time.Sleep(tt.startInterval * 2)
+
+			cs.Interrupt(nil)
+
+			wg.Wait()
+
+			// make sure we didn't accidentally update the start interval
+			require.Equal(t, tt.startInterval, cs.requestInterval)
+
+			// due to time imprecision, we can't get the exact number of fetches we expect
+			// so just check that we are close
+			expectedFetchesBuffer := 2
+			expectedFetchesMsg := fmt.Sprintf("fetch should have been called %d (+/- %d) times during test", expectedFetches, expectedFetchesBuffer)
+			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-expectedFetchesBuffer, expectedFetchesMsg)
+			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+expectedFetchesBuffer, expectedFetchesMsg)
 		})
 	}
 }

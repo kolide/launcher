@@ -12,6 +12,7 @@ type Option func(*ControlService)
 func WithRequestInterval(interval time.Duration) Option {
 	return func(c *ControlService) {
 		c.requestInterval = interval
+		c.requestTicker.Reset(interval)
 	}
 }
 
@@ -19,5 +20,12 @@ func WithRequestInterval(interval time.Duration) Option {
 func WithStore(store types.GetterSetter) Option {
 	return func(c *ControlService) {
 		c.store = store
+	}
+}
+
+// WithMinAcceleartionInterval sets the minimum interval between updates during request interval acceleration
+func WithMinAcclerationInterval(interval time.Duration) Option {
+	return func(c *ControlService) {
+		c.minAccelerationInterval = interval
 	}
 }
