@@ -141,6 +141,8 @@ type DesktopUsersProcessesRunner struct {
 	processSpawningEnabled bool
 	// flagsGetter gets agent flags
 	flagsGetter types.Getter
+	// monitorServer is a local server that desktop processes call to monitor parent
+	monitorServer *monitorServer
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -155,7 +157,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner {
+func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
@@ -176,7 +178,22 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	runner.writeDefaultMenuTemplateFile()
 	runner.refreshMenu()
 
-	return runner
+	ms, err := newMonitorServer()
+	if err != nil {
+		return nil, err
+	}
+
+	runner.monitorServer = ms
+	go func() {
+		if err := runner.monitorServer.serve(); err != nil {
+			level.Error(runner.logger).Log(
+				"msg", "running monitor server",
+				"err", err,
+			)
+		}
+	}()
+
+	return runner, nil
 }
 
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
@@ -219,6 +236,16 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 
 	// Kill any desktop processes that may exist
 	r.killDesktopProcesses()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	if err := r.monitorServer.Shutdown(ctx); err != nil {
+		level.Error(r.logger).Log(
+			"msg", "shutting down monitor server",
+			"err", err,
+		)
+	}
 }
 
 // killDesktopProcesses kills any existing desktop processes
@@ -463,9 +490,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		menuPath := r.menuPath()
-
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath)
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath(), r.monitorServer.newEndpoint())
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
@@ -648,7 +673,7 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath, monitorUrl string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
@@ -665,6 +690,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
 		fmt.Sprintf("PPID=%d", os.Getpid()),
+		fmt.Sprintf("MONITOR_URL=%s", monitorUrl),
 	}
 
 	stdErr, err := cmd.StderrPipe()
