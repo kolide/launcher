@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -179,17 +180,22 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 
 	for ; true; <-ticker.C {
 		response, err := client.Get(monitorUrl)
-		if response != nil && response.Body != nil {
-			response.Body.Close()
-		}
 
 		if err != nil {
-			level.Error(logger).Log(
+			level.Debug(logger).Log(
 				"msg", "could not connect to parent, exiting",
 				"err", err,
 			)
 			break
 		}
+
+		// this is the secret sauce to using reusing a single connection, you have to read the body in full
+		// before closing, other wise a new connection is established each time
+		// thank you Chris Bao! this article explains this well
+		// https://organicprogrammer.com/2021/10/25/understand-http1-1-persistent-connection-golang/
+		// in our case the monitor server spun up by desktop_runner does not write to the body so this is not strictly nessessary, but doesn't hurt
+		io.Copy(io.Discard, response.Body)
+		response.Body.Close()
 	}
 }
 
