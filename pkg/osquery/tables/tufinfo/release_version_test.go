@@ -139,7 +139,7 @@ func seedTufRepo(t *testing.T, testTargets []tufTarget, testRootDir string, bina
 	localStore, err := filejsonstore.NewFileJSONStore(localTufDir)
 	require.NoError(t, err, "could not set up local store")
 
-	// Set up our remote store i.e. tuf-devel.kolide.com
+	// Set up our remote store i.e. tuf.kolide.com
 	remoteOpts := client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}
