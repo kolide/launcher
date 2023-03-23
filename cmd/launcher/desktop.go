@@ -178,16 +178,30 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 		Timeout: interval,
 	}
 
+	const maxErrCount = 3
+	errCount := 0
+
 	for ; true; <-ticker.C {
 		response, err := client.Get(monitorUrl)
-
 		if err != nil {
+			errCount++
+
+			if errCount < maxErrCount {
+				continue
+			}
+
+			// errCount => maxErrCount
 			level.Debug(logger).Log(
-				"msg", "could not connect to parent, exiting",
+				"msg", "could not connect to parent, max attempts reached, exiting",
 				"err", err,
+				"attempts", errCount,
+				"max_attempts", maxErrCount,
 			)
+
 			break
 		}
+
+		errCount = 0
 
 		// this is the secret sauce to using reusing a single connection, you have to read the body in full
 		// before closing, other wise a new connection is established each time

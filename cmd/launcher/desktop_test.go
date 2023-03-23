@@ -20,18 +20,17 @@ func Test_desktopMonitorParentProcess(t *testing.T) {
 		}
 	}))
 
-	monitorInterval := 1 * time.Second
+	monitorInterval := 250 * time.Millisecond
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	go func() {
 		monitorParentProcess(log.NewLogfmtLogger(&logBytes), server.URL, monitorInterval)
 	}()
 
-	time.Sleep(3 * monitorInterval)
+	time.Sleep(8 * monitorInterval)
 	require.Empty(t, logBytes.String())
 
 	server.Close()
-
-	time.Sleep(3 * monitorInterval)
-	require.Contains(t, logBytes.String(), "could not connect to parent, exiting")
+	time.Sleep(8 * monitorInterval)
+	require.Contains(t, logBytes.String(), "could not connect to parent")
 }
