@@ -187,6 +187,19 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 			errCount++
 
 			if errCount < maxErrCount {
+
+				backOff := interval + (interval * time.Duration(errCount))
+				ticker.Reset(backOff)
+				// client.Timeout = backOff
+
+				level.Debug(logger).Log(
+					"msg", "could not connect to parent, will back off and retry",
+					"err", err,
+					"attempts", errCount,
+					"max_attempts", maxErrCount,
+					"backoff", backOff,
+				)
+
 				continue
 			}
 
@@ -201,10 +214,14 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 			break
 		}
 
-		errCount = 0
+		if errCount != 0 {
+			errCount = 0
+			ticker.Reset(interval)
+			// client.Timeout = interval
+		}
 
-		// this is the secret sauce to using reusing a single connection, you have to read the body in full
-		// before closing, other wise a new connection is established each time
+		// This is the secret sauce to reusing a single connection, you have to read the body in full
+		// before closing, otherwise a new connection is established each time.
 		// thank you Chris Bao! this article explains this well
 		// https://organicprogrammer.com/2021/10/25/understand-http1-1-persistent-connection-golang/
 		// in our case the monitor server spun up by desktop_runner does not write to the body so this is not strictly nessessary, but doesn't hurt
