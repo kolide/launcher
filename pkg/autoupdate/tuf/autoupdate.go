@@ -24,14 +24,14 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 )
 
-//go:embed assets/tuf-kolide/root.json
+//go:embed assets/tuf/root.json
 var rootJson []byte
 
 const (
 	DefaultTufServer      = "https://tuf.kolide.com"
 	AutoupdateErrorBucket = "tuf_autoupdate_errors"
 	defaultChannel        = "stable"
-	tufDirectoryName      = "tuf-kolide"
+	tufDirectoryName      = "tuf"
 )
 
 type ReleaseFileCustomMetadata struct {
