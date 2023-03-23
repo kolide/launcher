@@ -195,7 +195,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		MirrorServerURL:        "https://dl.kolide.co",
 		NotaryPrefix:           "kolide",
 		NotaryServerURL:        "https://notary.kolide.co",
-		TufServerURL:           "https://tuf-devel.kolide.com",
+		TufServerURL:           "https://tuf.kolide.com",
 		OsquerydPath:           windowsAddExe("/dev/null"),
 		Transport:              "grpc",
 		UpdateChannel:          "stable",
