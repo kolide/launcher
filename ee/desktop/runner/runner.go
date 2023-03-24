@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,7 +186,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunne
 
 	runner.monitorServer = ms
 	go func() {
-		if err := runner.monitorServer.serve(); err != nil {
+		if err := runner.monitorServer.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			level.Error(runner.logger).Log(
 				"msg", "running monitor server",
 				"err", err,
