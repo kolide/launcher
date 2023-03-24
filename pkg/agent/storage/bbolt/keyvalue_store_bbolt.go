@@ -4,20 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
-	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
 
-const (
-	dbTestFileName = "test.db"
-)
-
-// NoBucketError is an error type that represents a nil bbolt database
+// NoDbError is an error type that represents a nil bbolt database
 type NoDbError struct{}
 
 func (e NoDbError) Error() string {
@@ -154,7 +147,7 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 
 	var kvPairs map[string]string
 	if err := json.NewDecoder(data).Decode(&kvPairs); err != nil {
-		return fmt.Errorf("failed to decode '%s' bucket consumer json: %w", s.bucketName, err)
+		return fmt.Errorf("failed to decode '%s' key-value json: %w", s.bucketName, err)
 	}
 
 	err := s.db.Update(func(tx *bbolt.Tx) error {
@@ -209,19 +202,4 @@ func (s *bboltKeyValueStore) Update(data io.Reader) error {
 
 		return nil
 	})
-}
-
-// SetupDB is used for creating bbolt databases for testing
-func SetupDB(t *testing.T) *bbolt.DB {
-	// Create a temp directory to hold our bbolt db
-	dbDir := t.TempDir()
-
-	// Create database; ensure we clean it up after the test
-	db, err := bbolt.Open(filepath.Join(dbDir, dbTestFileName), 0600, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	return db
 }

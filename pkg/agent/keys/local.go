@@ -14,8 +14,7 @@ import (
 // This duplicates some of pkg/osquery/extension.go but that feels like the wrong place.
 // Really, we should have a simpler interface over a storage layer.
 const (
-	bucketName = "config"
-	localKey   = "localEccKey"
+	localKey = "localEccKey"
 )
 
 // dbKey is keyInt over a key stored in the agent database. Its used in places where we don't want, or don't have, the hardware key.
@@ -51,8 +50,8 @@ func SetupLocalDbKey(logger log.Logger, store types.GetterSetter) (*dbKey, error
 	return &dbKey{key}, nil
 }
 
-func fetchKey(getter types.Getter) (*ecdsa.PrivateKey, error) {
-	raw, _ := getter.Get([]byte(localKey))
+func fetchKey(store types.Getter) (*ecdsa.PrivateKey, error) {
+	raw, _ := store.Get([]byte(localKey))
 	return x509.ParseECPrivateKey(raw)
 }
 

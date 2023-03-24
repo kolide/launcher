@@ -6,16 +6,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.etcd.io/bbolt"
 )
 
 func Test_localServer_requestIdHandler(t *testing.T) {
@@ -49,19 +48,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 }
 
 func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
-
-	db, err := bbolt.Open(filepath.Join(t.TempDir(), "local_server_test.db"), 0600, &bbolt.Options{
-		Timeout: 1 * time.Second,
-	})
+	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err)
 
-	require.NoError(t, osquery.SetupLauncherKeys(db))
+	require.NoError(t, osquery.SetupLauncherKeys(s))
 
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	server, err := New(db, "", WithLogger(log.NewLogfmtLogger(logBytes)))
+	server, err := New(s, "", WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }

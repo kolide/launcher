@@ -3,13 +3,15 @@ package history
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.etcd.io/bbolt"
 )
 
 func TestNewInstance(t *testing.T) { // nolint:paralleltest
@@ -54,7 +56,7 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Cleanup(func() { currentHistory = &History{} })
 
-			require.NoError(t, InitHistory(newTestBoltDb(t, tt.initialInstances...)))
+			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
 			_, err := NewInstance()
 
@@ -117,7 +119,7 @@ func TestGetHistory(t *testing.T) { // nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Cleanup(func() { currentHistory = &History{} })
 
-			require.NoError(t, InitHistory(newTestBoltDb(t, tt.initialInstances...)))
+			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
 			got, err := GetHistory()
 
@@ -160,7 +162,7 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Cleanup(func() { currentHistory = &History{} })
 
-			require.NoError(t, InitHistory(newTestBoltDb(t, tt.initialInstances...)))
+			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
 			got, err := LatestInstance()
 
@@ -173,43 +175,16 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestNoDbError(t *testing.T) { // nolint:paralleltest
-	err := InitHistory(nil)
-	assert.ErrorIs(t, err, NoDbError{})
-
-	err = currentHistory.load()
-	assert.ErrorIs(t, err, NoDbError{})
-
-	err = currentHistory.save()
-	assert.ErrorIs(t, err, NoDbError{})
-}
-
-// newTestBoltDb creates a new boltdb instance and seeds it with the given instances.
-func newTestBoltDb(t *testing.T, seedInstances ...*Instance) *bbolt.DB {
-	dir := t.TempDir()
-
-	db, err := bbolt.Open(filepath.Join(dir, "osquery_instance_history_test.db"), 0600, &bbolt.Options{
-		Timeout: 1 * time.Second,
-	})
-
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
-
-	require.NoError(t, err, "expect no error opening bolt db")
+// setupStorage creates storage and seeds it with the given instances.
+func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
+	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
+	require.NoError(t, err)
 
 	json, err := json.Marshal(seedInstances)
 	require.NoError(t, err, "expect no error marshalling instances")
 
-	err = db.Update(func(tx *bbolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte("osquery_instance_history"))
-		require.NoError(t, err, "expect no error creating bucket")
+	err = s.Set([]byte(osqueryHistoryInstanceKey), json)
+	require.NoError(t, err, "expect no error writing history to bucket")
 
-		err = bucket.Put([]byte(osqueryHistoryInstanceKey), json)
-		require.NoError(t, err, "expect no error writing history to bucket")
-
-		return nil
-	})
-
-	return db
+	return s
 }
