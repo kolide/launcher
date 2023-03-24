@@ -111,7 +111,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
 
-			r := New(
+			r, err := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
 				WithHostname("somewhere-over-the-rainbow.example.com"),
@@ -121,6 +121,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithUsersFilesRoot(launcherRootDir(t)),
 				WithProcessSpawningEnabled(true),
 			)
+			require.NoError(t, err)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -240,7 +241,8 @@ func TestUpdate(t *testing.T) {
 			t.Parallel()
 
 			dir := t.TempDir()
-			r := New(WithUsersFilesRoot(dir))
+			r, err := New(WithUsersFilesRoot(dir))
+			require.NoError(t, err)
 
 			if tt.err {
 				require.Error(t, r.Update(tt.input))
@@ -265,9 +267,10 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	r := New(WithUsersFilesRoot(dir))
+	r, err := New(WithUsersFilesRoot(dir))
+	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))
-	err := r.SendNotification(notify.Notification{Title: "test", Body: "test"})
+	err = r.SendNotification(notify.Notification{Title: "test", Body: "test"})
 	require.Error(t, err, "should not be able to send notification when there are no child processes")
 }
