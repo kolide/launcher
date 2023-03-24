@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
@@ -19,6 +19,7 @@ import (
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
 	logger                   log.Logger
+	knapsack                 *knapsack.Knapsack
 	cancel                   context.CancelFunc
 	requestInterval          time.Duration
 	requestTicker            *time.Ticker
@@ -51,12 +52,14 @@ type dataProvider interface {
 	GetSubsystemData(hash string) (io.Reader, error)
 }
 
-func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:                  log.With(logger, "component", "control"),
-		requestInterval:         60 * time.Second,
+		knapsack:                k,
+		requestInterval:         k.Flags.ControlRequestInterval(),
 		minAccelerationInterval: 5 * time.Second,
 		fetcher:                 fetcher,
+		store:                   k.ControlStore(),
 		lastFetched:             make(map[string]string),
 		consumers:               make(map[string]consumer),
 		subscribers:             make(map[string][]subscriber),
@@ -190,7 +193,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !agent.Flags.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.Flags.ForceControlSubsystems() {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue

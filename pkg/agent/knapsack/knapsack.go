@@ -1,6 +1,7 @@
 package knapsack
 
 import (
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"go.etcd.io/bbolt"
@@ -10,6 +11,7 @@ import (
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 type Knapsack struct {
 	stores map[storage.Store]types.KVStore
+	Flags  flags.Flags
 
 	// BboltDB is the underlying bbolt database.
 	// Ideally, we can eventually remove this. This is only here because some parts of the codebase
@@ -24,9 +26,10 @@ type Knapsack struct {
 	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, db *bbolt.DB) *Knapsack {
+func New(stores map[storage.Store]types.KVStore, f flags.Flags, db *bbolt.DB) *Knapsack {
 	k := &Knapsack{
 		BboltDB: db,
+		Flags:   f,
 		stores:  stores,
 	}
 

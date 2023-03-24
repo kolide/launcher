@@ -25,7 +25,9 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -111,7 +113,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
-	k := knapsack.New(stores, db)
+
+	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
+	f := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags)
+	k := knapsack.New(stores, f, db)
 
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
@@ -204,10 +209,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
-	if opts.ControlServerURL == "" {
+	if k.Flags.ControlServerURL() == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, k.ControlStore(), opts)
+		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -217,16 +222,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(serverDataSubsystemName, k.ServerProvidedDataStore())
 		controlService.RegisterConsumer(agentFlagsSubsystemName, k.AgentFlagsStore())
 
-		desktopEnabledRaw, err := k.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
-		if err != nil {
-			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
-		}
-
-		// For now, while we're in transition from K2 to device trust, we want to default to _not_ running
-		// the desktop process. This can be overridden via control server interaction -- if the desktop_enabled_v1
-		// flag is present (regardless of it's value), this indicates control server has told launcher to enable desktop.
-		desktopProcessSpawningEnabled := desktopEnabledRaw != nil
-
 		runner, err = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
@@ -234,8 +229,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(k.AgentFlagsStore()),
+			desktopRunner.WithProcessSpawningEnabled(k.Flags.DesktopEnabled()),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
@@ -243,8 +237,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
-		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
-
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			k.SentNotificationsStore(),
@@ -265,7 +257,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// runEECode feels like it should move up to the opts level.
 	// We have some stuff there that sets `controlServerURL`
-	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense
+	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense // TODO
 
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
