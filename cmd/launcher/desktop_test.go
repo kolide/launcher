@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -14,9 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_desktopMonitorParentProcess(t *testing.T) {
-	t.Parallel()
-
+func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	mux := http.NewServeMux()
 
 	server := http.Server{
@@ -39,21 +38,29 @@ func Test_desktopMonitorParentProcess(t *testing.T) {
 		monitorParentProcess(log.NewLogfmtLogger(&logBytes), monitorURL, monitorInterval)
 	}()
 
-	// make sure we retry
 	time.Sleep(monitorInterval)
+
+	// request should fail since there is not handler for the endpoint
+	// make sure we retry
 	require.Contains(t, logBytes.String(), "will retry")
 
 	// add a handler to the endpoint
 	mux.HandleFunc(fmt.Sprintf("/%s", monitorEndpoint), func(w http.ResponseWriter, r *http.Request) {})
+
+	// clear log
+	io.Copy(io.Discard, &logBytes)
 	time.Sleep(monitorInterval * 8)
 
-	// make sure we don't exit
-	require.NotContains(t, logBytes.String(), "exiting")
+	// we should succeed now, nothing should be in the log
+	require.Empty(t, logBytes.String())
 
-	// stop the server
+	// stop the server, should now start getting errors
 	require.NoError(t, server.Shutdown(context.Background()))
 	time.Sleep(monitorInterval * 8)
 
-	// make sure we exit
+	// should retry
+	require.Contains(t, logBytes.String(), "will retry")
+
+	// should exit
 	require.Contains(t, logBytes.String(), "exiting")
 }
