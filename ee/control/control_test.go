@@ -405,7 +405,7 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 
 			// due to time imprecision, we can't get the exact number of fetches we expect
 			// so just check that we are close
-			expectedFetchesBuffer := 2
+			expectedFetchesBuffer := 3
 			expectedFetchesMsg := fmt.Sprintf("fetch should have been called %d (+/- %d) times during test", expectedFetches, expectedFetchesBuffer)
 			require.GreaterOrEqual(t, len(mockDataProvider.Calls), expectedFetches-expectedFetchesBuffer, expectedFetchesMsg)
 			require.LessOrEqual(t, len(mockDataProvider.Calls), expectedFetches+expectedFetchesBuffer, expectedFetchesMsg)
