@@ -183,21 +183,26 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 
 	for ; true; <-ticker.C {
 		response, err := client.Get(monitorUrl)
-		if err != nil {
+
+		if response != nil {
+			// This is the secret sauce to reusing a single connection, you have to read the body in full
+			// before closing, otherwise a new connection is established each time.
+			// thank you Chris Bao! this article explains this well
+			// https://organicprogrammer.com/2021/10/25/understand-http1-1-persistent-connection-golang/
+			// in our case the monitor server spun up by desktop_runner does not write to the body so this is not strictly nessessary, but doesn't hurt
+			io.Copy(io.Discard, response.Body)
+			response.Body.Close()
+		}
+
+		if err != nil || (response != nil && response.StatusCode != http.StatusOK) {
 			errCount++
 
 			if errCount < maxErrCount {
-
-				backOff := interval + (interval * time.Duration(errCount))
-				ticker.Reset(backOff)
-				// client.Timeout = backOff
-
 				level.Debug(logger).Log(
-					"msg", "could not connect to parent, will back off and retry",
+					"msg", "could not connect to parent, will retry",
 					"err", err,
 					"attempts", errCount,
 					"max_attempts", maxErrCount,
-					"backoff", backOff,
 				)
 
 				continue
@@ -214,19 +219,7 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 			break
 		}
 
-		if errCount != 0 {
-			errCount = 0
-			ticker.Reset(interval)
-			// client.Timeout = interval
-		}
-
-		// This is the secret sauce to reusing a single connection, you have to read the body in full
-		// before closing, otherwise a new connection is established each time.
-		// thank you Chris Bao! this article explains this well
-		// https://organicprogrammer.com/2021/10/25/understand-http1-1-persistent-connection-golang/
-		// in our case the monitor server spun up by desktop_runner does not write to the body so this is not strictly nessessary, but doesn't hurt
-		io.Copy(io.Discard, response.Body)
-		response.Body.Close()
+		errCount = 0
 	}
 }
 
