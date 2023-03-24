@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -42,7 +43,7 @@ import (
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	knapsack      *types.Knapsack
+	knapsack      *knapsack.Knapsack
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -123,7 +124,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, k *types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(client service.KolideService, k *knapsack.Knapsack, opts ExtensionOpts) (*Extension, error) {
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -149,7 +150,7 @@ func NewExtension(client service.KolideService, k *types.Knapsack, opts Extensio
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
 
-	configStore := k.Storage.ConfigStore()
+	configStore := k.ConfigStore()
 
 	if err := SetupLauncherKeys(configStore); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
@@ -177,7 +178,7 @@ func NewExtension(client service.KolideService, k *types.Knapsack, opts Extensio
 	initialRunner := &initialRunner{
 		logger:     opts.Logger,
 		identifier: identifier,
-		store:      k.Storage.InitialResultsStore(),
+		store:      k.InitialResultsStore(),
 		enabled:    opts.RunDifferentialQueriesImmediately,
 	}
 
@@ -211,7 +212,7 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.knapsack.Storage.ConfigStore())
+	return IdentifierFromDB(e.knapsack.ConfigStore())
 }
 
 // SetupLauncherKeys configures the various keys used for communication.
@@ -387,7 +388,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.knapsack.Storage.ConfigStore())
+	key, err := NodeKey(e.knapsack.ConfigStore())
 	if err != nil {
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
@@ -431,7 +432,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.knapsack.Storage.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
+	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -447,7 +448,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.knapsack.Storage.ConfigStore().Delete([]byte(nodeKeyKey))
+	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -463,7 +464,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.Storage.ConfigStore().Get([]byte(configKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
@@ -471,7 +472,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.knapsack.Storage.ConfigStore().Set([]byte(configKey), []byte(config))
+		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.

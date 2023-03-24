@@ -25,8 +25,8 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
@@ -107,11 +107,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
-	storage, err := agentbbolt.NewStorage(logger, db)
+	stores, err := agentbbolt.MakeStores(logger, db)
 	if err != nil {
-		return fmt.Errorf("failed to create storage: %w", err)
+		return fmt.Errorf("failed to create stores: %w", err)
 	}
-	k := types.NewKnapsack(storage, db)
+	k := knapsack.New(stores, db)
 
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
@@ -176,7 +176,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(storage.OsqueryHistoryInstanceStore()); err != nil {
+	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
@@ -207,17 +207,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, storage.ControlStore(), opts)
+		controlService, err := createControlService(ctx, logger, k.ControlStore(), opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, storage.ServerProvidedDataStore())
-		controlService.RegisterConsumer(agentFlagsSubsystemName, storage.AgentFlagsStore())
+		controlService.RegisterConsumer(serverDataSubsystemName, k.ServerProvidedDataStore())
+		controlService.RegisterConsumer(agentFlagsSubsystemName, k.AgentFlagsStore())
 
-		desktopEnabledRaw, err := storage.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
+		desktopEnabledRaw, err := k.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
 		if err != nil {
 			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
 		}
@@ -235,7 +235,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(storage.AgentFlagsStore()),
+			desktopRunner.WithGetter(k.AgentFlagsStore()),
 		)
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
@@ -243,7 +243,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			storage.SentNotificationsStore(),
+			k.SentNotificationsStore(),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
@@ -267,7 +267,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
-			storage.ConfigStore(),
+			k.ConfigStore(),
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 			localserver.WithControlService(controlService),
@@ -346,7 +346,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			opts.TufServerURL,
 			opts.RootDirectory,
 			metadataClient,
-			k.Storage.AutoupdateErrorsStore(),
+			k.AutoupdateErrorsStore(),
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),

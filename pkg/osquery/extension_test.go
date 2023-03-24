@@ -17,9 +17,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
 	"github.com/mixer/clock"
@@ -47,16 +47,12 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 	}
 }
 
-func makeKnapsack(t *testing.T, db *bbolt.DB) *types.Knapsack {
-	storage, err := agentbbolt.NewStorage(log.NewNopLogger(), db)
+func makeKnapsack(t *testing.T, db *bbolt.DB) *knapsack.Knapsack {
+	stores, err := agentbbolt.MakeStores(log.NewNopLogger(), db)
 	if err != nil {
-		t.Fatalf("creating storage: %s", err.Error())
+		t.Fatalf("creating stores: %s", err.Error())
 	}
-
-	k := &types.Knapsack{
-		Storage: storage,
-		BboltDB: db,
-	}
+	k := knapsack.New(stores, db)
 
 	return k
 }
