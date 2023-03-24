@@ -150,9 +150,21 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 }
 
 func (ta *TufAutoupdater) checkForUpdate() error {
-	_, err := ta.metadataClient.Update()
-	if err != nil {
-		return fmt.Errorf("could not update metadata: %w", err)
+	// Attempt an update a couple times before returning an error -- sometimes we just hit caching issues.
+	errs := make([]error, 0)
+	successfulUpdate := false
+	updateTryCount := 3
+	for i := 0; i < updateTryCount; i += 1 {
+		_, err := ta.metadataClient.Update()
+		if err == nil {
+			successfulUpdate = true
+			break
+		}
+
+		errs = append(errs, fmt.Errorf("try %d: %w", i, err))
+	}
+	if !successfulUpdate {
+		return fmt.Errorf("could not update metadata after %d tries: %+v", updateTryCount, errs)
 	}
 
 	// Find the newest release for our channel -- right now for logging purposes only
