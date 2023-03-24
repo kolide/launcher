@@ -24,13 +24,13 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 )
 
-//go:embed assets/tuf-dev/root.json
+//go:embed assets/tuf/root.json
 var rootJson []byte
 
 const (
-	DefaultTufServer = "https://tuf-devel.kolide.com"
+	DefaultTufServer      = "https://tuf.kolide.com"
 	defaultChannel   = "stable"
-	tufDirectoryName = "tuf-dev"
+	tufDirectoryName      = "tuf"
 )
 
 type ReleaseFileCustomMetadata struct {
@@ -103,7 +103,7 @@ func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *h
 		return nil, fmt.Errorf("could not initialize local TUF store: %w", err)
 	}
 
-	// Set up our remote store i.e. tuf-devel.kolide.com
+	// Set up our remote store i.e. tuf.kolide.com
 	remoteOpts := client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}
