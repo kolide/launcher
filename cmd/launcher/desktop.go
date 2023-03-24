@@ -194,32 +194,36 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 			response.Body.Close()
 		}
 
-		if err != nil || (response != nil && response.StatusCode != http.StatusOK) {
-			errCount++
+		// no error, 200 response
+		if err == nil && response != nil && response.StatusCode == 200 {
+			errCount = 0
+			continue
+		}
 
-			if errCount < maxErrCount {
-				level.Debug(logger).Log(
-					"msg", "could not connect to parent, will retry",
-					"err", err,
-					"attempts", errCount,
-					"max_attempts", maxErrCount,
-				)
+		// have an error or bad status code
+		errCount++
 
-				continue
-			}
-
-			// errCount => maxErrCount
+		// retry
+		if errCount < maxErrCount {
 			level.Debug(logger).Log(
-				"msg", "could not connect to parent, max attempts reached, exiting",
+				"msg", "could not connect to parent, will retry",
 				"err", err,
 				"attempts", errCount,
 				"max_attempts", maxErrCount,
 			)
 
-			break
+			continue
 		}
 
-		errCount = 0
+		// errCount => maxErrCount, exit
+		level.Debug(logger).Log(
+			"msg", "could not connect to parent, max attempts reached, exiting",
+			"err", err,
+			"attempts", errCount,
+			"max_attempts", maxErrCount,
+		)
+
+		break
 	}
 }
 
