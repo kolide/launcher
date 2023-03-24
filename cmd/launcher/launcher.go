@@ -227,7 +227,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// flag is present (regardless of it's value), this indicates control server has told launcher to enable desktop.
 		desktopProcessSpawningEnabled := desktopEnabledRaw != nil
 
-		runner = desktopRunner.New(
+		runner, err = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
@@ -237,6 +237,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
 			desktopRunner.WithGetter(k.AgentFlagsStore()),
 		)
+		if err != nil {
+			return fmt.Errorf("failed to create desktop runner: %w", err)
+		}
+
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
