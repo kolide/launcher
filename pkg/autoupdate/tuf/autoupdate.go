@@ -28,9 +28,9 @@ import (
 var rootJson []byte
 
 const (
-	DefaultTufServer      = "https://tuf.kolide.com"
+	DefaultTufServer = "https://tuf.kolide.com"
 	defaultChannel   = "stable"
-	tufDirectoryName      = "tuf"
+	tufDirectoryName = "tuf"
 )
 
 type ReleaseFileCustomMetadata struct {
