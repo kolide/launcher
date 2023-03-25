@@ -22,7 +22,6 @@ type Knapsack struct {
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
-	// Flags
 	// Querier
 }
 

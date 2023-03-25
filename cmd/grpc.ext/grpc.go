@@ -14,7 +14,9 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
@@ -96,7 +98,9 @@ func main() {
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("creating stores: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
-	k := knapsack.New(stores, db)
+	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
+	f := flags.NewFlagController(logger, flags.DefaultFlagValues(), nil, storedFlags)
+	k := knapsack.New(stores, f, db)
 
 	ext, err := grpcext.NewExtension(remote, k, extOpts)
 	if err != nil {

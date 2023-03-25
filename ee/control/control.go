@@ -56,10 +56,9 @@ func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...
 	cs := &ControlService{
 		logger:                  log.With(logger, "component", "control"),
 		knapsack:                k,
-		requestInterval:         k.Flags.ControlRequestInterval(),
+		requestInterval:         60 * time.Second,
 		minAccelerationInterval: 5 * time.Second,
 		fetcher:                 fetcher,
-		store:                   k.ControlStore(),
 		lastFetched:             make(map[string]string),
 		consumers:               make(map[string]consumer),
 		subscribers:             make(map[string][]subscriber),

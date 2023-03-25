@@ -5,6 +5,9 @@ import "time"
 // FlagKeys are named identifiers corresponding to flags
 type FlagKey string
 
+// When adding a new FlagKey:
+// 1. Provide a default value, by adding it to DefaultFlagValues()
+// 2. If the flag can be specified on the cmd line, add it to CmdLineFlagValues()
 const (
 	DesktopEnabled         FlagKey = "desktop_enabled"
 	DebugServerData        FlagKey = "debug_server_data"

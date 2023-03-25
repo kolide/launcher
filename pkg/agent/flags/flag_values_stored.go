@@ -24,6 +24,8 @@ func NewStoredFlagValues(logger log.Logger, agentFlagsStore types.GetterSetter) 
 
 // generateKeysMap returns a map which associates FlagKeys to the named keys used within a key-value store
 func generateKeysMap() map[FlagKey][]byte {
+	// Below is a mapping from FlagKey->"store key" (the value used as a bbolt key, for example)
+	// Add a mapping below if the store key should be different from the FlagKey
 	keysMap := map[FlagKey][]byte{
 		DesktopEnabled: []byte("desktop_enabled_v1"),
 	}

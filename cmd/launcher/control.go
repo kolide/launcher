@@ -39,7 +39,8 @@ func createControlService(ctx context.Context, logger log.Logger, store types.Ge
 	}
 
 	controlOpts := []control.Option{
-		control.WithRequestInterval(k.Flags.ControlRequestInterval()), // TODO Remove?
+		control.WithRequestInterval(k.Flags.ControlRequestInterval()),
+		control.WithStore(k.ControlStore()),
 	}
 	service := control.New(logger, k, client, controlOpts...)
 

@@ -10,6 +10,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control/mocks"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +58,13 @@ func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
 	return nil, nil
 }
 
+func getKnapsack(t *testing.T) *knapsack.Knapsack {
+	db := storageci.SetupDB(t)
+	stores, err := storageci.MakeStores(t, log.NewNopLogger(), db)
+	require.NoError(t, err)
+	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil)
+	return knapsack.New(stores, f, db)
+}
 func TestControlServiceRegisterConsumer(t *testing.T) {
 	t.Parallel()
 
@@ -81,7 +91,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), getKnapsack(t), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -109,7 +119,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), getKnapsack(t), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -152,7 +162,7 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), getKnapsack(t), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -207,7 +217,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), data, controlOpts...)
+			cs := New(log.NewNopLogger(), getKnapsack(t), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -265,7 +275,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				data := &TestClient{tt.subsystems, tt.hashData}
 				controlOpts := []Option{WithStore(store)}
 
-				cs := New(log.NewNopLogger(), data, controlOpts...)
+				cs := New(log.NewNopLogger(), getKnapsack(t), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -307,7 +317,7 @@ func TestControlService_AccelerateRequestInterval_MinInterval(t *testing.T) {
 			mockDataProvider.On("GetConfig").Return(nil, nil)
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
-			cs := New(log.NewLogfmtLogger(&logBytes), mockDataProvider)
+			cs := New(log.NewLogfmtLogger(&logBytes), getKnapsack(t), mockDataProvider)
 
 			cs.AccelerateRequestInterval(tt.interval, 0)
 
@@ -365,7 +375,7 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			mockDataProvider := mocks.NewDataProvider(t)
 			mockDataProvider.On("GetConfig").Return(nil, nil)
 
-			cs := New(log.NewNopLogger(), mockDataProvider, WithRequestInterval(tt.startInterval), WithMinAcclerationInterval(1*time.Millisecond))
+			cs := New(log.NewNopLogger(), getKnapsack(t), mockDataProvider, WithRequestInterval(tt.startInterval), WithMinAcclerationInterval(1*time.Millisecond))
 
 			wg := sync.WaitGroup{}
 			wg.Add(1)

@@ -8,9 +8,9 @@ import (
 // flagValues struct of FlagKeys and values
 func CmdLineFlagValues(opts *Options) *flags.AnyFlagValues {
 	f := flags.NewFlagValues[any]()
-	// f.Set(DesktopEnabled, opts.DesktopEnabled)
-	// f.Set(DebugServerData, opts.DebugServerData)
-	// f.Set(ForceControlSubsystems, opts.ForceControlSubsystems)
+
+	// Not every FlagKey has (or needs) an associated cmd line option.
+	// For those that do, make sure to add it below.
 	f.Set(flags.ControlServerURL, opts.ControlServerURL)
 	f.Set(flags.ControlRequestInterval, opts.ControlRequestInterval)
 	f.Set(flags.DisableControlTLS, opts.DisableControlTLS)

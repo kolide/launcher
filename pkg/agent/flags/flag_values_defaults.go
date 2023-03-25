@@ -7,6 +7,9 @@ import (
 // DefaultFlagValues returns a flagValues struct of default FlagKeys and values
 func DefaultFlagValues() *AnyFlagValues {
 	f := NewFlagValues[any]()
+
+	// Below is a list of every FlagKey and it's default value.
+	// When adding a new FlagKey, make sure to add it's default value below.
 	f.Set(DesktopEnabled, false)
 	f.Set(DebugServerData, false)
 	f.Set(ForceControlSubsystems, false)

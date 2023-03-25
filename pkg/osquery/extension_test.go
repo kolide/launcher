@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
@@ -52,7 +53,8 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) *knapsack.Knapsack {
 	if err != nil {
 		t.Fatalf("creating stores: %s", err.Error())
 	}
-	k := knapsack.New(stores, db)
+	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil)
+	k := knapsack.New(stores, f, db)
 
 	return k
 }
