@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
@@ -115,8 +116,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
-	f := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags)
-	k := knapsack.New(stores, f, db)
+	flagController := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags)
+	k := knapsack.New(stores, flagController, db)
 
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
@@ -218,9 +219,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
-		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, k.ServerProvidedDataStore())
-		controlService.RegisterConsumer(agentFlagsSubsystemName, k.AgentFlagsStore())
+		// serverDataConsumer handles server data table updates
+		serverDataConsumer := keyvalueconsumer.New(k.ServerProvidedDataStore())
+		controlService.RegisterConsumer(serverDataSubsystemName, serverDataConsumer)
+		// agentFlagConsumer handles agent flags pushed from the control server
+		agentFlagsConsumer := keyvalueconsumer.New(flagController)
+		controlService.RegisterConsumer(agentFlagsSubsystemName, agentFlagsConsumer)
 
 		runner, err = desktopRunner.New(
 			desktopRunner.WithLogger(logger),

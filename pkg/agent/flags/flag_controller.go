@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"errors"
 	"reflect"
 	"strconv"
 	"time"
@@ -20,7 +21,7 @@ type FlagController struct {
 }
 
 func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineValues *AnyFlagValues, storedFlagValues *storedFlagValues) *FlagController {
-	f := &FlagController{
+	fc := &FlagController{
 		logger:           logger,
 		defaultValues:    defaultValues,
 		cmdLineValues:    cmdLineValues,
@@ -28,13 +29,13 @@ func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineV
 		observers:        make(map[FlagKey][]FlagsChangeObserver),
 	}
 
-	return f
+	return fc
 }
 
-func get[T any](c *FlagController, key FlagKey) T {
+func get[T any](fc *FlagController, key FlagKey) T {
 	var t T
-	if c.storedFlagValues != nil {
-		byteValue, exists := c.storedFlagValues.Get(key)
+	if fc.storedFlagValues != nil {
+		byteValue, exists := fc.storedFlagValues.Get(key)
 		if exists {
 			var anyvalue any
 			// Determine the type that's being requested
@@ -46,13 +47,13 @@ func get[T any](c *FlagController, key FlagKey) T {
 				// Integers are stored as strings and need to be converted back
 				int64Value, err := strconv.ParseInt(string(byteValue), 10, 64)
 				if err != nil {
-					level.Debug(c.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
+					level.Debug(fc.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
 				}
 				anyvalue = int64Value
 			case reflect.String:
 				anyvalue = string(byteValue)
 			default:
-				level.Debug(c.logger).Log("msg", "unsupported type of stored flag", "type", reflect.TypeOf(t).Kind())
+				level.Debug(fc.logger).Log("msg", "unsupported type of stored flag", "type", reflect.TypeOf(t).Kind())
 			}
 
 			if anyvalue != nil {
@@ -61,33 +62,33 @@ func get[T any](c *FlagController, key FlagKey) T {
 				if ok {
 					return typedValue // TODO sanitize
 				} else {
-					level.Debug(c.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+					level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 				}
 			}
 		}
 	}
 
 	// We were not able to find a suitable stored key, now cmd line options take precedence
-	if c.cmdLineValues != nil {
-		value, exists := c.cmdLineValues.Get(key)
+	if fc.cmdLineValues != nil {
+		value, exists := fc.cmdLineValues.Get(key)
 		if exists {
 			typedValue, ok := value.(T)
 			if ok {
 				return typedValue // TODO sanitize
 			} else {
-				level.Debug(c.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+				level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 			}
 		}
 	}
 
 	// No suitable cmd line option provided, now fallback to the default values
-	if c.defaultValues != nil {
-		value, _ := c.defaultValues.Get(key)
+	if fc.defaultValues != nil {
+		value, _ := fc.defaultValues.Get(key)
 		typedValue, ok := value.(T)
 		if ok {
 			return typedValue
 		} else {
-			level.Debug(c.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+			level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 		}
 	}
 
@@ -95,23 +96,53 @@ func get[T any](c *FlagController, key FlagKey) T {
 	return *new(T)
 }
 
-func set[T any](c *FlagController, key FlagKey, value T) error {
+func set[T any](fc *FlagController, key FlagKey, value T) error {
+	if fc.storedFlagValues == nil {
+		return errors.New("storedFlagValues is nil")
+	}
 
 	// TODO sanitize
 
 	var anyvalue any = value
 	byteValue, ok := anyvalue.([]byte)
 	if ok {
-		err := c.storedFlagValues.Set(key, byteValue)
+		err := fc.storedFlagValues.Set(key, byteValue)
 		if err != nil {
-			level.Debug(c.logger).Log("msg", "failed to set stored key", "key", key, "err", err)
+			level.Debug(fc.logger).Log("msg", "failed to set stored key", "key", key, "err", err)
 			return err
 		}
 	}
 
-	c.notifyObservers(key)
+	fc.notifyObservers(key)
 
 	return nil
+}
+
+func (fc *FlagController) Update(pairs ...string) ([]string, error) {
+	if fc.storedFlagValues == nil {
+		return nil, errors.New("storedFlagValues is nil")
+	}
+
+	deletedKeys, err := fc.storedFlagValues.Update(pairs...)
+
+	var updatedKeys []string
+	for i := 0; i < len(pairs); i += 2 {
+		updatedKeys = append(updatedKeys, pairs[i])
+	}
+
+	changedKeys := append(updatedKeys, deletedKeys...)
+
+	fc.notifyObservers(toFlagKeys(changedKeys)...)
+
+	return changedKeys, err
+}
+
+func toFlagKeys(s []string) []FlagKey {
+	f := make([]FlagKey, len(s))
+	for i, v := range s {
+		f[i] = FlagKey(v)
+	}
+	return f
 }
 
 func (f *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {

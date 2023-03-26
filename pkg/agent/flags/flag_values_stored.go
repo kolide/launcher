@@ -8,11 +8,11 @@ import (
 
 type storedFlagValues struct {
 	logger          log.Logger
-	agentFlagsStore types.GetterSetter
+	agentFlagsStore types.KVStore
 	keysMap         map[FlagKey][]byte
 }
 
-func NewStoredFlagValues(logger log.Logger, agentFlagsStore types.GetterSetter) *storedFlagValues {
+func NewStoredFlagValues(logger log.Logger, agentFlagsStore types.KVStore) *storedFlagValues {
 	s := &storedFlagValues{
 		logger:          logger,
 		agentFlagsStore: agentFlagsStore,
@@ -64,4 +64,9 @@ func (f *storedFlagValues) Get(key FlagKey) ([]byte, bool) {
 	}
 
 	return value, true
+}
+
+// Update replaces data in the key-value store.
+func (f *storedFlagValues) Update(pairs ...string) ([]string, error) {
+	return f.agentFlagsStore.Update(pairs...)
 }

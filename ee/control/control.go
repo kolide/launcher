@@ -36,7 +36,7 @@ type ControlService struct {
 // consumer is an interface for something that consumes control server data updates. The
 // control server supports at most one consumer per subsystem.
 type consumer interface {
-	Update(io.Reader) error
+	Update(data io.Reader) error
 }
 
 // subscriber is an interface for something that wants to be notified when a subsystem has been updated.
