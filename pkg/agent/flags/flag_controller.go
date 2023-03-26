@@ -51,83 +51,95 @@ func get[T any](fc *FlagController, key FlagKey) T {
 	return getDefaultValue[T](fc, key)
 }
 
+// getStoredValue looks for a stored value for the key and returns it, and true
+// if a stored value is not found, a zero value and false will be returned
 func getStoredValue[T any](fc *FlagController, key FlagKey) (T, bool) {
-	if fc.storedFlagValues != nil {
-		byteValue, exists := fc.storedFlagValues.Get(key)
-		if exists {
-			var t T
-			var anyvalue any
-			// Determine the type that's being requested
-			switch reflect.TypeOf(t).Kind() {
-			case reflect.Bool:
-				// Boolean flags are either present or not
-				anyvalue = byteValue != nil
-			case reflect.Int64:
-				// Integers are stored as strings and need to be converted back
-				int64Value, err := strconv.ParseInt(string(byteValue), 10, 64)
-				if err != nil {
-					level.Debug(fc.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
-				}
-				// Integers are sanitized to avoid unreasonable values
-				if fc.sanitizer != nil {
-					anyvalue = fc.sanitizer.Sanitize(key, int64Value)
-				} else {
-					anyvalue = int64Value
-				}
-			case reflect.String:
-				anyvalue = string(byteValue)
-			default:
-				level.Debug(fc.logger).Log("msg", "unsupported type of stored flag", "type", reflect.TypeOf(t).Kind())
-			}
-
-			if anyvalue != nil {
-				// Now we can get the underlying concrete value
-				typedValue, ok := anyvalue.(T)
-				if ok {
-					return typedValue, true
-				} else {
-					level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
-				}
-			}
-		}
+	if fc.storedFlagValues == nil {
+		return *new(T), false
 	}
 
-	// No stored value found
-	return *new(T), false
+	byteValue, exists := fc.storedFlagValues.Get(key)
+	if !exists {
+		return *new(T), false
+	}
+
+	var t T
+	var anyvalue any
+	// Determine the type that's being requested
+	switch reflect.TypeOf(t).Kind() {
+	case reflect.Bool:
+		// Boolean flags are either present or not
+		anyvalue = byteValue != nil
+	case reflect.Int64:
+		// Integers are stored as strings and need to be converted back
+		int64Value, err := strconv.ParseInt(string(byteValue), 10, 64)
+		if err != nil {
+			level.Debug(fc.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
+		}
+		// Integers are sanitized to avoid unreasonable values
+		if fc.sanitizer != nil {
+			anyvalue = fc.sanitizer.Sanitize(key, int64Value)
+		} else {
+			anyvalue = int64Value
+		}
+	case reflect.String:
+		anyvalue = string(byteValue)
+	default:
+		level.Debug(fc.logger).Log("msg", "unsupported type of stored flag", "type", reflect.TypeOf(t).Kind())
+	}
+
+	if anyvalue == nil {
+		return *new(T), false
+	}
+
+	// Now we can get the underlying concrete value
+	typedValue, ok := anyvalue.(T)
+	if !ok {
+		level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		return *new(T), false
+	}
+
+	return typedValue, true
 }
 
+// getCmdLineValue looks for a cmd line value for the key and returns it, and true
+// if a cmd line value is not found, a zero value and false will be returned
 func getCmdLineValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	if fc.cmdLineValues != nil {
-		value, exists := fc.cmdLineValues.Get(key)
-		if exists {
-			typedValue, ok := value.(T)
-			if ok {
-				return typedValue, true
-			} else {
-				var t T
-				level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
-			}
-		}
+		return *new(T), false
 	}
 
-	// No cmd line value found
-	return *new(T), false
+	value, exists := fc.cmdLineValues.Get(key)
+	if !exists {
+		return *new(T), false
+	}
+
+	typedValue, ok := value.(T)
+	if !ok {
+		var t T
+		level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		return *new(T), false
+	}
+
+	return typedValue, true
 }
 
+// getDefaultValue looks for a default value for the key and returns it
+// if a cmd line value is not found, a zero value is returned
 func getDefaultValue[T any](fc *FlagController, key FlagKey) T {
 	if fc.defaultValues != nil {
-		value, _ := fc.defaultValues.Get(key)
-		typedValue, ok := value.(T)
-		if ok {
-			return typedValue
-		} else {
-			var t T
-			level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
-		}
+		return *new(T)
 	}
 
-	// If all else fails, return the zero value for the type
-	return *new(T)
+	value, _ := fc.defaultValues.Get(key)
+	typedValue, ok := value.(T)
+	if !ok {
+		var t T
+		level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		return *new(T)
+	}
+
+	return typedValue
 }
 
 func set[T any](fc *FlagController, key FlagKey, value T) error {
@@ -150,6 +162,8 @@ func set[T any](fc *FlagController, key FlagKey, value T) error {
 	return nil
 }
 
+// Update bulk replaces agent flags and stores them.
+// Observers will be notified of changed flags and deleted flags.
 func (fc *FlagController) Update(pairs ...string) ([]string, error) {
 	if fc.storedFlagValues == nil {
 		return nil, errors.New("storedFlagValues is nil")
@@ -177,6 +191,7 @@ func (fc *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, k
 	fc.observers[observer] = append(fc.observers[observer], keys...)
 }
 
+// notifyObservers informs all observers of the keys that they have changed.
 func (fc *FlagController) notifyObservers(keys ...FlagKey) {
 	for observer, observedKeys := range fc.observers {
 		changedKeys := intersection(observedKeys, keys)
