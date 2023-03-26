@@ -8,7 +8,7 @@ type FlagKey string
 // 2. If the flag can be specified on the cmd line, add it to CmdLineFlagValues()
 // 3. If the flag is an integer, provide reasonable constraints by adding to FlagValueConstraints()
 const (
-	DesktopEnabled         FlagKey = "desktop_enabled"
+	DesktopEnabled         FlagKey = "desktop_enabled_v1"
 	DebugServerData        FlagKey = "debug_server_data"
 	ForceControlSubsystems FlagKey = "force_control_subsystems"
 	ControlServerURL       FlagKey = "control_server_url"

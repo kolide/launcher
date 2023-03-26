@@ -9,50 +9,25 @@ import (
 type storedFlagValues struct {
 	logger          log.Logger
 	agentFlagsStore types.KVStore
-	keysMap         map[FlagKey][]byte
 }
 
 func NewStoredFlagValues(logger log.Logger, agentFlagsStore types.KVStore) *storedFlagValues {
 	s := &storedFlagValues{
 		logger:          logger,
 		agentFlagsStore: agentFlagsStore,
-		keysMap:         generateKeysMap(),
 	}
 
 	return s
 }
 
-// generateKeysMap returns a map which associates FlagKeys to the named keys used within a key-value store
-func generateKeysMap() map[FlagKey][]byte {
-	// Below is a mapping from FlagKey->"store key" (the value used as a bbolt key, for example)
-	// Add a mapping below if the store key should be different from the FlagKey
-	keysMap := map[FlagKey][]byte{
-		DesktopEnabled: []byte("desktop_enabled_v1"),
-	}
-	return keysMap
-}
-
-// lookupKey finds the named key associated with the FlagKey
-// If there is none, the string value of key is returned
-func (f *storedFlagValues) lookupKey(key FlagKey) []byte {
-	lookupKey := []byte(key)
-	mappedKey, exists := f.keysMap[key]
-	if exists {
-		lookupKey = mappedKey
-	}
-	return lookupKey
-}
-
 // Set stores the value for a key.
 func (f *storedFlagValues) Set(key FlagKey, value []byte) error {
-	lookupKey := f.lookupKey(key)
-	return f.agentFlagsStore.Set(lookupKey, value)
+	return f.agentFlagsStore.Set([]byte(key), value)
 }
 
 // Get retrieves the stored value for a key.
 func (f *storedFlagValues) Get(key FlagKey) ([]byte, bool) {
-	lookupKey := f.lookupKey(key)
-	value, err := f.agentFlagsStore.Get(lookupKey)
+	value, err := f.agentFlagsStore.Get([]byte(key))
 	if err != nil {
 		level.Debug(f.logger).Log("msg", "failed to get stored key", "key", key, "err", err)
 		return nil, false
