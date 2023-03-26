@@ -116,7 +116,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
-	flagController := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags)
+	sanitizer := flags.NewFlagValueSanitizer(flags.FlagValueConstraints())
+	flagController := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags, sanitizer)
 	k := knapsack.New(stores, flagController, db)
 
 	// If we have successfully opened the DB, and written a pid,

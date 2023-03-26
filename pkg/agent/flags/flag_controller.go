@@ -17,15 +17,17 @@ type FlagController struct {
 	defaultValues    *AnyFlagValues
 	cmdLineValues    *AnyFlagValues
 	storedFlagValues *storedFlagValues
+	sanitizer        *flagValueSanitizer
 	observers        map[FlagsChangeObserver][]FlagKey
 }
 
-func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineValues *AnyFlagValues, storedFlagValues *storedFlagValues) *FlagController {
+func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineValues *AnyFlagValues, storedFlagValues *storedFlagValues, sanitizer *flagValueSanitizer) *FlagController {
 	fc := &FlagController{
 		logger:           logger,
 		defaultValues:    defaultValues,
 		cmdLineValues:    cmdLineValues,
 		storedFlagValues: storedFlagValues,
+		sanitizer:        sanitizer,
 		observers:        make(map[FlagsChangeObserver][]FlagKey),
 	}
 
@@ -49,7 +51,8 @@ func get[T any](fc *FlagController, key FlagKey) T {
 				if err != nil {
 					level.Debug(fc.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
 				}
-				anyvalue = int64Value
+				// Integers are sanitized to avoid unreasonable values
+				anyvalue = fc.sanitizer.Sanitize(key, int64Value)
 			case reflect.String:
 				anyvalue = string(byteValue)
 			default:
@@ -60,7 +63,7 @@ func get[T any](fc *FlagController, key FlagKey) T {
 				// Now we can get the underlying concrete value
 				typedValue, ok := anyvalue.(T)
 				if ok {
-					return typedValue // TODO sanitize
+					return typedValue
 				} else {
 					level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 				}
@@ -100,8 +103,6 @@ func set[T any](fc *FlagController, key FlagKey, value T) error {
 	if fc.storedFlagValues == nil {
 		return errors.New("storedFlagValues is nil")
 	}
-
-	// TODO sanitize
 
 	var anyvalue any = value
 	byteValue, ok := anyvalue.([]byte)
