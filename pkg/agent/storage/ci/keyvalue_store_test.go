@@ -1,8 +1,6 @@
 package storageci
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -163,17 +161,17 @@ func Test_Updates(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		updates []map[string]string
+		updates [][]string
 		want    []map[string]string
 	}{
 		{
 			name:    "empty",
-			updates: []map[string]string{{}, {}},
+			updates: [][]string{{}, {}},
 			want:    []map[string]string{},
 		},
 		{
 			name:    "single",
-			updates: []map[string]string{{"one": "one"}, {"one": "new_one"}},
+			updates: [][]string{{"one", "one"}, {"one", "new_one"}},
 			want: []map[string]string{
 				{
 					"key":   "one",
@@ -183,16 +181,16 @@ func Test_Updates(t *testing.T) {
 		},
 		{
 			name: "multiple",
-			updates: []map[string]string{
+			updates: [][]string{
 				{
-					"one":   "one",
-					"two":   "two",
-					"three": "three",
+					"one", "one",
+					"two", "two",
+					"three", "three",
 				},
 				{
-					"one":   "new_one",
-					"two":   "new_two",
-					"three": "new_three",
+					"one", "new_one",
+					"two", "new_two",
+					"three", "new_three",
 				},
 			},
 			want: []map[string]string{
@@ -212,17 +210,17 @@ func Test_Updates(t *testing.T) {
 		},
 		{
 			name: "delete stale keys",
-			updates: []map[string]string{
+			updates: [][]string{
 				{
-					"one":   "one",
-					"two":   "two",
-					"three": "three",
-					"four":  "four",
-					"five":  "five",
-					"six":   "six",
+					"one", "one",
+					"two", "two",
+					"three", "three",
+					"four", "four",
+					"five", "five",
+					"six", "six",
 				},
 				{
-					"four": "four",
+					"four", "four",
 				},
 			},
 			want: []map[string]string{
@@ -240,10 +238,7 @@ func Test_Updates(t *testing.T) {
 
 			for _, s := range getStores(t) {
 				for _, update := range tt.updates {
-					updateBytes, err := json.Marshal(update)
-					require.NoError(t, err)
-
-					s.Update(bytes.NewReader(updateBytes))
+					s.Update(update...)
 				}
 
 				kvps, err := getKeyValueRows(s, tt.name)

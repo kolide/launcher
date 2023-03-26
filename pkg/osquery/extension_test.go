@@ -53,7 +53,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) *knapsack.Knapsack {
 	if err != nil {
 		t.Fatalf("creating stores: %s", err.Error())
 	}
-	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil)
+	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil, nil)
 	k := knapsack.New(stores, f, db)
 
 	return k

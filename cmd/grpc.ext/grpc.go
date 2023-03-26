@@ -99,7 +99,7 @@ func main() {
 		logutil.Fatal(logger, "err", fmt.Errorf("creating stores: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
-	f := flags.NewFlagController(logger, flags.DefaultFlagValues(), nil, storedFlags)
+	f := flags.NewFlagController(logger, flags.DefaultFlagValues(), nil, storedFlags, nil)
 	k := knapsack.New(stores, f, db)
 
 	ext, err := grpcext.NewExtension(remote, k, extOpts)

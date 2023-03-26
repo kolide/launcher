@@ -62,7 +62,7 @@ func getKnapsack(t *testing.T) *knapsack.Knapsack {
 	db := storageci.SetupDB(t)
 	stores, err := storageci.MakeStores(t, log.NewNopLogger(), db)
 	require.NoError(t, err)
-	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil)
+	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil, nil)
 	return knapsack.New(stores, f, db)
 }
 func TestControlServiceRegisterConsumer(t *testing.T) {

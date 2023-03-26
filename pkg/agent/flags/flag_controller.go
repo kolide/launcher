@@ -52,7 +52,11 @@ func get[T any](fc *FlagController, key FlagKey) T {
 					level.Debug(fc.logger).Log("msg", "failed to convert stored integer flag value", "key", key, "err", err)
 				}
 				// Integers are sanitized to avoid unreasonable values
-				anyvalue = fc.sanitizer.Sanitize(key, int64Value)
+				if fc.sanitizer != nil {
+					anyvalue = fc.sanitizer.Sanitize(key, int64Value)
+				} else {
+					anyvalue = int64Value
+				}
 			case reflect.String:
 				anyvalue = string(byteValue)
 			default:
