@@ -35,10 +35,27 @@ func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineV
 }
 
 func get[T any](fc *FlagController, key FlagKey) T {
-	var t T
+	// See if we can find a stored value to use
+	storedValue, ok := getStoredValue[T](fc, key)
+	if ok {
+		return storedValue
+	}
+
+	// We were not able to find a suitable stored value, now cmd line flags take precedence
+	cmdLineValue, ok := getCmdLineValue[T](fc, key)
+	if ok {
+		return cmdLineValue
+	}
+
+	// No suitable cmd line flag provided, now fallback to the default values
+	return getDefaultValue[T](fc, key)
+}
+
+func getStoredValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	if fc.storedFlagValues != nil {
 		byteValue, exists := fc.storedFlagValues.Get(key)
 		if exists {
+			var t T
 			var anyvalue any
 			// Determine the type that's being requested
 			switch reflect.TypeOf(t).Kind() {
@@ -67,7 +84,7 @@ func get[T any](fc *FlagController, key FlagKey) T {
 				// Now we can get the underlying concrete value
 				typedValue, ok := anyvalue.(T)
 				if ok {
-					return typedValue
+					return typedValue, true
 				} else {
 					level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 				}
@@ -75,26 +92,36 @@ func get[T any](fc *FlagController, key FlagKey) T {
 		}
 	}
 
-	// We were not able to find a suitable stored key, now cmd line options take precedence
+	// No stored value found
+	return *new(T), false
+}
+
+func getCmdLineValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	if fc.cmdLineValues != nil {
 		value, exists := fc.cmdLineValues.Get(key)
 		if exists {
 			typedValue, ok := value.(T)
 			if ok {
-				return typedValue // TODO sanitize
+				return typedValue, true
 			} else {
+				var t T
 				level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 			}
 		}
 	}
 
-	// No suitable cmd line option provided, now fallback to the default values
+	// No cmd line value found
+	return *new(T), false
+}
+
+func getDefaultValue[T any](fc *FlagController, key FlagKey) T {
 	if fc.defaultValues != nil {
 		value, _ := fc.defaultValues.Get(key)
 		typedValue, ok := value.(T)
 		if ok {
 			return typedValue
 		} else {
+			var t T
 			level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
 		}
 	}
@@ -144,32 +171,6 @@ func (fc *FlagController) Update(pairs ...string) ([]string, error) {
 	fc.notifyObservers(toFlagKeys(changedKeys)...)
 
 	return changedKeys, err
-}
-
-func toFlagKeys(s []string) []FlagKey {
-	f := make([]FlagKey, len(s))
-	for i, v := range s {
-		f[i] = FlagKey(v)
-	}
-	return f
-}
-
-// Returns the intersection of FlagKeys; keys which exist in both a and b.
-func intersection(a, b []FlagKey) []FlagKey {
-	m := make(map[FlagKey]bool)
-	var result []FlagKey
-
-	for _, element := range a {
-		m[element] = true
-	}
-
-	for _, element := range b {
-		if m[element] {
-			result = append(result, element)
-		}
-	}
-
-	return result
 }
 
 func (fc *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {

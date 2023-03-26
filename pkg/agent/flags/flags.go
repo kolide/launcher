@@ -2,53 +2,6 @@ package flags
 
 import "time"
 
-// FlagKeys are named identifiers corresponding to flags
-type FlagKey string
-
-// When adding a new FlagKey:
-// 1. Provide a default value, by adding it to DefaultFlagValues()
-// 2. If the flag can be specified on the cmd line, add it to CmdLineFlagValues()
-const (
-	DesktopEnabled         FlagKey = "desktop_enabled"
-	DebugServerData        FlagKey = "debug_server_data"
-	ForceControlSubsystems FlagKey = "force_control_subsystems"
-	ControlServerURL       FlagKey = "control_server_url"
-	ControlRequestInterval FlagKey = "control_request_interval"
-	DisableControlTLS      FlagKey = "disable_control_tls"
-	InsecureControlTLS     FlagKey = "insecure_control_tls"
-)
-
-func (key FlagKey) String() string {
-	return string(key)
-}
-
-// Alias which allows any type
-type AnyFlagValues = flagValues[any]
-
-type flagValues[T any] struct {
-	flags map[FlagKey]T
-}
-
-// NewFlagValues returns a new typed flagValues struct.
-func NewFlagValues[T any]() *flagValues[T] {
-	f := &flagValues[T]{
-		flags: make(map[FlagKey]T),
-	}
-
-	return f
-}
-
-// Set sets the value for a FlagKey.
-func (f *flagValues[T]) Set(key FlagKey, value T) {
-	f.flags[key] = value
-}
-
-// Get retrieves the value for a FlagKey.
-func (f *flagValues[T]) Get(key FlagKey) (T, bool) {
-	value, exists := f.flags[key]
-	return value, exists
-}
-
 // Flags is an interface for setting and retrieving launcher agent flags.
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
@@ -87,44 +40,4 @@ type Flags interface {
 type FlagsChangeObserver interface {
 	// FlagsChanged tells the observer that flag changes have occurred.
 	FlagsChanged(keys ...FlagKey)
-}
-
-// flagValueConstraint represents the constraining limits on a flag value.
-type flagValueConstraint struct {
-	min int64
-	max int64
-}
-
-type flagValueSanitizer struct {
-	constraints map[FlagKey]flagValueConstraint
-}
-
-func NewFlagValueSanitizer(constraints map[FlagKey]flagValueConstraint) *flagValueSanitizer {
-	s := &flagValueSanitizer{
-		constraints: constraints,
-	}
-
-	return s
-}
-
-// Sanitize returns a sanitized (clamped) value for a flag, if constraints for
-// the flag value have been provided. If undefined, the original value is returned.
-func (s *flagValueSanitizer) Sanitize(key FlagKey, value int64) int64 {
-	c, ok := s.constraints[key]
-	if ok {
-		return clampValue(value, c.min, c.max)
-	}
-	return value
-}
-
-// clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampValue(value int64, min, max int64) int64 {
-	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
-	default:
-		return value
-	}
 }
