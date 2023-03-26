@@ -172,12 +172,12 @@ func intersection(a, b []FlagKey) []FlagKey {
 	return result
 }
 
-func (f *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {
-	f.observers[observer] = append(f.observers[observer], keys...)
+func (fc *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {
+	fc.observers[observer] = append(fc.observers[observer], keys...)
 }
 
-func (f *FlagController) notifyObservers(keys ...FlagKey) {
-	for observer, observedKeys := range f.observers {
+func (fc *FlagController) notifyObservers(keys ...FlagKey) {
+	for observer, observedKeys := range fc.observers {
 		changedKeys := intersection(observedKeys, keys)
 
 		if len(changedKeys) > 0 {
@@ -186,51 +186,51 @@ func (f *FlagController) notifyObservers(keys ...FlagKey) {
 	}
 }
 
-func (f *FlagController) SetDesktopEnabled(enabled bool) error {
-	return set(f, DesktopEnabled, enabled)
+func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
+	return set(fc, DesktopEnabled, enabled)
 }
-func (f *FlagController) DesktopEnabled() bool {
-	return get[bool](f, DesktopEnabled)
-}
-
-func (f *FlagController) SetDebugServerData(debug bool) error {
-	return set(f, DebugServerData, debug)
-}
-func (f *FlagController) DebugServerData() bool {
-	return get[bool](f, DebugServerData)
+func (fc *FlagController) DesktopEnabled() bool {
+	return get[bool](fc, DesktopEnabled)
 }
 
-func (f *FlagController) SetForceControlSubsystems(force bool) error {
-	return set(f, ForceControlSubsystems, force)
+func (fc *FlagController) SetDebugServerData(debug bool) error {
+	return set(fc, DebugServerData, debug)
 }
-func (f *FlagController) ForceControlSubsystems() bool {
-	return get[bool](f, ForceControlSubsystems)
-}
-
-func (f *FlagController) SetControlServerURL(url string) error {
-	return set(f, ControlServerURL, url)
-}
-func (f *FlagController) ControlServerURL() string {
-	return get[string](f, ControlServerURL)
+func (fc *FlagController) DebugServerData() bool {
+	return get[bool](fc, DebugServerData)
 }
 
-func (f *FlagController) SetControlRequestInterval(interval time.Duration) error {
-	return set(f, ControlRequestInterval, interval)
+func (fc *FlagController) SetForceControlSubsystems(force bool) error {
+	return set(fc, ForceControlSubsystems, force)
 }
-func (f *FlagController) ControlRequestInterval() time.Duration {
-	return get[time.Duration](f, ControlRequestInterval)
-}
-
-func (f *FlagController) SetDisableControlTLS(disabled bool) error {
-	return set(f, DisableControlTLS, disabled)
-}
-func (f *FlagController) DisableControlTLS() bool {
-	return get[bool](f, DisableControlTLS)
+func (fc *FlagController) ForceControlSubsystems() bool {
+	return get[bool](fc, ForceControlSubsystems)
 }
 
-func (f *FlagController) SetInsecureControlTLS(disabled bool) error {
-	return set(f, InsecureControlTLS, disabled)
+func (fc *FlagController) SetControlServerURL(url string) error {
+	return set(fc, ControlServerURL, url)
 }
-func (f *FlagController) InsecureControlTLS() bool {
-	return get[bool](f, InsecureControlTLS)
+func (fc *FlagController) ControlServerURL() string {
+	return get[string](fc, ControlServerURL)
+}
+
+func (fc *FlagController) SetControlRequestInterval(interval time.Duration) error {
+	return set(fc, ControlRequestInterval, interval)
+}
+func (fc *FlagController) ControlRequestInterval() time.Duration {
+	return get[time.Duration](fc, ControlRequestInterval)
+}
+
+func (fc *FlagController) SetDisableControlTLS(disabled bool) error {
+	return set(fc, DisableControlTLS, disabled)
+}
+func (fc *FlagController) DisableControlTLS() bool {
+	return get[bool](fc, DisableControlTLS)
+}
+
+func (fc *FlagController) SetInsecureControlTLS(disabled bool) error {
+	return set(fc, InsecureControlTLS, disabled)
+}
+func (fc *FlagController) InsecureControlTLS() bool {
+	return get[bool](fc, InsecureControlTLS)
 }
