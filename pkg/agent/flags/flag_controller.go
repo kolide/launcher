@@ -17,7 +17,7 @@ type FlagController struct {
 	defaultValues    *AnyFlagValues
 	cmdLineValues    *AnyFlagValues
 	storedFlagValues *storedFlagValues
-	observers        map[FlagKey][]FlagsChangeObserver
+	observers        map[FlagsChangeObserver][]FlagKey
 }
 
 func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineValues *AnyFlagValues, storedFlagValues *storedFlagValues) *FlagController {
@@ -26,7 +26,7 @@ func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineV
 		defaultValues:    defaultValues,
 		cmdLineValues:    cmdLineValues,
 		storedFlagValues: storedFlagValues,
-		observers:        make(map[FlagKey][]FlagsChangeObserver),
+		observers:        make(map[FlagsChangeObserver][]FlagKey),
 	}
 
 	return fc
@@ -123,15 +123,19 @@ func (fc *FlagController) Update(pairs ...string) ([]string, error) {
 		return nil, errors.New("storedFlagValues is nil")
 	}
 
+	// Attempt to bulk replace the store with the key-values
 	deletedKeys, err := fc.storedFlagValues.Update(pairs...)
 
+	// Extract just the keys from the key-value pairs
 	var updatedKeys []string
 	for i := 0; i < len(pairs); i += 2 {
 		updatedKeys = append(updatedKeys, pairs[i])
 	}
 
+	// Changed keys is the union of updated keys and deleted keys
 	changedKeys := append(updatedKeys, deletedKeys...)
 
+	// Now observers can be notified these keys have possibly changed
 	fc.notifyObservers(toFlagKeys(changedKeys)...)
 
 	return changedKeys, err
@@ -145,18 +149,34 @@ func toFlagKeys(s []string) []FlagKey {
 	return f
 }
 
-func (f *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {
-	for _, key := range keys {
-		f.observers[key] = append(f.observers[key], observer)
+// Returns the intersection of FlagKeys; keys which exist in both a and b.
+func intersection(a, b []FlagKey) []FlagKey {
+	m := make(map[FlagKey]bool)
+	var result []FlagKey
+
+	for _, element := range a {
+		m[element] = true
 	}
+
+	for _, element := range b {
+		if m[element] {
+			result = append(result, element)
+		}
+	}
+
+	return result
+}
+
+func (f *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {
+	f.observers[observer] = append(f.observers[observer], keys...)
 }
 
 func (f *FlagController) notifyObservers(keys ...FlagKey) {
-	for _, key := range keys {
-		if observers, ok := f.observers[key]; ok {
-			for _, observer := range observers {
-				observer.FlagsChanged(key)
-			}
+	for observer, observedKeys := range f.observers {
+		changedKeys := intersection(observedKeys, keys)
+
+		if len(changedKeys) > 0 {
+			observer.FlagsChanged(changedKeys...)
 		}
 	}
 }
