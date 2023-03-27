@@ -6,31 +6,32 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"golang.org/x/exp/slices"
 )
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	logger                   log.Logger
-	knapsack                 *knapsack.Knapsack
-	cancel                   context.CancelFunc
-	requestInterval          time.Duration
-	requestTicker            *time.Ticker
-	requestAccelerationTimer *time.Timer
-	minAccelerationInterval  time.Duration
-	fetcher                  dataProvider
-	fetchMutex               sync.Mutex
-	store                    types.GetterSetter
-	lastFetched              map[string]string
-	consumers                map[string]consumer
-	subscribers              map[string][]subscriber
+	logger          log.Logger
+	knapsack        *knapsack.Knapsack
+	cancel          context.CancelFunc
+	requestInterval time.Duration
+	requestTicker   *time.Ticker
+	fetcher         dataProvider
+	fetchMutex      sync.Mutex
+	store           types.GetterSetter
+	lastFetched     map[string]string
+	consumers       map[string]consumer
+	subscribers     map[string][]subscriber
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -54,14 +55,13 @@ type dataProvider interface {
 
 func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		logger:                  log.With(logger, "component", "control"),
-		knapsack:                k,
-		requestInterval:         60 * time.Second,
-		minAccelerationInterval: 5 * time.Second,
-		fetcher:                 fetcher,
-		lastFetched:             make(map[string]string),
-		consumers:               make(map[string]consumer),
-		subscribers:             make(map[string][]subscriber),
+		logger:          log.With(logger, "component", "control"),
+		knapsack:        k,
+		requestInterval: 60 * time.Second,
+		fetcher:         fetcher,
+		lastFetched:     make(map[string]string),
+		consumers:       make(map[string]consumer),
+		subscribers:     make(map[string][]subscriber),
 	}
 
 	cs.requestTicker = time.NewTicker(cs.requestInterval)
@@ -69,6 +69,9 @@ func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...
 	for _, opt := range opts {
 		opt(cs)
 	}
+
+	// Observe DesktopEnabled changes to know when to enable/disable process spawning
+	cs.knapsack.Flags.RegisterChangeObserver(cs, flags.ControlRequestInterval)
 
 	return cs
 }
@@ -116,7 +119,29 @@ func (cs *ControlService) Stop() {
 	}
 }
 
-func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
+func (cs *ControlService) FlagsChanged(keys ...flags.FlagKey) {
+	if slices.Contains(keys, flags.ControlRequestInterval) {
+
+			// set request interval back to starting interval after duration has passed
+	// callback := func() {
+		level.Debug(cs.logger).Log(
+			"msg", "resetting control service request interval after acceleration",
+			"interval", cs.requestInterval,
+		)
+
+		// set back to original interval
+		cs.requestTicker.Reset(cs.requestInterval)
+
+		r.processSpawningEnabled = r.knapsack.Flags.DesktopEnabled()
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
+	}
+}
+
+func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
+	if interval == cs.requestInterval {
+		return
+	}
+	
 	// perform a fetch now
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
@@ -150,6 +175,68 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 		// set back to original interval
 		cs.requestTicker.Reset(cs.requestInterval)
 	})
+
+	level.Debug(cs.logger).Log(
+		"msg", "accelerating control service request interval",
+		"interval", interval,
+		"duration", duration,
+	)
+
+	// restart the ticker on accelerated interval
+	cs.requestTicker.Reset(interval)
+}
+
+func (cs *ControlService) FlagsChanged(keys ...flags.FlagKey) {
+	if slices.Contains(keys, flags.ControlRequestInterval) {
+
+			// set request interval back to starting interval after duration has passed
+	// callback := func() {
+		level.Debug(cs.logger).Log(
+			"msg", "resetting control service request interval after acceleration",
+			"interval", cs.requestInterval,
+		)
+
+		// set back to original interval
+		cs.requestTicker.Reset(cs.requestInterval)
+
+		r.processSpawningEnabled = r.knapsack.Flags.DesktopEnabled()
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
+	}
+}
+
+func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
+	// perform a fetch now
+	if err := cs.Fetch(); err != nil {
+		// if we got an error, log it and move on
+		level.Debug(cs.logger).Log(
+			"msg", "failed to fetch data from control server. Not fatal, moving on",
+			"err", err,
+		)
+	}
+
+	// callback := func() {
+	// 	level.Debug(cs.logger).Log(
+	// 		"msg", "resetting control service request interval after acceleration",
+	// 		"interval", cs.requestInterval,
+	// 	)
+
+	// 	// set back to original interval
+	// 	cs.requestTicker.Reset(cs.requestInterval)
+	// }
+
+	// override := flags.NewOverride(duration)
+	cs.knapsack.Flags.SetOverride(flags.ControlRequestInterval, interval, duration)
+
+	// set request interval back to starting interval after duration has passed
+	// callback := func() {
+		level.Debug(cs.logger).Log(
+			"msg", "resetting control service request interval after acceleration",
+			"interval", cs.requestInterval,
+		)
+
+		// set back to original interval
+		cs.requestTicker.Reset(cs.requestInterval)
+	}
 
 	level.Debug(cs.logger).Log(
 		"msg", "accelerating control service request interval",

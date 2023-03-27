@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -18,6 +19,8 @@ type FlagController struct {
 	cmdLineValues    *AnyFlagValues
 	storedFlagValues *storedFlagValues
 	sanitizer        *flagValueSanitizer
+	overrideMutex    sync.RWMutex
+	overrides        map[FlagKey]flagValueOverride
 	observers        map[FlagsChangeObserver][]FlagKey
 }
 
@@ -28,6 +31,7 @@ func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineV
 		cmdLineValues:    cmdLineValues,
 		storedFlagValues: storedFlagValues,
 		sanitizer:        sanitizer,
+		overrides:        make(map[FlagKey]flagValueOverride),
 		observers:        make(map[FlagsChangeObserver][]FlagKey),
 	}
 
@@ -35,6 +39,12 @@ func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineV
 }
 
 func get[T any](fc *FlagController, key FlagKey) T {
+	// If there is a temporary override, it takes precendence over anything else
+	overrideValue, ok := getOverrideValue[T](fc, key)
+	if ok {
+		return overrideValue
+	}
+
 	// See if we can find a stored value to use
 	storedValue, ok := getStoredValue[T](fc, key)
 	if ok {
@@ -49,6 +59,55 @@ func get[T any](fc *FlagController, key FlagKey) T {
 
 	// No suitable cmd line flag provided, now fallback to the default values
 	return getDefaultValue[T](fc, key)
+}
+
+// getOverrideValue looks for an override value for the key and returns it, and true
+// if an override value is not found, a zero value and false will be returned
+func getOverrideValue[T any](fc *FlagController, key FlagKey) (T, bool) {
+	override, ok := fc.overrides[key]
+	if !ok {
+		return *new(T), false
+	}
+
+	var t T
+	var anyvalue any
+	switch reflect.TypeOf(t).Kind() {
+	case reflect.Bool:
+		boolValue, ok := override.Value().(bool)
+		if ok {
+			anyvalue = boolValue
+		}
+	case reflect.Int64:
+		int64Value, ok := override.Value().(int64)
+		if ok {
+			// Integers are sanitized to avoid unreasonable values
+			if fc.sanitizer != nil {
+				anyvalue = fc.sanitizer.Sanitize(key, int64Value)
+			} else {
+				anyvalue = int64Value
+			}
+		}
+	case reflect.String:
+		stringValue, ok := override.Value().(string)
+		if ok {
+			anyvalue = stringValue
+		}
+	default:
+		level.Debug(fc.logger).Log("msg", "unsupported type of override flag", "type", reflect.TypeOf(t).Kind())
+	}
+
+	if anyvalue == nil {
+		return *new(T), false
+	}
+
+	// Now we can get the underlying concrete value
+	typedValue, ok := anyvalue.(T)
+	if !ok {
+		level.Debug(fc.logger).Log("msg", "override flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		return *new(T), false
+	}
+
+	return typedValue, true
 }
 
 // getStoredValue looks for a stored value for the key and returns it, and true
@@ -185,6 +244,41 @@ func (fc *FlagController) Update(pairs ...string) ([]string, error) {
 	fc.notifyObservers(toFlagKeys(changedKeys)...)
 
 	return changedKeys, err
+}
+
+func (fc *FlagController) SetOverride(key FlagKey, value any, duration time.Duration) {
+	// Always notify observers when overrides start, so they know to refresh.
+	// Defering this before unlocking the mutex so that notifications occur outside of the critical section.
+	defer fc.notifyObservers(key)
+
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	override, ok := fc.overrides[key]
+	if !ok {
+		override = &Override{}
+	}
+
+	// Start a new override, or re-start an existing one with a new value, duration, and expiration
+	override.Start(key, value, duration, fc.overrideExpired)
+
+	if !ok {
+		// Adding an override implicitly causes future flag retrievals to use the override until expiration
+		fc.overrides[key] = override
+	}
+}
+
+// overrideExpired removes an override and notifies observers of this change.
+func (fc *FlagController) overrideExpired(key FlagKey) {
+	// Always notify observers when overrides expire, so they know to refresh.
+	// Defering this before unlocking the mutex so that notifications occur outside of the critical section.
+	defer fc.notifyObservers(key)
+
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	// Removing the override implictly allows the next value to take precedence
+	fc.overrides[key] = nil
 }
 
 func (fc *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {

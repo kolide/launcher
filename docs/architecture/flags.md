@@ -1,4 +1,4 @@
-# Knapsack.Flags
+# Flags
 
 The `Flags` interface provides a simple API for storing and retrieving launcher flags at runtime. Currently, flags are of types `bool`, `int64` and `string`.
 
@@ -22,7 +22,7 @@ flowchart TB
     Store{Has control server provided a value?}
     CmdLine{Was a command line flag provided?}
 
-    Client -->|"Knapsack.Flags.DesktopEnabled()"| Override
+    Client -->|"Flags.DesktopEnabled()"| Override
     Override -->|Yes| Sanitize
     Override -->|No| Store
 
@@ -47,7 +47,7 @@ flowchart TB
     Notify[Notify Observers]
     Error{Did an error occur?}
 
-    Client -->|"Knapsack.Flags.SetDesktopEnabled(enabled)"|Store
+    Client -->|"Flags.SetDesktopEnabled(enabled)"|Store
 
     Store --> Error
     Error -->|No| Notify
@@ -61,22 +61,26 @@ flowchart TB
 ```mermaid
 flowchart TB
     Client[Client]
-    Store[Store Override Flag]
     Notify[Notify Observers]
-    Override{Is value changing?}
-    Store[Async Wait for Override Expiration]
-    CmdLine[Clear Override Flag]
+    Existing{Does this key already have an override?}
+    Start[Create & Start]
+    Reset[Stop & Reset]
+    Wait[Async Wait for Override Expiration]
+    Clear[Clear Override]
 
-    Client -->|"Knapsack.Flags.SetTemporaryOverride"|Override
+    Client -->|"Flags.SetOverride(key, override)"|Existing
 
-    Override -->|Yes| Store
-    Override -.->|No| Client
+    Existing -->|Yes| Reset
+    Existing -->|No| Start
 
-    Store -.-> Store
-    Store --> Notify
+    Reset --> Notify
+    Start --> Notify
 
-    Store -->CmdLine
-    CmdLine -->Notify
+    Reset -.-> Wait
+    Start -.-> Wait
+
+    Wait -.->Clear
+    Clear -.-> Notify
 
     Notify -.->|Return err to Client| Client
 ```

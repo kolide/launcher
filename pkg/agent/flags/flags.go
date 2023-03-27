@@ -7,6 +7,9 @@ type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey)
 
+	// SetOverride stores a value to be temporarily used as an override of any other value, until the duration has elapased.
+	SetOverride(key FlagKey, value any, duration time.Duration)
+
 	// DesktopEnabled causes the launcher desktop process and GUI to be enabled.
 	SetDesktopEnabled(enabled bool) error
 	DesktopEnabled() bool
