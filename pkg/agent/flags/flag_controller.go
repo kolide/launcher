@@ -105,7 +105,7 @@ func getStoredValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 // getCmdLineValue looks for a cmd line value for the key and returns it, and true
 // if a cmd line value is not found, a zero value and false will be returned
 func getCmdLineValue[T any](fc *FlagController, key FlagKey) (T, bool) {
-	if fc.cmdLineValues != nil {
+	if fc.cmdLineValues == nil {
 		return *new(T), false
 	}
 
@@ -127,7 +127,7 @@ func getCmdLineValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 // getDefaultValue looks for a default value for the key and returns it
 // if a cmd line value is not found, a zero value is returned
 func getDefaultValue[T any](fc *FlagController, key FlagKey) T {
-	if fc.defaultValues != nil {
+	if fc.defaultValues == nil {
 		return *new(T)
 	}
 
