@@ -18,9 +18,13 @@ import (
 	client "github.com/theupdateframework/go-tuf/client"
 )
 
+// updateLibraryManager manages the update libraries for launcher and osquery.
+// It downloads and verifies new updates, and moves them to the appropriate
+// location in the library specified by the version associated with that update.
+// It also ensures that old updates are removed when they are no longer needed.
 type updateLibraryManager struct {
-	metadataClient  *client.Client
-	mirrorUrl       string
+	metadataClient  *client.Client // used to validate downloads
+	mirrorUrl       string         // dl.kolide.co
 	mirrorClient    *http.Client
 	rootDirectory   string
 	operatingSystem string
@@ -51,14 +55,20 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 	return &ulm, nil
 }
 
+// updatesDirectory returns the update library location for the given binary.
 func (ulm *updateLibraryManager) updatesDirectory(binary string) string {
 	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-updates", binary))
 }
 
+// stagedUpdatesDirectory returns the location for staged updates -- i.e. updates
+// that have been downloaded, but not yet verified.
 func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary string) string {
 	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-staged-updates", binary))
 }
 
+// addToLibrary adds the given target file to the library for the given binary,
+// downloading and verifying it if it's not already there. After any addition
+// to the library, it cleans up older versions that are no longer needed.
 func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename string) error {
 	if ulm.alreadyAdded(binary, targetFilename) {
 		return nil
@@ -87,12 +97,14 @@ func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename stri
 	return nil
 }
 
+// alreadyAdded checks if the given target already exists in the update library.
 func (ulm *updateLibraryManager) alreadyAdded(binary string, targetFilename string) bool {
 	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 
 	return ulm.verifyExecutableInDirectory(updateDirectory, binary) == nil
 }
 
+// versionFromTarget extracts the semantic version for an update from its filename.
 func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename string) string {
 	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
 	prefixToTrim := fmt.Sprintf("%s-", binary)
@@ -100,6 +112,8 @@ func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename
 	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
+// stageUpdate downloads the update indicated by `targetFilename` and stages it for
+// further verification.
 func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename string) error {
 	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
 	out, err := os.Create(stagedUpdatePath)
@@ -122,6 +136,7 @@ func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename strin
 	return nil
 }
 
+// verifyStagedUpdate checks the downloaded update against the metadata in the TUF repo.
 func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, targetFilename string) error {
 	stagedUpdate := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
 	digest, err := sha512Digest(stagedUpdate)
@@ -143,6 +158,8 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, targetFilenam
 	return nil
 }
 
+// moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
+// to make sure that it's a valid, working update.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilename string) error {
 	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
@@ -179,6 +196,8 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 	return nil
 }
 
+// verifyExecutableInDirectory ensures that the given update exists, has the appropriate permissions,
+// and can be run.
 func (ulm *updateLibraryManager) verifyExecutableInDirectory(updateDirectory string, binary string) error {
 	stat, err := os.Stat(executableLocation(updateDirectory, binary))
 	switch {
@@ -200,6 +219,7 @@ func (ulm *updateLibraryManager) verifyExecutableInDirectory(updateDirectory str
 	return nil
 }
 
+// currentRunningVersion returns the current running version of the given binary.
 func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.Version, error) {
 	switch binary {
 	case "launcher":
@@ -216,6 +236,9 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.V
 	}
 }
 
+// tidyLibrary reviews all updates in the library for the binary and removes any old versions
+// that are no longer needed. It will always preserve the current running binary, and then the
+// two most recent valid versions. It will remove versions it cannot validate.
 func (ulm *updateLibraryManager) tidyLibrary(binary string, currentRunningVersion *semver.Version) {
 	const numberOfVersionsToKeep = 3
 
@@ -277,6 +300,8 @@ func (ulm *updateLibraryManager) tidyLibrary(binary string, currentRunningVersio
 	}
 }
 
+// sha512Digest calculates the digest of the given file, for use in validating downloads from the mirror
+// against the local TUF repository.
 func sha512Digest(filename string) (string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
