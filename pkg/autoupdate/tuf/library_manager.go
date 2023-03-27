@@ -76,15 +76,21 @@ func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename stri
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
-	ulm.tidyLibrary(binary)
+	v, err := ulm.currentRunningVersion(binary)
+	if err != nil {
+		level.Debug(ulm.logger).Log("msg", "cannot parse current running version, cannot safely tidy updates library", "err", err)
+		return nil
+	}
+
+	ulm.tidyLibrary(binary, v)
 
 	return nil
 }
 
 func (ulm *updateLibraryManager) alreadyAdded(binary string, targetFilename string) bool {
-	updateLocation := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename), targetFilename)
+	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 
-	return ulm.verifyExecutable(updateLocation) == nil
+	return ulm.verifyExecutableInDirectory(updateDirectory, binary) == nil
 }
 
 func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename string) string {
@@ -159,17 +165,13 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 	}
 
 	// Make sure that the binary is executable
-	outputBinary := filepath.Join(newUpdateDirectory, binary)
-	if ulm.operatingSystem == "windows" {
-		outputBinary += ".exe"
-	}
-	if err := os.Chmod(outputBinary, 0755); err != nil {
+	if err := os.Chmod(executableLocation(newUpdateDirectory, binary), 0755); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
-	if err := ulm.verifyExecutable(outputBinary); err != nil {
+	if err := ulm.verifyExecutableInDirectory(newUpdateDirectory, binary); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
@@ -177,20 +179,20 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 	return nil
 }
 
-func (ulm *updateLibraryManager) verifyExecutable(filepath string) error {
-	stat, err := os.Stat(filepath)
+func (ulm *updateLibraryManager) verifyExecutableInDirectory(updateDirectory string, binary string) error {
+	stat, err := os.Stat(executableLocation(updateDirectory, binary))
 	switch {
 	case os.IsNotExist(err):
 		// Target has not been downloaded
-		return fmt.Errorf("file does not exist at %s", filepath)
+		return fmt.Errorf("file does not exist at %s", updateDirectory)
 	case stat.IsDir():
-		return fmt.Errorf("expected executable but got directory at %s", filepath)
+		return fmt.Errorf("expected executable but got directory at %s", updateDirectory)
 	case err != nil:
 		// Can't check -- assume it's not added
-		return fmt.Errorf("error checking file info for %s: %w", filepath, err)
+		return fmt.Errorf("error checking file info for %s: %w", updateDirectory, err)
 	case stat.Mode()&0111 == 0:
 		// Exists but not executable
-		return fmt.Errorf("file %s is not executable", filepath)
+		return fmt.Errorf("file %s is not executable", updateDirectory)
 	}
 
 	// TODO run with --version
@@ -198,13 +200,23 @@ func (ulm *updateLibraryManager) verifyExecutable(filepath string) error {
 	return nil
 }
 
-func (ulm *updateLibraryManager) tidyLibrary(binary string) {
-	// Get the version for the currently-running launcher so we can preserve it
-	currentVersion, err := semver.NewVersion(version.Version().Version)
-	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "cannot parse current running version, cannot safely tidy updates library", "err", err)
+func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.Version, error) {
+	switch binary {
+	case "launcher":
+		currentVersion, err := semver.NewVersion(version.Version().Version)
+		if err != nil {
+			return nil, fmt.Errorf("cannot determine current running version of launcher: %w", err)
+		}
+		return currentVersion, nil
+	case "osqueryd":
+		// TODO
+		return nil, fmt.Errorf("not implemented for %s yet", binary)
+	default:
+		return nil, fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}
+}
 
+func (ulm *updateLibraryManager) tidyLibrary(binary string, currentRunningVersion *semver.Version) {
 	const numberOfVersionsToKeep = 3
 
 	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))
@@ -217,17 +229,20 @@ func (ulm *updateLibraryManager) tidyLibrary(binary string) {
 		return
 	}
 
+	removeUpdate := func(v string) {
+		directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), v)
+		level.Debug(ulm.logger).Log("removing old update", "directory", directoryToRemove)
+		if err := os.RemoveAll(directoryToRemove); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not remove old update when tidying updates library", "err", err, "directory", directoryToRemove)
+		}
+	}
+
 	versionsInLibrary := make([]*semver.Version, 0)
 	for _, rawVersion := range rawVersionsInLibrary {
-		v, err := semver.NewVersion(rawVersion)
+		v, err := semver.NewVersion(filepath.Base(rawVersion))
 		if err != nil {
-			level.Debug(ulm.logger).Log("msg", "updates library contains invalid semver", "err", err, "library_version", rawVersion)
-			// TODO possibly should remove this?
-			continue
-		}
-
-		if v == currentVersion {
-			// Don't add the current version to our list of versions slated for removal
+			level.Debug(ulm.logger).Log("msg", "updates library contains invalid semver", "err", err, "library_path", rawVersion)
+			removeUpdate(filepath.Base(rawVersion))
 			continue
 		}
 
@@ -237,12 +252,28 @@ func (ulm *updateLibraryManager) tidyLibrary(binary string) {
 	// Sort the versions (ascending order)
 	sort.Sort(semver.Collection(versionsInLibrary))
 
-	// Remove all but the most recent ones
-	for i := 0; i < len(versionsInLibrary)-numberOfVersionsToKeep; i += 1 {
-		directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original())
-		if err := os.RemoveAll(directoryToRemove); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not remove old update when tidying updates library", "err", err, "directory", directoryToRemove)
+	// Loop through, looking at the most recent versions first, and remove all once we hit nonCurrentlyRunningVersionsKept valid executables
+	nonCurrentlyRunningVersionsKept := 0
+	for i := len(versionsInLibrary) - 1; i >= 0; i -= 1 {
+		// Always keep the current running executable
+		if versionsInLibrary[i].Equal(currentRunningVersion) {
+			continue
 		}
+
+		// If we've already hit the number of versions to keep, then start to remove the older ones.
+		// We want to keep numberOfVersionsToKeep total, saving a spot for the currently running version.
+		if nonCurrentlyRunningVersionsKept >= numberOfVersionsToKeep-1 {
+			removeUpdate(versionsInLibrary[i].Original())
+			continue
+		}
+
+		// Only keep good executables
+		if err := ulm.verifyExecutableInDirectory(filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original()), binary); err != nil {
+			removeUpdate(versionsInLibrary[i].Original())
+			continue
+		}
+
+		nonCurrentlyRunningVersionsKept += 1
 	}
 }
 
