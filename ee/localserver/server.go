@@ -19,9 +19,9 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
-	"go.etcd.io/bbolt"
 	"golang.org/x/time/rate"
 )
 
@@ -81,7 +81,7 @@ func WithControlService(cs controlService) LocalServerOption {
 	}
 }
 
-func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(configStore types.Getter, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
@@ -101,7 +101,7 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	}
 
 	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(db)
+	privateKey, err := osquery.PrivateRSAKeyFromDB(configStore)
 	if err != nil {
 		return nil, fmt.Errorf("fetching private key: %w", err)
 	}

@@ -27,10 +27,9 @@ import (
 var rootJson []byte
 
 const (
-	DefaultTufServer      = "https://tuf.kolide.com"
-	AutoupdateErrorBucket = "tuf_autoupdate_errors"
-	defaultChannel        = "stable"
-	tufDirectoryName      = "tuf"
+	DefaultTufServer = "https://tuf.kolide.com"
+	defaultChannel   = "stable"
+	tufDirectoryName = "tuf"
 )
 
 var binaries = []string{"launcher", "osqueryd"}

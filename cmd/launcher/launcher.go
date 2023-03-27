@@ -25,6 +25,7 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -40,10 +41,6 @@ import (
 )
 
 const (
-	// Buckets used by launcher
-	agentFlagsBucketName     = "agent_flags"
-	controlServiceBucketName = "control_service_data"
-
 	// Subsystems that launcher listens for control server updates on
 	agentFlagsSubsystemName  = "agent_flags"
 	serverDataSubsystemName  = "kolide_server_data"
@@ -110,6 +107,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
+	stores, err := agentbbolt.MakeStores(logger, db)
+	if err != nil {
+		return fmt.Errorf("failed to create stores: %w", err)
+	}
+	k := knapsack.New(stores, db)
+
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
@@ -173,12 +176,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(db); err != nil {
+	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, db, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client, opts)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -204,31 +207,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if opts.ControlServerURL == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlStore, err := agentbbolt.NewStore(logger, db, controlServiceBucketName)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
-		}
-
-		controlService, err = createControlService(ctx, logger, controlStore, opts)
+		controlService, err := createControlService(ctx, logger, k.ControlStore(), opts)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataBucketConsumer handles server data table updates
-		serverDataBucketConsumer, err := agentbbolt.NewStore(logger, db, osquery.ServerProvidedDataBucket)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
-		}
-		controlService.RegisterConsumer(serverDataSubsystemName, serverDataBucketConsumer)
+		controlService.RegisterConsumer(serverDataSubsystemName, k.ServerProvidedDataStore())
+		controlService.RegisterConsumer(agentFlagsSubsystemName, k.AgentFlagsStore())
 
-		desktopFlagsBucketConsumer, err := agentbbolt.NewStore(logger, db, agentFlagsBucketName)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
-		}
-		controlService.RegisterConsumer(agentFlagsSubsystemName, desktopFlagsBucketConsumer)
-
-		desktopEnabledRaw, err := desktopFlagsBucketConsumer.Get([]byte("desktop_enabled_v1"))
+		desktopEnabledRaw, err := k.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
 		if err != nil {
 			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
 		}
@@ -238,7 +227,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// flag is present (regardless of it's value), this indicates control server has told launcher to enable desktop.
 		desktopProcessSpawningEnabled := desktopEnabledRaw != nil
 
-		runner = desktopRunner.New(
+		runner, err = desktopRunner.New(
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
@@ -246,20 +235,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(desktopFlagsBucketConsumer),
+			desktopRunner.WithGetter(k.AgentFlagsStore()),
 		)
+		if err != nil {
+			return fmt.Errorf("failed to create desktop runner: %w", err)
+		}
+
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
 
-		notificationStore, err := agentbbolt.NewStore(logger, db, osquery.SentNotificationsBucket)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore: %w", err)
-		}
-
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			notificationStore,
+			k.SentNotificationsStore(),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
@@ -282,7 +270,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
-		ls, err := localserver.New(db,
+		ls, err := localserver.New(
+			k.ConfigStore(),
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 			localserver.WithControlService(controlService),
@@ -354,12 +343,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 
-		// Set up the bucket for tracking new autoupdater errors
-		autoupdaterErrorStore, err := agentbbolt.NewStore(logger, db, tuf.AutoupdateErrorBucket)
-		if err != nil {
-			return fmt.Errorf("failed to create KVStore %s: %w", tuf.AutoupdateErrorBucket, err)
-		}
-
 		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 1 * time.Minute
@@ -367,7 +350,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			opts.TufServerURL,
 			opts.RootDirectory,
 			metadataClient,
-			autoupdaterErrorStore,
+			k.AutoupdateErrorsStore(),
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),

@@ -14,13 +14,14 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
+	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquery_logger "github.com/osquery/osquery-go/plugin/logger"
-
 	"go.etcd.io/bbolt"
 )
 
@@ -91,7 +92,13 @@ func main() {
 	}
 	defer db.Close()
 
-	ext, err := grpcext.NewExtension(remote, db, extOpts)
+	stores, err := agentbbolt.MakeStores(logger, db)
+	if err != nil {
+		logutil.Fatal(logger, "err", fmt.Errorf("creating stores: %w", err), "stack", fmt.Sprintf("%+v", err))
+	}
+	k := knapsack.New(stores, db)
+
+	ext, err := grpcext.NewExtension(remote, k, extOpts)
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("starting grpc extension: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
