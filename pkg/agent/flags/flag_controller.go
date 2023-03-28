@@ -39,7 +39,7 @@ func NewFlagController(logger log.Logger, defaultValues *FlagValues, cmdLineValu
 }
 
 func get[T any](fc *FlagController, key FlagKey) T {
-	// If there is a temporary override, it takes precendence over anything else
+	// If there is a temporary override, it takes precedence over anything else
 	overrideValue, ok := getOverrideValue[T](fc, key)
 	if ok {
 		return overrideValue

@@ -104,14 +104,14 @@ func (s *inMemoryKeyValueStore) Update(pairs ...string) ([]string, error) {
 	var deletedKeys []string
 
 	for key, _ := range s.items {
-		if _, ok := kvPairs[string(key)]; ok {
+		if _, ok := kvPairs[key]; ok {
 			continue
 		}
 
-		delete(s.items, string(key))
+		delete(s.items, key)
 
 		// Remember which keys we're deleting
-		deletedKeys = append(deletedKeys, string(key))
+		deletedKeys = append(deletedKeys, key)
 	}
 
 	return deletedKeys, nil
