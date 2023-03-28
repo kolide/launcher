@@ -155,52 +155,6 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 	cs.requestTicker.Reset(interval)
 }
 
-/*
-func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
-	// perform a fetch now
-	if err := cs.Fetch(); err != nil {
-		// if we got an error, log it and move on
-		level.Debug(cs.logger).Log(
-			"msg", "failed to fetch data from control server. Not fatal, moving on",
-			"err", err,
-		)
-	}
-
-	// callback := func() {
-	// 	level.Debug(cs.logger).Log(
-	// 		"msg", "resetting control service request interval after acceleration",
-	// 		"interval", cs.requestInterval,
-	// 	)
-
-	// 	// set back to original interval
-	// 	cs.requestTicker.Reset(cs.requestInterval)
-	// }
-
-	// override := flags.NewOverride(duration)
-	cs.knapsack.Flags.SetOverride(flags.ControlRequestInterval, interval, duration)
-
-	// set request interval back to starting interval after duration has passed
-	// callback := func() {
-		level.Debug(cs.logger).Log(
-			"msg", "resetting control service request interval after acceleration",
-			"interval", cs.requestInterval,
-		)
-
-		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
-	}
-
-	level.Debug(cs.logger).Log(
-		"msg", "accelerating control service request interval",
-		"interval", interval,
-		"duration", duration,
-	)
-
-	// restart the ticker on accelerated interval
-	cs.requestTicker.Reset(interval)
-}
-*/
-
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
 	cs.fetchMutex.Lock()
