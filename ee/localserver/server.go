@@ -159,13 +159,15 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	serverEccCertPem := k2EccServerCert
 	switch {
 	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
-		level.Debug(ls.logger).Log("msg", "using developer server certificate")
+		level.Debug(ls.logger).Log("msg", "using developer certificates")
 		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
-		level.Debug(ls.logger).Log("msg", "using review app server certificate")
+		level.Debug(ls.logger).Log("msg", "using review app certificates")
 		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
+	default:
+		level.Debug(ls.logger).Log("msg", "using default/production certificates")
 	}
 
 	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
