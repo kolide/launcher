@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -30,7 +31,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	assert.Empty(t, logBytes.String())
+	// We want to test that there were no errors or warnings logged. We do this indiredtly, by making sure the log
+	// only contains what we expect. There's probably a cleaner way....
+	// Right now, we expect a single log line about certificates
+	assert.Equal(t, 1, strings.Count(logBytes.String(), "\n"))
+	assert.Contains(t, logBytes.String(), "certificate")
+
 	assert.Equal(t, http.StatusOK, rr.Code)
 
 	// convert the response to a struct
