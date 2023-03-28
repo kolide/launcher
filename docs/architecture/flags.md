@@ -9,7 +9,7 @@ Launcher flags are identified by a `FlagKey` and can be specified through variou
 - Control server updates, which are ingested by the control server client and stored in a key-value store.
 - Temporary overrides, where a client can request the `Flags` interface to override the current value with a different value for a duration of time.
 
-Launcher flag values can also have constraints defined, which provide safeguards to prevent unreasonable values being used.
+Launcher flag values can also have constraints defined, which provide safeguards to prevent unreasonable values being used. Currently constraints only apply to `int64` flag values.
 
 ## Retrieving Flags
 
@@ -81,6 +81,4 @@ flowchart TB
 
     Wait -.->Clear
     Clear -.-> Notify
-
-    Notify -.->|Return err to Client| Client
 ```

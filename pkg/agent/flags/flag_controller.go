@@ -248,7 +248,7 @@ func (fc *FlagController) Update(pairs ...string) ([]string, error) {
 
 func (fc *FlagController) SetOverride(key FlagKey, value any, duration time.Duration) {
 	// Always notify observers when overrides start, so they know to refresh.
-	// Defering this before unlocking the mutex so that notifications occur outside of the critical section.
+	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
 	defer fc.notifyObservers(key)
 
 	fc.overrideMutex.RLock()
@@ -271,7 +271,7 @@ func (fc *FlagController) SetOverride(key FlagKey, value any, duration time.Dura
 // overrideExpired removes an override and notifies observers of this change.
 func (fc *FlagController) overrideExpired(key FlagKey) {
 	// Always notify observers when overrides expire, so they know to refresh.
-	// Defering this before unlocking the mutex so that notifications occur outside of the critical section.
+	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
 	defer fc.notifyObservers(key)
 
 	fc.overrideMutex.RLock()

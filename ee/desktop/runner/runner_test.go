@@ -16,6 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,6 +121,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithAuthToken("test-auth-token"),
 				WithUsersFilesRoot(launcherRootDir(t)),
 				WithProcessSpawningEnabled(true),
+				WithKnapsack(knapsack.NewTestingKnapsack(t)),
 			)
 			require.NoError(t, err)
 
@@ -241,7 +243,7 @@ func TestUpdate(t *testing.T) {
 			t.Parallel()
 
 			dir := t.TempDir()
-			r, err := New(WithUsersFilesRoot(dir))
+			r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t)), WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -267,7 +269,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	r, err := New(WithUsersFilesRoot(dir))
+	r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t)), WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))
