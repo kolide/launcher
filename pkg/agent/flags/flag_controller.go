@@ -15,8 +15,8 @@ import (
 // determining precedence, sanitizing flag values, and notifying observers of changes.
 type FlagController struct {
 	logger           log.Logger
-	defaultValues    *AnyFlagValues
-	cmdLineValues    *AnyFlagValues
+	defaultValues    *FlagValues
+	cmdLineValues    *FlagValues
 	storedFlagValues *storedFlagValues
 	sanitizer        *flagValueSanitizer
 	overrideMutex    sync.RWMutex
@@ -24,7 +24,7 @@ type FlagController struct {
 	observers        map[FlagsChangeObserver][]FlagKey
 }
 
-func NewFlagController(logger log.Logger, defaultValues *AnyFlagValues, cmdLineValues *AnyFlagValues, storedFlagValues *storedFlagValues, sanitizer *flagValueSanitizer) *FlagController {
+func NewFlagController(logger log.Logger, defaultValues *FlagValues, cmdLineValues *FlagValues, storedFlagValues *storedFlagValues, sanitizer *flagValueSanitizer) *FlagController {
 	fc := &FlagController{
 		logger:           logger,
 		defaultValues:    defaultValues,

@@ -1,28 +1,24 @@
 package flags
 
-// Alias which allows any type
-type AnyFlagValues = flagValues[any]
-
-type flagValues[T any] struct {
-	flags map[FlagKey]T
+type FlagValues struct {
+	flags map[FlagKey]any
 }
 
-// NewFlagValues returns a new typed flagValues struct.
-func NewFlagValues[T any]() *flagValues[T] {
-	f := &flagValues[T]{
-		flags: make(map[FlagKey]T),
+func NewFlagValues() *FlagValues {
+	f := &FlagValues{
+		flags: make(map[FlagKey]any),
 	}
 
 	return f
 }
 
 // Set sets the value for a FlagKey.
-func (f *flagValues[T]) Set(key FlagKey, value T) {
+func (f *FlagValues) Set(key FlagKey, value any) {
 	f.flags[key] = value
 }
 
 // Get retrieves the value for a FlagKey.
-func (f *flagValues[T]) Get(key FlagKey) (T, bool) {
+func (f *FlagValues) Get(key FlagKey) (any, bool) {
 	value, exists := f.flags[key]
 	return value, exists
 }

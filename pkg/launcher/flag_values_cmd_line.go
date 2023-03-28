@@ -5,9 +5,9 @@ import (
 )
 
 // CmdLineFlagValues converts command line options into the equivalent
-// flagValues struct of FlagKeys and values
-func CmdLineFlagValues(opts *Options) *flags.AnyFlagValues {
-	f := flags.NewFlagValues[any]()
+// FlagValues struct of FlagKeys and values
+func CmdLineFlagValues(opts *Options) *flags.FlagValues {
+	f := flags.NewFlagValues()
 
 	// Not every FlagKey has (or needs) an associated cmd line option.
 	// For those that do, make sure to add it below.

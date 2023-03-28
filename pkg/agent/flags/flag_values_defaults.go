@@ -4,9 +4,9 @@ import (
 	"time"
 )
 
-// DefaultFlagValues returns a flagValues struct of default FlagKeys and values
-func DefaultFlagValues() *AnyFlagValues {
-	f := NewFlagValues[any]()
+// DefaultFlagValues returns a FlagValues struct of default FlagKeys and values
+func DefaultFlagValues() *FlagValues {
+	f := NewFlagValues()
 
 	// Below is a list of every FlagKey and it's default value.
 	// When adding a new FlagKey, make sure to add it's default value below.
