@@ -53,19 +53,19 @@ func (tp *templateParser) Parse(text string) (string, error) {
 
 			switch {
 			case diff < 60*10: // less than 10 minutes
-				return "very soon"
+				return "Very Soon"
 			case diff < 60*50: // less than 50 minutes
-				return fmt.Sprintf("in %d minutes", diff/60)
+				return fmt.Sprintf("In %d Minutes", diff/60)
 			case diff < 60*90: // less than 90 minutes
-				return "in about an hour"
+				return "In About An Hour"
 			case diff < 60*60*23: // less than 23 hours
-				return fmt.Sprintf("in %d hours", diff/3600)
+				return fmt.Sprintf("In %d Hours", diff/3600)
 			case diff < 60*60*36: // less than 36 hours
-				return "in one day"
+				return "In One Day"
 			case diff < 60*60*24*14: // less than 14 days
-				return fmt.Sprintf("in %d days", diff/86400)
+				return fmt.Sprintf("In %d Days", diff/86400)
 			default: // 2 weeks or more
-				return fmt.Sprintf("in %d weeks", diff/604800)
+				return fmt.Sprintf("In %d Weeks", diff/604800)
 			}
 		},
 	}).Parse(text)
