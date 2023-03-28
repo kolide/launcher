@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/kolide/launcher/pkg/agent/flags"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {
@@ -14,11 +16,6 @@ func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Body == nil {
 		sendClientError(w, "request body is nil")
-		return
-	}
-
-	if ls.controlService == nil {
-		sendClientError(w, fmt.Sprintf("control service not configured"))
 		return
 	}
 
@@ -40,7 +37,7 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 		return
 	}
 
-	ls.controlService.AccelerateRequestInterval(interval, duration)
+	ls.knapsack.Flags.SetOverride(flags.ControlRequestInterval, interval, duration)
 }
 
 func durationFromMap(key string, body map[string]string) (time.Duration, error) {

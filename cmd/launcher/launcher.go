@@ -20,7 +20,6 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -207,8 +206,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
-	var controlService *control.ControlService
-
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if k.Flags.ControlServerURL() == "" {
@@ -268,10 +265,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
-			k.ConfigStore(),
+			k,
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
-			localserver.WithControlService(controlService),
 		)
 
 		if err != nil {

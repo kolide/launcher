@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"sync"
 	"time"
 
@@ -70,7 +69,7 @@ func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...
 		opt(cs)
 	}
 
-	// Observe DesktopEnabled changes to know when to enable/disable process spawning
+	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.Flags.RegisterChangeObserver(cs, flags.ControlRequestInterval)
 
 	return cs
@@ -121,19 +120,7 @@ func (cs *ControlService) Stop() {
 
 func (cs *ControlService) FlagsChanged(keys ...flags.FlagKey) {
 	if slices.Contains(keys, flags.ControlRequestInterval) {
-
-			// set request interval back to starting interval after duration has passed
-	// callback := func() {
-		level.Debug(cs.logger).Log(
-			"msg", "resetting control service request interval after acceleration",
-			"interval", cs.requestInterval,
-		)
-
-		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
-
-		r.processSpawningEnabled = r.knapsack.Flags.DesktopEnabled()
-		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
+		cs.requestIntervalChanged(cs.knapsack.Flags.ControlRequestInterval())
 	}
 }
 
@@ -141,7 +128,7 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 	if interval == cs.requestInterval {
 		return
 	}
-	
+
 	// perform a fetch now
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
@@ -151,59 +138,24 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 		)
 	}
 
-	if interval < cs.minAccelerationInterval {
+	if interval < cs.requestInterval {
 		level.Debug(cs.logger).Log(
-			"msg", "control service acceleration interval too small, using minimum interval",
-			"minimum_interval", cs.minAccelerationInterval,
-			"provided_interval", interval,
+			"msg", "accelerating control service request interval",
+			"interval", interval,
 		)
-		interval = cs.minAccelerationInterval
-	}
-
-	// stop existing timer
-	if cs.requestAccelerationTimer != nil {
-		cs.requestAccelerationTimer.Stop()
-	}
-
-	// set request interval back to starting interval after duration has passed
-	cs.requestAccelerationTimer = time.AfterFunc(duration, func() {
+	} else {
 		level.Debug(cs.logger).Log(
 			"msg", "resetting control service request interval after acceleration",
 			"interval", cs.requestInterval,
 		)
+	}
 
-		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
-	})
-
-	level.Debug(cs.logger).Log(
-		"msg", "accelerating control service request interval",
-		"interval", interval,
-		"duration", duration,
-	)
-
-	// restart the ticker on accelerated interval
+	// restart the ticker on new interval
+	cs.requestInterval = interval
 	cs.requestTicker.Reset(interval)
 }
 
-func (cs *ControlService) FlagsChanged(keys ...flags.FlagKey) {
-	if slices.Contains(keys, flags.ControlRequestInterval) {
-
-			// set request interval back to starting interval after duration has passed
-	// callback := func() {
-		level.Debug(cs.logger).Log(
-			"msg", "resetting control service request interval after acceleration",
-			"interval", cs.requestInterval,
-		)
-
-		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
-
-		r.processSpawningEnabled = r.knapsack.Flags.DesktopEnabled()
-		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
-	}
-}
-
+/*
 func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
 	// perform a fetch now
 	if err := cs.Fetch(); err != nil {
@@ -247,6 +199,7 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 	// restart the ticker on accelerated interval
 	cs.requestTicker.Reset(interval)
 }
+*/
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
