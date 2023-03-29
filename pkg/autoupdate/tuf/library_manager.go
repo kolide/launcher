@@ -3,6 +3,7 @@ package tuf
 import (
 	"context"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
 )
@@ -30,16 +32,18 @@ type updateLibraryManager struct {
 	mirrorClient    *http.Client
 	rootDirectory   string
 	operatingSystem string
+	osquerier       localserver.Querier
 	logger          log.Logger
 }
 
-func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, rootDirectory string, operatingSystem string, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, rootDirectory string, operatingSystem string, osquerier localserver.Querier, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
 		metadataClient:  metadataClient,
 		mirrorUrl:       mirrorUrl,
 		mirrorClient:    mirrorClient,
 		rootDirectory:   rootDirectory,
 		operatingSystem: operatingSystem,
+		osquerier:       osquerier,
 		logger:          logger,
 	}
 
@@ -208,8 +212,24 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.V
 		}
 		return currentVersion, nil
 	case "osqueryd":
-		// TODO
-		return nil, fmt.Errorf("not implemented for %s yet", binary)
+		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
+		if err != nil {
+			return nil, fmt.Errorf("could not query for osquery version: %w", err)
+		}
+		if len(resp) < 1 {
+			return nil, errors.New("osquery version query returned no rows")
+		}
+		rawVersion, ok := resp[0]["version"]
+		if !ok {
+			return nil, errors.New("osquery version query did not return version")
+		}
+
+		currentVersion, err := semver.NewVersion(rawVersion)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse current running version %s of osquery as semver: %w", rawVersion, err)
+		}
+
+		return currentVersion, nil
 	default:
 		return nil, fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}

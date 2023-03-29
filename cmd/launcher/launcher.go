@@ -351,6 +351,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			opts.RootDirectory,
 			metadataClient,
 			k.AutoupdateErrorsStore(),
+			extension,
 			tuf.WithLogger(logger),
 			tuf.WithChannel(string(opts.UpdateChannel)),
 			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),

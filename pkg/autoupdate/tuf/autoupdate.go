@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
@@ -69,7 +70,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, osquerier localserver.Querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		operatingSystem: runtime.GOOS,
 		channel:         defaultChannel,
@@ -89,7 +90,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *ht
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
 
-	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, autoupdate.DefaultMirror, http.DefaultClient, rootDirectory, ta.operatingSystem, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, autoupdate.DefaultMirror, http.DefaultClient, rootDirectory, ta.operatingSystem, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}

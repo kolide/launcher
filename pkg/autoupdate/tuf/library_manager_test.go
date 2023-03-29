@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
+	localservermocks "github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,6 +34,59 @@ func Test_addToLibrary_alreadyAdded(t *testing.T) {
 func Test_addToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	t.Parallel()
 	t.Skip("TODO")
+}
+
+func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
+	t.Parallel()
+
+	testLibraryManager := &updateLibraryManager{
+		logger: log.NewNopLogger(),
+	}
+
+	// In test, version.Version() returns `unknown` for everything, which is not something
+	// that the semver library can parse. So we only expect an error here.
+	launcherVersion, err := testLibraryManager.currentRunningVersion("launcher")
+	require.Error(t, err, "expected an error fetching current running version of launcher")
+	require.Nil(t, launcherVersion)
+}
+
+func Test_currentRunningVersion_osqueryd(t *testing.T) {
+	t.Parallel()
+
+	mockOsquerier := localservermocks.NewQuerier(t)
+
+	testLibraryManager := &updateLibraryManager{
+		logger:    log.NewNopLogger(),
+		osquerier: mockOsquerier,
+	}
+
+	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
+	require.NoError(t, err)
+
+	// Expect to return one row containing the version
+	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
+
+	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
+	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
+	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion.Original())
+}
+
+func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
+	t.Parallel()
+
+	mockOsquerier := localservermocks.NewQuerier(t)
+
+	testLibraryManager := &updateLibraryManager{
+		logger:    log.NewNopLogger(),
+		osquerier: mockOsquerier,
+	}
+
+	// Expect to return an error
+	mockOsquerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error")).Once()
+
+	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
+	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
+	require.Nil(t, osqueryVersion)
 }
 
 func Test_tidyLibrary(t *testing.T) {
