@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	flagMocks "github.com/kolide/launcher/pkg/agent/flags/mocks"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +60,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			}
 
 			var logBytes bytes.Buffer
-			server := testServer(t, &logBytes)
+			server := testServer(t, flagMocks.NewFlags(t), &logBytes)
 			server.querier = mockQuerier
 
 			jsonBytes, err := json.Marshal(map[string]string{
@@ -225,7 +226,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 
 			// set up test server
 			var logBytes bytes.Buffer
-			server := testServer(t, &logBytes)
+			server := testServer(t, flagMocks.NewFlags(t), &logBytes)
 			server.querier = mockQuerier
 
 			// make request body

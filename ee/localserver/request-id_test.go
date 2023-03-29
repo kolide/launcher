@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	"github.com/kolide/launcher/pkg/agent/flags/mocks"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +22,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	t.Parallel()
 
 	var logBytes bytes.Buffer
-	server := testServer(t, &logBytes)
+	server := testServer(t, mocks.NewFlags(t), &logBytes)
 
 	req, err := http.NewRequest("", "", nil)
 	require.NoError(t, err)
@@ -46,8 +48,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 }
 
-func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
-	k := knapsack.NewTestingKnapsack(t)
+func testServer(t *testing.T, f flags.Flags, logBytes *bytes.Buffer) *localServer {
+	k := knapsack.NewTestingKnapsack(t, f)
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
 	server, err := New(k, "", WithLogger(log.NewLogfmtLogger(logBytes)))

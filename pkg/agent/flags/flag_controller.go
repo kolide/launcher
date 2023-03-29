@@ -280,8 +280,8 @@ func (fc *FlagController) overrideExpired(key FlagKey) {
 	fc.overrideMutex.Lock()
 	defer fc.overrideMutex.Unlock()
 
-	// Removing the override implictly allows the next value to take precedence
-	fc.overrides[key] = nil
+	// Deleting the override implictly allows the next value to take precedence
+	delete(fc.overrides, key)
 }
 
 func (fc *FlagController) RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey) {
@@ -328,10 +328,10 @@ func (fc *FlagController) ControlServerURL() string {
 }
 
 func (fc *FlagController) SetControlRequestInterval(interval time.Duration) error {
-	return set(fc, ControlRequestInterval, interval)
+	return set(fc, ControlRequestInterval, int64(interval))
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
-	return get[time.Duration](fc, ControlRequestInterval)
+	return time.Duration(get[int64](fc, ControlRequestInterval))
 }
 
 func (fc *FlagController) SetDisableControlTLS(disabled bool) error {

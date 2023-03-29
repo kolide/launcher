@@ -10,9 +10,11 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control/mocks"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	flagMocks "github.com/kolide/launcher/pkg/agent/flags/mocks"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,9 +82,12 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockFlags := flagMocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), data, controlOpts...)
+			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -108,9 +113,12 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockFlags := flagMocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), data, controlOpts...)
+			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -151,9 +159,12 @@ func TestControlServiceUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockFlags := flagMocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), data, controlOpts...)
+			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -206,9 +217,13 @@ func TestControlServiceFetch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockFlags := flagMocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+			mockFlags.On("ForceControlSubsystems").Return(false)
+
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), data, controlOpts...)
+			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -266,7 +281,11 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				data := &TestClient{tt.subsystems, tt.hashData}
 				controlOpts := []Option{WithStore(store)}
 
-				cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), data, controlOpts...)
+				mockFlags := flagMocks.NewFlags(t)
+				mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+				mockFlags.On("ForceControlSubsystems").Return(false)
+
+				cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -276,49 +295,6 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 			// Expect consumer to have gotten exactly one update
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
-		})
-	}
-}
-
-func TestControlService_AccelerateRequestInterval_MinInterval(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		interval time.Duration
-		errStr   string
-	}{
-		{
-			name:     "happy path",
-			interval: 30 * time.Second,
-		},
-		{
-			name:     "too small interval",
-			interval: 1 * time.Second,
-			errStr:   "control service acceleration interval too small, using minimum interval",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockDataProvider := mocks.NewDataProvider(t)
-			mockDataProvider.On("GetConfig").Return(nil, nil)
-
-			var logBytes threadsafebuffer.ThreadSafeBuffer
-			cs := New(log.NewLogfmtLogger(&logBytes), knapsack.NewTestingKnapsack(t), mockDataProvider)
-
-			cs.AccelerateRequestInterval(tt.interval, 0)
-
-			if tt.errStr != "" {
-				assert.Contains(t, logBytes.String(), tt.errStr)
-				return
-			}
-
-			// ensure we accept legit intervals
-			assert.NotContains(t, logBytes.String(), "control service acceleration interval too small, using minimum interval")
 		})
 	}
 }
@@ -366,7 +342,11 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			mockDataProvider := mocks.NewDataProvider(t)
 			mockDataProvider.On("GetConfig").Return(nil, nil)
 
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t), mockDataProvider, WithRequestInterval(tt.startInterval), WithMinAcclerationInterval(1*time.Millisecond))
+			defaults := flags.DefaultFlagValues()
+			defaults.Set(flags.ControlRequestInterval, int64(tt.startInterval))
+			k := knapsack.NewTestingKnapsack(t, flags.NewFlagController(log.NewNopLogger(), defaults, nil, nil, nil))
+
+			cs := New(log.NewNopLogger(), k, mockDataProvider)
 
 			wg := sync.WaitGroup{}
 			wg.Add(1)
@@ -381,15 +361,15 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			time.Sleep(tt.startInterval)
 
 			// expect 1 fetch on acceleration request
-			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
 
 			// expect 1 fetch during single tick of acceleration
 			time.Sleep(tt.accelerationInterval)
 
 			// expect 1 fetch on acceleration request
-			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
 			// expect 1 fetch on acceleration request
-			cs.AccelerateRequestInterval(tt.accelerationInterval, tt.accelerationDuration)
+			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
 
 			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
 			time.Sleep(tt.accelerationDuration)

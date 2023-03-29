@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	"github.com/kolide/launcher/pkg/agent/flags/mocks"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,9 +19,10 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 	tests := []struct {
 		name                  string
 		expectedHttpStatus    int
+		expectedInterval      time.Duration
 		body                  map[string]string
 		httpErrStr, logErrStr string
-		mockControlService    func() controlService
+		mockFlags             func() flags.Flags
 	}{
 		{
 			name:               "happy path",
@@ -28,9 +31,10 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "250ms",
 				"duration": "1s",
 			},
-			mockControlService: func() controlService {
-				m := mocks.NewControlService(t)
-				m.On("AccelerateRequestInterval", 250*time.Millisecond, 1*time.Second)
+			expectedInterval: 250 * time.Millisecond,
+			mockFlags: func() flags.Flags {
+				m := mocks.NewFlags(t)
+				m.On("SetOverride", flags.ControlRequestInterval, int64(250*time.Millisecond), 1*time.Second)
 				return m
 			},
 		},
@@ -40,20 +44,13 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			httpErrStr:         "request body is nil",
 		},
 		{
-			name:               "no control service",
-			expectedHttpStatus: http.StatusBadRequest,
-			httpErrStr:         "control service not configured",
-			body:               map[string]string{},
-		},
-		{
 			name:               "bad interval",
 			expectedHttpStatus: http.StatusBadRequest,
 			body: map[string]string{
 				"interval": "blah",
 				"duration": "1s",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing interval",
+			httpErrStr: "error parsing interval",
 		},
 		{
 			name:               "empty interval",
@@ -62,8 +59,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "",
 				"duration": "1s",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing interval",
+			httpErrStr: "error parsing interval",
 		},
 		{
 			name:               "no interval",
@@ -71,8 +67,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			body: map[string]string{
 				"duration": "1s",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing interval",
+			httpErrStr: "error parsing interval",
+			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
 		},
 		{
 			name:               "bad duration",
@@ -81,8 +77,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "250ms",
 				"duration": "blah",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing duration",
+			httpErrStr: "error parsing duration",
+			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
 		},
 		{
 			name:               "empty duration",
@@ -91,8 +87,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "250ms",
 				"duration": "",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing duration",
+			httpErrStr: "error parsing duration",
+			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
 		},
 		{
 			name:               "no duration",
@@ -100,8 +96,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			body: map[string]string{
 				"interval": "250ms",
 			},
-			mockControlService: func() controlService { return mocks.NewControlService(t) },
-			httpErrStr:         "error parsing duration",
+			httpErrStr: "error parsing duration",
+			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
 		},
 	}
 
@@ -110,12 +106,13 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes bytes.Buffer
-			server := testServer(t, &logBytes)
-
-			if tt.mockControlService != nil {
-				server.controlService = tt.mockControlService()
+			var f flags.Flags
+			if tt.mockFlags != nil {
+				f = tt.mockFlags()
 			}
+
+			var logBytes bytes.Buffer
+			server := testServer(t, f, &logBytes)
 
 			req, err := http.NewRequest("", "", nil)
 			if tt.body != nil {

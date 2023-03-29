@@ -16,9 +16,12 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	"github.com/kolide/launcher/pkg/agent/flags/mocks"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -112,6 +115,9 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
 
+			mockFlags := mocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
+
 			r, err := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
@@ -121,7 +127,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithAuthToken("test-auth-token"),
 				WithUsersFilesRoot(launcherRootDir(t)),
 				WithProcessSpawningEnabled(true),
-				WithKnapsack(knapsack.NewTestingKnapsack(t)),
+				WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)),
 			)
 			require.NoError(t, err)
 
@@ -242,8 +248,11 @@ func TestUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockFlags := mocks.NewFlags(t)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
+
 			dir := t.TempDir()
-			r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t)), WithUsersFilesRoot(dir))
+			r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)), WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -268,8 +277,11 @@ func TestUpdate(t *testing.T) {
 func TestSendNotification_NoProcessesYet(t *testing.T) {
 	t.Parallel()
 
+	mockFlags := mocks.NewFlags(t)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
+
 	dir := t.TempDir()
-	r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t)), WithUsersFilesRoot(dir))
+	r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)), WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))

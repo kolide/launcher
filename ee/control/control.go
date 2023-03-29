@@ -56,18 +56,18 @@ func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...
 	cs := &ControlService{
 		logger:          log.With(logger, "component", "control"),
 		knapsack:        k,
-		requestInterval: 60 * time.Second,
+		requestInterval: k.Flags.ControlRequestInterval(),
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
 		consumers:       make(map[string]consumer),
 		subscribers:     make(map[string][]subscriber),
 	}
 
-	cs.requestTicker = time.NewTicker(cs.requestInterval)
-
 	for _, opt := range opts {
 		opt(cs)
 	}
+
+	cs.requestTicker = time.NewTicker(cs.requestInterval)
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.Flags.RegisterChangeObserver(cs, flags.ControlRequestInterval)

@@ -37,7 +37,7 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 		return
 	}
 
-	ls.knapsack.Flags.SetOverride(flags.ControlRequestInterval, interval, duration)
+	ls.knapsack.Flags.SetOverride(flags.ControlRequestInterval, int64(interval), duration)
 }
 
 func durationFromMap(key string, body map[string]string) (time.Duration, error) {

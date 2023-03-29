@@ -9,10 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewTestingKnapsack(t *testing.T) *Knapsack {
+func NewTestingKnapsack(t *testing.T, f flags.Flags) *Knapsack {
 	db := storageci.SetupDB(t)
 	stores, err := storageci.MakeStores(t, log.NewNopLogger(), db)
 	require.NoError(t, err)
-	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil, nil)
 	return New(stores, f, db)
 }

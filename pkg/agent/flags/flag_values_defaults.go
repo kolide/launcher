@@ -14,7 +14,7 @@ func DefaultFlagValues() *FlagValues {
 	f.Set(DebugServerData, false)
 	f.Set(ForceControlSubsystems, false)
 	f.Set(ControlServerURL, "")
-	f.Set(ControlRequestInterval, 60*time.Second)
+	f.Set(ControlRequestInterval, int64(60*time.Second))
 	f.Set(DisableControlTLS, false)
 	f.Set(InsecureControlTLS, false)
 	return f
