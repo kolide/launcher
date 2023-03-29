@@ -64,6 +64,9 @@ func get[T any](fc *FlagController, key FlagKey) T {
 // getOverrideValue looks for an override value for the key and returns it, and true
 // if an override value is not found, a zero value and false will be returned
 func getOverrideValue[T any](fc *FlagController, key FlagKey) (T, bool) {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	override, ok := fc.overrides[key]
 	if !ok {
 		return *new(T), false
@@ -251,8 +254,8 @@ func (fc *FlagController) SetOverride(key FlagKey, value any, duration time.Dura
 	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
 	defer fc.notifyObservers(key)
 
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
+	fc.overrideMutex.Lock()
+	defer fc.overrideMutex.Unlock()
 
 	override, ok := fc.overrides[key]
 	if !ok {
@@ -274,8 +277,8 @@ func (fc *FlagController) overrideExpired(key FlagKey) {
 	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
 	defer fc.notifyObservers(key)
 
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
+	fc.overrideMutex.Lock()
+	defer fc.overrideMutex.Unlock()
 
 	// Removing the override implictly allows the next value to take precedence
 	fc.overrides[key] = nil
