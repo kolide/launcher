@@ -209,14 +209,11 @@ func (ulm *updateLibraryManager) verifyExecutableInDirectory(updateDirectory str
 	case err != nil:
 		// Can't check -- assume it's not added
 		return fmt.Errorf("error checking file info for %s: %w", updateDirectory, err)
-	case stat.Mode()&0111 == 0:
-		// Exists but not executable
-		return fmt.Errorf("file %s is not executable", updateDirectory)
 	}
 
 	// TODO run with --version
 
-	return nil
+	return verifyExecutable(stat)
 }
 
 // currentRunningVersion returns the current running version of the given binary.

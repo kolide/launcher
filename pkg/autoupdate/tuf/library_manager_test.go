@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -195,6 +196,12 @@ func Test_tidyLibrary(t *testing.T) {
 				// Set up existing versions for test
 				for existingVersion, isExecutable := range tt.existingVersions {
 					executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), existingVersion), binary)
+					if !isExecutable && runtime.GOOS == "windows" {
+						// We check file extension .exe to confirm executable on Windows, so trim the extension
+						// if this test does not expect the file to be executable.
+						executablePath = strings.TrimSuffix(executablePath, ".exe")
+					}
+
 					require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
 
 					tmpFile, err := os.Create(executablePath)
