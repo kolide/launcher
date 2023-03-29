@@ -96,7 +96,7 @@ func getOverrideValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 			anyvalue = stringValue
 		}
 	default:
-		level.Debug(fc.logger).Log("msg", "unsupported type of override flag", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "unsupported type of override flag", "key", key, "type", reflect.TypeOf(t).Kind())
 	}
 
 	if anyvalue == nil {
@@ -106,7 +106,7 @@ func getOverrideValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	// Now we can get the underlying concrete value
 	typedValue, ok := anyvalue.(T)
 	if !ok {
-		level.Debug(fc.logger).Log("msg", "override flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "override flag type assertion failed", "key", key, "type", reflect.TypeOf(t).Kind())
 		return *new(T), false
 	}
 
@@ -147,7 +147,7 @@ func getStoredValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	case reflect.String:
 		anyvalue = string(byteValue)
 	default:
-		level.Debug(fc.logger).Log("msg", "unsupported type of stored flag", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "unsupported type of stored flag", "key", key, "type", reflect.TypeOf(t).Kind())
 	}
 
 	if anyvalue == nil {
@@ -157,7 +157,7 @@ func getStoredValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 	// Now we can get the underlying concrete value
 	typedValue, ok := anyvalue.(T)
 	if !ok {
-		level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "stored flag type assertion failed", "key", key, "type", reflect.TypeOf(t).Kind())
 		return *new(T), false
 	}
 
@@ -176,10 +176,18 @@ func getCmdLineValue[T any](fc *FlagController, key FlagKey) (T, bool) {
 		return *new(T), false
 	}
 
+	int64Value, ok := value.(int64)
+	if ok {
+		// Integers are sanitized to avoid unreasonable values
+		if fc.sanitizer != nil {
+			value = fc.sanitizer.Sanitize(key, int64Value)
+		}
+	}
+
 	typedValue, ok := value.(T)
 	if !ok {
 		var t T
-		level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "cmd line flag type assertion failed", "key", key, "type", reflect.TypeOf(t).Kind())
 		return *new(T), false
 	}
 
@@ -197,7 +205,7 @@ func getDefaultValue[T any](fc *FlagController, key FlagKey) T {
 	typedValue, ok := value.(T)
 	if !ok {
 		var t T
-		level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "type", reflect.TypeOf(t).Kind())
+		level.Debug(fc.logger).Log("msg", "default flag type assertion failed", "key", key, "type", reflect.TypeOf(t).Kind())
 		return *new(T)
 	}
 

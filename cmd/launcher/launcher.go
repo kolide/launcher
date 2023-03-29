@@ -260,7 +260,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// runEECode feels like it should move up to the opts level.
 	// We have some stuff there that sets `controlServerURL`
-	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense // TODO
+	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense
 
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
