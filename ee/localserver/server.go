@@ -121,7 +121,7 @@ func New(configStore types.Getter, kolideServer string, opts ...LocalServerOptio
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// uncomment to test without going through middleware
 	// for example:
