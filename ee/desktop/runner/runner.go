@@ -103,13 +103,6 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 	}
 }
 
-// WithKnapsack sets the knapsack
-func WithKnapsack(knapsack *knapsack.Knapsack) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.knapsack = knapsack
-	}
-}
-
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -160,7 +153,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k *knapsack.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
@@ -171,6 +164,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunne
 		interruptTimeout:       time.Second * 10,
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: false,
+		knapsack:               k,
 	}
 
 	for _, opt := range opts {

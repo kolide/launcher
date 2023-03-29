@@ -84,6 +84,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			mockFlags := flagMocks.NewFlags(t)
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -115,6 +116,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			mockFlags := flagMocks.NewFlags(t)
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -161,6 +163,7 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			mockFlags := flagMocks.NewFlags(t)
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -219,6 +222,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			mockFlags := flagMocks.NewFlags(t)
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
+			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
 			mockFlags.On("ForceControlSubsystems").Return(false)
 
 			data := &TestClient{tt.subsystems, tt.hashData}
@@ -283,7 +287,12 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 				mockFlags := flagMocks.NewFlags(t)
 				mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-				mockFlags.On("ForceControlSubsystems").Return(false)
+				mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
+
+				if j >= tt.expectedUpdates {
+					// ForceControlSubsystems is only called when no update would normally be triggered
+					mockFlags.On("ForceControlSubsystems").Return(false)
+				}
 
 				cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)

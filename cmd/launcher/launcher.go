@@ -225,6 +225,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(agentFlagsSubsystemName, agentFlagsConsumer)
 
 		runner, err = desktopRunner.New(
+			k,
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithMenuRefreshInterval(time.Minute*15),

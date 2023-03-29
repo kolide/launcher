@@ -119,6 +119,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
 
 			r, err := New(
+				knapsack.NewTestingKnapsack(t, mockFlags),
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
 				WithHostname("somewhere-over-the-rainbow.example.com"),
@@ -127,7 +128,6 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithAuthToken("test-auth-token"),
 				WithUsersFilesRoot(launcherRootDir(t)),
 				WithProcessSpawningEnabled(true),
-				WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)),
 			)
 			require.NoError(t, err)
 
@@ -252,7 +252,7 @@ func TestUpdate(t *testing.T) {
 			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
 
 			dir := t.TempDir()
-			r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)), WithUsersFilesRoot(dir))
+			r, err := New(knapsack.NewTestingKnapsack(t, mockFlags), WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -281,7 +281,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockFlags.On("RegisterChangeObserver", mock.Anything, flags.DesktopEnabled)
 
 	dir := t.TempDir()
-	r, err := New(WithKnapsack(knapsack.NewTestingKnapsack(t, mockFlags)), WithUsersFilesRoot(dir))
+	r, err := New(knapsack.NewTestingKnapsack(t, mockFlags), WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))
