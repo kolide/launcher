@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"context"
 	"crypto/sha512"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
 )
 
@@ -88,7 +90,7 @@ func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename stri
 
 	v, err := ulm.currentRunningVersion(binary)
 	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "cannot parse current running version, cannot safely tidy updates library", "err", err)
+		level.Debug(ulm.logger).Log("msg", "cannot get current running version, cannot safely tidy updates library", "binary", binary, "err", err)
 		return nil
 	}
 
@@ -101,7 +103,7 @@ func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename stri
 func (ulm *updateLibraryManager) alreadyAdded(binary string, targetFilename string) bool {
 	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 
-	return ulm.verifyExecutableInDirectory(updateDirectory, binary) == nil
+	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
 }
 
 // versionFromTarget extracts the semantic version for an update from its filename.
@@ -188,32 +190,12 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 	}
 
 	// Validate the executable
-	if err := ulm.verifyExecutableInDirectory(newUpdateDirectory, binary); err != nil {
+	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(newUpdateDirectory, binary), "--version"); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
 
 	return nil
-}
-
-// verifyExecutableInDirectory ensures that the given update exists, has the appropriate permissions,
-// and can be run.
-func (ulm *updateLibraryManager) verifyExecutableInDirectory(updateDirectory string, binary string) error {
-	stat, err := os.Stat(executableLocation(updateDirectory, binary))
-	switch {
-	case os.IsNotExist(err):
-		// Target has not been downloaded
-		return fmt.Errorf("file does not exist at %s", updateDirectory)
-	case stat.IsDir():
-		return fmt.Errorf("expected executable but got directory at %s", updateDirectory)
-	case err != nil:
-		// Can't check -- assume it's not added
-		return fmt.Errorf("error checking file info for %s: %w", updateDirectory, err)
-	}
-
-	// TODO run with --version
-
-	return verifyExecutable(stat)
 }
 
 // currentRunningVersion returns the current running version of the given binary.
@@ -288,7 +270,8 @@ func (ulm *updateLibraryManager) tidyLibrary(binary string, currentRunningVersio
 		}
 
 		// Only keep good executables
-		if err := ulm.verifyExecutableInDirectory(filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original()), binary); err != nil {
+		versionDir := filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original())
+		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
 			removeUpdate(versionsInLibrary[i].Original())
 			continue
 		}

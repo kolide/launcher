@@ -4,8 +4,6 @@
 package tuf
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 )
 
@@ -20,13 +18,4 @@ func executableLocation(updateDirectory string, binary string) string {
 	default:
 		return ""
 	}
-}
-
-// verifyExecutable checks the executable bits on the given file.
-func verifyExecutable(fileInfo os.FileInfo) error {
-	if fileInfo.Mode()&0111 == 0 {
-		return fmt.Errorf("file %s is not executable", fileInfo.Name())
-	}
-
-	return nil
 }

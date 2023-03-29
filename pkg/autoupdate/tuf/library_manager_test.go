@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -202,11 +203,7 @@ func Test_tidyLibrary(t *testing.T) {
 						executablePath = strings.TrimSuffix(executablePath, ".exe")
 					}
 
-					require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
-
-					tmpFile, err := os.Create(executablePath)
-					require.NoError(t, err, "os create")
-					tmpFile.Close()
+					copyBinary(t, executablePath)
 
 					if isExecutable {
 						require.NoError(t, os.Chmod(executablePath, 0755))
@@ -238,9 +235,19 @@ func Test_tidyLibrary(t *testing.T) {
 	}
 }
 
-func Test_verifyExecutable(t *testing.T) {
-	t.Parallel()
-	t.Skip("TODO")
+func copyBinary(t *testing.T, executablePath string) {
+	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+
+	destFile, err := os.Create(executablePath)
+	require.NoError(t, err, "create destination file")
+	defer destFile.Close()
+
+	srcFile, err := os.Open(os.Args[0])
+	require.NoError(t, err, "opening binary to copy for test")
+	defer srcFile.Close()
+
+	_, err = io.Copy(destFile, srcFile)
+	require.NoError(t, err, "copying binary")
 }
 
 func Test_executableLocation(t *testing.T) {
