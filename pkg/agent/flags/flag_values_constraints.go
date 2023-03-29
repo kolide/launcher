@@ -11,7 +11,7 @@ func FlagValueConstraints() map[FlagKey]flagValueConstraint {
 	// Below is a list of integer FlagKeys and their constraints
 	constraints[ControlRequestInterval] = flagValueConstraint{
 		min: int64(5 * time.Second),
-		max: int64(1 * time.Hour),
+		max: int64(10 * time.Minute),
 	}
 
 	return constraints
