@@ -121,6 +121,12 @@ func New(configStore types.Getter, kolideServer string, opts ...LocalServerOptio
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+
+	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
+	// after making it through the kryptoEcMiddleware
+	// by using v1, k2 can call endpoints without fear of panicing local server
+	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// uncomment to test without going through middleware
@@ -158,16 +164,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 	switch {
-	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
-		level.Debug(ls.logger).Log("msg", "using developer certificates")
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.HasSuffix(ls.kolideServer, ".ngrok.io"):
 		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
-		level.Debug(ls.logger).Log("msg", "using review app certificates")
 		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
-	default:
-		level.Debug(ls.logger).Log("msg", "using default/production certificates")
 	}
 
 	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
