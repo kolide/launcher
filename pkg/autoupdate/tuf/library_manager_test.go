@@ -86,21 +86,22 @@ func Test_newUpdateLibraryManager_removesOldDownloads(t *testing.T) {
 func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 
+	// Set up TUF dependencies -- we do this here to avoid re-initializing the local tuf server for each
+	// binary. It's unnecessary work since the mirror serves the same data both times.
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.2.4"
+	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+	require.NoError(t, err, "creating metadata client")
+	// Re-initialize the metadata client with our test root JSON
+	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+	_, err = metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client")
+
 	for _, binary := range binaries {
 		binary := binary
 		t.Run(binary, func(t *testing.T) {
 			t.Parallel()
-
-			// Set up TUF dependencies
-			testRootDir := t.TempDir()
-			testReleaseVersion := "1.2.3"
-			tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
-			metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
-			require.NoError(t, err, "creating metadata client")
-			// Re-initialize the metadata client with our test root JSON
-			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-			_, err = metadataClient.Update()
-			require.NoError(t, err, "could not update metadata client")
 
 			// Set up test library manager
 			mockOsquerier := localservermocks.NewQuerier(t)
@@ -218,21 +219,22 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	t.Parallel()
 
+	// Set up TUF dependencies -- we do this here to avoid re-initializing the local tuf server for each
+	// binary. It's unnecessary work since the mirror serves the same data both times.
+	testRootDir := t.TempDir()
+	testReleaseVersion := "0.3.5"
+	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+	require.NoError(t, err, "creating metadata client")
+	// Re-initialize the metadata client with our test root JSON
+	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+	_, err = metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client")
+
 	for _, binary := range binaries {
 		binary := binary
 		t.Run(binary, func(t *testing.T) {
 			t.Parallel()
-
-			// Set up TUF dependencies with legitimate metadata
-			testRootDir := t.TempDir()
-			testReleaseVersion := "0.3.5"
-			tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
-			metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
-			require.NoError(t, err, "creating metadata client")
-			// Re-initialize the metadata client with our test root JSON
-			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-			_, err = metadataClient.Update()
-			require.NoError(t, err, "could not update metadata client")
 
 			// Now, set up a mirror hosting an invalid file corresponding to our expected release
 			invalidBinaryPath := filepath.Join(t.TempDir(), fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion))

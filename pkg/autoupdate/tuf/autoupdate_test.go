@@ -212,18 +212,28 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	for _, b := range binaries {
 		for _, c := range []string{"stable", "beta", "nightly"} {
 			for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
-				// Create and commit a valid test binary
-
-				// Create test binary and copy it to the staged targets directory
-				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
-				executablePath := executableLocation(stagedTargetsDir, b)
-				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
-				copyBinary(t, executablePath)
-				require.NoError(t, os.Chmod(executablePath, 0755))
-
-				// Compress the binary or app bundle
 				binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
-				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
+
+				// Create a valid test binary -- an archive of an executable with the proper directory structure
+				// that will actually run -- if this is the release version we care about. If this is not the
+				// release version we care about, then just create a small text file since it won't be downloaded
+				// and evaluated.
+				if v == testReleaseVersion {
+					// Create test binary and copy it to the staged targets directory
+					stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
+					executablePath := executableLocation(stagedTargetsDir, b)
+					require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
+					copyBinary(t, executablePath)
+					require.NoError(t, os.Chmod(executablePath, 0755))
+
+					// Compress the binary or app bundle
+					compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
+				} else {
+					// Create and commit a test binary
+					require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
+					err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
+					require.NoError(t, err, "could not write test target binary to temp dir")
+				}
 
 				// Add the target
 				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
