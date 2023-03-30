@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf"
@@ -65,6 +66,12 @@ func TestExecute(t *testing.T) {
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
+	// Expect that we attempt to update the library
+	mockLibrarian := mocks.NewLibrarian(t)
+	autoupdater.libraryManager = mockLibrarian
+	mockLibrarian.On("AddToLibrary", "osqueryd", fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
+	mockLibrarian.On("AddToLibrary", "launcher", fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
+
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
 	time.Sleep(5 * time.Second)
@@ -75,17 +82,15 @@ func TestExecute(t *testing.T) {
 	// Wait one second to let autoupdater shut down
 	time.Sleep(1 * time.Second)
 
-	// Check log lines to confirm that:
-	// 1. We were able to successfully pull updates from TUF and identified the expected release version
-	// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
+	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
+	mockLibrarian.AssertExpectations(t)
+
+	// Check log lines to confirm that we see the log `received interrupt, stopping`, indicating that
+	// the autoupdater shut down at the end
 	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
-	// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
-	// only the first and last, so just make sure there are at least 2
-	require.GreaterOrEqual(t, len(logLines), 2)
-
-	// Check that we got the expected release version
-	require.Contains(t, logLines[0], testReleaseVersion)
+	// We expect at least 1 log for the shutdown line.
+	require.GreaterOrEqual(t, len(logLines), 1)
 
 	// Check that we shut down
 	require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
@@ -103,6 +108,7 @@ func Test_storeError(t *testing.T) {
 
 	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, testRootDir, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+	autoupdater.libraryManager = mocks.NewLibrarian(t)
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second

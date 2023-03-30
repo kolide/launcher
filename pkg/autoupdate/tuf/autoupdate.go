@@ -39,9 +39,13 @@ type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
 }
 
+type librarian interface {
+	AddToLibrary(binary string, targetFilename string) error
+}
+
 type TufAutoupdater struct {
 	metadataClient  *client.Client
-	libraryManager  *updateLibraryManager
+	libraryManager  librarian
 	operatingSystem string
 	channel         string
 	checkInterval   time.Duration
@@ -203,7 +207,7 @@ func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) e
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		return ta.libraryManager.addToLibrary(binary, filepath.Base(custom.Target))
+		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target))
 	}
 
 	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)

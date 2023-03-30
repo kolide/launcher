@@ -18,7 +18,26 @@ import (
 
 func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO")
+
+	testRootDir := t.TempDir()
+	_, err := newUpdateLibraryManager(nil, "", nil, testRootDir, runtime.GOOS, nil, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new update library manager")
+
+	stagedOsquerydDownloadDir, err := os.Stat(filepath.Join(testRootDir, "osqueryd-staged-updates"))
+	require.NoError(t, err, "could not stat staged osqueryd download dir")
+	require.True(t, stagedOsquerydDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
+
+	osquerydDownloadDir, err := os.Stat(filepath.Join(testRootDir, "osqueryd-updates"))
+	require.NoError(t, err, "could not stat osqueryd download dir")
+	require.True(t, osquerydDownloadDir.IsDir(), "osqueryd download dir is not a directory")
+
+	stagedLauncherDownloadDir, err := os.Stat(filepath.Join(testRootDir, "launcher-staged-updates"))
+	require.NoError(t, err, "could not stat staged launcher download dir")
+	require.True(t, stagedLauncherDownloadDir.IsDir(), "staged launcher download dir is not a directory")
+
+	launcherDownloadDir, err := os.Stat(filepath.Join(testRootDir, "launcher-updates"))
+	require.NoError(t, err, "could not stat launcher download dir")
+	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
 func Test_addToLibrary(t *testing.T) {

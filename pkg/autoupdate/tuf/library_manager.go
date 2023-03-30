@@ -32,7 +32,7 @@ type updateLibraryManager struct {
 	mirrorClient    *http.Client
 	rootDirectory   string
 	operatingSystem string
-	osquerier       localserver.Querier
+	osquerier       localserver.Querier // used to query for current running osquery version
 	logger          log.Logger
 }
 
@@ -75,7 +75,7 @@ func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary string) string {
 // addToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there. After any addition
 // to the library, it cleans up older versions that are no longer needed.
-func (ulm *updateLibraryManager) addToLibrary(binary string, targetFilename string) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename string) error {
 	if ulm.alreadyAdded(binary, targetFilename) {
 		return nil
 	}
@@ -128,7 +128,7 @@ func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename strin
 	}
 	defer out.Close()
 
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s", targetFilename))
+	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, ulm.operatingSystem, targetFilename))
 	if err != nil {
 		return fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
