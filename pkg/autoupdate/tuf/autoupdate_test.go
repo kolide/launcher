@@ -210,44 +210,44 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 
 	// Create test binaries and release files per binary and per release channel
 	for _, b := range binaries {
-		for _, c := range []string{"stable", "beta", "nightly"} {
-			for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
-				binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
+		for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
+			binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
 
-				// Create a valid test binary -- an archive of an executable with the proper directory structure
-				// that will actually run -- if this is the release version we care about. If this is not the
-				// release version we care about, then just create a small text file since it won't be downloaded
-				// and evaluated.
-				if v == testReleaseVersion {
-					// Create test binary and copy it to the staged targets directory
-					stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
-					executablePath := executableLocation(stagedTargetsDir, b)
-					require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
-					copyBinary(t, executablePath)
-					require.NoError(t, os.Chmod(executablePath, 0755))
+			// Create a valid test binary -- an archive of an executable with the proper directory structure
+			// that will actually run -- if this is the release version we care about. If this is not the
+			// release version we care about, then just create a small text file since it won't be downloaded
+			// and evaluated.
+			if v == testReleaseVersion {
+				// Create test binary and copy it to the staged targets directory
+				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
+				executablePath := executableLocation(stagedTargetsDir, b)
+				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
+				copyBinary(t, executablePath)
+				require.NoError(t, os.Chmod(executablePath, 0755))
 
-					// Compress the binary or app bundle
-					compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
-				} else {
-					// Create and commit a test binary
-					require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
-					err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
-					require.NoError(t, err, "could not write test target binary to temp dir")
-				}
+				// Compress the binary or app bundle
+				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
+			} else {
+				// Create and commit a test binary
+				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
+				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
+				require.NoError(t, err, "could not write test target binary to temp dir")
+			}
 
-				// Add the target
-				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
+			// Add the target
+			require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
 
-				// Commit
-				require.NoError(t, repo.Snapshot(), "could not take snapshot")
-				require.NoError(t, repo.Timestamp(), "could not take timestamp")
-				require.NoError(t, repo.Commit(), "could not commit")
+			// Commit
+			require.NoError(t, repo.Snapshot(), "could not take snapshot")
+			require.NoError(t, repo.Timestamp(), "could not take timestamp")
+			require.NoError(t, repo.Commit(), "could not commit")
 
-				if v != testReleaseVersion {
-					continue
-				}
+			if v != testReleaseVersion {
+				continue
+			}
 
-				// If this is our release version, also create and commit a test release file
+			// If this is our release version, also create and commit a test release file
+			for _, c := range []string{"stable", "beta", "nightly"} {
 				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c), 0777), "could not make staging directory")
 				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c, "release.json"), []byte("{}"), 0777)
 				require.NoError(t, err, "could not write test target release file to temp dir")
