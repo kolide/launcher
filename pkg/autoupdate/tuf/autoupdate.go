@@ -31,9 +31,11 @@ const (
 	DefaultTufServer = "https://tuf.kolide.com"
 	defaultChannel   = "stable"
 	tufDirectoryName = "tuf"
+	binaryLauncher   = "launcher"
+	binaryOsqueryd   = "osqueryd"
 )
 
-var binaries = []string{"launcher", "osqueryd"}
+var binaries = []string{binaryLauncher, binaryOsqueryd}
 
 type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`

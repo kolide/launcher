@@ -216,13 +216,13 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 // currentRunningVersion returns the current running version of the given binary.
 func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.Version, error) {
 	switch binary {
-	case "launcher":
+	case binaryLauncher:
 		currentVersion, err := semver.NewVersion(version.Version().Version)
 		if err != nil {
 			return nil, fmt.Errorf("cannot determine current running version of launcher: %w", err)
 		}
 		return currentVersion, nil
-	case "osqueryd":
+	case binaryOsqueryd:
 		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
 		if err != nil {
 			return nil, fmt.Errorf("could not query for osquery version: %w", err)
