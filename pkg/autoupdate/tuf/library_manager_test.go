@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -43,7 +44,51 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 
 func Test_addToLibrary(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO")
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(binary, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up TUF dependencies
+			testRootDir := t.TempDir()
+			testReleaseVersion := "1.2.3"
+			tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+			metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+			require.NoError(t, err, "creating metadata client")
+			// Re-initialize the metadata client with our test root JSON
+			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+			_, err = metadataClient.Update()
+			require.NoError(t, err, "could not update metadata client")
+
+			// Set up test library manager
+			mockOsquerier := localservermocks.NewQuerier(t)
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testRootDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new update library manager")
+
+			// For osqueryd, make sure we check that the running version is not equal to the target version
+			if binary == "osqueryd" {
+				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
+			}
+
+			// Request download
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)), "expected no error adding to library")
+			mockOsquerier.AssertExpectations(t)
+
+			// Confirm the update was downloaded
+			dirInfo, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(binary), testReleaseVersion))
+			require.NoError(t, err, "checking that update was downloaded")
+			require.True(t, dirInfo.IsDir())
+			executableInfo, err := os.Stat(executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testReleaseVersion), binary))
+			require.NoError(t, err, "checking that downloaded update includes executable")
+			require.False(t, executableInfo.IsDir())
+
+			// Confirm the staging directory is empty
+			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory(binary), "*"))
+			require.NoError(t, err, "checking that staging dir was cleaned")
+			require.Equal(t, 0, len(matches), "unexpected files found in staged updates directory: %+v", matches)
+		})
+	}
 }
 
 func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
@@ -93,7 +138,7 @@ func Test_addToLibrary_alreadyAdded(t *testing.T) {
 
 	for _, binary := range binaries {
 		binary := binary
-		t.Run(fmt.Sprintf("request adding already-added version to library: %s", binary), func(t *testing.T) {
+		t.Run(binary, func(t *testing.T) {
 			t.Parallel()
 
 			testRootDir := t.TempDir()

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -52,7 +53,7 @@ func TestExecute(t *testing.T) {
 	metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 
-	// Right now, we do not talk to the mirror at all
+	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(metadataServerUrl, testRootDir, http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
@@ -190,6 +191,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	localStore := tuf.FileSystemStore(tufDir, nil)
 	repo, err := tuf.NewRepo(localStore)
 	require.NoError(t, err, "could not create new tuf repo")
+	require.NoError(t, repo.Init(false), "could not init new tuf repo")
 
 	// Gen keys
 	_, err = repo.GenKey("root")
@@ -205,14 +207,30 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	require.NoError(t, repo.Sign("root.json"), "could not sign root metadata file")
 
 	// Create test binaries and release files per binary and per release channel
-	for _, b := range []string{"launcher", "osqueryd"} {
+	for _, b := range binaries {
 		for _, c := range []string{"stable", "beta", "nightly"} {
 			for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
-				// Create and commit a test binary
+				// Create and commit a valid test binary
+
+				// Create test binary and copy it to the staged targets directory
+				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
+				executablePath := executableLocation(stagedTargetsDir, b)
+				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
+				copyBinary(t, executablePath)
+				require.NoError(t, os.Chmod(executablePath, 0755))
+
+				// Compress the binary or app bundle
 				binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
-				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
-				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
-				require.NoError(t, err, "could not write test target binary to temp dir")
+				binaryFileLocation := filepath.Join(stagedTargetsDir, binaryFileName)
+				cmd := exec.Command("tar", "-zcf", binaryFileLocation, "-C", stagedTargetsDir)
+				if b == "launcher" && runtime.GOOS == "darwin" {
+					cmd.Args = append(cmd.Args, "Kolide.app/")
+				} else {
+					cmd.Args = append(cmd.Args, b)
+				}
+				require.NoError(t, cmd.Run(), "compressing target")
+
+				// Add the target
 				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
 
 				// Commit
@@ -239,7 +257,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 		}
 	}
 
-	// Quick validation that we set up the repo properly: key and metadata files should exist
+	// Quick validation that we set up the repo properly: key and metadata files should exist; targets should exist
 	require.DirExists(t, filepath.Join(tufDir, "keys"))
 	require.FileExists(t, filepath.Join(tufDir, "keys", "root.json"))
 	require.FileExists(t, filepath.Join(tufDir, "keys", "snapshot.json"))
@@ -250,14 +268,28 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	require.FileExists(t, filepath.Join(tufDir, "repository", "snapshot.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "timestamp.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)))
 
 	// Set up a test server to serve these files
 	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pathComponents := strings.Split(r.URL.Path, "/")
+		pathComponents := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+
 		fileToServe := tufDir
-		for _, c := range pathComponents {
-			fileToServe = filepath.Join(fileToServe, c)
+
+		// Allow the test server to also stand in for dl.kolide.co
+		if pathComponents[0] == "kolide" {
+			fileToServe = filepath.Join(fileToServe, "repository", "targets")
+		} else {
+			fileToServe = filepath.Join(fileToServe, pathComponents[0])
 		}
+
+		for i := 1; i < len(pathComponents); i += 1 {
+			fileToServe = filepath.Join(fileToServe, pathComponents[i])
+		}
+
 		http.ServeFile(w, r, fileToServe)
 	}))
 

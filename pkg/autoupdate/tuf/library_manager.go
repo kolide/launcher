@@ -193,9 +193,19 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 		}
 	}
 
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, binary), filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)); err != nil {
+	downloadedFile := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
+	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, binary), downloadedFile); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
+	}
+
+	// Remove the .tar.gz from the staged updates directory now that we no longer need it
+	if err := os.Remove(downloadedFile); err != nil {
+		level.Debug(ulm.logger).Log(
+			"msg", "could not remove download",
+			"downloaded_file", downloadedFile,
+			"err", err,
+		)
 	}
 
 	// Make sure that the binary is executable
