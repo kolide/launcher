@@ -33,7 +33,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 
-	_, err := NewTufAutoupdater("https://example.com", testRootDir, http.DefaultClient, s, localservermocks.NewQuerier(t))
+	_, err := NewTufAutoupdater("https://example.com", testRootDir, http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm that the TUF directory we expose is the one that we created
@@ -52,11 +52,11 @@ func TestExecute(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
-	metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(metadataServerUrl, testRootDir, http.DefaultClient, s, localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -103,13 +103,13 @@ func Test_storeError(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testTufServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulates TUF server being down
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer testMetadataServer.Close()
+	defer testTufServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, testRootDir, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	autoupdater.libraryManager = mocks.NewLibrarian(t)
 

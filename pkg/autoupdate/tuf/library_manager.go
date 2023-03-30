@@ -44,7 +44,7 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 		rootDirectory:   rootDirectory,
 		operatingSystem: operatingSystem,
 		osquerier:       osquerier,
-		logger:          logger,
+		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
 
 	// Ensure our staged updates and updates directories exist
