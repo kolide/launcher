@@ -329,6 +329,8 @@ func compress(t *testing.T, outFileName string, outFileDir string, targetDir str
 
 			require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
 		}
+	} else if runtime.GOOS == "windows" {
+		srcFilePath += ".exe"
 	}
 
 	srcFile, err := os.Open(filepath.Join(targetDir, srcFilePath))
