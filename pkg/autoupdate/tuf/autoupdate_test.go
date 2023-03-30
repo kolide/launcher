@@ -1,12 +1,14 @@
 package tuf
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -221,14 +223,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 
 				// Compress the binary or app bundle
 				binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
-				binaryFileLocation := filepath.Join(stagedTargetsDir, binaryFileName)
-				cmd := exec.Command("tar", "-zcf", binaryFileLocation, "-C", stagedTargetsDir)
-				if b == "launcher" && runtime.GOOS == "darwin" {
-					cmd.Args = append(cmd.Args, "Kolide.app/")
-				} else {
-					cmd.Args = append(cmd.Args, b)
-				}
-				require.NoError(t, cmd.Run(), "compressing target")
+				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
 
 				// Add the target
 				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
@@ -306,6 +301,50 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	rootJson = metadata["root.json"]
 
 	return tufServerURL, rootJson
+}
+
+func compress(t *testing.T, outFileName string, outFileDir string, targetDir string, binary string) {
+	out, err := os.Create(filepath.Join(outFileDir, outFileName))
+	require.NoError(t, err, "creating archive: %s in %s", outFileName, outFileDir)
+	defer out.Close()
+
+	gw := gzip.NewWriter(out)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	srcFilePath := binary
+	if binary == "launcher" && runtime.GOOS == "darwin" {
+		srcFilePath = filepath.Join("Kolide.app", "Contents", "MacOS", binary)
+
+		// Create directory structure for app bundle
+		for _, path := range []string{"Kolide.app", "Kolide.app/Contents", "Kolide.app/Contents/MacOS"} {
+			pInfo, err := os.Stat(filepath.Join(targetDir, path))
+			require.NoError(t, err, "stat for app bundle path %s", path)
+
+			hdr, err := tar.FileInfoHeader(pInfo, path)
+			require.NoError(t, err, "creating header for directory %s", path)
+			hdr.Name = path
+
+			require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
+		}
+	}
+
+	srcFile, err := os.Open(filepath.Join(targetDir, srcFilePath))
+	require.NoError(t, err, "opening binary")
+	defer srcFile.Close()
+
+	srcStats, err := srcFile.Stat()
+	require.NoError(t, err, "getting stats to compress binary")
+
+	hdr, err := tar.FileInfoHeader(srcStats, srcStats.Name())
+	require.NoError(t, err, "creating header")
+	hdr.Name = srcFilePath
+
+	require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
+	_, err = io.Copy(tw, srcFile)
+	require.NoError(t, err, "copying file to archive")
 }
 
 func setupStorage(t *testing.T) types.KVStore {
