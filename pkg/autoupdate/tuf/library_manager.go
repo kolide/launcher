@@ -93,15 +93,21 @@ func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename stri
 		return nil
 	}
 
-	if err := ulm.stageUpdate(binary, targetFilename); err != nil {
+	stagedUpdatePath, err := ulm.stageUpdate(binary, targetFilename)
+	defer func() {
+		if err := os.Remove(stagedUpdatePath); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not remove staged update", "staged_update_path", stagedUpdatePath, "err", err)
+		}
+	}()
+	if err != nil {
 		return fmt.Errorf("could not stage update: %w", err)
 	}
 
-	if err := ulm.verifyStagedUpdate(binary, targetFilename); err != nil {
+	if err := ulm.verifyStagedUpdate(binary, stagedUpdatePath); err != nil {
 		return fmt.Errorf("could not verify staged update: %w", err)
 	}
 
-	if err := ulm.moveVerifiedUpdate(binary, targetFilename); err != nil {
+	if err := ulm.moveVerifiedUpdate(binary, targetFilename, stagedUpdatePath); err != nil {
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
@@ -131,34 +137,33 @@ func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename
 
 // stageUpdate downloads the update indicated by `targetFilename` and stages it for
 // further verification.
-func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename string) error {
+func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename string) (string, error) {
 	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
 	out, err := os.Create(stagedUpdatePath)
 	if err != nil {
-		return fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
+		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
 	defer out.Close()
 
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, ulm.operatingSystem, targetFilename))
 	if err != nil {
-		return fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
+		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
 	defer resp.Body.Close()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
+		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
-	return nil
+	return stagedUpdatePath, nil
 }
 
 // verifyStagedUpdate checks the downloaded update against the metadata in the TUF repo.
-func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, targetFilename string) error {
-	stagedUpdate := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
+func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, stagedUpdate string) error {
 	digest, err := sha512Digest(stagedUpdate)
 	if err != nil {
-		return fmt.Errorf("could not compute digest for target %s to verify it: %w", targetFilename, err)
+		return fmt.Errorf("could not compute digest for target %s to verify it: %w", stagedUpdate, err)
 	}
 
 	fileInfo, err := os.Stat(stagedUpdate)
@@ -167,9 +172,9 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, targetFilenam
 	}
 
 	// Where the file lives in the binary bucket
-	pathToTargetInMirror := filepath.Join(binary, ulm.operatingSystem, targetFilename)
+	pathToTargetInMirror := filepath.Join(binary, ulm.operatingSystem, filepath.Base(stagedUpdate))
 	if err := ulm.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), pathToTargetInMirror); err != nil {
-		return fmt.Errorf("digest verification failed for target %s staged at %s: %w", targetFilename, stagedUpdate, err)
+		return fmt.Errorf("digest verification failed for target staged at %s: %w", stagedUpdate, err)
 	}
 
 	return nil
@@ -177,7 +182,7 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, targetFilenam
 
 // moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
 // to make sure that it's a valid, working update.
-func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilename string) error {
+func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilename string, stagedUpdate string) error {
 	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectory, err)
@@ -193,19 +198,9 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 		}
 	}
 
-	downloadedFile := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, binary), downloadedFile); err != nil {
+	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, binary), stagedUpdate); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
-	}
-
-	// Remove the .tar.gz from the staged updates directory now that we no longer need it
-	if err := os.Remove(downloadedFile); err != nil {
-		level.Debug(ulm.logger).Log(
-			"msg", "could not remove download",
-			"downloaded_file", downloadedFile,
-			"err", err,
-		)
 	}
 
 	// Make sure that the binary is executable

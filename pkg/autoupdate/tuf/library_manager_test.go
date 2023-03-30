@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,7 +43,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
-func Test_addToLibrary(t *testing.T) {
+func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
@@ -133,7 +134,7 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 	require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
 }
 
-func Test_addToLibrary_alreadyAdded(t *testing.T) {
+func TestAddToLibrary_alreadyAdded(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
@@ -174,9 +175,61 @@ func Test_addToLibrary_alreadyAdded(t *testing.T) {
 	}
 }
 
-func Test_addToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
+func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO")
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(binary, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up TUF dependencies with legitimate metadata
+			testRootDir := t.TempDir()
+			testReleaseVersion := "0.3.5"
+			tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+			metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+			require.NoError(t, err, "creating metadata client")
+			// Re-initialize the metadata client with our test root JSON
+			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+			_, err = metadataClient.Update()
+			require.NoError(t, err, "could not update metadata client")
+
+			// Now, set up a mirror hosting an invalid file corresponding to our expected release
+			invalidBinaryPath := filepath.Join(t.TempDir(), fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion))
+			fh, err := os.Create(invalidBinaryPath)
+			require.NoError(t, err, "could not create invalid binary for test")
+			_, err = fh.Write([]byte("definitely not the executable we expect"))
+			require.NoError(t, err, "could not write to invalid binary")
+			fh.Close()
+			testMaliciousMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, invalidBinaryPath)
+			}))
+
+			// Set up test library manager
+			mockOsquerier := localservermocks.NewQuerier(t)
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testRootDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new update library manager")
+
+			// For osqueryd, make sure we check that the running version is not equal to the target version
+			if binary == "osqueryd" {
+				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
+			}
+
+			// Request download
+			require.Error(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)), "expected error when library manager downloads invalid file")
+			mockOsquerier.AssertExpectations(t)
+
+			// Confirm the update was removed after download
+			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory(binary), "*"))
+			require.NoError(t, err, "checking that staging dir did not have any downloads")
+			require.Equal(t, 0, len(downloadMatches), "unexpected files found in staged updates directory: %+v", downloadMatches)
+
+			// Confirm the update was not added to the library
+			updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory(binary), "*"))
+			require.NoError(t, err, "checking that updates directory does not contain any updates")
+			require.Equal(t, 0, len(updateMatches), "unexpected files found in updates directory: %+v", updateMatches)
+		})
+	}
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
