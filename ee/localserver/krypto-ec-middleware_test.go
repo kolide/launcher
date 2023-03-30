@@ -46,6 +46,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		localDbKey, hardwareKey crypto.Signer
 		challenge               func() ([]byte, *[32]byte)
 		loggedErr               string
+		handler                 http.HandlerFunc
+		responseData            []byte
 	}{
 		{
 			name:       "no command",
@@ -73,6 +75,17 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				return challenge, nil
 			},
 			loggedErr: "unable to verify signature",
+		},
+		{
+			name:       "not found 404",
+			localDbKey: ecdsaKey(t),
+			challenge: func() ([]byte, *[32]byte) {
+				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
+				require.NoError(t, err)
+				return challenge, priv
+			},
+			handler:      http.NotFound,
+			responseData: []byte("404 page not found\n"),
 		},
 		{
 			name:        "works with hardware key",
@@ -110,20 +123,27 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			responseData := tt.responseData
 			// generate the response we want the handler to return
-			responseData := []byte(ulid.New())
+			if responseData == nil {
+				responseData = []byte(ulid.New())
+			}
+
+			testHandler := tt.handler
 
 			// this handler is what will respond to the request made by the kryptoEcMiddleware.Wrap handler
 			// in this test we just want it to regurgitate the response data we defined above
 			// this should match the responseData in the opened response
-			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				reqBodyRaw, err := io.ReadAll(r.Body)
-				require.NoError(t, err)
-				defer r.Body.Close()
+			if testHandler == nil {
+				testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					reqBodyRaw, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+					defer r.Body.Close()
 
-				require.Equal(t, cmdReqBody, reqBodyRaw)
-				w.Write(responseData)
-			})
+					require.Equal(t, cmdReqBody, reqBodyRaw)
+					w.Write(responseData)
+				})
+			}
 
 			challengeBytes, privateEncryptionKey := tt.challenge()
 

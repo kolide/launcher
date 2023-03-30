@@ -177,6 +177,10 @@ type bufferedHttpResponse struct {
 }
 
 func (bhr *bufferedHttpResponse) Header() http.Header {
+	if bhr.header == nil {
+		bhr.header = make(http.Header)
+	}
+
 	return bhr.header
 }
 
