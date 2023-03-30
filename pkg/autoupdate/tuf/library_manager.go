@@ -49,12 +49,18 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 
 	// Ensure our staged updates and updates directories exist
 	for _, binary := range binaries {
+		// Attempt out the staged updates directory, in case there are any archives there that we
+		// were unable to clean up previously.
+		_ = os.RemoveAll(ulm.stagedUpdatesDirectory(binary))
+
+		// Create the directory for staging updates
 		if err := os.MkdirAll(ulm.stagedUpdatesDirectory(binary), 0755); err != nil {
 			return nil, fmt.Errorf("could not make staged updates directory for %s: %w", binary, err)
 		}
 
+		// Create the update library
 		if err := os.MkdirAll(ulm.updatesDirectory(binary), 0755); err != nil {
-			return nil, fmt.Errorf("could not make staged updates directory for %s: %w", binary, err)
+			return nil, fmt.Errorf("could not make updates directory for %s: %w", binary, err)
 		}
 	}
 
