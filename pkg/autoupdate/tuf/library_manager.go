@@ -76,6 +76,19 @@ func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary string) string {
 // downloading and verifying it if it's not already there. After any addition
 // to the library, it cleans up older versions that are no longer needed.
 func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename string) error {
+	// Check to see if the current running version is the version we were requested to add;
+	// return early if it is, but don't error out if we can't determine the current version.
+	currentVersion, err := ulm.currentRunningVersion(binary)
+	if err != nil {
+		level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
+	} else {
+		if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
+			// We don't need to download the current running version because it already exists,
+			// either in this updates library or in the original install location.
+			return nil
+		}
+	}
+
 	if ulm.alreadyAdded(binary, targetFilename) {
 		return nil
 	}
@@ -92,13 +105,11 @@ func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename stri
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
-	v, err := ulm.currentRunningVersion(binary)
-	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "cannot get current running version, cannot safely tidy updates library", "binary", binary, "err", err)
-		return nil
+	if currentVersion != nil {
+		ulm.tidyLibrary(binary, currentVersion)
+	} else {
+		level.Debug(ulm.logger).Log("msg", "skipping tidying library because current running version could not be determined", "binary", binary)
 	}
-
-	ulm.tidyLibrary(binary, v)
 
 	return nil
 }

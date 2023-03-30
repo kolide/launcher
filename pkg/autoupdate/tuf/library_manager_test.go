@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -45,9 +46,87 @@ func Test_addToLibrary(t *testing.T) {
 	t.Skip("TODO")
 }
 
+func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
+	t.Parallel()
+
+	// We only do this particular test for osqueryd because in test, version.Version()
+	// returns `unknown` for everything when we attempt to get the current running version
+	// of launcher, which is not something that the semver library can parse.
+
+	testRootDir := t.TempDir()
+	mockOsquerier := localservermocks.NewQuerier(t)
+	testLibraryManager := &updateLibraryManager{
+		logger:        log.NewNopLogger(),
+		rootDirectory: testRootDir,
+		osquerier:     mockOsquerier,
+	}
+
+	// Make sure our update directories exist so we can verify they're empty later
+	require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory("osqueryd"), 0755))
+	require.NoError(t, os.MkdirAll(testLibraryManager.stagedUpdatesDirectory("osqueryd"), 0755))
+
+	// Set osquerier to return same version we want to add to the library
+	testVersion := "0.12.1-abcdabcd"
+	expectedOsqueryVersion, err := semver.NewVersion(testVersion)
+	require.NoError(t, err)
+
+	// Expect to return one row containing the version
+	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
+
+	// Ask the library manager to perform the download
+	require.NoError(t, testLibraryManager.AddToLibrary("osqueryd", fmt.Sprintf("osqueryd-%s.tar.gz", testVersion)), "expected no error on adding already-running version to library")
+	mockOsquerier.AssertExpectations(t)
+
+	// Confirm that there is nothing in the updates directory (no update performed)
+	updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory("osqueryd"), "*"))
+	require.NoError(t, err, "error globbing for matches")
+	require.Equal(t, 0, len(updateMatches), "expected no directories in updates directory but found: %+v", updateMatches)
+
+	// Confirm that there is nothing in the staged updates directory (no update attempted)
+	stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory("osqueryd"), "*"))
+	require.NoError(t, err, "error globbing for matches")
+	require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
+}
+
 func Test_addToLibrary_alreadyAdded(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO")
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(fmt.Sprintf("request adding already-added version to library: %s", binary), func(t *testing.T) {
+			t.Parallel()
+
+			testRootDir := t.TempDir()
+			mockOsquerier := localservermocks.NewQuerier(t)
+			testLibraryManager := &updateLibraryManager{
+				logger:        log.NewNopLogger(),
+				rootDirectory: testRootDir,
+				osquerier:     mockOsquerier,
+			}
+
+			// Make sure our update directory exists
+			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
+
+			// Ensure that a valid update already exists in that directory for the specified version
+			testVersion := "2.2.2"
+			executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testVersion), binary)
+			copyBinary(t, executablePath)
+			require.NoError(t, os.Chmod(executablePath, 0755))
+
+			// For osqueryd, make sure we check that the running version is not equal to the target version
+			if binary == "osqueryd" {
+				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
+			}
+
+			// Ask the library manager to perform the download
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)), "expected no error on adding already-downloaded version to library")
+			mockOsquerier.AssertExpectations(t)
+
+			// Confirm the requested version is still there
+			_, err := os.Stat(executablePath)
+			require.NoError(t, err, "could not stat update that should have existed")
+		})
+	}
 }
 
 func Test_addToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
