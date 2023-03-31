@@ -81,6 +81,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 		flNotaryPrefix           = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
 		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
+		flUpdateDirectory        = flagset.String("update_directory", "", "Location of update libraries for osqueryd and launcher")
 
 		// Development & Debugging options
 		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
@@ -245,6 +246,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		RootPEM:                            *flRootPEM,
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
+		UpdateDirectory:                    *flUpdateDirectory,
 	}
 
 	return opts, nil

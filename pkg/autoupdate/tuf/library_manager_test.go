@@ -22,23 +22,27 @@ import (
 func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
-	testRootDir := t.TempDir()
-	_, err := newUpdateLibraryManager(nil, "", nil, testRootDir, runtime.GOOS, nil, log.NewNopLogger())
+	testBaseDir := filepath.Join(t.TempDir(), "updates")
+	_, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, runtime.GOOS, nil, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
-	stagedOsquerydDownloadDir, err := os.Stat(filepath.Join(testRootDir, "osqueryd-staged-updates"))
+	baseDir, err := os.Stat(testBaseDir)
+	require.NoError(t, err, "could not stat base dir")
+	require.True(t, baseDir.IsDir(), "base dir is not a directory")
+
+	stagedOsquerydDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "osqueryd-staged"))
 	require.NoError(t, err, "could not stat staged osqueryd download dir")
 	require.True(t, stagedOsquerydDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
 
-	osquerydDownloadDir, err := os.Stat(filepath.Join(testRootDir, "osqueryd-updates"))
+	osquerydDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "osqueryd"))
 	require.NoError(t, err, "could not stat osqueryd download dir")
 	require.True(t, osquerydDownloadDir.IsDir(), "osqueryd download dir is not a directory")
 
-	stagedLauncherDownloadDir, err := os.Stat(filepath.Join(testRootDir, "launcher-staged-updates"))
+	stagedLauncherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher-staged"))
 	require.NoError(t, err, "could not stat staged launcher download dir")
 	require.True(t, stagedLauncherDownloadDir.IsDir(), "staged launcher download dir is not a directory")
 
-	launcherDownloadDir, err := os.Stat(filepath.Join(testRootDir, "launcher-updates"))
+	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
 	require.NoError(t, err, "could not stat launcher download dir")
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
@@ -48,10 +52,10 @@ func TestAddToLibrary(t *testing.T) {
 
 	// Set up TUF dependencies -- we do this here to avoid re-initializing the local tuf server for each
 	// binary. It's unnecessary work since the mirror serves the same data both times.
-	testRootDir := t.TempDir()
+	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
 	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -65,7 +69,7 @@ func TestAddToLibrary(t *testing.T) {
 
 			// Set up test library manager
 			mockOsquerier := localservermocks.NewQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testRootDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// For osqueryd, make sure we check that the running version is not equal to the target version
@@ -100,12 +104,12 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 	// returns `unknown` for everything when we attempt to get the current running version
 	// of launcher, which is not something that the semver library can parse.
 
-	testRootDir := t.TempDir()
+	testBaseDir := t.TempDir()
 	mockOsquerier := localservermocks.NewQuerier(t)
 	testLibraryManager := &updateLibraryManager{
-		logger:        log.NewNopLogger(),
-		rootDirectory: testRootDir,
-		osquerier:     mockOsquerier,
+		logger:    log.NewNopLogger(),
+		baseDir:   testBaseDir,
+		osquerier: mockOsquerier,
 	}
 
 	// Make sure our update directories exist so we can verify they're empty later
@@ -143,12 +147,12 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
-			testRootDir := t.TempDir()
+			testBaseDir := t.TempDir()
 			mockOsquerier := localservermocks.NewQuerier(t)
 			testLibraryManager := &updateLibraryManager{
-				logger:        log.NewNopLogger(),
-				rootDirectory: testRootDir,
-				osquerier:     mockOsquerier,
+				logger:    log.NewNopLogger(),
+				baseDir:   testBaseDir,
+				osquerier: mockOsquerier,
 			}
 
 			// Make sure our update directory exists
@@ -181,10 +185,10 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 
 	// Set up TUF dependencies -- we do this here to avoid re-initializing the local tuf server for each
 	// binary. It's unnecessary work since the mirror serves the same data both times.
-	testRootDir := t.TempDir()
+	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
 	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(testRootDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -209,7 +213,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 
 			// Set up test library manager
 			mockOsquerier := localservermocks.NewQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testRootDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// For osqueryd, make sure we check that the running version is not equal to the target version
@@ -296,8 +300,8 @@ func Test_tidyStagedUpdates(t *testing.T) {
 			t.Parallel()
 
 			// Make some files in the two staged updates directories
-			testRootDir := t.TempDir()
-			stagedUpdatesDir := filepath.Join(testRootDir, fmt.Sprintf("%s-staged-updates", binary))
+			testBaseDir := t.TempDir()
+			stagedUpdatesDir := filepath.Join(testBaseDir, fmt.Sprintf("%s-staged", binary))
 			require.NoError(t, os.MkdirAll(stagedUpdatesDir, 0755), "making staged updates directory")
 			f1, err := os.Create(filepath.Join(stagedUpdatesDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
 			require.NoError(t, err, "creating fake download file")
@@ -309,7 +313,7 @@ func Test_tidyStagedUpdates(t *testing.T) {
 			require.Equal(t, 1, len(matches))
 
 			// Initialize the library manager
-			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testRootDir, runtime.GOOS, nil, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, runtime.GOOS, nil, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Tidy up staged updates and confirm they're removed after
@@ -478,10 +482,10 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				t.Parallel()
 
 				// Set up test library manager
-				rootDir := t.TempDir()
+				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					logger:        log.NewNopLogger(),
-					rootDirectory: rootDir,
+					logger:  log.NewNopLogger(),
+					baseDir: testBaseDir,
 				}
 
 				// Set up existing versions for test

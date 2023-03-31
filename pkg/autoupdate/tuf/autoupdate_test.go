@@ -32,7 +32,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 
-	_, err := NewTufAutoupdater("https://example.com", testRootDir, http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
+	_, err := NewTufAutoupdater("https://example.com", testRootDir, "", http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm that the TUF directory we expose is the one that we created
@@ -43,6 +43,10 @@ func TestNewTufAutoupdater(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(exposedRootDir, "root.json"))
 	require.NoError(t, err, "could not stat root.json that should have been created in test")
+
+	// Confirm that the library manager's base directory was set correctly
+	_, err = os.Stat(filepath.Join(testRootDir, "updates"))
+	require.NoError(t, err, "could not stat updates directory that should have been created for library manager")
 }
 
 // Tests running as well as shutdown
@@ -55,7 +59,7 @@ func TestExecute(t *testing.T) {
 	s := setupStorage(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, "", http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -108,7 +112,7 @@ func Test_storeError(t *testing.T) {
 	}))
 	defer testTufServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	autoupdater.libraryManager = newMockLibrarian(t)
 

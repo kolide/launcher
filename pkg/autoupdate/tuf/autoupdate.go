@@ -82,8 +82,8 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, mirrorUrl string, mirrorHttpClient *http.Client,
-	store types.KVStore, osquerier localserver.Querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
+	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier localserver.Querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		operatingSystem: runtime.GOOS,
 		channel:         defaultChannel,
@@ -103,7 +103,11 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *ht
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
 
-	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, rootDirectory, ta.operatingSystem, osquerier, ta.logger)
+	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
+	if updateDirectory == "" {
+		updateDirectory = filepath.Join(rootDirectory, "updates")
+	}
+	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, updateDirectory, ta.operatingSystem, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}

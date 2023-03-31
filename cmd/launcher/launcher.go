@@ -351,6 +351,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			opts.TufServerURL,
 			opts.RootDirectory,
+			opts.UpdateDirectory,
 			metadataClient,
 			opts.MirrorServerURL,
 			mirrorClient,

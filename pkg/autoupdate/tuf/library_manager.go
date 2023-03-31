@@ -30,21 +30,26 @@ type updateLibraryManager struct {
 	metadataClient  *client.Client // used to validate downloads
 	mirrorUrl       string         // dl.kolide.co
 	mirrorClient    *http.Client
-	rootDirectory   string
+	baseDir         string
 	operatingSystem string
 	osquerier       localserver.Querier // used to query for current running osquery version
 	logger          log.Logger
 }
 
-func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, rootDirectory string, operatingSystem string, osquerier localserver.Querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, operatingSystem string, osquerier localserver.Querier, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
 		metadataClient:  metadataClient,
 		mirrorUrl:       mirrorUrl,
 		mirrorClient:    mirrorClient,
-		rootDirectory:   rootDirectory,
+		baseDir:         baseDir,
 		operatingSystem: operatingSystem,
 		osquerier:       osquerier,
 		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
+	}
+
+	// Ensure the updates directory exists
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
 	}
 
 	// Ensure our staged updates and updates directories exist
@@ -65,13 +70,13 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 
 // updatesDirectory returns the update library location for the given binary.
 func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-updates", binary))
+	return filepath.Join(ulm.baseDir, string(binary))
 }
 
 // stagedUpdatesDirectory returns the location for staged updates -- i.e. updates
 // that have been downloaded, but not yet verified.
 func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-staged-updates", binary))
+	return filepath.Join(ulm.baseDir, fmt.Sprintf("%s-staged", binary))
 }
 
 // addToLibrary adds the given target file to the library for the given binary,
