@@ -294,7 +294,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 	removeUpdate := func(v string) {
 		directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), v)
-		level.Debug(ulm.logger).Log("removing old update", "directory", directoryToRemove)
+		level.Debug(ulm.logger).Log("msg", "removing old update", "directory", directoryToRemove)
 		if err := os.RemoveAll(directoryToRemove); err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not remove old update when tidying updates library", "err", err, "directory", directoryToRemove)
 		}
