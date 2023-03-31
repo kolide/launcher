@@ -347,7 +347,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 1 * time.Minute
 		mirrorClient := http.DefaultClient
-		mirrorClient.Timeout = 1 * time.Minute
+		mirrorClient.Timeout = 5 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			opts.TufServerURL,
 			opts.RootDirectory,
