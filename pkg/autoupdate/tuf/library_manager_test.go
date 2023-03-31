@@ -43,46 +43,6 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
-func Test_newUpdateLibraryManager_removesOldDownloads(t *testing.T) {
-	t.Parallel()
-
-	// Make some files in the two staged updates directories
-	testRootDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(testRootDir, "osqueryd-staged-updates"), 0755), "making staged updates directory for osqueryd")
-	f1, err := os.Create(filepath.Join(testRootDir, "osqueryd-staged-updates", "osqueryd-1.2.3.tar.gz"))
-	require.NoError(t, err, "creating fake download file")
-	f1.Close()
-	require.NoError(t, os.MkdirAll(filepath.Join(testRootDir, "launcher-staged-updates"), 0755), "making staged updates directory for launcher")
-	f2, err := os.Create(filepath.Join(testRootDir, "launcher-staged-updates", "launcher-2.2.3.tar.gz"))
-	require.NoError(t, err, "creating fake download file")
-	f2.Close()
-
-	// Confirm we made the files
-	osquerydMatches, err := filepath.Glob(filepath.Join(testRootDir, "osqueryd-staged-updates", "*"))
-	require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-	require.Equal(t, 1, len(osquerydMatches))
-	launcherMatches, err := filepath.Glob(filepath.Join(testRootDir, "launcher-staged-updates", "*"))
-	require.NoError(t, err, "could not glob for files in staged launcher download dir")
-	require.Equal(t, 1, len(launcherMatches))
-
-	// Initialize the library manager
-	_, err = newUpdateLibraryManager(nil, "", nil, testRootDir, runtime.GOOS, nil, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new update library manager")
-
-	// Confirm the directories exist, and that they don't have any files in them
-	_, err = os.Stat(filepath.Join(testRootDir, "osqueryd-staged-updates"))
-	require.NoError(t, err, "could not stat staged osqueryd download dir")
-	osquerydMatchesAfter, err := filepath.Glob(filepath.Join(testRootDir, "osqueryd-staged-updates", "*"))
-	require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-	require.Equal(t, 0, len(osquerydMatchesAfter))
-
-	_, err = os.Stat(filepath.Join(testRootDir, "launcher-staged-updates"))
-	require.NoError(t, err, "could not stat staged launcher download dir")
-	launcherMatchesAfter, err := filepath.Glob(filepath.Join(testRootDir, "launcher-staged-updates", "*"))
-	require.NoError(t, err, "could not glob for files in staged launcher download dir")
-	require.Equal(t, 0, len(launcherMatchesAfter))
-}
-
 func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 
@@ -327,7 +287,43 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	require.Nil(t, osqueryVersion)
 }
 
-func Test_tidyLibrary(t *testing.T) {
+func Test_tidyStagedUpdates(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Make some files in the two staged updates directories
+			testRootDir := t.TempDir()
+			stagedUpdatesDir := filepath.Join(testRootDir, fmt.Sprintf("%s-staged-updates", binary))
+			require.NoError(t, os.MkdirAll(stagedUpdatesDir, 0755), "making staged updates directory")
+			f1, err := os.Create(filepath.Join(stagedUpdatesDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
+			require.NoError(t, err, "creating fake download file")
+			f1.Close()
+
+			// Confirm we made the files
+			matches, err := filepath.Glob(filepath.Join(stagedUpdatesDir, "*"))
+			require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
+			require.Equal(t, 1, len(matches))
+
+			// Initialize the library manager
+			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testRootDir, runtime.GOOS, nil, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new update library manager")
+
+			// Tidy up staged updates and confirm they're removed after
+			testLibraryManager.tidyStagedUpdates(binary)
+			_, err = os.Stat(stagedUpdatesDir)
+			require.NoError(t, err, "could not stat staged download dir")
+			matchesAfter, err := filepath.Glob(filepath.Join(stagedUpdatesDir, "*"))
+			require.NoError(t, err, "could not glob for files in staged download dir")
+			require.Equal(t, 0, len(matchesAfter))
+		})
+	}
+}
+
+func Test_tidyUpdateLibrary(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -542,32 +538,6 @@ func copyBinary(t *testing.T, executablePath string) {
 
 	_, err = io.Copy(destFile, srcFile)
 	require.NoError(t, err, "copying binary")
-}
-
-func Test_executableLocation(t *testing.T) {
-	t.Parallel()
-
-	updateDir := filepath.Join("some", "path", "to", "the", "updates", "directory")
-
-	var expectedOsquerydLocation string
-	var expectedLauncherLocation string
-	switch runtime.GOOS {
-	case "darwin":
-		expectedOsquerydLocation = filepath.Join(updateDir, "osqueryd")
-		expectedLauncherLocation = filepath.Join(updateDir, "Kolide.app", "Contents", "MacOS", "launcher")
-	case "windows":
-		expectedOsquerydLocation = filepath.Join(updateDir, "osqueryd.exe")
-		expectedLauncherLocation = filepath.Join(updateDir, "launcher.exe")
-	case "linux":
-		expectedOsquerydLocation = filepath.Join(updateDir, "osqueryd")
-		expectedLauncherLocation = filepath.Join(updateDir, "launcher")
-	}
-
-	osquerydLocation := executableLocation(updateDir, "osqueryd")
-	require.Equal(t, expectedOsquerydLocation, osquerydLocation)
-
-	launcherLocation := executableLocation(updateDir, "launcher")
-	require.Equal(t, expectedLauncherLocation, launcherLocation)
 }
 
 func Test_versionFromTarget(t *testing.T) {
