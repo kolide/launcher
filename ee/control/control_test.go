@@ -10,9 +10,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control/mocks"
-	"github.com/kolide/launcher/pkg/agent/flags"
-	flagMocks "github.com/kolide/launcher/pkg/agent/flags/mocks"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,13 +83,13 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockFlags := flagMocks.NewFlags(t)
-			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
+			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -114,13 +115,13 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockFlags := flagMocks.NewFlags(t)
-			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
+			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -161,13 +162,13 @@ func TestControlServiceUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockFlags := flagMocks.NewFlags(t)
-			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
+			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -220,14 +221,14 @@ func TestControlServiceFetch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockFlags := flagMocks.NewFlags(t)
-			mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-			mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
-			mockFlags.On("ForceControlSubsystems").Return(false)
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("ForceControlSubsystems").Return(false)
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
+			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -285,16 +286,16 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				data := &TestClient{tt.subsystems, tt.hashData}
 				controlOpts := []Option{WithStore(store)}
 
-				mockFlags := flagMocks.NewFlags(t)
-				mockFlags.On("RegisterChangeObserver", mock.Anything, flags.ControlRequestInterval)
-				mockFlags.On("ControlRequestInterval").Return(60 * time.Second)
+				mockKnapsack := typesMocks.NewKnapsack(t)
+				mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+				mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 
 				if j >= tt.expectedUpdates {
 					// ForceControlSubsystems is only called when no update would normally be triggered
-					mockFlags.On("ForceControlSubsystems").Return(false)
+					mockKnapsack.On("ForceControlSubsystems").Return(false)
 				}
 
-				cs := New(log.NewNopLogger(), knapsack.NewTestingKnapsack(t, mockFlags), data, controlOpts...)
+				cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -351,10 +352,20 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			mockDataProvider := mocks.NewDataProvider(t)
 			mockDataProvider.On("GetConfig").Return(nil, nil)
 
-			defaults := flags.DefaultFlagValues()
-			defaults.Set(flags.ControlRequestInterval, int64(tt.startInterval))
-			k := knapsack.NewTestingKnapsack(t, flags.NewFlagController(log.NewNopLogger(), defaults, nil, nil, nil))
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 
+			// mockKnapsack := typesMocks.NewKnapsack(t)
+
+			// defaults := keys.DefaultFlagValues()
+			// defaults.Set(keys.ControlRequestInterval, int64(tt.startInterval))
+
+			db := storageci.SetupDB(t)
+			stores, err := storageci.MakeStores(t, log.NewNopLogger(), db)
+			require.NoError(t, err)
+			flags := typesMocks.NewFlags(t)
+			k := knapsack.New(stores, flags, db)
 			cs := New(log.NewNopLogger(), k, mockDataProvider)
 
 			wg := sync.WaitGroup{}
@@ -370,15 +381,15 @@ func TestControlService_AccelerateRequestInterval(t *testing.T) {
 			time.Sleep(tt.startInterval)
 
 			// expect 1 fetch on acceleration request
-			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
+			k.SetControlRequestIntervalOverride(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect 1 fetch during single tick of acceleration
 			time.Sleep(tt.accelerationInterval)
 
 			// expect 1 fetch on acceleration request
-			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
+			k.SetControlRequestIntervalOverride(tt.accelerationInterval, tt.accelerationDuration)
 			// expect 1 fetch on acceleration request
-			k.Flags.SetOverride(flags.ControlRequestInterval, int64(tt.accelerationInterval), tt.accelerationDuration)
+			k.SetControlRequestIntervalOverride(tt.accelerationInterval, tt.accelerationDuration)
 
 			// expect (accelerationDuration / accelerationInterval) fetching during accleration duration
 			time.Sleep(tt.accelerationDuration)

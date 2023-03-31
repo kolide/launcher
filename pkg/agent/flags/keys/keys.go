@@ -1,4 +1,4 @@
-package flags
+package keys
 
 // FlagKeys are named identifiers corresponding to flags
 type FlagKey string
@@ -21,7 +21,7 @@ func (key FlagKey) String() string {
 	return string(key)
 }
 
-func toFlagKeys(s []string) []FlagKey {
+func ToFlagKeys(s []string) []FlagKey {
 	f := make([]FlagKey, len(s))
 	for i, v := range s {
 		f[i] = FlagKey(v)
@@ -30,7 +30,7 @@ func toFlagKeys(s []string) []FlagKey {
 }
 
 // Returns the intersection of FlagKeys; keys which exist in both a and b.
-func intersection(a, b []FlagKey) []FlagKey {
+func Intersection(a, b []FlagKey) []FlagKey {
 	m := make(map[FlagKey]bool)
 	var result []FlagKey
 

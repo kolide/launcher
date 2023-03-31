@@ -1,14 +1,15 @@
-package flags
+package types
 
-import "time"
+import (
+	"time"
+
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
+)
 
 // Flags is an interface for setting and retrieving launcher agent flags.
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
-	RegisterChangeObserver(observer FlagsChangeObserver, keys ...FlagKey)
-
-	// SetOverride stores a value to be temporarily used as an override of any other value, until the duration has elapased.
-	SetOverride(key FlagKey, value any, duration time.Duration)
+	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
 
 	// DesktopEnabled causes the launcher desktop process and GUI to be enabled.
 	SetDesktopEnabled(enabled bool) error
@@ -28,6 +29,8 @@ type Flags interface {
 
 	// ControlRequestInterval is the interval at which control client will check for updates from the control server.
 	SetControlRequestInterval(interval time.Duration) error
+	// SetControlRequestIntervalOverride stores an interval to be temporarily used as an override of any other interval, until the duration has elapased.
+	SetControlRequestIntervalOverride(interval, duration time.Duration)
 	ControlRequestInterval() time.Duration
 
 	// DisableControlTLS disables TLS transport with the control server.

@@ -9,8 +9,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/localserver/mocks"
-	flagMocks "github.com/kolide/launcher/pkg/agent/flags/mocks"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +54,9 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
 			mockQuerier := mocks.NewQuerier(t)
@@ -60,7 +66,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			}
 
 			var logBytes bytes.Buffer
-			server := testServer(t, flagMocks.NewFlags(t), &logBytes)
+			server := testServer(t, mockKnapsack, &logBytes)
 			server.querier = mockQuerier
 
 			jsonBytes, err := json.Marshal(map[string]string{
@@ -212,6 +218,9 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
 			scheduledQueryQuery := fmt.Sprintf("select name, query from osquery_schedule where name like '%s'", tt.scheduledQueriesQueryNamePattern)
@@ -226,7 +235,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 
 			// set up test server
 			var logBytes bytes.Buffer
-			server := testServer(t, flagMocks.NewFlags(t), &logBytes)
+			server := testServer(t, mockKnapsack, &logBytes)
 			server.querier = mockQuerier
 
 			// make request body

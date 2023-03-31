@@ -23,5 +23,5 @@ As an example, this is how you would access the control server request interval:
 
 ```
 var k knapsack // Passed into your code as a dependency
-interval := k.Flags.ControlRequestInterval()
+interval := k.ControlRequestInterval()
 ```

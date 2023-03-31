@@ -17,10 +17,11 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/testutil"
-	"github.com/kolide/launcher/pkg/agent/flags"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
 	"github.com/mixer/clock"
@@ -48,15 +49,11 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 	}
 }
 
-func makeKnapsack(t *testing.T, db *bbolt.DB) *knapsack.Knapsack {
-	stores, err := agentbbolt.MakeStores(log.NewNopLogger(), db)
-	if err != nil {
-		t.Fatalf("creating stores: %s", err.Error())
-	}
-	f := flags.NewFlagController(log.NewNopLogger(), flags.DefaultFlagValues(), nil, nil, nil)
-	k := knapsack.New(stores, f, db)
-
-	return k
+func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
+	m := mocks.NewKnapsack(t)
+	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
+	return m
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {

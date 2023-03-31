@@ -1,25 +1,37 @@
 package flags
 
-import "time"
+import (
+	"time"
+
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
+)
 
 type flagValueOverride interface {
 	Value() any
-	Start(key FlagKey, value any, duration time.Duration, expiredCallback func(key FlagKey))
+	Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey))
 }
 
 // Override represents a key-value override and manages the duration for which it is active.
 type Override struct {
-	key   FlagKey
+	key   keys.FlagKey
 	value any
 	timer *time.Timer
 }
 
 // Value returns the value associated with the override
 func (o *Override) Value() any {
+	if o == nil {
+		return nil
+	}
+
 	return o.value
 }
 
-func (o *Override) Start(key FlagKey, value any, duration time.Duration, expiredCallback func(key FlagKey)) {
+func (o *Override) Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey)) {
+	if o == nil {
+		return
+	}
+
 	// Stop existing timer, if necessary
 	if o.timer != nil {
 		// To ensure the channel is empty after a call to Stop, check the

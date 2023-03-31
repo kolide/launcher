@@ -27,8 +27,8 @@ import (
 	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/flags"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
@@ -136,7 +136,7 @@ type DesktopUsersProcessesRunner struct {
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
 	// knapsack is the almighty sack of knaps
-	knapsack *knapsack.Knapsack
+	knapsack types.Knapsack
 	// monitorServer is a local server that desktop processes call to monitor parent
 	monitorServer *monitorServer
 }
@@ -153,7 +153,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(k *knapsack.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
@@ -176,7 +176,7 @@ func New(k *knapsack.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*Desk
 	runner.refreshMenu()
 
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
-	runner.knapsack.Flags.RegisterChangeObserver(runner, flags.DesktopEnabled)
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
 	ms, err := newMonitorServer()
 	if err != nil {
@@ -347,9 +347,9 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) FlagsChanged(keys ...flags.FlagKey) {
-	if slices.Contains(keys, flags.DesktopEnabled) {
-		r.processSpawningEnabled = r.knapsack.Flags.DesktopEnabled()
+func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
+	if slices.Contains(flagKeys, keys.DesktopEnabled) {
+		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
 		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
 	}
 }
@@ -377,7 +377,7 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 // refreshMenu updates the menu file and tells desktop processes to refresh their menus
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	if err := r.generateMenuFile(); err != nil {
-		if r.knapsack.Flags.DebugServerData() {
+		if r.knapsack.DebugServerData() {
 			level.Error(r.logger).Log(
 				"msg", "failed to generate menu file",
 				"error", err,

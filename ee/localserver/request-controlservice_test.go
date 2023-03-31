@@ -7,8 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent/flags"
-	"github.com/kolide/launcher/pkg/agent/flags/mocks"
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
 
 	"github.com/stretchr/testify/require"
 )
@@ -16,13 +19,19 @@ import (
 func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 	t.Parallel()
 
+	defaultMockKnapsack := func() types.Knapsack {
+		m := mocks.NewKnapsack(t)
+		m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+		return m
+	}
+
 	tests := []struct {
 		name                  string
 		expectedHttpStatus    int
 		expectedInterval      time.Duration
 		body                  map[string]string
 		httpErrStr, logErrStr string
-		mockFlags             func() flags.Flags
+		mockKnapsack          func() types.Knapsack
 	}{
 		{
 			name:               "happy path",
@@ -32,9 +41,10 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"duration": "1s",
 			},
 			expectedInterval: 250 * time.Millisecond,
-			mockFlags: func() flags.Flags {
-				m := mocks.NewFlags(t)
-				m.On("SetOverride", flags.ControlRequestInterval, int64(250*time.Millisecond), 1*time.Second)
+			mockKnapsack: func() types.Knapsack {
+				m := mocks.NewKnapsack(t)
+				m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				return m
 			},
 		},
@@ -42,6 +52,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			name:               "no body",
 			expectedHttpStatus: http.StatusBadRequest,
 			httpErrStr:         "request body is nil",
+			mockKnapsack:       defaultMockKnapsack,
 		},
 		{
 			name:               "bad interval",
@@ -50,7 +61,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "blah",
 				"duration": "1s",
 			},
-			httpErrStr: "error parsing interval",
+			httpErrStr:   "error parsing interval",
+			mockKnapsack: defaultMockKnapsack,
 		},
 		{
 			name:               "empty interval",
@@ -59,7 +71,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "",
 				"duration": "1s",
 			},
-			httpErrStr: "error parsing interval",
+			httpErrStr:   "error parsing interval",
+			mockKnapsack: defaultMockKnapsack,
 		},
 		{
 			name:               "no interval",
@@ -67,8 +80,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			body: map[string]string{
 				"duration": "1s",
 			},
-			httpErrStr: "error parsing interval",
-			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
+			httpErrStr:   "error parsing interval",
+			mockKnapsack: defaultMockKnapsack,
 		},
 		{
 			name:               "bad duration",
@@ -77,8 +90,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "250ms",
 				"duration": "blah",
 			},
-			httpErrStr: "error parsing duration",
-			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
+			httpErrStr:   "error parsing duration",
+			mockKnapsack: defaultMockKnapsack,
 		},
 		{
 			name:               "empty duration",
@@ -87,8 +100,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				"interval": "250ms",
 				"duration": "",
 			},
-			httpErrStr: "error parsing duration",
-			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
+			httpErrStr:   "error parsing duration",
+			mockKnapsack: defaultMockKnapsack,
 		},
 		{
 			name:               "no duration",
@@ -96,8 +109,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			body: map[string]string{
 				"interval": "250ms",
 			},
-			httpErrStr: "error parsing duration",
-			mockFlags:  func() flags.Flags { return mocks.NewFlags(t) },
+			httpErrStr:   "error parsing duration",
+			mockKnapsack: defaultMockKnapsack,
 		},
 	}
 
@@ -106,13 +119,13 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var f flags.Flags
-			if tt.mockFlags != nil {
-				f = tt.mockFlags()
+			var k types.Knapsack
+			if tt.mockKnapsack != nil {
+				k = tt.mockKnapsack()
 			}
 
 			var logBytes bytes.Buffer
-			server := testServer(t, f, &logBytes)
+			server := testServer(t, k, &logBytes)
 
 			req, err := http.NewRequest("", "", nil)
 			if tt.body != nil {

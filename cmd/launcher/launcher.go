@@ -114,9 +114,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
 
-	storedFlags := flags.NewStoredFlagValues(logger, stores[storage.AgentFlagsStore])
-	sanitizer := flags.NewFlagValueSanitizer(flags.FlagValueConstraints())
-	flagController := flags.NewFlagController(logger, flags.DefaultFlagValues(), launcher.CmdLineFlagValues(opts), storedFlags, sanitizer)
+	flagController := flags.NewFlagController(logger, opts, stores[storage.AgentFlagsStore])
 	k := knapsack.New(stores, flagController, db)
 
 	// If we have successfully opened the DB, and written a pid,
@@ -208,7 +206,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
-	if k.Flags.ControlServerURL() == "" {
+	if k.ControlServerURL() == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
 		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
@@ -232,7 +230,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(k.Flags.DesktopEnabled()),
+			desktopRunner.WithProcessSpawningEnabled(k.DesktopEnabled()),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)

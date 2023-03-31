@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	flags "github.com/kolide/launcher/pkg/agent/flags"
+	keys "github.com/kolide/launcher/pkg/agent/flags/keys"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,11 +12,11 @@ type FlagsChangeObserver struct {
 	mock.Mock
 }
 
-// FlagsChanged provides a mock function with given fields: keys
-func (_m *FlagsChangeObserver) FlagsChanged(keys ...flags.FlagKey) {
-	_va := make([]interface{}, len(keys))
-	for _i := range keys {
-		_va[_i] = keys[_i]
+// FlagsChanged provides a mock function with given fields: flagKeys
+func (_m *FlagsChangeObserver) FlagsChanged(flagKeys ...keys.FlagKey) {
+	_va := make([]interface{}, len(flagKeys))
+	for _i := range flagKeys {
+		_va[_i] = flagKeys[_i]
 	}
 	var _ca []interface{}
 	_ca = append(_ca, _va...)

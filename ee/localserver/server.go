@@ -19,7 +19,7 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"golang.org/x/time/rate"
@@ -41,7 +41,7 @@ type Querier interface {
 
 type localServer struct {
 	logger       log.Logger
-	knapsack     *knapsack.Knapsack
+	knapsack     types.Knapsack
 	srv          *http.Server
 	identifiers  identifiers
 	limiter      *rate.Limiter
@@ -70,7 +70,7 @@ func WithLogger(logger log.Logger) LocalServerOption {
 	}
 }
 
-func New(k *knapsack.Knapsack, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(k types.Knapsack, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
 		knapsack:              k,

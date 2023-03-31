@@ -11,8 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent/flags"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"golang.org/x/exp/slices"
 )
@@ -21,7 +20,7 @@ import (
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
 	logger          log.Logger
-	knapsack        *knapsack.Knapsack
+	knapsack        types.Knapsack
 	cancel          context.CancelFunc
 	requestInterval time.Duration
 	requestTicker   *time.Ticker
@@ -52,11 +51,11 @@ type dataProvider interface {
 	GetSubsystemData(hash string) (io.Reader, error)
 }
 
-func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
 		logger:          log.With(logger, "component", "control"),
 		knapsack:        k,
-		requestInterval: k.Flags.ControlRequestInterval(),
+		requestInterval: k.ControlRequestInterval(),
 		fetcher:         fetcher,
 		lastFetched:     make(map[string]string),
 		consumers:       make(map[string]consumer),
@@ -70,7 +69,7 @@ func New(logger log.Logger, k *knapsack.Knapsack, fetcher dataProvider, opts ...
 	cs.requestTicker = time.NewTicker(cs.requestInterval)
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
-	cs.knapsack.Flags.RegisterChangeObserver(cs, flags.ControlRequestInterval)
+	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
 
 	return cs
 }
@@ -118,9 +117,9 @@ func (cs *ControlService) Stop() {
 	}
 }
 
-func (cs *ControlService) FlagsChanged(keys ...flags.FlagKey) {
-	if slices.Contains(keys, flags.ControlRequestInterval) {
-		cs.requestIntervalChanged(cs.knapsack.Flags.ControlRequestInterval())
+func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
+	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
+		cs.requestIntervalChanged(cs.knapsack.ControlRequestInterval())
 	}
 }
 
@@ -186,7 +185,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !cs.knapsack.Flags.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
