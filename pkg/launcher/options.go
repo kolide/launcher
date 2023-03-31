@@ -77,7 +77,7 @@ type Options struct {
 	NotaryPrefix string
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
-	// UpdateDirectory is the location of the of update libraries for osqueryd and launcher
+	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	UpdateDirectory string
 
 	// Debug enables debug logging.
