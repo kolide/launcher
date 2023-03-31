@@ -68,20 +68,20 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 }
 
 // updatesDirectory returns the update library location for the given binary.
-func (ulm *updateLibraryManager) updatesDirectory(binary string) string {
+func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) string {
 	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-updates", binary))
 }
 
 // stagedUpdatesDirectory returns the location for staged updates -- i.e. updates
 // that have been downloaded, but not yet verified.
-func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary string) string {
+func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBinary) string {
 	return filepath.Join(ulm.rootDirectory, fmt.Sprintf("%s-staged-updates", binary))
 }
 
 // addToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there. After any addition
 // to the library, it cleans up older versions that are no longer needed.
-func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename string) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
 	currentVersion, err := ulm.currentRunningVersion(binary)
@@ -127,14 +127,14 @@ func (ulm *updateLibraryManager) AddToLibrary(binary string, targetFilename stri
 }
 
 // alreadyAdded checks if the given target already exists in the update library.
-func (ulm *updateLibraryManager) alreadyAdded(binary string, targetFilename string) bool {
+func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
 	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 
 	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
 }
 
 // versionFromTarget extracts the semantic version for an update from its filename.
-func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename string) string {
+func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
 	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
 	prefixToTrim := fmt.Sprintf("%s-", binary)
 
@@ -143,7 +143,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary string, targetFilename
 
 // stageUpdate downloads the update indicated by `targetFilename` and stages it for
 // further verification.
-func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename string) (string, error) {
+func (ulm *updateLibraryManager) stageUpdate(binary autoupdatableBinary, targetFilename string) (string, error) {
 	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
 	out, err := os.Create(stagedUpdatePath)
 	if err != nil {
@@ -166,7 +166,7 @@ func (ulm *updateLibraryManager) stageUpdate(binary string, targetFilename strin
 }
 
 // verifyStagedUpdate checks the downloaded update against the metadata in the TUF repo.
-func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, stagedUpdate string) error {
+func (ulm *updateLibraryManager) verifyStagedUpdate(binary autoupdatableBinary, stagedUpdate string) error {
 	digest, err := sha512Digest(stagedUpdate)
 	if err != nil {
 		return fmt.Errorf("could not compute digest for target %s to verify it: %w", stagedUpdate, err)
@@ -189,7 +189,7 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary string, stagedUpdate 
 
 // moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
 // to make sure that it's a valid, working update.
-func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilename string, stagedUpdate string) error {
+func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
 	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
 	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectory, err)
@@ -205,7 +205,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 		}
 	}
 
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, binary), stagedUpdate); err != nil {
+	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, string(binary)), stagedUpdate); err != nil {
 		removeBrokenUpdateDir()
 		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
 	}
@@ -226,7 +226,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary string, targetFilenam
 }
 
 // currentRunningVersion returns the current running version of the given binary.
-func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.Version, error) {
+func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (*semver.Version, error) {
 	switch binary {
 	case binaryLauncher:
 		currentVersion, err := semver.NewVersion(version.Version().Version)
@@ -261,7 +261,7 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary string) (*semver.V
 // tidyLibrary reviews all updates in the library for the binary and removes any old versions
 // that are no longer needed. It will always preserve the current running binary, and then the
 // two most recent valid versions. It will remove versions it cannot validate.
-func (ulm *updateLibraryManager) tidyLibrary(binary string, currentRunningVersion *semver.Version) {
+func (ulm *updateLibraryManager) tidyLibrary(binary autoupdatableBinary, currentRunningVersion *semver.Version) {
 	const numberOfVersionsToKeep = 3
 
 	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))

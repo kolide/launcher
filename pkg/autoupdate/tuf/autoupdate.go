@@ -26,22 +26,29 @@ import (
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
+// Configuration defaults
 const (
 	DefaultTufServer = "https://tuf.kolide.com"
 	defaultChannel   = "stable"
 	tufDirectoryName = "tuf"
-	binaryLauncher   = "launcher"
-	binaryOsqueryd   = "osqueryd"
 )
 
-var binaries = []string{binaryLauncher, binaryOsqueryd}
+// Binaries handled by autoupdater
+type autoupdatableBinary string
+
+const (
+	binaryLauncher autoupdatableBinary = "launcher"
+	binaryOsqueryd autoupdatableBinary = "osqueryd"
+)
+
+var binaries = []autoupdatableBinary{binaryLauncher, binaryOsqueryd}
 
 type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
 }
 
 type librarian interface {
-	AddToLibrary(binary string, targetFilename string) error
+	AddToLibrary(binary autoupdatableBinary, targetFilename string) error
 }
 
 type TufAutoupdater struct {
@@ -195,7 +202,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	return nil
 }
 
-func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) error {
+func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) error {
 	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {

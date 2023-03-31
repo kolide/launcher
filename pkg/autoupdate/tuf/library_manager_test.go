@@ -100,7 +100,7 @@ func TestAddToLibrary(t *testing.T) {
 
 	for _, binary := range binaries {
 		binary := binary
-		t.Run(binary, func(t *testing.T) {
+		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
@@ -180,7 +180,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 
 	for _, binary := range binaries {
 		binary := binary
-		t.Run(binary, func(t *testing.T) {
+		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
 			testRootDir := t.TempDir()
@@ -233,7 +233,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 
 	for _, binary := range binaries {
 		binary := binary
-		t.Run(binary, func(t *testing.T) {
+		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
 			// Now, set up a mirror hosting an invalid file corresponding to our expected release
@@ -478,7 +478,7 @@ func Test_tidyLibrary(t *testing.T) {
 		binary := binary
 		for _, tt := range testCases {
 			tt := tt
-			t.Run(binary+": "+tt.testCaseName, func(t *testing.T) {
+			t.Run(string(binary)+": "+tt.testCaseName, func(t *testing.T) {
 				t.Parallel()
 
 				// Set up test library manager
@@ -575,43 +575,43 @@ func Test_versionFromTarget(t *testing.T) {
 
 	testVersions := []struct {
 		target          string
-		binary          string
+		binary          autoupdatableBinary
 		operatingSystem string
 		version         string
 	}{
 		{
 			target:          "launcher/darwin/launcher-0.10.1.tar.gz",
-			binary:          "launcher",
+			binary:          binaryLauncher,
 			operatingSystem: "darwin",
 			version:         "0.10.1",
 		},
 		{
 			target:          "launcher/windows/launcher-1.13.5.tar.gz",
-			binary:          "launcher",
+			binary:          binaryLauncher,
 			operatingSystem: "windows",
 			version:         "1.13.5",
 		},
 		{
 			target:          "launcher/linux/launcher-0.13.5-40-gefdc582.tar.gz",
-			binary:          "launcher",
+			binary:          binaryLauncher,
 			operatingSystem: "linux",
 			version:         "0.13.5-40-gefdc582",
 		},
 		{
 			target:          "osqueryd/darwin/osqueryd-5.8.1.tar.gz",
-			binary:          "osqueryd",
+			binary:          binaryOsqueryd,
 			operatingSystem: "darwin",
 			version:         "5.8.1",
 		},
 		{
 			target:          "osqueryd/windows/osqueryd-0.8.1.tar.gz",
-			binary:          "osqueryd",
+			binary:          binaryOsqueryd,
 			operatingSystem: "windows",
 			version:         "0.8.1",
 		},
 		{
 			target:          "osqueryd/linux/osqueryd-5.8.2.tar.gz",
-			binary:          "osqueryd",
+			binary:          binaryOsqueryd,
 			operatingSystem: "linux",
 			version:         "5.8.2",
 		},

@@ -8,6 +8,6 @@ import (
 )
 
 // executableLocation returns the path to the executable in `updateDirectory`.
-func executableLocation(updateDirectory string, binary string) string {
-	return filepath.Join(updateDirectory, binary)
+func executableLocation(updateDirectory string, binary autoupdatableBinary) string {
+	return filepath.Join(updateDirectory, string(binary))
 }
