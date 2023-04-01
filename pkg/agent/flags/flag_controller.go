@@ -19,7 +19,7 @@ type FlagController struct {
 	cmdLineOpts            *launcher.Options
 	agentFlagsStore        types.KVStore
 	overrideMutex          sync.RWMutex
-	controlRequestOverride flagValueOverride
+	controlRequestOverride FlagValueOverride
 	observers              map[types.FlagsChangeObserver][]keys.FlagKey
 }
 

@@ -6,8 +6,13 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 )
 
-type flagValueOverride interface {
+// FlagValueOverride is an interface for an override which can be active for a duration of
+// time, with a special-case value, until it expires.
+type FlagValueOverride interface {
+	// Value gets the override value.
 	Value() any
+	// Start begins or resets the duration for which the override is active. The expiredCallback
+	// func will be invoked when the override expires.
 	Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey))
 }
 
