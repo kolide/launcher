@@ -62,7 +62,7 @@ func boolToBytes(enabled bool) []byte {
 	if enabled {
 		return []byte("enabled")
 	}
-	return []byte("") // TODO is this right?
+	return []byte("")
 }
 
 func bytesToBool(controlServerValue []byte) bool {
@@ -176,8 +176,8 @@ func (fc *FlagController) SetControlRequestIntervalOverride(interval, duration t
 	fc.controlRequestOverride.Start(keys.ControlRequestInterval, interval, duration, overrideExpired)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
-	// TODO override
 	return NewDurationFlagValue(fc.logger, keys.ControlRequestInterval,
+		WithOverride(fc.controlRequestOverride),
 		WithDefault(fc.cmdLineOpts.ControlRequestInterval),
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),

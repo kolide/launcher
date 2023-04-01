@@ -12,6 +12,12 @@ import (
 
 type durationOption func(*durationFlagValue)
 
+func WithOverride(override flagValueOverride) durationOption {
+	return func(d *durationFlagValue) {
+		d.override = override
+	}
+}
+
 func WithDefault(defaultVal time.Duration) durationOption {
 	return func(d *durationFlagValue) {
 		d.defaultVal = int64(defaultVal)
@@ -33,6 +39,7 @@ func WithMax(max time.Duration) durationOption {
 type durationFlagValue struct {
 	logger     log.Logger
 	key        keys.FlagKey
+	override   flagValueOverride
 	defaultVal int64
 	min        int64
 	max        int64
@@ -56,11 +63,20 @@ func NewDurationFlagValue(logger log.Logger, key keys.FlagKey, opts ...durationO
 func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 	int64Value := d.defaultVal
 	if controlServerValue != nil {
-		// Integers are stored as strings and need to be converted back
+		// Control server provided integers are stored as strings and need to be converted back
 		var err error
 		int64Value, err = strconv.ParseInt(string(controlServerValue), 10, 64)
 		if err != nil {
 			level.Debug(d.logger).Log("msg", "failed to convert stored duration flag value", "key", d.key, "err", err)
+		}
+	}
+
+	overrideValue := d.override.Value()
+	if overrideValue != nil {
+		// An override was provided, if it's valid let it take precedence
+		value, ok := overrideValue.(time.Duration)
+		if ok {
+			int64Value = int64(value)
 		}
 	}
 
