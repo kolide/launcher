@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"strconv"
 	"sync"
 	"time"
 
@@ -16,14 +15,14 @@ import (
 // determining precedence, sanitizing flag values, and notifying observers of changes.
 type FlagController struct {
 	logger                 log.Logger
-	cmdLineOpts            *launcher.Options
+	cmdLineOpts            launcher.Options
 	agentFlagsStore        types.KVStore
 	overrideMutex          sync.RWMutex
 	controlRequestOverride FlagValueOverride
 	observers              map[types.FlagsChangeObserver][]keys.FlagKey
 }
 
-func NewFlagController(logger log.Logger, cmdLineOpts *launcher.Options, agentFlagsStore types.KVStore) *FlagController {
+func NewFlagController(logger log.Logger, cmdLineOpts launcher.Options, agentFlagsStore types.KVStore) *FlagController {
 	fc := &FlagController{
 		logger:          logger,
 		cmdLineOpts:     cmdLineOpts,
@@ -56,25 +55,6 @@ func (fc *FlagController) set(key keys.FlagKey, value []byte) error {
 	fc.notifyObservers(key)
 
 	return nil
-}
-
-func boolToBytes(enabled bool) []byte {
-	if enabled {
-		return []byte("enabled")
-	}
-	return []byte("")
-}
-
-func bytesToBool(controlServerValue []byte) bool {
-	var booleanValue bool
-	if string(controlServerValue) == "enabled" {
-		return true
-	}
-	return booleanValue
-}
-
-func durationToBytes(duration time.Duration) []byte {
-	return []byte(strconv.FormatInt(int64(duration), 10))
 }
 
 // Update bulk replaces agent flags and stores them.
@@ -117,21 +97,21 @@ func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
 	return fc.set(keys.DesktopEnabled, boolToBytes(enabled))
 }
 func (fc *FlagController) DesktopEnabled() bool {
-	return bytesToBool(fc.getControlServerValue(keys.DesktopEnabled))
+	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.DesktopEnabled))
 }
 
 func (fc *FlagController) SetDebugServerData(debug bool) error {
 	return fc.set(keys.DebugServerData, boolToBytes(debug))
 }
 func (fc *FlagController) DebugServerData() bool {
-	return bytesToBool(fc.getControlServerValue(keys.DebugServerData))
+	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.DebugServerData))
 }
 
 func (fc *FlagController) SetForceControlSubsystems(force bool) error {
 	return fc.set(keys.ForceControlSubsystems, boolToBytes(force))
 }
 func (fc *FlagController) ForceControlSubsystems() bool {
-	return bytesToBool(fc.getControlServerValue(keys.ForceControlSubsystems))
+	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.ForceControlSubsystems))
 }
 
 func (fc *FlagController) SetControlServerURL(url string) error {
@@ -140,7 +120,6 @@ func (fc *FlagController) SetControlServerURL(url string) error {
 func (fc *FlagController) ControlServerURL() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.ControlServerURL),
-		WithSanitizer(func(value string) string { return "" }),
 	).get(fc.getControlServerValue(keys.ControlServerURL))
 }
 
@@ -188,12 +167,12 @@ func (fc *FlagController) SetDisableControlTLS(disabled bool) error {
 	return fc.set(keys.DisableControlTLS, boolToBytes(disabled))
 }
 func (fc *FlagController) DisableControlTLS() bool {
-	return bytesToBool(fc.getControlServerValue(keys.DisableControlTLS))
+	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.DisableControlTLS)).get(fc.getControlServerValue(keys.DisableControlTLS))
 }
 
 func (fc *FlagController) SetInsecureControlTLS(disabled bool) error {
 	return fc.set(keys.InsecureControlTLS, boolToBytes(disabled))
 }
 func (fc *FlagController) InsecureControlTLS() bool {
-	return bytesToBool(fc.getControlServerValue(keys.InsecureControlTLS))
+	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureControlTLS)).get(fc.getControlServerValue(keys.InsecureControlTLS))
 }

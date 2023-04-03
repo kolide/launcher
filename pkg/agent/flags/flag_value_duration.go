@@ -97,3 +97,7 @@ func clampValue(value int64, min, max int64) int64 {
 		return value
 	}
 }
+
+func durationToBytes(duration time.Duration) []byte {
+	return []byte(strconv.FormatInt(int64(duration), 10))
+}
