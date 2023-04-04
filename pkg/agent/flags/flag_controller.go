@@ -159,6 +159,9 @@ func (fc *FlagController) SetControlRequestIntervalOverride(interval, duration t
 	fc.controlRequestOverride.Start(keys.ControlRequestInterval, interval, duration, overrideExpired)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	return NewDurationFlagValue(fc.logger, keys.ControlRequestInterval,
 		WithOverride(fc.controlRequestOverride),
 		WithDefault(fc.cmdLineOpts.ControlRequestInterval),
