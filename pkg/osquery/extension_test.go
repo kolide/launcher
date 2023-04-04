@@ -1095,13 +1095,16 @@ func TestExtensionWriteResults(t *testing.T) {
 func TestLauncherRsaKeys(t *testing.T) {
 	m := &mock.KolideService{}
 
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
-	_, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	configStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
 	require.NoError(t, err)
 
-	configStore, err := agentbbolt.NewStore(log.NewNopLogger(), db, storage.ConfigStore.String())
+	k := mocks.NewKnapsack(t)
+	k.On("ConfigStore").Return(configStore)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+
+	_, err = NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.NoError(t, err)
 
 	key, err := PrivateRSAKeyFromDB(configStore)

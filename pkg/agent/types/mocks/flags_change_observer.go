@@ -14,13 +14,7 @@ type FlagsChangeObserver struct {
 
 // FlagsChanged provides a mock function with given fields: flagKeys
 func (_m *FlagsChangeObserver) FlagsChanged(flagKeys ...keys.FlagKey) {
-	_va := make([]interface{}, len(flagKeys))
-	for _i := range flagKeys {
-		_va[_i] = flagKeys[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	_m.Called(_ca...)
+	_m.Called(flagKeys)
 }
 
 type mockConstructorTestingTNewFlagsChangeObserver interface {

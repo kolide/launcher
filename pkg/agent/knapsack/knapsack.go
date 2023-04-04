@@ -92,7 +92,7 @@ func (k *knapsack) ServerProvidedDataStore() types.KVStore {
 }
 
 func (k *knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
-	k.RegisterChangeObserver(observer, flagKeys...)
+	k.flags.RegisterChangeObserver(observer, flagKeys...)
 }
 
 func (k *knapsack) SetDesktopEnabled(enabled bool) error {
