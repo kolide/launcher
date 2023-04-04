@@ -15,19 +15,23 @@ import (
 // determining precedence, sanitizing flag values, and notifying observers of changes.
 type FlagController struct {
 	logger                 log.Logger
-	cmdLineOpts            launcher.Options
+	cmdLineOpts            *launcher.Options
 	agentFlagsStore        types.KVStore
 	overrideMutex          sync.RWMutex
 	controlRequestOverride FlagValueOverride
 	observers              map[types.FlagsChangeObserver][]keys.FlagKey
 }
 
-func NewFlagController(logger log.Logger, cmdLineOpts launcher.Options, agentFlagsStore types.KVStore) *FlagController {
+func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
 	fc := &FlagController{
 		logger:          logger,
-		cmdLineOpts:     cmdLineOpts,
+		cmdLineOpts:     &launcher.Options{},
 		agentFlagsStore: agentFlagsStore,
 		observers:       make(map[types.FlagsChangeObserver][]keys.FlagKey),
+	}
+
+	for _, opt := range opts {
+		opt(fc)
 	}
 
 	return fc
@@ -134,7 +138,7 @@ func (fc *FlagController) SetControlRequestIntervalOverride(interval, duration t
 	fc.overrideMutex.Lock()
 	defer fc.overrideMutex.Unlock()
 
-	if fc.controlRequestOverride.Value() == nil {
+	if fc.controlRequestOverride == nil || fc.controlRequestOverride.Value() == nil {
 		// Creating the override implicitly causes future ControlRequestInterval retrievals to use the override until expiration
 		fc.controlRequestOverride = &Override{}
 	}

@@ -114,7 +114,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
 
-	flagController := flags.NewFlagController(logger, opts, stores[storage.AgentFlagsStore])
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db)
 
 	// If we have successfully opened the DB, and written a pid,

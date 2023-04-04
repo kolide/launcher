@@ -34,7 +34,7 @@ func TestControllerBoolFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), launcher.Options{}, store)
+			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
 			var value bool
@@ -89,7 +89,7 @@ func TestControllerStringFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), launcher.Options{}, store)
+			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
 			var value string
@@ -129,7 +129,7 @@ func TestControllerDurationFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), launcher.Options{}, store)
+			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
 			var value time.Duration
@@ -152,10 +152,8 @@ func TestControllerNotify(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		cmdLineOpts     *launcher.Options
-		agentFlagsStore types.KVStore
-		valueToSet      time.Duration
+		name       string
+		valueToSet time.Duration
 	}{
 		{
 			name:       "happy path",
@@ -169,7 +167,7 @@ func TestControllerNotify(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), launcher.Options{}, store)
+			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
@@ -182,6 +180,89 @@ func TestControllerNotify(t *testing.T) {
 
 			value := fc.ControlRequestInterval()
 			assert.Equal(t, tt.valueToSet, value)
+		})
+	}
+}
+
+func TestControllerUpdate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		pairs       []string
+		changedKeys []string
+	}{
+		{
+			name:        "happy path",
+			pairs:       []string{keys.ControlRequestInterval.String(), "125000", keys.ControlServerURL.String(), "kolide-app.com"},
+			changedKeys: []string{keys.ControlRequestInterval.String(), keys.ControlServerURL.String()},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			require.NoError(t, err)
+			fc := NewFlagController(log.NewNopLogger(), store)
+			assert.NotNil(t, fc)
+
+			mockObserver := mocks.NewFlagsChangeObserver(t)
+			mockObserver.On("FlagsChanged", keys.ControlRequestInterval, keys.ControlServerURL)
+
+			fc.RegisterChangeObserver(mockObserver, keys.ToFlagKeys(tt.changedKeys)...)
+
+			changedKeys, err := fc.Update(tt.pairs...)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.changedKeys, changedKeys)
+		})
+	}
+}
+
+func TestControllerOverride(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		valueToSet time.Duration
+		interval   time.Duration
+		duration   time.Duration
+	}{
+		{
+			name:       "happy path",
+			valueToSet: 8 * time.Second,
+			interval:   6 * time.Second,
+			duration:   2 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			require.NoError(t, err)
+			fc := NewFlagController(log.NewNopLogger(), store)
+			assert.NotNil(t, fc)
+
+			mockObserver := mocks.NewFlagsChangeObserver(t)
+			mockObserver.On("FlagsChanged", keys.ControlRequestInterval)
+
+			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
+
+			err = fc.SetControlRequestInterval(tt.valueToSet)
+			require.NoError(t, err)
+
+			value := fc.ControlRequestInterval()
+			assert.Equal(t, tt.valueToSet, value)
+
+			fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
+			assert.Equal(t, tt.interval, fc.ControlRequestInterval())
+
+			time.Sleep(tt.duration * 2)
+			assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
 		})
 	}
 }
