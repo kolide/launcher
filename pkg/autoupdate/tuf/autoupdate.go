@@ -151,7 +151,8 @@ func LocalTufDirectory(rootDirectory string) string {
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
-	// On startup, tidy the library
+	// For now, tidy the library on startup. In the future, we will tidy the library
+	// earlier, after version selection.
 	ta.libraryManager.TidyLibrary()
 
 	checkTicker := time.NewTicker(ta.checkInterval)
