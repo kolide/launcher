@@ -117,7 +117,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 }
 
 func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
-	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
+	// Set up the local TUF directory for our TUF client
 	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
