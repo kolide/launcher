@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
@@ -254,13 +255,33 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinar
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
 func (ulm *updateLibraryManager) TidyLibrary() {
 	for _, binary := range binaries {
+		// First, remove old staged archives
 		ulm.tidyStagedUpdates(binary)
 
-		currentVersion, err := ulm.currentRunningVersion(binary)
+		// Get the current running version to preserve it when tidying the available updates
+		var currentVersion *semver.Version
+		var err error
+		switch binary {
+		case binaryOsqueryd:
+			// The osqueryd client may not have initialized yet, so retry the version
+			// check a couple times before giving up
+			osquerydVersionCheckRetries := 5
+			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
+				currentVersion, err = ulm.currentRunningVersion(binary)
+				if err == nil {
+					break
+				}
+				time.Sleep(1 * time.Minute)
+			}
+		default:
+			currentVersion, err = ulm.currentRunningVersion(binary)
+		}
+
 		if err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-			return
+			continue
 		}
+
 		ulm.tidyUpdateLibrary(binary, currentVersion)
 	}
 }
@@ -297,10 +318,6 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 		return
 	}
 
-	if len(rawVersionsInLibrary) <= numberOfVersionsToKeep {
-		return
-	}
-
 	removeUpdate := func(v string) {
 		directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), v)
 		level.Debug(ulm.logger).Log("msg", "removing old update", "directory", directoryToRemove)
@@ -319,6 +336,10 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 		}
 
 		versionsInLibrary = append(versionsInLibrary, v)
+	}
+
+	if len(versionsInLibrary) <= numberOfVersionsToKeep {
+		return
 	}
 
 	// Sort the versions (ascending order)
