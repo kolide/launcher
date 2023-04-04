@@ -113,6 +113,12 @@ func New(k types.Knapsack, kolideServer string, opts ...LocalServerOption) (*loc
 	mux.HandleFunc("/", http.NotFound)
 	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
+	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
+	// after making it through the kryptoEcMiddleware
+	// by using v1, k2 can call endpoints without fear of panicing local server
+	// /v0/cmd left for transition period
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+
 	// uncomment to test without going through middleware
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'
