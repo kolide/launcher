@@ -32,9 +32,9 @@ func TestFlagValueOverride(t *testing.T) {
 			o := &Override{}
 			assert.Nil(t, o.Value())
 
-			var expired bool
+			ch := make(chan bool)
 			expiredCallback := func(key keys.FlagKey) {
-				expired = true
+				ch <- true
 			}
 
 			o.Start(tt.key, tt.overrideValue, tt.duration, expiredCallback)
@@ -42,7 +42,7 @@ func TestFlagValueOverride(t *testing.T) {
 
 			time.Sleep(tt.duration * 2)
 			assert.Equal(t, tt.overrideValue, o.Value())
-			assert.True(t, expired)
+			assert.True(t, <-ch)
 		})
 	}
 }
@@ -71,22 +71,25 @@ func TestFlagValueOverrideRestart(t *testing.T) {
 			o := &Override{}
 			assert.Nil(t, o.Value())
 
-			var expired bool
+			ch := make(chan bool)
 			expiredCallback := func(key keys.FlagKey) {
-				expired = true
+				ch <- true
 			}
 
-			o.Start(tt.key, tt.overrideValue, tt.duration, expiredCallback)
+			neverEverCallback := func(key keys.FlagKey) {
+				assert.Fail(t, "Override expire callback called when it should not be")
+			}
+
+			o.Start(tt.key, tt.overrideValue, tt.duration, neverEverCallback)
 			assert.Equal(t, tt.overrideValue, o.Value())
 
 			time.Sleep(tt.duration / 2)
 			o.Start(tt.key, tt.overrideValue, tt.duration, expiredCallback)
-			assert.False(t, expired)
 			assert.Equal(t, tt.overrideValue, o.Value())
 
 			time.Sleep(tt.duration * 2)
 			assert.Equal(t, tt.overrideValue, o.Value())
-			assert.True(t, expired)
+			assert.True(t, <-ch)
 		})
 	}
 }
