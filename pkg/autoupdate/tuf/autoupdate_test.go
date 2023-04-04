@@ -73,10 +73,11 @@ func TestExecute(t *testing.T) {
 	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Expect that we attempt to update the library
-	mockLibrarian := newMockLibrarian(t)
-	autoupdater.libraryManager = mockLibrarian
-	mockLibrarian.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
-	mockLibrarian.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
+	mockLibraryManager := newMockLibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockLibraryManager.On("TidyLibrary").Return().Once()
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
@@ -89,7 +90,7 @@ func TestExecute(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
-	mockLibrarian.AssertExpectations(t)
+	mockLibraryManager.AssertExpectations(t)
 
 	// Check log lines to confirm that we see the log `received interrupt, stopping`, indicating that
 	// the autoupdater shut down at the end
@@ -114,7 +115,9 @@ func Test_storeError(t *testing.T) {
 
 	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-	autoupdater.libraryManager = newMockLibrarian(t)
+	mockLibraryManager := newMockLibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockLibraryManager.On("TidyLibrary").Return().Once()
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
@@ -141,6 +144,8 @@ func Test_storeError(t *testing.T) {
 	})
 	require.NoError(t, err, "could not iterate over keys")
 	require.Greater(t, errorCount, 0, "TUF autoupdater did not record error counts")
+
+	mockLibraryManager.AssertExpectations(t)
 }
 
 func Test_cleanUpOldErrors(t *testing.T) {

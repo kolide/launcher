@@ -509,7 +509,7 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				require.NoError(t, err, "invalid current version for test: %s", tt.currentlyRunningVersion)
 
 				// Tidy the library
-				testLibraryManager.tidyLibrary(binary, currentVersion)
+				testLibraryManager.tidyUpdateLibrary(binary, currentVersion)
 
 				// Confirm that the versions we expect are still there
 				for _, expectedPreservedVersion := range tt.expectedPreservedVersions {

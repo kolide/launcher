@@ -100,7 +100,8 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 		return nil
 	}
 
-	defer ulm.tidyLibrary(binary, currentVersion)
+	// Remove downloaded archives after update, regardless of success
+	defer ulm.tidyStagedUpdates(binary)
 
 	stagedUpdatePath, err := ulm.stageUpdate(binary, targetFilename)
 	if err != nil {
@@ -250,10 +251,18 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinar
 	}
 }
 
-// tidyLibrary removes unneeded files from the staged updates and updates directories.
-func (ulm *updateLibraryManager) tidyLibrary(binary autoupdatableBinary, currentRunningVersion *semver.Version) {
-	ulm.tidyStagedUpdates(binary)
-	ulm.tidyUpdateLibrary(binary, currentRunningVersion)
+// TidyLibrary removes unneeded files from the staged updates and updates directories.
+func (ulm *updateLibraryManager) TidyLibrary() {
+	for _, binary := range binaries {
+		ulm.tidyStagedUpdates(binary)
+
+		currentVersion, err := ulm.currentRunningVersion(binary)
+		if err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
+			return
+		}
+		ulm.tidyUpdateLibrary(binary, currentVersion)
+	}
 }
 
 // tidyStagedUpdates removes all old archives from the staged updates directory.

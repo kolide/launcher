@@ -23,6 +23,11 @@ func (_m *mockLibrarian) AddToLibrary(binary autoupdatableBinary, targetFilename
 	return r0
 }
 
+// TidyLibrary provides a mock function with given fields:
+func (_m *mockLibrarian) TidyLibrary() {
+	_m.Called()
+}
+
 type mockConstructorTestingTnewMockLibrarian interface {
 	mock.TestingT
 	Cleanup(func())

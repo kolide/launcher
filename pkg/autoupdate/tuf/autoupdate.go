@@ -49,6 +49,7 @@ type ReleaseFileCustomMetadata struct {
 
 type librarian interface {
 	AddToLibrary(binary autoupdatableBinary, targetFilename string) error
+	TidyLibrary()
 }
 
 type TufAutoupdater struct {
@@ -150,6 +151,9 @@ func LocalTufDirectory(rootDirectory string) string {
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
+	// On startup, tidy the library
+	ta.libraryManager.TidyLibrary()
+
 	checkTicker := time.NewTicker(ta.checkInterval)
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 
