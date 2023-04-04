@@ -72,6 +72,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				malloryKey, err := echelper.GenerateEcdsaKey()
 				require.NoError(t, err)
 				challenge, _, err := challenge.Generate(malloryKey, challengeId, challengeData, cmdReq)
+				require.NoError(t, err)
 				return challenge, nil
 			},
 			loggedErr: "unable to verify signature",
