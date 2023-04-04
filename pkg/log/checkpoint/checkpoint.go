@@ -1,6 +1,8 @@
 package checkpoint
 
 import (
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -40,91 +43,124 @@ type logger interface {
 	Log(keyvals ...interface{}) error
 }
 
+type querierInt interface {
+	Query(query string) ([]map[string]string, error)
+}
+
+type checkPointer struct {
+	logger  logger
+	querier querierInt
+	db      *bbolt.DB
+	opts    launcher.Options
+
+	lock        sync.RWMutex
+	queriedInfo map[string]any
+}
+
+func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
+	return &checkPointer{
+		logger: log.With(logger, "component", "log checkpoint"),
+		db:     db,
+		opts:   opts,
+
+		lock:        sync.RWMutex{},
+		queriedInfo: make(map[string]any),
+	}
+}
+
+// SetQuerier adds the querier into the checkpointer. It is done in a function, so it can happen
+// later in the startup sequencing.
+func (c *checkPointer) SetQuerier(querier querierInt) {
+	c.querier = querier
+	c.queryStaticInfo()
+	c.logQueriedInfo()
+}
+
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
-func Run(logger logger, db *bbolt.DB, opts launcher.Options) {
-
-	// Things to add:
-	//  * invoke osquery for better hardware info
-	//  * runtime stats, like memory allocations
-
+func (c *checkPointer) Run() {
 	go func() {
-		logCheckPoint(logger, db, opts)
+		c.logCheckPoint()
 
 		for range time.Tick(time.Minute * 60) {
-			logCheckPoint(logger, db, opts)
+			c.logCheckPoint()
 		}
 	}()
 }
 
-func logCheckPoint(logger log.Logger, db *bbolt.DB, opts launcher.Options) {
-	logger = log.With(logger, "msg", "log checkpoint")
+func (c *checkPointer) logCheckPoint() {
+	// populate and log the queried static info
+	c.queryStaticInfo()
+	c.logQueriedInfo()
 
-	logger.Log("hostname", hostName())
-	logger.Log("runtime", runtimeInfo)
-	logger.Log("launcher", launcherInfo)
-	logger.Log("notableFiles", fileNamesInDirs(notableFileDirs...))
-	logDbSize(logger, db)
-	logConnections(logger, opts)
-	logIpLookups(logger, opts)
-	logKolideServerVersion(logger, opts)
-	logNotaryVersions(logger, opts)
+	c.logger.Log("runtime", runtimeInfo)
+	c.logger.Log("launcher", launcherInfo)
+	c.logger.Log("hostname", hostName())
+	c.logger.Log("notableFiles", filesInDirs(notableFileDirs...))
+	c.logger.Log("keyinfo", agentKeyInfo())
+	c.logOsqueryInfo()
+	c.logDbSize()
+	c.logKolideServerVersion()
+	c.logConnections()
+	c.logIpLookups()
+	c.logNotaryVersions()
+	c.logServerProvidedData()
 }
 
-func logDbSize(logger log.Logger, db *bbolt.DB) {
-	boltStats, err := agent.GetStats(db)
+func (c *checkPointer) logDbSize() {
+	boltStats, err := agent.GetStats(c.db)
 	if err != nil {
-		logger.Log("bbolt db size", err.Error())
+		c.logger.Log("bbolt db size", err.Error())
 	} else {
-		logger.Log("bbolt db size", boltStats.DB.Size)
+		c.logger.Log("bbolt db size", boltStats.DB.Size)
 	}
 }
 
-func logKolideServerVersion(logger logger, opts launcher.Options) {
-	if !opts.KolideHosted {
+func (c *checkPointer) logKolideServerVersion() {
+	if !c.opts.KolideHosted {
 		return
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", opts.KolideServerURL), opts)
+	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", c.opts.KolideServerURL), c.opts)
 	if err != nil {
-		logger.Log("kolide server version fetch", err)
+		c.logger.Log("kolide server version fetch", err)
 	} else {
-		logger.Log("kolide server version fetch", fetchFromUrls(httpClient, kolideServerUrl))
+		c.logger.Log("kolide server version fetch", fetchFromUrls(httpClient, kolideServerUrl))
 	}
 }
 
-func logNotaryVersions(logger logger, opts launcher.Options) {
-	if !opts.KolideHosted || !opts.Autoupdate {
+func (c *checkPointer) logNotaryVersions() {
+	if !c.opts.KolideHosted || !c.opts.Autoupdate {
 		return
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", opts.NotaryServerURL), opts)
+	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.opts.NotaryServerURL), c.opts)
 	if err != nil {
-		logger.Log("notary versions", err)
+		c.logger.Log("notary versions", err)
 	} else {
-		logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
+		c.logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
 	}
 }
 
-func logConnections(logger logger, opts launcher.Options) {
+func (c *checkPointer) logConnections() {
 	dialer := &net.Dialer{Timeout: requestTimeout}
-	logger.Log("connections", testConnections(dialer, urlsToTest(opts)...))
+	c.logger.Log("connections", testConnections(dialer, urlsToTest(c.opts)...))
 }
 
-func logIpLookups(logger logger, opts launcher.Options) {
+func (c *checkPointer) logIpLookups() {
 	ipLookuper := &net.Resolver{}
-	logger.Log("ip loook ups", lookupHostsIpv4s(ipLookuper, urlsToTest(opts)...))
+	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.opts)...))
 }
 
 func urlsToTest(opts launcher.Options) []*url.URL {
 	addrsToTest := []string{opts.KolideServerURL}
 
 	if opts.Autoupdate {
-		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL)
+		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL, opts.TufServerURL)
 	}
 
 	if opts.Control {
@@ -181,4 +217,34 @@ func hostName() string {
 	}
 
 	return hostname
+}
+
+func agentKeyInfo() map[string]string {
+	keyinfo := make(map[string]string, 3)
+
+	pub := agent.LocalDbKeys().Public()
+	if pub == nil {
+		keyinfo["local_key"] = "nil. Likely startup delay"
+		return keyinfo
+	}
+
+	if localKeyDer, err := x509.MarshalPKIXPublicKey(pub); err == nil {
+		// der is a binary format, so convert to b64
+		keyinfo["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
+	} else {
+		keyinfo["local_key"] = fmt.Sprintf("error marshalling local key (startup is sometimes weird): %s", err)
+	}
+
+	// We don't always have hardware keys. Move on if we don't
+	if agent.HardwareKeys().Public() == nil {
+		return keyinfo
+	}
+
+	if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+		// der is a binary format, so convert to b64
+		keyinfo["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
+		keyinfo["hardware_key_source"] = agent.HardwareKeys().Type()
+	}
+
+	return keyinfo
 }

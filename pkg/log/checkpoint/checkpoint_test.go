@@ -28,6 +28,7 @@ func Test_urlsToTest(t *testing.T) {
 					ControlServerURL: "k2control.kolide.com:443",
 					Autoupdate:       true,
 					NotaryServerURL:  "notary.kolide.co:443",
+					TufServerURL:     "tuf.kolide.com:443",
 					MirrorServerURL:  "dl.kolide.co:443",
 				},
 			},
@@ -45,6 +46,10 @@ func Test_urlsToTest(t *testing.T) {
 					Scheme: "https",
 				},
 				{
+					Host:   "tuf.kolide.com:443",
+					Scheme: "https",
+				},
+				{
 					Host:   "k2control.kolide.com:443",
 					Scheme: "https",
 				},
@@ -57,6 +62,7 @@ func Test_urlsToTest(t *testing.T) {
 					KolideServerURL: "k2device.kolide.com:443",
 					Autoupdate:      true,
 					NotaryServerURL: "notary.kolide.co:443",
+					TufServerURL:    "tuf.kolide.com:443",
 					MirrorServerURL: "dl.kolide.co:443",
 				},
 			},
@@ -73,6 +79,10 @@ func Test_urlsToTest(t *testing.T) {
 					Host:   "notary.kolide.co:443",
 					Scheme: "https",
 				},
+				{
+					Host:   "tuf.kolide.com:443",
+					Scheme: "https",
+				},
 			},
 		},
 		{
@@ -83,6 +93,7 @@ func Test_urlsToTest(t *testing.T) {
 					Control:          true,
 					ControlServerURL: "k2control.kolide.com:443",
 					NotaryServerURL:  "notary.kolide.co:443",
+					TufServerURL:     "tuf.kolide.com:443",
 					MirrorServerURL:  "dl.kolide.co:443",
 				},
 			},

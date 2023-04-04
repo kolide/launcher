@@ -1,10 +1,13 @@
 package localserver
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,46 +27,33 @@ const (
 
 type v2CmdRequestType struct {
 	Path string
+	Body []byte
 }
 
 type kryptoEcMiddleware struct {
-	signer       crypto.Signer
-	counterParty ecdsa.PublicKey
-	logger       log.Logger
+	localDbSigner, hardwareSigner crypto.Signer
+	counterParty                  ecdsa.PublicKey
+	logger                        log.Logger
 }
 
-func newKryptoEcMiddleware(logger log.Logger, signer crypto.Signer, counteParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		signer:       signer,
-		counterParty: counteParty,
-		logger:       log.With(logger, "keytype", "ec"),
+		localDbSigner:  localDbSigner,
+		hardwareSigner: hardwareSigner,
+		counterParty:   counterParty,
+		logger:         log.With(logger, "keytype", "ec"),
 	}
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
-			r.Body.Close()
+			defer r.Body.Close()
 		}
 
-		// Extract the box from the URL query parameters
-		boxRaw := r.URL.Query().Get("box")
-		if boxRaw == "" {
-			level.Debug(e.logger).Log("msg", "no data in box query parameter")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		boxRawBytes, err := base64.StdEncoding.DecodeString(boxRaw)
+		challengeBox, err := extractChallenge(r)
 		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to b64 decode box", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		challengeBox, err := challenge.UnmarshalChallenge(boxRawBytes)
-		if err != nil {
-			level.Debug(e.logger).Log("msg", "failed to unmarshal challenge", "err", err)
+			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -90,16 +80,18 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		v := url.Values{}
-
 		newReq := &http.Request{
-			Method: "GET",
+			Method: http.MethodPost,
 			URL: &url.URL{
-				Scheme:   r.URL.Scheme,
-				Host:     r.Host,
-				Path:     cmdReq.Path,
-				RawQuery: v.Encode(),
+				Scheme: r.URL.Scheme,
+				Host:   r.Host,
+				Path:   cmdReq.Path,
 			},
+		}
+
+		// the body of the cmdReq become the body of the next http request
+		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
+			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 		}
 
 		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
@@ -108,7 +100,16 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		response, err := challengeBox.Respond(e.signer, bhr.Bytes())
+		var response []byte
+		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
+		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
+		// pass nil to krypto
+		if e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
+			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
+		} else {
+			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
+		}
+
 		if err != nil {
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -126,4 +127,71 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
 		}
 	})
+}
+
+// extractChallenge finds the challenge in an http request. It prefers the GET parameter, but will fall back to POST data.
+func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
+	// first check query parmeters
+	rawBox := r.URL.Query().Get("box")
+	if rawBox != "" {
+		decoded, err := base64.StdEncoding.DecodeString(rawBox)
+		if err != nil {
+			return nil, fmt.Errorf("decoding b64 box from url param: %w", err)
+		}
+
+		return challenge.UnmarshalChallenge(decoded)
+	}
+
+	// now check body
+	if r.Body == nil {
+		return nil, fmt.Errorf("no box found in url params or request body: body nil")
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("unmarshalling request body to json: %w", err)
+	}
+
+	val, ok := body["box"]
+	if !ok {
+		return nil, fmt.Errorf("no box key found in request body json")
+	}
+
+	valStr, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf("box value is not a string")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(valStr)
+	if err != nil {
+		return nil, fmt.Errorf("decoding b64 box from request body: %w", err)
+	}
+
+	return challenge.UnmarshalChallenge(decoded)
+}
+
+type bufferedHttpResponse struct {
+	header http.Header
+	code   int
+	buf    bytes.Buffer
+}
+
+func (bhr *bufferedHttpResponse) Header() http.Header {
+	if bhr.header == nil {
+		bhr.header = make(http.Header)
+	}
+
+	return bhr.header
+}
+
+func (bhr *bufferedHttpResponse) Write(in []byte) (int, error) {
+	return bhr.buf.Write(in)
+}
+
+func (bhr *bufferedHttpResponse) WriteHeader(code int) {
+	bhr.code = code
+}
+
+func (bhr *bufferedHttpResponse) Bytes() []byte {
+	return bhr.buf.Bytes()
 }

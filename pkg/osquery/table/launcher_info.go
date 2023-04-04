@@ -9,13 +9,13 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go/plugin/table"
-	"go.etcd.io/bbolt"
 )
 
-func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
+func LauncherInfoTable(store types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -41,12 +41,12 @@ func LauncherInfoTable(db *bbolt.DB) *table.Plugin {
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(db))
+	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(store))
 }
 
-func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
+func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		identifier, err := osquery.IdentifierFromDB(db)
+		identifier, err := osquery.IdentifierFromDB(store)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return nil, err
 		}
 
-		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(db)
+		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(store)
 		if err != nil {
 			// No logger here, so we can't easily log. Move on with blank values
 			publicKey = ""
@@ -88,8 +88,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 		}
 
 		// going forward were using DER format
-		localKeyDer, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public())
-		if err == nil {
+		if localKeyDer, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public()); err == nil {
 			// der is a binary format, so convert to b64
 			results[0]["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
 		}
@@ -99,8 +98,7 @@ func generateLauncherInfoTable(db *bbolt.DB) table.GenerateFunc {
 			return results, nil
 		}
 
-		hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public())
-		if err == nil {
+		if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
 			// der is a binary format, so convert to b64
 			results[0]["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
 			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()

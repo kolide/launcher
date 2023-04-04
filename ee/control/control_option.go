@@ -3,7 +3,7 @@ package control
 import (
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 type Option func(*ControlService)
@@ -12,12 +12,20 @@ type Option func(*ControlService)
 func WithRequestInterval(interval time.Duration) Option {
 	return func(c *ControlService) {
 		c.requestInterval = interval
+		c.requestTicker.Reset(interval)
 	}
 }
 
-// WithGetterSetter sets the key/value getset for control data
-func WithGetterSetter(getset agent.GetterSetter) Option {
+// WithStore sets the key/value store for control data
+func WithStore(store types.GetterSetter) Option {
 	return func(c *ControlService) {
-		c.getset = getset
+		c.store = store
+	}
+}
+
+// WithMinAcceleartionInterval sets the minimum interval between updates during request interval acceleration
+func WithMinAcclerationInterval(interval time.Duration) Option {
+	return func(c *ControlService) {
+		c.minAccelerationInterval = interval
 	}
 }

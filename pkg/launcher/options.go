@@ -45,7 +45,7 @@ type Options struct {
 	// appropriate for the transport.
 	LogMaxBytesPerBatch int
 
-	// Control enables the remote control functionality.
+	// Control enables the remote control functionality. It is not in use.
 	Control bool
 	// ControlServerURL URL for control server.
 	ControlServerURL string
@@ -64,6 +64,8 @@ type Options struct {
 	Autoupdate bool
 	// NotaryServerURL is the URL for the Notary server.
 	NotaryServerURL string
+	// TufServerURL is the URL for the tuf server.
+	TufServerURL string
 	// MirrorServerURL is the URL for the Notary mirror.
 	MirrorServerURL string
 	// AutoupdateInterval is the interval at which Launcher will check for
@@ -87,10 +89,14 @@ type Options struct {
 	OsqueryFlags []string
 	// DisableControlTLS disables TLS transport with the control server.
 	DisableControlTLS bool
+	// InsecureControlTLS disables TLS certificate validation for the control server.
+	InsecureControlTLS bool
 	// InsecureTLS disables TLS certificate verification.
 	InsecureTLS bool
 	// InsecureTransport disables TLS in the transport layer.
 	InsecureTransport bool
 	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
 	CompactDbMaxTx int64
+	// IAmBreakingEELicence disables the EE licence check before runnign the local server
+	IAmBreakingEELicense bool
 }

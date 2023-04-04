@@ -1,0 +1,10 @@
+{
+    "icon": "translucent",
+    "tooltip": "Kolide",
+    "items": [
+        {
+            "label": "Kolide Agent Version: {{.LauncherVersion}}",
+            "disabled": true
+        }
+    ]
+}

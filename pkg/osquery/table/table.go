@@ -1,31 +1,35 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
 	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
-	"github.com/kolide/launcher/pkg/osquery/tables/kolide_server_data"
+	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
+	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
 	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
-	"go.etcd.io/bbolt"
 )
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(db *bbolt.DB, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(k *knapsack.Knapsack, opts *launcher.Options) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(db),
-		LauncherDbInfo(db),
-		LauncherInfoTable(db),
-		kolide_server_data.TablePlugin(db),
+		LauncherConfigTable(k.ConfigStore()),
+		LauncherDbInfo(k.BboltDB),
+		LauncherInfoTable(k.ConfigStore()),
+		launcher_db.TablePlugin("kolide_server_data", k.ServerProvidedDataStore()),
+		launcher_db.TablePlugin("kolide_control_flags", k.AgentFlagsStore()),
 		LauncherAutoupdateConfigTable(opts),
 		osquery_instance_history.TablePlugin(),
+		tufinfo.TufReleaseVersionTable(opts),
+		launcher_db.TablePlugin("kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
 	}
 }
 

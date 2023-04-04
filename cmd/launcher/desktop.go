@@ -4,10 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -16,10 +17,11 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/desktop/server"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
-	"github.com/shirou/gopsutil/process"
 )
 
 func runDesktop(args []string) error {
@@ -39,6 +41,11 @@ func runDesktop(args []string) error {
 			"socket_path",
 			"",
 			"path to create socket",
+		)
+		flmonitorurl = flagset.String(
+			"monitor_url",
+			"",
+			"url to monitor parent",
 		)
 		flmenupath = flagset.String(
 			"menu_path",
@@ -91,22 +98,27 @@ func runDesktop(args []string) error {
 		return nil
 	}, func(error) {})
 
+	// Set up notification sending and listening
+	notifier := notify.NewDesktopNotifier(logger, *flIconPath)
+	runGroup.Add(notifier.Listen, notifier.Interrupt)
+
 	// monitor parent
 	runGroup.Add(func() error {
-		monitorParentProcess(logger)
+		monitorParentProcess(logger, *flmonitorurl, 2*time.Second)
 		return nil
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, *flIconPath, shutdownChan)
+	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
 
-	menu := menu.New(logger, *flhostname, *flmenupath)
-	server.RegisterRefreshListener(func() {
-		menu.Build()
-	})
+	m := menu.New(logger, *flhostname, *flmenupath)
+	refreshMenu := func() {
+		m.Build()
+	}
+	server.RegisterRefreshListener(refreshMenu)
 
 	// start desktop server
 	runGroup.Add(server.Serve, func(err error) {
@@ -125,7 +137,7 @@ func runDesktop(args []string) error {
 		<-shutdownChan
 		return nil
 	}, func(err error) {
-		menu.Shutdown()
+		m.Shutdown()
 	})
 
 	// run run group
@@ -140,7 +152,7 @@ func runDesktop(args []string) error {
 	}()
 
 	// blocks until shutdown called
-	menu.Init()
+	m.Init()
 
 	return nil
 }
@@ -159,30 +171,59 @@ func listenSignals(logger log.Logger) {
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger) {
-	ticker := time.NewTicker(2 * time.Second)
+func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+
+	client := http.Client{
+		Timeout: interval,
+	}
+
+	const maxErrCount = 3
+	errCount := 0
 
 	for ; true; <-ticker.C {
-		ppid := os.Getppid()
+		response, err := client.Get(monitorUrl)
 
-		if ppid <= 1 {
-			break
+		if response != nil {
+			// This is the secret sauce to reusing a single connection, you have to read the body in full
+			// before closing, otherwise a new connection is established each time.
+			// thank you Chris Bao! this article explains this well
+			// https://organicprogrammer.com/2021/10/25/understand-http1-1-persistent-connection-golang/
+			// in our case the monitor server spun up by desktop_runner does not write to the body so this is not strictly nessessary, but doesn't hurt
+			io.Copy(io.Discard, response.Body)
+			response.Body.Close()
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		exists, err := process.PidExistsWithContext(ctx, int32(ppid))
+		// no error, 200 response
+		if err == nil && response != nil && response.StatusCode == 200 {
+			errCount = 0
+			continue
+		}
 
-		// pretty sure this `cancel()` call is not needed since it should call cancel on it's own when time is exceeded
-		// https://cs.opensource.google/go/go/+/master:src/context/context.go;l=456?q=func%20WithDeadline&ss=go%2Fgo
-		// but the linter and the context.WithTimeout docs say to do it
-		cancel()
-		if err != nil || !exists {
-			level.Error(logger).Log(
-				"msg", "parent process gone",
+		// have an error or bad status code
+		errCount++
+
+		// retry
+		if errCount < maxErrCount {
+			level.Debug(logger).Log(
+				"msg", "could not connect to parent, will retry",
 				"err", err,
+				"attempts", errCount,
+				"max_attempts", maxErrCount,
 			)
-			break
+
+			continue
 		}
+
+		// errCount => maxErrCount, exit
+		level.Debug(logger).Log(
+			"msg", "could not connect to parent, max attempts reached, exiting",
+			"err", err,
+			"attempts", errCount,
+			"max_attempts", maxErrCount,
+		)
+
+		break
 	}
 }
 
@@ -193,5 +234,5 @@ func defaultSocketPath() string {
 		return fmt.Sprintf(`\\.\pipe\%s_%d_%s`, socketBaseName, os.Getpid(), ulid.New())
 	}
 
-	return filepath.Join(os.TempDir(), fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
+	return agent.TempPath(fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
 }

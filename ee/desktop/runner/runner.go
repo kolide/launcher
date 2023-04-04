@@ -5,9 +5,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,11 +20,14 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/desktop/assets"
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
+	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
@@ -54,6 +58,13 @@ func WithUpdateInterval(interval time.Duration) desktopUsersProcessesRunnerOptio
 	}
 }
 
+// WithMenuRefreshInterval sets the interval on which the runner will refresh the desktop menu
+func WithMenuRefreshInterval(interval time.Duration) desktopUsersProcessesRunnerOption {
+	return func(r *DesktopUsersProcessesRunner) {
+		r.menuRefreshInterval = interval
+	}
+}
+
 // WithExecutablePath sets the path to the executable that will be run for each desktop.
 func WithExecutablePath(path string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
@@ -77,9 +88,9 @@ func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 
 // WithUsersFilesRoot sets the launcher root dir with will be the parent dir
 // for kolide desktop files on a per user basis
-func WithUsersFilesRoot(token string) desktopUsersProcessesRunnerOption {
+func WithUsersFilesRoot(usersFilesRoot string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.usersFilesRoot = token
+		r.usersFilesRoot = usersFilesRoot
 	}
 }
 
@@ -91,9 +102,9 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 }
 
 // WithGetter sets the key/value getter for agent flags
-func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
+func WithGetter(getter types.Getter) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.flagsGetter = storedData
+		r.flagsGetter = getter
 	}
 }
 
@@ -102,9 +113,12 @@ func WithGetter(storedData agent.Getter) desktopUsersProcessesRunnerOption {
 // will create a new one.
 // Initialize with New().
 type DesktopUsersProcessesRunner struct {
-	logger         log.Logger
+	logger log.Logger
+	// updateInterval is the interval on which desktop processes will be spawned, if necessary
 	updateInterval time.Duration
-	interrupt      chan struct{}
+	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
+	menuRefreshInterval time.Duration
+	interrupt           chan struct{}
 	// uidProcs is a map of uid to desktop process
 	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
@@ -127,7 +141,9 @@ type DesktopUsersProcessesRunner struct {
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
 	// flagsGetter gets agent flags
-	flagsGetter agent.Getter
+	flagsGetter types.Getter
+	// monitorServer is a local server that desktop processes call to monitor parent
+	monitorServer *monitorServer
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -142,15 +158,16 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner {
+func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
 		updateInterval:         time.Second * 5,
+		menuRefreshInterval:    time.Minute * 15,
 		procsWg:                &sync.WaitGroup{},
 		interruptTimeout:       time.Second * 10,
-		usersFilesRoot:         filepath.Join(os.TempDir(), "kolide-desktop"),
+		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: false,
 	}
 
@@ -159,15 +176,34 @@ func New(opts ...desktopUsersProcessesRunnerOption) *DesktopUsersProcessesRunner
 	}
 
 	runner.writeIconFile()
+	runner.writeDefaultMenuTemplateFile()
+	runner.refreshMenu()
 
-	return runner
+	ms, err := newMonitorServer()
+	if err != nil {
+		return nil, err
+	}
+
+	runner.monitorServer = ms
+	go func() {
+		if err := runner.monitorServer.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			level.Error(runner.logger).Log(
+				"msg", "running monitor server",
+				"err", err,
+			)
+		}
+	}()
+
+	return runner, nil
 }
 
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	ticker := time.NewTicker(r.updateInterval)
-	defer ticker.Stop()
+	updateTicker := time.NewTicker(r.updateInterval)
+	defer updateTicker.Stop()
+	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
+	defer menuRefreshTicker.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
@@ -176,7 +212,10 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		}
 
 		select {
-		case <-ticker.C:
+		case <-updateTicker.C:
+			continue
+		case <-menuRefreshTicker.C:
+			r.refreshMenu()
 			continue
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
@@ -198,6 +237,16 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 
 	// Kill any desktop processes that may exist
 	r.killDesktopProcesses()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	if err := r.monitorServer.Shutdown(ctx); err != nil {
+		level.Error(r.logger).Log(
+			"msg", "shutting down monitor server",
+			"err", err,
+		)
+	}
 }
 
 // killDesktopProcesses kills any existing desktop processes
@@ -208,6 +257,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		r.procsWg.Wait()
 	}()
 
+	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
@@ -218,12 +268,20 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				"path", proc.path,
 				"err", err,
 			)
+			continue
 		}
+		shutdownRequestCount++
 	}
 
 	select {
 	case <-wgDone:
-		level.Debug(r.logger).Log("msg", "all desktop processes shutdown successfully")
+		if shutdownRequestCount > 0 {
+			level.Debug(r.logger).Log(
+				"msg", "successfully completed desktop process shutdown requests",
+				"count", shutdownRequestCount,
+			)
+		}
+
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
@@ -245,18 +303,15 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	}
 }
 
-func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error {
+func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
+	if len(r.uidProcs) == 0 {
+		return errors.New("cannot send notification, no child desktop processes")
+	}
+
 	errs := make([]error, 0)
-	for uid, proc := range r.uidProcs {
+	for _, proc := range r.uidProcs {
 		client := client.New(r.authToken, proc.socketPath)
-		if err := client.Notify(title, body); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending notify command to desktop process",
-				"uid", uid,
-				"pid", proc.process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
+		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -270,15 +325,76 @@ func (r *DesktopUsersProcessesRunner) SendNotification(title, body string) error
 
 // Update handles control server updates for the desktop-menu subsystem
 func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
-	var menu menu.MenuData
-	if err := json.NewDecoder(data).Decode(&menu); err != nil {
-		return fmt.Errorf("failed to decode menu data: %w", err)
+	if data == nil {
+		return errors.New("data is nil")
+	}
+
+	var dataCopy bytes.Buffer
+	dataTee := io.TeeReader(data, &dataCopy)
+
+	// Replace the menu template file
+	dataBytes, err := io.ReadAll(dataTee)
+	if err != nil {
+		return fmt.Errorf("error reading control data: %w", err)
+	}
+	if err := r.writeSharedFile(r.menuTemplatePath(), dataBytes); err != nil {
+		level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
 	}
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
 	// any desktop user processes, either when they refresh, or when they are spawned.
-	if err := r.writeMenuFile(menu); err != nil {
-		return err
+	r.refreshMenu()
+
+	return nil
+}
+
+func (r *DesktopUsersProcessesRunner) Ping() {
+	// agent_flags bucket has been updated, query the flags to react to changes
+	// This has a `v1` appended, because the menu data format went from v0 to v1 -- we
+	// added `hasCapability`. Doing this cleanly required a flag day. Future work will
+	// need to do something else, probably something where the menu data is versioned.
+	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled_v1"))
+	if err != nil {
+		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
+		return
+	}
+
+	// The presence of anything for this flag means desktop is enabled
+	enabled := enabledRaw != nil
+
+	r.processSpawningEnabled = enabled
+	level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(enabled)))
+}
+
+// writeSharedFile writes data to a shared file for user processes to access
+func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("creating file: %w", err)
+	}
+
+	if err := os.Chmod(path, 0644); err != nil {
+		return fmt.Errorf("os.Chmod: %w", err)
+	}
+
+	defer file.Close()
+	_, err = file.Write(data)
+	if err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+
+	return nil
+}
+
+// refreshMenu updates the menu file and tells desktop processes to refresh their menus
+func (r *DesktopUsersProcessesRunner) refreshMenu() {
+	if err := r.generateMenuFile(); err != nil {
+		if agent.Flags.DebugServerData() {
+			level.Error(r.logger).Log(
+				"msg", "failed to generate menu file",
+				"error", err,
+			)
+		}
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
@@ -294,49 +410,55 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 			)
 		}
 	}
+}
+
+// generateMenuFile generates and writes menu data to a shared file
+func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
+	// First generate fresh template data to use for parsing
+	v := version.Version()
+	td := &menu.TemplateData{
+		LauncherVersion:  v.Version,
+		LauncherRevision: v.Revision,
+		GoVersion:        v.GoVersion,
+		ServerHostname:   r.hostname,
+	}
+
+	menuTemplateFileBytes, err := os.ReadFile(r.menuTemplatePath())
+	if err != nil {
+		return fmt.Errorf("failed to read menu template file: %w", err)
+	}
+
+	// Convert the raw JSON to a string and feed it to the parser for template expansion
+	parser := menu.NewTemplateParser(td)
+	parsedMenuDataStr, err := parser.Parse(string(menuTemplateFileBytes))
+	if err != nil {
+		return fmt.Errorf("failed to parse menu data: %w", err)
+	}
+
+	// Convert the parsed string back to bytes, which can now be decoded per usual
+	parsedMenuDataBytes := []byte(parsedMenuDataStr)
+
+	// Write the menu data out to a file that can be grabbed by
+	// any desktop user processes, either when they refresh, or when they are spawned.
+	if err := r.writeSharedFile(r.menuPath(), parsedMenuDataBytes); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) Ping() {
-	// agent_flags bucket has been updated, query the flags to react to changes
-	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled"))
-	if err != nil {
-		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
-		return
+// writeDefaultMenuTemplateFile will create the menu template file, if it does not already exist
+func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
+	menuTemplatePath := r.menuTemplatePath()
+	_, err := os.Stat(menuTemplatePath)
+
+	if os.IsNotExist(err) {
+		if err := r.writeSharedFile(menuTemplatePath, menu.InitialMenu); err != nil {
+			level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
+		}
+	} else if err != nil {
+		level.Error(r.logger).Log("msg", "could not check if menu template file exists", "err", err)
 	}
-
-	// The presence of anything for this flag means desktop is enabled
-	enabled := enabledRaw != nil
-
-	r.processSpawningEnabled = enabled
-	level.Debug(r.logger).Log("msg", "runner processSpawningEnabled:%s", strconv.FormatBool(enabled))
-}
-
-// writeMenuFile writes menu data to a shared file for user processes to access
-func (r *DesktopUsersProcessesRunner) writeMenuFile(data menu.MenuData) error {
-	menuBytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal menu json: %w", err)
-	}
-
-	menuPath := r.menuPath()
-	statusFile, err := os.Create(menuPath)
-	if err != nil {
-		return fmt.Errorf("creating desktop menu file: %w", err)
-	}
-
-	if err := os.Chmod(menuPath, 0644); err != nil {
-		return fmt.Errorf("os.Chmod: %w", err)
-	}
-
-	defer statusFile.Close()
-	_, err = io.Copy(statusFile, bytes.NewReader(menuBytes))
-	if err != nil {
-		return fmt.Errorf("writing desktop menu file: %w", err)
-	}
-
-	return nil
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
@@ -369,14 +491,12 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		menuPath := r.menuPath()
-
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, menuPath)
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath(), r.monitorServer.newEndpoint())
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := runAsUser(uid, cmd); err != nil {
+		if err := r.runAsUser(ctx, uid, cmd); err != nil {
 			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
@@ -548,16 +668,30 @@ func (r *DesktopUsersProcessesRunner) menuPath() string {
 	return filepath.Join(r.usersFilesRoot, "menu.json")
 }
 
+// menuTemplatePath returns the path to the menu template file
+func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
+	return filepath.Join(r.usersFilesRoot, "menu_template.json")
+}
+
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath, monitorUrl string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
+		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
+		// when running the command. We need PATH (e.g. to be able to look up powershell and xdg-open) in the
+		// desktop process, so we set it explicitly here.
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
+		// without passing the temp var, the desktop icon will not appear on windows and emit the error:
+		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
+		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
 		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
 		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
+		fmt.Sprintf("PPID=%d", os.Getpid()),
+		fmt.Sprintf("MONITOR_URL=%s", monitorUrl),
 	}
 
 	stdErr, err := cmd.StderrPipe()
@@ -592,7 +726,7 @@ func (r *DesktopUsersProcessesRunner) writeIconFile() {
 	_, err := os.Stat(expectedLocation)
 
 	if os.IsNotExist(err) {
-		if err := os.WriteFile(expectedLocation, assets.KolideDesktopIcon, 0644); err != nil {
+		if err := os.WriteFile(expectedLocation, assets.MenubarDefaultLightmodeIco, 0644); err != nil {
 			level.Error(r.logger).Log("msg", "icon file did not exist, could not create it", "err", err)
 		}
 	} else if err != nil {
@@ -600,6 +734,13 @@ func (r *DesktopUsersProcessesRunner) writeIconFile() {
 	}
 }
 
+func iconFilename() string {
+	if runtime.GOOS == "windows" {
+		return "kolide.ico"
+	}
+	return "kolide.png"
+}
+
 func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
-	return filepath.Join(r.usersFilesRoot, assets.KolideIconFilename)
+	return filepath.Join(r.usersFilesRoot, iconFilename())
 }

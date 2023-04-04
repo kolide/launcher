@@ -1,34 +1,33 @@
 package menu
 
-func parseMenuData(m *MenuData, builder MenuBuilder) {
+func parseMenuData(m *MenuData, builder menuBuilder) {
 	if m == nil {
 		return
 	}
 
 	// Set top-level menu properties
-	builder.SetIcon(m.Icon)
-	builder.SetTooltip(m.Tooltip)
+	builder.setIcon(m.Icon)
+	builder.setTooltip(m.Tooltip)
 
 	for _, child := range m.Items {
 		parseMenuItem(&child, builder, nil)
 	}
 }
 
-func parseMenuItem(m *menuItemData, builder MenuBuilder, parent any) {
+func parseMenuItem(m *menuItemData, builder menuBuilder, parent any) {
 	if m == nil {
 		return
 	}
 
-	if m.IsSeparator {
+	if m.Separator {
 		// If the item is a separator, nothing else matters
-		builder.AddSeparator()
+		builder.addSeparator()
 		return
 	}
 
 	var item any
 	if m.Label != "" {
-		// A menu item must have a non-empty label
-		item = builder.AddMenuItem(m.Label, m.Tooltip, m.Disabled, m.NonProdOnly, m.Action.Performer, parent)
+		item = builder.addMenuItem(m.Label, m.Tooltip, m.Disabled, m.Action.Performer, parent)
 	}
 
 	if item == nil {

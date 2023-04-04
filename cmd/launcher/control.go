@@ -8,15 +8,15 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
-	"go.etcd.io/bbolt"
 )
 
 func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Options) (*control.HTTPClient, error) {
 	level.Debug(logger).Log("msg", "creating control http client")
 
 	clientOpts := []control.HTTPClientOption{}
-	if opts.InsecureTLS {
+	if opts.InsecureControlTLS {
 		clientOpts = append(clientOpts, control.WithInsecureSkipVerify())
 	}
 	if opts.DisableControlTLS {
@@ -30,7 +30,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, opts *launcher.Opt
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, opts *launcher.Options) (*control.ControlService, error) {
+func createControlService(ctx context.Context, logger log.Logger, store types.GetterSetter, opts *launcher.Options) (*control.ControlService, error) {
 	level.Debug(logger).Log("msg", "creating control service")
 
 	client, err := createHTTPClient(ctx, logger, opts)
@@ -38,13 +38,11 @@ func createControlService(ctx context.Context, logger log.Logger, db *bbolt.DB, 
 		return nil, err
 	}
 
-	getset := control.NewBucketConsumer(logger, db, "control_service_data")
-
 	controlOpts := []control.Option{
 		control.WithRequestInterval(opts.ControlRequestInterval),
-		control.WithGetterSetter(getset),
+		control.WithStore(store),
 	}
-	service := control.New(logger, ctx, client, controlOpts...)
+	service := control.New(logger, client, controlOpts...)
 
 	return service, nil
 }

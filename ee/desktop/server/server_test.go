@@ -116,7 +116,7 @@ func testHandler() http.Handler {
 func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buffer) (*DesktopServer, chan struct{}) {
 	shutdownChan := make(chan struct{})
 
-	server, err := New(log.NewLogfmtLogger(logBytes), authHeader, socketPath, t.TempDir(), shutdownChan)
+	server, err := New(log.NewLogfmtLogger(logBytes), authHeader, socketPath, shutdownChan, nil)
 	require.NoError(t, err)
 	return server, shutdownChan
 }

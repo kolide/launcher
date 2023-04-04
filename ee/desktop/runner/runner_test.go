@@ -1,21 +1,22 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
-	"sync"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop/assets"
+	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,9 +109,9 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes threadSafeBuffer
+			var logBytes threadsafebuffer.ThreadSafeBuffer
 
-			r := New(
+			r, err := New(
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
 				WithHostname("somewhere-over-the-rainbow.example.com"),
@@ -120,6 +121,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				WithUsersFilesRoot(launcherRootDir(t)),
 				WithProcessSpawningEnabled(true),
 			)
+			require.NoError(t, err)
 
 			if tt.setup != nil {
 				tt.setup(t, r)
@@ -156,48 +158,29 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
-					if processExists(p) {
-						state, err := p.process.Wait()
-						require.NoError(t, err, fmt.Sprintf("failed to wait for process: %v", state))
+					if !processExists(p) {
+						continue
 					}
+					// intentionally ignoring the error here
+					// CI will intermittently fail with "wait: no child processes" due runner.go also calling process.Wait()
+					// racing with this code to remove the child process
+					p.process.Wait()
 				}
 			})
 		})
 	}
 }
 
-// thank you zupa https://stackoverflow.com/a/36226525
-type threadSafeBuffer struct {
-	b bytes.Buffer
-	m sync.Mutex
-}
-
-func (b *threadSafeBuffer) Read(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Read(p)
-}
-
-func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Write(p)
-}
-
-func (b *threadSafeBuffer) String() string {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.String()
-}
-
 func launcherRootDir(t *testing.T) string {
 	safeTestName := fmt.Sprintf("%s_%s", "launcher_desktop_test", ulid.New())
 
-	path := filepath.Join(os.TempDir(), safeTestName)
+	path := filepath.Join(t.TempDir(), safeTestName)
 
 	if runtime.GOOS != "windows" {
 		path = filepath.Join("/tmp", safeTestName)
 	}
+
+	require.NoError(t, os.MkdirAll(path, 0700))
 
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(path))
@@ -219,6 +202,75 @@ func Test_writeIconPath(t *testing.T) {
 
 	// Test that if the icon doesn't exist in the root dir, the runner will create it.
 	r.writeIconFile()
-	_, err := os.Stat(filepath.Join(rootDir, assets.KolideIconFilename))
+	_, err := os.Stat(filepath.Join(rootDir, iconFilename()))
 	require.NoError(t, err, "icon file not created")
+}
+
+func TestUpdate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    io.Reader
+		err      bool
+		contains []string
+	}{
+		{
+			name:     "works",
+			input:    strings.NewReader(`{"items":[{"label":"one","tooltip":null,"action":null,"items":[],"disabled":true,"separator":false},{"label":null,"tooltip":null,"action":null,"items":[],"disabled":true,"separator":true},{"label":"two","tooltip":null,"action":null,"items":[],"disabled":true,"separator":false}],"icon":null,"tooltip":"Kolide"}`),
+			contains: []string{"Kolide", "one", "two"},
+		},
+		{
+			name:  "empty",
+			input: strings.NewReader(""),
+		},
+		{
+			name:  "nil",
+			input: nil,
+			err:   true,
+		},
+		{
+			name:  "bad json",
+			input: strings.NewReader("hello"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			r, err := New(WithUsersFilesRoot(dir))
+			require.NoError(t, err)
+
+			if tt.err {
+				require.Error(t, r.Update(tt.input))
+				return
+			}
+			require.NoError(t, r.Update(tt.input))
+
+			menuFH, err := os.Open(r.menuPath())
+			require.NoError(t, err)
+			defer menuFH.Close()
+
+			menuContents, err := io.ReadAll(menuFH)
+			require.NoError(t, err)
+			for _, str := range tt.contains {
+				assert.Contains(t, string(menuContents), str)
+			}
+		})
+	}
+}
+
+func TestSendNotification_NoProcessesYet(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	r, err := New(WithUsersFilesRoot(dir))
+	require.NoError(t, err)
+
+	require.Equal(t, 0, len(r.uidProcs))
+	err = r.SendNotification(notify.Notification{Title: "test", Body: "test"})
+	require.Error(t, err, "should not be able to send notification when there are no child processes")
 }
