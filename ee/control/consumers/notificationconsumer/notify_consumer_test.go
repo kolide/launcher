@@ -11,9 +11,9 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -350,7 +350,7 @@ func TestUpdate_HandlesMalformedNotifications(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), osquery.SentNotificationsBucket)
+	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.SentNotificationsStore.String())
 	require.NoError(t, err)
 	return s
 }

@@ -21,7 +21,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/storage"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/mixer/clock"
@@ -34,10 +36,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	configBucketName = "config"
-)
-
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
@@ -45,7 +43,7 @@ const (
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	db            *bbolt.DB
+	knapsack      *knapsack.Knapsack
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -71,20 +69,6 @@ type Querier interface {
 }
 
 const (
-	// Bucket name to use for launcher configuration.
-	configBucket         = "config"
-	initialResultsBucket = "initial_results"
-	// Bucket name to use for buffered status logs.
-	statusLogsBucket = "status_logs"
-	// Bucket name to use for buffered result logs.
-	resultLogsBucket = "result_logs"
-
-	// the bucket which we push values into from server-backed tables
-	ServerProvidedDataBucket = "server_provided_data"
-
-	// the bucket where we hold sent notifications
-	SentNotificationsBucket = "sent_notifications"
-
 	// DB key for UUID
 	uuidKey = "uuid"
 	// DB key for node key
@@ -140,11 +124,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts) (*Extension, error) {
-	// bucketNames contains the names of buckets that should be created when the
-	// extension opens the DB. It should be treated as a constant.
-	var bucketNames = []string{configBucket, statusLogsBucket, resultLogsBucket, initialResultsBucket, ServerProvidedDataBucket}
-
+func NewExtension(client service.KolideService, k *knapsack.Knapsack, opts ExtensionOpts) (*Extension, error) {
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -170,39 +150,22 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
 
-	// Create Bolt buckets as necessary
-	err := db.Update(func(tx *bbolt.Tx) error {
-		for _, name := range bucketNames {
-			_, err := tx.CreateBucketIfNotExists([]byte(name))
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating DB buckets: %w", err)
-	}
+	configStore := k.ConfigStore()
 
-	store, err := agentbbolt.NewStore(opts.Logger, db, configBucketName)
-	if err != nil {
-		return nil, fmt.Errorf("creating KVStore: %w", err)
-	}
-
-	if err := SetupLauncherKeys(db); err != nil {
+	if err := SetupLauncherKeys(configStore); err != nil {
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, store); err != nil {
+	if err := agent.SetupKeys(opts.Logger, configStore); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
-	identifier, err := IdentifierFromDB(db)
+	identifier, err := IdentifierFromDB(configStore)
 	if err != nil {
 		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
 	}
 
-	nodekey, err := NodeKeyFromDB(db)
+	nodekey, err := NodeKey(configStore)
 	if err != nil {
 		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
@@ -215,14 +178,14 @@ func NewExtension(client service.KolideService, db *bbolt.DB, opts ExtensionOpts
 	initialRunner := &initialRunner{
 		logger:     opts.Logger,
 		identifier: identifier,
-		db:         db,
+		store:      k.InitialResultsStore(),
 		enabled:    opts.RunDifferentialQueriesImmediately,
 	}
 
 	return &Extension{
 		logger:        opts.Logger,
 		serviceClient: client,
-		db:            db,
+		knapsack:      k,
 		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
@@ -249,7 +212,7 @@ func (e *Extension) Shutdown() {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.db)
+	return IdentifierFromDB(e.knapsack.ConfigStore())
 }
 
 // SetupLauncherKeys configures the various keys used for communication.
@@ -258,66 +221,52 @@ func (e *Extension) getHostIdentifier() (string, error) {
 // 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
 // 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
 // 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
-func SetupLauncherKeys(db *bbolt.DB) error {
-	err := db.Update(func(tx *bbolt.Tx) error {
+func SetupLauncherKeys(configStore types.KVStore) error {
+	// Soon-to-be-deprecated RSA keys
+	if err := ensureRsaKey(configStore); err != nil {
+		return fmt.Errorf("ensuring rsa key: %w", err)
+	}
 
-		bucket, err := tx.CreateBucketIfNotExists([]byte(configBucket))
-		if err != nil {
-			return fmt.Errorf("creating bucket: %w", err)
+	// Remove things we don't keep in the bucket any more
+	for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
+		if err := configStore.Delete([]byte(k)); err != nil {
+			return fmt.Errorf("deleting %s: %w", k, err)
 		}
+	}
 
-		// Soon-to-be-deprecated RSA keys
-		if err := ensureRsaKey(bucket); err != nil {
-			return fmt.Errorf("ensuring rsa key: %w", err)
-		}
-
-		// Remove things we don't keep in the bucket any more
-		for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
-			if err := bucket.Delete([]byte(k)); err != nil {
-				return fmt.Errorf("deleting %s: %w", k, err)
-			}
-		}
-
-		return nil
-	})
-
-	return err
+	return nil
 }
 
 // ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
-func ensureRsaKey(bucket *bbolt.Bucket) error {
+func ensureRsaKey(configStore types.GetterSetter) error {
 	// If it exists, we're good
-	if bucket.Get([]byte(privateKeyKey)) != nil {
+	_, err := configStore.Get([]byte(privateKeyKey))
+	if err != nil {
 		return nil
 	}
 
 	// Create a random key
 	key, err := rsaRandomKey()
 	if err != nil {
-		return fmt.Errorf("generating key: %w", err)
+		return fmt.Errorf("generating private key: %w", err)
 	}
 
 	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
-		return fmt.Errorf("marshalling key: %w", err)
+		return fmt.Errorf("marshalling private key: %w", err)
 	}
 
-	if err := bucket.Put([]byte(privateKeyKey), keyDer); err != nil {
-		return fmt.Errorf("storing key: %w", err)
+	if err := configStore.Set([]byte(privateKeyKey), keyDer); err != nil {
+		return fmt.Errorf("storing private key: %w", err)
 	}
 
 	return nil
 }
 
 // PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
-func PrivateRSAKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
-	var privateKey []byte
-
-	if err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		privateKey = b.Get([]byte(privateKeyKey))
-		return nil
-	}); err != nil {
+func PrivateRSAKeyFromDB(configStore types.Getter) (*rsa.PrivateKey, error) {
+	privateKey, err := configStore.Get([]byte(privateKeyKey))
+	if err != nil {
 		return nil, fmt.Errorf("error reading private key info from db: %w", err)
 	}
 
@@ -335,8 +284,8 @@ func PrivateRSAKeyFromDB(db *bbolt.DB) (*rsa.PrivateKey, error) {
 }
 
 // PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicRSAKeyFromDB(db *bbolt.DB) (string, string, error) {
-	privateKey, err := PrivateRSAKeyFromDB(db)
+func PublicRSAKeyFromDB(configStore types.Getter) (string, string, error) {
+	privateKey, err := PrivateRSAKeyFromDB(configStore)
 	if err != nil {
 		return "", "", fmt.Errorf("reading private key: %w", err)
 	}
@@ -356,56 +305,38 @@ func PublicRSAKeyFromDB(db *bbolt.DB) (string, string, error) {
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
-func IdentifierFromDB(db *bbolt.DB) (string, error) {
+func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 	var identifier string
-	err := db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		uuidBytes := b.Get([]byte(uuidKey))
-		gotID, err := uuid.ParseBytes(uuidBytes)
+	uuidBytes, _ := configStore.Get([]byte(uuidKey))
+	gotID, err := uuid.ParseBytes(uuidBytes)
 
-		// Use existing UUID
-		if err == nil {
-			identifier = gotID.String()
-			return nil
-		}
-
-		// Generate new (random) UUID
-		gotID, err = uuid.NewRandom()
-		if err != nil {
-			return fmt.Errorf("generating new UUID: %w", err)
-		}
+	// Use existing UUID
+	if err == nil {
 		identifier = gotID.String()
+		return identifier, nil
+	}
 
-		// Save new UUID
-		err = b.Put([]byte(uuidKey), []byte(identifier))
-		if err != nil {
-			return fmt.Errorf("saving new UUID: %w", err)
-		}
-
-		return nil
-	})
-
+	// Generate new (random) UUID
+	gotID, err = uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generating new UUID: %w", err)
+	}
+	identifier = gotID.String()
+
+	// Save new UUID
+	err = configStore.Set([]byte(uuidKey), []byte(identifier))
+	if err != nil {
+		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
 
 	return identifier, nil
 }
 
-// NodeKeyFromDB returns the device node key from a local bolt DB
-func NodeKeyFromDB(db *bbolt.DB) (string, error) {
-	if db == nil {
-		return "", errors.New("received a nil db")
-	}
-
-	var key []byte
-	err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		key = b.Get([]byte(nodeKeyKey))
-		return nil
-	})
+// NodeKey returns the device node key from the storage layer
+func NodeKey(getter types.Getter) (string, error) {
+	key, err := getter.Get([]byte(nodeKeyKey))
 	if err != nil {
-		return "", fmt.Errorf("error reading node key from db: %w", err)
+		return "", fmt.Errorf("error getting node key: %w", err)
 	}
 	if key != nil {
 		return string(key), nil
@@ -414,20 +345,11 @@ func NodeKeyFromDB(db *bbolt.DB) (string, error) {
 	}
 }
 
-// ConfigFromDB returns the device config from a local bolt DB
-func ConfigFromDB(db *bbolt.DB) (string, error) {
-	if db == nil {
-		return "", errors.New("received a nil db")
-	}
-
-	var key []byte
-	err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		key = b.Get([]byte(configKey))
-		return nil
-	})
+// Config returns the device config from the storage layer
+func Config(getter types.Getter) (string, error) {
+	key, err := getter.Get([]byte(configKey))
 	if err != nil {
-		return "", fmt.Errorf("error reading config from db: %w", err)
+		return "", fmt.Errorf("error getting config key: %w", err)
 	}
 	if key != nil {
 		return string(key), nil
@@ -466,7 +388,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKeyFromDB(e.db)
+	key, err := NodeKey(e.knapsack.ConfigStore())
 	if err != nil {
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
@@ -510,10 +432,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(configBucket))
-		return b.Put([]byte(nodeKeyKey), []byte(keyString))
-	})
+	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -529,10 +448,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.db.Update(func(tx *bbolt.Tx) error {
-		tx.Bucket([]byte(configBucket)).Delete([]byte(nodeKeyKey))
-		return nil
-	})
+	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -548,11 +464,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		e.db.View(func(tx *bbolt.Tx) error {
-			b := tx.Bucket([]byte(configBucket))
-			confBytes = b.Get([]byte(configKey))
-			return nil
-		})
+		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
@@ -560,10 +472,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.db.Update(func(tx *bbolt.Tx) error {
-			b := tx.Bucket([]byte(configBucket))
-			return b.Put([]byte(configKey), []byte(config))
-		})
+		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.
@@ -634,9 +543,9 @@ func uint64FromByteKey(k []byte) uint64 {
 func bucketNameFromLogType(typ logger.LogType) (string, error) {
 	switch typ {
 	case logger.LogTypeString, logger.LogTypeSnapshot:
-		return resultLogsBucket, nil
+		return storage.ResultLogsStore.String(), nil
 	case logger.LogTypeStatus:
-		return statusLogsBucket, nil
+		return storage.StatusLogsStore.String(), nil
 	default:
 		return "", fmt.Errorf("unknown log type: %v", typ)
 
@@ -693,7 +602,7 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 	}
 
 	var count int
-	err = e.db.View(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		count = b.Stats().KeyN
 		return nil
@@ -717,7 +626,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	err = e.db.View(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		c := b.Cursor()
@@ -778,7 +687,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	// Delete logs that were successfully sent
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		for _, k := range logIDs {
 			b.Delete(k)
@@ -829,7 +738,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	if err != nil {
 		return err
 	}
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		logCount := b.Stats().KeyN
@@ -881,7 +790,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
-	err = e.db.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		// Log keys are generated with the auto-incrementing sequence
@@ -1082,7 +991,7 @@ type initialRunner struct {
 	enabled    bool
 	identifier string
 	client     Querier
-	db         *bbolt.DB
+	store      types.GetterSetter
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
@@ -1173,38 +1082,26 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{}, error) {
 	known := make(map[string]struct{})
-	err := i.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(initialResultsBucket))
-		for _, q := range allFromConfig {
-			knownQuery := b.Get([]byte(q))
-			if knownQuery != nil {
-				continue
-			}
-			known[q] = struct{}{}
-		}
-		return nil
-	})
 
-	if err != nil {
-		return nil, fmt.Errorf("check bolt for queries to run: %w", err)
+	for _, q := range allFromConfig {
+		knownQuery, err := i.store.Get([]byte(q))
+		if err != nil {
+			return nil, fmt.Errorf("check store for queries to run: %w", err)
+		}
+		if knownQuery != nil {
+			continue
+		}
+		known[q] = struct{}{}
 	}
 
 	return known, nil
 }
 
 func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
-	err := i.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(initialResultsBucket))
-		for q := range known {
-			if err := b.Put([]byte(q), []byte(q)); err != nil {
-				return fmt.Errorf("cache initial result query %q: %w", q, err)
-			}
+	for q := range known {
+		if err := i.store.Set([]byte(q), []byte(q)); err != nil {
+			return fmt.Errorf("cache initial result query %q: %w", q, err)
 		}
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("cache initial result queries: %w", err)
 	}
 
 	return nil

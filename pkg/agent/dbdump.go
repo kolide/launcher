@@ -6,9 +6,6 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-// KeyN is the number of keys
-// LeafAlloc is pretty close the number of bytes uses
-
 type bucketStatsHolder struct {
 	Stats        bbolt.BucketStats
 	FillPercent  float64
@@ -49,6 +46,9 @@ func GetStats(db *bbolt.DB) (*Stats, error) {
 func bucketStatsFunc(stats *Stats) func([]byte, *bbolt.Bucket) error {
 	return func(name []byte, b *bbolt.Bucket) error {
 		bstats := b.Stats()
+
+		// KeyN is the number of keys
+		// LeafAlloc is pretty close the number of bytes used
 		stats.Buckets[string(name)] = bucketStatsHolder{
 			Stats:        bstats,
 			FillPercent:  b.FillPercent,

@@ -19,9 +19,9 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
-	"go.etcd.io/bbolt"
 	"golang.org/x/time/rate"
 )
 
@@ -81,7 +81,7 @@ func WithControlService(cs controlService) LocalServerOption {
 	}
 }
 
-func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(configStore types.Getter, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
@@ -101,7 +101,7 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	}
 
 	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(db)
+	privateKey, err := osquery.PrivateRSAKeyFromDB(configStore)
 	if err != nil {
 		return nil, fmt.Errorf("fetching private key: %w", err)
 	}
@@ -122,6 +122,12 @@ func New(db *bbolt.DB, kolideServer string, opts ...LocalServerOption) (*localSe
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
 	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+
+	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
+	// after making it through the kryptoEcMiddleware
+	// by using v1, k2 can call endpoints without fear of panicing local server
+	// /v0/cmd left for transition period
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -158,12 +164,16 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 	switch {
-	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.HasSuffix(ls.kolideServer, ".ngrok.io"):
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
+		level.Debug(ls.logger).Log("msg", "using developer certificates")
 		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
+		level.Debug(ls.logger).Log("msg", "using review app certificates")
 		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
+	default:
+		level.Debug(ls.logger).Log("msg", "using default/production certificates")
 	}
 
 	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
