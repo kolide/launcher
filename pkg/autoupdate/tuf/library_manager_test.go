@@ -47,6 +47,25 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
+func TestAvailableInLibrary(t *testing.T) {
+	t.Parallel()
+
+	testBaseDir := t.TempDir()
+	mockOsquerier := localservermocks.NewQuerier(t)
+
+	testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new update library manager")
+
+	// Query for the current osquery version
+	runningOsqueryVersion := "5.5.7"
+	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
+	require.True(t, testLibraryManager.AvailableInLibrary(binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)))
+
+	// Query for a different osqueryd version
+	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
+	require.False(t, testLibraryManager.AvailableInLibrary(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
+}
+
 func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 

@@ -21,6 +21,7 @@ import (
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
+	"golang.org/x/sync/errgroup"
 )
 
 //go:embed assets/tuf/root.json
@@ -48,6 +49,7 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
+	AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string) error
 	TidyLibrary()
 }
@@ -202,16 +204,60 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	for _, binary := range binaries {
-		if err := ta.findRelease(binary, targets); err != nil {
-			return fmt.Errorf("could not find release: %w", err)
+	// Allow checking for and downloading launcher and osqueryd releases to happen in parallel
+	var wg errgroup.Group
+	updatesDownloaded := make([]bool, len(binaries))
+	for i, binary := range binaries {
+		i := i
+		binary := binary
+		wg.Go(func() error {
+			updateForBinaryDownloaded, err := ta.downloadUpdate(binary, targets)
+			if err != nil {
+				return fmt.Errorf("could not download update for %s: %w", binary, err)
+			}
+
+			updatesDownloaded[i] = updateForBinaryDownloaded
+			return nil
+		})
+	}
+
+	// Wait for both update downloads to complete
+	if err := wg.Wait(); err != nil {
+		return fmt.Errorf("could not download updates: %w", err)
+	}
+
+	for _, updateDownloaded := range updatesDownloaded {
+		if updateDownloaded {
+			// In the future, we would restart or re-launch the binary with the new version
+			level.Debug(ta.logger).Log("msg", "update downloaded")
+			break
 		}
 	}
 
 	return nil
 }
 
-func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) error {
+func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (bool, error) {
+	updateDownloaded := false
+
+	release, err := ta.findRelease(binary, targets)
+	if err != nil {
+		return updateDownloaded, fmt.Errorf("could not find release: %w", err)
+	}
+
+	if ta.libraryManager.AvailableInLibrary(binary, release) {
+		return updateDownloaded, nil
+	}
+
+	if err := ta.libraryManager.AddToLibrary(binary, release); err != nil {
+		return updateDownloaded, fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
+	}
+
+	updateDownloaded = true
+	return updateDownloaded, nil
+}
+
+func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
 	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
@@ -222,13 +268,13 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 		// to see if we're on this latest version.
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
-			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+			return "", fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target))
+		return filepath.Base(custom.Target), nil
 	}
 
-	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	return "", fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
 }
 
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {

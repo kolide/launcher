@@ -23,6 +23,20 @@ func (_m *mockLibrarian) AddToLibrary(binary autoupdatableBinary, targetFilename
 	return r0
 }
 
+// AvailableInLibrary provides a mock function with given fields: binary, targetFilename
+func (_m *mockLibrarian) AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool {
+	ret := _m.Called(binary, targetFilename)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) bool); ok {
+		r0 = rf(binary, targetFilename)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // TidyLibrary provides a mock function with given fields:
 func (_m *mockLibrarian) TidyLibrary() {
 	_m.Called()

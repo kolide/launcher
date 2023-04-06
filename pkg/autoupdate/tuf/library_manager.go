@@ -80,10 +80,9 @@ func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBina
 	return filepath.Join(ulm.baseDir, fmt.Sprintf("%s-staged", binary))
 }
 
-// addToLibrary adds the given target file to the library for the given binary,
-// downloading and verifying it if it's not already there. After any addition
-// to the library, it cleans up older versions that are no longer needed.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
+// AvailableInLibrary determines if the given target is already available, either as the currently-running
+// binary or within the update library.
+func (ulm *updateLibraryManager) AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
 	currentVersion, err := ulm.currentRunningVersion(binary)
@@ -93,11 +92,29 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 		if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
 			// We don't need to download the current running version because it already exists,
 			// either in this updates library or in the original install location.
-			return nil
+			return true
 		}
 	}
 
 	if ulm.alreadyAdded(binary, targetFilename) {
+		return true
+	}
+
+	return false
+}
+
+// alreadyAdded checks if the given target already exists in the update library.
+func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
+	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
+
+	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
+}
+
+// addToLibrary adds the given target file to the library for the given binary,
+// downloading and verifying it if it's not already there. After any addition
+// to the library, it cleans up older versions that are no longer needed.
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
+	if ulm.AvailableInLibrary(binary, targetFilename) {
 		return nil
 	}
 
@@ -118,13 +135,6 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	}
 
 	return nil
-}
-
-// alreadyAdded checks if the given target already exists in the update library.
-func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
-	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
-
-	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
 }
 
 // versionFromTarget extracts the semantic version for an update from its filename.

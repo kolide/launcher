@@ -76,6 +76,8 @@ func TestExecute(t *testing.T) {
 	mockLibraryManager := newMockLibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary").Return().Once()
+	mockLibraryManager.On("AvailableInLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
+	mockLibraryManager.On("AvailableInLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
 	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
 
