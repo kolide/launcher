@@ -34,6 +34,7 @@ type updateLibraryManager struct {
 	baseDir         string
 	operatingSystem string
 	osquerier       localserver.Querier // used to query for current running osquery version
+	lock            *libraryLock
 	logger          log.Logger
 }
 
@@ -45,6 +46,7 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 		baseDir:         baseDir,
 		operatingSystem: operatingSystem,
 		osquerier:       osquerier,
+		lock:            newLibraryLock(),
 		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
 
@@ -96,11 +98,7 @@ func (ulm *updateLibraryManager) AvailableInLibrary(binary autoupdatableBinary, 
 		}
 	}
 
-	if ulm.alreadyAdded(binary, targetFilename) {
-		return true
-	}
-
-	return false
+	return ulm.alreadyAdded(binary, targetFilename)
 }
 
 // alreadyAdded checks if the given target already exists in the update library.
@@ -114,11 +112,15 @@ func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, target
 // downloading and verifying it if it's not already there. After any addition
 // to the library, it cleans up older versions that are no longer needed.
 func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
+	// Acquire lock for modifying the library
+	ulm.lock.Lock(binary)
+	defer ulm.lock.Unlock(binary)
+
 	if ulm.AvailableInLibrary(binary, targetFilename) {
 		return nil
 	}
 
-	// Remove downloaded archives after update, regardless of success
+	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
 	defer ulm.tidyStagedUpdates(binary)
 
 	stagedUpdatePath, err := ulm.stageUpdate(binary, targetFilename)
@@ -265,6 +267,10 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinar
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
 func (ulm *updateLibraryManager) TidyLibrary() {
 	for _, binary := range binaries {
+		// Acquire lock for modifying the library
+		ulm.lock.Lock(binary)
+		defer ulm.lock.Unlock(binary)
+
 		// First, remove old staged archives
 		ulm.tidyStagedUpdates(binary)
 

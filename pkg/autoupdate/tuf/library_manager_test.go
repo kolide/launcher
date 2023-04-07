@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -93,11 +94,21 @@ func TestAddToLibrary(t *testing.T) {
 
 			// For osqueryd, make sure we check that the running version is not equal to the target version
 			if binary == "osqueryd" {
-				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
+				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil)
 			}
 
-			// Request download
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)), "expected no error adding to library")
+			// Request download -- make a couple concurrent requests to confirm that the lock works.
+			var wg sync.WaitGroup
+			for i := 0; i < 5; i += 1 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)), "expected no error adding to library")
+				}()
+			}
+
+			wg.Wait()
+
 			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the update was downloaded
@@ -129,6 +140,7 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 		logger:    log.NewNopLogger(),
 		baseDir:   testBaseDir,
 		osquerier: mockOsquerier,
+		lock:      newLibraryLock(),
 	}
 
 	// Make sure our update directories exist so we can verify they're empty later
@@ -172,6 +184,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 				logger:    log.NewNopLogger(),
 				baseDir:   testBaseDir,
 				osquerier: mockOsquerier,
+				lock:      newLibraryLock(),
 			}
 
 			// Make sure our update directory exists
@@ -505,6 +518,7 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				testLibraryManager := &updateLibraryManager{
 					logger:  log.NewNopLogger(),
 					baseDir: testBaseDir,
+					lock:    newLibraryLock(),
 				}
 
 				// Set up existing versions for test
