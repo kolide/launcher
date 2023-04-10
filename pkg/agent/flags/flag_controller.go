@@ -49,6 +49,8 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 	return value
 }
 
+// set stores the value for a FlagKey in the agent flags store. Typically, this is used by the control
+// server to provide a control-server-provided value
 func (fc *FlagController) set(key keys.FlagKey, value []byte) error {
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {

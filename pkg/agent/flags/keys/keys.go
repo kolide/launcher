@@ -4,9 +4,10 @@ package keys
 type FlagKey string
 
 // When adding a new FlagKey:
-// 1. Provide a default value, by adding it to DefaultFlagValues()
-// 2. If the flag can be specified on the cmd line, add it to CmdLineFlagValues()
-// 3. If the flag is an integer, provide reasonable constraints by adding to FlagValueConstraints()
+// 1. Define the FlagKey identifier, and the string key value it corresponds to, in the block below
+// 2. Add a getter and setter to the Flags interface (flags.go)
+// 3. Implement the getter and setter in the Knapsack, which delegates the call to the FlagController
+// 4. Implement the getter and setter in the FlagController, providing defaults, limits, and overrides
 const (
 	DesktopEnabled         FlagKey = "desktop_enabled_v1"
 	DebugServerData        FlagKey = "debug_server_data"
