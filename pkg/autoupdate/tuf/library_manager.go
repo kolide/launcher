@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -18,36 +19,37 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
 )
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
+}
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
 // location in the library specified by the version associated with that update.
 // It also ensures that old updates are removed when they are no longer needed.
 type updateLibraryManager struct {
-	metadataClient  *client.Client // used to validate downloads
-	mirrorUrl       string         // dl.kolide.co
-	mirrorClient    *http.Client
-	baseDir         string
-	operatingSystem string
-	osquerier       localserver.Querier // used to query for current running osquery version
-	lock            *libraryLock
-	logger          log.Logger
+	metadataClient *client.Client // used to validate downloads
+	mirrorUrl      string         // dl.kolide.co
+	mirrorClient   *http.Client
+	baseDir        string
+	osquerier      querier // used to query for current running osquery version
+	lock           *libraryLock
+	logger         log.Logger
 }
 
-func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, operatingSystem string, osquerier localserver.Querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
-		metadataClient:  metadataClient,
-		mirrorUrl:       mirrorUrl,
-		mirrorClient:    mirrorClient,
-		baseDir:         baseDir,
-		operatingSystem: operatingSystem,
-		osquerier:       osquerier,
-		lock:            newLibraryLock(),
-		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
+		metadataClient: metadataClient,
+		mirrorUrl:      mirrorUrl,
+		mirrorClient:   mirrorClient,
+		baseDir:        baseDir,
+		osquerier:      osquerier,
+		lock:           newLibraryLock(),
+		logger:         log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
 
 	// Ensure the updates directory exists
@@ -90,12 +92,10 @@ func (ulm *updateLibraryManager) AvailableInLibrary(binary autoupdatableBinary, 
 	currentVersion, err := ulm.currentRunningVersion(binary)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-	} else {
-		if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
-			// We don't need to download the current running version because it already exists,
-			// either in this updates library or in the original install location.
-			return true
-		}
+	} else if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
+		// We don't need to download the current running version because it already exists,
+		// either in this updates library or in the original install location.
+		return true
 	}
 
 	return ulm.alreadyAdded(binary, targetFilename)
@@ -157,7 +157,7 @@ func (ulm *updateLibraryManager) stageUpdate(binary autoupdatableBinary, targetF
 	}
 	defer out.Close()
 
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, ulm.operatingSystem, targetFilename))
+	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
@@ -185,7 +185,7 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary autoupdatableBinary, 
 
 	// Where the file lives in the binary bucket -- we can't use filepath.Join here because on Windows,
 	// that won't match the actual bucket filepath
-	pathToTargetInMirror := fmt.Sprintf("%s/%s/%s", binary, ulm.operatingSystem, filepath.Base(stagedUpdate))
+	pathToTargetInMirror := fmt.Sprintf("%s/%s/%s", binary, runtime.GOOS, filepath.Base(stagedUpdate))
 	if err := ulm.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), pathToTargetInMirror); err != nil {
 		return fmt.Errorf("digest verification failed for target staged at %s: %w", stagedUpdate, err)
 	}
