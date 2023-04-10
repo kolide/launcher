@@ -52,14 +52,13 @@ type librarian interface {
 }
 
 type TufAutoupdater struct {
-	metadataClient  *client.Client
-	libraryManager  librarian
-	operatingSystem string
-	channel         string
-	checkInterval   time.Duration
-	store           types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	interrupt       chan struct{}
-	logger          log.Logger
+	metadataClient *client.Client
+	libraryManager librarian
+	channel        string
+	checkInterval  time.Duration
+	store          types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	interrupt      chan struct{}
+	logger         log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -85,12 +84,11 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
 	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		operatingSystem: runtime.GOOS,
-		channel:         defaultChannel,
-		interrupt:       make(chan struct{}),
-		checkInterval:   60 * time.Second,
-		store:           store,
-		logger:          log.NewNopLogger(),
+		channel:       defaultChannel,
+		interrupt:     make(chan struct{}),
+		checkInterval: 60 * time.Second,
+		store:         store,
+		logger:        log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -107,7 +105,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	if updateDirectory == "" {
 		updateDirectory = filepath.Join(rootDirectory, "updates")
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, updateDirectory, ta.operatingSystem, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -211,7 +209,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 }
 
 func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) error {
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue

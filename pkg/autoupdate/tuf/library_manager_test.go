@@ -22,7 +22,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	_, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, runtime.GOOS, nil, log.NewNopLogger())
+	_, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, nil, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
@@ -68,7 +68,7 @@ func TestAddToLibrary(t *testing.T) {
 
 			// Set up test library manager
 			mockOsquerier := newMockQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testBaseDir, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// For osqueryd, make sure we check that the running version is not equal to the target version
@@ -212,7 +212,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 
 			// Set up test library manager
 			mockOsquerier := newMockQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testBaseDir, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// For osqueryd, make sure we check that the running version is not equal to the target version
@@ -312,7 +312,7 @@ func Test_tidyStagedUpdates(t *testing.T) {
 			require.Equal(t, 1, len(matches))
 
 			// Initialize the library manager
-			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, runtime.GOOS, nil, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, nil, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Tidy up staged updates and confirm they're removed after
@@ -591,9 +591,7 @@ func Test_versionFromTarget(t *testing.T) {
 	}
 
 	for _, testVersion := range testVersions {
-		libManager := &updateLibraryManager{
-			operatingSystem: testVersion.operatingSystem,
-		}
+		libManager := &updateLibraryManager{}
 		require.Equal(t, testVersion.version, libManager.versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
 	}
 }
