@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
 )
@@ -36,6 +37,7 @@ type updateLibraryManager struct {
 	mirrorUrl      string         // dl.kolide.co
 	mirrorClient   *http.Client
 	baseDir        string
+	stagingDir     string
 	osquerier      querier // used to query for current running osquery version
 	lock           *libraryLock
 	logger         log.Logger
@@ -57,14 +59,15 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
 	}
 
-	// Ensure our staged updates and updates directories exist
-	for _, binary := range binaries {
-		// Create the directory for staging updates
-		if err := os.MkdirAll(ulm.stagedUpdatesDirectory(binary), 0755); err != nil {
-			return nil, fmt.Errorf("could not make staged updates directory for %s: %w", binary, err)
-		}
+	// Create the directory for staging updates
+	stagingDir, err := agent.MkdirTemp("staged-updates")
+	if err != nil {
+		return nil, fmt.Errorf("could not make staged updates directory: %w", err)
+	}
+	ulm.stagingDir = stagingDir
 
-		// Create the update library
+	// Create the update library
+	for _, binary := range binaries {
 		if err := os.MkdirAll(ulm.updatesDirectory(binary), 0755); err != nil {
 			return nil, fmt.Errorf("could not make updates directory for %s: %w", binary, err)
 		}
@@ -76,12 +79,6 @@ func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mi
 // updatesDirectory returns the update library location for the given binary.
 func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) string {
 	return filepath.Join(ulm.baseDir, string(binary))
-}
-
-// stagedUpdatesDirectory returns the location for staged updates -- i.e. updates
-// that have been downloaded, but not yet verified.
-func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.baseDir, fmt.Sprintf("%s-staged", binary))
 }
 
 // AvailableInLibrary determines if the given target is already available, either as the currently-running
@@ -150,7 +147,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 // stageUpdate downloads the update indicated by `targetFilename` and stages it for
 // further verification.
 func (ulm *updateLibraryManager) stageUpdate(binary autoupdatableBinary, targetFilename string) (string, error) {
-	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
+	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
 	out, err := os.Create(stagedUpdatePath)
 	if err != nil {
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
@@ -304,7 +301,7 @@ func (ulm *updateLibraryManager) TidyLibrary() {
 
 // tidyStagedUpdates removes all old archives from the staged updates directory.
 func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
-	matches, err := filepath.Glob(filepath.Join(ulm.stagedUpdatesDirectory(binary), "*"))
+	matches, err := filepath.Glob(filepath.Join(ulm.stagingDir, "*"))
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not glob for staged updates to tidy updates library", "err", err)
 		return

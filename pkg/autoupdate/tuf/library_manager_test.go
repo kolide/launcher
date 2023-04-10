@@ -23,24 +23,20 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	_, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, nil, log.NewNopLogger())
+	testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, nil, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
 	require.NoError(t, err, "could not stat base dir")
 	require.True(t, baseDir.IsDir(), "base dir is not a directory")
 
-	stagedOsquerydDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "osqueryd-staged"))
+	stagedDownloadDir, err := os.Stat(testLibraryManager.stagingDir)
 	require.NoError(t, err, "could not stat staged osqueryd download dir")
-	require.True(t, stagedOsquerydDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
+	require.True(t, stagedDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
 
 	osquerydDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "osqueryd"))
 	require.NoError(t, err, "could not stat osqueryd download dir")
 	require.True(t, osquerydDownloadDir.IsDir(), "osqueryd download dir is not a directory")
-
-	stagedLauncherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher-staged"))
-	require.NoError(t, err, "could not stat staged launcher download dir")
-	require.True(t, stagedLauncherDownloadDir.IsDir(), "staged launcher download dir is not a directory")
 
 	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
 	require.NoError(t, err, "could not stat launcher download dir")
@@ -119,7 +115,7 @@ func TestAddToLibrary(t *testing.T) {
 			require.False(t, executableInfo.IsDir())
 
 			// Confirm the staging directory is empty
-			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory(binary), "*"))
+			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 			require.NoError(t, err, "checking that staging dir was cleaned")
 			require.Equal(t, 0, len(matches), "unexpected files found in staged updates directory: %+v", matches)
 		})
@@ -135,16 +131,11 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 
 	testBaseDir := t.TempDir()
 	mockOsquerier := newMockQuerier(t)
-	testLibraryManager := &updateLibraryManager{
-		logger:    log.NewNopLogger(),
-		baseDir:   testBaseDir,
-		osquerier: mockOsquerier,
-		lock:      newLibraryLock(),
-	}
+	testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, mockOsquerier, log.NewNopLogger())
+	require.NoError(t, err, "initializing test library manager")
 
 	// Make sure our update directories exist so we can verify they're empty later
 	require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory("osqueryd"), 0755))
-	require.NoError(t, os.MkdirAll(testLibraryManager.stagedUpdatesDirectory("osqueryd"), 0755))
 
 	// Set osquerier to return same version we want to add to the library
 	testVersion := "0.12.1-abcdabcd"
@@ -164,7 +155,7 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 	require.Equal(t, 0, len(updateMatches), "expected no directories in updates directory but found: %+v", updateMatches)
 
 	// Confirm that there is nothing in the staged updates directory (no update attempted)
-	stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory("osqueryd"), "*"))
+	stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 	require.NoError(t, err, "error globbing for matches")
 	require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
 }
@@ -257,7 +248,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the update was removed after download
-			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagedUpdatesDirectory(binary), "*"))
+			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 			require.NoError(t, err, "checking that staging dir did not have any downloads")
 			require.Equal(t, 0, len(downloadMatches), "unexpected files found in staged updates directory: %+v", downloadMatches)
 
@@ -330,28 +321,27 @@ func Test_tidyStagedUpdates(t *testing.T) {
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
-			// Make some files in the two staged updates directories
 			testBaseDir := t.TempDir()
-			stagedUpdatesDir := filepath.Join(testBaseDir, fmt.Sprintf("%s-staged", binary))
-			require.NoError(t, os.MkdirAll(stagedUpdatesDir, 0755), "making staged updates directory")
-			f1, err := os.Create(filepath.Join(stagedUpdatesDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
-			require.NoError(t, err, "creating fake download file")
-			f1.Close()
-
-			// Confirm we made the files
-			matches, err := filepath.Glob(filepath.Join(stagedUpdatesDir, "*"))
-			require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-			require.Equal(t, 1, len(matches))
 
 			// Initialize the library manager
 			testLibraryManager, err := newUpdateLibraryManager(nil, "", nil, testBaseDir, nil, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
+			// Make a file in the staged updates directory
+			f1, err := os.Create(filepath.Join(testLibraryManager.stagingDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
+			require.NoError(t, err, "creating fake download file")
+			f1.Close()
+
+			// Confirm we made the files
+			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+			require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
+			require.Equal(t, 1, len(matches))
+
 			// Tidy up staged updates and confirm they're removed after
 			testLibraryManager.tidyStagedUpdates(binary)
-			_, err = os.Stat(stagedUpdatesDir)
+			_, err = os.Stat(testLibraryManager.stagingDir)
 			require.NoError(t, err, "could not stat staged download dir")
-			matchesAfter, err := filepath.Glob(filepath.Join(stagedUpdatesDir, "*"))
+			matchesAfter, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 			require.NoError(t, err, "could not glob for files in staged download dir")
 			require.Equal(t, 0, len(matchesAfter))
 		})
