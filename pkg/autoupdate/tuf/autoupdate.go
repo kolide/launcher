@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -84,7 +83,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 }
 
 func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
-	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier localserver.Querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		operatingSystem: runtime.GOOS,
 		channel:         defaultChannel,

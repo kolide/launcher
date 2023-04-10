@@ -18,10 +18,13 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	client "github.com/theupdateframework/go-tuf/client"
 )
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
+}
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
@@ -33,11 +36,11 @@ type updateLibraryManager struct {
 	mirrorClient    *http.Client
 	baseDir         string
 	operatingSystem string
-	osquerier       localserver.Querier // used to query for current running osquery version
+	osquerier       querier // used to query for current running osquery version
 	logger          log.Logger
 }
 
-func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, operatingSystem string, osquerier localserver.Querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, operatingSystem string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
 		metadataClient:  metadataClient,
 		mirrorUrl:       mirrorUrl,

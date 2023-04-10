@@ -14,7 +14,6 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
-	localservermocks "github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -68,7 +67,7 @@ func TestAddToLibrary(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
-			mockOsquerier := localservermocks.NewQuerier(t)
+			mockOsquerier := newMockQuerier(t)
 			testLibraryManager, err := newUpdateLibraryManager(metadataClient, tufServerUrl, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
@@ -105,7 +104,7 @@ func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
 	// of launcher, which is not something that the semver library can parse.
 
 	testBaseDir := t.TempDir()
-	mockOsquerier := localservermocks.NewQuerier(t)
+	mockOsquerier := newMockQuerier(t)
 	testLibraryManager := &updateLibraryManager{
 		logger:    log.NewNopLogger(),
 		baseDir:   testBaseDir,
@@ -148,7 +147,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			t.Parallel()
 
 			testBaseDir := t.TempDir()
-			mockOsquerier := localservermocks.NewQuerier(t)
+			mockOsquerier := newMockQuerier(t)
 			testLibraryManager := &updateLibraryManager{
 				logger:    log.NewNopLogger(),
 				baseDir:   testBaseDir,
@@ -212,7 +211,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			}))
 
 			// Set up test library manager
-			mockOsquerier := localservermocks.NewQuerier(t)
+			mockOsquerier := newMockQuerier(t)
 			testLibraryManager, err := newUpdateLibraryManager(metadataClient, testMaliciousMirror.URL, http.DefaultClient, testBaseDir, runtime.GOOS, mockOsquerier, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
@@ -255,7 +254,7 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	t.Parallel()
 
-	mockOsquerier := localservermocks.NewQuerier(t)
+	mockOsquerier := newMockQuerier(t)
 
 	testLibraryManager := &updateLibraryManager{
 		logger:    log.NewNopLogger(),
@@ -276,7 +275,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	t.Parallel()
 
-	mockOsquerier := localservermocks.NewQuerier(t)
+	mockOsquerier := newMockQuerier(t)
 
 	testLibraryManager := &updateLibraryManager{
 		logger:    log.NewNopLogger(),
