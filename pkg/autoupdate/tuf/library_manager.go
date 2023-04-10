@@ -92,12 +92,10 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	currentVersion, err := ulm.currentRunningVersion(binary)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-	} else {
-		if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
-			// We don't need to download the current running version because it already exists,
-			// either in this updates library or in the original install location.
-			return nil
-		}
+	} else if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
+		// We don't need to download the current running version because it already exists,
+		// either in this updates library or in the original install location.
+		return nil
 	}
 
 	if ulm.alreadyAdded(binary, targetFilename) {
