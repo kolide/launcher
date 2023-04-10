@@ -19,12 +19,24 @@ type storeInt interface {
 	agenttypes.GetterSetterDeleterIterator
 }
 
+type encoder interface {
+	Encode(e any) error // TODO is this Encode or EncodeValue?
+}
+
+type decoder interface {
+	Decode(e any) error
+}
+
 type persistentRing struct {
 	store storeInt
 	size  int
 	next  int
 
-	lock sync.RWMutex
+	enc      encoder
+	dec      decoder
+	writeBuf bytes.Buffer // pointer or real?
+	readBuf  bytes.Buffer // pointer or real?
+	lock     sync.RWMutex
 }
 
 var (
@@ -42,18 +54,25 @@ func New(store storeInt, size int) (*persistentRing, error) {
 		return nil, fmt.Errorf("converting next (%s) to int: %w", nextPtr, err)
 	}
 
+	wbuf := bytes.Buffer{}
+	rbuf := bytes.Buffer{}
+
 	r := &persistentRing{
 		store: store,
 		size:  size,
 		next:  next,
-		lock:  sync.RWMutex{},
+
+		enc:      gob.NewEncoder(&wbuf),
+		dec:      gob.NewDecoder(&rbuf),
+		writeBuf: wbuf,
+		readBuf:  rbuf,
+		lock:     sync.RWMutex{},
 	}
 
 	return r, nil
 }
 
-// Write writes a value to the ring.
-func (r *persistentRing) Write(val []byte) (n int, err error) {
+func (r *persistentRing) Add(val any) (err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -61,20 +80,21 @@ func (r *persistentRing) Write(val []byte) (n int, err error) {
 
 	nextBytes, err := intToByte(r.next % r.size)
 	if err != nil {
-		return 0, fmt.Errorf("converting %d to bytes: %w", r.next, err)
+		return fmt.Errorf("converting %d to bytes: %w", r.next, err)
 	}
 
 	// TODO: Create MultiSet()
 	if err := r.store.Set(nextBytes, val); err != nil {
-		return 0, fmt.Errorf("writing value to store: %w", err)
+		return fmt.Errorf("writing value to store: %w", err)
 	}
 	if err := r.store.Set(nextKey, nextBytes); err != nil {
-		return 0, fmt.Errorf("writing next to store: %w", err)
+		return fmt.Errorf("writing next to store: %w", err)
 	}
 
-	return len(val), nil
+	return nil
 }
 
+// TODO callback to avoid the extra casting?
 func (r *persistentRing) GetAll() ([][]byte, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -96,12 +116,6 @@ func (r *persistentRing) GetAll() ([][]byte, error) {
 	}
 
 	return results, nil
-}
-
-// Close does nothing, but allows us to implement io.Closer
-func (r *persistentRing) Close() error {
-	return nil
-
 }
 
 func intToByte(i int) ([]byte, error) {
