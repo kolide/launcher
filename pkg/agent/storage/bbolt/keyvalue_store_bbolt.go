@@ -138,14 +138,9 @@ func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	})
 }
 
-func (s *bboltKeyValueStore) Update(pairs ...string) ([]string, error) {
+func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error) {
 	if s == nil || s.db == nil {
 		return nil, NoDbError{}
-	}
-
-	kvPairs := make(map[string]string)
-	for i := 0; i < len(pairs)-1; i += 2 {
-		kvPairs[pairs[i]] = pairs[i+1]
 	}
 
 	err := s.db.Update(func(tx *bbolt.Tx) error {

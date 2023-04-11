@@ -32,7 +32,7 @@ func (c *KeyValueConsumer) Update(data io.Reader) error {
 	}
 
 	// Turn the map into a slice of key, value, ... and send it to the thing storing this data
-	_, err := c.updater.Update(mapToSlice(kvPairs)...)
+	_, err := c.updater.Update(kvPairs)
 
 	return err
 }

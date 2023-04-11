@@ -189,12 +189,12 @@ func TestControllerUpdate(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		pairs       []string
+		kvPairs     map[string]string
 		changedKeys []string
 	}{
 		{
 			name:        "happy path",
-			pairs:       []string{keys.ControlRequestInterval.String(), "125000", keys.ControlServerURL.String(), "kolide-app.com"},
+			kvPairs:     map[string]string{keys.ControlRequestInterval.String(): "125000", keys.ControlServerURL.String(): "kolide-app.com"},
 			changedKeys: []string{keys.ControlRequestInterval.String(), keys.ControlServerURL.String()},
 		},
 	}
@@ -213,7 +213,7 @@ func TestControllerUpdate(t *testing.T) {
 
 			fc.RegisterChangeObserver(mockObserver, keys.ToFlagKeys(tt.changedKeys)...)
 
-			changedKeys, err := fc.Update(tt.pairs...)
+			changedKeys, err := fc.Update(tt.kvPairs)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.changedKeys, changedKeys)

@@ -78,18 +78,13 @@ func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	return nil
 }
 
-func (s *inMemoryKeyValueStore) Update(pairs ...string) ([]string, error) {
+func (s *inMemoryKeyValueStore) Update(kvPairs map[string]string) ([]string, error) {
 	if s == nil {
 		return nil, errors.New("store is nil")
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	kvPairs := make(map[string]string)
-	for i := 0; i < len(pairs)-1; i += 2 {
-		kvPairs[pairs[i]] = pairs[i+1]
-	}
 
 	s.items = make(map[string][]byte)
 

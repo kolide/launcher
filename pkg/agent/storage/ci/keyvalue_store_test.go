@@ -161,17 +161,17 @@ func Test_Updates(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		updates [][]string
+		updates []map[string]string
 		want    []map[string]string
 	}{
 		{
 			name:    "empty",
-			updates: [][]string{{}, {}},
+			updates: []map[string]string{{}, {}},
 			want:    []map[string]string{},
 		},
 		{
 			name:    "single",
-			updates: [][]string{{"one", "one"}, {"one", "new_one"}},
+			updates: []map[string]string{{"one": "one"}, {"one": "new_one"}},
 			want: []map[string]string{
 				{
 					"key":   "one",
@@ -181,16 +181,16 @@ func Test_Updates(t *testing.T) {
 		},
 		{
 			name: "multiple",
-			updates: [][]string{
+			updates: []map[string]string{
 				{
-					"one", "one",
-					"two", "two",
-					"three", "three",
+					"one":   "one",
+					"two":   "two",
+					"three": "three",
 				},
 				{
-					"one", "new_one",
-					"two", "new_two",
-					"three", "new_three",
+					"one":   "new_one",
+					"two":   "new_two",
+					"three": "new_three",
 				},
 			},
 			want: []map[string]string{
@@ -210,17 +210,17 @@ func Test_Updates(t *testing.T) {
 		},
 		{
 			name: "delete stale keys",
-			updates: [][]string{
+			updates: []map[string]string{
 				{
-					"one", "one",
-					"two", "two",
-					"three", "three",
-					"four", "four",
-					"five", "five",
-					"six", "six",
+					"one":   "one",
+					"two":   "two",
+					"three": "three",
+					"four":  "four",
+					"five":  "five",
+					"six":   "six",
 				},
 				{
-					"four", "four",
+					"four": "four",
 				},
 			},
 			want: []map[string]string{
@@ -238,7 +238,7 @@ func Test_Updates(t *testing.T) {
 
 			for _, s := range getStores(t) {
 				for _, update := range tt.updates {
-					s.Update(update...)
+					s.Update(update)
 				}
 
 				kvps, err := getKeyValueRows(s, tt.name)

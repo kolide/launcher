@@ -83,31 +83,25 @@ func (_m *GetterSetterDeleterIteratorUpdater) Set(key []byte, value []byte) erro
 	return r0
 }
 
-// Update provides a mock function with given fields: pairs
-func (_m *GetterSetterDeleterIteratorUpdater) Update(pairs ...string) ([]string, error) {
-	_va := make([]interface{}, len(pairs))
-	for _i := range pairs {
-		_va[_i] = pairs[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// Update provides a mock function with given fields: kvPairs
+func (_m *GetterSetterDeleterIteratorUpdater) Update(kvPairs map[string]string) ([]string, error) {
+	ret := _m.Called(kvPairs)
 
 	var r0 []string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(...string) ([]string, error)); ok {
-		return rf(pairs...)
+	if rf, ok := ret.Get(0).(func(map[string]string) ([]string, error)); ok {
+		return rf(kvPairs)
 	}
-	if rf, ok := ret.Get(0).(func(...string) []string); ok {
-		r0 = rf(pairs...)
+	if rf, ok := ret.Get(0).(func(map[string]string) []string); ok {
+		r0 = rf(kvPairs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(...string) error); ok {
-		r1 = rf(pairs...)
+	if rf, ok := ret.Get(1).(func(map[string]string) error); ok {
+		r1 = rf(kvPairs)
 	} else {
 		r1 = ret.Error(1)
 	}

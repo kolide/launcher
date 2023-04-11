@@ -65,14 +65,16 @@ func (fc *FlagController) set(key keys.FlagKey, value []byte) error {
 
 // Update bulk replaces agent flags and stores them.
 // Observers will be notified of changed flags and deleted flags.
-func (fc *FlagController) Update(pairs ...string) ([]string, error) {
+func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 	// Attempt to bulk replace the store with the key-values
-	deletedKeys, err := fc.agentFlagsStore.Update(pairs...)
+	deletedKeys, err := fc.agentFlagsStore.Update(kvPairs)
 
 	// Extract just the keys from the key-value pairs
-	var updatedKeys []string
-	for i := 0; i < len(pairs); i += 2 {
-		updatedKeys = append(updatedKeys, pairs[i])
+	updatedKeys := make([]string, len(kvPairs))
+	i := 0
+	for k := range kvPairs {
+		updatedKeys[i] = k
+		i++
 	}
 
 	// Changed keys is the union of updated keys and deleted keys
