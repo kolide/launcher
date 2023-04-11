@@ -1,8 +1,8 @@
 package tuf
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha512"
 	"errors"
 	"fmt"
 	"io"
@@ -147,11 +147,12 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	}
 	defer resp.Body.Close()
 
-	// Wrap the download in a LimitReader so we download at most localMeta.Length bytes
+	// Wrap the download in a LimitReader so we read at most localMeta.Length bytes
 	stream := io.LimitReader(resp.Body, localTargetMetadata.Length)
+	var fileBuffer bytes.Buffer
 
-	// Read the target file, simultaneously writing it to the staging directory and generating its metadata
-	actualTargetMeta, err := util.GenerateTargetFileMeta(io.TeeReader(stream, out), localTargetMetadata.HashAlgorithms()...)
+	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
+	actualTargetMeta, err := util.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
 	}
@@ -159,6 +160,11 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	// Verify the actual download against the confirmed local metadata
 	if err := util.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
+	}
+
+	// Everything looks good: write the buffered download to disk
+	if _, err := io.Copy(out, &fileBuffer); err != nil {
+		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	return stagedUpdatePath, nil
@@ -340,21 +346,4 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 		nonCurrentlyRunningVersionsKept += 1
 	}
-}
-
-// sha512Digest calculates the digest of the given file, for use in validating downloads from the mirror
-// against the local TUF repository.
-func sha512Digest(filename string) (string, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return "", fmt.Errorf("could not open file %s to calculate digest: %w", filename, err)
-	}
-	defer f.Close()
-
-	h := sha512.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("could not compute checksum for file %s: %w", filename, err)
-	}
-
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
