@@ -222,7 +222,12 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target), target)
+		targetToDownload, err := ta.metadataClient.Target(custom.Target)
+		if err != nil {
+			return fmt.Errorf("could not get TUF metadata for release %s: %w", custom.Target, err)
+		}
+
+		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target), targetToDownload)
 	}
 
 	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
