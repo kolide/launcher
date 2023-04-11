@@ -37,8 +37,8 @@ func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ..
 	return fc
 }
 
-// getControlServerValue looks for a control-server-provided value for the key and returns it, and true
-// if a control server value is not found, nil is returned
+// getControlServerValue looks for a control-server-provided value for the key and returns it.
+// If a control server value is not found, nil is returned.
 func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 	value, err := fc.agentFlagsStore.Get([]byte(key))
 	if err != nil {
@@ -50,7 +50,7 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 }
 
 // set stores the value for a FlagKey in the agent flags store. Typically, this is used by the control
-// server to provide a control-server-provided value
+// server to provide a control-server-provided value.
 func (fc *FlagController) set(key keys.FlagKey, value []byte) error {
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {

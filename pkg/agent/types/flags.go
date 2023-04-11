@@ -15,7 +15,7 @@ type Flags interface {
 	SetDesktopEnabled(enabled bool) error
 	DesktopEnabled() bool
 
-	// DebugServerData causes logging and diagnostics related to control server error handling  to be enabled.
+	// DebugServerData causes logging and diagnostics related to control server error handling to be enabled.
 	SetDebugServerData(debug bool) error
 	DebugServerData() bool
 

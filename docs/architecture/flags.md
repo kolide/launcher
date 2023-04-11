@@ -9,7 +9,7 @@ Launcher flags are identified by a `FlagKey` and can be specified through variou
 - Control server updates, which are ingested by the control server client and stored in a key-value store.
 - Temporary overrides, where a client can request the `Flags` interface to override the current value with a different value for a duration of time.
 
-Launcher flag values can also have constraints defined, which provide safeguards to prevent unreasonable values being used. Currently constraints only apply to `int64` flag values.
+Launcher flag values can also have constraints defined, which provide safeguards to prevent unreasonable values being used.
 
 ## Retrieving Flags
 
@@ -17,7 +17,7 @@ Launcher flag values can also have constraints defined, which provide safeguards
 flowchart TB
     Client[Client]
     Default[Use Default Value]
-    Sanitize[Sanitize Integer Flags]
+    Sanitize[Sanitize Value]
     Override{Is flag temporarily overridden?}
     Store{Has control server provided a value?}
     CmdLine{Was a command line flag provided?}
@@ -68,7 +68,7 @@ flowchart TB
     Wait[Async Wait for Override Expiration]
     Clear[Clear Override]
 
-    Client -->|"Flags.SetOverride(key, override)"|Existing
+    Client -->|"Flags.SetControlRequestIntervalOverride(interval, duration)"|Existing
 
     Existing -->|Yes| Reset
     Existing -->|No| Start

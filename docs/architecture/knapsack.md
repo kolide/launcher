@@ -24,7 +24,7 @@ As an example, this is how you would access the launcher configuration data and 
 
 ```
 var k knapsack // Passed into your code as a dependency
-key, err :=k.ConfigStore().Get([]byte(nodeKey))
+key, err := k.ConfigStore().Get([]byte(nodeKey))
 ```
 
 ### Flags
