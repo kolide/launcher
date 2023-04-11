@@ -83,8 +83,7 @@ func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBina
 }
 
 // addToLibrary adds the given target file to the library for the given binary,
-// downloading and verifying it if it's not already there. After any addition
-// to the library, it cleans up older versions that are no longer needed.
+// downloading and verifying it if it's not already there.
 func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
