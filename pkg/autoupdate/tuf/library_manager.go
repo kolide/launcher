@@ -183,39 +183,40 @@ func (ulm *updateLibraryManager) verifyStagedUpdate(binary autoupdatableBinary, 
 // moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
 // to make sure that it's a valid, working update.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
-	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
+	targetVersion := ulm.versionFromTarget(binary, targetFilename)
+	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
 	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectory, err)
 	}
 
-	removeBrokenUpdateDir := func() {
-		if err := os.RemoveAll(newUpdateDirectory); err != nil {
-			level.Debug(ulm.logger).Log(
-				"msg", "could not remove broken update directory",
-				"update_dir", newUpdateDirectory,
-				"err", err,
-			)
-		}
-	}
-
 	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, string(binary)), stagedUpdate); err != nil {
-		removeBrokenUpdateDir()
+		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
 	}
 
 	// Make sure that the binary is executable
 	if err := os.Chmod(executableLocation(newUpdateDirectory, binary), 0755); err != nil {
-		removeBrokenUpdateDir()
+		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
 	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(newUpdateDirectory, binary), "--version"); err != nil {
-		removeBrokenUpdateDir()
+		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
 
 	return nil
+}
+
+// removeUpdate removes a given version from the given binary's update library.
+func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binaryVersion string) {
+	directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), binaryVersion)
+	if err := os.RemoveAll(directoryToRemove); err != nil {
+		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
+	} else {
+		level.Debug(ulm.logger).Log("msg", "removed update", "directory", directoryToRemove)
+	}
 }
 
 // currentRunningVersion returns the current running version of the given binary.
@@ -312,20 +313,12 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 		return
 	}
 
-	removeUpdate := func(v string) {
-		directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), v)
-		level.Debug(ulm.logger).Log("msg", "removing old update", "directory", directoryToRemove)
-		if err := os.RemoveAll(directoryToRemove); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not remove old update when tidying updates library", "err", err, "directory", directoryToRemove)
-		}
-	}
-
 	versionsInLibrary := make([]*semver.Version, 0)
 	for _, rawVersion := range rawVersionsInLibrary {
 		v, err := semver.NewVersion(filepath.Base(rawVersion))
 		if err != nil {
 			level.Debug(ulm.logger).Log("msg", "updates library contains invalid semver", "err", err, "library_path", rawVersion)
-			removeUpdate(filepath.Base(rawVersion))
+			ulm.removeUpdate(binary, filepath.Base(rawVersion))
 			continue
 		}
 
@@ -350,14 +343,14 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 		// If we've already hit the number of versions to keep, then start to remove the older ones.
 		// We want to keep numberOfVersionsToKeep total, saving a spot for the currently running version.
 		if nonCurrentlyRunningVersionsKept >= numberOfVersionsToKeep-1 {
-			removeUpdate(versionsInLibrary[i].Original())
+			ulm.removeUpdate(binary, versionsInLibrary[i].Original())
 			continue
 		}
 
 		// Only keep good executables
 		versionDir := filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original())
 		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
-			removeUpdate(versionsInLibrary[i].Original())
+			ulm.removeUpdate(binary, versionsInLibrary[i].Original())
 			continue
 		}
 
