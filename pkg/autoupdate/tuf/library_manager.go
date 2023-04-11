@@ -90,7 +90,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	currentVersion, err := ulm.currentRunningVersion(binary)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-	} else if currentVersion.Original() == ulm.versionFromTarget(binary, targetFilename) {
+	} else if currentVersion == ulm.versionFromTarget(binary, targetFilename) {
 		// We don't need to download the current running version because it already exists,
 		// either in this updates library or in the original install location.
 		return nil
@@ -219,35 +219,30 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 }
 
 // currentRunningVersion returns the current running version of the given binary.
-func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (*semver.Version, error) {
+func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (string, error) {
 	switch binary {
 	case binaryLauncher:
-		currentVersion, err := semver.NewVersion(version.Version().Version)
-		if err != nil {
-			return nil, fmt.Errorf("cannot determine current running version of launcher: %w", err)
+		launcherVersion := version.Version().Version
+		if launcherVersion == "unknown" {
+			return "", errors.New("unknown launcher version")
 		}
-		return currentVersion, nil
+		return launcherVersion, nil
 	case binaryOsqueryd:
 		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
 		if err != nil {
-			return nil, fmt.Errorf("could not query for osquery version: %w", err)
+			return "", fmt.Errorf("could not query for osquery version: %w", err)
 		}
 		if len(resp) < 1 {
-			return nil, errors.New("osquery version query returned no rows")
+			return "", errors.New("osquery version query returned no rows")
 		}
-		rawVersion, ok := resp[0]["version"]
+		osquerydVersion, ok := resp[0]["version"]
 		if !ok {
-			return nil, errors.New("osquery version query did not return version")
+			return "", errors.New("osquery version query did not return version")
 		}
 
-		currentVersion, err := semver.NewVersion(rawVersion)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse current running version %s of osquery as semver: %w", rawVersion, err)
-		}
-
-		return currentVersion, nil
+		return osquerydVersion, nil
 	default:
-		return nil, fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
+		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}
 }
 
@@ -258,7 +253,7 @@ func (ulm *updateLibraryManager) TidyLibrary() {
 		ulm.tidyStagedUpdates(binary)
 
 		// Get the current running version to preserve it when tidying the available updates
-		var currentVersion *semver.Version
+		var currentVersion string
 		var err error
 		switch binary {
 		case binaryOsqueryd:
@@ -303,8 +298,8 @@ func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
 // tidyUpdateLibrary reviews all updates in the library for the binary and removes any old versions
 // that are no longer needed. It will always preserve the current running binary, and then the
 // two most recent valid versions. It will remove versions it cannot validate.
-func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, currentRunningVersion *semver.Version) {
-	if currentRunningVersion == nil {
+func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, currentRunningVersion string) {
+	if currentRunningVersion == "" {
 		level.Debug(ulm.logger).Log("msg", "cannot tidy update library without knowing current running version")
 		return
 	}
@@ -348,7 +343,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 	nonCurrentlyRunningVersionsKept := 0
 	for i := len(versionsInLibrary) - 1; i >= 0; i -= 1 {
 		// Always keep the current running executable
-		if versionsInLibrary[i].Equal(currentRunningVersion) {
+		if versionsInLibrary[i].Original() == currentRunningVersion {
 			continue
 		}
 

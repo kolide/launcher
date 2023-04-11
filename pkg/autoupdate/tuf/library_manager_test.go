@@ -248,7 +248,7 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 	// that the semver library can parse. So we only expect an error here.
 	launcherVersion, err := testLibraryManager.currentRunningVersion("launcher")
 	require.Error(t, err, "expected an error fetching current running version of launcher")
-	require.Nil(t, launcherVersion)
+	require.Equal(t, "", launcherVersion)
 }
 
 func Test_currentRunningVersion_osqueryd(t *testing.T) {
@@ -269,7 +269,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 
 	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
 	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
-	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion.Original())
+	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
 }
 
 func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
@@ -287,7 +287,7 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 
 	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
-	require.Nil(t, osqueryVersion)
+	require.Equal(t, "", osqueryVersion)
 }
 
 func Test_tidyStagedUpdates(t *testing.T) {
@@ -503,12 +503,8 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 					}
 				}
 
-				// Prepare the current version
-				currentVersion, err := semver.NewVersion(tt.currentlyRunningVersion)
-				require.NoError(t, err, "invalid current version for test: %s", tt.currentlyRunningVersion)
-
 				// Tidy the library
-				testLibraryManager.tidyUpdateLibrary(binary, currentVersion)
+				testLibraryManager.tidyUpdateLibrary(binary, tt.currentlyRunningVersion)
 
 				// Confirm that the versions we expect are still there
 				for _, expectedPreservedVersion := range tt.expectedPreservedVersions {
