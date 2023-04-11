@@ -22,6 +22,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf"
 )
@@ -76,8 +77,8 @@ func TestExecute(t *testing.T) {
 	mockLibraryManager := newMockLibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary").Return().Once()
-	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
-	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), mock.Anything).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), mock.Anything).Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()

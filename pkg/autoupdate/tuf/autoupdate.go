@@ -47,7 +47,7 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
-	AddToLibrary(binary autoupdatableBinary, targetFilename string) error
+	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
 }
 
@@ -105,7 +105,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	if updateDirectory == "" {
 		updateDirectory = filepath.Join(rootDirectory, "updates")
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -222,7 +222,7 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target))
+		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target), target)
 	}
 
 	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)

@@ -20,7 +20,8 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
-	client "github.com/theupdateframework/go-tuf/client"
+	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/util"
 )
 
 type querier interface {
@@ -32,22 +33,20 @@ type querier interface {
 // location in the library specified by the version associated with that update.
 // It also ensures that old updates are removed when they are no longer needed.
 type updateLibraryManager struct {
-	metadataClient *client.Client // used to validate downloads
-	mirrorUrl      string         // dl.kolide.co
-	mirrorClient   *http.Client
-	baseDir        string
-	osquerier      querier // used to query for current running osquery version
-	logger         log.Logger
+	mirrorUrl    string // dl.kolide.co
+	mirrorClient *http.Client
+	baseDir      string
+	osquerier    querier // used to query for current running osquery version
+	logger       log.Logger
 }
 
-func newUpdateLibraryManager(metadataClient *client.Client, mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
-		metadataClient: metadataClient,
-		mirrorUrl:      mirrorUrl,
-		mirrorClient:   mirrorClient,
-		baseDir:        baseDir,
-		osquerier:      osquerier,
-		logger:         log.With(logger, "component", "tuf_autoupdater_library_manager"),
+		mirrorUrl:    mirrorUrl,
+		mirrorClient: mirrorClient,
+		baseDir:      baseDir,
+		osquerier:    osquerier,
+		logger:       log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
 
 	// Ensure the updates directory exists
@@ -84,7 +83,7 @@ func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBina
 
 // addToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
 	currentVersion, err := ulm.currentRunningVersion(binary)
@@ -103,13 +102,9 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	// Remove downloaded archives after update, regardless of success
 	defer ulm.tidyStagedUpdates(binary)
 
-	stagedUpdatePath, err := ulm.stageUpdate(binary, targetFilename)
+	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(binary, targetFilename, targetMetadata)
 	if err != nil {
 		return fmt.Errorf("could not stage update: %w", err)
-	}
-
-	if err := ulm.verifyStagedUpdate(binary, stagedUpdatePath); err != nil {
-		return fmt.Errorf("could not verify staged update: %w", err)
 	}
 
 	if err := ulm.moveVerifiedUpdate(binary, targetFilename, stagedUpdatePath); err != nil {
@@ -134,9 +129,10 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
-// stageUpdate downloads the update indicated by `targetFilename` and stages it for
-// further verification.
-func (ulm *updateLibraryManager) stageUpdate(binary autoupdatableBinary, targetFilename string) (string, error) {
+// stageUpdate downloads the update indicated by `targetFilename` and verifies it against
+// the given, validated local metadata.
+func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
+	// Create the staging file
 	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
 	out, err := os.Create(stagedUpdatePath)
 	if err != nil {
@@ -144,40 +140,28 @@ func (ulm *updateLibraryManager) stageUpdate(binary autoupdatableBinary, targetF
 	}
 	defer out.Close()
 
+	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	// Wrap the download in a LimitReader so we download at most localMeta.Length bytes
+	stream := io.LimitReader(resp.Body, localTargetMetadata.Length)
+
+	// Read the target file, simultaneously writing it to the staging directory and generating its metadata
+	actualTargetMeta, err := util.GenerateTargetFileMeta(io.TeeReader(stream, out), localTargetMetadata.HashAlgorithms()...)
 	if err != nil {
-		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
+		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
+	}
+
+	// Verify the actual download against the confirmed local metadata
+	if err := util.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
+		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	return stagedUpdatePath, nil
-}
-
-// verifyStagedUpdate checks the downloaded update against the metadata in the TUF repo.
-func (ulm *updateLibraryManager) verifyStagedUpdate(binary autoupdatableBinary, stagedUpdate string) error {
-	digest, err := sha512Digest(stagedUpdate)
-	if err != nil {
-		return fmt.Errorf("could not compute digest for target %s to verify it: %w", stagedUpdate, err)
-	}
-
-	fileInfo, err := os.Stat(stagedUpdate)
-	if err != nil {
-		return fmt.Errorf("could not get info for staged update at %s: %w", stagedUpdate, err)
-	}
-
-	// Where the file lives in the binary bucket -- we can't use filepath.Join here because on Windows,
-	// that won't match the actual bucket filepath
-	pathToTargetInMirror := fmt.Sprintf("%s/%s/%s", binary, runtime.GOOS, filepath.Base(stagedUpdate))
-	if err := ulm.metadataClient.VerifyDigest(digest, "sha512", fileInfo.Size(), pathToTargetInMirror); err != nil {
-		return fmt.Errorf("digest verification failed for target staged at %s: %w", stagedUpdate, err)
-	}
-
-	return nil
 }
 
 // moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
