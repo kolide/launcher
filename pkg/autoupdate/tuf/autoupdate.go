@@ -49,7 +49,7 @@ type ReleaseFileCustomMetadata struct {
 
 type librarian interface {
 	AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool
-	AddToLibrary(binary autoupdatableBinary, targetFilename string) error
+	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
 }
 
@@ -107,7 +107,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	if updateDirectory == "" {
 		updateDirectory = filepath.Join(rootDirectory, "updates")
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(ta.metadataClient, mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -195,7 +195,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not update metadata after %d tries: %+v", updateTryCount, errs)
 	}
 
-	// Find the newest release for our channel -- right now for logging purposes only
+	// Find the newest release for our channel
 	targets, err := ta.metadataClient.Targets()
 	if err != nil {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
@@ -237,7 +237,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (bool, error) {
 	updateDownloaded := false
 
-	release, err := ta.findRelease(binary, targets)
+	release, releaseMetadata, err := ta.findRelease(binary, targets)
 	if err != nil {
 		return updateDownloaded, fmt.Errorf("could not find release: %w", err)
 	}
@@ -246,7 +246,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return updateDownloaded, nil
 	}
 
-	if err := ta.libraryManager.AddToLibrary(binary, release); err != nil {
+	if err := ta.libraryManager.AddToLibrary(binary, release, releaseMetadata); err != nil {
 		return updateDownloaded, fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}
 
@@ -254,7 +254,9 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 	return updateDownloaded, nil
 }
 
-func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
+func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, data.TargetFileMeta, error) {
+	// First, find the target that the channel release file is pointing to
+	var releaseTarget string
 	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
@@ -265,13 +267,27 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 		// to see if we're on this latest version.
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
-			return "", fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+			return "", data.TargetFileMeta{}, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		return filepath.Base(custom.Target), nil
+		releaseTarget = custom.Target
+		break
 	}
 
-	return "", fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	if releaseTarget == "" {
+		return "", data.TargetFileMeta{}, fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	}
+
+	// Now, get the metadata for our release target
+	for targetName, target := range targets {
+		if targetName != releaseTarget {
+			continue
+		}
+
+		return filepath.Base(releaseTarget), target, nil
+	}
+
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", targetReleaseFile, binary)
 }
 
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {

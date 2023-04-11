@@ -72,14 +72,22 @@ func TestExecute(t *testing.T) {
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
+	// Get metadata for each release
+	_, err = autoupdater.metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, binaryOsqueryd, testReleaseVersion))
+	require.NoError(t, err, "could not get test metadata for osqueryd")
+	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, binaryLauncher, testReleaseVersion))
+	require.NoError(t, err, "could not get test metadata for launcher")
+
 	// Expect that we attempt to update the library
 	mockLibraryManager := newMockLibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary").Return().Once()
 	mockLibraryManager.On("AvailableInLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("AvailableInLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(nil)
-	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
