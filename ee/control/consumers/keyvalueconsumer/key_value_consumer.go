@@ -36,11 +36,3 @@ func (c *KeyValueConsumer) Update(data io.Reader) error {
 
 	return err
 }
-
-func mapToSlice(m map[string]string) []string {
-	result := make([]string, 0, len(m)*2)
-	for k, v := range m {
-		result = append(result, k, v)
-	}
-	return result
-}
