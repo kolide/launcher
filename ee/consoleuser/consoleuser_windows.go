@@ -91,7 +91,7 @@ func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
 	username, err := proc.UsernameWithContext(ctx)
 	if err != nil {
-		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid(), err)
+		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid, err)
 	}
 
 	user, err := user.Lookup(username)
