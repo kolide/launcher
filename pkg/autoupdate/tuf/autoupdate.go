@@ -215,12 +215,18 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		i := i
 		binary := binary
 		wg.Go(func() error {
-			updateForBinaryDownloaded, err := ta.downloadUpdate(binary, targets)
+			downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
 			if err != nil {
 				return fmt.Errorf("could not download update for %s: %w", binary, err)
 			}
 
-			updatesDownloaded[i] = updateForBinaryDownloaded
+			if downloadedUpdateVersion != "" {
+				level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
+				updatesDownloaded[i] = true
+			} else {
+				updatesDownloaded[i] = false
+			}
+
 			return nil
 		})
 	}
@@ -233,7 +239,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	for _, updateDownloaded := range updatesDownloaded {
 		if updateDownloaded {
 			// In the future, we would restart or re-launch the binary with the new version
-			level.Debug(ta.logger).Log("msg", "update downloaded")
+			level.Debug(ta.logger).Log("msg", "at least one update downloaded")
 			break
 		}
 	}
@@ -243,24 +249,21 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
-func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (bool, error) {
-	updateDownloaded := false
-
+func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
 	release, releaseMetadata, err := ta.findRelease(binary, targets)
 	if err != nil {
-		return updateDownloaded, fmt.Errorf("could not find release: %w", err)
+		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
 	if ta.libraryManager.AvailableInLibrary(binary, release) {
-		return updateDownloaded, nil
+		return "", nil
 	}
 
 	if err := ta.libraryManager.AddToLibrary(binary, release, releaseMetadata); err != nil {
-		return updateDownloaded, fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
+		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}
 
-	updateDownloaded = true
-	return updateDownloaded, nil
+	return release, nil
 }
 
 // findRelease checks the latest data from TUF (in `targets`) to see whether a new release
