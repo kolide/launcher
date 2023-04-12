@@ -181,30 +181,38 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	return stagedUpdatePath, nil
 }
 
-// moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
-// to make sure that it's a valid, working update.
+// moveVerifiedUpdate untars the update and performs final checks to make sure that it's a valid, working update.
+// Finally, it moves the update to its correct versioned location in the update library for the given binary.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
 	targetVersion := ulm.versionFromTarget(binary, targetFilename)
-	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
-	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
-		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectory, err)
+	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
+	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
+		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
 	}
 
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, string(binary)), stagedUpdate); err != nil {
+	// Untar the archive. Note that `UntarBundle` calls `filepath.Dir(destination)`, so the inclusion of `binary`
+	// here doesn't matter as it's immediately stripped off.
+	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
-		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
+		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
 	// Make sure that the binary is executable
-	if err := os.Chmod(executableLocation(newUpdateDirectory, binary), 0755); err != nil {
+	if err := os.Chmod(executableLocation(stagedVersionedDirectory, binary), 0755); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
-	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(newUpdateDirectory, binary), "--version"); err != nil {
+	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not verify executable: %w", err)
+	}
+
+	// All good! Shelve it in the library under its version
+	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
+	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
+		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
 
 	return nil
