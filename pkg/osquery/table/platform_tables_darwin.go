@@ -118,5 +118,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		munki.MunkiReport(client, logger),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`, `--no-scan`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`}),
 	}
 }
