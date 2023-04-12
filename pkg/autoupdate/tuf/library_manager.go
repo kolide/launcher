@@ -22,7 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/util"
+	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
 type querier interface {
@@ -139,7 +139,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
-// stageUpdate downloads the update indicated by `targetFilename` and verifies it against
+// stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
 	// Create the staging file
@@ -148,7 +148,11 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	if err != nil {
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not close file after writing", "err", err, "file", stagedUpdatePath)
+		}
+	}()
 
 	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
@@ -162,13 +166,13 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	var fileBuffer bytes.Buffer
 
 	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
-	actualTargetMeta, err := util.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
+	actualTargetMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	// Verify the actual download against the confirmed local metadata
-	if err := util.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
+	if err := tufutil.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
