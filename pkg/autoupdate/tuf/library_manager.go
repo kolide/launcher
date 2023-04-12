@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
-	"github.com/theupdateframework/go-tuf/util"
+	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
 type querier interface {
@@ -152,13 +152,13 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	var fileBuffer bytes.Buffer
 
 	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
-	actualTargetMeta, err := util.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
+	actualTargetMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	// Verify the actual download against the confirmed local metadata
-	if err := util.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
+	if err := tufutil.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
