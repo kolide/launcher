@@ -129,7 +129,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
-// stageUpdate downloads the update indicated by `targetFilename` and verifies it against
+// stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
 	// Create the staging file
