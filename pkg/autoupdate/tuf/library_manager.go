@@ -104,9 +104,8 @@ func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, target
 	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
 }
 
-// addToLibrary adds the given target file to the library for the given binary,
-// downloading and verifying it if it's not already there. After any addition
-// to the library, it cleans up older versions that are no longer needed.
+// AddToLibrary adds the given target file to the library for the given binary,
+// downloading and verifying it if it's not already there.
 func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
@@ -142,17 +141,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
-	// Create the staging file
 	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
-	out, err := os.Create(stagedUpdatePath)
-	if err != nil {
-		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
-	}
-	defer func() {
-		if err := out.Close(); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not close file after writing", "err", err, "file", stagedUpdatePath)
-		}
-	}()
 
 	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
@@ -176,9 +165,17 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
-	// Everything looks good: write the buffered download to disk
+	// Everything looks good: create the file and write it to disk
+	out, err := os.Create(stagedUpdatePath)
+	if err != nil {
+		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
+	}
 	if _, err := io.Copy(out, &fileBuffer); err != nil {
+		out.Close()
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
+	}
+	if err := out.Close(); err != nil {
+		return stagedUpdatePath, fmt.Errorf("could not close downloaded target file %s after writing: %w", targetFilename, err)
 	}
 
 	return stagedUpdatePath, nil
