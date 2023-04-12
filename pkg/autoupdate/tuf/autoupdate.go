@@ -12,12 +12,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -27,24 +25,40 @@ import (
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
+// Configuration defaults
 const (
 	DefaultTufServer = "https://tuf.kolide.com"
 	defaultChannel   = "stable"
 	tufDirectoryName = "tuf"
 )
 
+// Binaries handled by autoupdater
+type autoupdatableBinary string
+
+const (
+	binaryLauncher autoupdatableBinary = "launcher"
+	binaryOsqueryd autoupdatableBinary = "osqueryd"
+)
+
+var binaries = []autoupdatableBinary{binaryLauncher, binaryOsqueryd}
+
 type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
 }
 
+type librarian interface {
+	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
+	TidyLibrary()
+}
+
 type TufAutoupdater struct {
-	metadataClient  *client.Client
-	operatingSystem string
-	channel         string
-	checkInterval   time.Duration
-	store           types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	interrupt       chan struct{}
-	logger          log.Logger
+	metadataClient *client.Client
+	libraryManager librarian
+	channel        string
+	checkInterval  time.Duration
+	store          types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	interrupt      chan struct{}
+	logger         log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -67,14 +81,14 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
+	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		operatingSystem: runtime.GOOS,
-		channel:         defaultChannel,
-		interrupt:       make(chan struct{}),
-		checkInterval:   60 * time.Second,
-		store:           store,
-		logger:          log.NewNopLogger(),
+		channel:       defaultChannel,
+		interrupt:     make(chan struct{}),
+		checkInterval: 60 * time.Second,
+		store:         store,
+		logger:        log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -87,11 +101,20 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, metadataHttpClient *ht
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
 
+	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
+	if updateDirectory == "" {
+		updateDirectory = filepath.Join(rootDirectory, "updates")
+	}
+	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not init update library manager: %w", err)
+	}
+
 	return ta, nil
 }
 
 func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
-	// Set up the local TUF directory for our TUF client -- a dev repo, to be replaced once we move to production
+	// Set up the local TUF directory for our TUF client
 	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
@@ -125,6 +148,10 @@ func LocalTufDirectory(rootDirectory string) string {
 }
 
 func (ta *TufAutoupdater) Execute() (err error) {
+	// For now, tidy the library on startup. In the future, we will tidy the library
+	// earlier, after version selection.
+	ta.libraryManager.TidyLibrary()
+
 	checkTicker := time.NewTicker(ta.checkInterval)
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 
@@ -172,7 +199,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	for _, binary := range []string{"launcher", "osqueryd"} {
+	for _, binary := range binaries {
 		if err := ta.findRelease(binary, targets); err != nil {
 			return fmt.Errorf("could not find release: %w", err)
 		}
@@ -181,8 +208,8 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	return nil
 }
 
-func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) error {
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, ta.operatingSystem, ta.channel)
+func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) error {
+	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -195,31 +222,21 @@ func (ta *TufAutoupdater) findRelease(binary string, targets data.TargetFiles) e
 			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		level.Debug(ta.logger).Log(
-			"msg", "checked most up-to-date release from TUF",
-			"launcher_version", version.Version().Version,
-			"release_version", ta.versionFromTarget(custom.Target, binary),
-			"binary", binary,
-			"channel", ta.channel,
-		)
+		targetToDownload, err := ta.metadataClient.Target(custom.Target)
+		if err != nil {
+			return fmt.Errorf("could not get TUF metadata for release %s: %w", custom.Target, err)
+		}
 
-		return nil
+		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target), targetToDownload)
 	}
 
 	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
 }
 
-func (ta *TufAutoupdater) versionFromTarget(target string, binary string) string {
-	// The target is in the form `launcher/linux/launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s/%s/%s-", binary, ta.operatingSystem, binary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(target, prefixToTrim), ".tar.gz")
-}
-
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
-		level.Debug(ta.logger).Log("msg", "could store autoupdater error", "err", err)
+		level.Debug(ta.logger).Log("msg", "could not store autoupdater error", "err", err)
 	}
 }
 

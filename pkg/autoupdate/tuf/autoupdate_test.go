@@ -1,8 +1,11 @@
 package tuf
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +17,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	localservermocks "github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -28,7 +32,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 
-	_, err := NewTufAutoupdater("https://example.com", testRootDir, http.DefaultClient, s)
+	_, err := NewTufAutoupdater("https://example.com", testRootDir, "", http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm that the TUF directory we expose is the one that we created
@@ -39,6 +43,10 @@ func TestNewTufAutoupdater(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(exposedRootDir, "root.json"))
 	require.NoError(t, err, "could not stat root.json that should have been created in test")
+
+	// Confirm that the library manager's base directory was set correctly
+	_, err = os.Stat(filepath.Join(testRootDir, "updates"))
+	require.NoError(t, err, "could not stat updates directory that should have been created for library manager")
 }
 
 // Tests running as well as shutdown
@@ -47,11 +55,11 @@ func TestExecute(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
-	metadataServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 
-	// Right now, we do not talk to the mirror at all
-	autoupdater, err := NewTufAutoupdater(metadataServerUrl, testRootDir, http.DefaultClient, s)
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, "", http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -64,6 +72,21 @@ func TestExecute(t *testing.T) {
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
+	// Get metadata for each release
+	_, err = autoupdater.metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, binaryOsqueryd, testReleaseVersion))
+	require.NoError(t, err, "could not get test metadata for osqueryd")
+	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, binaryLauncher, testReleaseVersion))
+	require.NoError(t, err, "could not get test metadata for launcher")
+
+	// Expect that we attempt to update the library
+	mockLibraryManager := newMockLibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockLibraryManager.On("TidyLibrary").Return().Once()
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
+
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
 	time.Sleep(5 * time.Second)
@@ -74,17 +97,15 @@ func TestExecute(t *testing.T) {
 	// Wait one second to let autoupdater shut down
 	time.Sleep(1 * time.Second)
 
-	// Check log lines to confirm that:
-	// 1. We were able to successfully pull updates from TUF and identified the expected release version
-	// 2. We see the log `received interrupt, stopping`, indicating that the autoupdater shut down at the end
+	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
+	mockLibraryManager.AssertExpectations(t)
+
+	// Check log lines to confirm that we see the log `received interrupt, stopping`, indicating that
+	// the autoupdater shut down at the end
 	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
-	// We expect 6 logs (1 check per second for 5 seconds, plus 1 log indicating shutdown) but will check
-	// only the first and last, so just make sure there are at least 2
-	require.GreaterOrEqual(t, len(logLines), 2)
-
-	// Check that we got the expected release version
-	require.Contains(t, logLines[0], testReleaseVersion)
+	// We expect at least 1 log for the shutdown line.
+	require.GreaterOrEqual(t, len(logLines), 1)
 
 	// Check that we shut down
 	require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
@@ -94,14 +115,17 @@ func Test_storeError(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testTufServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulates TUF server being down
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer testMetadataServer.Close()
+	defer testTufServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testMetadataServer.URL, testRootDir, http.DefaultClient, setupStorage(t))
+	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+	mockLibraryManager := newMockLibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockLibraryManager.On("TidyLibrary").Return().Once()
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
@@ -128,6 +152,8 @@ func Test_storeError(t *testing.T) {
 	})
 	require.NoError(t, err, "could not iterate over keys")
 	require.Greater(t, errorCount, 0, "TUF autoupdater did not record error counts")
+
+	mockLibraryManager.AssertExpectations(t)
 }
 
 func Test_cleanUpOldErrors(t *testing.T) {
@@ -173,61 +199,6 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	require.Equal(t, 1, keyCount, "cleanup routine did not clean up correct number of old errors")
 }
 
-func Test_versionFromTarget(t *testing.T) {
-	t.Parallel()
-
-	testLauncherVersions := []struct {
-		target          string
-		binary          string
-		operatingSystem string
-		version         string
-	}{
-		{
-			target:          "launcher/darwin/launcher-0.10.1.tar.gz",
-			binary:          "launcher",
-			operatingSystem: "darwin",
-			version:         "0.10.1",
-		},
-		{
-			target:          "launcher/windows/launcher-1.13.5.tar.gz",
-			binary:          "launcher",
-			operatingSystem: "windows",
-			version:         "1.13.5",
-		},
-		{
-			target:          "launcher/linux/launcher-0.13.5-40-gefdc582.tar.gz",
-			binary:          "launcher",
-			operatingSystem: "linux",
-			version:         "0.13.5-40-gefdc582",
-		},
-		{
-			target:          "osqueryd/darwin/osqueryd-5.8.1.tar.gz",
-			binary:          "osqueryd",
-			operatingSystem: "darwin",
-			version:         "5.8.1",
-		},
-		{
-			target:          "osqueryd/windows/osqueryd-0.8.1.tar.gz",
-			binary:          "osqueryd",
-			operatingSystem: "windows",
-			version:         "0.8.1",
-		},
-		{
-			target:          "osqueryd/linux/osqueryd-5.8.2.tar.gz",
-			binary:          "osqueryd",
-			operatingSystem: "linux",
-			version:         "5.8.2",
-		},
-	}
-
-	for _, testLauncherVersion := range testLauncherVersions {
-		autoupdater := &TufAutoupdater{
-			operatingSystem: testLauncherVersion.operatingSystem,
-		}
-		require.Equal(t, testLauncherVersion.version, autoupdater.versionFromTarget(testLauncherVersion.target, testLauncherVersion.binary))
-	}
-}
-
 // Sets up a local TUF repo with some targets to serve metadata about; returns the URL
 // of a test HTTP server to serve that metadata and the root JSON needed to initialize
 // a client.
@@ -238,6 +209,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	localStore := tuf.FileSystemStore(tufDir, nil)
 	repo, err := tuf.NewRepo(localStore)
 	require.NoError(t, err, "could not create new tuf repo")
+	require.NoError(t, repo.Init(false), "could not init new tuf repo")
 
 	// Gen keys
 	_, err = repo.GenKey("root")
@@ -253,28 +225,47 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	require.NoError(t, repo.Sign("root.json"), "could not sign root metadata file")
 
 	// Create test binaries and release files per binary and per release channel
-	for _, b := range []string{"launcher", "osqueryd"} {
-		for _, c := range []string{"stable", "beta", "nightly"} {
-			for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
+	for _, b := range binaries {
+		for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
+			binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
+
+			// Create a valid test binary -- an archive of an executable with the proper directory structure
+			// that will actually run -- if this is the release version we care about. If this is not the
+			// release version we care about, then just create a small text file since it won't be downloaded
+			// and evaluated.
+			if v == testReleaseVersion {
+				// Create test binary and copy it to the staged targets directory
+				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", string(b), runtime.GOOS)
+				executablePath := executableLocation(stagedTargetsDir, b)
+				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
+				copyBinary(t, executablePath)
+				require.NoError(t, os.Chmod(executablePath, 0755))
+
+				// Compress the binary or app bundle
+				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
+			} else {
 				// Create and commit a test binary
-				binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
-				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
-				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
+				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", string(b), runtime.GOOS), 0777), "could not make staging directory")
+				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", string(b), runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
 				require.NoError(t, err, "could not write test target binary to temp dir")
-				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
+			}
 
-				// Commit
-				require.NoError(t, repo.Snapshot(), "could not take snapshot")
-				require.NoError(t, repo.Timestamp(), "could not take timestamp")
-				require.NoError(t, repo.Commit(), "could not commit")
+			// Add the target
+			require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
 
-				if v != testReleaseVersion {
-					continue
-				}
+			// Commit
+			require.NoError(t, repo.Snapshot(), "could not take snapshot")
+			require.NoError(t, repo.Timestamp(), "could not take timestamp")
+			require.NoError(t, repo.Commit(), "could not commit")
 
-				// If this is our release version, also create and commit a test release file
-				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c), 0777), "could not make staging directory")
-				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c, "release.json"), []byte("{}"), 0777)
+			if v != testReleaseVersion {
+				continue
+			}
+
+			// If this is our release version, also create and commit a test release file
+			for _, c := range []string{"stable", "beta", "nightly"} {
+				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", string(b), runtime.GOOS, c), 0777), "could not make staging directory")
+				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", string(b), runtime.GOOS, c, "release.json"), []byte("{}"), 0777)
 				require.NoError(t, err, "could not write test target release file to temp dir")
 				customMetadata := fmt.Sprintf("{\"target\":\"%s/%s/%s\"}", b, runtime.GOOS, binaryFileName)
 				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s/release.json", b, runtime.GOOS, c), []byte(customMetadata)), "could not add test target release file to tuf")
@@ -287,7 +278,7 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 		}
 	}
 
-	// Quick validation that we set up the repo properly: key and metadata files should exist
+	// Quick validation that we set up the repo properly: key and metadata files should exist; targets should exist
 	require.DirExists(t, filepath.Join(tufDir, "keys"))
 	require.FileExists(t, filepath.Join(tufDir, "keys", "root.json"))
 	require.FileExists(t, filepath.Join(tufDir, "keys", "snapshot.json"))
@@ -298,14 +289,28 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	require.FileExists(t, filepath.Join(tufDir, "repository", "snapshot.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "timestamp.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)))
 
 	// Set up a test server to serve these files
 	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pathComponents := strings.Split(r.URL.Path, "/")
+		pathComponents := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+
 		fileToServe := tufDir
-		for _, c := range pathComponents {
-			fileToServe = filepath.Join(fileToServe, c)
+
+		// Allow the test server to also stand in for dl.kolide.co
+		if pathComponents[0] == "kolide" {
+			fileToServe = filepath.Join(fileToServe, "repository", "targets")
+		} else {
+			fileToServe = filepath.Join(fileToServe, pathComponents[0])
 		}
+
+		for i := 1; i < len(pathComponents); i += 1 {
+			fileToServe = filepath.Join(fileToServe, pathComponents[i])
+		}
+
 		http.ServeFile(w, r, fileToServe)
 	}))
 
@@ -322,6 +327,52 @@ func initLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL s
 	rootJson = metadata["root.json"]
 
 	return tufServerURL, rootJson
+}
+
+func compress(t *testing.T, outFileName string, outFileDir string, targetDir string, binary autoupdatableBinary) {
+	out, err := os.Create(filepath.Join(outFileDir, outFileName))
+	require.NoError(t, err, "creating archive: %s in %s", outFileName, outFileDir)
+	defer out.Close()
+
+	gw := gzip.NewWriter(out)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	srcFilePath := string(binary)
+	if binary == "launcher" && runtime.GOOS == "darwin" {
+		srcFilePath = filepath.Join("Kolide.app", "Contents", "MacOS", string(binary))
+
+		// Create directory structure for app bundle
+		for _, path := range []string{"Kolide.app", "Kolide.app/Contents", "Kolide.app/Contents/MacOS"} {
+			pInfo, err := os.Stat(filepath.Join(targetDir, path))
+			require.NoError(t, err, "stat for app bundle path %s", path)
+
+			hdr, err := tar.FileInfoHeader(pInfo, path)
+			require.NoError(t, err, "creating header for directory %s", path)
+			hdr.Name = path
+
+			require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
+		}
+	} else if runtime.GOOS == "windows" {
+		srcFilePath += ".exe"
+	}
+
+	srcFile, err := os.Open(filepath.Join(targetDir, srcFilePath))
+	require.NoError(t, err, "opening binary")
+	defer srcFile.Close()
+
+	srcStats, err := srcFile.Stat()
+	require.NoError(t, err, "getting stats to compress binary")
+
+	hdr, err := tar.FileInfoHeader(srcStats, srcStats.Name())
+	require.NoError(t, err, "creating header")
+	hdr.Name = srcFilePath
+
+	require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
+	_, err = io.Copy(tw, srcFile)
+	require.NoError(t, err, "copying file to archive")
 }
 
 func setupStorage(t *testing.T) types.KVStore {

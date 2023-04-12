@@ -196,7 +196,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		// check that executions work. If the exec fails,
 		// there's clearly an issue and we should remove it.
 		if newestSettings.runningExecutable != foundExecutable {
-			if err := checkExecutable(ctx, foundExecutable, "--version"); err != nil {
+			if err := CheckExecutable(ctx, foundExecutable, "--version"); err != nil {
 				if newestSettings.deleteCorrupt {
 					level.Error(logger).Log("msg", "not executable. Removing", "binary", foundExecutable, "reason", err)
 					if err := os.RemoveAll(basedir); err != nil {
@@ -232,7 +232,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return fullBinaryPath
 	}
 
-	if err := checkExecutable(ctx, fullBinaryPath, "--version"); err == nil {
+	if err := CheckExecutable(ctx, fullBinaryPath, "--version"); err == nil {
 		return fullBinaryPath
 	}
 
@@ -351,9 +351,9 @@ func FindBaseDir(path string) string {
 	return filepath.Dir(components[0])
 }
 
-// checkExecutable tests whether something is an executable. It
+// CheckExecutable tests whether something is an executable. It
 // examines permissions, mode, and tries to exec it directly.
-func checkExecutable(ctx context.Context, potentialBinary string, args ...string) error {
+func CheckExecutable(ctx context.Context, potentialBinary string, args ...string) error {
 	if err := checkExecutablePermissions(potentialBinary); err != nil {
 		return err
 	}
@@ -383,7 +383,7 @@ func checkExecutable(ctx context.Context, potentialBinary string, args ...string
 	return supressRoutineErrors(execErr)
 }
 
-// supressNormalErrors attempts to tell whether the error was a
+// supressRoutineErrors attempts to tell whether the error was a
 // program that has executed, and then exited, vs one that's execution
 // was entirely unsuccessful. This differentiation allows us to
 // detect, and recover, from corrupt updates vs something in-app.
