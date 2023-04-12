@@ -53,7 +53,7 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 	for _, proc := range explorerProcs {
 		procOwnerUid, err := processOwnerUid(ctx, proc)
 		if err != nil {
-			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", explorerProc.Pid, err)
+			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", proc.Pid, err)
 		}
 
 		if uid == procOwnerUid {
