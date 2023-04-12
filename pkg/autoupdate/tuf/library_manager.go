@@ -138,7 +138,11 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	if err != nil {
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not close file after writing", "err", err, "file", stagedUpdatePath)
+		}
+	}()
 
 	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
