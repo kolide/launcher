@@ -303,7 +303,7 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 }
 
 // storeError saves errors that occur during the periodic check for updates, so that they
-// can be queryable via a launcher table.
+// can be queryable via the `kolide_tuf_autoupdater_errors` table.
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
@@ -311,6 +311,8 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	}
 }
 
+// cleanUpOldErrors removes all errors from our store that are more than a week old,
+// so we only keep the most recent/salient errors.
 func (ta *TufAutoupdater) cleanUpOldErrors() {
 	// We want to delete all errors more than 1 week old
 	errorTtl := 7 * 24 * time.Hour
