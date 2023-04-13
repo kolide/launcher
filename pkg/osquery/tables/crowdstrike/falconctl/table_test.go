@@ -81,7 +81,7 @@ func TestOptionRestrictions(t *testing.T) {
 	}
 }
 
-func noopExec(_ context.Context, log log.Logger, _ int, _ []string, args []string) ([]byte, error) {
+func noopExec(_ context.Context, log log.Logger, _ int, _ []string, args []string, _ bool) ([]byte, error) {
 	log.Log("exec", "exec-in-test", "args", strings.Join(args, " "))
 	return []byte{}, nil
 }
