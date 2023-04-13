@@ -2,11 +2,14 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/shirou/gopsutil/process"
 )
 
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
@@ -65,10 +68,63 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
+	var oneTimeExtraKeyVals []string
+	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
+		oneTimeExtraKeyVals = getInfoAboutUnrecognizedProcessUsingPidfile(p)
+	}
+
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
+	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller, oneTimeExtraKeyVals)...); err != nil {
 		return 0, err
 	}
 	return len(p), nil
+}
+
+func getInfoAboutUnrecognizedProcessUsingPidfile(p []byte) []string {
+	pidStr := strings.TrimSpace(strings.TrimPrefix(string(p), "Refusing to kill non-osqueryd process"))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return []string{"process_info_err", fmt.Sprintf("could not extract PID of non-osqueryd process %s using pidfile: %v", pidStr, err)}
+	}
+
+	unknownProcess, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return []string{"process_info_err", fmt.Sprintf("could not get non-osqueryd process %d using pidfile: %v", pid, err)}
+	}
+
+	// Gather as much info as we can about the process
+	processInfo := make([]string, 0)
+	processInfo = append(processInfo, "process_name", getStringStat(unknownProcess.Name))
+	processInfo = append(processInfo, "process_cmdline", getStringStat(unknownProcess.Cmdline))
+	processInfo = append(processInfo, "process_open_files", getStructStat(unknownProcess.OpenFiles))
+	processInfo = append(processInfo, "process_status", getStringStat(unknownProcess.Status))
+	processInfo = append(processInfo, "process_create_time", getIntStat(unknownProcess.CreateTime))
+	processInfo = append(processInfo, "process_username", getStringStat(unknownProcess.Username))
+
+	return processInfo
+}
+
+func getStringStat(getFunc func() (string, error)) string {
+	stat, err := getFunc()
+	if err != nil {
+		return fmt.Sprintf("could not get stat: %v", err)
+	}
+	return stat
+}
+
+func getIntStat(getFunc func() (int64, error)) string {
+	stat, err := getFunc()
+	if err != nil {
+		return fmt.Sprintf("could not get stat: %v", err)
+	}
+	return fmt.Sprintf("%d", stat)
+}
+
+func getStructStat(getFunc func() ([]process.OpenFilesStat, error)) string {
+	stat, err := getFunc()
+	if err != nil {
+		return fmt.Sprintf("could not get stat: %v", err)
+	}
+	return fmt.Sprintf("%+v", stat)
 }
