@@ -6,7 +6,6 @@ package consoleuser
 import (
 	"context"
 	"fmt"
-	"os/user"
 	"path/filepath"
 
 	"github.com/shirou/gopsutil/process"
@@ -94,10 +93,8 @@ func processOwnerUid(ctx context.Context, proc *process.Process) (string, error)
 		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid, err)
 	}
 
-	user, err := user.Lookup(username)
-	if err != nil {
-		return "", fmt.Errorf("looking up username %s: %w", username, err)
-	}
-
-	return user.Uid, nil
+	// Looking up the proper UID (which on Windows, is a SID) seems to be problematic and
+	// can fail for reasons we don't quite understand. We just need something to uniquely
+	// identify the user, so on Windows we use the username instead of numeric UID.
+	return username, nil
 }
