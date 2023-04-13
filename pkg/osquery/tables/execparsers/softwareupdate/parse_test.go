@@ -98,14 +98,22 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name:     "no update available, --no-scan",
-			input:    no_update_available_noscan,
-			expected: make([]map[string]string, 0),
+			name:  "no update available, --no-scan",
+			input: no_update_available_noscan,
+			expected: []map[string]string{
+				{
+					"UpToDate": "true",
+				},
+			},
 		},
 		{
-			name:     "no update available",
-			input:    no_update_available_scan,
-			expected: make([]map[string]string, 0),
+			name:  "no update available",
+			input: no_update_available_scan,
+			expected: []map[string]string{
+				{
+					"UpToDate": "true",
+				},
+			},
 		},
 		{
 			name:  "update available, --no-scan",
