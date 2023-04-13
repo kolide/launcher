@@ -17,6 +17,15 @@ func (p *parser) parseSoftwareupdate(reader io.Reader) (any, error) {
 	for p.scanner.Scan() {
 		currentLine := strings.TrimSpace(p.scanner.Text())
 
+		if strings.Contains(currentLine, "No new software available") {
+			// This is our indication that the device is up-to-date: there should be no recommended
+			// updates. Return this data early.
+			results = append(results, map[string]string{
+				"UpToDate": "true",
+			})
+			break
+		}
+
 		// There are some header lines (e.g. `Software Update Tool`) that we can safely discard.
 		// We only care about pairs of lines, where the first line begins in the following way.
 		if !strings.HasPrefix(currentLine, "* Label:") {
