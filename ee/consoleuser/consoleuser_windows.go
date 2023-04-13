@@ -28,7 +28,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	for _, explorerProc := range explorerProcs {
 		uid, err := processOwnerUid(ctx, explorerProc)
 		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid: %w", err)
+			return nil, fmt.Errorf("getting process owner uid (for pid %d): %w", explorerProc.Pid, err)
 		}
 		uidsMap[uid] = struct{}{}
 	}
@@ -53,7 +53,7 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 	for _, proc := range explorerProcs {
 		procOwnerUid, err := processOwnerUid(ctx, proc)
 		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid: %w", err)
+			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", proc.Pid, err)
 		}
 
 		if uid == procOwnerUid {
@@ -91,12 +91,12 @@ func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
 	username, err := proc.UsernameWithContext(ctx)
 	if err != nil {
-		return "", fmt.Errorf("getting process username: %w", err)
+		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid, err)
 	}
 
 	user, err := user.Lookup(username)
 	if err != nil {
-		return "", fmt.Errorf("looking up user: %w", err)
+		return "", fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
 	return user.Uid, nil
