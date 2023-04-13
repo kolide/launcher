@@ -68,18 +68,26 @@ func runDesktop(args []string) error {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	user, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("getting current user: %w", err)
-	}
-
 	// set up logging
 	logger := logutil.NewServerLogger(*fldebug)
 	logger = log.With(logger,
 		"subprocess", "desktop",
 		"pid", os.Getpid(),
-		"uid", user.Uid,
 	)
+
+	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
+	user, err := user.Current()
+	if err != nil {
+		level.Debug(logger).Log(
+			"msg", "error getting current user",
+			"err", err,
+		)
+	} else {
+		logger = log.With(logger,
+			"uid", user.Uid,
+		)
+	}
+
 	level.Info(logger).Log("msg", "starting")
 
 	if *flsocketpath == "" {
