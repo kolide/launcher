@@ -35,7 +35,7 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, log.Logger, int, []string, []string) ([]byte, error)
+type execFunc func(context.Context, log.Logger, int, []string, []string, bool) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	logger    log.Logger
@@ -86,7 +86,7 @@ OUTER:
 		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
-		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args)
+		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args, false)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "exec failed", "err", err)
 			return nil, err

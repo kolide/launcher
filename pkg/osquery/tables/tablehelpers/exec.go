@@ -20,7 +20,7 @@ import (
 //  3. It moves the stderr into the return error, if needed.
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
-func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string) ([]byte, error) {
+func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -33,7 +33,11 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 
 		cmd := exec.CommandContext(ctx, bin, args...)
 		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		if includeStderr {
+			cmd.Stderr = &stdout
+		} else {
+			cmd.Stderr = &stderr
+		}
 
 		level.Debug(logger).Log(
 			"msg", "execing",
