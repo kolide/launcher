@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -120,6 +121,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 
 	// Gather as much info as we can about the process
 	processInfo := []interface{}{"pid", pid}
+	processInfo = append(processInfo, "launcher_pid", os.Getpid())
 	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
 	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
 	processInfo = append(processInfo, "status", getStringStat(unknownProcess.Status))
