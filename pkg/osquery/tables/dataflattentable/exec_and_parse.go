@@ -24,6 +24,7 @@ type execTableV2 struct {
 	flattener      bytesFlattener
 	timeoutSeconds int
 	tabledebug     bool
+	includeStderr  bool
 	execPaths      []string
 	execArgs       []string
 }
@@ -45,6 +46,12 @@ func WithTableDebug() execTableV2Opt {
 func WithAdditionalExecPaths(paths ...string) execTableV2Opt {
 	return func(t *execTableV2) {
 		t.execPaths = append(t.execPaths, paths...)
+	}
+}
+
+func WithIncludeStderr() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.includeStderr = true
 	}
 }
 
@@ -72,7 +79,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.execPaths, t.execArgs)
+	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.execPaths, t.execArgs, t.includeStderr)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

@@ -144,7 +144,11 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			if tt.cleanShutdown || (os.Getenv("CI") == "true" && runtime.GOOS == "linux") {
 				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
 			} else {
-				assert.Contains(t, r.uidProcs, user.Uid)
+				if runtime.GOOS == "windows" {
+					assert.Contains(t, r.uidProcs, user.Username)
+				} else {
+					assert.Contains(t, r.uidProcs, user.Uid)
+				}
 				assert.Len(t, r.uidProcs, 1)
 
 				if len(tt.logContains) > 0 {

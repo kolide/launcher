@@ -38,7 +38,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{bootPolicyUtilPath}, []string{bootPolicyUtilArgs})
+	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{bootPolicyUtilPath}, []string{bootPolicyUtilArgs}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "bputil failed", "err", err)
 		return nil, nil

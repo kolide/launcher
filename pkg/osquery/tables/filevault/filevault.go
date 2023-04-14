@@ -38,7 +38,7 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{fdesetupPath}, []string{"status"})
+	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{fdesetupPath}, []string{"status"}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "fdesetup failed", "err", err)
 

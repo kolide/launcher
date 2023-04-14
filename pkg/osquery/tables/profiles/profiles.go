@@ -107,7 +107,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, fmt.Errorf("Unknown user argument: %s", user)
 					}
 
-					output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{profilesPath}, profileArgs)
+					output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{profilesPath}, profileArgs, false)
 					if err != nil {
 						level.Info(t.logger).Log("msg", "ioreg exec failed", "err", err)
 						continue
