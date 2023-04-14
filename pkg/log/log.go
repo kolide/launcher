@@ -70,7 +70,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	logContext := l.extraKeyVals
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
-		logContext = append(logContext, getInfoAboutUnrecognizedProcessUsingPidfile(p)...)
+		logContext = append(logContext, getInfoAboutUnrecognizedProcessLockingPidfile(p)...)
 	}
 
 	msg := strings.TrimSpace(string(p))
@@ -81,7 +81,12 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func getInfoAboutUnrecognizedProcessUsingPidfile(p []byte) []interface{} {
+// Occasionally, launcher will fail to start osquery -- in this case, osquery fails
+// to lock the pidfile, and then will not kill the process using the pidfile because
+// it does not appear to be another instance of osquery. We attempt to log additional
+// information here about the process locking the pidfile.
+// See: https://github.com/osquery/osquery/issues/7796
+func getInfoAboutUnrecognizedProcessLockingPidfile(p []byte) []interface{} {
 	pidStr := strings.TrimSpace(strings.TrimPrefix(string(p), "Refusing to kill non-osqueryd process"))
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
@@ -104,6 +109,9 @@ func getInfoAboutUnrecognizedProcessUsingPidfile(p []byte) []interface{} {
 	return processInfo
 }
 
+// getStringStat is a small wrapper around gopsutil/process functions
+// to return the stat if available, or an error message if not, so
+// that either way the info will be captured in the log.
 func getStringStat(getFunc func() (string, error)) string {
 	stat, err := getFunc()
 	if err != nil {
@@ -112,6 +120,9 @@ func getStringStat(getFunc func() (string, error)) string {
 	return stat
 }
 
+// getIntStat is a small wrapper around gopsutil/process functions
+// to return the stat if available, or an error message if not, so
+// that either way the info will be captured in the log.
 func getIntStat(getFunc func() (int64, error)) string {
 	stat, err := getFunc()
 	if err != nil {
