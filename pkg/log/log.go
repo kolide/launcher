@@ -72,6 +72,11 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
+	// Occasionally, launcher will fail to start osquery -- in this case, osquery fails
+	// to lock the pidfile, and then will not kill the process using the pidfile because
+	// it does not appear to be another instance of osquery. We attempt to log additional
+	// information here about the process locking the pidfile.
+	// See: https://github.com/osquery/osquery/issues/7796
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
 		l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
 	}
@@ -84,11 +89,8 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Occasionally, launcher will fail to start osquery -- in this case, osquery fails
-// to lock the pidfile, and then will not kill the process using the pidfile because
-// it does not appear to be another instance of osquery. We attempt to log additional
-// information here about the process locking the pidfile.
-// See: https://github.com/osquery/osquery/issues/7796
+// logInfoAboutUnrecognizedProcessLockingPidfile attempts to extract the PID of the process
+// holding the osquery lock from the osquery log, and logs information about it if available.
 func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []byte) {
 	matches := pidRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
