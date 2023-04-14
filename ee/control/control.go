@@ -109,6 +109,7 @@ func (cs *ControlService) Interrupt(err error) {
 
 func (cs *ControlService) Stop() {
 	level.Info(cs.logger).Log("msg", "control service stopping")
+	cs.requestTicker.Stop()
 	if cs.cancel != nil {
 		cs.cancel()
 	}
