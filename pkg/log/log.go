@@ -70,14 +70,13 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	logContext := l.extraKeyVals
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
-		logContext = append(logContext, getInfoAboutUnrecognizedProcessLockingPidfile(p)...)
+		l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
 	}
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	if err := lf(l.logger).Log(append(logContext, "msg", msg, "caller", caller)...); err != nil {
+	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -88,31 +87,48 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 // it does not appear to be another instance of osquery. We attempt to log additional
 // information here about the process locking the pidfile.
 // See: https://github.com/osquery/osquery/issues/7796
-func getInfoAboutUnrecognizedProcessLockingPidfile(p []byte) []interface{} {
+func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []byte) {
 	matches := pidRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
-		return []interface{}{"process_info_err", fmt.Sprintf("could not extract PID of non-osqueryd process using pidfile: %s", string(p))}
+		level.Debug(l.logger).Log(
+			"msg", "could not extract PID of non-osqueryd process using pidfile from log line",
+			"log_line", string(p),
+		)
+		return
 	}
+
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
-		return []interface{}{"process_info_err", fmt.Sprintf("could not extract PID of non-osqueryd process %s using pidfile: %v", pidStr, err)}
+		level.Debug(l.logger).Log(
+			"msg", "could not extract PID of non-osqueryd process using pidfile",
+			"pid", pidStr,
+			"err", err,
+		)
+		return
 	}
 
 	unknownProcess, err := process.NewProcess(int32(pid))
 	if err != nil {
-		return []interface{}{"process_info_err", fmt.Sprintf("could not get non-osqueryd process %d using pidfile: %v", pid, err)}
+		level.Debug(l.logger).Log(
+			"msg", "could not get non-osqueryd process using pidfile",
+			"pid", pid,
+			"err", err,
+		)
+		return
 	}
 
 	// Gather as much info as we can about the process
 	processInfo := make([]interface{}, 0)
-	processInfo = append(processInfo, "process_name", getStringStat(unknownProcess.Name))
-	processInfo = append(processInfo, "process_cmdline", getStringStat(unknownProcess.Cmdline))
-	processInfo = append(processInfo, "process_status", getStringStat(unknownProcess.Status))
-	processInfo = append(processInfo, "process_create_time", getIntStat(unknownProcess.CreateTime))
-	processInfo = append(processInfo, "process_username", getStringStat(unknownProcess.Username))
+	processInfo = append(processInfo, "pid", pid)
+	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
+	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
+	processInfo = append(processInfo, "status", getStringStat(unknownProcess.Status))
+	processInfo = append(processInfo, "create_time", getIntStat(unknownProcess.CreateTime))
+	processInfo = append(processInfo, "username", getStringStat(unknownProcess.Username))
+	processInfo = append(processInfo, "uids", getSliceStat(unknownProcess.Uids))
 
-	return processInfo
+	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
 }
 
 // getStringStat is a small wrapper around gopsutil/process functions
@@ -135,4 +151,15 @@ func getIntStat(getFunc func() (int64, error)) string {
 		return fmt.Sprintf("could not get stat: %v", err)
 	}
 	return fmt.Sprintf("%d", stat)
+}
+
+// getSliceStat is a small wrapper around gopsutil/process functions
+// to return the stat if available, or an error message if not, so
+// that either way the info will be captured in the log.
+func getSliceStat(getFunc func() ([]int32, error)) string {
+	stat, err := getFunc()
+	if err != nil {
+		return fmt.Sprintf("could not get stat: %v", err)
+	}
+	return fmt.Sprintf("%+v", stat)
 }
