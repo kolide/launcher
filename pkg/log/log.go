@@ -119,14 +119,20 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	// Gather as much info as we can about the process
-	processInfo := make([]interface{}, 0)
-	processInfo = append(processInfo, "pid", pid)
+	processInfo := []interface{}{"pid", pid}
 	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
 	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
 	processInfo = append(processInfo, "status", getStringStat(unknownProcess.Status))
 	processInfo = append(processInfo, "create_time", getIntStat(unknownProcess.CreateTime))
 	processInfo = append(processInfo, "username", getStringStat(unknownProcess.Username))
 	processInfo = append(processInfo, "uids", getSliceStat(unknownProcess.Uids))
+
+	unknownProcessParent, _ := unknownProcess.Parent()
+	if unknownProcessParent != nil {
+		processInfo = append(processInfo, "parent_pid", unknownProcessParent.Pid)
+		processInfo = append(processInfo, "parent_cmdline", getStringStat(unknownProcessParent.Cmdline))
+		processInfo = append(processInfo, "parent_status", getStringStat(unknownProcessParent.Status))
+	}
 
 	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
 }
