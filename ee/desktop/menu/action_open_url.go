@@ -3,6 +3,7 @@ package menu
 import (
 	"os/exec"
 	"runtime"
+	"syscall"
 
 	"github.com/go-kit/kit/log/level"
 )
@@ -30,12 +31,20 @@ func open(url string) error {
 	switch runtime.GOOS {
 	case "windows":
 		cmd = "cmd"
-		args = []string{"/c", "start"}
+		args = []string{"/C", "start"}
 	case "darwin":
 		cmd = "/usr/bin/open"
 	default: // "linux", "freebsd", "openbsd", "netbsd"
 		cmd = "xdg-open"
 	}
 	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
+
+	command := exec.Command(cmd, args...)
+	if runtime.GOOS == "windows" {
+		// https://stackoverflow.com/questions/42500570/how-to-hide-command-prompt-window-when-using-exec-in-golang
+		// Otherwise the cmd window will appear briefly
+		command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
+
+	return command.Start()
 }
