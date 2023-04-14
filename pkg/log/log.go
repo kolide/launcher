@@ -10,6 +10,7 @@ import (
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -121,7 +122,6 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 
 	// Gather as much info as we can about the process
 	processInfo := []interface{}{"pid", pid}
-	processInfo = append(processInfo, "launcher_pid", os.Getpid())
 	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
 	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
 	processInfo = append(processInfo, "status", getStringStat(unknownProcess.Status))
@@ -129,11 +129,19 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	processInfo = append(processInfo, "username", getStringStat(unknownProcess.Username))
 	processInfo = append(processInfo, "uids", getSliceStat(unknownProcess.Uids))
 
+	// Add info about the parent, if available
 	unknownProcessParent, _ := unknownProcess.Parent()
 	if unknownProcessParent != nil {
 		processInfo = append(processInfo, "parent_pid", unknownProcessParent.Pid)
 		processInfo = append(processInfo, "parent_cmdline", getStringStat(unknownProcessParent.Cmdline))
 		processInfo = append(processInfo, "parent_status", getStringStat(unknownProcessParent.Status))
+	}
+
+	// Add system-level info
+	processInfo = append(processInfo, "launcher_pid", os.Getpid())
+	uptime, err := host.Uptime()
+	if err == nil {
+		processInfo = append(processInfo, "system_uptime", uptime)
 	}
 
 	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
