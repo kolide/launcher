@@ -36,6 +36,8 @@ func WithLevelFunc(lf func(kitlog.Logger) kitlog.Logger) Option {
 
 var callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
 
+var pidRegex = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+
 func extractOsqueryCaller(msg string) string {
 	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
 }
@@ -87,7 +89,11 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 // information here about the process locking the pidfile.
 // See: https://github.com/osquery/osquery/issues/7796
 func getInfoAboutUnrecognizedProcessLockingPidfile(p []byte) []interface{} {
-	pidStr := strings.TrimSpace(strings.TrimPrefix(string(p), "Refusing to kill non-osqueryd process"))
+	matches := pidRegex.FindAllStringSubmatch(string(p), -1)
+	if len(matches) < 1 || len(matches[0]) < 2 {
+		return []interface{}{"process_info_err", fmt.Sprintf("could not extract PID of non-osqueryd process using pidfile: %s", string(p))}
+	}
+	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
 		return []interface{}{"process_info_err", fmt.Sprintf("could not extract PID of non-osqueryd process %s using pidfile: %v", pidStr, err)}
