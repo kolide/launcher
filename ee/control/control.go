@@ -13,6 +13,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/task"
 )
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
@@ -21,7 +22,7 @@ type ControlService struct {
 	logger                   log.Logger
 	cancel                   context.CancelFunc
 	requestInterval          time.Duration
-	requestTicker            *time.Ticker
+	requestTask              task.Task
 	requestAccelerationTimer *time.Timer
 	minAccelerationInterval  time.Duration
 	fetcher                  dataProvider
@@ -62,7 +63,10 @@ func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlServic
 		subscribers:             make(map[string][]subscriber),
 	}
 
-	cs.requestTicker = time.NewTicker(cs.requestInterval)
+	cs.requestTask = task.New(
+		"control-service-requests",
+		task.Repeats(),
+		task.WithInterval(cs.requestInterval))
 
 	for _, opt := range opts {
 		opt(cs)
@@ -80,7 +84,7 @@ func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
 	}
 }
 
-// Start is the main control service loop. It fetches control
+// Start is the main control service loop. It fetches control data
 func (cs *ControlService) Start(ctx context.Context) {
 	level.Info(cs.logger).Log("msg", "control service started")
 	ctx, cs.cancel = context.WithCancel(ctx)
@@ -95,7 +99,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-cs.requestTicker.C:
+		case <-cs.requestTask.C():
 			// Go fetch!
 			continue
 		}
@@ -109,7 +113,7 @@ func (cs *ControlService) Interrupt(err error) {
 
 func (cs *ControlService) Stop() {
 	level.Info(cs.logger).Log("msg", "control service stopping")
-	cs.requestTicker.Stop()
+	cs.requestTask.Stop()
 	if cs.cancel != nil {
 		cs.cancel()
 	}
@@ -147,7 +151,7 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 		)
 
 		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
+		cs.requestTask.Reset(cs.requestInterval)
 	})
 
 	level.Debug(cs.logger).Log(
@@ -157,7 +161,7 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 	)
 
 	// restart the ticker on accelerated interval
-	cs.requestTicker.Reset(interval)
+	cs.requestTask.Reset(interval)
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.

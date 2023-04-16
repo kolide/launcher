@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/pkg/task"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -406,13 +407,16 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
-		ticker := time.NewTicker(healthCheckInterval)
-		defer ticker.Stop()
+		task := task.New(
+			"osquery-health-check",
+			task.Repeats(),
+			task.WithInterval(healthCheckInterval))
+		defer task.Stop()
 		for {
 			select {
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
-			case <-ticker.C:
+			case <-task.C():
 				// Health check! Allow a couple
 				// failures before we tear everything
 				// down. This is pretty simple, it

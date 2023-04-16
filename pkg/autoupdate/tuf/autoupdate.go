@@ -17,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/task"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
@@ -152,19 +153,25 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.libraryManager.TidyLibrary()
 
-	checkTicker := time.NewTicker(ta.checkInterval)
-	defer checkTicker.Stop()
-	cleanupTicker := time.NewTicker(12 * time.Hour)
-	defer cleanupTicker.Stop()
+	checkTask := task.New(
+		"autoupdate-check",
+		task.Repeats(),
+		task.WithInterval(ta.checkInterval))
+	defer checkTask.Stop()
+	cleanupTask := task.New(
+		"autoupdate-cleanup",
+		task.Repeats(),
+		task.WithInterval(12*time.Hour))
+	defer cleanupTask.Stop()
 
 	for {
 		select {
-		case <-checkTicker.C:
+		case <-checkTask.C():
 			if err := ta.checkForUpdate(); err != nil {
 				ta.storeError(err)
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
-		case <-cleanupTicker.C:
+		case <-cleanupTask.C():
 			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
 			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")

@@ -26,6 +26,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/task"
 	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -579,8 +580,12 @@ func (e *Extension) writeAndPurgeLogs() {
 
 func (e *Extension) writeLogsLoopRunner() {
 	defer e.wg.Done()
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
-	defer ticker.Stop()
+	purgeLogsTask := task.New(
+		"desktop-update",
+		task.Repeats(),
+		task.WithInterval(e.Opts.LoggingInterval))
+	defer purgeLogsTask.Stop()
+
 	for {
 		e.writeAndPurgeLogs()
 
@@ -588,7 +593,7 @@ func (e *Extension) writeLogsLoopRunner() {
 		select {
 		case <-e.done:
 			return
-		case <-ticker.Chan():
+		case <-purgeLogsTask.C():
 			// Resume loop
 		}
 	}

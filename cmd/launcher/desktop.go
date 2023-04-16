@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/task"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 )
@@ -180,8 +181,11 @@ func listenSignals(logger log.Logger) {
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
 func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	monitorTask := task.New(
+		"desktop-monitor",
+		task.Repeats(),
+		task.WithInterval(interval))
+	defer monitorTask.Stop()
 
 	client := http.Client{
 		Timeout: interval,
@@ -190,7 +194,7 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 	const maxErrCount = 3
 	errCount := 0
 
-	for ; true; <-ticker.C {
+	for ; true; <-monitorTask.C() {
 		response, err := client.Get(monitorUrl)
 
 		if response != nil {

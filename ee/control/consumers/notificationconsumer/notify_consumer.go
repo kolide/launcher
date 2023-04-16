@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/notify"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/task"
 )
 
 // Consumes notifications from control server, tracks when notifications are sent to end user
@@ -189,14 +190,17 @@ func (nc *NotificationConsumer) Interrupt(err error) {
 
 func (nc *NotificationConsumer) runCleanup(ctx context.Context) {
 	ctx, nc.cancel = context.WithCancel(ctx)
-	t := time.NewTicker(nc.cleanupInterval)
-	defer t.Stop()
+	cleanupTask := task.New(
+		"autoupdate-cleanup",
+		task.Repeats(),
+		task.WithInterval(nc.cleanupInterval))
+	defer cleanupTask.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
+		case <-cleanupTask.C():
 			nc.cleanup()
 		}
 	}

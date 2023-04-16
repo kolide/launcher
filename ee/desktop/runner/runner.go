@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/task"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
 )
@@ -200,10 +201,16 @@ func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunne
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	updateTicker := time.NewTicker(r.updateInterval)
-	defer updateTicker.Stop()
-	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
-	defer menuRefreshTicker.Stop()
+	updateTask := task.New(
+		"desktop-update",
+		task.Repeats(),
+		task.WithInterval(r.updateInterval))
+	defer updateTask.Stop()
+	menuRefreshTask := task.New(
+		"desktop-menu",
+		task.Repeats(),
+		task.WithInterval(r.menuRefreshInterval))
+	defer menuRefreshTask.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
@@ -212,9 +219,9 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		}
 
 		select {
-		case <-updateTicker.C:
+		case <-updateTask.C():
 			continue
-		case <-menuRefreshTicker.C:
+		case <-menuRefreshTask.C():
 			r.refreshMenu()
 			continue
 		case <-r.interrupt:
