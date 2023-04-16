@@ -39,7 +39,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// get the active property of the session, this command does not respect the --output=json flag
 		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active").Output()
 		if err != nil {
-			return nil, fmt.Errorf("loginctl show-session: %w", err)
+			return nil, fmt.Errorf("loginctl show-session (for uid %d): %w", s.UID, err)
 		}
 
 		if strings.Trim(string(output), "\n") != "yes" {

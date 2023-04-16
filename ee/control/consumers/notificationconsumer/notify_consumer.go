@@ -190,6 +190,8 @@ func (nc *NotificationConsumer) Interrupt(err error) {
 func (nc *NotificationConsumer) runCleanup(ctx context.Context) {
 	ctx, nc.cancel = context.WithCancel(ctx)
 	t := time.NewTicker(nc.cleanupInterval)
+	defer t.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():

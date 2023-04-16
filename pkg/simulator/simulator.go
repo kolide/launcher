@@ -384,8 +384,11 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		}
 
 		requestQueriesTicker := time.NewTicker(h.requestQueriesInterval)
+		defer requestQueriesTicker.Stop()
 		requestConfigTicker := time.NewTicker(h.requestConfigInterval)
+		defer requestConfigTicker.Stop()
 		publishLogsTicker := time.NewTicker(h.publishLogsInterval)
+		defer publishLogsTicker.Stop()
 
 		for {
 			var err error

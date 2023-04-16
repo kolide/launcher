@@ -52,7 +52,7 @@ type airportExecutor struct {
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
-	return tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option})
+	return tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option}, false)
 }
 
 type executor interface {
