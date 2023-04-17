@@ -7,7 +7,10 @@ package task
 #cgo darwin CFLAGS: -DDARWIN -x objective-c
 #cgo darwin LDFLAGS: -framework Cocoa
 
-void schedule(char*, int);
+#include <stdint.h>
+
+void schedule(char*, int, uint64_t, void*);
+void reset(void*);
 void stop(void*);
 
 */
@@ -15,6 +18,7 @@ import "C"
 import (
 	"sync"
 	"time"
+	"unsafe"
 )
 
 type task struct {
@@ -22,6 +26,7 @@ type task struct {
 	repeats    bool
 	interval   time.Duration
 	channel    chan time.Time
+	activity   unsafe.Pointer
 }
 
 var (
@@ -52,18 +57,17 @@ func New(identifier string, opts ...Opt) *task {
 
 	identifierCStr := C.CString(identifier)
 	// defer C.free(unsafe.Pointer(identifierCStr))
-	defer C.schedule(identifierCStr, C.int(intVal(t.repeats)))
-	///*, C.BOOL(t.repeats), C.uint64_t(t.interval)*/)
+	defer C.schedule(identifierCStr, C.int(intVal(t.repeats)), C.ulonglong(t.interval), t.activity)
 
 	return t
 }
 
 func (t *task) Stop() {
-
+	C.stop(t.activity)
 }
 
 func (t *task) Reset(interval time.Duration) {
-
+	C.reset(t.activity)
 }
 
 func (t *task) C() <-chan time.Time {

@@ -25,7 +25,7 @@ func TestTaskRepeats(t *testing.T) {
 		{
 			name:                   "happy path",
 			identifier:             "com.kolide.launcher.test",
-			interval:               time.Second * 2,
+			interval:               1,
 			expectedTimesPerformed: 2,
 		},
 	}
@@ -47,15 +47,57 @@ func TestTaskRepeats(t *testing.T) {
 	}
 }
 
-func countTimesPerformed(t Task) int {
+/*
+func TestTaskStop(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		identifier             string
+		interval               time.Duration
+		expectedTimesPerformed int
+	}{
+		// {
+		// 	name: "zero interval",
+		// 	interval: ,
+		// 	// subsystem: "",
+		// 	// c:         &mockConsumer{},
+		// },
+		{
+			name:                   "happy path",
+			identifier:             "com.kolide.launcher.test",
+			interval:               1,
+			expectedTimesPerformed: 2,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			task := New(
+				tt.identifier,
+				Repeats(),
+				WithInterval(tt.interval))
+			defer task.Stop()
+
+			timesPerformed := countTimesPerformed(task)
+
+			assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
+		})
+	}
+}
+
+func countTimesPerformed(t Task, max int) int {
 	var timesPerformed int
 	for {
 		select {
 		case <-t.C():
 			timesPerformed = timesPerformed + 1
-			if timesPerformed > 1 {
+			if timesPerformed >= max {
 				return timesPerformed
 			}
 		}
 	}
 }
+*/

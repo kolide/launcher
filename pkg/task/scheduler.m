@@ -8,8 +8,7 @@
 // Go callbacks
 extern void performTask(char*);
 
-void schedule(char* cIdentifier, int repeats) {
-  ///*, bool repeats, uint64_t interval*/
+void schedule(char* cIdentifier, int repeats, uint64_t interval, void* pActivity) {
   @autoreleasepool {
     [NSApplication sharedApplication];
 
@@ -18,7 +17,7 @@ void schedule(char* cIdentifier, int repeats) {
         [[NSBackgroundActivityScheduler alloc] initWithIdentifier:identifier];
 
     activity.repeats = repeats ? YES: NO;
-    activity.interval = 10;
+    activity.interval = interval;
     activity.qualityOfService = NSQualityOfServiceUserInteractive;
     //   activity.tolerance = 1;
 
@@ -28,11 +27,14 @@ void schedule(char* cIdentifier, int repeats) {
           completion(NSBackgroundActivityResultFinished);
         }];
 
-    return; // activity;
+    pActivity = activity;
   }
 }
 
+void reset(void* p) {
+}
+
 void stop(void* p) {
-  // NSBackgroundActivityScheduler* activity = (NSBackgroundActivityScheduler*)p;
-  // [activity invalidate];
+  NSBackgroundActivityScheduler* activity = (NSBackgroundActivityScheduler*)p;
+  [activity invalidate];
 }
