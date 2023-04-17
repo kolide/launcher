@@ -16,8 +16,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,7 +114,11 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
 
+			mockKnapsack := mocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+
 			r, err := New(
+				mockKnapsack,
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
 				WithHostname("somewhere-over-the-rainbow.example.com"),
@@ -244,8 +251,11 @@ func TestUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mockKnapsack := mocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+
 			dir := t.TempDir()
-			r, err := New(WithUsersFilesRoot(dir))
+			r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -270,8 +280,11 @@ func TestUpdate(t *testing.T) {
 func TestSendNotification_NoProcessesYet(t *testing.T) {
 	t.Parallel()
 
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+
 	dir := t.TempDir()
-	r, err := New(WithUsersFilesRoot(dir))
+	r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))

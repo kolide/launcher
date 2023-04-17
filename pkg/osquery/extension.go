@@ -21,7 +21,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -44,7 +43,7 @@ import (
 type Extension struct {
 	NodeKey       string
 	Opts          ExtensionOpts
-	knapsack      *knapsack.Knapsack
+	knapsack      types.Knapsack
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
@@ -125,7 +124,7 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, k *knapsack.Knapsack, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -607,7 +606,7 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 	}
 
 	var count int
-	err = e.knapsack.BboltDB.View(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		count = b.Stats().KeyN
 		return nil
@@ -631,7 +630,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	err = e.knapsack.BboltDB.View(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		c := b.Cursor()
@@ -692,7 +691,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	// Delete logs that were successfully sent
-	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		for _, k := range logIDs {
 			b.Delete(k)
@@ -743,7 +742,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	if err != nil {
 		return err
 	}
-	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		logCount := b.Stats().KeyN
@@ -795,7 +794,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
-	err = e.knapsack.BboltDB.Update(func(tx *bbolt.Tx) error {
+	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
 		// Log keys are generated with the auto-incrementing sequence

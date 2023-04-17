@@ -1,8 +1,6 @@
 package storageci
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -240,10 +238,7 @@ func Test_Updates(t *testing.T) {
 
 			for _, s := range getStores(t) {
 				for _, update := range tt.updates {
-					updateBytes, err := json.Marshal(update)
-					require.NoError(t, err)
-
-					s.Update(bytes.NewReader(updateBytes))
+					s.Update(update)
 				}
 
 				kvps, err := getKeyValueRows(s, tt.name)
