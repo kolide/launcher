@@ -7,6 +7,42 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTaskNoRepeat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		identifier             string
+		interval               time.Duration
+		expectedTimesPerformed int
+	}{
+		// {
+		// 	name: "zero interval",
+		// },
+		{
+			name:                   "happy path",
+			identifier:             "TestTaskNoRepeat",
+			interval:               time.Second * 2,
+			expectedTimesPerformed: 1,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			task := New(
+				tt.identifier,
+				WithInterval(tt.interval))
+			defer task.Stop()
+
+			timesPerformed := countTimesPerformed(task, 1)
+
+			assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
+		})
+	}
+}
+
 func TestTaskRepeats(t *testing.T) {
 	t.Parallel()
 
@@ -18,14 +54,11 @@ func TestTaskRepeats(t *testing.T) {
 	}{
 		// {
 		// 	name: "zero interval",
-		// 	interval: ,
-		// 	// subsystem: "",
-		// 	// c:         &mockConsumer{},
 		// },
 		{
 			name:                   "happy path",
-			identifier:             "com.kolide.launcher.test",
-			interval:               1,
+			identifier:             "TestTaskRepeats",
+			interval:               time.Second * 2,
 			expectedTimesPerformed: 2,
 		},
 	}
@@ -47,7 +80,6 @@ func TestTaskRepeats(t *testing.T) {
 	}
 }
 
-/*
 func TestTaskStop(t *testing.T) {
 	t.Parallel()
 
@@ -57,16 +89,10 @@ func TestTaskStop(t *testing.T) {
 		interval               time.Duration
 		expectedTimesPerformed int
 	}{
-		// {
-		// 	name: "zero interval",
-		// 	interval: ,
-		// 	// subsystem: "",
-		// 	// c:         &mockConsumer{},
-		// },
 		{
 			name:                   "happy path",
-			identifier:             "com.kolide.launcher.test",
-			interval:               1,
+			identifier:             "TestTaskStop",
+			interval:               time.Second * 2,
 			expectedTimesPerformed: 2,
 		},
 	}
@@ -79,15 +105,49 @@ func TestTaskStop(t *testing.T) {
 				tt.identifier,
 				Repeats(),
 				WithInterval(tt.interval))
-			defer task.Stop()
+			task.Stop()
 
-			timesPerformed := countTimesPerformed(task)
+			// timesPerformed := countTimesPerformed(task)
 
-			assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
+			//  assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
 		})
 	}
 }
-*/
+
+func TestTaskReset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		identifier             string
+		interval               time.Duration
+		resetInterval          time.Duration
+		expectedTimesPerformed int
+	}{
+		{
+			name:                   "happy path",
+			identifier:             "TestTaskReset",
+			interval:               time.Second * 2,
+			expectedTimesPerformed: 2,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			task := New(
+				tt.identifier,
+				Repeats(),
+				WithInterval(tt.interval))
+			task.Reset(tt.resetInterval)
+
+			// timesPerformed := countTimesPerformed(task)
+
+			//  assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
+		})
+	}
+}
 
 func countTimesPerformed(t Task, max int) int {
 	var timesPerformed int

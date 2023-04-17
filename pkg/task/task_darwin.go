@@ -59,7 +59,7 @@ func New(identifier string, opts ...Opt) *task {
 
 	identifierCStr := C.CString(identifier)
 	// defer C.free(unsafe.Pointer(identifierCStr))
-	defer C.schedule(identifierCStr, C.int(intVal(t.repeats)), C.ulonglong(t.interval), t.activity)
+	defer C.schedule(identifierCStr, C.int(intVal(t.repeats)), C.ulonglong(t.interval.Seconds()), t.activity)
 
 	return t
 }

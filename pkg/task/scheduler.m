@@ -13,11 +13,14 @@ void schedule(char* cIdentifier,
               uint64_t interval,
               void* pActivity) {
   @autoreleasepool {
-    NSString* identifier = [NSString stringWithUTF8String:cIdentifier];
+    NSString* kolideIdentifier = @"com.kolide.launcher.";
+    NSString* identifier = [kolideIdentifier
+        stringByAppendingString:[NSString stringWithUTF8String:cIdentifier]];
     NSBackgroundActivityScheduler* activity =
         [[NSBackgroundActivityScheduler alloc] initWithIdentifier:identifier];
 
-    // Choose a quality of service depending on how frequent the task is being invoked
+    // Choose a quality of service depending on how frequent the task is being
+    // invoked
     // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/power_efficiency_guidelines_osx/PrioritizeWorkAtTheTaskLevel.html#//apple_ref/doc/uid/TP40013929-CH35
     NSQualityOfService qos = NSQualityOfServiceBackground;
     if (interval < 15) {
@@ -40,11 +43,13 @@ void schedule(char* cIdentifier,
   }
 }
 
-void reset(void* p) {}
+void reset(void* p) {
+  // TODO
+}
 
 void stop(void* p) {
   NSBackgroundActivityScheduler* activity = (NSBackgroundActivityScheduler*)p;
   if (activity != nil) {
-      [activity invalidate];
-    }
+    [activity invalidate];
+  }
 }
