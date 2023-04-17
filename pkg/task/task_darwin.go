@@ -21,6 +21,8 @@ import (
 	"unsafe"
 )
 
+// task uses the macOS API NSBackgroundActivityScheduler to efficiently schedule tasks.
+// https://developer.apple.com/library/archive/documentation/Performance/Conceptual/power_efficiency_guidelines_osx/SchedulingBackgroundActivity.html#//apple_ref/doc/uid/TP40013929-CH32-SW1
 type task struct {
 	identifier string
 	repeats    bool
@@ -77,11 +79,13 @@ func (t *task) C() <-chan time.Time {
 //export performTask
 func performTask(identifier *C.char) {
 	if identifier != nil {
+		// This function is called from Objective-C land when the task is to be performed
 		mu.RLock()
 		defer mu.RUnlock()
 
 		existingTask, ok := tasks[C.GoString(identifier)]
 		if ok {
+			// Sending on the channel will invoke the code waiting to perform the task
 			sendTime(existingTask.channel)
 		}
 	}
@@ -95,6 +99,7 @@ func sendTime(c chan time.Time) {
 	}
 }
 
+// intVal returns the int value of a bool for cgo functions.
 func intVal(value bool) int {
 	var iVal int
 	if value {

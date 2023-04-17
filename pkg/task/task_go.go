@@ -5,6 +5,7 @@ package task
 
 import "time"
 
+// task simply wraps a Go Ticker and uses its facilities for scheduling tasks
 type task struct {
 	identifier string
 	repeats    bool
