@@ -168,6 +168,7 @@ func getStringSliceStat(getFunc func() ([]string, error)) string {
 	if err != nil {
 		return fmt.Sprintf("could not get stat: %v", err)
 	}
+	// We only use this function for `Status` at the moment, which is guaranteed to have one element when successful.
 	return stat[0]
 }
 
