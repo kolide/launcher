@@ -24,7 +24,7 @@ type ControlService struct {
 	knapsack        types.Knapsack
 	cancel          context.CancelFunc
 	requestInterval time.Duration
-	requestTask              task.Task
+	requestTask     task.Task
 	fetcher         dataProvider
 	fetchMutex      sync.Mutex
 	store           types.GetterSetter
@@ -63,15 +63,14 @@ func New(logger log.Logger, k types.Knapsack, fetcher dataProvider, opts ...Opti
 		subscribers:     make(map[string][]subscriber),
 	}
 
-	cs.requestTask = task.New(
-		"control-service-requests",
-		task.Repeats(),
-		task.WithInterval(cs.requestInterval))
 	for _, opt := range opts {
 		opt(cs)
 	}
 
-	cs.requestTicker = time.NewTicker(cs.requestInterval)
+	cs.requestTask = task.New(
+		"control-service-requests",
+		task.Repeats(),
+		task.WithInterval(cs.requestInterval))
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
