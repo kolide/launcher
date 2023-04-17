@@ -1,7 +1,5 @@
 package types
 
-import "io"
-
 // Getter is an interface for getting data from a key/value store.
 type Getter interface {
 	// Get retrieves the value for a key.
@@ -35,10 +33,10 @@ type Iterator interface {
 
 // Updater is an interface for bulk replacing data in a key/value store.
 type Updater interface {
-	// Update decodes data as a JSON-encoded map of key-value pairs, and inserts
+	// Update takes a map of key-value pairs, and inserts
 	// these key-values into the store. Any preexisting keys in the store which
 	// do not exist in data will be deleted.
-	Update(data io.Reader) error
+	Update(kvPairs map[string]string) ([]string, error)
 }
 
 // GetterSetter is an interface that groups the Get and Set methods.

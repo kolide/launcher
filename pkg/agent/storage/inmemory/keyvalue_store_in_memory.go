@@ -1,10 +1,7 @@
 package inmemory
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"sync"
 
 	"github.com/go-kit/kit/log"
@@ -81,28 +78,36 @@ func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	return nil
 }
 
-func (s *inMemoryKeyValueStore) Update(data io.Reader) error {
+func (s *inMemoryKeyValueStore) Update(kvPairs map[string]string) ([]string, error) {
 	if s == nil {
-		return errors.New("store is nil")
+		return nil, errors.New("store is nil")
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var kvPairs map[string]string
-	if err := json.NewDecoder(data).Decode(&kvPairs); err != nil {
-		return fmt.Errorf("failed to decode key-value json: %w", err)
-	}
-
 	s.items = make(map[string][]byte)
 
 	for key, value := range kvPairs {
 		if key == "" {
-			return errors.New("key is blank")
+			return nil, errors.New("key is blank")
 		}
 
 		s.items[key] = []byte(value)
 	}
 
-	return nil
+	var deletedKeys []string
+
+	for key, _ := range s.items {
+		if _, ok := kvPairs[key]; ok {
+			continue
+		}
+
+		delete(s.items, key)
+
+		// Remember which keys we're deleting
+		deletedKeys = append(deletedKeys, key)
+	}
+
+	return deletedKeys, nil
 }

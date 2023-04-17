@@ -27,10 +27,12 @@ import (
 	"github.com/kolide/launcher/ee/desktop/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/shirou/gopsutil/process"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
@@ -101,13 +103,6 @@ func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption 
 	}
 }
 
-// WithGetter sets the key/value getter for agent flags
-func WithGetter(getter types.Getter) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.flagsGetter = getter
-	}
-}
-
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -140,8 +135,8 @@ type DesktopUsersProcessesRunner struct {
 	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
 	// This effectively represents whether or not the launcher desktop GUI is enabled or not
 	processSpawningEnabled bool
-	// flagsGetter gets agent flags
-	flagsGetter types.Getter
+	// knapsack is the almighty sack of knaps
+	knapsack types.Knapsack
 	// monitorServer is a local server that desktop processes call to monitor parent
 	monitorServer *monitorServer
 }
@@ -158,7 +153,7 @@ type processRecord struct {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
@@ -169,6 +164,7 @@ func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunne
 		interruptTimeout:       time.Second * 10,
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: false,
+		knapsack:               k,
 	}
 
 	for _, opt := range opts {
@@ -178,6 +174,9 @@ func New(opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunne
 	runner.writeIconFile()
 	runner.writeDefaultMenuTemplateFile()
 	runner.refreshMenu()
+
+	// Observe DesktopEnabled changes to know when to enable/disable process spawning
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
 	ms, err := newMonitorServer()
 	if err != nil {
@@ -348,22 +347,11 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) Ping() {
-	// agent_flags bucket has been updated, query the flags to react to changes
-	// This has a `v1` appended, because the menu data format went from v0 to v1 -- we
-	// added `hasCapability`. Doing this cleanly required a flag day. Future work will
-	// need to do something else, probably something where the menu data is versioned.
-	enabledRaw, err := r.flagsGetter.Get([]byte("desktop_enabled_v1"))
-	if err != nil {
-		level.Debug(r.logger).Log("msg", "failed to query desktop flags", "err", err)
-		return
+func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
+	if slices.Contains(flagKeys, keys.DesktopEnabled) {
+		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
+		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
 	}
-
-	// The presence of anything for this flag means desktop is enabled
-	enabled := enabledRaw != nil
-
-	r.processSpawningEnabled = enabled
-	level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(enabled)))
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
@@ -389,7 +377,7 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 // refreshMenu updates the menu file and tells desktop processes to refresh their menus
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	if err := r.generateMenuFile(); err != nil {
-		if agent.Flags.DebugServerData() {
+		if r.knapsack.DebugServerData() {
 			level.Error(r.logger).Log(
 				"msg", "failed to generate menu file",
 				"error", err,
