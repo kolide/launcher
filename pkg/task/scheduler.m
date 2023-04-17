@@ -10,16 +10,21 @@ extern void performTask(char*);
 
 void schedule(char* cIdentifier, int repeats, uint64_t interval, void* pActivity) {
   @autoreleasepool {
-    [NSApplication sharedApplication];
-
     NSString* identifier = [NSString stringWithUTF8String:cIdentifier];
     NSBackgroundActivityScheduler* activity =
         [[NSBackgroundActivityScheduler alloc] initWithIdentifier:identifier];
 
+    NSQualityOfService qos = NSQualityOfServiceBackground;
+    if (interval < 15) {
+      qos = NSQualityOfServiceUserInteractive;
+    }
+    else if (interval < 60) {
+      qos = NSQualityOfServiceUserInitiated;
+    }
+
     activity.repeats = repeats ? YES: NO;
     activity.interval = interval;
-    activity.qualityOfService = NSQualityOfServiceUserInteractive;
-    //   activity.tolerance = 1;
+    activity.qualityOfService = qos;
 
     [activity
         scheduleWithBlock:^(NSBackgroundActivityCompletionHandler completion) {

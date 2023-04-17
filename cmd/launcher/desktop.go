@@ -181,6 +181,8 @@ func listenSignals(logger log.Logger) {
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
 func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Duration) {
+	// ticker := time.NewTicker(interval)
+	// defer ticker.Stop()
 	monitorTask := task.New(
 		"desktop-monitor",
 		task.Repeats(),

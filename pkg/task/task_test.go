@@ -40,7 +40,7 @@ func TestTaskRepeats(t *testing.T) {
 				WithInterval(tt.interval))
 			defer task.Stop()
 
-			timesPerformed := countTimesPerformed(task)
+			timesPerformed := countTimesPerformed(task, 2)
 
 			assert.Equal(t, tt.expectedTimesPerformed, timesPerformed)
 		})
@@ -87,6 +87,7 @@ func TestTaskStop(t *testing.T) {
 		})
 	}
 }
+*/
 
 func countTimesPerformed(t Task, max int) int {
 	var timesPerformed int
@@ -100,4 +101,3 @@ func countTimesPerformed(t Task, max int) int {
 		}
 	}
 }
-*/

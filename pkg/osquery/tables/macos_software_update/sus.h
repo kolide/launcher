@@ -16,7 +16,7 @@ void getSoftwareUpdateConfiguration(int os_version,
                                     int* lastCheckTimestamp);
 
 // Gets recommended updates from the SUSharedPrefs API
-void getRecommendedUpdates();
+void getRecommendedUpdates(void);
 
 // Gets the available products via the SUScanController API
-void getAvailableProducts();
+void getAvailableProducts(void);

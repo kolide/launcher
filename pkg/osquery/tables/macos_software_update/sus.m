@@ -64,7 +64,7 @@ void getSoftwareUpdateConfiguration(int os_version,
   return;
 }
 
-void getRecommendedUpdates() {
+void getRecommendedUpdates(void) {
   NSBundle* bundle;
   bundle = [NSBundle
       bundleWithPath:
@@ -91,7 +91,7 @@ void getRecommendedUpdates() {
   return;
 }
 
-void getAvailableProducts() {
+void getAvailableProducts(void) {
   NSBundle* bundle;
   bundle = [NSBundle
       bundleWithPath:
