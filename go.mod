@@ -55,7 +55,7 @@ require (
 
 require (
 	github.com/kolide/systray v1.10.3
-	github.com/kolide/toast v0.0.0-20230417184432-2a74b503c185
+	github.com/kolide/toast v1.0.0
 	github.com/shirou/gopsutil/v3 v3.23.3
 )
 
