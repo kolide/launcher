@@ -146,3 +146,131 @@ func (k *knapsack) SetInsecureControlTLS(disabled bool) error {
 func (k *knapsack) InsecureControlTLS() bool {
 	return k.flags.InsecureControlTLS()
 }
+
+// InsecureTLS disables TLS certificate verification.
+func (k *knapsack) SetInsecureTLS(insecure bool) error {
+	return k.flags.SetInsecureTLS(insecure)
+}
+func (k *knapsack) InsecureTLS() bool {
+	return k.flags.InsecureTLS()
+}
+
+// InsecureTransport disables TLS in the transport layer.
+func (k *knapsack) SetInsecureTransportTLS(insecure bool) error {
+	return k.flags.SetInsecureTransportTLS(insecure)
+}
+func (k *knapsack) InsecureTransportTLS() bool {
+	return k.flags.InsecureTransportTLS()
+}
+
+// CompactDbMaxTx func (k *knapsack) Sets the max transaction size for bolt db compaction operations
+func (k *knapsack) SetCompactDbMaxTx(max int64) error {
+	return k.flags.SetCompactDbMaxTx(max)
+}
+func (k *knapsack) CompactDbMaxTx() int64 {
+	return k.flags.CompactDbMaxTx()
+}
+
+// IAmBreakingEELicence disables the EE licence check before running the local server
+func (k *knapsack) SetIAmBreakingEELicense(disabled bool) error {
+	return k.flags.SetIAmBreakingEELicense(disabled)
+}
+func (k *knapsack) IAmBreakingEELicense() bool {
+	return k.flags.IAmBreakingEELicense()
+}
+
+// Debug enables debug logging.
+func (k *knapsack) SetDebug(debug bool) error {
+	return k.flags.SetDebug(debug)
+}
+func (k *knapsack) Debug() bool {
+	return k.flags.Debug()
+}
+
+// DebugLogFile is an optional file to mirror debug logs to.
+func (k *knapsack) SetDebugLogFile(file string) error {
+	return k.flags.SetDebugLogFile(file)
+}
+func (k *knapsack) DebugLogFile() string {
+	return k.flags.DebugLogFile()
+}
+
+// OsqueryVerbose puts osquery into verbose mode.
+func (k *knapsack) SetOsqueryVerbose(verbose bool) error {
+	return k.flags.SetOsqueryVerbose(verbose)
+}
+func (k *knapsack) OsqueryVerbose() bool {
+	return k.flags.OsqueryVerbose()
+}
+
+// Autoupdate enables the autoupdate functionality.
+func (k *knapsack) SetAutoupdate(enabled bool) error {
+	return k.flags.SetAutoupdate(enabled)
+}
+func (k *knapsack) Autoupdate() bool {
+	return k.flags.Autoupdate()
+}
+
+// NotaryServerURL is the URL for the Notary server.
+func (k *knapsack) SetNotaryServerURL(url string) error {
+	return k.flags.SetNotaryServerURL(url)
+}
+func (k *knapsack) NotaryServerURL() string {
+	return k.flags.NotaryServerURL()
+}
+
+// TufServerURL is the URL for the tuf server.
+func (k *knapsack) SetTufServerURL(url string) error {
+	return k.flags.SetTufServerURL(url)
+}
+func (k *knapsack) TufServerURL() string {
+	return k.flags.TufServerURL()
+}
+
+// MirrorServerURL is the URL for the Notary mirror.
+func (k *knapsack) SetMirrorServerURL(url string) error {
+	return k.flags.SetMirrorServerURL(url)
+}
+func (k *knapsack) MirrorServerURL() string {
+	return k.flags.MirrorServerURL()
+}
+
+// AutoupdateInterval is the interval at which Launcher will check for updates.
+func (k *knapsack) SetAutoupdateInterval(interval time.Duration) error {
+	return k.flags.SetAutoupdateInterval(interval)
+}
+func (k *knapsack) AutoupdateInterval() time.Duration {
+	return k.flags.AutoupdateInterval()
+}
+
+// UpdateChannel is the channel to pull options from (stable, beta, nightly).
+func (k *knapsack) SetUpdateChannel(channel string) error {
+	return k.flags.SetUpdateChannel(channel)
+}
+func (k *knapsack) UpdateChannel() string {
+	return k.flags.UpdateChannel()
+}
+
+// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
+func (k *knapsack) SetNotaryPrefix(prefix string) error {
+	return k.flags.SetNotaryPrefix(prefix)
+}
+func (k *knapsack) NotaryPrefix() string {
+	return k.flags.NotaryPrefix()
+}
+
+// AutoupdateInitialDelay func (k *knapsack) Set an initial startup delay on the autoupdater process.
+func (k *knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
+	return k.flags.SetAutoupdateInitialDelay(delay)
+}
+func (k *knapsack) AutoupdateInitialDelay() time.Duration {
+	return k.flags.AutoupdateInitialDelay()
+}
+
+// UpdateDirectory is the location of the update libraries for osqueryd and launcher
+func (k *knapsack) SetUpdateDirectory(directory string) error {
+	return k.flags.SetUpdateDirectory(directory)
+}
+func (k *knapsack) UpdateDirectory() string {
+	return k.flags.UpdateDirectory()
+}

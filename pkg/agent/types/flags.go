@@ -40,4 +40,68 @@ type Flags interface {
 	// InsecureControlTLS disables TLS certificate validation for the control server.
 	SetInsecureControlTLS(disabled bool) error
 	InsecureControlTLS() bool
+
+	// InsecureTLS disables TLS certificate verification.
+	SetInsecureTLS(insecure bool) error
+	InsecureTLS() bool
+
+	// InsecureTransport disables TLS in the transport layer.
+	SetInsecureTransportTLS(insecure bool) error
+	InsecureTransportTLS() bool
+
+	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
+	SetCompactDbMaxTx(max int64) error
+	CompactDbMaxTx() int64
+
+	// IAmBreakingEELicence disables the EE licence check before running the local server
+	SetIAmBreakingEELicense(disabled bool) error
+	IAmBreakingEELicense() bool
+
+	// Debug enables debug logging.
+	SetDebug(debug bool) error
+	Debug() bool
+
+	// DebugLogFile is an optional file to mirror debug logs to.
+	SetDebugLogFile(file string) error
+	DebugLogFile() string
+
+	// OsqueryVerbose puts osquery into verbose mode.
+	SetOsqueryVerbose(verbose bool) error
+	OsqueryVerbose() bool
+
+	// Autoupdate enables the autoupdate functionality.
+	SetAutoupdate(enabled bool) error
+	Autoupdate() bool
+
+	// NotaryServerURL is the URL for the Notary server.
+	SetNotaryServerURL(url string) error
+	NotaryServerURL() string
+
+	// TufServerURL is the URL for the tuf server.
+	SetTufServerURL(url string) error
+	TufServerURL() string
+
+	// MirrorServerURL is the URL for the Notary mirror.
+	SetMirrorServerURL(url string) error
+	MirrorServerURL() string
+
+	// AutoupdateInterval is the interval at which Launcher will check for updates.
+	SetAutoupdateInterval(interval time.Duration) error
+	AutoupdateInterval() time.Duration
+
+	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
+	SetUpdateChannel(channel string) error
+	UpdateChannel() string
+
+	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
+	SetNotaryPrefix(prefix string) error
+	NotaryPrefix() string
+
+	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
+	SetAutoupdateInitialDelay(delay time.Duration) error
+	AutoupdateInitialDelay() time.Duration
+
+	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
+	SetUpdateDirectory(directory string) error
+	UpdateDirectory() string
 }

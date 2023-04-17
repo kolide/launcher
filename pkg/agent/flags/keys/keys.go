@@ -16,6 +16,22 @@ const (
 	ControlRequestInterval FlagKey = "control_request_interval"
 	DisableControlTLS      FlagKey = "disable_control_tls"
 	InsecureControlTLS     FlagKey = "insecure_control_tls"
+	InsecureTLS            FlagKey = "insecure_tls"
+	InsecureTransportTLS   FlagKey = "insecure_transport"
+	CompactDbMaxTx         FlagKey = "compactdb-max-tx"
+	IAmBreakingEELicense   FlagKey = "i-am-breaking-ee-license"
+	Debug                  FlagKey = "debug"
+	DebugLogFile           FlagKey = "debug_log_file"
+	OsqueryVerbose         FlagKey = "osquery_verbose"
+	Autoupdate             FlagKey = "autoupdate"
+	NotaryServerURL        FlagKey = "notary_url"
+	TufServerURL           FlagKey = "tuf_url"
+	MirrorServerURL        FlagKey = "mirror_url"
+	AutoupdateInterval     FlagKey = "autoupdate_interval"
+	UpdateChannel          FlagKey = "update_channel"
+	NotaryPrefix           FlagKey = "notary_prefix"
+	AutoupdateInitialDelay FlagKey = "autoupdater_initial_delay"
+	UpdateDirectory        FlagKey = "update_directory"
 )
 
 func (key FlagKey) String() string {

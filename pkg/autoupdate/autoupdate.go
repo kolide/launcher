@@ -70,6 +70,18 @@ const (
 	Nightly               = "nightly"
 )
 
+func (c UpdateChannel) String() string {
+	return string(c)
+}
+
+func SanitizeUpdateChannel(value string) string {
+	switch UpdateChannel(value) {
+	case Stable, Alpha, Beta, Nightly:
+		return value
+	}
+	return Stable.String()
+}
+
 const (
 	DefaultMirror       = "https://dl.kolide.co"
 	DefaultNotary       = "https://notary.kolide.co"
