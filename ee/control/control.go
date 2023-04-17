@@ -11,31 +11,31 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"golang.org/x/exp/slices"
 )
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	logger                   log.Logger
-	cancel                   context.CancelFunc
-	requestInterval          time.Duration
-	requestTicker            *time.Ticker
-	requestAccelerationTimer *time.Timer
-	minAccelerationInterval  time.Duration
-	fetcher                  dataProvider
-	fetchMutex               sync.Mutex
-	store                    types.GetterSetter
-	lastFetched              map[string]string
-	consumers                map[string]consumer
-	subscribers              map[string][]subscriber
+	logger          log.Logger
+	knapsack        types.Knapsack
+	cancel          context.CancelFunc
+	requestInterval time.Duration
+	requestTicker   *time.Ticker
+	fetcher         dataProvider
+	fetchMutex      sync.Mutex
+	store           types.GetterSetter
+	lastFetched     map[string]string
+	consumers       map[string]consumer
+	subscribers     map[string][]subscriber
 }
 
 // consumer is an interface for something that consumes control server data updates. The
 // control server supports at most one consumer per subsystem.
 type consumer interface {
-	Update(io.Reader) error
+	Update(data io.Reader) error
 }
 
 // subscriber is an interface for something that wants to be notified when a subsystem has been updated.
@@ -51,22 +51,25 @@ type dataProvider interface {
 	GetSubsystemData(hash string) (io.Reader, error)
 }
 
-func New(logger log.Logger, fetcher dataProvider, opts ...Option) *ControlService {
+func New(logger log.Logger, k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		logger:                  log.With(logger, "component", "control"),
-		requestInterval:         60 * time.Second,
-		minAccelerationInterval: 5 * time.Second,
-		fetcher:                 fetcher,
-		lastFetched:             make(map[string]string),
-		consumers:               make(map[string]consumer),
-		subscribers:             make(map[string][]subscriber),
+		logger:          log.With(logger, "component", "control"),
+		knapsack:        k,
+		requestInterval: k.ControlRequestInterval(),
+		fetcher:         fetcher,
+		lastFetched:     make(map[string]string),
+		consumers:       make(map[string]consumer),
+		subscribers:     make(map[string][]subscriber),
 	}
-
-	cs.requestTicker = time.NewTicker(cs.requestInterval)
 
 	for _, opt := range opts {
 		opt(cs)
 	}
+
+	cs.requestTicker = time.NewTicker(cs.requestInterval)
+
+	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
+	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
 
 	return cs
 }
@@ -109,12 +112,23 @@ func (cs *ControlService) Interrupt(err error) {
 
 func (cs *ControlService) Stop() {
 	level.Info(cs.logger).Log("msg", "control service stopping")
+	cs.requestTicker.Stop()
 	if cs.cancel != nil {
 		cs.cancel()
 	}
 }
 
-func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Duration) {
+func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
+	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
+		cs.requestIntervalChanged(cs.knapsack.ControlRequestInterval())
+	}
+}
+
+func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
+	if interval == cs.requestInterval {
+		return
+	}
+
 	// perform a fetch now
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
@@ -124,38 +138,20 @@ func (cs *ControlService) AccelerateRequestInterval(interval, duration time.Dura
 		)
 	}
 
-	if interval < cs.minAccelerationInterval {
+	if interval < cs.requestInterval {
 		level.Debug(cs.logger).Log(
-			"msg", "control service acceleration interval too small, using minimum interval",
-			"minimum_interval", cs.minAccelerationInterval,
-			"provided_interval", interval,
+			"msg", "accelerating control service request interval",
+			"interval", interval,
 		)
-		interval = cs.minAccelerationInterval
-	}
-
-	// stop existing timer
-	if cs.requestAccelerationTimer != nil {
-		cs.requestAccelerationTimer.Stop()
-	}
-
-	// set request interval back to starting interval after duration has passed
-	cs.requestAccelerationTimer = time.AfterFunc(duration, func() {
+	} else {
 		level.Debug(cs.logger).Log(
 			"msg", "resetting control service request interval after acceleration",
 			"interval", cs.requestInterval,
 		)
+	}
 
-		// set back to original interval
-		cs.requestTicker.Reset(cs.requestInterval)
-	})
-
-	level.Debug(cs.logger).Log(
-		"msg", "accelerating control service request interval",
-		"interval", interval,
-		"duration", duration,
-	)
-
-	// restart the ticker on accelerated interval
+	// restart the ticker on new interval
+	cs.requestInterval = interval
 	cs.requestTicker.Reset(interval)
 }
 
@@ -190,7 +186,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !agent.Flags.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue

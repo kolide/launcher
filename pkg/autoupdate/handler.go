@@ -95,7 +95,7 @@ func (u *Updater) handler() tuf.NotificationHandler {
 		}
 
 		// Check that it all came through okay
-		if err := checkExecutable(context.TODO(), outputBinary, "--version"); err != nil {
+		if err := CheckExecutable(context.TODO(), outputBinary, "--version"); err != nil {
 			level.Error(u.logger).Log(
 				"msg", "Broken updated binary. Removing",
 				"target", u.target,

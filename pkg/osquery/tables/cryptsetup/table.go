@@ -54,7 +54,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, name := range requestedNames {
-		output, err := tablehelpers.Exec(ctx, t.logger, 15, cryptsetupPaths, []string{"--readonly", "status", name})
+		output, err := tablehelpers.Exec(ctx, t.logger, 15, cryptsetupPaths, []string{"--readonly", "status", name}, false)
 		if err != nil {
 			level.Debug(t.logger).Log("msg", "Error execing for status", "name", name, "err", err)
 			continue

@@ -35,16 +35,13 @@ var portList = []int{
 	22322,
 }
 
-type controlService interface {
-	AccelerateRequestInterval(interval, duration time.Duration)
-}
-
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
 type localServer struct {
 	logger       log.Logger
+	knapsack     types.Knapsack
 	srv          *http.Server
 	identifiers  identifiers
 	limiter      *rate.Limiter
@@ -58,8 +55,6 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
-
-	controlService controlService
 }
 
 const (
@@ -75,15 +70,10 @@ func WithLogger(logger log.Logger) LocalServerOption {
 	}
 }
 
-func WithControlService(cs controlService) LocalServerOption {
-	return func(s *localServer) {
-		s.controlService = cs
-	}
-}
-
-func New(configStore types.Getter, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(k types.Knapsack, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
+		knapsack:              k,
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:          kolideServer,
 		myLocalDbSigner:       agent.LocalDbKeys(),
@@ -101,7 +91,7 @@ func New(configStore types.Getter, kolideServer string, opts ...LocalServerOptio
 	}
 
 	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(configStore)
+	privateKey, err := osquery.PrivateRSAKeyFromDB(k.ConfigStore())
 	if err != nil {
 		return nil, fmt.Errorf("fetching private key: %w", err)
 	}
