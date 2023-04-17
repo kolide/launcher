@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"sort"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -209,16 +209,17 @@ func TestControllerUpdate(t *testing.T) {
 			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
-			sort.Strings(tt.changedKeys)
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", keys.ToFlagKeys(tt.changedKeys))
+			mockObserver.On("FlagsChanged", mock.MatchedBy(func(k []keys.FlagKey) bool {
+				return assert.ElementsMatch(t, k, keys.ToFlagKeys(tt.changedKeys))
+			}))
 
 			fc.RegisterChangeObserver(mockObserver, keys.ToFlagKeys(tt.changedKeys)...)
 
 			changedKeys, err := fc.Update(tt.kvPairs)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.changedKeys, changedKeys)
+			assert.ElementsMatch(t, tt.changedKeys, changedKeys)
 		})
 	}
 }
