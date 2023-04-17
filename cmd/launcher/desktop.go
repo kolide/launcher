@@ -43,11 +43,11 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
-		flmonitorurl = flagset.String(
-			"monitor_url",
-			"",
-			"url to monitor parent",
-		)
+		// flmonitorurl = flagset.String(
+		// 	"monitor_url",
+		// 	"",
+		// 	"url to monitor parent",
+		// )
 		flmenupath = flagset.String(
 			"menu_path",
 			"",
@@ -112,10 +112,10 @@ func runDesktop(args []string) error {
 	runGroup.Add(notifier.Listen, notifier.Interrupt)
 
 	// monitor parent
-	runGroup.Add(func() error {
-		monitorParentProcess(logger, *flmonitorurl, 2*time.Second)
-		return nil
-	}, func(error) {})
+	// runGroup.Add(func() error {
+	// 	monitorParentProcess(logger, *flmonitorurl, 2*time.Second)
+	// 	return nil
+	// }, func(error) {})
 
 	shutdownChan := make(chan struct{})
 	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
