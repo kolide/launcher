@@ -56,6 +56,12 @@ func Test_Parse(t *testing.T) {
 			output: "This Menu Was Last Updated 15 Minutes Ago.",
 		},
 		{
+			name:   "relativeTime 111 seconds ago",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-111 * time.Second).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated 111 Seconds Ago.",
+		},
+		{
 			name:   "relativeTime one minute ago",
 			td:     &TemplateData{LastUpdateTime: time.Now().Add(-1 * time.Minute).Unix()},
 			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
@@ -90,6 +96,12 @@ func Test_Parse(t *testing.T) {
 			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
 			text:   fmt.Sprintf("This Is Starting {{if hasCapability `relativeTime`}}{{relativeTime %d}}{{else}}never{{end}}.", time.Now().Add(1*time.Hour+30*time.Second).Unix()),
 			output: "This Is Starting In About An Hour.",
+		},
+		{
+			name:   "relativeTime 111 minutes",
+			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
+			text:   fmt.Sprintf("This Is Starting {{if hasCapability `relativeTime`}}{{relativeTime %d}}{{else}}never{{end}}.", time.Now().Add(111*time.Minute+30*time.Second).Unix()),
+			output: "This Is Starting In 111 Minutes.",
 		},
 		{
 			name:   "relativeTime four hours",

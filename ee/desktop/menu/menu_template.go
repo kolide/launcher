@@ -55,8 +55,10 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			switch {
 			case diff < -60*60: // more than an hour ago
 				return fmt.Sprintf("%d Hours Ago", -diff/3600)
-			case diff < -90: // more than 90 seconds ago
+			case diff < -60*2: // more than 2 minutes ago
 				return fmt.Sprintf("%d Minutes Ago", -diff/60)
+			case diff < -90: // more than 90 seconds ago
+				return fmt.Sprintf("%d Seconds Ago", -diff)
 			case diff < -50: // more than 50 seconds ago
 				return "One Minute Ago"
 			case diff < -5: // more than 5 seconds ago
@@ -69,6 +71,8 @@ func (tp *templateParser) Parse(text string) (string, error) {
 				return fmt.Sprintf("In %d Minutes", diff/60)
 			case diff < 60*90: // less than 90 minutes
 				return "In About An Hour"
+			case diff < 60*60*2: // less than 2 hours
+				return fmt.Sprintf("In %d Minutes", diff/60)
 			case diff < 60*60*23: // less than 23 hours
 				return fmt.Sprintf("In %d Hours", diff/3600)
 			case diff < 60*60*36: // less than 36 hours
