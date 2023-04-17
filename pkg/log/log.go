@@ -10,8 +10,8 @@ import (
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/shirou/gopsutil/host"
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
@@ -126,7 +126,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	processInfo := []interface{}{"pid", pid}
 	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
 	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
-	processInfo = append(processInfo, "status", getStringStat(unknownProcess.Status))
+	processInfo = append(processInfo, "status", getStringArrayStat(unknownProcess.Status))
 	processInfo = append(processInfo, "create_time", getIntStat(unknownProcess.CreateTime))
 	processInfo = append(processInfo, "username", getStringStat(unknownProcess.Username))
 	processInfo = append(processInfo, "uids", getSliceStat(unknownProcess.Uids))
@@ -136,7 +136,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	if unknownProcessParent != nil {
 		processInfo = append(processInfo, "parent_pid", unknownProcessParent.Pid)
 		processInfo = append(processInfo, "parent_cmdline", getStringStat(unknownProcessParent.Cmdline))
-		processInfo = append(processInfo, "parent_status", getStringStat(unknownProcessParent.Status))
+		processInfo = append(processInfo, "parent_status", getStringArrayStat(unknownProcessParent.Status))
 	}
 
 	// Add system-level info
@@ -158,6 +158,17 @@ func getStringStat(getFunc func() (string, error)) string {
 		return fmt.Sprintf("could not get stat: %v", err)
 	}
 	return stat
+}
+
+// getStringArrayStat is a small wrapper around gopsutil/process functions
+// to return the stat if available, or an error message if not, so
+// that either way the info will be captured in the log.
+func getStringArrayStat(getFunc func() ([]string, error)) string {
+	stat, err := getFunc()
+	if err != nil {
+		return fmt.Sprintf("could not get stat: %v", err)
+	}
+	return stat[0]
 }
 
 // getIntStat is a small wrapper around gopsutil/process functions
