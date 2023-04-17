@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -208,6 +209,7 @@ func TestControllerUpdate(t *testing.T) {
 			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
+			sort.Strings(tt.changedKeys)
 			mockObserver := mocks.NewFlagsChangeObserver(t)
 			mockObserver.On("FlagsChanged", keys.ToFlagKeys(tt.changedKeys))
 

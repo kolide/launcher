@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -79,6 +80,7 @@ func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 
 	// Changed keys is the union of updated keys and deleted keys
 	changedKeys := append(updatedKeys, deletedKeys...)
+	sort.Strings(changedKeys)
 
 	// Now observers can be notified these keys have possibly changed
 	fc.notifyObservers(keys.ToFlagKeys(changedKeys)...)
