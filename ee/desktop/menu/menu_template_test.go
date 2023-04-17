@@ -44,6 +44,36 @@ func Test_Parse(t *testing.T) {
 			output: "This capability is unsupported.",
 		},
 		{
+			name:   "relativeTime 2 hours ago",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-2 * time.Hour).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated 2 Hours Ago.",
+		},
+		{
+			name:   "relativeTime 15 minutes ago",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-15*time.Minute - 30*time.Second).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated 15 Minutes Ago.",
+		},
+		{
+			name:   "relativeTime one minute ago",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-1 * time.Minute).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated One Minute Ago.",
+		},
+		{
+			name:   "relativeTime 7 seconds ago",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-7 * time.Second).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated 7 Seconds Ago.",
+		},
+		{
+			name:   "relativeTime just now",
+			td:     &TemplateData{LastUpdateTime: time.Now().Add(-1 * time.Second).Unix()},
+			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastUpdateTime}}{{else}}never{{end}}."),
+			output: "This Menu Was Last Updated Just Now.",
+		},
+		{
 			name:   "relativeTime very soon",
 			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
 			text:   fmt.Sprintf("This Is Starting {{if hasCapability `relativeTime`}}{{relativeTime %d}}{{else}}never{{end}}.", time.Now().Add(2*time.Minute+30*time.Second).Unix()),

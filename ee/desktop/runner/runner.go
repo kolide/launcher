@@ -404,11 +404,18 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	// First generate fresh template data to use for parsing
 	v := version.Version()
+
+	info, err := os.Stat(r.menuTemplatePath())
+	if err != nil {
+		return fmt.Errorf("failed to stat menu template file: %w", err)
+	}
+
 	td := &menu.TemplateData{
 		LauncherVersion:  v.Version,
 		LauncherRevision: v.Revision,
 		GoVersion:        v.GoVersion,
 		ServerHostname:   r.hostname,
+		LastUpdateTime:   info.ModTime().Unix(),
 	}
 
 	menuTemplateFileBytes, err := os.ReadFile(r.menuTemplatePath())

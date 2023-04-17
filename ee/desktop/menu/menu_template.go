@@ -17,6 +17,7 @@ type TemplateData struct {
 	LauncherRevision string `json:",omitempty"`
 	GoVersion        string `json:",omitempty"`
 	ServerHostname   string `json:",omitempty"`
+	LastUpdateTime   int64  `json:",omitempty"`
 }
 
 type templateParser struct {
@@ -52,6 +53,16 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			diff := timestamp - currentTime
 
 			switch {
+			case diff < -60*60: // more than an hour ago
+				return fmt.Sprintf("%d Hours Ago", -diff/3600)
+			case diff < -90: // more than 90 seconds ago
+				return fmt.Sprintf("%d Minutes Ago", -diff/60)
+			case diff < -50: // more than 50 seconds ago
+				return "One Minute Ago"
+			case diff < -5: // more than 5 seconds ago
+				return fmt.Sprintf("%d Seconds Ago", -diff)
+			case diff < 0: // in the last 5 seconds
+				return "Just Now"
 			case diff < 60*10: // less than 10 minutes
 				return "Very Soon"
 			case diff < 60*50: // less than 50 minutes
