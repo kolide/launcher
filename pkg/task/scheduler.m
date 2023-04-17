@@ -1,18 +1,38 @@
-#include "scheduler.h"
+//go:build darwin
+// +build darwin
 
+#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 #import <Foundation/NSBackgroundActivityScheduler.h>
 
-void schedule() {
-  NSBackgroundActivityScheduler *activity = [[NSBackgroundActivityScheduler alloc] initWithIdentifier:@"com.example.MyApp.updatecheck"];
+// Go callbacks
+extern void performTask(char*);
 
-  activity.interval = 30 * 60;
-  activity.tolerance = 15 * 60;
+void schedule(char* cIdentifier, int repeats) {
+  ///*, bool repeats, uint64_t interval*/
+  @autoreleasepool {
+    [NSApplication sharedApplication];
 
-  [activity
-    scheduleWithBlock:^(NSBackgroundActivityCompletionHandler completion) {
-      perform();
-      // Perform the activity
-      completion(NSBackgroundActivityResultFinished);
-  }];
+    NSString* identifier = [NSString stringWithUTF8String:cIdentifier];
+    NSBackgroundActivityScheduler* activity =
+        [[NSBackgroundActivityScheduler alloc] initWithIdentifier:identifier];
+
+    activity.repeats = repeats ? YES: NO;
+    activity.interval = 10;
+    activity.qualityOfService = NSQualityOfServiceUserInteractive;
+    //   activity.tolerance = 1;
+
+    [activity
+        scheduleWithBlock:^(NSBackgroundActivityCompletionHandler completion) {
+          performTask(cIdentifier);
+          completion(NSBackgroundActivityResultFinished);
+        }];
+
+    return; // activity;
+  }
+}
+
+void stop(void* p) {
+  // NSBackgroundActivityScheduler* activity = (NSBackgroundActivityScheduler*)p;
+  // [activity invalidate];
 }
