@@ -11,6 +11,11 @@ type FlagKey string
 const (
 	KolideServerURL        FlagKey = "hostname"
 	KolideHosted           FlagKey = "kolide_hosted"
+	Transport              FlagKey = "transport"
+	LoggingInterval        FlagKey = "logging_interval"
+	OsquerydPath           FlagKey = "osqueryd_path"
+	RootDirectory          FlagKey = "root_directory"
+	RootPEM                FlagKey = "root_pem"
 	DesktopEnabled         FlagKey = "desktop_enabled_v1"
 	DebugServerData        FlagKey = "debug_server_data"
 	ForceControlSubsystems FlagKey = "force_control_subsystems"

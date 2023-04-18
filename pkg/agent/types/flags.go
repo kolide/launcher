@@ -19,6 +19,45 @@ type Flags interface {
 	SetKolideHosted(hosted bool) error
 	KolideHosted() bool
 
+	// EnrollSecret contains the raw enroll secret.
+	EnrollSecret() string
+
+	// EnrollSecretPath contains the path to a file containing the enroll
+	// secret.
+	EnrollSecretPath() string
+
+	// RootDirectory is the directory that should be used as the osquery
+	// root directory (database files, pidfile, etc.).
+	RootDirectory() string
+
+	// OsquerydPath is the path to the osqueryd binary.
+	OsquerydPath() string
+
+	// CertPins are optional hashes of subject public key info to use for
+	// certificate pinning.
+	CertPins() [][]byte
+
+	// RootPEM is the path to the pem file containing the certificate
+	// chain, if necessary for verification.
+	RootPEM() string
+
+	// LoggingInterval is the interval at which logs should be flushed to
+	// the server.
+	LoggingInterval() time.Duration
+
+	// EnableInitialRunner enables running scheduled queries immediately
+	// (before first schedule interval passes).
+	EnableInitialRunner() bool
+
+	// Transport the transport that should be used for remote
+	// communication.
+	Transport() string
+
+	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
+	// of log. When blank, launcher will pick a value
+	// appropriate for the transport.
+	LogMaxBytesPerBatch() int
+
 	// DesktopEnabled causes the launcher desktop process and GUI to be enabled.
 	SetDesktopEnabled(enabled bool) error
 	DesktopEnabled() bool

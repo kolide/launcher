@@ -120,6 +120,64 @@ func (fc *FlagController) KolideHosted() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.KolideHosted))
 }
 
+func (fc *FlagController) EnrollSecret() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.EnrollSecret),
+	).get(nil)
+}
+
+func (fc *FlagController) EnrollSecretPath() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.EnrollSecretPath),
+	).get(nil)
+}
+
+func (fc *FlagController) RootDirectory() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.RootDirectory),
+	).get(nil)
+}
+
+func (fc *FlagController) OsquerydPath() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsquerydPath),
+	).get(nil)
+}
+
+func (fc *FlagController) CertPins() [][]byte {
+	return fc.cmdLineOpts.CertPins
+}
+
+func (fc *FlagController) RootPEM() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.RootPEM),
+	).get(nil)
+}
+
+func (fc *FlagController) LoggingInterval() time.Duration {
+	return NewDurationFlagValue(fc.logger, keys.LoggingInterval,
+		WithDefault(fc.cmdLineOpts.LoggingInterval),
+		WithMin(5*time.Second),
+		WithMax(10*time.Minute),
+	).get(fc.getControlServerValue(keys.LoggingInterval))
+}
+
+func (fc *FlagController) EnableInitialRunner() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.EnableInitialRunner)).
+		get(nil)
+}
+
+func (fc *FlagController) Transport() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.Transport),
+	).get(nil)
+}
+
+func (fc *FlagController) LogMaxBytesPerBatch() int {
+	return 0 // TODO k.flags.LogMaxBytesPerBatch()
+}
+
 func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
 	return fc.set(keys.DesktopEnabled, boolToBytes(enabled))
 }

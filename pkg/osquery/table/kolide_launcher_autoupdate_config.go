@@ -3,13 +3,13 @@ package table
 import (
 	"context"
 
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const launcherAutoupdateConfigTableName = "kolide_launcher_autoupdate_config"
 
-func LauncherAutoupdateConfigTable(opts *launcher.Options) *table.Plugin {
+func LauncherAutoupdateConfigTable(flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("autoupdate"),
 		table.TextColumn("notary_server_url"),
@@ -19,7 +19,7 @@ func LauncherAutoupdateConfigTable(opts *launcher.Options) *table.Plugin {
 		table.TextColumn("update_channel"),
 	}
 
-	return table.NewPlugin(launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(opts))
+	return table.NewPlugin(launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
 }
 
 func boolToString(in bool) string {
@@ -30,16 +30,16 @@ func boolToString(in bool) string {
 	}
 }
 
-func generateLauncherAutoupdateConfigTable(opts *launcher.Options) table.GenerateFunc {
+func generateLauncherAutoupdateConfigTable(flags types.Flags) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return []map[string]string{
 			{
-				"autoupdate":          boolToString(opts.Autoupdate),
-				"notary_server_url":   opts.NotaryServerURL,
-				"mirror_server_url":   opts.MirrorServerURL,
-				"tuf_server_url":      opts.TufServerURL,
-				"autoupdate_interval": opts.AutoupdateInterval.String(),
-				"update_channel":      string(opts.UpdateChannel),
+				"autoupdate":          boolToString(flags.Autoupdate()),
+				"notary_server_url":   flags.NotaryServerURL(),
+				"mirror_server_url":   flags.MirrorServerURL(),
+				"tuf_server_url":      flags.TufServerURL(),
+				"autoupdate_interval": flags.AutoupdateInterval().String(),
+				"update_channel":      string(flags.UpdateChannel()),
 			},
 		}, nil
 	}

@@ -117,6 +117,53 @@ func (k *knapsack) KolideHosted() bool {
 	return k.flags.KolideHosted()
 }
 
+func (k *knapsack) EnrollSecret() string {
+	return k.flags.EnrollSecret()
+}
+
+func (k *knapsack) EnrollSecretPath() string {
+	return k.flags.EnrollSecretPath()
+}
+
+func (k *knapsack) RootDirectory() string {
+	return k.flags.RootDirectory()
+}
+
+func (k *knapsack) OsquerydPath() string {
+	return k.flags.OsquerydPath()
+}
+
+func (k *knapsack) CertPins() [][]byte {
+	return k.flags.CertPins()
+}
+
+func (k *knapsack) RootPEM() string {
+	return k.flags.RootPEM()
+}
+
+func (k *knapsack) LoggingInterval() time.Duration {
+	return k.flags.LoggingInterval()
+}
+
+// EnableInitialRunner enables running scheduled queries immediately
+// (before first schedule interval passes).
+func (k *knapsack) EnableInitialRunner() bool {
+	return k.flags.EnableInitialRunner()
+}
+
+// Transport the transport that should be used for remote
+// communication.
+func (k *knapsack) Transport() string {
+	return k.flags.Transport()
+}
+
+// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
+// of log. When blank, launcher will pick a value
+// appropriate for the transport.
+func (k *knapsack) LogMaxBytesPerBatch() int {
+	return k.flags.LogMaxBytesPerBatch()
+}
+
 func (k *knapsack) SetDesktopEnabled(enabled bool) error {
 	return k.flags.SetDesktopEnabled(enabled)
 }

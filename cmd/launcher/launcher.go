@@ -164,16 +164,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	var client service.KolideService
 	{
-		switch opts.Transport {
+		switch k.Transport() {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(opts.KolideServerURL, k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
 			if err != nil {
 				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(opts.KolideServerURL, k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
+			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
 		case "osquery":
 			client = service.NewNoopClient(logger)
 		default:
@@ -187,7 +187,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -227,9 +227,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runner, err = desktopRunner.New(
 			k,
 			desktopRunner.WithLogger(logger),
-			desktopRunner.WithUpdateInterval(time.Second*5),
-			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
-			desktopRunner.WithHostname(opts.KolideServerURL),
+			desktopRunner.WithUpdateInterval(time.Second*5),       // TODO
+			desktopRunner.WithMenuRefreshInterval(time.Minute*15), // TODO
+			desktopRunner.WithHostname(k.KolideServerURL()),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 			desktopRunner.WithProcessSpawningEnabled(k.DesktopEnabled()),
@@ -258,7 +258,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	// runEECode feels like it should move up to the opts level.
+	// runEECode feels like it should move up to the opts level. // TODO comment still accurate?
 	// We have some stuff there that sets `controlServerURL`
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
 
@@ -267,7 +267,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if runLocalServer {
 		ls, err := localserver.New(
 			k,
-			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 		)
 
