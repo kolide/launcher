@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -114,7 +115,9 @@ func Test_urlsToTest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := urlsToTest(tt.args.opts)
+			mockFlags := mocks.NewFlags(t)
+
+			got := urlsToTest(mockFlags)
 
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("urlsToTest() = %v, want %v", got, tt.want)
@@ -212,7 +215,8 @@ func Test_parseUrl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := parseUrl(tt.args.addr, tt.args.opts)
+			mockFlags := mocks.NewFlags(t)
+			got, err := parseUrl(tt.args.addr, mockFlags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUrl() error = %v, wantErr %v", err, tt.wantErr)
 				return

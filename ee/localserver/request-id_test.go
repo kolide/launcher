@@ -61,7 +61,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 func testServer(t *testing.T, k types.Knapsack, logBytes *bytes.Buffer) *localServer {
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	server, err := New(k, "", WithLogger(log.NewLogfmtLogger(logBytes)))
+	server, err := New(k, WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }
