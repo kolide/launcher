@@ -39,7 +39,7 @@ func generateLauncherAutoupdateConfigTable(flags types.Flags) table.GenerateFunc
 				"mirror_server_url":   flags.MirrorServerURL(),
 				"tuf_server_url":      flags.TufServerURL(),
 				"autoupdate_interval": flags.AutoupdateInterval().String(),
-				"update_channel":      string(flags.UpdateChannel()),
+				"update_channel":      flags.UpdateChannel(),
 			},
 		}, nil
 	}

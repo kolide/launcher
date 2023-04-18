@@ -79,6 +79,7 @@ func SanitizeUpdateChannel(value string) string {
 	case Stable, Alpha, Beta, Nightly:
 		return value
 	}
+	// Fallback to stable if invalid channel
 	return Stable.String()
 }
 
