@@ -37,19 +37,13 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	return k
 }
 
+// BboltDB interface methods
+
 func (k *knapsack) BboltDB() *bbolt.DB {
 	return k.db
 }
 
-func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
-	if k == nil {
-		return nil
-	}
-
-	// Ignoring ok value, this should only fail if an invalid storeType is provided
-	store, _ := k.stores[storeType]
-	return store
-}
+// Stores interface methods
 
 func (k *knapsack) AgentFlagsStore() types.KVStore {
 	return k.getKVStore(storage.AgentFlagsStore)
@@ -91,8 +85,36 @@ func (k *knapsack) ServerProvidedDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerProvidedDataStore)
 }
 
+func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
+	if k == nil {
+		return nil
+	}
+
+	// Ignoring ok value, this should only fail if an invalid storeType is provided
+	store, _ := k.stores[storeType]
+	return store
+}
+
+// Flags interface methods
+
 func (k *knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	k.flags.RegisterChangeObserver(observer, flagKeys...)
+}
+
+// KolideServerURL is the URL of the management server to connect to.
+func (k *knapsack) SetKolideServerURL(url string) error {
+	return k.flags.SetKolideServerURL(url)
+}
+func (k *knapsack) KolideServerURL() string {
+	return k.flags.KolideServerURL()
+}
+
+// KolideHosted true if using Kolide SaaS settings.
+func (k *knapsack) SetKolideHosted(hosted bool) error {
+	return k.flags.SetKolideHosted(hosted)
+}
+func (k *knapsack) KolideHosted() bool {
+	return k.flags.KolideHosted()
 }
 
 func (k *knapsack) SetDesktopEnabled(enabled bool) error {

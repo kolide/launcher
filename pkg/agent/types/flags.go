@@ -11,6 +11,14 @@ type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
 
+	// KolideServerURL is the URL of the management server to connect to.
+	SetKolideServerURL(url string) error
+	KolideServerURL() string
+
+	// KolideHosted true if using Kolide SaaS settings.
+	SetKolideHosted(hosted bool) error
+	KolideHosted() bool
+
 	// DesktopEnabled causes the launcher desktop process and GUI to be enabled.
 	SetDesktopEnabled(enabled bool) error
 	DesktopEnabled() bool

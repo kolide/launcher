@@ -102,6 +102,24 @@ func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
 	}
 }
 
+// KolideServerURL is the URL of the management server to connect to.
+func (fc *FlagController) SetKolideServerURL(url string) error {
+	return fc.set(keys.KolideServerURL, []byte(url))
+}
+func (fc *FlagController) KolideServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.KolideServerURL),
+	).get(fc.getControlServerValue(keys.KolideServerURL))
+}
+
+// KolideHosted true if using Kolide SaaS settings.
+func (fc *FlagController) SetKolideHosted(hosted bool) error {
+	return fc.set(keys.KolideHosted, boolToBytes(hosted))
+}
+func (fc *FlagController) KolideHosted() bool {
+	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.KolideHosted))
+}
+
 func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
 	return fc.set(keys.DesktopEnabled, boolToBytes(enabled))
 }

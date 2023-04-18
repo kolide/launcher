@@ -9,6 +9,8 @@ type FlagKey string
 // 3. Implement the getter and setter in the Knapsack, which delegates the call to the FlagController
 // 4. Implement the getter and setter in the FlagController, providing defaults, limits, and overrides
 const (
+	KolideServerURL        FlagKey = "hostname"
+	KolideHosted           FlagKey = "kolide_hosted"
 	DesktopEnabled         FlagKey = "desktop_enabled_v1"
 	DebugServerData        FlagKey = "debug_server_data"
 	ForceControlSubsystems FlagKey = "force_control_subsystems"
