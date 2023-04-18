@@ -85,6 +85,11 @@ func TestServiceOptions(t *testing.T) {
 			out:  []string{`DelayedAutoStart="yes"`},
 			name: "DelayedStart",
 		},
+		{
+			in:   NewService("daemon.exe", WithServiceDependency("Dnscache")),
+			out:  []string{`ServiceDependency Id="Dnscache"`},
+			name: "ServiceDependency",
+		},
 	}
 
 	for _, tt := range tests {

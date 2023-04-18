@@ -64,6 +64,14 @@ type ServiceInstall struct {
 	Vital             YesNoType          `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
 	UtilServiceConfig *UtilServiceConfig `xml:",omitempty"`
 	ServiceConfig     *ServiceConfig     `xml:",omitempty"`
+	ServiceDependency *ServiceDependency `xml:",omitempty"`
+}
+
+// ServiceDependency implements
+// https://wixtoolset.org/docs/v3/xsd/wix/servicedependency/
+type ServiceDependency struct {
+	Id    string    `xml:",attr,omitempty"`
+	Group YesNoType `xml:",attr,omitempty"`
 }
 
 // ServiceControl implements
@@ -148,6 +156,15 @@ func WithDisabledService() ServiceOpt {
 		// If this is not explicitly set to none, the installer hangs trying to start the
 		// disabled service.
 		s.serviceControl.Start = StartNone
+	}
+}
+
+func WithServiceDependency(service string) ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.ServiceDependency = &ServiceDependency{
+			Id:    service,
+			Group: No, // set to no since `service` is the name of a singular service and not a group of services
+		}
 	}
 }
 
