@@ -205,8 +205,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	serviceConfig := &ServiceConfig{
-		OnInstall:   Yes,
-		OnReinstall: Yes,
+		OnInstall:        Yes,
+		OnReinstall:      Yes,
+		DelayedAutoStart: No,
 	}
 
 	// If a service name is not specified, replace the .exe with a svc,
