@@ -13,11 +13,11 @@ const (
 )
 
 type TemplateData struct {
-	LauncherVersion  string `json:",omitempty"`
-	LauncherRevision string `json:",omitempty"`
-	GoVersion        string `json:",omitempty"`
-	ServerHostname   string `json:",omitempty"`
-	LastUpdateTime   int64  `json:",omitempty"`
+	LauncherVersion    string `json:",omitempty"`
+	LauncherRevision   string `json:",omitempty"`
+	GoVersion          string `json:",omitempty"`
+	ServerHostname     string `json:",omitempty"`
+	LastMenuUpdateTime int64  `json:",omitempty"`
 }
 
 type templateParser struct {
