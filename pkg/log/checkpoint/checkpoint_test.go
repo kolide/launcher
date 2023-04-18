@@ -39,6 +39,10 @@ func Test_urlsToTest(t *testing.T) {
 					Scheme: "https",
 				},
 				{
+					Host:   "k2control.kolide.com:443",
+					Scheme: "https",
+				},
+				{
 					Host:   "dl.kolide.co:443",
 					Scheme: "https",
 				},
@@ -48,10 +52,6 @@ func Test_urlsToTest(t *testing.T) {
 				},
 				{
 					Host:   "tuf.kolide.com:443",
-					Scheme: "https",
-				},
-				{
-					Host:   "k2control.kolide.com:443",
 					Scheme: "https",
 				},
 			},
@@ -116,6 +116,13 @@ func Test_urlsToTest(t *testing.T) {
 			t.Parallel()
 
 			mockFlags := mocks.NewFlags(t)
+			mockFlags.On("InsecureTransportTLS").Return(false)
+			mockFlags.On("KolideServerURL").Return("k2device.kolide.com:443")
+			mockFlags.On("ControlServerURL").Return("k2control.kolide.com:443")
+			mockFlags.On("Autoupdate").Return(true)
+			mockFlags.On("MirrorServerURL").Return("dl.kolide.co:443")
+			mockFlags.On("NotaryServerURL").Return("notary.kolide.co:443")
+			mockFlags.On("TufServerURL").Return("tuf.kolide.com:443")
 
 			got := urlsToTest(mockFlags)
 
@@ -134,16 +141,17 @@ func Test_parseUrl(t *testing.T) {
 		opts launcher.Options
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *url.URL
-		wantErr bool
+		name              string
+		insecureTransport bool
+		args              args
+		want              *url.URL
+		wantErr           bool
+		portDefined       bool
 	}{
 		{
 			name: "secure_with_port_input",
 			args: args{
 				addr: "example.com:443",
-				opts: launcher.Options{},
 			},
 			want: &url.URL{
 				Host:   "example.com:443",
@@ -154,7 +162,6 @@ func Test_parseUrl(t *testing.T) {
 			name: "secure_no_port_input",
 			args: args{
 				addr: "example.com",
-				opts: launcher.Options{},
 			},
 			want: &url.URL{
 				Host:   "example.com:443",
@@ -162,12 +169,10 @@ func Test_parseUrl(t *testing.T) {
 			},
 		},
 		{
-			name: "insecure_with_port_input",
+			name:              "insecure_with_port_input",
+			insecureTransport: true,
 			args: args{
 				addr: "example.com:80",
-				opts: launcher.Options{
-					InsecureTransport: true,
-				},
 			},
 			want: &url.URL{
 				Host:   "example.com:80",
@@ -175,12 +180,10 @@ func Test_parseUrl(t *testing.T) {
 			},
 		},
 		{
-			name: "insecure_no_port_input",
+			name:              "insecure_no_port_input",
+			insecureTransport: true,
 			args: args{
 				addr: "example.com",
-				opts: launcher.Options{
-					InsecureTransport: true,
-				},
 			},
 			want: &url.URL{
 				Host:   "example.com:80",
@@ -191,7 +194,6 @@ func Test_parseUrl(t *testing.T) {
 			name: "addr_with_scheme",
 			args: args{
 				addr: "https://example.com",
-				opts: launcher.Options{},
 			},
 			want: &url.URL{
 				Host:   "example.com:443",
@@ -199,10 +201,10 @@ func Test_parseUrl(t *testing.T) {
 			},
 		},
 		{
-			name: "addr_with_scheme_and_port",
+			name:        "addr_with_scheme_and_port",
+			portDefined: true,
 			args: args{
 				addr: "https://example.com:443",
-				opts: launcher.Options{},
 			},
 			want: &url.URL{
 				Host:   "example.com:443",
@@ -216,6 +218,10 @@ func Test_parseUrl(t *testing.T) {
 			t.Parallel()
 
 			mockFlags := mocks.NewFlags(t)
+			if !tt.portDefined {
+				mockFlags.On("InsecureTransportTLS").Return(tt.insecureTransport)
+			}
+
 			got, err := parseUrl(tt.args.addr, mockFlags)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseUrl() error = %v, wantErr %v", err, tt.wantErr)

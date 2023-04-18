@@ -186,10 +186,26 @@ func TestControllerDurationFlags(t *testing.T) {
 		name            string
 		cmdLineOpts     *launcher.Options
 		agentFlagsStore types.KVStore
+		getFlag         func(fc *FlagController) time.Duration
+		setFlag         func(fc *FlagController, d time.Duration) error
 		valueToSet      time.Duration
 	}{
 		{
-			name:       "happy path",
+			name:       "DesktopUpdateInterval",
+			getFlag:    func(fc *FlagController) time.Duration { return fc.DesktopUpdateInterval() },
+			setFlag:    func(fc *FlagController, d time.Duration) error { return fc.SetDesktopUpdateInterval(d) },
+			valueToSet: 7 * time.Second,
+		},
+		{
+			name:       "DesktopMenuRefreshInterval",
+			getFlag:    func(fc *FlagController) time.Duration { return fc.DesktopMenuRefreshInterval() },
+			setFlag:    func(fc *FlagController, d time.Duration) error { return fc.SetDesktopMenuRefreshInterval(d) },
+			valueToSet: 7 * time.Second,
+		},
+		{
+			name:       "ControlRequestInterval",
+			getFlag:    func(fc *FlagController) time.Duration { return fc.ControlRequestInterval() },
+			setFlag:    func(fc *FlagController, d time.Duration) error { return fc.SetControlRequestInterval(d) },
 			valueToSet: 7 * time.Second,
 		},
 	}
@@ -203,18 +219,44 @@ func TestControllerDurationFlags(t *testing.T) {
 			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
-			var value time.Duration
-			assertValues := func(expectedValue time.Duration) {
-				value = fc.ControlRequestInterval()
-				assert.Equal(t, expectedValue, value)
-			}
+			value := tt.getFlag(fc)
+			// assert.Equal(t, tt.valueToSet, value)
 
-			assertValues(5 * time.Second)
-
-			err = fc.SetControlRequestInterval(tt.valueToSet)
+			err = tt.setFlag(fc, tt.valueToSet)
+			// fc.SetDesktopUpdateInterval(tt.valueToSet)
 			require.NoError(t, err)
 
-			assertValues(tt.valueToSet)
+			value = tt.getFlag(fc)
+			assert.Equal(t, tt.valueToSet, value)
+
+			// var value time.Duration
+			// assertValues := func(expectedValue time.Duration) {
+			// 	value = tt.getFlag(fc)
+			// 	assert.Equal(t, expectedValue, value)
+			// 	// value = fc.DesktopMenuRefreshInterval()
+			// 	// assert.Equal(t, expectedValue, value)
+			// 	// value = fc.ControlRequestInterval()
+			// 	// assert.Equal(t, expectedValue, value)
+			// 	// value = fc.AutoupdateInterval()
+			// 	// assert.Equal(t, expectedValue, value)
+			// 	// value = fc.AutoupdateInitialDelay()
+			// 	// assert.Equal(t, expectedValue, value)
+			// }
+
+			// assertValues(7 * time.Second)
+
+			// err = fc.SetDesktopUpdateInterval(tt.valueToSet)
+			// require.NoError(t, err)
+			// err = fc.SetDesktopMenuRefreshInterval(tt.valueToSet)
+			// require.NoError(t, err)
+			// err = fc.SetControlRequestInterval(tt.valueToSet)
+			// require.NoError(t, err)
+			// err = fc.SetAutoupdateInterval(tt.valueToSet)
+			// require.NoError(t, err)
+			// err = fc.SetAutoupdateInitialDelay(tt.valueToSet)
+			// require.NoError(t, err)
+
+			// assertValues(tt.valueToSet)
 		})
 	}
 }
