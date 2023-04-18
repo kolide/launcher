@@ -105,7 +105,6 @@ func (k *knapsack) AutoloadedExtensions() []string {
 	return k.flags.AutoloadedExtensions()
 }
 
-// KolideServerURL is the URL of the management server to connect to.
 func (k *knapsack) SetKolideServerURL(url string) error {
 	return k.flags.SetKolideServerURL(url)
 }
@@ -113,7 +112,6 @@ func (k *knapsack) KolideServerURL() string {
 	return k.flags.KolideServerURL()
 }
 
-// KolideHosted true if using Kolide SaaS settings.
 func (k *knapsack) SetKolideHosted(hosted bool) error {
 	return k.flags.SetKolideHosted(hosted)
 }
@@ -149,21 +147,14 @@ func (k *knapsack) LoggingInterval() time.Duration {
 	return k.flags.LoggingInterval()
 }
 
-// EnableInitialRunner enables running scheduled queries immediately
-// (before first schedule interval passes).
 func (k *knapsack) EnableInitialRunner() bool {
 	return k.flags.EnableInitialRunner()
 }
 
-// Transport the transport that should be used for remote
-// communication.
 func (k *knapsack) Transport() string {
 	return k.flags.Transport()
 }
 
-// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
-// of log. When blank, launcher will pick a value
-// appropriate for the transport.
 func (k *knapsack) LogMaxBytesPerBatch() int {
 	return k.flags.LogMaxBytesPerBatch()
 }
@@ -173,6 +164,20 @@ func (k *knapsack) SetDesktopEnabled(enabled bool) error {
 }
 func (k *knapsack) DesktopEnabled() bool {
 	return k.flags.DesktopEnabled()
+}
+
+func (k *knapsack) SetDesktopUpdateInterval(interval time.Duration) error {
+	return k.flags.SetDesktopUpdateInterval(interval)
+}
+func (k *knapsack) DesktopUpdateInterval() time.Duration {
+	return k.flags.DesktopUpdateInterval()
+}
+
+func (k *knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error {
+	return k.flags.SetDesktopMenuRefreshInterval(interval)
+}
+func (k *knapsack) DesktopMenuRefreshInterval() time.Duration {
+	return k.flags.DesktopMenuRefreshInterval()
 }
 
 func (k *knapsack) SetDebugServerData(debug bool) error {
@@ -220,7 +225,6 @@ func (k *knapsack) InsecureControlTLS() bool {
 	return k.flags.InsecureControlTLS()
 }
 
-// InsecureTLS disables TLS certificate verification.
 func (k *knapsack) SetInsecureTLS(insecure bool) error {
 	return k.flags.SetInsecureTLS(insecure)
 }
@@ -228,7 +232,6 @@ func (k *knapsack) InsecureTLS() bool {
 	return k.flags.InsecureTLS()
 }
 
-// InsecureTransport disables TLS in the transport layer.
 func (k *knapsack) SetInsecureTransportTLS(insecure bool) error {
 	return k.flags.SetInsecureTransportTLS(insecure)
 }
@@ -236,7 +239,6 @@ func (k *knapsack) InsecureTransportTLS() bool {
 	return k.flags.InsecureTransportTLS()
 }
 
-// IAmBreakingEELicence disables the EE licence check before running the local server
 func (k *knapsack) SetIAmBreakingEELicense(disabled bool) error {
 	return k.flags.SetIAmBreakingEELicense(disabled)
 }
@@ -244,7 +246,6 @@ func (k *knapsack) IAmBreakingEELicense() bool {
 	return k.flags.IAmBreakingEELicense()
 }
 
-// Debug enables debug logging.
 func (k *knapsack) SetDebug(debug bool) error {
 	return k.flags.SetDebug(debug)
 }
@@ -252,7 +253,6 @@ func (k *knapsack) Debug() bool {
 	return k.flags.Debug()
 }
 
-// DebugLogFile is an optional file to mirror debug logs to.
 func (k *knapsack) SetDebugLogFile(file string) error {
 	return k.flags.SetDebugLogFile(file)
 }
@@ -260,7 +260,6 @@ func (k *knapsack) DebugLogFile() string {
 	return k.flags.DebugLogFile()
 }
 
-// OsqueryVerbose puts osquery into verbose mode.
 func (k *knapsack) SetOsqueryVerbose(verbose bool) error {
 	return k.flags.SetOsqueryVerbose(verbose)
 }
@@ -272,7 +271,6 @@ func (k *knapsack) OsqueryFlags() []string {
 	return k.flags.OsqueryFlags()
 }
 
-// Osquery TLS options
 func (k *knapsack) OsqueryTlsConfigEndpoint() string {
 	return k.flags.OsqueryTlsConfigEndpoint()
 }
@@ -289,7 +287,6 @@ func (k *knapsack) OsqueryTlsDistributedWriteEndpoint() string {
 	return k.flags.OsqueryTlsDistributedWriteEndpoint()
 }
 
-// Autoupdate enables the autoupdate functionality.
 func (k *knapsack) SetAutoupdate(enabled bool) error {
 	return k.flags.SetAutoupdate(enabled)
 }
@@ -297,7 +294,6 @@ func (k *knapsack) Autoupdate() bool {
 	return k.flags.Autoupdate()
 }
 
-// NotaryServerURL is the URL for the Notary server.
 func (k *knapsack) SetNotaryServerURL(url string) error {
 	return k.flags.SetNotaryServerURL(url)
 }
@@ -305,7 +301,6 @@ func (k *knapsack) NotaryServerURL() string {
 	return k.flags.NotaryServerURL()
 }
 
-// TufServerURL is the URL for the tuf server.
 func (k *knapsack) SetTufServerURL(url string) error {
 	return k.flags.SetTufServerURL(url)
 }
@@ -313,7 +308,6 @@ func (k *knapsack) TufServerURL() string {
 	return k.flags.TufServerURL()
 }
 
-// MirrorServerURL is the URL for the Notary mirror.
 func (k *knapsack) SetMirrorServerURL(url string) error {
 	return k.flags.SetMirrorServerURL(url)
 }
@@ -321,7 +315,6 @@ func (k *knapsack) MirrorServerURL() string {
 	return k.flags.MirrorServerURL()
 }
 
-// AutoupdateInterval is the interval at which Launcher will check for updates.
 func (k *knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	return k.flags.SetAutoupdateInterval(interval)
 }
@@ -329,7 +322,6 @@ func (k *knapsack) AutoupdateInterval() time.Duration {
 	return k.flags.AutoupdateInterval()
 }
 
-// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 func (k *knapsack) SetUpdateChannel(channel string) error {
 	return k.flags.SetUpdateChannel(channel)
 }
@@ -337,7 +329,6 @@ func (k *knapsack) UpdateChannel() string {
 	return k.flags.UpdateChannel()
 }
 
-// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
 func (k *knapsack) SetNotaryPrefix(prefix string) error {
 	return k.flags.SetNotaryPrefix(prefix)
 }
@@ -345,7 +336,6 @@ func (k *knapsack) NotaryPrefix() string {
 	return k.flags.NotaryPrefix()
 }
 
-// AutoupdateInitialDelay func (k *knapsack) Set an initial startup delay on the autoupdater process.
 func (k *knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return k.flags.SetAutoupdateInitialDelay(delay)
 }
@@ -353,7 +343,6 @@ func (k *knapsack) AutoupdateInitialDelay() time.Duration {
 	return k.flags.AutoupdateInitialDelay()
 }
 
-// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 func (k *knapsack) SetUpdateDirectory(directory string) error {
 	return k.flags.SetUpdateDirectory(directory)
 }

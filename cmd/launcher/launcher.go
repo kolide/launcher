@@ -227,12 +227,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runner, err = desktopRunner.New(
 			k,
 			desktopRunner.WithLogger(logger),
-			desktopRunner.WithUpdateInterval(time.Second*5),       // TODO
-			desktopRunner.WithMenuRefreshInterval(time.Minute*15), // TODO
-			desktopRunner.WithHostname(k.KolideServerURL()),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(k.DesktopEnabled()),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)

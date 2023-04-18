@@ -116,17 +116,18 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+			mockKnapsack.On("DesktopEnabled").Return(true)
 
 			r, err := New(
 				mockKnapsack,
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
-				WithHostname("somewhere-over-the-rainbow.example.com"),
-				WithUpdateInterval(time.Millisecond*250),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
 				WithUsersFilesRoot(launcherRootDir(t)),
-				WithProcessSpawningEnabled(true),
 			)
 			require.NoError(t, err)
 

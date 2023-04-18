@@ -187,6 +187,28 @@ func (fc *FlagController) DesktopEnabled() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.DesktopEnabled))
 }
 
+func (fc *FlagController) SetDesktopUpdateInterval(interval time.Duration) error {
+	return fc.set(keys.DesktopUpdateInterval, durationToBytes(interval))
+}
+func (fc *FlagController) DesktopUpdateInterval() time.Duration {
+	return NewDurationFlagValue(fc.logger, keys.DesktopUpdateInterval,
+		WithDefault(5*time.Second),
+		WithMin(5*time.Second),
+		WithMax(10*time.Minute),
+	).get(fc.getControlServerValue(keys.DesktopUpdateInterval))
+}
+
+func (fc *FlagController) SetDesktopMenuRefreshInterval(interval time.Duration) error {
+	return fc.set(keys.DesktopMenuRefreshInterval, durationToBytes(interval))
+}
+func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
+	return NewDurationFlagValue(fc.logger, keys.DesktopMenuRefreshInterval,
+		WithDefault(15*time.Minute),
+		WithMin(5*time.Minute),
+		WithMax(60*time.Minute),
+	).get(fc.getControlServerValue(keys.DesktopMenuRefreshInterval))
+}
+
 func (fc *FlagController) SetDebugServerData(debug bool) error {
 	return fc.set(keys.DebugServerData, boolToBytes(debug))
 }

@@ -66,6 +66,14 @@ type Flags interface {
 	SetDesktopEnabled(enabled bool) error
 	DesktopEnabled() bool
 
+	// DesktopUpdateInterval is the interval on which desktop processes will be spawned, if necessary.
+	SetDesktopUpdateInterval(interval time.Duration) error
+	DesktopUpdateInterval() time.Duration
+
+	// DesktopMenuRefreshInterval is the interval on which the desktop menu will be refreshed.
+	SetDesktopMenuRefreshInterval(interval time.Duration) error
+	DesktopMenuRefreshInterval() time.Duration
+
 	// DebugServerData causes logging and diagnostics related to control server error handling to be enabled.
 	SetDebugServerData(debug bool) error
 	DebugServerData() bool

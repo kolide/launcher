@@ -174,6 +174,34 @@ func (_m *Flags) DesktopEnabled() bool {
 	return r0
 }
 
+// DesktopMenuRefreshInterval provides a mock function with given fields:
+func (_m *Flags) DesktopMenuRefreshInterval() time.Duration {
+	ret := _m.Called()
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// DesktopUpdateInterval provides a mock function with given fields:
+func (_m *Flags) DesktopUpdateInterval() time.Duration {
+	ret := _m.Called()
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // DisableControlTLS provides a mock function with given fields:
 func (_m *Flags) DisableControlTLS() bool {
 	ret := _m.Called()
@@ -676,6 +704,34 @@ func (_m *Flags) SetDesktopEnabled(enabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetDesktopMenuRefreshInterval provides a mock function with given fields: interval
+func (_m *Flags) SetDesktopMenuRefreshInterval(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetDesktopUpdateInterval provides a mock function with given fields: interval
+func (_m *Flags) SetDesktopUpdateInterval(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
 	} else {
 		r0 = ret.Error(0)
 	}
