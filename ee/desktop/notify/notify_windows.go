@@ -5,7 +5,7 @@ package notify
 
 import (
 	"github.com/go-kit/kit/log"
-	"gopkg.in/toast.v1"
+	"github.com/kolide/toast"
 )
 
 type windowsNotifier struct {
