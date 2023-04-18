@@ -219,7 +219,7 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 		runtime.WithOsqueryVerbose(k.OsqueryVerbose()),
 		runtime.WithOsqueryFlags(k.OsqueryFlags()),
 		runtime.WithAugeasLensFunction(augeas.InstallLenses),
-		runtime.WithAutoloadedExtensions(opts.AutoloadedExtensions...),
+		runtime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
 	}
 }
 
@@ -240,12 +240,12 @@ func osqueryRunnerOptions(logger log.Logger, k types.Knapsack) ([]runtime.Osquer
 		runtime.WithConfigPluginFlag("tls"),
 		runtime.WithDistributedPluginFlag("tls"),
 		runtime.WithLoggerPluginFlag("tls"),
-		runtime.WithTlsConfigEndpoint(opts.OsqueryTlsConfigEndpoint),
-		runtime.WithTlsDistributedReadEndpoint(opts.OsqueryTlsDistributedReadEndpoint),
-		runtime.WithTlsDistributedWriteEndpoint(opts.OsqueryTlsDistributedWriteEndpoint),
-		runtime.WithTlsEnrollEndpoint(opts.OsqueryTlsEnrollEndpoint),
+		runtime.WithTlsConfigEndpoint(k.OsqueryTlsConfigEndpoint()),
+		runtime.WithTlsDistributedReadEndpoint(k.OsqueryTlsDistributedReadEndpoint()),
+		runtime.WithTlsDistributedWriteEndpoint(k.OsqueryTlsDistributedWriteEndpoint()),
+		runtime.WithTlsEnrollEndpoint(k.OsqueryTlsEnrollEndpoint()),
 		runtime.WithTlsHostname(k.KolideServerURL()),
-		runtime.WithTlsLoggerEndpoint(opts.OsqueryTlsLoggerEndpoint),
+		runtime.WithTlsLoggerEndpoint(k.OsqueryTlsLoggerEndpoint()),
 		runtime.WithTlsServerCerts(caCertFile),
 	)
 

@@ -102,6 +102,10 @@ func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
 	}
 }
 
+func (fc *FlagController) AutoloadedExtensions() []string {
+	return fc.cmdLineOpts.AutoloadedExtensions
+}
+
 // KolideServerURL is the URL of the management server to connect to.
 func (fc *FlagController) SetKolideServerURL(url string) error {
 	return fc.set(keys.KolideServerURL, []byte(url))
@@ -325,6 +329,27 @@ func (fc *FlagController) SetOsqueryVerbose(verbose bool) error {
 }
 func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
+}
+
+func (fc *FlagController) OsqueryFlags() []string {
+	return fc.cmdLineOpts.OsqueryFlags
+}
+
+// Osquery TLS options
+func (fc *FlagController) OsqueryTlsConfigEndpoint() string {
+	return fc.cmdLineOpts.OsqueryTlsConfigEndpoint
+}
+func (fc *FlagController) OsqueryTlsEnrollEndpoint() string {
+	return fc.cmdLineOpts.OsqueryTlsEnrollEndpoint
+}
+func (fc *FlagController) OsqueryTlsLoggerEndpoint() string {
+	return fc.cmdLineOpts.OsqueryTlsLoggerEndpoint
+}
+func (fc *FlagController) OsqueryTlsDistributedReadEndpoint() string {
+	return fc.cmdLineOpts.OsqueryTlsDistributedReadEndpoint
+}
+func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
+	return fc.cmdLineOpts.OsqueryTlsDistributedWriteEndpoint
 }
 
 // Autoupdate enables the autoupdate functionality.

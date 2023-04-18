@@ -101,6 +101,10 @@ func (k *knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, fl
 	k.flags.RegisterChangeObserver(observer, flagKeys...)
 }
 
+func (k *knapsack) AutoloadedExtensions() []string {
+	return k.flags.AutoloadedExtensions()
+}
+
 // KolideServerURL is the URL of the management server to connect to.
 func (k *knapsack) SetKolideServerURL(url string) error {
 	return k.flags.SetKolideServerURL(url)
@@ -270,6 +274,27 @@ func (k *knapsack) SetOsqueryVerbose(verbose bool) error {
 }
 func (k *knapsack) OsqueryVerbose() bool {
 	return k.flags.OsqueryVerbose()
+}
+
+func (k *knapsack) OsqueryFlags() []string {
+	return k.flags.OsqueryFlags()
+}
+
+// Osquery TLS options
+func (k *knapsack) OsqueryTlsConfigEndpoint() string {
+	return k.flags.OsqueryTlsConfigEndpoint()
+}
+func (k *knapsack) OsqueryTlsEnrollEndpoint() string {
+	return k.flags.OsqueryTlsEnrollEndpoint()
+}
+func (k *knapsack) OsqueryTlsLoggerEndpoint() string {
+	return k.flags.OsqueryTlsLoggerEndpoint()
+}
+func (k *knapsack) OsqueryTlsDistributedReadEndpoint() string {
+	return k.flags.OsqueryTlsDistributedReadEndpoint()
+}
+func (k *knapsack) OsqueryTlsDistributedWriteEndpoint() string {
+	return k.flags.OsqueryTlsDistributedWriteEndpoint()
 }
 
 // Autoupdate enables the autoupdate functionality.

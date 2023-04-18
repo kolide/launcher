@@ -11,6 +11,10 @@ type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
 
+	// AutoloadedExtensions to load with osquery, expected to be in same
+	// directory as launcher binary.
+	AutoloadedExtensions() []string
+
 	// KolideServerURL is the URL of the management server to connect to.
 	SetKolideServerURL(url string) error
 	KolideServerURL() string
@@ -115,6 +119,17 @@ type Flags interface {
 	// OsqueryVerbose puts osquery into verbose mode.
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
+
+	// OsqueryFlags defines additional flags to pass to osquery (possibly
+	// overriding Launcher defaults)
+	OsqueryFlags() []string
+
+	// Osquery TLS options
+	OsqueryTlsConfigEndpoint() string
+	OsqueryTlsEnrollEndpoint() string
+	OsqueryTlsLoggerEndpoint() string
+	OsqueryTlsDistributedReadEndpoint() string
+	OsqueryTlsDistributedWriteEndpoint() string
 
 	// Autoupdate enables the autoupdate functionality.
 	SetAutoupdate(enabled bool) error

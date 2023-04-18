@@ -130,14 +130,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
-	if opts.RootPEM != "" {
+	if k.RootPEM() != "" {
 		rootPool = x509.NewCertPool()
-		pemContents, err := os.ReadFile(opts.RootPEM)
+		pemContents, err := os.ReadFile(k.RootPEM())
 		if err != nil {
-			return fmt.Errorf("reading root certs PEM at path: %s: %w", opts.RootPEM, err)
+			return fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
 		}
 		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return fmt.Errorf("found no valid certs in PEM at path: %s", opts.RootPEM)
+			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
 		}
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -166,14 +166,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	{
 		switch k.Transport() {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
 			if err != nil {
 				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), opts.CertPins, rootPool, logger)
+			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
 		case "osquery":
 			client = service.NewNoopClient(logger)
 		default:
