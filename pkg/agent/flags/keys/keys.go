@@ -25,7 +25,6 @@ const (
 	InsecureControlTLS     FlagKey = "insecure_control_tls"
 	InsecureTLS            FlagKey = "insecure_tls"
 	InsecureTransportTLS   FlagKey = "insecure_transport"
-	CompactDbMaxTx         FlagKey = "compactdb-max-tx"
 	IAmBreakingEELicense   FlagKey = "i-am-breaking-ee-license"
 	Debug                  FlagKey = "debug"
 	DebugLogFile           FlagKey = "debug_log_file"

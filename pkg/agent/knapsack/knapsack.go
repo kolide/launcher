@@ -236,14 +236,6 @@ func (k *knapsack) InsecureTransportTLS() bool {
 	return k.flags.InsecureTransportTLS()
 }
 
-// CompactDbMaxTx func (k *knapsack) Sets the max transaction size for bolt db compaction operations
-func (k *knapsack) SetCompactDbMaxTx(max int64) error {
-	return k.flags.SetCompactDbMaxTx(max)
-}
-func (k *knapsack) CompactDbMaxTx() int64 {
-	return k.flags.CompactDbMaxTx()
-}
-
 // IAmBreakingEELicence disables the EE licence check before running the local server
 func (k *knapsack) SetIAmBreakingEELicense(disabled bool) error {
 	return k.flags.SetIAmBreakingEELicense(disabled)

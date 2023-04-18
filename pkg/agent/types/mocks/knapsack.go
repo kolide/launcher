@@ -139,20 +139,6 @@ func (_m *Knapsack) CertPins() [][]byte {
 	return r0
 }
 
-// CompactDbMaxTx provides a mock function with given fields:
-func (_m *Knapsack) CompactDbMaxTx() int64 {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	return r0
-}
-
 // ConfigStore provides a mock function with given fields:
 func (_m *Knapsack) ConfigStore() types.GetterSetterDeleterIteratorUpdater {
 	ret := _m.Called()
@@ -762,20 +748,6 @@ func (_m *Knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
 		r0 = rf(interval)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetCompactDbMaxTx provides a mock function with given fields: max
-func (_m *Knapsack) SetCompactDbMaxTx(max int64) error {
-	ret := _m.Called(max)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(int64) error); ok {
-		r0 = rf(max)
 	} else {
 		r0 = ret.Error(0)
 	}

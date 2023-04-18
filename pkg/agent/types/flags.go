@@ -100,10 +100,6 @@ type Flags interface {
 	SetInsecureTransportTLS(insecure bool) error
 	InsecureTransportTLS() bool
 
-	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
-	SetCompactDbMaxTx(max int64) error
-	CompactDbMaxTx() int64
-
 	// IAmBreakingEELicence disables the EE licence check before running the local server
 	SetIAmBreakingEELicense(disabled bool) error
 	IAmBreakingEELicense() bool

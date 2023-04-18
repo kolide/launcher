@@ -106,7 +106,6 @@ func (fc *FlagController) AutoloadedExtensions() []string {
 	return fc.cmdLineOpts.AutoloadedExtensions
 }
 
-// KolideServerURL is the URL of the management server to connect to.
 func (fc *FlagController) SetKolideServerURL(url string) error {
 	return fc.set(keys.KolideServerURL, []byte(url))
 }
@@ -116,7 +115,6 @@ func (fc *FlagController) KolideServerURL() string {
 	).get(fc.getControlServerValue(keys.KolideServerURL))
 }
 
-// KolideHosted true if using Kolide SaaS settings.
 func (fc *FlagController) SetKolideHosted(hosted bool) error {
 	return fc.set(keys.KolideHosted, boolToBytes(hosted))
 }
@@ -179,7 +177,7 @@ func (fc *FlagController) Transport() string {
 }
 
 func (fc *FlagController) LogMaxBytesPerBatch() int {
-	return 0 // TODO k.flags.LogMaxBytesPerBatch()
+	return fc.cmdLineOpts.LogMaxBytesPerBatch
 }
 
 func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
@@ -269,7 +267,6 @@ func (fc *FlagController) InsecureControlTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureControlTLS)).get(fc.getControlServerValue(keys.InsecureControlTLS))
 }
 
-// InsecureTLS disables TLS certificate verification.
 func (fc *FlagController) SetInsecureTLS(insecure bool) error {
 	return fc.set(keys.InsecureTLS, boolToBytes(insecure))
 }
@@ -277,7 +274,6 @@ func (fc *FlagController) InsecureTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureTLS)).get(fc.getControlServerValue(keys.InsecureTLS))
 }
 
-// InsecureTransport disables TLS in the transport layer.
 func (fc *FlagController) SetInsecureTransportTLS(insecure bool) error {
 	return fc.set(keys.InsecureTransportTLS, boolToBytes(insecure))
 }
@@ -285,19 +281,6 @@ func (fc *FlagController) InsecureTransportTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureTransport)).get(fc.getControlServerValue(keys.InsecureTransportTLS))
 }
 
-// CompactDbMaxTx func (fc *FlagController) Sets the max transaction size for bolt db compaction operations
-func (fc *FlagController) SetCompactDbMaxTx(max int64) error {
-	return fc.set(keys.CompactDbMaxTx, durationToBytes(time.Duration(max)))
-}
-func (fc *FlagController) CompactDbMaxTx() int64 {
-	return int64(NewDurationFlagValue(fc.logger, keys.CompactDbMaxTx,
-		WithDefault(time.Duration(fc.cmdLineOpts.CompactDbMaxTx)),
-		WithMin(1*time.Minute),
-		WithMax(24*time.Hour),
-	).get(fc.getControlServerValue(keys.CompactDbMaxTx)))
-}
-
-// IAmBreakingEELicence disables the EE licence check before running the local server
 func (fc *FlagController) SetIAmBreakingEELicense(disabled bool) error {
 	return fc.set(keys.IAmBreakingEELicense, boolToBytes(disabled))
 }
@@ -305,7 +288,6 @@ func (fc *FlagController) IAmBreakingEELicense() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.IAmBreakingEELicense)).get(fc.getControlServerValue(keys.IAmBreakingEELicense))
 }
 
-// Debug enables debug logging.
 func (fc *FlagController) SetDebug(debug bool) error {
 	return fc.set(keys.Debug, boolToBytes(debug))
 }
@@ -313,7 +295,6 @@ func (fc *FlagController) Debug() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Debug)).get(fc.getControlServerValue(keys.Debug))
 }
 
-// DebugLogFile is an optional file to mirror debug logs to.
 func (fc *FlagController) SetDebugLogFile(file string) error {
 	return fc.set(keys.DebugLogFile, []byte(file))
 }
@@ -323,7 +304,6 @@ func (fc *FlagController) DebugLogFile() string {
 	).get(fc.getControlServerValue(keys.DebugLogFile))
 }
 
-// OsqueryVerbose puts osquery into verbose mode.
 func (fc *FlagController) SetOsqueryVerbose(verbose bool) error {
 	return fc.set(keys.OsqueryVerbose, boolToBytes(verbose))
 }
@@ -335,7 +315,6 @@ func (fc *FlagController) OsqueryFlags() []string {
 	return fc.cmdLineOpts.OsqueryFlags
 }
 
-// Osquery TLS options
 func (fc *FlagController) OsqueryTlsConfigEndpoint() string {
 	return fc.cmdLineOpts.OsqueryTlsConfigEndpoint
 }
@@ -352,7 +331,6 @@ func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
 	return fc.cmdLineOpts.OsqueryTlsDistributedWriteEndpoint
 }
 
-// Autoupdate enables the autoupdate functionality.
 func (fc *FlagController) SetAutoupdate(enabled bool) error {
 	return fc.set(keys.Autoupdate, boolToBytes(enabled))
 }
@@ -360,7 +338,6 @@ func (fc *FlagController) Autoupdate() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Autoupdate)).get(fc.getControlServerValue(keys.Autoupdate))
 }
 
-// NotaryServerURL is the URL for the Notary server.
 func (fc *FlagController) SetNotaryServerURL(url string) error {
 	return fc.set(keys.NotaryServerURL, []byte(url))
 }
@@ -370,7 +347,6 @@ func (fc *FlagController) NotaryServerURL() string {
 	).get(fc.getControlServerValue(keys.NotaryServerURL))
 }
 
-// TufServerURL is the URL for the tuf server.
 func (fc *FlagController) SetTufServerURL(url string) error {
 	return fc.set(keys.TufServerURL, []byte(url))
 }
@@ -380,7 +356,6 @@ func (fc *FlagController) TufServerURL() string {
 	).get(fc.getControlServerValue(keys.TufServerURL))
 }
 
-// MirrorServerURL is the URL for the Notary mirror.
 func (fc *FlagController) SetMirrorServerURL(url string) error {
 	return fc.set(keys.MirrorServerURL, []byte(url))
 }
@@ -390,7 +365,6 @@ func (fc *FlagController) MirrorServerURL() string {
 	).get(fc.getControlServerValue(keys.MirrorServerURL))
 }
 
-// AutoupdateInterval is the interval at which Launcher will check for updates.
 func (fc *FlagController) SetAutoupdateInterval(interval time.Duration) error {
 	return fc.set(keys.AutoupdateInterval, durationToBytes(interval))
 }
@@ -402,7 +376,6 @@ func (fc *FlagController) AutoupdateInterval() time.Duration {
 	).get(fc.getControlServerValue(keys.AutoupdateInterval))
 }
 
-// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 func (fc *FlagController) SetUpdateChannel(channel string) error {
 	return fc.set(keys.UpdateChannel, []byte(channel))
 }
@@ -413,7 +386,6 @@ func (fc *FlagController) UpdateChannel() string {
 	).get(fc.getControlServerValue(keys.UpdateChannel))
 }
 
-// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
 func (fc *FlagController) SetNotaryPrefix(prefix string) error {
 	return fc.set(keys.NotaryPrefix, []byte(prefix))
 }
@@ -423,7 +395,6 @@ func (fc *FlagController) NotaryPrefix() string {
 	).get(fc.getControlServerValue(keys.NotaryPrefix))
 }
 
-// AutoupdateInitialDelay func (fc *FlagController) Set an initial startup delay on the autoupdater process.
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return fc.set(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
@@ -435,7 +406,6 @@ func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
 	).get(fc.getControlServerValue(keys.AutoupdateInitialDelay))
 }
 
-// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 func (fc *FlagController) SetUpdateDirectory(directory string) error {
 	return fc.set(keys.UpdateDirectory, []byte(directory))
 }
