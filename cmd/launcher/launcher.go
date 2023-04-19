@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +31,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -55,6 +57,21 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 	level.Debug(logger).Log("msg", "runLauncher starting")
+
+	// We've seen launcher intermittently be unable to recover from
+	// DNS failures in the past, so this check gives us a little bit
+	// of room to ensure that we are able to resolve DNS requests
+	// before proceeding with starting launcher.
+	if err := backoff.WaitFor(func() error {
+		_, lookupErr := net.LookupIP(opts.KolideServerURL)
+		return lookupErr
+	}, 10*time.Second, 1*time.Second); err != nil {
+		level.Info(logger).Log(
+			"msg", "could not successfully perform IP lookup before starting launcher, proceeding anyway",
+			"kolide_server_url", opts.KolideServerURL,
+			"err", err,
+		)
+	}
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
