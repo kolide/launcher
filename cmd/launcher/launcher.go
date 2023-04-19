@@ -56,6 +56,16 @@ const (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
+	// If delay_start is configured, wait before running launcher.
+	if opts.DelayStart > 0*time.Second {
+		level.Debug(logger).Log(
+			"msg", "delay_start configured, waiting before starting launcher",
+			"delay_start", opts.DelayStart.String(),
+		)
+		time.Sleep(opts.DelayStart)
+	}
+
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
 	// We've seen launcher intermittently be unable to recover from
