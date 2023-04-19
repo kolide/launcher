@@ -97,7 +97,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.5.0 // indirect
-	github.com/shoenig/go-m1cpu v0.1.4 // indirect
+	github.com/shoenig/go-m1cpu v0.1.5 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.8.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
