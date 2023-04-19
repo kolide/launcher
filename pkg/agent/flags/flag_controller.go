@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
+	"golang.org/x/exp/maps"
 )
 
 // FlagController is responsible for retrieving flag values from the appropriate sources,
@@ -51,9 +52,8 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 	return value
 }
 
-// set stores the value for a FlagKey in the agent flags store. Typically, this is used by the control
-// server to provide a control-server-provided value.
-func (fc *FlagController) set(key keys.FlagKey, value []byte) error {
+// setControlServerValue stores a control-server-provided value in the agent flags store.
+func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) error {
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {
 		level.Debug(fc.logger).Log("msg", "failed to set control server key", "key", key, "err", err)
@@ -72,12 +72,7 @@ func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 	deletedKeys, err := fc.agentFlagsStore.Update(kvPairs)
 
 	// Extract just the keys from the key-value pairs
-	updatedKeys := make([]string, len(kvPairs))
-	i := 0
-	for k := range kvPairs {
-		updatedKeys[i] = k
-		i++
-	}
+	updatedKeys := maps.Keys(kvPairs)
 
 	// Changed keys is the union of updated keys and deleted keys
 	changedKeys := append(updatedKeys, deletedKeys...)
@@ -114,7 +109,7 @@ func (fc *FlagController) AutoloadedExtensions() []string {
 }
 
 func (fc *FlagController) SetKolideServerURL(url string) error {
-	return fc.set(keys.KolideServerURL, []byte(url))
+	return fc.setControlServerValue(keys.KolideServerURL, []byte(url))
 }
 func (fc *FlagController) KolideServerURL() string {
 	return NewStringFlagValue(
@@ -123,7 +118,7 @@ func (fc *FlagController) KolideServerURL() string {
 }
 
 func (fc *FlagController) SetKolideHosted(hosted bool) error {
-	return fc.set(keys.KolideHosted, boolToBytes(hosted))
+	return fc.setControlServerValue(keys.KolideHosted, boolToBytes(hosted))
 }
 func (fc *FlagController) KolideHosted() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.KolideHosted))
@@ -164,7 +159,7 @@ func (fc *FlagController) RootPEM() string {
 }
 
 func (fc *FlagController) SetLoggingInterval(interval time.Duration) error {
-	return fc.set(keys.LoggingInterval, durationToBytes(interval))
+	return fc.setControlServerValue(keys.LoggingInterval, durationToBytes(interval))
 }
 func (fc *FlagController) LoggingInterval() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.LoggingInterval,
@@ -191,14 +186,14 @@ func (fc *FlagController) LogMaxBytesPerBatch() int {
 }
 
 func (fc *FlagController) SetDesktopEnabled(enabled bool) error {
-	return fc.set(keys.DesktopEnabled, boolToBytes(enabled))
+	return fc.setControlServerValue(keys.DesktopEnabled, boolToBytes(enabled))
 }
 func (fc *FlagController) DesktopEnabled() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.DesktopEnabled))
 }
 
 func (fc *FlagController) SetDesktopUpdateInterval(interval time.Duration) error {
-	return fc.set(keys.DesktopUpdateInterval, durationToBytes(interval))
+	return fc.setControlServerValue(keys.DesktopUpdateInterval, durationToBytes(interval))
 }
 func (fc *FlagController) DesktopUpdateInterval() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.DesktopUpdateInterval,
@@ -209,7 +204,7 @@ func (fc *FlagController) DesktopUpdateInterval() time.Duration {
 }
 
 func (fc *FlagController) SetDesktopMenuRefreshInterval(interval time.Duration) error {
-	return fc.set(keys.DesktopMenuRefreshInterval, durationToBytes(interval))
+	return fc.setControlServerValue(keys.DesktopMenuRefreshInterval, durationToBytes(interval))
 }
 func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.DesktopMenuRefreshInterval,
@@ -220,21 +215,21 @@ func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
 }
 
 func (fc *FlagController) SetDebugServerData(debug bool) error {
-	return fc.set(keys.DebugServerData, boolToBytes(debug))
+	return fc.setControlServerValue(keys.DebugServerData, boolToBytes(debug))
 }
 func (fc *FlagController) DebugServerData() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.DebugServerData))
 }
 
 func (fc *FlagController) SetForceControlSubsystems(force bool) error {
-	return fc.set(keys.ForceControlSubsystems, boolToBytes(force))
+	return fc.setControlServerValue(keys.ForceControlSubsystems, boolToBytes(force))
 }
 func (fc *FlagController) ForceControlSubsystems() bool {
 	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.ForceControlSubsystems))
 }
 
 func (fc *FlagController) SetControlServerURL(url string) error {
-	return fc.set(keys.ControlServerURL, []byte(url))
+	return fc.setControlServerValue(keys.ControlServerURL, []byte(url))
 }
 func (fc *FlagController) ControlServerURL() string {
 	return NewStringFlagValue(
@@ -243,7 +238,7 @@ func (fc *FlagController) ControlServerURL() string {
 }
 
 func (fc *FlagController) SetControlRequestInterval(interval time.Duration) error {
-	return fc.set(keys.ControlRequestInterval, durationToBytes(interval))
+	return fc.setControlServerValue(keys.ControlRequestInterval, durationToBytes(interval))
 }
 func (fc *FlagController) SetControlRequestIntervalOverride(interval, duration time.Duration) {
 	// Always notify observers when overrides start, so they know to refresh.
@@ -286,49 +281,49 @@ func (fc *FlagController) ControlRequestInterval() time.Duration {
 }
 
 func (fc *FlagController) SetDisableControlTLS(disabled bool) error {
-	return fc.set(keys.DisableControlTLS, boolToBytes(disabled))
+	return fc.setControlServerValue(keys.DisableControlTLS, boolToBytes(disabled))
 }
 func (fc *FlagController) DisableControlTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.DisableControlTLS)).get(fc.getControlServerValue(keys.DisableControlTLS))
 }
 
 func (fc *FlagController) SetInsecureControlTLS(disabled bool) error {
-	return fc.set(keys.InsecureControlTLS, boolToBytes(disabled))
+	return fc.setControlServerValue(keys.InsecureControlTLS, boolToBytes(disabled))
 }
 func (fc *FlagController) InsecureControlTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureControlTLS)).get(fc.getControlServerValue(keys.InsecureControlTLS))
 }
 
 func (fc *FlagController) SetInsecureTLS(insecure bool) error {
-	return fc.set(keys.InsecureTLS, boolToBytes(insecure))
+	return fc.setControlServerValue(keys.InsecureTLS, boolToBytes(insecure))
 }
 func (fc *FlagController) InsecureTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureTLS)).get(fc.getControlServerValue(keys.InsecureTLS))
 }
 
 func (fc *FlagController) SetInsecureTransportTLS(insecure bool) error {
-	return fc.set(keys.InsecureTransportTLS, boolToBytes(insecure))
+	return fc.setControlServerValue(keys.InsecureTransportTLS, boolToBytes(insecure))
 }
 func (fc *FlagController) InsecureTransportTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureTransport)).get(fc.getControlServerValue(keys.InsecureTransportTLS))
 }
 
 func (fc *FlagController) SetIAmBreakingEELicense(disabled bool) error {
-	return fc.set(keys.IAmBreakingEELicense, boolToBytes(disabled))
+	return fc.setControlServerValue(keys.IAmBreakingEELicense, boolToBytes(disabled))
 }
 func (fc *FlagController) IAmBreakingEELicense() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.IAmBreakingEELicense)).get(fc.getControlServerValue(keys.IAmBreakingEELicense))
 }
 
 func (fc *FlagController) SetDebug(debug bool) error {
-	return fc.set(keys.Debug, boolToBytes(debug))
+	return fc.setControlServerValue(keys.Debug, boolToBytes(debug))
 }
 func (fc *FlagController) Debug() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Debug)).get(fc.getControlServerValue(keys.Debug))
 }
 
 func (fc *FlagController) SetDebugLogFile(file string) error {
-	return fc.set(keys.DebugLogFile, []byte(file))
+	return fc.setControlServerValue(keys.DebugLogFile, []byte(file))
 }
 func (fc *FlagController) DebugLogFile() string {
 	return NewStringFlagValue(
@@ -337,7 +332,7 @@ func (fc *FlagController) DebugLogFile() string {
 }
 
 func (fc *FlagController) SetOsqueryVerbose(verbose bool) error {
-	return fc.set(keys.OsqueryVerbose, boolToBytes(verbose))
+	return fc.setControlServerValue(keys.OsqueryVerbose, boolToBytes(verbose))
 }
 func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
@@ -364,14 +359,14 @@ func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
 }
 
 func (fc *FlagController) SetAutoupdate(enabled bool) error {
-	return fc.set(keys.Autoupdate, boolToBytes(enabled))
+	return fc.setControlServerValue(keys.Autoupdate, boolToBytes(enabled))
 }
 func (fc *FlagController) Autoupdate() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Autoupdate)).get(fc.getControlServerValue(keys.Autoupdate))
 }
 
 func (fc *FlagController) SetNotaryServerURL(url string) error {
-	return fc.set(keys.NotaryServerURL, []byte(url))
+	return fc.setControlServerValue(keys.NotaryServerURL, []byte(url))
 }
 func (fc *FlagController) NotaryServerURL() string {
 	return NewStringFlagValue(
@@ -380,7 +375,7 @@ func (fc *FlagController) NotaryServerURL() string {
 }
 
 func (fc *FlagController) SetTufServerURL(url string) error {
-	return fc.set(keys.TufServerURL, []byte(url))
+	return fc.setControlServerValue(keys.TufServerURL, []byte(url))
 }
 func (fc *FlagController) TufServerURL() string {
 	return NewStringFlagValue(
@@ -389,7 +384,7 @@ func (fc *FlagController) TufServerURL() string {
 }
 
 func (fc *FlagController) SetMirrorServerURL(url string) error {
-	return fc.set(keys.MirrorServerURL, []byte(url))
+	return fc.setControlServerValue(keys.MirrorServerURL, []byte(url))
 }
 func (fc *FlagController) MirrorServerURL() string {
 	return NewStringFlagValue(
@@ -398,7 +393,7 @@ func (fc *FlagController) MirrorServerURL() string {
 }
 
 func (fc *FlagController) SetAutoupdateInterval(interval time.Duration) error {
-	return fc.set(keys.AutoupdateInterval, durationToBytes(interval))
+	return fc.setControlServerValue(keys.AutoupdateInterval, durationToBytes(interval))
 }
 func (fc *FlagController) AutoupdateInterval() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.AutoupdateInterval,
@@ -409,7 +404,7 @@ func (fc *FlagController) AutoupdateInterval() time.Duration {
 }
 
 func (fc *FlagController) SetUpdateChannel(channel string) error {
-	return fc.set(keys.UpdateChannel, []byte(channel))
+	return fc.setControlServerValue(keys.UpdateChannel, []byte(channel))
 }
 func (fc *FlagController) UpdateChannel() string {
 	return NewStringFlagValue(
@@ -419,7 +414,7 @@ func (fc *FlagController) UpdateChannel() string {
 }
 
 func (fc *FlagController) SetNotaryPrefix(prefix string) error {
-	return fc.set(keys.NotaryPrefix, []byte(prefix))
+	return fc.setControlServerValue(keys.NotaryPrefix, []byte(prefix))
 }
 func (fc *FlagController) NotaryPrefix() string {
 	return NewStringFlagValue(
@@ -428,7 +423,7 @@ func (fc *FlagController) NotaryPrefix() string {
 }
 
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
-	return fc.set(keys.AutoupdateInitialDelay, durationToBytes(delay))
+	return fc.setControlServerValue(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
 func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.AutoupdateInitialDelay,
@@ -439,7 +434,7 @@ func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
 }
 
 func (fc *FlagController) SetUpdateDirectory(directory string) error {
-	return fc.set(keys.UpdateDirectory, []byte(directory))
+	return fc.setControlServerValue(keys.UpdateDirectory, []byte(directory))
 }
 func (fc *FlagController) UpdateDirectory() string {
 	return NewStringFlagValue(

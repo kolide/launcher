@@ -8,6 +8,7 @@ type FlagKey string
 // 2. Add a getter and setter to the Flags interface (flags.go)
 // 3. Implement the getter and setter in the Knapsack, which delegates the call to the FlagController
 // 4. Implement the getter and setter in the FlagController, providing defaults, limits, and overrides
+// 4. Implement tests for any new APIs, sanitizers, limits, overrides.
 const (
 	KolideServerURL            FlagKey = "hostname"
 	KolideHosted               FlagKey = "kolide_hosted"
