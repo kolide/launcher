@@ -200,7 +200,7 @@ func TestControllerDurationFlags(t *testing.T) {
 			name:       "DesktopMenuRefreshInterval",
 			getFlag:    func(fc *FlagController) time.Duration { return fc.DesktopMenuRefreshInterval() },
 			setFlag:    func(fc *FlagController, d time.Duration) error { return fc.SetDesktopMenuRefreshInterval(d) },
-			valueToSet: 7 * time.Second,
+			valueToSet: 7 * time.Minute,
 		},
 		{
 			name:       "ControlRequestInterval",

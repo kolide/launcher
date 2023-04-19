@@ -254,8 +254,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	// runEECode feels like it should move up to the opts level. // TODO comment still accurate?
-	// We have some stuff there that sets `controlServerURL`
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
 
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
