@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -374,7 +373,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 	}
 
-	o.extensionManagerClient, err = osquery.NewClient(paths.extensionSocketPath, 5*time.Second)
+	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
