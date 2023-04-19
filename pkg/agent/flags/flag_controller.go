@@ -21,6 +21,7 @@ type FlagController struct {
 	overrideMutex          sync.RWMutex
 	controlRequestOverride FlagValueOverride
 	observers              map[types.FlagsChangeObserver][]keys.FlagKey
+	observersMutex         sync.RWMutex
 }
 
 func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
@@ -88,11 +89,17 @@ func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 }
 
 func (fc *FlagController) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
+	fc.observersMutex.Lock()
+	defer fc.observersMutex.Unlock()
+
 	fc.observers[observer] = append(fc.observers[observer], flagKeys...)
 }
 
 // notifyObservers informs all observers of the keys that they have changed.
 func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
+	fc.observersMutex.RLock()
+	defer fc.observersMutex.RUnlock()
+
 	for observer, observedKeys := range fc.observers {
 		changedKeys := keys.Intersection(observedKeys, flagKeys)
 
