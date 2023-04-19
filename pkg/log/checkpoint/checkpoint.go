@@ -154,10 +154,14 @@ func (c *checkPointer) logIpLookups() {
 }
 
 func urlsToTest(flags types.Flags) []*url.URL {
-	addrsToTest := []string{flags.KolideServerURL(), flags.ControlServerURL()}
+	addrsToTest := []string{flags.KolideServerURL()}
 
 	if flags.Autoupdate() {
 		addrsToTest = append(addrsToTest, flags.MirrorServerURL(), flags.NotaryServerURL(), flags.TufServerURL())
+	}
+
+	if flags.ControlServerURL() != "" {
+		addrsToTest = append(addrsToTest, flags.ControlServerURL())
 	}
 
 	urls := []*url.URL{}

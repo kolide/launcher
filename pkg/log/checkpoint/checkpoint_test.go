@@ -17,29 +17,25 @@ func Test_urlsToTest(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		args args
+		mock func(t *testing.T) *mocks.Flags
 		want []*url.URL
 	}{
 		{
 			name: "kolide_saas",
-			args: args{
-				opts: launcher.Options{
-					KolideServerURL:  "k2device.kolide.com:443",
-					Control:          true,
-					ControlServerURL: "k2control.kolide.com:443",
-					Autoupdate:       true,
-					NotaryServerURL:  "notary.kolide.co:443",
-					TufServerURL:     "tuf.kolide.com:443",
-					MirrorServerURL:  "dl.kolide.co:443",
-				},
+			mock: func(t *testing.T) *mocks.Flags {
+				m := mocks.NewFlags(t)
+				m.On("InsecureTransportTLS").Return(false)
+				m.On("KolideServerURL").Return("k2device.kolide.com:443")
+				m.On("ControlServerURL").Return("k2control.kolide.com:443")
+				m.On("Autoupdate").Return(true)
+				m.On("MirrorServerURL").Return("dl.kolide.co:443")
+				m.On("NotaryServerURL").Return("notary.kolide.co:443")
+				m.On("TufServerURL").Return("tuf.kolide.com:443")
+				return m
 			},
 			want: []*url.URL{
 				{
 					Host:   "k2device.kolide.com:443",
-					Scheme: "https",
-				},
-				{
-					Host:   "k2control.kolide.com:443",
 					Scheme: "https",
 				},
 				{
@@ -54,18 +50,24 @@ func Test_urlsToTest(t *testing.T) {
 					Host:   "tuf.kolide.com:443",
 					Scheme: "https",
 				},
+				{
+					Host:   "k2control.kolide.com:443",
+					Scheme: "https",
+				},
 			},
 		},
 		{
 			name: "no_control",
-			args: args{
-				opts: launcher.Options{
-					KolideServerURL: "k2device.kolide.com:443",
-					Autoupdate:      true,
-					NotaryServerURL: "notary.kolide.co:443",
-					TufServerURL:    "tuf.kolide.com:443",
-					MirrorServerURL: "dl.kolide.co:443",
-				},
+			mock: func(t *testing.T) *mocks.Flags {
+				m := mocks.NewFlags(t)
+				m.On("InsecureTransportTLS").Return(false)
+				m.On("KolideServerURL").Return("k2device.kolide.com:443")
+				m.On("ControlServerURL").Return("")
+				m.On("Autoupdate").Return(true)
+				m.On("MirrorServerURL").Return("dl.kolide.co:443")
+				m.On("NotaryServerURL").Return("notary.kolide.co:443")
+				m.On("TufServerURL").Return("tuf.kolide.com:443")
+				return m
 			},
 			want: []*url.URL{
 				{
@@ -88,15 +90,13 @@ func Test_urlsToTest(t *testing.T) {
 		},
 		{
 			name: "no_autoupdate",
-			args: args{
-				opts: launcher.Options{
-					KolideServerURL:  "k2device.kolide.com:443",
-					Control:          true,
-					ControlServerURL: "k2control.kolide.com:443",
-					NotaryServerURL:  "notary.kolide.co:443",
-					TufServerURL:     "tuf.kolide.com:443",
-					MirrorServerURL:  "dl.kolide.co:443",
-				},
+			mock: func(t *testing.T) *mocks.Flags {
+				m := mocks.NewFlags(t)
+				m.On("InsecureTransportTLS").Return(false)
+				m.On("KolideServerURL").Return("k2device.kolide.com:443")
+				m.On("ControlServerURL").Return("k2control.kolide.com:443")
+				m.On("Autoupdate").Return(false)
+				return m
 			},
 			want: []*url.URL{
 				{
@@ -115,16 +115,7 @@ func Test_urlsToTest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockFlags := mocks.NewFlags(t)
-			mockFlags.On("InsecureTransportTLS").Return(false)
-			mockFlags.On("KolideServerURL").Return("k2device.kolide.com:443")
-			mockFlags.On("ControlServerURL").Return("k2control.kolide.com:443")
-			mockFlags.On("Autoupdate").Return(true)
-			mockFlags.On("MirrorServerURL").Return("dl.kolide.co:443")
-			mockFlags.On("NotaryServerURL").Return("notary.kolide.co:443")
-			mockFlags.On("TufServerURL").Return("tuf.kolide.com:443")
-
-			got := urlsToTest(mockFlags)
+			got := urlsToTest(tt.mock(t))
 
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("urlsToTest() = %v, want %v", got, tt.want)
