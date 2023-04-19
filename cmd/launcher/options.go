@@ -90,6 +90,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flInsecureTransport    = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
 		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
+		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -217,6 +218,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		ControlServerURL:                   controlServerURL,
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
+		DelayStart:                         *flDelayStart,
 		DisableControlTLS:                  disableControlTLS,
 		InsecureControlTLS:                 insecureControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
