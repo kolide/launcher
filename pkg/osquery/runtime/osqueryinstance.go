@@ -537,6 +537,22 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	return cmd, nil
 }
 
+// StartOsqueryClient will create and return a new osquery client with a connection
+// over the socket at the provided path. It will retry for up to 10 seconds to create
+// the connection in the event of a failure.
+func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.ExtensionManagerClient, error) {
+	var client *osquery.ExtensionManagerClient
+	if err := backoff.WaitFor(func() error {
+		var newErr error
+		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2)
+		return newErr
+	}, socketOpenTimeout, socketOpenInterval); err != nil {
+		return nil, fmt.Errorf("could not create an extension client: %w", err)
+	}
+
+	return client, nil
+}
+
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
 func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, plugins []osquery.OsqueryPlugin) error {
