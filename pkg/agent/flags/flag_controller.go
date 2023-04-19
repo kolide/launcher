@@ -156,6 +156,9 @@ func (fc *FlagController) RootPEM() string {
 	).get(nil)
 }
 
+func (fc *FlagController) SetLoggingInterval(interval time.Duration) error {
+	return fc.set(keys.LoggingInterval, durationToBytes(interval))
+}
 func (fc *FlagController) LoggingInterval() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.LoggingInterval,
 		WithDefault(fc.cmdLineOpts.LoggingInterval),

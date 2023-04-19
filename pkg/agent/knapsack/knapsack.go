@@ -143,6 +143,9 @@ func (k *knapsack) RootPEM() string {
 	return k.flags.RootPEM()
 }
 
+func (k *knapsack) SetLoggingInterval(interval time.Duration) error {
+	return k.flags.SetLoggingInterval(interval)
+}
 func (k *knapsack) LoggingInterval() time.Duration {
 	return k.flags.LoggingInterval()
 }

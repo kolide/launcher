@@ -851,6 +851,20 @@ func (_m *Flags) SetKolideServerURL(url string) error {
 	return r0
 }
 
+// SetLoggingInterval provides a mock function with given fields: interval
+func (_m *Flags) SetLoggingInterval(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetMirrorServerURL provides a mock function with given fields: url
 func (_m *Flags) SetMirrorServerURL(url string) error {
 	ret := _m.Called(url)

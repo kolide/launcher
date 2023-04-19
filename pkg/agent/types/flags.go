@@ -47,6 +47,7 @@ type Flags interface {
 
 	// LoggingInterval is the interval at which logs should be flushed to
 	// the server.
+	SetLoggingInterval(interval time.Duration) error
 	LoggingInterval() time.Duration
 
 	// EnableInitialRunner enables running scheduled queries immediately
