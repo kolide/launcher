@@ -64,6 +64,14 @@ type ServiceInstall struct {
 	Vital             YesNoType          `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
 	UtilServiceConfig *UtilServiceConfig `xml:",omitempty"`
 	ServiceConfig     *ServiceConfig     `xml:",omitempty"`
+	ServiceDependency *ServiceDependency `xml:",omitempty"`
+}
+
+// ServiceDependency implements
+// https://wixtoolset.org/docs/v3/xsd/wix/servicedependency/
+type ServiceDependency struct {
+	Id    string    `xml:",attr,omitempty"`
+	Group YesNoType `xml:",attr,omitempty"`
 }
 
 // ServiceControl implements
@@ -151,6 +159,15 @@ func WithDisabledService() ServiceOpt {
 	}
 }
 
+func WithServiceDependency(service string) ServiceOpt {
+	return func(s *Service) {
+		s.serviceInstall.ServiceDependency = &ServiceDependency{
+			Id:    service,
+			Group: No, // set to no since `service` is the name of a singular service and not a group of services
+		}
+	}
+}
+
 // ServiceArgs takes an array of args, wraps them in spaces, then
 // joins them into a string. Handling spaces in the arguments is a bit
 // gnarly. Some parts of windows use ` as an escape character, but
@@ -188,8 +205,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	serviceConfig := &ServiceConfig{
-		OnInstall:   Yes,
-		OnReinstall: Yes,
+		OnInstall:        Yes,
+		OnReinstall:      Yes,
+		DelayedAutoStart: No,
 	}
 
 	// If a service name is not specified, replace the .exe with a svc,

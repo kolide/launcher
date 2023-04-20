@@ -120,7 +120,8 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	if includeService {
 		launcherService := wix.NewService("launcher.exe",
-			wix.WithDelayedStart(),
+			// Ensure that the service does not start until DNS is available, to avoid unrecoverable DNS failures in launcher.
+			wix.WithServiceDependency("Dnscache"),
 			wix.ServiceName(fmt.Sprintf("Launcher%sSvc", strings.Title(po.Identifier))),
 			wix.ServiceArgs([]string{"svc", "-config", po.FlagFile}),
 			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),

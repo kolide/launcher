@@ -28,7 +28,7 @@ func TestService(t *testing.T) {
 
 	expectedXml := `<ServiceInstall Account="[SERVICEACCOUNT]" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes">
                         <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
-                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/2006/wi" OnInstall="yes" OnReinstall="yes"></ServiceConfig>
+                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/2006/wi" DelayedAutoStart="no" OnInstall="yes" OnReinstall="yes"></ServiceConfig>
                     </ServiceInstall>
                     <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
 
@@ -84,6 +84,11 @@ func TestServiceOptions(t *testing.T) {
 			in:   NewService("snake-case.exe", WithDelayedStart()),
 			out:  []string{`DelayedAutoStart="yes"`},
 			name: "DelayedStart",
+		},
+		{
+			in:   NewService("daemon.exe", WithServiceDependency("Dnscache")),
+			out:  []string{`ServiceDependency Id="Dnscache"`},
+			name: "ServiceDependency",
 		},
 	}
 
