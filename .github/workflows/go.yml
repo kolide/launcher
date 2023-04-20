@@ -61,12 +61,7 @@ jobs:
       run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
 
     - name: Build
-      if: ${{ ! contains(matrix.os, 'ubuntu') }}
       run: make -j2 github-build
-
-    - name: Build (No Cross Compiles)
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      run: make -j2 github-build-no-cross
 
     - name: Lipo
       run: make github-lipo
