@@ -63,6 +63,8 @@ jobs:
     - name: Set up zig
       if: ${{ contains(matrix.os, 'ubuntu') }}
       uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.9.1 # Avoiding zig issue 13385 by downgrading -- upgrade to 0.11.0 when available
 
     - name: Build
       run: make -j2 github-build
