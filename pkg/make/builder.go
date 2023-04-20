@@ -173,8 +173,6 @@ func New(opts ...Option) *Builder {
 			fmt.Sprintf("ZIGTARGET=%s", zigTarget(b.os, b.arch)),
 			fmt.Sprintf("CC=%s", filepath.Join(cwd, "tools", "zcc")),
 			fmt.Sprintf("CXX=%s", filepath.Join(cwd, "tools", "zxx")),
-			fmt.Sprintf("CC_FOR_TARGET=%s", filepath.Join(cwd, "tools", "zcc")),
-			fmt.Sprintf("CXX_FOR_TARGET=%s", filepath.Join(cwd, "tools", "zxx")),
 		)
 	}
 
@@ -505,6 +503,9 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		var ldFlags []string
 		if b.static {
 			ldFlags = append(ldFlags, "-d -linkmode internal")
+		} else if b.os == "linux" && b.arch != runtime.GOARCH {
+			// Cross-compiling for Linux requires external linking
+			ldFlags = append(ldFlags, "-linkmode external")
 		}
 
 		if !b.notStripped {
