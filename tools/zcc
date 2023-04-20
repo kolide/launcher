@@ -2,4 +2,4 @@
 # This is working around a go bug prior to 1.17
 # https://dev.to/kristoff/zig-makes-go-cross-compilation-just-work-29ho
 mkdir -p /tmp/zigcache
-ZIG_LOCAL_CACHE_DIR="/tmp/zigcache" zig cc -Wno-deprecated-non-prototype -target "$ZIGTARGET" "$@"
+ZIG_LOCAL_CACHE_DIR="/tmp/zigcache" zig cc -target "$ZIGTARGET" "$@"
