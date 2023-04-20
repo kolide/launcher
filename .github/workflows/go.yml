@@ -20,7 +20,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-11
+          - macos-12
           - windows-latest
     steps:
     - name: Check out code
@@ -136,7 +136,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-11
+          - macos-12
           - windows-latest
     steps:
     - uses: actions/checkout@v3
