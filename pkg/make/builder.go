@@ -503,6 +503,9 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		var ldFlags []string
 		if b.static {
 			ldFlags = append(ldFlags, "-d -linkmode internal")
+		} else if b.os == "linux" && b.arch != runtime.GOARCH {
+			// Cross-compiling for Linux requires external linking
+			ldFlags = append(ldFlags, "-linkmode external")
 		}
 
 		if !b.notStripped {
