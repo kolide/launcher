@@ -173,6 +173,8 @@ func New(opts ...Option) *Builder {
 			fmt.Sprintf("ZIGTARGET=%s", zigTarget(b.os, b.arch)),
 			fmt.Sprintf("CC=%s", filepath.Join(cwd, "tools", "zcc")),
 			fmt.Sprintf("CXX=%s", filepath.Join(cwd, "tools", "zxx")),
+			fmt.Sprintf("CC_FOR_TARGET=%s", filepath.Join(cwd, "tools", "zcc")),
+			fmt.Sprintf("CXX_FOR_TARGET=%s", filepath.Join(cwd, "tools", "zxx")),
 		)
 	}
 
