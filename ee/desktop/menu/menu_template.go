@@ -8,17 +8,23 @@ import (
 )
 
 const (
-	funcHasCapability = "hasCapability"
-	funcRelativeTime  = "relativeTime"
+	CurrentMenuVersion string = "0.1.0" // Bump menu version when major changes occur to the TemplateData format
+
+	// Capabilities queriable via hasCapability
+	funcHasCapability     = "hasCapability"
+	funcRelativeTime      = "relativeTime"
+	errorlessTemplateVars = "errorlessTemplateVars" // capability to evaluate undefined template vars without failing
+
+	// TemplateData keys
+	LauncherVersion    string = "LauncherVersion"
+	LauncherRevision   string = "LauncherRevision"
+	GoVersion          string = "GoVersion"
+	ServerHostname     string = "ServerHostname"
+	LastMenuUpdateTime string = "LastMenuUpdateTime"
+	MenuVersion        string = "MenuVersion"
 )
 
-type TemplateData struct {
-	LauncherVersion    string `json:",omitempty"`
-	LauncherRevision   string `json:",omitempty"`
-	GoVersion          string `json:",omitempty"`
-	ServerHostname     string `json:",omitempty"`
-	LastMenuUpdateTime int64  `json:",omitempty"`
-}
+type TemplateData map[string]interface{}
 
 type templateParser struct {
 	td *TemplateData
@@ -42,7 +48,10 @@ func (tp *templateParser) Parse(text string) (string, error) {
 	t, err := template.New("menu_template").Funcs(template.FuncMap{
 		// hasCapability enables interoperability between different versions of launcher
 		funcHasCapability: func(capability string) bool {
-			if capability == funcRelativeTime {
+			switch capability {
+			case funcRelativeTime:
+				return true
+			case errorlessTemplateVars:
 				return true
 			}
 			return false
