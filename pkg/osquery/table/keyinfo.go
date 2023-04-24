@@ -59,6 +59,11 @@ func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryCon
 	for _, constraint := range q.Constraints {
 		ki, err := t.kIdentifer.IdentifyFile(constraint.Expression)
 		if err != nil {
+			level.Debug(t.logger).Log(
+				"msg", "Failed to get keyinfo for file",
+				"file", constraint.Expression,
+				"err", err,
+			)
 			continue
 		}
 
