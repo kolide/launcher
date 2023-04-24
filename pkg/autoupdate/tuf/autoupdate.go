@@ -20,7 +20,6 @@ import (
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
-	"golang.org/x/sync/errgroup"
 )
 
 //go:embed assets/tuf/root.json
@@ -210,32 +209,27 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	// Allow checking for and downloading launcher and osqueryd releases to happen in parallel
-	var wg errgroup.Group
+	// Check for and download any new releases that are available
 	updatesDownloaded := make([]bool, len(binaries))
+	updateErrors := make([]error, 0)
 	for i, binary := range binaries {
-		i := i
-		binary := binary
-		wg.Go(func() error {
-			downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
-			if err != nil {
-				return fmt.Errorf("could not download update for %s: %w", binary, err)
-			}
+		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
+		if err != nil {
+			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
+		}
 
-			if downloadedUpdateVersion != "" {
-				level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
-				updatesDownloaded[i] = true
-			} else {
-				updatesDownloaded[i] = false
-			}
+		if downloadedUpdateVersion != "" {
+			level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
+			updatesDownloaded[i] = true
+		} else {
+			updatesDownloaded[i] = false
+		}
 
-			return nil
-		})
 	}
 
-	// Wait for both update downloads to complete
-	if err := wg.Wait(); err != nil {
-		return fmt.Errorf("could not download updates: %w", err)
+	// If an update failed, save the error
+	if len(updateErrors) > 0 {
+		return fmt.Errorf("could not download updates: %+v", updateErrors)
 	}
 
 	for _, updateDownloaded := range updatesDownloaded {
