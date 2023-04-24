@@ -48,7 +48,7 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
-	AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool
+	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
 }
@@ -257,7 +257,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
-	if ta.libraryManager.AvailableInLibrary(binary, release) {
+	if ta.libraryManager.Available(binary, release) {
 		return "", nil
 	}
 

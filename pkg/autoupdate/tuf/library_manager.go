@@ -80,9 +80,9 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 	return filepath.Join(ulm.baseDir, string(binary))
 }
 
-// AvailableInLibrary determines if the given target is already available, either as the currently-running
+// Available determines if the given target is already available, either as the currently-running
 // binary or within the update library.
-func (ulm *updateLibraryManager) AvailableInLibrary(binary autoupdatableBinary, targetFilename string) bool {
+func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
 	currentVersion, err := ulm.currentRunningVersion(binary)
@@ -111,7 +111,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
 
-	if ulm.AvailableInLibrary(binary, targetFilename) {
+	if ulm.Available(binary, targetFilename) {
 		return nil
 	}
 
