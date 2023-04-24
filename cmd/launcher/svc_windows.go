@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -77,6 +78,9 @@ func runWindowsSvc(args []string) error {
 			autoupdate.DeleteOldUpdates(),
 		)
 	}()
+
+	// Ensure that service configuration is up-to-date
+	editRegistry(logger)
 
 	level.Info(logger).Log(
 		"msg", "launching service",
@@ -188,5 +192,45 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				level.Info(w.logger).Log("err", "unexpected control request", "control_request", c)
 			}
 		}
+	}
+}
+
+const (
+	launcherServiceRegistryKeyNameFormat = `SYSTEM\CurrentControlSet\Services\Launcher%sSvc`
+
+	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
+	delayedAutostartName         = `DelayedAutostart`
+	delayedAutostartValue uint32 = 0
+
+	// DependOnService is type REG_MULTI_SZ, i.e. a list of strings
+	dependOnServiceName = `DependOnService`
+	dependOnService     = `Dnscache`
+)
+
+func editRegistry(logger log.Logger) {
+	// Get launcher service key
+	// TODO: ideally we'd pull the identifier from somewhere legitimate
+	launcherServiceKeyName := fmt.Sprintf(launcherServiceRegistryKeyNameFormat, "KolideK2")
+	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceKeyName, registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not open registry key", "key_name", launcherServiceKeyName, "err", err)
+		return
+	}
+
+	// Close it once we're done
+	defer func() {
+		if err := launcherServiceKey.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", launcherServiceKeyName, "err", err)
+		}
+	}()
+
+	// Turn off delayed autostart
+	if err := launcherServiceKey.SetDWordValue(delayedAutostartName, delayedAutostartValue); err != nil {
+		level.Error(logger).Log("msg", "could not set dword value for DelayedAutostart", "err", err)
+	}
+
+	// Set service to depend on Dnscache
+	if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dependOnService}); err != nil {
+		level.Error(logger).Log("msg", "could not set strings value for DependOnService", "err", err)
 	}
 }
