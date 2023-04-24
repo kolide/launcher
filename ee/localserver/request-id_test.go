@@ -13,6 +13,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/types"
+	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,8 +23,11 @@ import (
 func Test_localServer_requestIdHandler(t *testing.T) {
 	t.Parallel()
 
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+
 	var logBytes bytes.Buffer
-	server := testServer(t, &logBytes)
+	server := testServer(t, mockKnapsack, &logBytes)
 
 	req, err := http.NewRequest("", "", nil)
 	require.NoError(t, err)
@@ -53,13 +58,10 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 }
 
-func testServer(t *testing.T, logBytes *bytes.Buffer) *localServer {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
+func testServer(t *testing.T, k types.Knapsack, logBytes *bytes.Buffer) *localServer {
+	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	require.NoError(t, osquery.SetupLauncherKeys(s))
-
-	server, err := New(s, "", WithLogger(log.NewLogfmtLogger(logBytes)))
+	server, err := New(k, "", WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }

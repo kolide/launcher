@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,14 +21,17 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -52,7 +56,32 @@ const (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+
+	// If delay_start is configured, wait before running launcher.
+	if opts.DelayStart > 0*time.Second {
+		level.Debug(logger).Log(
+			"msg", "delay_start configured, waiting before starting launcher",
+			"delay_start", opts.DelayStart.String(),
+		)
+		time.Sleep(opts.DelayStart)
+	}
+
 	level.Debug(logger).Log("msg", "runLauncher starting")
+
+	// We've seen launcher intermittently be unable to recover from
+	// DNS failures in the past, so this check gives us a little bit
+	// of room to ensure that we are able to resolve DNS requests
+	// before proceeding with starting launcher.
+	if err := backoff.WaitFor(func() error {
+		_, lookupErr := net.LookupIP(opts.KolideServerURL)
+		return lookupErr
+	}, 10*time.Second, 1*time.Second); err != nil {
+		level.Info(logger).Log(
+			"msg", "could not successfully perform IP lookup before starting launcher, proceeding anyway",
+			"kolide_server_url", opts.KolideServerURL,
+			"err", err,
+		)
+	}
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
@@ -111,7 +140,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
-	k := knapsack.New(stores, db)
+
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
+	k := knapsack.New(stores, flagController, db)
 
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
@@ -200,42 +232,33 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		checkpointer.SetQuerier(extension)
 	}()
 
-	var controlService *control.ControlService
-
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
-	if opts.ControlServerURL == "" {
+	if k.ControlServerURL() == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err = createControlService(ctx, logger, k.ControlStore(), opts)
+		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
-		// serverDataBucketConsumer handles server data table updates
-		controlService.RegisterConsumer(serverDataSubsystemName, k.ServerProvidedDataStore())
-		controlService.RegisterConsumer(agentFlagsSubsystemName, k.AgentFlagsStore())
-
-		desktopEnabledRaw, err := k.AgentFlagsStore().Get([]byte("desktop_enabled_v1"))
-		if err != nil {
-			level.Debug(logger).Log("msg", "failed to query desktop_enabled_v1 flag", "err", err)
-		}
-
-		// For now, while we're in transition from K2 to device trust, we want to default to _not_ running
-		// the desktop process. This can be overridden via control server interaction -- if the desktop_enabled_v1
-		// flag is present (regardless of it's value), this indicates control server has told launcher to enable desktop.
-		desktopProcessSpawningEnabled := desktopEnabledRaw != nil
+		// serverDataConsumer handles server data table updates
+		serverDataConsumer := keyvalueconsumer.New(k.ServerProvidedDataStore())
+		controlService.RegisterConsumer(serverDataSubsystemName, serverDataConsumer)
+		// agentFlagConsumer handles agent flags pushed from the control server
+		agentFlagsConsumer := keyvalueconsumer.New(flagController)
+		controlService.RegisterConsumer(agentFlagsSubsystemName, agentFlagsConsumer)
 
 		runner, err = desktopRunner.New(
+			k,
 			desktopRunner.WithLogger(logger),
 			desktopRunner.WithUpdateInterval(time.Second*5),
 			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
 			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(desktopProcessSpawningEnabled),
-			desktopRunner.WithGetter(k.AgentFlagsStore()),
+			desktopRunner.WithProcessSpawningEnabled(k.DesktopEnabled()),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
@@ -243,8 +266,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
-		controlService.RegisterSubscriber(agentFlagsSubsystemName, runner)
-
 		// Run the notification service
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			k.SentNotificationsStore(),
@@ -271,10 +292,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
-			k.ConfigStore(),
+			k,
 			opts.KolideServerURL,
 			localserver.WithLogger(logger),
-			localserver.WithControlService(controlService),
 		)
 
 		if err != nil {

@@ -62,7 +62,7 @@ func TestExec(t *testing.T) {
 			if tt.timeout == 0 {
 				tt.timeout = 30
 			}
-			output, err := Exec(ctx, logger, tt.timeout, tt.bins, tt.args)
+			output, err := Exec(ctx, logger, tt.timeout, tt.bins, tt.args, false)
 			if tt.err {
 				assert.Error(t, err)
 				assert.Empty(t, output)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/user"
+	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log/level"
@@ -107,12 +108,18 @@ func consoleUsers() ([]*user.User, error) {
 		}
 
 		for _, uid := range uids {
-			user, err := user.LookupId(uid)
+			var err error
+			var u *user.User
+			if runtime.GOOS == "windows" {
+				u, err = user.Lookup(uid)
+			} else {
+				u, err = user.LookupId(uid)
+			}
 			if err != nil {
 				return err
 			}
 
-			users = append(users, user)
+			users = append(users, u)
 		}
 		return nil
 	}, maxDuration, 250*time.Millisecond)

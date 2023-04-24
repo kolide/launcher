@@ -160,7 +160,9 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	ta.libraryManager.TidyLibrary()
 
 	checkTicker := time.NewTicker(ta.checkInterval)
+	defer checkTicker.Stop()
 	cleanupTicker := time.NewTicker(12 * time.Hour)
+	defer cleanupTicker.Stop()
 
 	for {
 		select {

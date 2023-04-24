@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 const defaultDisplay = ":0"

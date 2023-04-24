@@ -31,12 +31,11 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
-	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/theupdateframework/notary v0.6.1
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
+	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0
@@ -45,7 +44,7 @@ require (
 	golang.org/x/image v0.5.0
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.6.0
 	golang.org/x/text v0.7.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.38.0
@@ -56,7 +55,8 @@ require (
 
 require (
 	github.com/kolide/systray v1.10.3
-	gopkg.in/toast.v1 v1.0.0-20180812000517-0a84660828b2
+	github.com/kolide/toast v1.0.0
+	github.com/shirou/gopsutil/v3 v3.23.3
 )
 
 require (
@@ -86,6 +86,7 @@ require (
 	github.com/jinzhu/gorm v1.9.1 // indirect
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
@@ -94,12 +95,14 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.5.0 // indirect
+	github.com/shoenig/go-m1cpu v0.1.4 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/viper v1.8.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
-	github.com/tklauser/numcpus v0.4.0 // indirect
+	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
