@@ -23,7 +23,7 @@ func Test_Parse(t *testing.T) {
 			name:   "default",
 			td:     &TemplateData{},
 			text:   "Version: {{.LauncherVersion}}",
-			output: "Version: ",
+			output: "Version: <no value>",
 		},
 		{
 			name:   "single option",
@@ -46,37 +46,37 @@ func Test_Parse(t *testing.T) {
 		{
 			name:   "relativeTime 2 hours ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-2 * time.Hour).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated 2 Hours Ago.",
 		},
 		{
 			name:   "relativeTime 15 minutes ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-15*time.Minute - 30*time.Second).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated 15 Minutes Ago.",
 		},
 		{
 			name:   "relativeTime 111 seconds ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-111 * time.Second).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated 111 Seconds Ago.",
 		},
 		{
 			name:   "relativeTime one minute ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-1 * time.Minute).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated One Minute Ago.",
 		},
 		{
 			name:   "relativeTime 7 seconds ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-7 * time.Second).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated 7 Seconds Ago.",
 		},
 		{
 			name:   "relativeTime just now",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-1 * time.Second).Unix()},
-			text:   fmt.Sprintf("This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}."),
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated Just Now.",
 		},
 		{
@@ -134,11 +134,35 @@ func Test_Parse(t *testing.T) {
 			output: "This Is Starting In 2 Weeks.",
 		},
 		{
-			name:        "undefined",
+			name:   "errorlessTemplateVars",
+			td:     &TemplateData{MenuVersion: CurrentMenuVersion},
+			text:   "{{if hasCapability `errorlessTemplateVars`}}{{.MenuVersion}}{{else}}{{end}}",
+			output: CurrentMenuVersion,
+		},
+		{
+			name:        "unparseable error",
 			td:          &TemplateData{},
 			text:        "Version: {{GARBAGE}}",
 			output:      "",
-			expectedErr: true,
+			expectedErr: true, // An invalid template format is one of the only times errors are expected
+		},
+		{
+			name:   "undefined key",
+			td:     &TemplateData{},
+			text:   "Version: {{.UndefinedKey}}",
+			output: "Version: <no value>",
+		},
+		{
+			name:   "undefined key with value check",
+			td:     &TemplateData{},
+			text:   "{{if .UndefinedKey}}UndefinedKey is: {{.UndefinedKey}}{{else}}UndefinedKey is NOT set.{{end}}",
+			output: "UndefinedKey is NOT set.",
+		},
+		{
+			name:   "current menu version",
+			td:     &TemplateData{MenuVersion: CurrentMenuVersion},
+			text:   "{{if .MenuVersion}}Menu Version is: {{.MenuVersion}}{{else}}{{end}}",
+			output: fmt.Sprintf("Menu Version is: %s", CurrentMenuVersion),
 		},
 	}
 	for _, tt := range tests {
@@ -148,7 +172,9 @@ func Test_Parse(t *testing.T) {
 
 			tp := NewTemplateParser(tt.td)
 			o, err := tp.Parse(tt.text)
-			if !tt.expectedErr {
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.output, o)
