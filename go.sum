@@ -301,8 +301,8 @@ github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab h1:KVR7cs+oPyy85i+8t1Za
 github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/krypto v0.0.0-20230209233022-9fce3e429899 h1:xxLm19kyV9FUxN7T9B+5IXcMU3kHOyPF/ULHcbz4cD0=
 github.com/kolide/krypto v0.0.0-20230209233022-9fce3e429899/go.mod h1:PvKvoNvMWfyPXZN9/yXNrGtAasI2b+sc8RpwkCJGzzc=
-github.com/kolide/systray v1.10.3 h1:PcWYvDepwRn2Sk7mLXM5LlMiIwCTRTUEqDELATVJYx0=
-github.com/kolide/systray v1.10.3/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
+github.com/kolide/systray v1.10.4 h1:eBhnVfhW0fGal1KBkBZC9fzRs4yrxUymgiXuQh5MBSg=
+github.com/kolide/systray v1.10.4/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
 github.com/kolide/toast v1.0.0 h1:pQViHayQVSzkdz0v8xnYuC/o4L7LF8mUuLCvpZ21efU=
 github.com/kolide/toast v1.0.0/go.mod h1:84R5sM7VWn6morUpJBGKrBMZB3Cm9OrmtBLWHwSEWL0=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
