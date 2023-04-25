@@ -198,8 +198,6 @@ func (cs *ControlService) Fetch() error {
 		}
 	}
 
-	level.Debug(cs.logger).Log("msg", "control data fetch complete")
-
 	return nil
 }
 
