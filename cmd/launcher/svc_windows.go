@@ -80,7 +80,7 @@ func runWindowsSvc(args []string) error {
 	}()
 
 	// Ensure that service configuration is up-to-date
-	editRegistry(logger)
+	checkServiceConfiguration(logger, opts.RootDirectory)
 
 	level.Info(logger).Log(
 		"msg", "launching service",
@@ -199,15 +199,15 @@ const (
 	launcherServiceRegistryKeyNameFormat = `SYSTEM\CurrentControlSet\Services\Launcher%sSvc`
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
-	delayedAutostartName         = `DelayedAutostart`
-	delayedAutostartValue uint32 = 0
+	delayedAutostartName            = `DelayedAutostart`
+	delayedAutostartDisabled uint32 = 0
 
 	// DependOnService is type REG_MULTI_SZ, i.e. a list of strings
 	dependOnServiceName = `DependOnService`
-	dependOnService     = `Dnscache`
+	dnscacheService     = `Dnscache`
 )
 
-func editRegistry(logger log.Logger) {
+func checkServiceConfiguration(logger log.Logger, rootDirectory string) {
 	// Get launcher service key
 	// TODO: ideally we'd pull the identifier from somewhere legitimate
 	launcherServiceKeyName := fmt.Sprintf(launcherServiceRegistryKeyNameFormat, "KolideK2")
@@ -224,13 +224,38 @@ func editRegistry(logger log.Logger) {
 		}
 	}()
 
-	// Turn off delayed autostart
-	if err := launcherServiceKey.SetDWordValue(delayedAutostartName, delayedAutostartValue); err != nil {
-		level.Error(logger).Log("msg", "could not set dword value for DelayedAutostart", "err", err)
+	// Check to see if we need to turn off delayed autostart
+	currentDelayedAutostart, _, getDelayedAutostartErr := launcherServiceKey.GetIntegerValue(delayedAutostartName)
+	if getDelayedAutostartErr == nil && currentDelayedAutostart != uint64(delayedAutostartDisabled) {
+		// Turn off delayed autostart
+		if err := launcherServiceKey.SetDWordValue(delayedAutostartName, delayedAutostartDisabled); err != nil {
+			level.Error(logger).Log("msg", "could not set dword value for DelayedAutostart", "err", err)
+		}
+	}
+
+	// Check to see if we need to update the service to depend on Dnscache
+	serviceList, _, getServiceListErr := launcherServiceKey.GetStringsValue(dependOnServiceName)
+	if getServiceListErr != nil {
+		// If we can't get the current value, we don't want to proceed -- we don't want to wipe
+		// any current data from the list.
+		return
+	}
+
+	foundDnscacheInList := false
+	for _, service := range serviceList {
+		if service == dnscacheService {
+			foundDnscacheInList = true
+			break
+		}
+	}
+
+	if foundDnscacheInList {
+		return
 	}
 
 	// Set service to depend on Dnscache
-	if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dependOnService}); err != nil {
+	serviceList = append(serviceList, dnscacheService)
+	if err := launcherServiceKey.SetStringsValue(dependOnServiceName, serviceList); err != nil {
 		level.Error(logger).Log("msg", "could not set strings value for DependOnService", "err", err)
 	}
 }
