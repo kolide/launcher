@@ -81,7 +81,7 @@ func main() {
 	// on linux (for fscrypt)
 	optsMaybeCgo := opts
 	if *flBuildOS == "linux" {
-		// overwrite with append, since optsMaybyeCgo was a shallow clone
+		// overwrite with append, since optsMaybeCgo was a shallow clone
 		optsMaybeCgo = append(opts, make.WithCgo())
 	}
 
@@ -91,7 +91,7 @@ func main() {
 		"generate-tuf":    make.New(opts...).GenerateTUF,
 		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
 		"tables.ext":      make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
-		"grpc.ext":        make.New(opts...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
+		"grpc.ext":        make.New(optsMaybeCgo...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
 		"package-builder": make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
 		"make":            make.New(opts...).BuildCmd("./cmd/make", "make"),
 	}

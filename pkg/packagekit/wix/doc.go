@@ -14,7 +14,7 @@ The basic steps of making a package:
  2. Create a packageRoot directory structure
  3. Use `heat` to harvest the file list from the packageRoot
  4. Use `candle` to take the wxs from (1) and (3) and make a wixobj
- 5. Use `light` to compile thje wixobj into an msi
+ 5. Use `light` to compile the wixobj into an msi
 
 While this is a somewhat agnostic wrapper, it does make several
 assumptions about the underlying process. It is not meant as a

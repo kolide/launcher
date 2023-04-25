@@ -8,16 +8,23 @@ import (
 )
 
 const (
-	funcHasCapability = "hasCapability"
-	funcRelativeTime  = "relativeTime"
+	CurrentMenuVersion string = "0.1.0" // Bump menu version when major changes occur to the TemplateData format
+
+	// Capabilities queriable via hasCapability
+	funcHasCapability     = "hasCapability"
+	funcRelativeTime      = "relativeTime"
+	errorlessTemplateVars = "errorlessTemplateVars" // capability to evaluate undefined template vars without failing
+
+	// TemplateData keys
+	LauncherVersion    string = "LauncherVersion"
+	LauncherRevision   string = "LauncherRevision"
+	GoVersion          string = "GoVersion"
+	ServerHostname     string = "ServerHostname"
+	LastMenuUpdateTime string = "LastMenuUpdateTime"
+	MenuVersion        string = "MenuVersion"
 )
 
-type TemplateData struct {
-	LauncherVersion  string `json:",omitempty"`
-	LauncherRevision string `json:",omitempty"`
-	GoVersion        string `json:",omitempty"`
-	ServerHostname   string `json:",omitempty"`
-}
+type TemplateData map[string]interface{}
 
 type templateParser struct {
 	td *TemplateData
@@ -41,7 +48,10 @@ func (tp *templateParser) Parse(text string) (string, error) {
 	t, err := template.New("menu_template").Funcs(template.FuncMap{
 		// hasCapability enables interoperability between different versions of launcher
 		funcHasCapability: func(capability string) bool {
-			if capability == funcRelativeTime {
+			switch capability {
+			case funcRelativeTime:
+				return true
+			case errorlessTemplateVars:
 				return true
 			}
 			return false
@@ -52,12 +62,26 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			diff := timestamp - currentTime
 
 			switch {
+			case diff < -60*60: // more than an hour ago
+				return fmt.Sprintf("%d Hours Ago", -diff/3600)
+			case diff < -60*2: // more than 2 minutes ago
+				return fmt.Sprintf("%d Minutes Ago", -diff/60)
+			case diff < -90: // more than 90 seconds ago
+				return fmt.Sprintf("%d Seconds Ago", -diff)
+			case diff < -50: // more than 50 seconds ago
+				return "One Minute Ago"
+			case diff < -5: // more than 5 seconds ago
+				return fmt.Sprintf("%d Seconds Ago", -diff)
+			case diff < 0: // in the last 5 seconds
+				return "Just Now"
 			case diff < 60*10: // less than 10 minutes
 				return "Very Soon"
 			case diff < 60*50: // less than 50 minutes
 				return fmt.Sprintf("In %d Minutes", diff/60)
 			case diff < 60*90: // less than 90 minutes
 				return "In About An Hour"
+			case diff < 60*60*2: // less than 2 hours
+				return fmt.Sprintf("In %d Minutes", diff/60)
 			case diff < 60*60*23: // less than 23 hours
 				return fmt.Sprintf("In %d Hours", diff/3600)
 			case diff < 60*60*36: // less than 36 hours

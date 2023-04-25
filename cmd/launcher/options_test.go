@@ -200,6 +200,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		Transport:              "grpc",
 		UpdateChannel:          "stable",
 		AutoloadedExtensions:   []string{"some-extension.ext"},
+		DelayStart:             0 * time.Second,
 	}
 
 	return args, opts
