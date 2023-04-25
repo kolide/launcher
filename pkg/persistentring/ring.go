@@ -1,15 +1,21 @@
 // Package persistentring provides something akin to a ring buffer, that is persisted to a store. It is intended to be
-// used in places we want to to track the last N items, across restarts. It should be suitable for low volume things,
-// where N is measured in hundreds.
+// used in places we want to to track the last N items, across restarts. Because it writes things to a backing store,
+// it is most suitable for mid-sized things, perhaps thousands. It should be bechmarked if size or rate gets too high.
 //
-// The underlying implementation is not as efficient as a pure ring buffer, it is much more analogous to a map. There
-// is no deletion, changing key sizes may cause old data to appear.
+// It is implemented as a map, and not a linked list, because it makes the underlying implementation simpler. And since
+// we don't insert at arbitary places, there is little value in a linked list.
+//
+// Encoding and Decoding are the responsibility of the caller. Creating a generic `any` implementation turns to
+// be non-performant because libraries like `gob` need a new decoder per type, which is better handled in the
+// caller. See:
+//   - https://stackoverflow.com/questions/69874951/re-using-the-same-encoder-decoder-for-the-same-struct-type-in-go-without-creatin
+//   - https://github.com/golang/go/issues/29766#issuecomment-454926474
 package persistentring
 
 import (
-	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"sync"
 
 	agenttypes "github.com/kolide/launcher/pkg/agent/types"
@@ -19,98 +25,75 @@ type storeInt interface {
 	agenttypes.GetterSetterDeleterIterator
 }
 
-type encoder interface {
-	Encode(e any) error // TODO is this Encode or EncodeValue?
-}
-
-type decoder interface {
-	Decode(e any) error
-}
-
 type persistentRing struct {
 	store storeInt
-	size  int
-	next  int
+	size  uint16
+	next  uint16
 
-	enc      encoder
-	dec      decoder
-	writeBuf bytes.Buffer // pointer or real?
-	readBuf  bytes.Buffer // pointer or real?
-	lock     sync.RWMutex
+	lock sync.RWMutex
 }
 
 var (
 	nextKey = []byte("nextPtr")
 )
 
-func New(store storeInt, size int) (*persistentRing, error) {
+func New(store storeInt, size uint16) (*persistentRing, error) {
+	if size > math.MaxUint16 {
+		return nil, fmt.Errorf("size %d too big! Max Uint16", size)
+	}
+
 	nextPtr, err := store.Get(nextKey)
 	if err != nil {
-		return nil, fmt.Errorf("getting next pointer: %w", err)
+		return nil, fmt.Errorf("getting next pointer from %s: %w", string(nextKey), err)
 	}
 
-	next, err := byteToInt(nextPtr)
-	if err != nil {
-		return nil, fmt.Errorf("converting next (%s) to int: %w", nextPtr, err)
-	}
-
-	wbuf := bytes.Buffer{}
-	rbuf := bytes.Buffer{}
+	next := byteToInt(nextPtr)
 
 	r := &persistentRing{
 		store: store,
 		size:  size,
 		next:  next,
 
-		enc:      gob.NewEncoder(&wbuf),
-		dec:      gob.NewDecoder(&rbuf),
-		writeBuf: wbuf,
-		readBuf:  rbuf,
-		lock:     sync.RWMutex{},
+		lock: sync.RWMutex{},
 	}
 
 	return r, nil
 }
 
-func (r *persistentRing) Add(val any) (err error) {
+func (r *persistentRing) Add(val []byte) (err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	r.next++
 
-	nextBytes, err := intToByte(r.next % r.size)
-	if err != nil {
-		return fmt.Errorf("converting %d to bytes: %w", r.next, err)
-	}
+	nextBytes := intToByte(r.next % r.size)
 
 	// TODO: Create MultiSet()
 	if err := r.store.Set(nextBytes, val); err != nil {
-		return fmt.Errorf("writing value to store: %w", err)
+		return fmt.Errorf("writing value to store (%s): %w", nextBytes, err)
 	}
 	if err := r.store.Set(nextKey, nextBytes); err != nil {
-		return fmt.Errorf("writing next to store: %w", err)
+		return fmt.Errorf("writing next to store (%s: %s): %w", nextKey, nextBytes, err)
 	}
 
 	return nil
 }
 
-// TODO callback to avoid the extra casting?
 func (r *persistentRing) GetAll() ([][]byte, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
+	// If we took a callback, we could avoid this allocation.
 	results := make([][]byte, r.size)
 
-	for i := 0; i < r.size; i++ {
-		// TODO: Modulus
+	for i := uint16(0); i < r.size; i++ {
 		// Start at the pointer _after_ next, so we get oldest first
-		ptr, err := intToByte(r.next + 1 + i)
-		if err != nil {
-			return nil, fmt.Errorf("converting %d to bytes: %w", r.next+1+i, err)
-		}
+		pos := (r.next + 1 + i) % r.size
+
+		ptr := intToByte(pos)
 		val, err := r.store.Get(ptr)
 		if err != nil {
-			return nil, fmt.Errorf("getting value: %w", err)
+			return nil, fmt.Errorf("getting value from key %s: %w", string(ptr), err)
 		}
 		results[i] = val
 	}
@@ -118,16 +101,16 @@ func (r *persistentRing) GetAll() ([][]byte, error) {
 	return results, nil
 }
 
-func intToByte(i int) ([]byte, error) {
-	// Allocating a bytes.Buffer is a bit of a bummer here, but with the
-	// eventual destination needing []byte as a value for a key, the overhead
-	// feels unavoidable.
-	var b bytes.Buffer
-	err := gob.NewEncoder(&b).Encode(i)
-	return b.Bytes(), err
+func intToByte(i uint16) []byte {
+	bs := make([]byte, binary.MaxVarintLen16)
+	binary.LittleEndian.PutUint16(bs, i)
+	return bs
 }
 
-func byteToInt(b []byte) (int, error) {
-	var i int
-	return i, gob.NewDecoder(bytes.NewReader(b)).Decode(&i)
+func byteToInt(b []byte) uint16 {
+	if len(b) < 2 {
+		// If len(b) is under 2, this panics. So, just return 0 here instead
+		return 0
+	}
+	return binary.LittleEndian.Uint16(b)
 }
