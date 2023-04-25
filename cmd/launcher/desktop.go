@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -18,8 +17,11 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/notify"
-	"github.com/kolide/launcher/ee/desktop/server"
+	rootserver "github.com/kolide/launcher/ee/desktop/runner/server"
+	desktopserver "github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/systray"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 )
@@ -42,10 +44,15 @@ func runDesktop(args []string) error {
 			"",
 			"path to create socket",
 		)
-		flmonitorurl = flagset.String(
-			"monitor_url",
+		flrootServerUrl = flagset.String(
+			"root_server_url",
 			"",
-			"url to monitor parent",
+			"url to root server",
+		)
+		flrootauthtoken = flagset.String(
+			"root_auth_token",
+			"",
+			"token used to auth with root process",
 		)
 		flmenupath = flagset.String(
 			"menu_path",
@@ -74,6 +81,10 @@ func runDesktop(args []string) error {
 		"subprocess", "desktop",
 		"pid", os.Getpid(),
 	)
+
+	if *fldebug {
+		level.AllowDebug()
+	}
 
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
@@ -112,12 +123,12 @@ func runDesktop(args []string) error {
 
 	// monitor parent
 	runGroup.Add(func() error {
-		monitorParentProcess(logger, *flmonitorurl, 2*time.Second)
+		monitorParentProcess(logger, *flrootServerUrl, *flrootauthtoken, 2*time.Second)
 		return nil
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
+	server, err := desktopserver.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
@@ -147,6 +158,12 @@ func runDesktop(args []string) error {
 	}, func(err error) {
 		m.Shutdown()
 	})
+
+	// notify root launcher when menu opened
+	runGroup.Add(func() error {
+		notifyRootMenuOpened(logger, *flrootServerUrl, *flrootauthtoken)
+		return nil
+	}, func(err error) {})
 
 	// run run group
 	go func() {
@@ -178,21 +195,50 @@ func listenSignals(logger log.Logger) {
 	)
 }
 
+func notifyRootMenuOpened(logger log.Logger, rootServerUrl, authToken string) {
+	client := authedclient.New(authToken, 2*time.Second)
+	menuOpendUrl := fmt.Sprintf("%s%s", rootServerUrl, rootserver.MenuOpenedEndpoint)
+
+	for {
+		<-systray.SystrayMenuOpened
+
+		response, err := client.Get(menuOpendUrl)
+		if err != nil {
+			level.Error(logger).Log(
+				"msg", "sending menu opened request to root server",
+				"err", err,
+			)
+		}
+
+		if response != nil {
+			io.Copy(io.Discard, response.Body)
+			response.Body.Close()
+		}
+	}
+}
+
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Duration) {
+func monitorParentProcess(logger log.Logger, rootServerUrl, authToken string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	client := http.Client{
-		Timeout: interval,
-	}
+	client := authedclient.New(authToken, interval)
 
 	const maxErrCount = 3
 	errCount := 0
 
-	for ; true; <-ticker.C {
-		response, err := client.Get(monitorUrl)
+	rootHealthUrl := fmt.Sprintf("%s%s", rootServerUrl, rootserver.HealthCheckEndpoint)
 
+	for ; true; <-ticker.C {
+		// check to to ensure that the ppid is still legit
+		if os.Getppid() < 2 {
+			level.Debug(logger).Log(
+				"msg", "ppid is 0 or 1, exiting",
+			)
+			break
+		}
+
+		response, err := client.Get(rootHealthUrl)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
 			// before closing, otherwise a new connection is established each time.
