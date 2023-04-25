@@ -415,11 +415,12 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	}
 
 	td := &menu.TemplateData{
-		LauncherVersion:    v.Version,
-		LauncherRevision:   v.Revision,
-		GoVersion:          v.GoVersion,
-		ServerHostname:     r.hostname,
-		LastMenuUpdateTime: info.ModTime().Unix(),
+		menu.LauncherVersion:    v.Version,
+		menu.LauncherRevision:   v.Revision,
+		menu.GoVersion:          v.GoVersion,
+		menu.ServerHostname:     r.hostname,
+		menu.LastMenuUpdateTime: info.ModTime().Unix(),
+		menu.MenuVersion:        menu.CurrentMenuVersion,
 	}
 
 	menuTemplateFileBytes, err := os.ReadFile(r.menuTemplatePath())
