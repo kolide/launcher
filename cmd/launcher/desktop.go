@@ -82,10 +82,6 @@ func runDesktop(args []string) error {
 		"pid", os.Getpid(),
 	)
 
-	if *fldebug {
-		level.AllowDebug()
-	}
-
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
 	if err != nil {
@@ -211,7 +207,6 @@ func notifyRootMenuOpened(logger log.Logger, rootServerUrl, authToken string) {
 		}
 
 		if response != nil {
-			io.Copy(io.Discard, response.Body)
 			response.Body.Close()
 		}
 	}
