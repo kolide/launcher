@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/launcher"
 	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
@@ -39,7 +38,7 @@ func (aq actorQuerier) Query(query string) ([]map[string]string, error) {
 
 // TODO: the extension, runtime, and client are all kind of entangled
 // here. Untangle the underlying libraries and separate into units
-func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClient service.KolideService, opts *launcher.Options) (
+func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClient service.KolideService) (
 	run *actorQuerier,
 	restart func() error, // restart osqueryd runner
 	shutdown func() error, // shutdown osqueryd runner
@@ -49,12 +48,12 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
-	if opts.EnrollSecret != "" {
-		enrollSecret = opts.EnrollSecret
-	} else if opts.EnrollSecretPath != "" {
-		content, err := os.ReadFile(opts.EnrollSecretPath)
+	if k.EnrollSecret() != "" {
+		enrollSecret = k.EnrollSecret()
+	} else if k.EnrollSecretPath() != "" {
+		content, err := os.ReadFile(k.EnrollSecretPath())
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("could not read enroll_secret_path: %s: %w", opts.EnrollSecretPath, err)
+			return nil, nil, nil, fmt.Errorf("could not read enroll_secret_path: %s: %w", k.EnrollSecretPath(), err)
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	}
@@ -63,8 +62,8 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	extOpts := osquery.ExtensionOpts{
 		EnrollSecret:                      enrollSecret,
 		Logger:                            logger,
-		LoggingInterval:                   opts.LoggingInterval,
-		RunDifferentialQueriesImmediately: opts.EnableInitialRunner,
+		LoggingInterval:                   k.LoggingInterval(),
+		RunDifferentialQueriesImmediately: k.EnableInitialRunner(),
 	}
 
 	// Setting MaxBytesPerBatch is a tradeoff. If it's too low, we
@@ -76,17 +75,17 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	// extension defaults to 3mb, to support GRPC's hardcoded 4MB
 	// limit. But as we're transport aware here. we can set it to
 	// 5MB for others.
-	if opts.LogMaxBytesPerBatch != 0 {
-		if opts.Transport == "grpc" && opts.LogMaxBytesPerBatch > 3 {
+	if k.LogMaxBytesPerBatch() != 0 {
+		if k.Transport() == "grpc" && k.LogMaxBytesPerBatch() > 3 {
 			level.Info(logger).Log(
 				"msg", "LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
-				"LogMaxBytesPerBatch", opts.LogMaxBytesPerBatch,
+				"LogMaxBytesPerBatch", k.LogMaxBytesPerBatch(),
 			)
 		}
-		extOpts.MaxBytesPerBatch = opts.LogMaxBytesPerBatch << 20
-	} else if opts.Transport == "grpc" {
+		extOpts.MaxBytesPerBatch = k.LogMaxBytesPerBatch() << 20
+	} else if k.Transport() == "grpc" {
 		extOpts.MaxBytesPerBatch = 3 << 20
-	} else if opts.Transport != "grpc" {
+	} else if k.Transport() != "grpc" {
 		extOpts.MaxBytesPerBatch = 5 << 20
 	}
 
@@ -98,14 +97,14 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 	var runnerOptions []runtime.OsqueryInstanceOption
 
-	if opts.Transport == "osquery" {
+	if k.Transport() == "osquery" {
 		var err error
-		runnerOptions, err = osqueryRunnerOptions(logger, k, opts)
+		runnerOptions, err = osqueryRunnerOptions(logger, k)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("creating osquery runner options: %w", err)
 		}
 	} else {
-		runnerOptions = grpcRunnerOptions(logger, k, opts, ext)
+		runnerOptions = grpcRunnerOptions(logger, k, ext)
 	}
 
 	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
@@ -130,7 +129,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					}
 
 					// If we're using osquery transport, we don't need the extension
-					if opts.Transport == "osquery" {
+					if k.Transport() == "osquery" {
 						level.Debug(logger).Log("msg", "Using osquery transport, skipping extension startup")
 
 						// TODO: remove when underlying libs are refactored
@@ -195,7 +194,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 }
 
 // commonRunnerOptions returns osquery runtime options common to all transports
-func commonRunnerOptions(logger log.Logger, k types.Knapsack, opts *launcher.Options) []runtime.OsqueryInstanceOption {
+func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryInstanceOption {
 	// create the logging adapters for osquery
 	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
 		logger,
@@ -211,52 +210,52 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack, opts *launcher.Opt
 	)
 
 	return []runtime.OsqueryInstanceOption{
-		runtime.WithOsquerydBinary(opts.OsquerydPath),
-		runtime.WithRootDirectory(opts.RootDirectory),
-		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(k, opts)...),
+		runtime.WithOsquerydBinary(k.OsquerydPath()),
+		runtime.WithRootDirectory(k.RootDirectory()),
+		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(k)...),
 		runtime.WithStdout(osqueryStdoutLogger),
 		runtime.WithStderr(osqueryStderrLogger),
 		runtime.WithLogger(logger),
-		runtime.WithOsqueryVerbose(opts.OsqueryVerbose),
-		runtime.WithOsqueryFlags(opts.OsqueryFlags),
+		runtime.WithOsqueryVerbose(k.OsqueryVerbose()),
+		runtime.WithOsqueryFlags(k.OsqueryFlags()),
 		runtime.WithAugeasLensFunction(augeas.InstallLenses),
-		runtime.WithAutoloadedExtensions(opts.AutoloadedExtensions...),
+		runtime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
 	}
 }
 
 // osqueryRunnerOptions returns the osquery runtime options when using native osquery transport
-func osqueryRunnerOptions(logger log.Logger, k types.Knapsack, opts *launcher.Options) ([]runtime.OsqueryInstanceOption, error) {
+func osqueryRunnerOptions(logger log.Logger, k types.Knapsack) ([]runtime.OsqueryInstanceOption, error) {
 	// As osquery requires TLS server certs, we'll  use our embedded defaults if not specified
-	caCertFile := opts.RootPEM
+	caCertFile := k.RootPEM()
 	if caCertFile == "" {
 		var err error
-		caCertFile, err = internal.InstallCaCerts(opts.RootDirectory)
+		caCertFile, err = internal.InstallCaCerts(k.RootDirectory())
 		if err != nil {
 			return nil, fmt.Errorf("writing CA certs: %w", err)
 		}
 	}
 
 	runtimeOptions := append(
-		commonRunnerOptions(logger, k, opts),
+		commonRunnerOptions(logger, k),
 		runtime.WithConfigPluginFlag("tls"),
 		runtime.WithDistributedPluginFlag("tls"),
 		runtime.WithLoggerPluginFlag("tls"),
-		runtime.WithTlsConfigEndpoint(opts.OsqueryTlsConfigEndpoint),
-		runtime.WithTlsDistributedReadEndpoint(opts.OsqueryTlsDistributedReadEndpoint),
-		runtime.WithTlsDistributedWriteEndpoint(opts.OsqueryTlsDistributedWriteEndpoint),
-		runtime.WithTlsEnrollEndpoint(opts.OsqueryTlsEnrollEndpoint),
-		runtime.WithTlsHostname(opts.KolideServerURL),
-		runtime.WithTlsLoggerEndpoint(opts.OsqueryTlsLoggerEndpoint),
+		runtime.WithTlsConfigEndpoint(k.OsqueryTlsConfigEndpoint()),
+		runtime.WithTlsDistributedReadEndpoint(k.OsqueryTlsDistributedReadEndpoint()),
+		runtime.WithTlsDistributedWriteEndpoint(k.OsqueryTlsDistributedWriteEndpoint()),
+		runtime.WithTlsEnrollEndpoint(k.OsqueryTlsEnrollEndpoint()),
+		runtime.WithTlsHostname(k.KolideServerURL()),
+		runtime.WithTlsLoggerEndpoint(k.OsqueryTlsLoggerEndpoint()),
 		runtime.WithTlsServerCerts(caCertFile),
 	)
 
 	// Enroll secrets... Either we pass a file, or we write a
 	// secret, and pass _that_ file
-	if opts.EnrollSecretPath != "" {
-		runtimeOptions = append(runtimeOptions, runtime.WithEnrollSecretPath(opts.EnrollSecretPath))
-	} else if opts.EnrollSecret != "" {
-		filename := filepath.Join(opts.RootDirectory, "secret")
-		os.WriteFile(filename, []byte(opts.EnrollSecret), 0400)
+	if k.EnrollSecretPath() != "" {
+		runtimeOptions = append(runtimeOptions, runtime.WithEnrollSecretPath(k.EnrollSecretPath()))
+	} else if k.EnrollSecret() != "" {
+		filename := filepath.Join(k.RootDirectory(), "secret")
+		os.WriteFile(filename, []byte(k.EnrollSecret()), 0400)
 		runtimeOptions = append(runtimeOptions, runtime.WithEnrollSecretPath(filename))
 	}
 
@@ -264,9 +263,9 @@ func osqueryRunnerOptions(logger log.Logger, k types.Knapsack, opts *launcher.Op
 }
 
 // grpcRunnerOptions returns the osquery runtime options when using launcher transports. (Eg: grpc or jsonrpc)
-func grpcRunnerOptions(logger log.Logger, k types.Knapsack, opts *launcher.Options, ext *osquery.Extension) []runtime.OsqueryInstanceOption {
+func grpcRunnerOptions(logger log.Logger, k types.Knapsack, ext *osquery.Extension) []runtime.OsqueryInstanceOption {
 	return append(
-		commonRunnerOptions(logger, k, opts),
+		commonRunnerOptions(logger, k),
 		runtime.WithConfigPluginFlag("kolide_grpc"),
 		runtime.WithLoggerPluginFlag("kolide_grpc"),
 		runtime.WithDistributedPluginFlag("kolide_grpc"),

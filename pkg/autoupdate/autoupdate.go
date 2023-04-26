@@ -65,10 +65,23 @@ type UpdateChannel string
 
 const (
 	Stable  UpdateChannel = "stable"
-	Alpha                 = "alpha"
-	Beta                  = "beta"
-	Nightly               = "nightly"
+	Alpha   UpdateChannel = "alpha"
+	Beta    UpdateChannel = "beta"
+	Nightly UpdateChannel = "nightly"
 )
+
+func (c UpdateChannel) String() string {
+	return string(c)
+}
+
+func SanitizeUpdateChannel(value string) string {
+	switch UpdateChannel(value) {
+	case Stable, Alpha, Beta, Nightly:
+		return value
+	}
+	// Fallback to stable if invalid channel
+	return Stable.String()
+}
 
 const (
 	DefaultMirror       = "https://dl.kolide.co"

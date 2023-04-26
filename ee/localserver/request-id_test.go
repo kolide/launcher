@@ -25,6 +25,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	mockKnapsack.On("KolideServerURL").Return("localhost")
 
 	var logBytes bytes.Buffer
 	server := testServer(t, mockKnapsack, &logBytes)
@@ -61,7 +62,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 func testServer(t *testing.T, k types.Knapsack, logBytes *bytes.Buffer) *localServer {
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	server, err := New(k, "", WithLogger(log.NewLogfmtLogger(logBytes)))
+	server, err := New(k, WithLogger(log.NewLogfmtLogger(logBytes)))
 	require.NoError(t, err)
 	return server
 }
