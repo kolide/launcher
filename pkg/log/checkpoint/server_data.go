@@ -18,7 +18,7 @@ var serverProvidedDataKeys = []string{
 func (c *checkPointer) logServerProvidedData() {
 	data := make(map[string]string, len(serverProvidedDataKeys))
 
-	if err := c.db.View(func(tx *bbolt.Tx) error {
+	if err := c.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(storage.ServerProvidedDataStore))
 		if b == nil {
 			return nil

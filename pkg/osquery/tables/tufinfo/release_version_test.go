@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
-	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/osquery/osquery-go/gen/osquery"
+
 	"github.com/stretchr/testify/require"
 	gotuf "github.com/theupdateframework/go-tuf"
 	"github.com/theupdateframework/go-tuf/client"
@@ -60,8 +61,11 @@ func TestTufReleaseVersionTable(t *testing.T) {
 	seedTufRepo(t, testTargets, testRootDir, "launcher")
 	seedTufRepo(t, testTargets, testRootDir, "osqueryd")
 
+	mockFlags := mocks.NewFlags(t)
+	mockFlags.On("RootDirectory").Return(testRootDir)
+
 	// Call table generate func and validate that our data matches what exists in the filesystem
-	testTable := TufReleaseVersionTable(&launcher.Options{RootDirectory: testRootDir})
+	testTable := TufReleaseVersionTable(mockFlags)
 	resp := testTable.Call(context.Background(), osquery.ExtensionPluginRequest{
 		"action":  "generate",
 		"context": "{}",
