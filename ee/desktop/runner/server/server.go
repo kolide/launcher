@@ -14,6 +14,8 @@ import (
 	"github.com/kolide/kit/ulid"
 )
 
+// RunnerServer provides IPC for user desktop processes to communicate back to the root desktop runner.
+// It allows the user process to notify and monitor the health of the runner process.
 type RunnerServer struct {
 	server                          *http.Server
 	listener                        net.Listener
@@ -24,8 +26,10 @@ type RunnerServer struct {
 }
 
 const (
-	HealthCheckEndpoint = "/health"
-	MenuOpenedEndpoint  = "/menuopened"
+	HealthCheckEndpoint                = "/health"
+	MenuOpenedEndpoint                 = "/menuopened"
+	controlRequestAccelerationInterval = 5 * time.Second
+	controlRequestAcclerationDuration  = 1 * time.Minute
 )
 
 type controlRequestIntervalOverrider interface {
@@ -64,7 +68,7 @@ func New(logger log.Logger, controlRequestIntervalOverrider controlRequestInterv
 			r.Body.Close()
 		}
 
-		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(5*time.Second, 1*time.Minute)
+		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
 
 	rs.server = &http.Server{

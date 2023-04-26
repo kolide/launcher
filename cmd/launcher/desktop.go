@@ -37,7 +37,7 @@ func runDesktop(args []string) error {
 		flUserServerAuthToken = flagset.String(
 			"user_server_auth_token",
 			"",
-			"auth token for user user server",
+			"auth token for user server",
 		)
 		flUserServerSocketPath = flagset.String(
 			"user_server_socket_path",
