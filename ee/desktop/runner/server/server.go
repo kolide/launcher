@@ -12,16 +12,15 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 type RootServer struct {
-	server                *http.Server
-	listener              net.Listener
-	logger                log.Logger
-	desktopProcAuthTokens map[string]string
-	mutex                 sync.Mutex
-	knapsack              types.Knapsack
+	server                          *http.Server
+	listener                        net.Listener
+	logger                          log.Logger
+	desktopProcAuthTokens           map[string]string
+	mutex                           sync.Mutex
+	controlRequestIntervalOverrider controlRequestIntervalOverrider
 }
 
 const (
@@ -29,21 +28,25 @@ const (
 	MenuOpenedEndpoint  = "/menuopened"
 )
 
-func New(logger log.Logger, k types.Knapsack) (*RootServer, error) {
+type controlRequestIntervalOverrider interface {
+	SetControlRequestIntervalOverride(time.Duration, time.Duration)
+}
+
+func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RootServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, err
 	}
 
-	ms := &RootServer{
-		listener:              listener,
-		logger:                logger,
-		desktopProcAuthTokens: make(map[string]string),
-		knapsack:              k,
+	rs := &RootServer{
+		listener:                        listener,
+		logger:                          logger,
+		desktopProcAuthTokens:           make(map[string]string),
+		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
 	}
 
-	if ms.logger != nil {
-		ms.logger = log.With(ms.logger, "component", "desktop_runner_root_server")
+	if rs.logger != nil {
+		rs.logger = log.With(rs.logger, "component", "desktop_runner_root_server")
 	}
 
 	mux := http.NewServeMux()
@@ -61,14 +64,14 @@ func New(logger log.Logger, k types.Knapsack) (*RootServer, error) {
 			r.Body.Close()
 		}
 
-		ms.knapsack.SetControlRequestIntervalOverride(5*time.Second, 1*time.Minute)
+		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(5*time.Second, 1*time.Minute)
 	})
 
-	ms.server = &http.Server{
-		Handler: ms.authMiddleware(mux),
+	rs.server = &http.Server{
+		Handler: rs.authMiddleware(mux),
 	}
 
-	return ms, err
+	return rs, err
 }
 
 func (ms *RootServer) Serve() error {
