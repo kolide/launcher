@@ -79,8 +79,10 @@ func runWindowsSvc(args []string) error {
 		)
 	}()
 
-	// Ensure that service configuration is up-to-date
-	checkServiceConfiguration(logger, opts.RootDirectory)
+	// For Kolide installations, confirm that service configuration is up-to-date
+	if opts.KolideServerURL == "k2device.kolide.com" || opts.KolideServerURL == "k2device-preprod.kolide.com" {
+		checkServiceConfiguration(logger)
+	}
 
 	level.Info(logger).Log(
 		"msg", "launching service",
@@ -196,7 +198,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 }
 
 const (
-	launcherServiceRegistryKeyNameFormat = `SYSTEM\CurrentControlSet\Services\Launcher%sSvc`
+	launcherServiceRegistryKeyName = `SYSTEM\CurrentControlSet\Services\LauncherKolideK2Svc`
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
 	delayedAutostartName            = `DelayedAutostart`
@@ -207,20 +209,18 @@ const (
 	dnscacheService     = `Dnscache`
 )
 
-func checkServiceConfiguration(logger log.Logger, rootDirectory string) {
+func checkServiceConfiguration(logger log.Logger) {
 	// Get launcher service key
-	// TODO: ideally we'd pull the identifier from somewhere legitimate
-	launcherServiceKeyName := fmt.Sprintf(launcherServiceRegistryKeyNameFormat, "KolideK2")
-	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceKeyName, registry.ALL_ACCESS)
+	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceRegistryKeyName, registry.ALL_ACCESS)
 	if err != nil {
-		level.Error(logger).Log("msg", "could not open registry key", "key_name", launcherServiceKeyName, "err", err)
+		level.Error(logger).Log("msg", "could not open registry key", "key_name", launcherServiceRegistryKeyName, "err", err)
 		return
 	}
 
 	// Close it once we're done
 	defer func() {
 		if err := launcherServiceKey.Close(); err != nil {
-			level.Error(logger).Log("msg", "could not close registry key", "key_name", launcherServiceKeyName, "err", err)
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", launcherServiceRegistryKeyName, "err", err)
 		}
 	}()
 
@@ -236,8 +236,16 @@ func checkServiceConfiguration(logger log.Logger, rootDirectory string) {
 	// Check to see if we need to update the service to depend on Dnscache
 	serviceList, _, getServiceListErr := launcherServiceKey.GetStringsValue(dependOnServiceName)
 	if getServiceListErr != nil {
-		// If we can't get the current value, we don't want to proceed -- we don't want to wipe
-		// any current data from the list.
+		// If DependsOn isn't set at all yet, set it with the Dnscache service
+		if getServiceListErr.Error() == "The system cannot find the file specified." {
+			if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dnscacheService}); err != nil {
+				level.Error(logger).Log("msg", "could not set strings value for DependOnService", "err", err)
+			}
+			return
+		}
+
+		// In any other case, if we can't get the current value, we don't want to proceed --
+		// we don't want to wipe any current data from the list.
 		return
 	}
 
