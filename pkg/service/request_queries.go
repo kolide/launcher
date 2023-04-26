@@ -155,18 +155,16 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
-		logger := level.Debug(mw.logger)
 		if err != nil {
-			logger = level.Info(mw.logger)
+			level.Info(mw.logger).Log(
+				"method", "RequestQueries",
+				"uuid", uuid,
+				"res", string(resJSON),
+				"reauth", reauth,
+				"err", err,
+				"took", time.Since(begin),
+			)
 		}
-		logger.Log(
-			"method", "RequestQueries",
-			"uuid", uuid,
-			"res", string(resJSON),
-			"reauth", reauth,
-			"err", err,
-			"took", time.Since(begin),
-		)
 	}(time.Now())
 
 	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)

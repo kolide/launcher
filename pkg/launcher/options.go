@@ -99,6 +99,8 @@ type Options struct {
 	InsecureTransport bool
 	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
 	CompactDbMaxTx int64
-	// IAmBreakingEELicence disables the EE licence check before runnign the local server
+	// IAmBreakingEELicence disables the EE licence check before running the local server
 	IAmBreakingEELicense bool
+	// DelayStart allows for delaying launcher startup for a configurable amount of time
+	DelayStart time.Duration
 }
