@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/kit/ulid"
 )
 
-type RootServer struct {
+type RunnerServer struct {
 	server                          *http.Server
 	listener                        net.Listener
 	logger                          log.Logger
@@ -32,13 +32,13 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RootServer, error) {
+func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, err
 	}
 
-	rs := &RootServer{
+	rs := &RunnerServer{
 		listener:                        listener,
 		logger:                          logger,
 		desktopProcAuthTokens:           make(map[string]string),
@@ -74,17 +74,17 @@ func New(logger log.Logger, controlRequestIntervalOverrider controlRequestInterv
 	return rs, err
 }
 
-func (ms *RootServer) Serve() error {
+func (ms *RunnerServer) Serve() error {
 	return ms.server.Serve(ms.listener)
 }
 
-func (ms *RootServer) Shutdown(ctx context.Context) error {
+func (ms *RunnerServer) Shutdown(ctx context.Context) error {
 	return ms.server.Shutdown(ctx)
 }
 
 // RegisterClient registers a desktop proc with the server under the provided key.
 // Returns the generated auth token.
-func (ms *RootServer) RegisterClient(key string) string {
+func (ms *RunnerServer) RegisterClient(key string) string {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
@@ -98,7 +98,7 @@ func (ms *RootServer) RegisterClient(key string) string {
 	return token
 }
 
-func (ms *RootServer) DeRegisterClient(key string) {
+func (ms *RunnerServer) DeRegisterClient(key string) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
@@ -108,11 +108,11 @@ func (ms *RootServer) DeRegisterClient(key string) {
 	}
 }
 
-func (ms *RootServer) Url() string {
+func (ms *RunnerServer) Url() string {
 	return fmt.Sprintf("http://%s", ms.listener.Addr().String())
 }
 
-func (ms *RootServer) authMiddleware(next http.Handler) http.Handler {
+func (ms *RunnerServer) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
 

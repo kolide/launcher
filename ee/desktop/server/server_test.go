@@ -19,7 +19,7 @@ import (
 
 const validAuthHeader = "test-auth-header"
 
-func TestDesktopServer_authMiddleware(t *testing.T) {
+func TestUserServer_authMiddleware(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -70,7 +70,7 @@ func TestDesktopServer_authMiddleware(t *testing.T) {
 	}
 }
 
-func TestDesktopServer_shutdownHandler(t *testing.T) {
+func TestUserServer_shutdownHandler(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -113,7 +113,7 @@ func testHandler() http.Handler {
 	})
 }
 
-func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buffer) (*DesktopServer, chan struct{}) {
+func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buffer) (*UserServer, chan struct{}) {
 	shutdownChan := make(chan struct{})
 
 	server, err := New(log.NewLogfmtLogger(logBytes), authHeader, socketPath, shutdownChan, nil)
