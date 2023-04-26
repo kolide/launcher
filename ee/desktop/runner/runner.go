@@ -37,33 +37,11 @@ import (
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
 
-// WithHostname sets the hostname for the runner
-func WithHostname(hostname string) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.hostname = hostname
-	}
-}
-
 func WithLogger(logger log.Logger) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.logger = log.With(logger,
 			"component", "desktop_users_processes_runner",
 		)
-	}
-}
-
-// WithUpdateInterval sets the interval on which the runner will create desktops for
-// user who don't have them and spin up new ones if any have died.
-func WithUpdateInterval(interval time.Duration) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.updateInterval = interval
-	}
-}
-
-// WithMenuRefreshInterval sets the interval on which the runner will refresh the desktop menu
-func WithMenuRefreshInterval(interval time.Duration) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.menuRefreshInterval = interval
 	}
 }
 
@@ -93,13 +71,6 @@ func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 func WithUsersFilesRoot(usersFilesRoot string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
 		r.usersFilesRoot = usersFilesRoot
-	}
-}
-
-// WithProcessSpawningEnabled sets desktop GUI enablement
-func WithProcessSpawningEnabled(enabled bool) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.processSpawningEnabled = enabled
 	}
 }
 
@@ -158,12 +129,13 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
-		updateInterval:         time.Second * 5,
-		menuRefreshInterval:    time.Minute * 15,
+		updateInterval:         k.DesktopUpdateInterval(),
+		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
 		procsWg:                &sync.WaitGroup{},
 		interruptTimeout:       time.Second * 10,
+		hostname:               k.KolideServerURL(),
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
-		processSpawningEnabled: false,
+		processSpawningEnabled: k.DesktopEnabled(),
 		knapsack:               k,
 	}
 

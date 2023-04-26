@@ -40,6 +40,8 @@ func TestControllerBoolFlags(t *testing.T) {
 
 			var value bool
 			assertValues := func(expectedValue bool) {
+				value = fc.KolideHosted()
+				assert.Equal(t, expectedValue, value)
 				value = fc.DesktopEnabled()
 				assert.Equal(t, expectedValue, value)
 				value = fc.DebugServerData()
@@ -49,10 +51,25 @@ func TestControllerBoolFlags(t *testing.T) {
 				value = fc.DisableControlTLS()
 				assert.Equal(t, expectedValue, value)
 				value = fc.InsecureControlTLS()
+				assert.Equal(t, expectedValue, value)
+				value = fc.InsecureTLS()
+				assert.Equal(t, expectedValue, value)
+				value = fc.InsecureTransportTLS()
+				assert.Equal(t, expectedValue, value)
+				value = fc.IAmBreakingEELicense()
+				assert.Equal(t, expectedValue, value)
+				value = fc.Debug()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryVerbose()
+				assert.Equal(t, expectedValue, value)
+				value = fc.Autoupdate()
+				assert.Equal(t, expectedValue, value)
 			}
 
 			assertValues(false)
 
+			err = fc.SetKolideHosted(true)
+			require.NoError(t, err)
 			err = fc.SetDesktopEnabled(true)
 			require.NoError(t, err)
 			err = fc.SetDebugServerData(true)
@@ -62,6 +79,18 @@ func TestControllerBoolFlags(t *testing.T) {
 			err = fc.SetDisableControlTLS(true)
 			require.NoError(t, err)
 			err = fc.SetInsecureControlTLS(true)
+			require.NoError(t, err)
+			err = fc.SetInsecureTLS(true)
+			require.NoError(t, err)
+			err = fc.SetInsecureTransportTLS(true)
+			require.NoError(t, err)
+			err = fc.SetIAmBreakingEELicense(true)
+			require.NoError(t, err)
+			err = fc.SetDebug(true)
+			require.NoError(t, err)
+			err = fc.SetOsqueryVerbose(true)
+			require.NoError(t, err)
+			err = fc.SetAutoupdate(true)
 			require.NoError(t, err)
 
 			assertValues(true)
@@ -94,14 +123,69 @@ func TestControllerStringFlags(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			var value string
+			assertGettersValues := func(expectedValue string) {
+				value = fc.EnrollSecret()
+				assert.Equal(t, expectedValue, value)
+				value = fc.EnrollSecretPath()
+				assert.Equal(t, expectedValue, value)
+				value = fc.RootDirectory()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsquerydPath()
+				assert.Equal(t, expectedValue, value)
+				value = fc.RootPEM()
+				assert.Equal(t, expectedValue, value)
+				value = fc.Transport()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryTlsConfigEndpoint()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryTlsEnrollEndpoint()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryTlsLoggerEndpoint()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryTlsDistributedReadEndpoint()
+				assert.Equal(t, expectedValue, value)
+				value = fc.OsqueryTlsDistributedWriteEndpoint()
+				assert.Equal(t, expectedValue, value)
+			}
+
+			assertGettersValues("")
+
 			assertValues := func(expectedValue string) {
+				value = fc.KolideServerURL()
+				assert.Equal(t, expectedValue, value)
 				value = fc.ControlServerURL()
+				assert.Equal(t, expectedValue, value)
+				value = fc.DebugLogFile()
+				assert.Equal(t, expectedValue, value)
+				value = fc.NotaryServerURL()
+				assert.Equal(t, expectedValue, value)
+				value = fc.TufServerURL()
+				assert.Equal(t, expectedValue, value)
+				value = fc.MirrorServerURL()
+				assert.Equal(t, expectedValue, value)
+				value = fc.NotaryPrefix()
+				assert.Equal(t, expectedValue, value)
+				value = fc.UpdateDirectory()
 				assert.Equal(t, expectedValue, value)
 			}
 
 			assertValues("")
 
+			err = fc.SetKolideServerURL(tt.valueToSet)
+			require.NoError(t, err)
 			err = fc.SetControlServerURL(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetDebugLogFile(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetNotaryServerURL(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetTufServerURL(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetMirrorServerURL(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetNotaryPrefix(tt.valueToSet)
+			require.NoError(t, err)
+			err = fc.SetUpdateDirectory(tt.valueToSet)
 			require.NoError(t, err)
 
 			assertValues(tt.valueToSet)
@@ -116,11 +200,52 @@ func TestControllerDurationFlags(t *testing.T) {
 		name            string
 		cmdLineOpts     *launcher.Options
 		agentFlagsStore types.KVStore
-		valueToSet      time.Duration
+		getFlag         func(fc *FlagController) time.Duration
+		setFlag         func(fc *FlagController, d time.Duration) error
+		valuesToSet     []time.Duration
+		valuesToGet     []time.Duration
 	}{
 		{
-			name:       "happy path",
-			valueToSet: 7 * time.Second,
+			name:        "LoggingInterval",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.LoggingInterval() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetLoggingInterval(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Second, 20 * time.Minute},
+			valuesToGet: []time.Duration{5 * time.Second, 7 * time.Second, 10 * time.Minute},
+		},
+		{
+			name:        "DesktopUpdateInterval",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.DesktopUpdateInterval() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetDesktopUpdateInterval(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Second, 20 * time.Minute},
+			valuesToGet: []time.Duration{5 * time.Second, 7 * time.Second, 10 * time.Minute},
+		},
+		{
+			name:        "DesktopMenuRefreshInterval",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.DesktopMenuRefreshInterval() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetDesktopMenuRefreshInterval(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Minute, 30 * time.Minute},
+			valuesToGet: []time.Duration{5 * time.Minute, 7 * time.Minute, 30 * time.Minute},
+		},
+		{
+			name:        "ControlRequestInterval",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.ControlRequestInterval() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetControlRequestInterval(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Second, 20 * time.Minute},
+			valuesToGet: []time.Duration{5 * time.Second, 7 * time.Second, 10 * time.Minute},
+		},
+		{
+			name:        "AutoupdateInterval",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.AutoupdateInterval() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetAutoupdateInterval(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 30 * time.Minute, 36 * time.Hour},
+			valuesToGet: []time.Duration{1 * time.Minute, 30 * time.Minute, 24 * time.Hour},
+		},
+		{
+			name:        "AutoupdateInitialDelay",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.AutoupdateInitialDelay() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetAutoupdateInitialDelay(d) },
+			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Second, 20 * time.Minute},
+			valuesToGet: []time.Duration{5 * time.Second, 7 * time.Second, 20 * time.Minute},
 		},
 	}
 	for _, tt := range tests {
@@ -133,18 +258,13 @@ func TestControllerDurationFlags(t *testing.T) {
 			fc := NewFlagController(log.NewNopLogger(), store)
 			assert.NotNil(t, fc)
 
-			var value time.Duration
-			assertValues := func(expectedValue time.Duration) {
-				value = fc.ControlRequestInterval()
-				assert.Equal(t, expectedValue, value)
+			for i, valueToSet := range tt.valuesToSet {
+				err = tt.setFlag(fc, valueToSet)
+				require.NoError(t, err)
+
+				value := tt.getFlag(fc)
+				assert.Equal(t, tt.valuesToGet[i], value)
 			}
-
-			assertValues(5 * time.Second)
-
-			err = fc.SetControlRequestInterval(tt.valueToSet)
-			require.NoError(t, err)
-
-			assertValues(tt.valueToSet)
 		})
 	}
 }

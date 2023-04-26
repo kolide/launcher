@@ -16,8 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/launcher"
-	"go.etcd.io/bbolt"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // defines time out for all http, dns, connectivity requests
@@ -48,20 +47,18 @@ type querierInt interface {
 }
 
 type checkPointer struct {
-	logger  logger
-	querier querierInt
-	db      *bbolt.DB
-	opts    launcher.Options
+	logger   logger
+	knapsack types.Knapsack
+	querier  querierInt
 
 	lock        sync.RWMutex
 	queriedInfo map[string]any
 }
 
-func New(logger logger, db *bbolt.DB, opts launcher.Options) *checkPointer {
+func New(logger logger, k types.Knapsack) *checkPointer {
 	return &checkPointer{
-		logger: log.With(logger, "component", "log checkpoint"),
-		db:     db,
-		opts:   opts,
+		logger:   log.With(logger, "component", "log checkpoint"),
+		knapsack: k,
 
 		lock:        sync.RWMutex{},
 		queriedInfo: make(map[string]any),
@@ -108,7 +105,7 @@ func (c *checkPointer) logCheckPoint() {
 }
 
 func (c *checkPointer) logDbSize() {
-	boltStats, err := agent.GetStats(c.db)
+	boltStats, err := agent.GetStats(c.knapsack.BboltDB())
 	if err != nil {
 		c.logger.Log("bbolt db size", err.Error())
 	} else {
@@ -117,13 +114,13 @@ func (c *checkPointer) logDbSize() {
 }
 
 func (c *checkPointer) logKolideServerVersion() {
-	if !c.opts.KolideHosted {
+	if !c.knapsack.KolideHosted() {
 		return
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", c.opts.KolideServerURL), c.opts)
+	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", c.knapsack.KolideServerURL()), c.knapsack)
 	if err != nil {
 		c.logger.Log("kolide server version fetch", err)
 	} else {
@@ -132,13 +129,13 @@ func (c *checkPointer) logKolideServerVersion() {
 }
 
 func (c *checkPointer) logNotaryVersions() {
-	if !c.opts.KolideHosted || !c.opts.Autoupdate {
+	if !c.knapsack.KolideHosted() || !c.knapsack.Autoupdate() {
 		return
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.opts.NotaryServerURL), c.opts)
+	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.knapsack.NotaryServerURL()), c.knapsack)
 	if err != nil {
 		c.logger.Log("notary versions", err)
 	} else {
@@ -148,30 +145,30 @@ func (c *checkPointer) logNotaryVersions() {
 
 func (c *checkPointer) logConnections() {
 	dialer := &net.Dialer{Timeout: requestTimeout}
-	c.logger.Log("connections", testConnections(dialer, urlsToTest(c.opts)...))
+	c.logger.Log("connections", testConnections(dialer, urlsToTest(c.knapsack)...))
 }
 
 func (c *checkPointer) logIpLookups() {
 	ipLookuper := &net.Resolver{}
-	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.opts)...))
+	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...))
 }
 
-func urlsToTest(opts launcher.Options) []*url.URL {
-	addrsToTest := []string{opts.KolideServerURL}
+func urlsToTest(flags types.Flags) []*url.URL {
+	addrsToTest := []string{flags.KolideServerURL()}
 
-	if opts.Autoupdate {
-		addrsToTest = append(addrsToTest, opts.MirrorServerURL, opts.NotaryServerURL, opts.TufServerURL)
+	if flags.Autoupdate() {
+		addrsToTest = append(addrsToTest, flags.MirrorServerURL(), flags.NotaryServerURL(), flags.TufServerURL())
 	}
 
-	if opts.Control {
-		addrsToTest = append(addrsToTest, opts.ControlServerURL)
+	if flags.ControlServerURL() != "" {
+		addrsToTest = append(addrsToTest, flags.ControlServerURL())
 	}
 
 	urls := []*url.URL{}
 
 	for _, addr := range addrsToTest {
 
-		url, urlErr := parseUrl(addr, opts)
+		url, urlErr := parseUrl(addr, flags)
 
 		if urlErr != nil {
 			continue
@@ -183,11 +180,10 @@ func urlsToTest(opts launcher.Options) []*url.URL {
 	return urls
 }
 
-func parseUrl(addr string, opts launcher.Options) (*url.URL, error) {
-
+func parseUrl(addr string, flags types.Flags) (*url.URL, error) {
 	if !strings.HasPrefix(addr, "http") {
 		scheme := "https"
-		if opts.InsecureTransport {
+		if flags.InsecureTransportTLS() {
 			scheme = "http"
 		}
 		addr = fmt.Sprintf("%s://%s", scheme, addr)
@@ -201,7 +197,7 @@ func parseUrl(addr string, opts launcher.Options) (*url.URL, error) {
 
 	if u.Port() == "" {
 		port := "443"
-		if opts.InsecureTransport {
+		if flags.InsecureTransportTLS() {
 			port = "80"
 		}
 		u.Host = net.JoinHostPort(u.Host, port)

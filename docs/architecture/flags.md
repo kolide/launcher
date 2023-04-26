@@ -18,21 +18,16 @@ flowchart TB
     Client[Client]
     Default[Use Default Value]
     Sanitize[Sanitize Value]
-    Override{Is flag temporarily overridden?}
-    Store{Has control server provided a value?}
-    CmdLine{Was a command line flag provided?}
+    Default[Choose Default Value]
+    Override[Overlay temporary override]
+    Store[Overlay control server provided value]
+    CmdLine[Overlay command line flag]
 
-    Client -->|"Flags.DesktopEnabled()"| Override
-    Override -->|Yes| Sanitize
-    Override -->|No| Store
-
-    Store -->|Yes| Sanitize
-    Store -->|No| CmdLine
-
-    CmdLine -->|Yes| Sanitize
-    CmdLine -->|No| Default
-
-    Default --> Sanitize
+    Client -->|"Flags.ControlRequestInterval()"| Default
+    Default --> CmdLine
+    CmdLine --> Store
+    Store --> Override
+    Override --> Sanitize
 
     Sanitize -.->|Return value to Client| Client
 
