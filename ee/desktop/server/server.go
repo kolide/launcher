@@ -24,7 +24,7 @@ type notificationSender interface {
 	SendNotification(notify.Notification) error
 }
 
-type DesktopServer struct {
+type UserServer struct {
 	logger           log.Logger
 	server           *http.Server
 	listener         net.Listener
@@ -35,8 +35,8 @@ type DesktopServer struct {
 	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*DesktopServer, error) {
-	desktopServer := &DesktopServer{
+func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*UserServer, error) {
+	userServer := &UserServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
 		logger:       log.With(logger, "component", "desktop_server"),
@@ -45,17 +45,17 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	}
 
 	authedMux := http.NewServeMux()
-	authedMux.HandleFunc("/shutdown", desktopServer.shutdownHandler)
-	authedMux.HandleFunc("/ping", desktopServer.pingHandler)
-	authedMux.HandleFunc("/notification", desktopServer.notificationHandler)
-	authedMux.HandleFunc("/refresh", desktopServer.refreshHandler)
+	authedMux.HandleFunc("/shutdown", userServer.shutdownHandler)
+	authedMux.HandleFunc("/ping", userServer.pingHandler)
+	authedMux.HandleFunc("/notification", userServer.notificationHandler)
+	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
 
-	desktopServer.server = &http.Server{
-		Handler: desktopServer.authMiddleware(authedMux),
+	userServer.server = &http.Server{
+		Handler: userServer.authMiddleware(authedMux),
 	}
 
 	// remove existing socket
-	if err := desktopServer.removeSocket(); err != nil {
+	if err := userServer.removeSocket(); err != nil {
 		return nil, err
 	}
 
@@ -63,23 +63,23 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	if err != nil {
 		return nil, err
 	}
-	desktopServer.listener = listener
+	userServer.listener = listener
 
-	desktopServer.server.RegisterOnShutdown(func() {
+	userServer.server.RegisterOnShutdown(func() {
 		// remove socket on shutdown
-		if err := desktopServer.removeSocket(); err != nil {
+		if err := userServer.removeSocket(); err != nil {
 			level.Error(logger).Log("msg", "removing socket on shutdown", "err", err)
 		}
 	})
 
-	return desktopServer, nil
+	return userServer, nil
 }
 
-func (s *DesktopServer) Serve() error {
+func (s *UserServer) Serve() error {
 	return s.server.Serve(s.listener)
 }
 
-func (s *DesktopServer) Shutdown(ctx context.Context) error {
+func (s *UserServer) Shutdown(ctx context.Context) error {
 	err := s.server.Shutdown(ctx)
 	if err != nil {
 		return err
@@ -96,20 +96,20 @@ func (s *DesktopServer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *DesktopServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
+func (s *UserServer) shutdownHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"msg": "shutting down"}` + "\n"))
 	s.shutdownChan <- struct{}{}
 }
 
-func (s *DesktopServer) pingHandler(w http.ResponseWriter, req *http.Request) {
+func (s *UserServer) pingHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"pong": "Kolide"}` + "\n"))
 }
 
-func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Request) {
+func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -135,25 +135,25 @@ func (s *DesktopServer) notificationHandler(w http.ResponseWriter, req *http.Req
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *DesktopServer) refreshHandler(w http.ResponseWriter, req *http.Request) {
+func (s *UserServer) refreshHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	s.notifyRefreshListeners()
 }
 
 // Registers a listener to be notified when status data should be refreshed
-func (s *DesktopServer) RegisterRefreshListener(f func()) {
+func (s *UserServer) RegisterRefreshListener(f func()) {
 	s.refreshListeners = append(s.refreshListeners, f)
 }
 
 // Notifies all listeners to refresh their status data
-func (s *DesktopServer) notifyRefreshListeners() {
+func (s *UserServer) notifyRefreshListeners() {
 	for _, listener := range s.refreshListeners {
 		listener()
 	}
 }
 
-func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
+func (s *UserServer) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
@@ -178,7 +178,7 @@ func (s *DesktopServer) authMiddleware(next http.Handler) http.Handler {
 // on windows, you can't delete a file that is opened by another resource. When the server
 // shuts down, there is some lag time before the file is release, this can cause errors
 // when trying to delete the file.
-func (s *DesktopServer) removeSocket() error {
+func (s *UserServer) removeSocket() error {
 	return backoff.WaitFor(func() error {
 		return os.RemoveAll(s.socketPath)
 	}, 5*time.Second, 1*time.Second)

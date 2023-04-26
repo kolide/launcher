@@ -8,23 +8,23 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/ee/desktop/runner/server"
+	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
-	rootServer, err := server.New(log.NewNopLogger(), nil)
+	runnerServer, err := runnerserver.New(log.NewNopLogger(), nil)
 	require.NoError(t, err)
 
 	// register client and get token
-	token := rootServer.RegisterClient("0")
+	token := runnerServer.RegisterClient("0")
 
 	monitorInterval := 250 * time.Millisecond
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	go func() {
-		monitorParentProcess(log.NewLogfmtLogger(&logBytes), rootServer.Url(), token, monitorInterval)
+		monitorParentProcess(log.NewLogfmtLogger(&logBytes), runnerServer.Url(), token, monitorInterval)
 	}()
 
 	time.Sleep(monitorInterval * 2)
@@ -34,7 +34,7 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 
 	// start server
 	go func() {
-		if err := rootServer.Serve(); err != nil {
+		if err := runnerServer.Serve(); err != nil {
 			require.ErrorIs(t, err, http.ErrServerClosed)
 		}
 	}()
@@ -51,7 +51,7 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	require.Empty(t, logBytes.String())
 
 	// stop the server, should now start getting errors
-	require.NoError(t, rootServer.Shutdown(context.Background()))
+	require.NoError(t, runnerServer.Shutdown(context.Background()))
 	time.Sleep(monitorInterval * 8)
 
 	// should retry
