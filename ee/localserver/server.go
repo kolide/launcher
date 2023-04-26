@@ -70,12 +70,12 @@ func WithLogger(logger log.Logger) LocalServerOption {
 	}
 }
 
-func New(k types.Knapsack, kolideServer string, opts ...LocalServerOption) (*localServer, error) {
+func New(k types.Knapsack, opts ...LocalServerOption) (*localServer, error) {
 	ls := &localServer{
 		logger:                log.NewNopLogger(),
 		knapsack:              k,
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer:          kolideServer,
+		kolideServer:          k.KolideServerURL(),
 		myLocalDbSigner:       agent.LocalDbKeys(),
 		myLocalHardwareSigner: agent.HardwareKeys(),
 	}

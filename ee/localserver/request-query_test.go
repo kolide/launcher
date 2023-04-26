@@ -56,6 +56,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("KolideServerURL").Return("localhost")
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -220,6 +221,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("KolideServerURL").Return("localhost")
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
