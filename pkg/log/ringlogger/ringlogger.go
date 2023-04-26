@@ -2,6 +2,7 @@ package ringlogger
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -47,6 +48,27 @@ func (rl *ringLogger) Log(keyvals ...interface{}) error {
 	return nil
 }
 
-func (rl *ringLogger) GetAll() ([][]byte, error) {
-	return rl.ring.GetAll()
+func (rl *ringLogger) GetAll() ([]map[string]any, error) {
+
+	all, err := rl.ring.GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("getting all logs from ring: %w", err)
+	}
+
+	logs := make([]map[string]any, len(all))
+
+	reader := &bytes.Reader{}
+	dec := json.NewDecoder(reader)
+
+	for i, logLineRaw := range all {
+		var logLine map[string]any
+		reader.Reset(logLineRaw)
+		if err := dec.Decode(&logLine); err != nil {
+			return nil, fmt.Errorf("decoding stored log: %w", err)
+		}
+
+		logs[i] = logLine
+	}
+
+	return logs, nil
 }

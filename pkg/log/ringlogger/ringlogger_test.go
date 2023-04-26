@@ -1,8 +1,6 @@
 package ringlogger
 
 import (
-	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -29,17 +27,15 @@ func TestRingLogger(t *testing.T) {
 
 	expected := []int{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}
 
-	results, err := rl.GetAll()
+	logs, err := rl.GetAll()
 	require.NoError(t, err)
 
 	actual := make([]int, ringSize)
-	for i, res := range results {
-		var logLine struct{ I int }
-		reader := bytes.NewReader(res)
-		require.NoError(t, json.NewDecoder(reader).Decode(&logLine))
-		actual[i] = logLine.I
 
+	for i, logLine := range logs {
+		actual[i] = int(logLine["i"].(float64))
 	}
 
 	require.Equal(t, expected, actual)
+
 }
