@@ -24,6 +24,8 @@ type notificationSender interface {
 	SendNotification(notify.Notification) error
 }
 
+// UserServer provides IPC for the root desktop runner to communicate with the user desktop processes.
+// It allows the runner process to send notficaitons and commands to the desktop processes.
 type UserServer struct {
 	logger           log.Logger
 	server           *http.Server
