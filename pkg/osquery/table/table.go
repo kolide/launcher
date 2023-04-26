@@ -2,7 +2,6 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
@@ -19,16 +18,16 @@ import (
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(k types.Knapsack, opts *launcher.Options) []osquery.OsqueryPlugin {
+func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(k.ConfigStore()),
 		LauncherDbInfo(k.BboltDB()),
 		LauncherInfoTable(k.ConfigStore()),
 		launcher_db.TablePlugin("kolide_server_data", k.ServerProvidedDataStore()),
 		launcher_db.TablePlugin("kolide_control_flags", k.AgentFlagsStore()),
-		LauncherAutoupdateConfigTable(opts),
+		LauncherAutoupdateConfigTable(k),
 		osquery_instance_history.TablePlugin(),
-		tufinfo.TufReleaseVersionTable(opts),
+		tufinfo.TufReleaseVersionTable(k),
 		launcher_db.TablePlugin("kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
 	}
 }

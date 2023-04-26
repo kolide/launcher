@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -108,18 +109,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	debug.AttachDebugHandler(debugAddrPath, logger)
 	defer os.Remove(debugAddrPath)
 
-	// construct the appropriate http client based on security settings
-	httpClient := http.DefaultClient
-	if opts.InsecureTLS {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-
 	// open the database for storing launcher data, we do it here
 	// because it's passed to multiple actors. Add a timeout to
 	// this. Note that the timeout is documented as failing
@@ -145,25 +134,37 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db)
 
+	// construct the appropriate http client based on security settings
+	httpClient := http.DefaultClient
+	if k.InsecureTLS() {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	}
+
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(rootDirectory)
 
 	// Try to ensure useful info in the logs
-	checkpointer := checkpoint.New(logger, db, *opts)
+	checkpointer := checkpoint.New(logger, k)
 	checkpointer.Run()
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
-	if opts.RootPEM != "" {
+	if k.RootPEM() != "" {
 		rootPool = x509.NewCertPool()
-		pemContents, err := os.ReadFile(opts.RootPEM)
+		pemContents, err := os.ReadFile(k.RootPEM())
 		if err != nil {
-			return fmt.Errorf("reading root certs PEM at path: %s: %w", opts.RootPEM, err)
+			return fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
 		}
 		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return fmt.Errorf("found no valid certs in PEM at path: %s", opts.RootPEM)
+			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
 		}
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -190,16 +191,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	var client service.KolideService
 	{
-		switch opts.Transport {
+		switch k.Transport() {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
 			if err != nil {
 				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
 			client = service.NewGRPCClient(grpcConn, logger)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(opts.KolideServerURL, opts.InsecureTLS, opts.InsecureTransport, opts.CertPins, rootPool, logger)
+			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
 		case "osquery":
 			client = service.NewNoopClient(logger)
 		default:
@@ -213,7 +214,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client, opts)
+	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -253,12 +254,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runner, err = desktopRunner.New(
 			k,
 			desktopRunner.WithLogger(logger),
-			desktopRunner.WithUpdateInterval(time.Second*5),
-			desktopRunner.WithMenuRefreshInterval(time.Minute*15),
-			desktopRunner.WithHostname(opts.KolideServerURL),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
-			desktopRunner.WithProcessSpawningEnabled(k.DesktopEnabled()),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
@@ -284,16 +281,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
-	// runEECode feels like it should move up to the opts level.
-	// We have some stuff there that sets `controlServerURL`
-	runEECode := opts.ControlServerURL != "" || opts.IAmBreakingEELicense
+	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
 
 	// at this moment, these values are the same. This variable is here to help humans parse what's happening
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
 			k,
-			opts.KolideServerURL,
 			localserver.WithLogger(logger),
 		)
 
@@ -307,17 +301,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
-	if opts.Autoupdate {
+	if k.Autoupdate() {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
-			AutoupdateInterval: opts.AutoupdateInterval,
-			UpdateChannel:      opts.UpdateChannel,
-			NotaryURL:          opts.NotaryServerURL,
-			MirrorURL:          opts.MirrorServerURL,
-			NotaryPrefix:       opts.NotaryPrefix,
+			AutoupdateInterval: k.AutoupdateInterval(),
+			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
+			NotaryURL:          k.NotaryServerURL(),
+			MirrorURL:          k.MirrorServerURL(),
+			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       opts.AutoupdateInitialDelay + opts.AutoupdateInterval/2,
+			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
 			SigChannel:         sigChannel,
 		}
 
@@ -331,13 +325,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		launcherUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
-			AutoupdateInterval: opts.AutoupdateInterval,
-			UpdateChannel:      opts.UpdateChannel,
-			NotaryURL:          opts.NotaryServerURL,
-			MirrorURL:          opts.MirrorServerURL,
-			NotaryPrefix:       opts.NotaryPrefix,
+			AutoupdateInterval: k.AutoupdateInterval(),
+			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
+			NotaryURL:          k.NotaryServerURL(),
+			MirrorURL:          k.MirrorServerURL(),
+			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       opts.AutoupdateInitialDelay,
+			InitialDelay:       k.AutoupdateInitialDelay(),
 			SigChannel:         sigChannel,
 		}
 
@@ -369,17 +363,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 5 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
-			opts.TufServerURL,
+			k.TufServerURL(),
 			opts.RootDirectory,
-			opts.UpdateDirectory,
+			k.UpdateDirectory(),
 			metadataClient,
-			opts.MirrorServerURL,
+			k.MirrorServerURL(),
 			mirrorClient,
 			k.AutoupdateErrorsStore(),
 			extension,
 			tuf.WithLogger(logger),
-			tuf.WithChannel(string(opts.UpdateChannel)),
-			tuf.WithUpdateCheckInterval(opts.AutoupdateInterval),
+			tuf.WithChannel(k.UpdateChannel()),
+			tuf.WithUpdateCheckInterval(k.AutoupdateInterval()),
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet

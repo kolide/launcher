@@ -22,6 +22,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 	defaultMockKnapsack := func() types.Knapsack {
 		m := mocks.NewKnapsack(t)
 		m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+		m.On("KolideServerURL").Return("localhost")
 		return m
 	}
 
@@ -44,6 +45,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			mockKnapsack: func() types.Knapsack {
 				m := mocks.NewKnapsack(t)
 				m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+				m.On("KolideServerURL").Return("localhost")
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				return m
 			},

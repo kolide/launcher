@@ -11,13 +11,13 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/theupdateframework/go-tuf/data"
 
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
-	"github.com/kolide/launcher/pkg/launcher"
 )
 
 const tufReleaseVersionTableName = "kolide_tuf_release_version"
 
-func TufReleaseVersionTable(opts *launcher.Options) *table.Plugin {
+func TufReleaseVersionTable(flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("binary"),
 		table.TextColumn("operating_system"),
@@ -25,15 +25,15 @@ func TufReleaseVersionTable(opts *launcher.Options) *table.Plugin {
 		table.TextColumn("target"),
 	}
 
-	return table.NewPlugin(tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(opts))
+	return table.NewPlugin(tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
 }
 
-func generateTufReleaseVersionTable(opts *launcher.Options) table.GenerateFunc {
+func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		results := []map[string]string{}
 
 		for _, binary := range []string{"launcher", "osqueryd"} {
-			tufTargetsFile := filepath.Join(tuf.LocalTufDirectory(opts.RootDirectory), "targets.json")
+			tufTargetsFile := filepath.Join(tuf.LocalTufDirectory(flags.RootDirectory()), "targets.json")
 
 			targetFileBytes, err := os.ReadFile(tufTargetsFile)
 			if err != nil {
