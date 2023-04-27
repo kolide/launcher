@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/client"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/notify"
+	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
@@ -62,7 +63,7 @@ func WithInterruptTimeout(timeout time.Duration) desktopUsersProcessesRunnerOpti
 // WithAuthToken sets the auth token for the runner
 func WithAuthToken(token string) desktopUsersProcessesRunnerOption {
 	return func(r *DesktopUsersProcessesRunner) {
-		r.authToken = token
+		r.userServerAuthToken = token
 	}
 }
 
@@ -98,8 +99,8 @@ type DesktopUsersProcessesRunner struct {
 	// hostname is the host that launcher is connecting to. It gets passed to the desktop process
 	// and is used to determine which icon to display
 	hostname string
-	// authToken is the auth token to use when connecting to the launcher desktop server
-	authToken string
+	// userServerAuthToken is the auth token to use when connecting to the launcher user server
+	userServerAuthToken string
 	// usersFilesRoot is the launcher root dir with will be the parent dir
 	// for kolide desktop files on a per user basis
 	usersFilesRoot string
@@ -108,8 +109,8 @@ type DesktopUsersProcessesRunner struct {
 	processSpawningEnabled bool
 	// knapsack is the almighty sack of knaps
 	knapsack types.Knapsack
-	// monitorServer is a local server that desktop processes call to monitor parent
-	monitorServer *monitorServer
+	// runnerServer is a local server that desktop processes call to monitor parent
+	runnerServer *runnerserver.RunnerServer
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -150,14 +151,14 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
-	ms, err := newMonitorServer()
+	rs, err := runnerserver.New(runner.logger, k)
 	if err != nil {
 		return nil, err
 	}
 
-	runner.monitorServer = ms
+	runner.runnerServer = rs
 	go func() {
-		if err := runner.monitorServer.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			level.Error(runner.logger).Log(
 				"msg", "running monitor server",
 				"err", err,
@@ -212,7 +213,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	if err := r.monitorServer.Shutdown(ctx); err != nil {
+	if err := r.runnerServer.Shutdown(ctx); err != nil {
 		level.Error(r.logger).Log(
 			"msg", "shutting down monitor server",
 			"err", err,
@@ -230,10 +231,13 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
+		// unregistering client from runner server so server will not respond to its requests
+		r.runnerServer.DeRegisterClient(uid)
+
+		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
 			level.Error(r.logger).Log(
-				"msg", "error sending shutdown command to desktop process",
+				"msg", "error sending shutdown command to user desktop process",
 				"uid", uid,
 				"pid", proc.process.Pid,
 				"path", proc.path,
@@ -281,7 +285,7 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 
 	errs := make([]error, 0)
 	for _, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
+		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
 		}
@@ -359,7 +363,7 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
 	for uid, proc := range r.uidProcs {
-		client := client.New(r.authToken, proc.socketPath)
+		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
 			level.Error(r.logger).Log(
 				"msg", "error sending refresh command to desktop process",
@@ -459,7 +463,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath(), r.monitorServer.newEndpoint())
+		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
 		if err != nil {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
@@ -470,18 +474,22 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 
 		r.waitOnProcessAsync(uid, cmd.Process)
 
-		client := client.New(r.authToken, socketPath)
+		client := client.New(r.userServerAuthToken, socketPath)
 		if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+			// unregister proc from desktop server so server will not respond to its requests
+			r.runnerServer.DeRegisterClient(uid)
+
 			if err := cmd.Process.Kill(); err != nil {
 				level.Error(r.logger).Log(
-					"msg", "killing desktop process after startup ping failed",
+					"msg", "killing user desktop process after startup ping failed",
 					"uid", uid,
 					"pid", cmd.Process.Pid,
 					"path", cmd.Path,
 					"err", err,
 				)
 			}
-			return fmt.Errorf("pinging desktop server after startup: %w", err)
+
+			return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
 		}
 
 		level.Debug(r.logger).Log(
@@ -642,7 +650,7 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath, monitorUrl string) (*exec.Cmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
 	cmd := exec.Command(executablePath, "desktop")
 
 	cmd.Env = []string{
@@ -654,12 +662,13 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		// unable to write icon data to temp file: open C:\\windows\\systray_temp_icon_...: Access is denied
 		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("HOSTNAME=%s", r.hostname),
-		fmt.Sprintf("AUTHTOKEN=%s", r.authToken),
-		fmt.Sprintf("SOCKET_PATH=%s", socketPath),
+		fmt.Sprintf("USER_SERVER_AUTH_TOKEN=%s", r.userServerAuthToken),
+		fmt.Sprintf("USER_SERVER_SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
 		fmt.Sprintf("PPID=%d", os.Getpid()),
-		fmt.Sprintf("MONITOR_URL=%s", monitorUrl),
+		fmt.Sprintf("RUNNER_SERVER_URL=%s", r.runnerServer.Url()),
+		fmt.Sprintf("RUNNER_SERVER_AUTH_TOKEN=%s", r.runnerServer.RegisterClient(uid)),
 	}
 
 	stdErr, err := cmd.StderrPipe()
