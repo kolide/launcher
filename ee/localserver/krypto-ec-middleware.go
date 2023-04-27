@@ -23,6 +23,7 @@ const (
 	timestampValidityRange             = 150
 	kolideKryptoEccHeader20230130Value = "2023-01-30"
 	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
+	localTimeHeaderKey                 = "localtime"
 )
 
 type v2CmdRequestType struct {
@@ -50,6 +51,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		if r.Body != nil {
 			defer r.Body.Close()
 		}
+
+		w.Header().Add(localTimeHeaderKey, fmt.Sprint(time.Now().Unix()))
 
 		challengeBox, err := extractChallenge(r)
 		if err != nil {

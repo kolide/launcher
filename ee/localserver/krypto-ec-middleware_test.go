@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -176,6 +177,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NotEmpty(t, rr.Body.String())
 
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
+
+					localTimeInt, err := strconv.ParseInt(rr.Header().Get(localTimeHeaderKey), 10, 64)
+					require.NoError(t, err)
+					localTimeHeaderVal := time.Unix(localTimeInt, 0)
+					require.WithinDurationf(t, localTimeHeaderVal, time.Now(), 30*time.Second, "response should contain [%s] header with value close to now", localTimeHeaderVal)
 
 					// try to open the response
 					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
