@@ -65,8 +65,9 @@ func (r *persistentRing) Add(val []byte) (err error) {
 	defer r.lock.Unlock()
 
 	r.next++
+	r.next = r.next % r.size
 
-	nextBytes := intToByte(r.next % r.size)
+	nextBytes := intToByte(r.next)
 
 	// TODO: Create MultiSet()
 	if err := r.store.Set(nextBytes, val); err != nil {

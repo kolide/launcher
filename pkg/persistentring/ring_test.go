@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,7 +64,7 @@ func TestBadByteToInt(t *testing.T) {
 	}
 }
 
-func TestRing(t *testing.T) {
+func TestRings(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
@@ -77,6 +78,11 @@ func TestRing(t *testing.T) {
 			expected: [][]byte{[]byte("a"), []byte("b"), []byte("c")},
 		},
 		{
+			size:     4,
+			input:    [][]byte{[]byte("a"), []byte("b"), []byte("c")},
+			expected: [][]byte{nil, []byte("a"), []byte("b"), []byte("c")},
+		},
+		{
 			size:     2,
 			input:    [][]byte{[]byte("a"), []byte("b"), []byte("c")},
 			expected: [][]byte{[]byte("b"), []byte("c")},
@@ -88,19 +94,36 @@ func TestRing(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
-			s, err := storageci.NewStore(nil, log.NewNopLogger(), "persistenring-test")
-			require.NoError(t, err)
+			t.Run("persisted", func(t *testing.T) {
+				t.Parallel()
+				s, err := storageci.NewStore(nil, log.NewNopLogger(), "persistenring-test")
+				require.NoError(t, err)
 
-			r, err := New(s, tt.size)
-			require.NoError(t, err)
+				r, err := New(s, tt.size)
+				require.NoError(t, err)
 
-			for _, v := range tt.input {
-				require.NoError(t, r.Add(v))
-			}
+				for _, v := range tt.input {
+					require.NoError(t, r.Add(v))
+				}
 
-			actual, err := r.GetAll()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, actual)
+				actual, err := r.GetAll()
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, actual)
+			})
+
+			t.Run("inmemory", func(t *testing.T) {
+				t.Parallel()
+
+				r := NewInMemory(tt.size)
+
+				for _, v := range tt.input {
+					require.NoError(t, r.Add(v))
+				}
+
+				actual, err := r.GetAll()
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, actual)
+			})
 
 		})
 	}
@@ -109,9 +132,7 @@ func TestRing(t *testing.T) {
 func TestRingBig(t *testing.T) {
 	t.Parallel()
 
-	// Big isn't very big. This is because it takes something like 0.25s to add a value, and we don't like
-	// CI being slow. (This speed is becase there's a write transaction to a database in there)
-	bigSize := uint16(100)
+	bigSize := uint16(2048)
 
 	seed := int64(78)
 	random := rand.New(rand.NewSource(seed))
@@ -121,8 +142,9 @@ func TestRingBig(t *testing.T) {
 	for i := 0; i < cap(data); i++ {
 		data[i] = randomTestBytes(random)
 	}
-	s, err := storageci.NewStore(nil, log.NewNopLogger(), "persistenring-test")
-	require.NoError(t, err)
+
+	// To avoid the transaction overhead during this big tests, we explcitely create an inmemory store.
+	s := inmemory.NewStore(log.NewNopLogger())
 
 	r, err := New(s, bigSize)
 	require.NoError(t, err)
