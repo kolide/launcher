@@ -210,6 +210,8 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			copyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
 
+			fmt.Printf("created binary at %s for %s\n\n\n", executablePath, binary)
+
 			// For osqueryd, make sure we check that the running version is not equal to the target version
 			if binary == "osqueryd" {
 				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()

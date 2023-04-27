@@ -94,12 +94,17 @@ func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFil
 		return true
 	}
 
+	fmt.Printf("target file %s for binary %s is not the current running version (current: %s; target: %s)\n\n\n", binary, targetFilename, currentVersion, ulm.versionFromTarget(binary, targetFilename))
+
 	return ulm.alreadyAdded(binary, targetFilename)
 }
 
 // alreadyAdded checks if the given target already exists in the update library.
 func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
 	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
+
+	err := autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version")
+	fmt.Printf("checking executable for target file %s in directory %s for binary %s (%s): %v\n\n\n", binary, updateDirectory, targetFilename, executableLocation(updateDirectory, binary), err)
 
 	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
 }
