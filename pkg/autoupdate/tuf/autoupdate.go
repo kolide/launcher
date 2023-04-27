@@ -183,6 +183,12 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
 }
 
+func (ta *TufAutoupdater) findExecutablePath(binary autoupdatableBinary) {
+	// From already-downloaded metadata, look for the release version
+	// If we can find it, and if it's in the library, return the path to that executable
+	// If we can't find it, return the executable with the most recent version in the library
+}
+
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
 func (ta *TufAutoupdater) checkForUpdate() error {
