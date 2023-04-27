@@ -49,7 +49,7 @@ func checkServiceConfiguration(logger log.Logger, opts *launcher.Options) {
 	checkDelayedAutostart(launcherServiceKey, logger)
 
 	// Check to see if we need to update the service to depend on Dnscache
-	checkDependsOn(launcherServiceKey, logger)
+	checkDependOnService(launcherServiceKey, logger)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -73,14 +73,14 @@ func checkDelayedAutostart(launcherServiceKey registry.Key, logger log.Logger) {
 	}
 }
 
-// checkDependsOn checks the current value of `DependsOn` (the list of services that must start before
-// launcher can) and updates it if necessary.
-func checkDependsOn(launcherServiceKey registry.Key, logger log.Logger) {
+// checkDependOnService checks the current value of `DependOnService` (the list of services that must
+// start before launcher can) and updates it if necessary.
+func checkDependOnService(launcherServiceKey registry.Key, logger log.Logger) {
 	serviceList, _, getServiceListErr := launcherServiceKey.GetStringsValue(dependOnServiceName)
 
 	if getServiceListErr != nil {
 		if getServiceListErr.Error() == notFoundInRegistryError {
-			// `DependsOn` does not exist for this service yet -- we can safely set it to include the Dnscache service.
+			// `DependOnService` does not exist for this service yet -- we can safely set it to include the Dnscache service.
 			if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dnscacheService}); err != nil {
 				level.Error(logger).Log("msg", "could not set strings value for DependOnService", "err", err)
 			}
