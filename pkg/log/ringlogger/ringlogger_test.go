@@ -37,5 +37,4 @@ func TestRingLogger(t *testing.T) {
 	}
 
 	require.Equal(t, expected, actual)
-
 }
