@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
@@ -36,7 +37,9 @@ type updateLibraryManager struct {
 	mirrorUrl    string // dl.kolide.co
 	mirrorClient *http.Client
 	baseDir      string
+	stagingDir   string
 	osquerier    querier // used to query for current running osquery version
+	lock         *libraryLock
 	logger       log.Logger
 }
 
@@ -46,6 +49,7 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 		mirrorClient: mirrorClient,
 		baseDir:      baseDir,
 		osquerier:    osquerier,
+		lock:         newLibraryLock(),
 		logger:       log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
 
@@ -54,14 +58,15 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
 	}
 
-	// Ensure our staged updates and updates directories exist
-	for _, binary := range binaries {
-		// Create the directory for staging updates
-		if err := os.MkdirAll(ulm.stagedUpdatesDirectory(binary), 0755); err != nil {
-			return nil, fmt.Errorf("could not make staged updates directory for %s: %w", binary, err)
-		}
+	// Create the directory for staging updates
+	stagingDir, err := agent.MkdirTemp("staged-updates")
+	if err != nil {
+		return nil, fmt.Errorf("could not make staged updates directory: %w", err)
+	}
+	ulm.stagingDir = stagingDir
 
-		// Create the update library
+	// Create the update library
+	for _, binary := range binaries {
 		if err := os.MkdirAll(ulm.updatesDirectory(binary), 0755); err != nil {
 			return nil, fmt.Errorf("could not make updates directory for %s: %w", binary, err)
 		}
@@ -75,15 +80,9 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 	return filepath.Join(ulm.baseDir, string(binary))
 }
 
-// stagedUpdatesDirectory returns the location for staged updates -- i.e. updates
-// that have been downloaded, but not yet verified.
-func (ulm *updateLibraryManager) stagedUpdatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.baseDir, fmt.Sprintf("%s-staged", binary))
-}
-
-// addToLibrary adds the given target file to the library for the given binary,
-// downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
+// Available determines if the given target is already available, either as the currently-running
+// binary or within the update library.
+func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	// Check to see if the current running version is the version we were requested to add;
 	// return early if it is, but don't error out if we can't determine the current version.
 	currentVersion, err := ulm.currentRunningVersion(binary)
@@ -92,14 +91,31 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	} else if currentVersion == ulm.versionFromTarget(binary, targetFilename) {
 		// We don't need to download the current running version because it already exists,
 		// either in this updates library or in the original install location.
+		return true
+	}
+
+	return ulm.alreadyAdded(binary, targetFilename)
+}
+
+// alreadyAdded checks if the given target already exists in the update library.
+func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
+	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
+
+	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
+}
+
+// AddToLibrary adds the given target file to the library for the given binary,
+// downloading and verifying it if it's not already there.
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
+	// Acquire lock for modifying the library
+	ulm.lock.Lock(binary)
+	defer ulm.lock.Unlock(binary)
+
+	if ulm.Available(binary, targetFilename) {
 		return nil
 	}
 
-	if ulm.alreadyAdded(binary, targetFilename) {
-		return nil
-	}
-
-	// Remove downloaded archives after update, regardless of success
+	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
 	defer ulm.tidyStagedUpdates(binary)
 
 	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(binary, targetFilename, targetMetadata)
@@ -114,13 +130,6 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	return nil
 }
 
-// alreadyAdded checks if the given target already exists in the update library.
-func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
-	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
-
-	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
-}
-
 // versionFromTarget extracts the semantic version for an update from its filename.
 func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
 	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
@@ -132,17 +141,7 @@ func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, t
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
-	// Create the staging file
-	stagedUpdatePath := filepath.Join(ulm.stagedUpdatesDirectory(binary), targetFilename)
-	out, err := os.Create(stagedUpdatePath)
-	if err != nil {
-		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
-	}
-	defer func() {
-		if err := out.Close(); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not close file after writing", "err", err, "file", stagedUpdatePath)
-		}
-	}()
+	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
 
 	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
@@ -166,38 +165,54 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
-	// Everything looks good: write the buffered download to disk
+	// Everything looks good: create the file and write it to disk
+	out, err := os.Create(stagedUpdatePath)
+	if err != nil {
+		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
+	}
 	if _, err := io.Copy(out, &fileBuffer); err != nil {
+		out.Close()
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
+	}
+	if err := out.Close(); err != nil {
+		return stagedUpdatePath, fmt.Errorf("could not close downloaded target file %s after writing: %w", targetFilename, err)
 	}
 
 	return stagedUpdatePath, nil
 }
 
-// moveVerifiedUpdate untars the update, moves it into the update library, and performs final checks
-// to make sure that it's a valid, working update.
+// moveVerifiedUpdate untars the update and performs final checks to make sure that it's a valid, working update.
+// Finally, it moves the update to its correct versioned location in the update library for the given binary.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
 	targetVersion := ulm.versionFromTarget(binary, targetFilename)
-	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
-	if err := os.MkdirAll(newUpdateDirectory, 0755); err != nil {
-		return fmt.Errorf("could not create directory %s for new update: %w", newUpdateDirectory, err)
+	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
+	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
+		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
 	}
 
-	if err := fsutil.UntarBundle(filepath.Join(newUpdateDirectory, string(binary)), stagedUpdate); err != nil {
+	// Untar the archive. Note that `UntarBundle` calls `filepath.Dir(destination)`, so the inclusion of `binary`
+	// here doesn't matter as it's immediately stripped off.
+	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
-		return fmt.Errorf("could not untar update to %s: %w", newUpdateDirectory, err)
+		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
 	// Make sure that the binary is executable
-	if err := os.Chmod(executableLocation(newUpdateDirectory, binary), 0755); err != nil {
+	if err := os.Chmod(executableLocation(stagedVersionedDirectory, binary), 0755); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
-	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(newUpdateDirectory, binary), "--version"); err != nil {
+	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
 		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not verify executable: %w", err)
+	}
+
+	// All good! Shelve it in the library under its version
+	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
+	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
+		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
 
 	return nil
@@ -244,6 +259,10 @@ func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinar
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
 func (ulm *updateLibraryManager) TidyLibrary() {
 	for _, binary := range binaries {
+		// Acquire lock for modifying the library
+		ulm.lock.Lock(binary)
+		defer ulm.lock.Unlock(binary)
+
 		// First, remove old staged archives
 		ulm.tidyStagedUpdates(binary)
 
@@ -277,7 +296,7 @@ func (ulm *updateLibraryManager) TidyLibrary() {
 
 // tidyStagedUpdates removes all old archives from the staged updates directory.
 func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
-	matches, err := filepath.Glob(filepath.Join(ulm.stagedUpdatesDirectory(binary), "*"))
+	matches, err := filepath.Glob(filepath.Join(ulm.stagingDir, "*"))
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not glob for staged updates to tidy updates library", "err", err)
 		return

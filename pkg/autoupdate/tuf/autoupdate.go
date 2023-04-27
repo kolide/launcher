@@ -47,6 +47,7 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
+	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
 }
@@ -113,6 +114,8 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	return ta, nil
 }
 
+// initMetadataClient sets up a TUF client with our validated root metadata, prepared to fetch updates
+// from our TUF server.
 func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
 	// Set up the local TUF directory for our TUF client
 	localTufDirectory := LocalTufDirectory(rootDirectory)
@@ -147,6 +150,9 @@ func LocalTufDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
+// Execute is the TufAutoupdater run loop. It periodically checks to see if a new release
+// has been published; less frequently, it removes old/outdated TUF errors from the bucket
+// we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
@@ -177,6 +183,8 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
 }
 
+// checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
+// a new release that we should download. If so, it will add the release to our updates library.
 func (ta *TufAutoupdater) checkForUpdate() error {
 	// Attempt an update a couple times before returning an error -- sometimes we just hit caching issues.
 	errs := make([]error, 0)
@@ -195,22 +203,71 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not update metadata after %d tries: %+v", updateTryCount, errs)
 	}
 
-	// Find the newest release for our channel -- right now for logging purposes only
+	// Find the newest release for our channel
 	targets, err := ta.metadataClient.Targets()
 	if err != nil {
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	for _, binary := range binaries {
-		if err := ta.findRelease(binary, targets); err != nil {
-			return fmt.Errorf("could not find release: %w", err)
+	// Check for and download any new releases that are available
+	updatesDownloaded := make([]bool, len(binaries))
+	updateErrors := make([]error, 0)
+	for i, binary := range binaries {
+		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
+		if err != nil {
+			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
+		}
+
+		if downloadedUpdateVersion != "" {
+			level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
+			updatesDownloaded[i] = true
+		} else {
+			updatesDownloaded[i] = false
+		}
+
+	}
+
+	// If an update failed, save the error
+	if len(updateErrors) > 0 {
+		return fmt.Errorf("could not download updates: %+v", updateErrors)
+	}
+
+	for _, updateDownloaded := range updatesDownloaded {
+		if updateDownloaded {
+			// In the future, we would restart or re-launch the binary with the new version
+			level.Debug(ta.logger).Log("msg", "at least one update downloaded")
+			break
 		}
 	}
 
 	return nil
 }
 
-func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) error {
+// downloadUpdate will download a new release for the given binary, if available from TUF
+// and not already downloaded.
+func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
+	release, releaseMetadata, err := ta.findRelease(binary, targets)
+	if err != nil {
+		return "", fmt.Errorf("could not find release: %w", err)
+	}
+
+	if ta.libraryManager.Available(binary, release) {
+		return "", nil
+	}
+
+	if err := ta.libraryManager.AddToLibrary(binary, release, releaseMetadata); err != nil {
+		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
+	}
+
+	return release, nil
+}
+
+// findRelease checks the latest data from TUF (in `targets`) to see whether a new release
+// has been published for our channel. If it has, it returns the target for that release
+// and its associated metadata.
+func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, data.TargetFileMeta, error) {
+	// First, find the target that the channel release file is pointing to
+	var releaseTarget string
 	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
@@ -221,20 +278,31 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 		// to see if we're on this latest version.
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
-			return fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+			return "", data.TargetFileMeta{}, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
-		targetToDownload, err := ta.metadataClient.Target(custom.Target)
-		if err != nil {
-			return fmt.Errorf("could not get TUF metadata for release %s: %w", custom.Target, err)
-		}
-
-		return ta.libraryManager.AddToLibrary(binary, filepath.Base(custom.Target), targetToDownload)
+		releaseTarget = custom.Target
+		break
 	}
 
-	return fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	if releaseTarget == "" {
+		return "", data.TargetFileMeta{}, fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	}
+
+	// Now, get the metadata for our release target
+	for targetName, target := range targets {
+		if targetName != releaseTarget {
+			continue
+		}
+
+		return filepath.Base(releaseTarget), target, nil
+	}
+
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", targetReleaseFile, binary)
 }
 
+// storeError saves errors that occur during the periodic check for updates, so that they
+// can be queryable via the `kolide_tuf_autoupdater_errors` table.
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
@@ -242,6 +310,8 @@ func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	}
 }
 
+// cleanUpOldErrors removes all errors from our store that are more than a week old,
+// so we only keep the most recent/salient errors.
 func (ta *TufAutoupdater) cleanUpOldErrors() {
 	// We want to delete all errors more than 1 week old
 	errorTtl := 7 * 24 * time.Hour
