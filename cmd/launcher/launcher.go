@@ -363,17 +363,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 5 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
-			k.TufServerURL(),
+			k,
 			opts.RootDirectory,
-			k.UpdateDirectory(),
 			metadataClient,
-			k.MirrorServerURL(),
 			mirrorClient,
-			k.AutoupdateErrorsStore(),
 			extension,
 			tuf.WithLogger(logger),
-			tuf.WithChannel(k.UpdateChannel()),
-			tuf.WithUpdateCheckInterval(k.AutoupdateInterval()),
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
