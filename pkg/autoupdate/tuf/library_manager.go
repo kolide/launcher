@@ -80,6 +80,24 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 	return filepath.Join(ulm.baseDir, string(binary))
 }
 
+// MostRecentVersion returns the most recent, valid version available in the library for the
+// given binary.
+func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, error) {
+	validVersionsInLibrary, _, err := ulm.sortedVersionsInLibrary(binary)
+	if err != nil {
+		return "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
+	}
+
+	mostRecentVersionInLibrary := validVersionsInLibrary[len(validVersionsInLibrary)-1]
+	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibrary)
+	return executableLocation(versionDir, binary), nil
+}
+
+func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
+	versionDir := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
+	return executableLocation(versionDir, binary)
+}
+
 // Available determines if the given target is already available, either as the currently-running
 // binary or within the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
@@ -99,9 +117,7 @@ func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFil
 
 // alreadyAdded checks if the given target already exists in the update library.
 func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
-	updateDirectory := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
-
-	return autoupdate.CheckExecutable(context.TODO(), executableLocation(updateDirectory, binary), "--version") == nil
+	return autoupdate.CheckExecutable(context.TODO(), ulm.PathToTargetVersionExecutable(binary, targetFilename), "--version") == nil
 }
 
 // AddToLibrary adds the given target file to the library for the given binary,
@@ -320,53 +336,76 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 	const numberOfVersionsToKeep = 3
 
-	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))
+	versionsInLibrary, invalidVersionsInLibrary, err := ulm.sortedVersionsInLibrary(binary)
 	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "could not glob for updates to tidy updates library", "err", err)
+		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
 		return
 	}
 
-	versionsInLibrary := make([]*semver.Version, 0)
-	for _, rawVersion := range rawVersionsInLibrary {
-		v, err := semver.NewVersion(filepath.Base(rawVersion))
-		if err != nil {
-			level.Debug(ulm.logger).Log("msg", "updates library contains invalid semver", "err", err, "library_path", rawVersion)
-			ulm.removeUpdate(binary, filepath.Base(rawVersion))
-			continue
-		}
-
-		versionsInLibrary = append(versionsInLibrary, v)
+	for _, invalidVersion := range invalidVersionsInLibrary {
+		level.Debug(ulm.logger).Log("msg", "updates library contains invalid version", "err", err, "library_path", invalidVersion)
+		ulm.removeUpdate(binary, invalidVersion)
 	}
 
 	if len(versionsInLibrary) <= numberOfVersionsToKeep {
 		return
 	}
 
-	// Sort the versions (ascending order)
-	sort.Sort(semver.Collection(versionsInLibrary))
-
 	// Loop through, looking at the most recent versions first, and remove all once we hit nonCurrentlyRunningVersionsKept valid executables
 	nonCurrentlyRunningVersionsKept := 0
 	for i := len(versionsInLibrary) - 1; i >= 0; i -= 1 {
 		// Always keep the current running executable
-		if versionsInLibrary[i].Original() == currentRunningVersion {
+		if versionsInLibrary[i] == currentRunningVersion {
 			continue
 		}
 
 		// If we've already hit the number of versions to keep, then start to remove the older ones.
 		// We want to keep numberOfVersionsToKeep total, saving a spot for the currently running version.
 		if nonCurrentlyRunningVersionsKept >= numberOfVersionsToKeep-1 {
-			ulm.removeUpdate(binary, versionsInLibrary[i].Original())
-			continue
-		}
-
-		// Only keep good executables
-		versionDir := filepath.Join(ulm.updatesDirectory(binary), versionsInLibrary[i].Original())
-		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
-			ulm.removeUpdate(binary, versionsInLibrary[i].Original())
+			ulm.removeUpdate(binary, versionsInLibrary[i])
 			continue
 		}
 
 		nonCurrentlyRunningVersionsKept += 1
 	}
+}
+
+// sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
+// available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
+// an error only when unable to glob for versions.
+func (ulm *updateLibraryManager) sortedVersionsInLibrary(binary autoupdatableBinary) ([]string, []string, error) {
+	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not glob for updates in library: %w", err)
+	}
+
+	versionsInLibrary := make([]*semver.Version, 0)
+	invalidVersions := make([]string, 0)
+	for _, rawVersionWithPath := range rawVersionsInLibrary {
+		rawVersion := filepath.Base(rawVersionWithPath)
+		v, err := semver.NewVersion(rawVersion)
+		if err != nil {
+			invalidVersions = append(invalidVersions, rawVersion)
+			continue
+		}
+
+		versionDir := filepath.Join(ulm.updatesDirectory(binary), rawVersion)
+		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
+			invalidVersions = append(invalidVersions, rawVersion)
+			continue
+		}
+
+		versionsInLibrary = append(versionsInLibrary, v)
+	}
+
+	// Sort the versions (ascending order)
+	sort.Sort(semver.Collection(versionsInLibrary))
+
+	// Transform versions back into strings now that we've finished sorting them
+	versionsInLibraryStr := make([]string, len(versionsInLibrary))
+	for i, v := range versionsInLibrary {
+		versionsInLibraryStr[i] = v.Original()
+	}
+
+	return versionsInLibraryStr, invalidVersions, nil
 }
