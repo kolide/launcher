@@ -93,17 +93,11 @@ func checkDependOnService(launcherServiceKey registry.Key, logger log.Logger) {
 	}
 
 	// Check whether the service configuration already includes Dnscache in the list of services it depends on
-	foundDnscacheInList := false
 	for _, service := range serviceList {
+		// Already included -- no need to update
 		if service == dnscacheService {
-			foundDnscacheInList = true
-			break
+			return
 		}
-	}
-
-	// Dnscache is already listed in services that launcher depends on -- no need to update
-	if foundDnscacheInList {
-		return
 	}
 
 	// Set service to depend on Dnscache
