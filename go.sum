@@ -301,8 +301,8 @@ github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab h1:KVR7cs+oPyy85i+8t1Za
 github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
 github.com/kolide/krypto v0.0.0-20230209233022-9fce3e429899 h1:xxLm19kyV9FUxN7T9B+5IXcMU3kHOyPF/ULHcbz4cD0=
 github.com/kolide/krypto v0.0.0-20230209233022-9fce3e429899/go.mod h1:PvKvoNvMWfyPXZN9/yXNrGtAasI2b+sc8RpwkCJGzzc=
-github.com/kolide/systray v1.10.3 h1:PcWYvDepwRn2Sk7mLXM5LlMiIwCTRTUEqDELATVJYx0=
-github.com/kolide/systray v1.10.3/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
+github.com/kolide/systray v1.10.4 h1:eBhnVfhW0fGal1KBkBZC9fzRs4yrxUymgiXuQh5MBSg=
+github.com/kolide/systray v1.10.4/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
 github.com/kolide/toast v1.0.0 h1:pQViHayQVSzkdz0v8xnYuC/o4L7LF8mUuLCvpZ21efU=
 github.com/kolide/toast v1.0.0/go.mod h1:84R5sM7VWn6morUpJBGKrBMZB3Cm9OrmtBLWHwSEWL0=
 github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80 h1:XFzdAHvTlbQoHZdEgOEiFt93eyfXP6VZCwH5p+lPpBg=
@@ -371,8 +371,8 @@ github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQ
 github.com/opencontainers/image-spec v1.0.2 h1:9yCKha/T5XdGtO0q9Q9a6T5NUCsTn/DrBg0D7ufOcFM=
 github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/osquery/osquery-go v0.0.0-20210622151333-99b4efa62ec5/go.mod h1:JKR5QhjsYdnIPY7hakgas5sxf8qlA/9wQnLqaMfWdcg=
-github.com/osquery/osquery-go v0.0.0-20220706183148-4e1f83012b42 h1:Epwxipb+y/e8ss/SJ7947F8J6dwjv3RHRCz2g0OkCII=
-github.com/osquery/osquery-go v0.0.0-20220706183148-4e1f83012b42/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
+github.com/osquery/osquery-go v0.0.0-20230427204930-ff54f5f08296 h1:Jh/mQI9eHGRam9eWRw59eE9DN1/1IW0g90lGiS5yxGo=
+github.com/osquery/osquery-go v0.0.0-20230427204930-ff54f5f08296/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml v1.6.0/go.mod h1:5N711Q9dKgbdkxHL+MEfF31hpT7l0S0s/t2kKREewys=

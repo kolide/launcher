@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -18,8 +17,11 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/menu"
 	"github.com/kolide/launcher/ee/desktop/notify"
-	"github.com/kolide/launcher/ee/desktop/server"
+	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
+	userserver "github.com/kolide/launcher/ee/desktop/server"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/systray"
 	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 )
@@ -32,20 +34,25 @@ func runDesktop(args []string) error {
 			"",
 			"hostname launcher is connected to",
 		)
-		flauthtoken = flagset.String(
-			"authtoken",
+		flUserServerAuthToken = flagset.String(
+			"user_server_auth_token",
 			"",
-			"auth token for desktop server",
+			"auth token for user server",
 		)
-		flsocketpath = flagset.String(
-			"socket_path",
+		flUserServerSocketPath = flagset.String(
+			"user_server_socket_path",
 			"",
-			"path to create socket",
+			"path to create socket for user server",
 		)
-		flmonitorurl = flagset.String(
-			"monitor_url",
+		flRunnerServerUrl = flagset.String(
+			"runner_server_url",
 			"",
-			"url to monitor parent",
+			"url of runner server",
+		)
+		flRunnerServerAuthToken = flagset.String(
+			"runner_server_auth_token",
+			"",
+			"token used to auth with runner server",
 		)
 		flmenupath = flagset.String(
 			"menu_path",
@@ -90,11 +97,11 @@ func runDesktop(args []string) error {
 
 	level.Info(logger).Log("msg", "starting")
 
-	if *flsocketpath == "" {
-		*flsocketpath = defaultSocketPath()
+	if *flUserServerSocketPath == "" {
+		*flUserServerSocketPath = defaultUserServerSocketPath()
 		level.Info(logger).Log(
 			"msg", "using default socket path since none was provided",
-			"socket_path", *flsocketpath,
+			"socket_path", *flUserServerSocketPath,
 		)
 	}
 
@@ -112,12 +119,12 @@ func runDesktop(args []string) error {
 
 	// monitor parent
 	runGroup.Add(func() error {
-		monitorParentProcess(logger, *flmonitorurl, 2*time.Second)
+		monitorParentProcess(logger, *flRunnerServerUrl, *flRunnerServerAuthToken, 2*time.Second)
 		return nil
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := server.New(logger, *flauthtoken, *flsocketpath, shutdownChan, notifier)
+	server, err := userserver.New(logger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
@@ -128,7 +135,7 @@ func runDesktop(args []string) error {
 	}
 	server.RegisterRefreshListener(refreshMenu)
 
-	// start desktop server
+	// start user server
 	runGroup.Add(server.Serve, func(err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -147,6 +154,12 @@ func runDesktop(args []string) error {
 	}, func(err error) {
 		m.Shutdown()
 	})
+
+	// notify runner server when menu opened
+	runGroup.Add(func() error {
+		notifyRunnerServerMenuOpened(logger, *flRunnerServerUrl, *flRunnerServerAuthToken)
+		return nil
+	}, func(err error) {})
 
 	// run run group
 	go func() {
@@ -178,21 +191,49 @@ func listenSignals(logger log.Logger) {
 	)
 }
 
+func notifyRunnerServerMenuOpened(logger log.Logger, rootServerUrl, authToken string) {
+	client := authedclient.New(authToken, 2*time.Second)
+	menuOpendUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
+
+	for {
+		<-systray.SystrayMenuOpened
+
+		response, err := client.Get(menuOpendUrl)
+		if err != nil {
+			level.Error(logger).Log(
+				"msg", "sending menu opened request to root server",
+				"err", err,
+			)
+		}
+
+		if response != nil {
+			response.Body.Close()
+		}
+	}
+}
+
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Duration) {
+func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthToken string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	client := http.Client{
-		Timeout: interval,
-	}
+	client := authedclient.New(runnerServerAuthToken, interval)
 
 	const maxErrCount = 3
 	errCount := 0
 
-	for ; true; <-ticker.C {
-		response, err := client.Get(monitorUrl)
+	runnerHealthUrl := fmt.Sprintf("%s%s", runnerServerUrl, runnerserver.HealthCheckEndpoint)
 
+	for ; true; <-ticker.C {
+		// check to to ensure that the ppid is still legit
+		if os.Getppid() < 2 {
+			level.Debug(logger).Log(
+				"msg", "ppid is 0 or 1, exiting",
+			)
+			break
+		}
+
+		response, err := client.Get(runnerHealthUrl)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
 			// before closing, otherwise a new connection is established each time.
@@ -236,7 +277,7 @@ func monitorParentProcess(logger log.Logger, monitorUrl string, interval time.Du
 	}
 }
 
-func defaultSocketPath() string {
+func defaultUserServerSocketPath() string {
 	const socketBaseName = "kolide_desktop.sock"
 
 	if runtime.GOOS == "windows" {

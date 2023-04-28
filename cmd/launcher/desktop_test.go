@@ -2,60 +2,56 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/ulid"
+	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
-	mux := http.NewServeMux()
-
-	server := http.Server{
-		Handler: mux,
-	}
-
-	listener, err := net.Listen("tcp", "localhost:0")
+	runnerServer, err := runnerserver.New(log.NewNopLogger(), nil)
 	require.NoError(t, err)
 
-	go func() {
-		server.Serve(listener)
-	}()
+	// register client and get token
+	token := runnerServer.RegisterClient("0")
 
 	monitorInterval := 250 * time.Millisecond
-	monitorEndpoint := ulid.New()
-	monitorURL := fmt.Sprintf("http://%s/%s", listener.Addr().String(), monitorEndpoint)
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	go func() {
-		monitorParentProcess(log.NewLogfmtLogger(&logBytes), monitorURL, monitorInterval)
+		monitorParentProcess(log.NewLogfmtLogger(&logBytes), runnerServer.Url(), token, monitorInterval)
 	}()
 
-	time.Sleep(monitorInterval)
+	time.Sleep(monitorInterval * 2)
 
-	// request should fail since there is not handler for the endpoint
-	// make sure we retry
+	// should retry
 	require.Contains(t, logBytes.String(), "will retry")
 
-	// add a handler to the endpoint
-	mux.HandleFunc(fmt.Sprintf("/%s", monitorEndpoint), func(w http.ResponseWriter, r *http.Request) {})
+	// start server
+	go func() {
+		if err := runnerServer.Serve(); err != nil {
+			require.ErrorIs(t, err, http.ErrServerClosed)
+		}
+	}()
 
-	// clear log
+	// wait a moment for server to start
+	time.Sleep(monitorInterval * 2)
+
+	// clear the log
 	io.Copy(io.Discard, &logBytes)
-	time.Sleep(monitorInterval * 8)
+	// let it run for a few intervals and make sure there is no error
+	time.Sleep(monitorInterval * 4)
 
 	// we should succeed now, nothing should be in the log
 	require.Empty(t, logBytes.String())
 
 	// stop the server, should now start getting errors
-	require.NoError(t, server.Shutdown(context.Background()))
+	require.NoError(t, runnerServer.Shutdown(context.Background()))
 	time.Sleep(monitorInterval * 8)
 
 	// should retry
