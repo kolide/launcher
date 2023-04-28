@@ -3,56 +3,37 @@ package tuf
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
-	"strings"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
-
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
 // location in the library specified by the version associated with that update.
 // It also ensures that old updates are removed when they are no longer needed.
 type updateLibraryManager struct {
+	*readOnlyLibrary
 	mirrorUrl    string // dl.kolide.co
 	mirrorClient *http.Client
-	baseDir      string
 	stagingDir   string
-	osquerier    querier // used to query for current running osquery version
 	lock         *libraryLock
 	logger       log.Logger
 }
 
 func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
-	ulm := updateLibraryManager{
-		mirrorUrl:    mirrorUrl,
-		mirrorClient: mirrorClient,
-		baseDir:      baseDir,
-		osquerier:    osquerier,
-		lock:         newLibraryLock(),
-		logger:       log.With(logger, "component", "tuf_autoupdater_library_manager"),
-	}
-
 	// Ensure the updates directory exists
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
@@ -63,61 +44,30 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 	if err != nil {
 		return nil, fmt.Errorf("could not make staged updates directory: %w", err)
 	}
-	ulm.stagingDir = stagingDir
 
 	// Create the update library
 	for _, binary := range binaries {
-		if err := os.MkdirAll(ulm.updatesDirectory(binary), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(baseDir, string(binary)), 0755); err != nil {
 			return nil, fmt.Errorf("could not make updates directory for %s: %w", binary, err)
 		}
 	}
 
+	// Create the nested read-only library
+	readOnlyLibrary, err := newReadOnlyLibrary(baseDir, osquerier, logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not create read-only library: %w", err)
+	}
+
+	ulm := updateLibraryManager{
+		readOnlyLibrary: readOnlyLibrary,
+		mirrorUrl:       mirrorUrl,
+		mirrorClient:    mirrorClient,
+		stagingDir:      stagingDir,
+		lock:            newLibraryLock(),
+		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
+	}
+
 	return &ulm, nil
-}
-
-// updatesDirectory returns the update library location for the given binary.
-func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.baseDir, string(binary))
-}
-
-// MostRecentVersion returns the most recent, valid version available in the library for the
-// given binary.
-func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, error) {
-	validVersionsInLibrary, _, err := ulm.sortedVersionsInLibrary(binary)
-	if err != nil {
-		return "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
-	}
-
-	mostRecentVersionInLibrary := validVersionsInLibrary[len(validVersionsInLibrary)-1]
-	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibrary)
-	return executableLocation(versionDir, binary), nil
-}
-
-func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
-	versionDir := filepath.Join(ulm.updatesDirectory(binary), ulm.versionFromTarget(binary, targetFilename))
-	return executableLocation(versionDir, binary)
-}
-
-// Available determines if the given target is already available, either as the currently-running
-// binary or within the update library.
-func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
-	// Check to see if the current running version is the version we were requested to add;
-	// return early if it is, but don't error out if we can't determine the current version.
-	currentVersion, err := ulm.currentRunningVersion(binary)
-	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-	} else if currentVersion == ulm.versionFromTarget(binary, targetFilename) {
-		// We don't need to download the current running version because it already exists,
-		// either in this updates library or in the original install location.
-		return true
-	}
-
-	return ulm.alreadyAdded(binary, targetFilename)
-}
-
-// alreadyAdded checks if the given target already exists in the update library.
-func (ulm *updateLibraryManager) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
-	return autoupdate.CheckExecutable(context.TODO(), ulm.PathToTargetVersionExecutable(binary, targetFilename), "--version") == nil
 }
 
 // AddToLibrary adds the given target file to the library for the given binary,
@@ -144,14 +94,6 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	}
 
 	return nil
-}
-
-// versionFromTarget extracts the semantic version for an update from its filename.
-func (ulm *updateLibraryManager) versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
-	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s-", binary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
@@ -241,34 +183,6 @@ func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binary
 		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
 	} else {
 		level.Debug(ulm.logger).Log("msg", "removed update", "directory", directoryToRemove)
-	}
-}
-
-// currentRunningVersion returns the current running version of the given binary.
-func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (string, error) {
-	switch binary {
-	case binaryLauncher:
-		launcherVersion := version.Version().Version
-		if launcherVersion == "unknown" {
-			return "", errors.New("unknown launcher version")
-		}
-		return launcherVersion, nil
-	case binaryOsqueryd:
-		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
-		if err != nil {
-			return "", fmt.Errorf("could not query for osquery version: %w", err)
-		}
-		if len(resp) < 1 {
-			return "", errors.New("osquery version query returned no rows")
-		}
-		osquerydVersion, ok := resp[0]["version"]
-		if !ok {
-			return "", errors.New("osquery version query did not return version")
-		}
-
-		return osquerydVersion, nil
-	default:
-		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}
 }
 
@@ -368,44 +282,4 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 		nonCurrentlyRunningVersionsKept += 1
 	}
-}
-
-// sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
-// available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
-// an error only when unable to glob for versions.
-func (ulm *updateLibraryManager) sortedVersionsInLibrary(binary autoupdatableBinary) ([]string, []string, error) {
-	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not glob for updates in library: %w", err)
-	}
-
-	versionsInLibrary := make([]*semver.Version, 0)
-	invalidVersions := make([]string, 0)
-	for _, rawVersionWithPath := range rawVersionsInLibrary {
-		rawVersion := filepath.Base(rawVersionWithPath)
-		v, err := semver.NewVersion(rawVersion)
-		if err != nil {
-			invalidVersions = append(invalidVersions, rawVersion)
-			continue
-		}
-
-		versionDir := filepath.Join(ulm.updatesDirectory(binary), rawVersion)
-		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
-			invalidVersions = append(invalidVersions, rawVersion)
-			continue
-		}
-
-		versionsInLibrary = append(versionsInLibrary, v)
-	}
-
-	// Sort the versions (ascending order)
-	sort.Sort(semver.Collection(versionsInLibrary))
-
-	// Transform versions back into strings now that we've finished sorting them
-	versionsInLibraryStr := make([]string, len(versionsInLibrary))
-	for i, v := range versionsInLibrary {
-		versionsInLibraryStr[i] = v.Original()
-	}
-
-	return versionsInLibraryStr, invalidVersions, nil
 }
