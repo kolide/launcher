@@ -46,8 +46,6 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
-	MostRecentVersion(binary autoupdatableBinary) (string, error)
-	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
@@ -84,7 +82,7 @@ func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
 }
 
 func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
-	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		channel:       defaultChannel,
 		interrupt:     make(chan struct{}),
@@ -107,7 +105,7 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}

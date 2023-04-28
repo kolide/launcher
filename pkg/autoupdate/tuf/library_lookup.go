@@ -10,7 +10,7 @@ import (
 
 // Read-only library
 type updateLibrary interface {
-	MostRecentVersion(binary autoupdatableBinary) (string, error)
+	MostRecentVersion(binary autoupdatableBinary, currentRunningExecutable string) (string, error)
 	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string
 	Available(binary autoupdatableBinary, targetFilename string) bool
 }
@@ -24,13 +24,13 @@ type libraryLookup struct {
 	channel               string
 }
 
-func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channel string, osquerier querier, logger log.Logger) (*libraryLookup, error) {
+func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*libraryLookup, error) {
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
 	// Set up the library
-	r, err := newReadOnlyLibrary(updateDirectory, osquerier, logger)
+	r, err := newReadOnlyLibrary(updateDirectory, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not create read-only update library: %w", err)
 	}
@@ -53,14 +53,14 @@ func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channe
 	return &l, nil
 }
 
-func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary) (string, error) {
+func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary, currentRunningExecutable string) (string, error) {
 	releaseVersion, err := l.findExecutableFromRelease(binary)
 	if err == nil {
 		return releaseVersion, nil
 	}
 
 	// If we can't find it, return the executable with the most recent version in the library
-	return l.library.MostRecentVersion(binary)
+	return l.library.MostRecentVersion(binary, currentRunningExecutable)
 }
 
 func (l *libraryLookup) findExecutableFromRelease(binary autoupdatableBinary) (string, error) {

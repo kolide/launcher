@@ -16,23 +16,17 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
-
 // readOnlyLibrary provides a read-only view into the updates libraries for all
 // binaries. It is used to determine what version of each binary should be running.
 type readOnlyLibrary struct {
-	baseDir   string
-	osquerier querier // used to query for current running osquery version
-	logger    log.Logger
+	baseDir string
+	logger  log.Logger
 }
 
-func newReadOnlyLibrary(baseDir string, osquerier querier, logger log.Logger) (*readOnlyLibrary, error) {
+func newReadOnlyLibrary(baseDir string, logger log.Logger) (*readOnlyLibrary, error) {
 	rol := readOnlyLibrary{
-		baseDir:   baseDir,
-		osquerier: osquerier,
-		logger:    log.With(logger, "component", "tuf_autoupdater_read_only_library"),
+		baseDir: baseDir,
+		logger:  log.With(logger, "component", "tuf_autoupdater_read_only_library"),
 	}
 
 	// Ensure the updates directory exists
@@ -56,8 +50,9 @@ func (rol *readOnlyLibrary) updatesDirectory(binary autoupdatableBinary) string 
 }
 
 // MostRecentVersion returns the most recent, valid version available in the library for the
-// given binary.
-func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary) (string, error) {
+// given binary. Returns an empty string if the current running executable is already the most
+// up-to-date version.
+func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary, currentRunningExecutable string) (string, error) {
 	// Get current running version
 	currentVersionRaw, err := rol.currentRunningVersion(binary)
 	if err != nil {
@@ -81,11 +76,7 @@ func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary) (strin
 		return "", fmt.Errorf("could not parse most recent version %s in library for %s: %w", mostRecentVersionInLibraryRaw, binary, err)
 	}
 	if currentVersion.GreaterThan(mostRecentVersionInLibrary) {
-		currentVersionExecutable, err := os.Executable()
-		if err != nil {
-			return "", fmt.Errorf("could not get current executable: %w", err)
-		}
-		return currentVersionExecutable, nil
+		return "", nil
 	}
 
 	// Update library version is more recent than current running version, so return its location
@@ -139,19 +130,7 @@ func (rol *readOnlyLibrary) currentRunningVersion(binary autoupdatableBinary) (s
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
-		resp, err := rol.osquerier.Query("SELECT version FROM osquery_info;")
-		if err != nil {
-			return "", fmt.Errorf("could not query for osquery version: %w", err)
-		}
-		if len(resp) < 1 {
-			return "", errors.New("osquery version query returned no rows")
-		}
-		osquerydVersion, ok := resp[0]["version"]
-		if !ok {
-			return "", errors.New("osquery version query did not return version")
-		}
-
-		return osquerydVersion, nil
+		return "", errors.New("need to implement with something faster than the osquerier")
 	default:
 		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}

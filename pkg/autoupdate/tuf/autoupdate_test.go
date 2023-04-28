@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	localservermocks "github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -32,7 +31,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 
-	_, err := NewTufAutoupdater("https://example.com", testRootDir, "", http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
+	_, err := NewTufAutoupdater("https://example.com", testRootDir, "", http.DefaultClient, "https://example.com", http.DefaultClient, s)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm that the TUF directory we expose is the one that we created
@@ -59,7 +58,7 @@ func TestExecute(t *testing.T) {
 	s := setupStorage(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, "", http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, "", http.DefaultClient, tufServerUrl, http.DefaultClient, s)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -123,7 +122,7 @@ func Test_storeError(t *testing.T) {
 	}))
 	defer testTufServer.Close()
 
-	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -33,7 +32,7 @@ type updateLibraryManager struct {
 	logger       log.Logger
 }
 
-func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, logger log.Logger) (*updateLibraryManager, error) {
 	// Ensure the updates directory exists
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
@@ -53,7 +52,7 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 	}
 
 	// Create the nested read-only library
-	readOnlyLibrary, err := newReadOnlyLibrary(baseDir, osquerier, logger)
+	readOnlyLibrary, err := newReadOnlyLibrary(baseDir, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not create read-only library: %w", err)
 	}
@@ -197,24 +196,7 @@ func (ulm *updateLibraryManager) TidyLibrary() {
 		ulm.tidyStagedUpdates(binary)
 
 		// Get the current running version to preserve it when tidying the available updates
-		var currentVersion string
-		var err error
-		switch binary {
-		case binaryOsqueryd:
-			// The osqueryd client may not have initialized yet, so retry the version
-			// check a couple times before giving up
-			osquerydVersionCheckRetries := 5
-			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
-				currentVersion, err = ulm.currentRunningVersion(binary)
-				if err == nil {
-					break
-				}
-				time.Sleep(1 * time.Minute)
-			}
-		default:
-			currentVersion, err = ulm.currentRunningVersion(binary)
-		}
-
+		currentVersion, err := ulm.currentRunningVersion(binary)
 		if err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
 			continue

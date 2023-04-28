@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,23 +8,22 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_newReadOnlyLibrary(t *testing.T) {
 	t.Parallel()
 
-	_, err := newReadOnlyLibrary("/some/path/to/a/fake/directory", nil, log.NewNopLogger())
+	_, err := newReadOnlyLibrary("/some/path/to/a/fake/directory", log.NewNopLogger())
 	require.Error(t, err, "expected error when creating library with nonexistent base dir")
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	_, err = newReadOnlyLibrary(testBaseDir, nil, log.NewNopLogger())
+	_, err = newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
 	require.Error(t, err, "expected error when creating library with nonexistent libraries")
 
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
-	_, err = newReadOnlyLibrary(testBaseDir, nil, log.NewNopLogger())
+	_, err = newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "expected no error when creating library")
 }
 
@@ -47,18 +45,15 @@ func TestAvailable(t *testing.T) {
 	testBaseDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
-	mockOsquerier := newMockQuerier(t)
 
-	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, mockOsquerier, log.NewNopLogger())
+	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	// Query for the current osquery version
 	runningOsqueryVersion := "5.5.7"
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
 	require.True(t, testReadOnlyLibrary.Available(binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)))
 
 	// Query for a different osqueryd version
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
 	require.False(t, testReadOnlyLibrary.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
 }
 
@@ -79,40 +74,16 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	t.Parallel()
 
-	mockOsquerier := newMockQuerier(t)
-
 	testReadOnlyLibrary := &readOnlyLibrary{
-		logger:    log.NewNopLogger(),
-		osquerier: mockOsquerier,
+		logger: log.NewNopLogger(),
 	}
 
 	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
 	require.NoError(t, err)
 
-	// Expect to return one row containing the version
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
-
 	osqueryVersion, err := testReadOnlyLibrary.currentRunningVersion("osqueryd")
 	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
 	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
-}
-
-func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
-	t.Parallel()
-
-	mockOsquerier := newMockQuerier(t)
-
-	testReadOnlyLibrary := &readOnlyLibrary{
-		logger:    log.NewNopLogger(),
-		osquerier: mockOsquerier,
-	}
-
-	// Expect to return an error
-	mockOsquerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error")).Once()
-
-	osqueryVersion, err := testReadOnlyLibrary.currentRunningVersion("osqueryd")
-	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
-	require.Equal(t, "", osqueryVersion)
 }
 
 func Test_versionFromTarget(t *testing.T) {

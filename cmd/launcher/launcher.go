@@ -370,7 +370,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			k.MirrorServerURL(),
 			mirrorClient,
 			k.AutoupdateErrorsStore(),
-			extension,
 			tuf.WithLogger(logger),
 			tuf.WithChannel(k.UpdateChannel()),
 			tuf.WithUpdateCheckInterval(k.AutoupdateInterval()),
