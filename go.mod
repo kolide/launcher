@@ -26,7 +26,7 @@ require (
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/oklog/run v1.0.0
-	github.com/osquery/osquery-go v0.0.0-20220706183148-4e1f83012b42
+	github.com/osquery/osquery-go v0.0.0-20230427204930-ff54f5f08296
 	github.com/peterbourgon/ff/v3 v3.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
