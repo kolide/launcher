@@ -69,7 +69,7 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(k types.Knapsack, rootDirectory string, metadataHttpClient *http.Client,
+func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
 	mirrorHttpClient *http.Client, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		channel:       k.UpdateChannel(),
@@ -84,7 +84,7 @@ func NewTufAutoupdater(k types.Knapsack, rootDirectory string, metadataHttpClien
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(rootDirectory, k.TufServerURL(), metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(k.RootDirectory(), k.TufServerURL(), metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
@@ -92,7 +92,7 @@ func NewTufAutoupdater(k types.Knapsack, rootDirectory string, metadataHttpClien
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
 	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = filepath.Join(rootDirectory, "updates")
+		updateDirectory = filepath.Join(k.RootDirectory(), "updates")
 	}
 	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, osquerier, ta.logger)
 	if err != nil {
