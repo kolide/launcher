@@ -26,7 +26,6 @@ var rootJson []byte
 // Configuration defaults
 const (
 	DefaultTufServer            = "https://tuf.kolide.com"
-	defaultChannel              = "stable"
 	tufDirectoryName            = "tuf"
 	genericReleaseVersionFormat = "%s/%s/%s/release.json" // <binary>/<os>/<channel>/release.json
 )
@@ -69,25 +68,13 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	}
 }
 
-func WithChannel(channel string) TufAutoupdaterOption {
-	return func(ta *TufAutoupdater) {
-		ta.channel = channel
-	}
-}
-
-func WithUpdateCheckInterval(checkInterval time.Duration) TufAutoupdaterOption {
-	return func(ta *TufAutoupdater) {
-		ta.checkInterval = checkInterval
-	}
-}
-
-func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string, metadataHttpClient *http.Client,
-	mirrorUrl string, mirrorHttpClient *http.Client, store types.KVStore, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
+	mirrorHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		channel:       defaultChannel,
+		channel:       k.UpdateChannel(),
 		interrupt:     make(chan struct{}),
-		checkInterval: 60 * time.Second,
-		store:         store,
+		checkInterval: k.AutoupdateInterval(),
+		store:         k.AutoupdateErrorsStore(),
 		logger:        log.NewNopLogger(),
 	}
 
@@ -96,16 +83,17 @@ func NewTufAutoupdater(metadataUrl, rootDirectory string, updateDirectory string
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(rootDirectory, metadataUrl, metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(k.RootDirectory(), k.TufServerURL(), metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
 
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
+	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = DefaultLibraryDirectory(rootDirectory)
+		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(mirrorUrl, mirrorHttpClient, updateDirectory, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}

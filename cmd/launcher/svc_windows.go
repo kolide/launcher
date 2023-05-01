@@ -78,6 +78,9 @@ func runWindowsSvc(args []string) error {
 		)
 	}()
 
+	// Confirm that service configuration is up-to-date
+	checkServiceConfiguration(logger, opts)
+
 	level.Info(logger).Log(
 		"msg", "launching service",
 		"version", version.Version().Version,
