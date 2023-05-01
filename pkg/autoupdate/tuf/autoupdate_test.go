@@ -17,10 +17,10 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	localservermocks "github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
+	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf"
@@ -31,9 +31,20 @@ func TestNewTufAutoupdater(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return("https://example.com")
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 
-	_, err := NewTufAutoupdater("https://example.com", testRootDir, "", http.DefaultClient, "https://example.com", http.DefaultClient, s, localservermocks.NewQuerier(t))
+	_, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
 
 	// Confirm that the TUF directory we expose is the one that we created
 	exposedRootDir := LocalTufDirectory(testRootDir)
@@ -57,10 +68,21 @@ func TestExecute(t *testing.T) {
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(tufServerUrl, testRootDir, "", http.DefaultClient, tufServerUrl, http.DefaultClient, s, localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -122,9 +144,21 @@ func Test_storeError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer testTufServer.Close()
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(setupStorage(t))
+	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 
-	autoupdater, err := NewTufAutoupdater(testTufServer.URL, testRootDir, "", http.DefaultClient, testTufServer.URL, http.DefaultClient, setupStorage(t), localservermocks.NewQuerier(t))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary").Return().Once()
