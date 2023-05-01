@@ -366,6 +366,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			k,
 			metadataClient,
 			mirrorClient,
+			extension,
 			tuf.WithLogger(logger),
 		)
 		if err != nil {

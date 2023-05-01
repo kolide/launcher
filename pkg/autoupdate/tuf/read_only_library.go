@@ -5,14 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
@@ -49,18 +50,13 @@ func (rol *readOnlyLibrary) updatesDirectory(binary autoupdatableBinary) string 
 	return filepath.Join(rol.baseDir, string(binary))
 }
 
-// MostRecentVersion returns the most recent, valid version available in the library for the
-// given binary. Returns an empty string if the current running executable is already the most
-// up-to-date version.
+// MostRecentVersion returns the path to the most recent, valid version available in the library for the
+// given binary.
 func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary, currentRunningExecutable string) (string, error) {
-	// Get current running version
-	currentVersionRaw, err := rol.currentRunningVersion(binary)
+	// Get installed version
+	installedVersion, installedVersionPath, err := InstalledVersion(binary)
 	if err != nil {
 		return "", fmt.Errorf("could not determine current running version of %s: %w", binary, err)
-	}
-	currentVersion, err := semver.NewVersion(currentVersionRaw)
-	if err != nil {
-		return "", fmt.Errorf("could not parse current running version %s of %s: %w", currentVersionRaw, binary, err)
 	}
 
 	// Pull all available versions from library
@@ -69,71 +65,46 @@ func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary, curren
 		return "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
 
-	// Compare most recent version in library with current running version
+	// If we don't have any updates in the library, return the installed version
+	if len(validVersionsInLibrary) < 1 {
+		return installedVersionPath, nil
+	}
+
+	// Compare most recent version in library with the installed version
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
 	mostRecentVersionInLibrary, err := semver.NewVersion(mostRecentVersionInLibraryRaw)
 	if err != nil {
 		return "", fmt.Errorf("could not parse most recent version %s in library for %s: %w", mostRecentVersionInLibraryRaw, binary, err)
 	}
-	if currentVersion.GreaterThan(mostRecentVersionInLibrary) {
-		return "", nil
+	if installedVersion.GreaterThan(mostRecentVersionInLibrary) {
+		return installedVersionPath, nil
 	}
 
-	// Update library version is more recent than current running version, so return its location
+	// The update library version is more recent than the installed version, so return its location
 	versionDir := filepath.Join(rol.updatesDirectory(binary), mostRecentVersionInLibraryRaw)
 	return executableLocation(versionDir, binary), nil
 }
 
 // PathToTargetVersionExecutable returns the path to the executable for the desired version.
 func (rol *readOnlyLibrary) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
-	versionDir := filepath.Join(rol.updatesDirectory(binary), rol.versionFromTarget(binary, targetFilename))
+	versionDir := filepath.Join(rol.updatesDirectory(binary), versionFromTarget(binary, targetFilename))
 	return executableLocation(versionDir, binary)
 }
 
-// Available determines if the given target is already available, either as the currently-running
-// binary or within the update library.
-func (rol *readOnlyLibrary) Available(binary autoupdatableBinary, targetFilename string) bool {
-	// Check to see if the current running version is the version we were requested to add;
-	// return early if it is, but don't error out if we can't determine the current version.
-	currentVersion, err := rol.currentRunningVersion(binary)
+func (rol *readOnlyLibrary) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
+	installedVersion, _, err := InstalledVersion(binary)
 	if err != nil {
-		level.Debug(rol.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-	} else if currentVersion == rol.versionFromTarget(binary, targetFilename) {
-		// We don't need to download the current running version because it already exists,
-		// either in this updates library or in the original install location.
-		return true
+		level.Debug(rol.logger).Log("msg", "could not get installed version", "binary", binary, "err", err)
+		return false
 	}
 
-	return rol.alreadyAdded(binary, targetFilename)
+	return installedVersion.Original() == versionFromTarget(binary, targetFilename)
 }
 
-// alreadyAdded checks if the given target already exists in the update library.
-func (rol *readOnlyLibrary) alreadyAdded(binary autoupdatableBinary, targetFilename string) bool {
-	return autoupdate.CheckExecutable(context.TODO(), rol.PathToTargetVersionExecutable(binary, targetFilename), "--version") == nil
-}
-
-// versionFromTarget extracts the semantic version for an update from its filename.
-func (rol *readOnlyLibrary) versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
-	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s-", binary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
-}
-
-// currentRunningVersion returns the current running version of the given binary.
-func (rol *readOnlyLibrary) currentRunningVersion(binary autoupdatableBinary) (string, error) {
-	switch binary {
-	case binaryLauncher:
-		launcherVersion := version.Version().Version
-		if launcherVersion == "unknown" {
-			return "", errors.New("unknown launcher version")
-		}
-		return launcherVersion, nil
-	case binaryOsqueryd:
-		return "", errors.New("need to implement with something faster than the osquerier")
-	default:
-		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
-	}
+// Available determines if the given target is already available in the update library.
+func (rol *readOnlyLibrary) Available(binary autoupdatableBinary, targetFilename string) bool {
+	executablePath := rol.PathToTargetVersionExecutable(binary, targetFilename)
+	return autoupdate.CheckExecutable(context.TODO(), executablePath, "--version") == nil
 }
 
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
@@ -174,4 +145,110 @@ func (rol *readOnlyLibrary) sortedVersionsInLibrary(binary autoupdatableBinary) 
 	}
 
 	return versionsInLibraryStr, invalidVersions, nil
+}
+
+// versionFromTarget extracts the semantic version for an update from its filename.
+func versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
+	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
+	prefixToTrim := fmt.Sprintf("%s-", binary)
+
+	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
+}
+
+func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
+	// TODO cache it somewhere
+	pathToBinary := findInstallLocation(binary)
+	if pathToBinary == "" {
+		return nil, "", errors.New("could not find install location")
+	}
+	cmd := exec.Command(pathToBinary, "--version")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, "", fmt.Errorf("could not execute %s --version: out %s, error %w", pathToBinary, string(out), err)
+	}
+
+	var v *semver.Version
+	switch binary {
+	case binaryLauncher:
+		v, err = parseLauncherVersion(out)
+	case binaryOsqueryd:
+		v, err = parseOsquerydVersion(out)
+	default:
+		return nil, "", fmt.Errorf("cannot parse version for unknown binary %s", binary)
+	}
+
+	if err != nil {
+		return nil, "", fmt.Errorf("could not parse binary install version: %w", err)
+	}
+
+	return v, pathToBinary, nil
+}
+
+func parseLauncherVersion(versionOutput []byte) (*semver.Version, error) {
+	// TODO: trim everything that's not line `launcher - version 1.0.7-19-g8c890f3`
+	versionStr := strings.TrimSpace(strings.TrimPrefix("launcher - version", string(versionOutput)))
+	launcherInstallVersion, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse launcher version %s as semver: %w", versionStr, err)
+	}
+
+	return launcherInstallVersion, nil
+}
+
+func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
+	versionStr := strings.TrimSpace(strings.TrimPrefix("osqueryd version", string(versionOutput)))
+	osqueryInstallVersion, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse osquery version %s as semver: %w", versionStr, err)
+	}
+
+	return osqueryInstallVersion, nil
+}
+
+// TODO ripped directly from findOsquery()
+func findInstallLocation(binary autoupdatableBinary) string {
+	binaryName := string(binary)
+	if runtime.GOOS == "windows" {
+		binaryName = binaryName + ".exe"
+	}
+
+	var likelyDirectories []string
+
+	if exPath, err := os.Executable(); err == nil {
+		likelyDirectories = append(likelyDirectories, filepath.Dir(exPath))
+	}
+
+	// Places to check. We could conditionalize on GOOS, but it doesn't
+	// seem important.
+	likelyDirectories = append(
+		likelyDirectories,
+		"/usr/local/kolide/bin",
+		"/usr/local/kolide-k2/bin",
+		"/usr/local/bin",
+		`C:\Program Files\osquery`,
+		`C:\Program Files\Kolide\Launcher-kolide-k2\bin`,
+	)
+
+	for _, dir := range likelyDirectories {
+		potentialPath := filepath.Join(filepath.Clean(dir), binaryName)
+
+		info, err := os.Stat(potentialPath)
+		if err != nil {
+			continue
+		}
+
+		if info.IsDir() {
+			continue
+		}
+
+		// I guess it's good enough...
+		return potentialPath
+	}
+
+	// last ditch, check for binary on the PATH
+	if osqPath, err := exec.LookPath(binaryName); err == nil {
+		return osqPath
+	}
+
+	return ""
 }

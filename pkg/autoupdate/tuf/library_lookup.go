@@ -10,6 +10,7 @@ import (
 
 // Read-only library
 type updateLibrary interface {
+	IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool
 	MostRecentVersion(binary autoupdatableBinary, currentRunningExecutable string) (string, error)
 	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string
 	Available(binary autoupdatableBinary, targetFilename string) bool
@@ -59,7 +60,8 @@ func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary, currentRunnin
 		return releaseVersion, nil
 	}
 
-	// If we can't find it, return the executable with the most recent version in the library
+	// If we can't find the specific release version that we should be on, then just return the executable
+	// with the most recent version in the library
 	return l.library.MostRecentVersion(binary, currentRunningExecutable)
 }
 
@@ -78,6 +80,10 @@ func (l *libraryLookup) findExecutableFromRelease(binary autoupdatableBinary) (s
 	targetName, _, err := findRelease(binary, targets, l.channel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
+	}
+
+	if l.library.IsInstallVersion(binary, targetName) {
+		return "", errors.New("TODO: path to install location")
 	}
 
 	if !l.library.Available(binary, targetName) {

@@ -3,21 +3,28 @@ package tuf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
+}
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
@@ -28,11 +35,12 @@ type updateLibraryManager struct {
 	mirrorUrl    string // dl.kolide.co
 	mirrorClient *http.Client
 	stagingDir   string
+	osquerier    querier // used to query for current running osquery version
 	lock         *libraryLock
 	logger       log.Logger
 }
 
-func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
 	// Ensure the updates directory exists
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
@@ -75,6 +83,10 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, target
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
+
+	if ulm.IsInstallVersion(binary, targetFilename) {
+		return nil
+	}
 
 	if ulm.Available(binary, targetFilename) {
 		return nil
@@ -141,7 +153,7 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 // moveVerifiedUpdate untars the update and performs final checks to make sure that it's a valid, working update.
 // Finally, it moves the update to its correct versioned location in the update library for the given binary.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
-	targetVersion := ulm.versionFromTarget(binary, targetFilename)
+	targetVersion := versionFromTarget(binary, targetFilename)
 	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
 	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
@@ -185,6 +197,34 @@ func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binary
 	}
 }
 
+// currentRunningVersion returns the current running version of the given binary.
+func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (string, error) {
+	switch binary {
+	case binaryLauncher:
+		launcherVersion := version.Version().Version
+		if launcherVersion == "unknown" {
+			return "", errors.New("unknown launcher version")
+		}
+		return launcherVersion, nil
+	case binaryOsqueryd:
+		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
+		if err != nil {
+			return "", fmt.Errorf("could not query for osquery version: %w", err)
+		}
+		if len(resp) < 1 {
+			return "", errors.New("osquery version query returned no rows")
+		}
+		osquerydVersion, ok := resp[0]["version"]
+		if !ok {
+			return "", errors.New("osquery version query did not return version")
+		}
+
+		return osquerydVersion, nil
+	default:
+		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
+	}
+}
+
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
 func (ulm *updateLibraryManager) TidyLibrary() {
 	for _, binary := range binaries {
@@ -196,7 +236,24 @@ func (ulm *updateLibraryManager) TidyLibrary() {
 		ulm.tidyStagedUpdates(binary)
 
 		// Get the current running version to preserve it when tidying the available updates
-		currentVersion, err := ulm.currentRunningVersion(binary)
+		var currentVersion string
+		var err error
+		switch binary {
+		case binaryOsqueryd:
+			// The osqueryd client may not have initialized yet, so retry the version
+			// check a couple times before giving up
+			osquerydVersionCheckRetries := 5
+			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
+				currentVersion, err = ulm.currentRunningVersion(binary)
+				if err == nil {
+					break
+				}
+				time.Sleep(1 * time.Minute)
+			}
+		default:
+			currentVersion, err = ulm.currentRunningVersion(binary)
+		}
+
 		if err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
 			continue

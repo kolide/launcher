@@ -45,6 +45,7 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
+	IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary()
@@ -68,8 +69,8 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
-	mirrorHttpClient *http.Client, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
+	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		channel:       k.UpdateChannel(),
 		interrupt:     make(chan struct{}),
@@ -93,7 +94,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, osquerier, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -240,6 +241,10 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 	release, releaseMetadata, err := findRelease(binary, targets, ta.channel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
+	}
+
+	if ta.libraryManager.IsInstallVersion(binary, release) {
+		return "", nil
 	}
 
 	if ta.libraryManager.Available(binary, release) {

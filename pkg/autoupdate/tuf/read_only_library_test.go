@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
 )
@@ -57,33 +56,10 @@ func TestAvailable(t *testing.T) {
 	require.False(t, testReadOnlyLibrary.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
 }
 
-func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
+func Test_installedVersion(t *testing.T) {
 	t.Parallel()
 
-	testReadOnlyLibrary := &readOnlyLibrary{
-		logger: log.NewNopLogger(),
-	}
-
-	// In test, version.Version() returns `unknown` for everything, which is not something
-	// that the semver library can parse. So we only expect an error here.
-	launcherVersion, err := testReadOnlyLibrary.currentRunningVersion("launcher")
-	require.Error(t, err, "expected an error fetching current running version of launcher")
-	require.Equal(t, "", launcherVersion)
-}
-
-func Test_currentRunningVersion_osqueryd(t *testing.T) {
-	t.Parallel()
-
-	testReadOnlyLibrary := &readOnlyLibrary{
-		logger: log.NewNopLogger(),
-	}
-
-	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
-	require.NoError(t, err)
-
-	osqueryVersion, err := testReadOnlyLibrary.currentRunningVersion("osqueryd")
-	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
-	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
+	t.Skip("TODO")
 }
 
 func Test_versionFromTarget(t *testing.T) {
@@ -134,7 +110,6 @@ func Test_versionFromTarget(t *testing.T) {
 	}
 
 	for _, testVersion := range testVersions {
-		testReadOnlyLibrary := &readOnlyLibrary{}
-		require.Equal(t, testVersion.version, testReadOnlyLibrary.versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
+		require.Equal(t, testVersion.version, versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
 	}
 }

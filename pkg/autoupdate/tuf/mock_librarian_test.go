@@ -40,39 +40,15 @@ func (_m *Mocklibrarian) Available(binary autoupdatableBinary, targetFilename st
 	return r0
 }
 
-// MostRecentVersion provides a mock function with given fields: binary
-func (_m *Mocklibrarian) MostRecentVersion(binary autoupdatableBinary) (string, error) {
-	ret := _m.Called(binary)
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary) (string, error)); ok {
-		return rf(binary)
-	}
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary) string); ok {
-		r0 = rf(binary)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(autoupdatableBinary) error); ok {
-		r1 = rf(binary)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// PathToTargetVersionExecutable provides a mock function with given fields: binary, targetFilename
-func (_m *Mocklibrarian) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
+// IsInstallVersion provides a mock function with given fields: binary, targetFilename
+func (_m *Mocklibrarian) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
 	ret := _m.Called(binary, targetFilename)
 
-	var r0 string
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) string); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) bool); ok {
 		r0 = rf(binary, targetFilename)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
