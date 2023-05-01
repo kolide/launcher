@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 
-	"github.com/kolide/launcher/ee/desktop/server"
+	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

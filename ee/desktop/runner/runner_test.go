@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"

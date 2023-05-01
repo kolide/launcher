@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/ee/desktop/user/notify"
 )
 
 type transport struct {
