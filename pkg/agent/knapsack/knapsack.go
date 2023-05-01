@@ -112,9 +112,6 @@ func (k *knapsack) KolideServerURL() string {
 	return k.flags.KolideServerURL()
 }
 
-func (k *knapsack) SetKolideHosted(hosted bool) error {
-	return k.flags.SetKolideHosted(hosted)
-}
 func (k *knapsack) KolideHosted() bool {
 	return k.flags.KolideHosted()
 }
@@ -242,9 +239,6 @@ func (k *knapsack) InsecureTransportTLS() bool {
 	return k.flags.InsecureTransportTLS()
 }
 
-func (k *knapsack) SetIAmBreakingEELicense(disabled bool) error {
-	return k.flags.SetIAmBreakingEELicense(disabled)
-}
 func (k *knapsack) IAmBreakingEELicense() bool {
 	return k.flags.IAmBreakingEELicense()
 }
@@ -256,9 +250,6 @@ func (k *knapsack) Debug() bool {
 	return k.flags.Debug()
 }
 
-func (k *knapsack) SetDebugLogFile(file string) error {
-	return k.flags.SetDebugLogFile(file)
-}
 func (k *knapsack) DebugLogFile() string {
 	return k.flags.DebugLogFile()
 }
