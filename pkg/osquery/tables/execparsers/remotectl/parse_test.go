@@ -88,9 +88,6 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if tt.name != "dumpstate_with_features" {
-				return
-			}
 			p := New()
 			result, err := p.Parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
