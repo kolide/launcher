@@ -157,11 +157,14 @@ func versionFromTarget(binary autoupdatableBinary, targetFilename string) string
 
 func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
 	// TODO cache it somewhere
+	// TODO this doesn't really work for launcher because it'll still try to find the newest
+	// version for `--version` instead of reporting the install version
 	pathToBinary := findInstallLocation(binary)
 	if pathToBinary == "" {
 		return nil, "", errors.New("could not find install location")
 	}
 	cmd := exec.Command(pathToBinary, "--version")
+	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE") // Prevents launcher from fork-bombing
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, "", fmt.Errorf("could not execute %s --version: out %s, error %w", pathToBinary, string(out), err)
