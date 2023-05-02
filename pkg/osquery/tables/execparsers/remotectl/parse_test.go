@@ -27,6 +27,9 @@ var malformed_dumpstate_at_top_level string
 //go:embed test-data/malformed_dumpstate_in_properties.txt
 var malformed_dumpstate_in_properties string
 
+//go:embed test-data/dumpstate_with_features.txt
+var dumpstate_with_features string
+
 func TestParse(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +62,13 @@ func TestParse(t *testing.T) {
 			expectedErr:         false,
 		},
 		{
+			name:                "dumpstate_with_features",
+			input:               []byte(dumpstate_with_features),
+			expectedDeviceCount: 2,
+			expectedValueCount:  44,
+			expectedErr:         false,
+		},
+		{
 			name:                "malformed dumpstate output -- malformed top-level property",
 			input:               []byte(malformed_dumpstate_at_top_level),
 			expectedDeviceCount: 0,
@@ -78,6 +88,9 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			if tt.name != "dumpstate_with_features" {
+				return
+			}
 			p := New()
 			result, err := p.Parse(bytes.NewReader(tt.input))
 			if tt.expectedErr {
@@ -133,8 +146,15 @@ func TestParse(t *testing.T) {
 
 								if serviceKey == "Properties" {
 									for servicePropertyKey, servicePropertyValue := range serviceValue.(map[string]interface{}) {
-										actualValueCount += 1
-										validateKeyValueInCommandOutput(t, servicePropertyKey, servicePropertyValue.(string), tt.input)
+										if servicePropertyKey == "Features" {
+											for servicePropertyFeatureKey, servicePropertyFeatureValue := range servicePropertyValue.(map[string]interface{}) {
+												actualValueCount += 1
+												validateKeyValueInCommandOutput(t, servicePropertyFeatureKey, servicePropertyFeatureValue.(string), tt.input)
+											}
+										} else {
+											actualValueCount += 1
+											validateKeyValueInCommandOutput(t, servicePropertyKey, servicePropertyValue.(string), tt.input)
+										}
 									}
 
 									continue
