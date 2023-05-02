@@ -148,6 +148,18 @@ func (p *parser) parseDictionary() (map[string]interface{}, error) {
 			return dictionaryResults, nil
 		}
 
+		// Check to see if this entry is a feature
+		if strings.HasPrefix(p.lastReadLine, "Features") {
+			propertyFeatures, err := p.parseFeatures()
+			if err != nil {
+				return nil, err
+			}
+
+			dictionaryResults["Features"] = propertyFeatures
+			continue
+		}
+
+		// Just a regular property -- parse it accordingly
 		propertyKey, propertyValue, err := extractPropertyKeyValue(p.lastReadLine)
 		if err != nil {
 			return nil, err
@@ -157,6 +169,33 @@ func (p *parser) parseDictionary() (map[string]interface{}, error) {
 	}
 
 	return nil, errors.New("unexpected end to dictionary")
+}
+
+// parseFeatures parses a list of features found within properties. The features
+// take the following format:
+//
+//	Features => [<capacity = 1>
+//		0: com.apple.dt.profile
+//	]
+func (p *parser) parseFeatures() (map[string]interface{}, error) {
+	featuresResults := make(map[string]interface{})
+
+	for p.scanner.Scan() {
+		p.lastReadLine = strings.TrimSpace(p.scanner.Text())
+
+		// Exiting feature list
+		if p.lastReadLine == "]" {
+			return featuresResults, nil
+		}
+
+		k, v, err := extractKeyValue(p.lastReadLine, ":")
+		if err != nil {
+			return nil, err
+		}
+		featuresResults[k] = v
+	}
+
+	return nil, errors.New("unexpected end to features list")
 }
 
 func (p *parser) parseStringArray() ([]string, error) {
@@ -251,7 +290,7 @@ func extractTopLevelKeyValue(line string) (string, string, error) {
 func extractKeyValue(line, delimiter string) (string, string, error) {
 	extracted := strings.Split(line, delimiter)
 	if len(extracted) != 2 {
-		return "", "", errors.New("top-level key/value pair in remotectl output is in an unexpected format")
+		return "", "", fmt.Errorf("top-level key/value pair `%s` in remotectl output is in an unexpected format", line)
 	}
 
 	return strings.TrimSpace(extracted[0]), strings.TrimSpace(extracted[1]), nil
