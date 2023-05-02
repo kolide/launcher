@@ -830,20 +830,6 @@ func (_m *Knapsack) SetDebug(debug bool) error {
 	return r0
 }
 
-// SetDebugLogFile provides a mock function with given fields: file
-func (_m *Knapsack) SetDebugLogFile(file string) error {
-	ret := _m.Called(file)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(file)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetDebugServerData provides a mock function with given fields: debug
 func (_m *Knapsack) SetDebugServerData(debug bool) error {
 	ret := _m.Called(debug)
@@ -928,20 +914,6 @@ func (_m *Knapsack) SetForceControlSubsystems(force bool) error {
 	return r0
 }
 
-// SetIAmBreakingEELicense provides a mock function with given fields: disabled
-func (_m *Knapsack) SetIAmBreakingEELicense(disabled bool) error {
-	ret := _m.Called(disabled)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(disabled)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetInsecureControlTLS provides a mock function with given fields: disabled
 func (_m *Knapsack) SetInsecureControlTLS(disabled bool) error {
 	ret := _m.Called(disabled)
@@ -977,20 +949,6 @@ func (_m *Knapsack) SetInsecureTransportTLS(insecure bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(insecure)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetKolideHosted provides a mock function with given fields: hosted
-func (_m *Knapsack) SetKolideHosted(hosted bool) error {
-	ret := _m.Called(hosted)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(hosted)
 	} else {
 		r0 = ret.Error(0)
 	}
