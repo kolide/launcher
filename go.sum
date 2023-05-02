@@ -373,6 +373,8 @@ github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zM
 github.com/osquery/osquery-go v0.0.0-20210622151333-99b4efa62ec5/go.mod h1:JKR5QhjsYdnIPY7hakgas5sxf8qlA/9wQnLqaMfWdcg=
 github.com/osquery/osquery-go v0.0.0-20230501171314-2fc54ff75669 h1:XkFPghRi7tQ8QF1gl+YIG3dTHvpyv4JGJm3cKdRqHr8=
 github.com/osquery/osquery-go v0.0.0-20230501171314-2fc54ff75669/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
+github.com/osquery/osquery-go v0.0.0-20230502201847-c0d96ae4db30 h1:Jc+I6dgjroUMwFWNQYTRIpzUqL6egwLaIAVGQvV+jfY=
+github.com/osquery/osquery-go v0.0.0-20230502201847-c0d96ae4db30/go.mod h1:0KzmMhe0PL19cdYq6nd1cT9/5bMMJBTssAfuEgM2i34=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml v1.6.0/go.mod h1:5N711Q9dKgbdkxHL+MEfF31hpT7l0S0s/t2kKREewys=
