@@ -106,6 +106,7 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 		extensionName,
 		socketPath,
 		osquery.ServerTimeout(10*time.Second),
+		osquery.ServerConnectivityCheckInterval(100*time.Millisecond),
 	)
 
 	if err != nil {

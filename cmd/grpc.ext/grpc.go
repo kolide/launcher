@@ -111,6 +111,7 @@ func main() {
 		"com.kolide.grpc_extension",
 		*flSocketPath,
 		osquery.ServerTimeout(timeout),
+		osquery.ServerConnectivityCheckInterval(100*time.Millisecond),
 	)
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))

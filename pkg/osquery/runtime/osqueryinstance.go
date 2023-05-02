@@ -567,6 +567,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 			name,
 			socketPath,
 			osquery.ServerTimeout(1*time.Minute),
+			osquery.ServerConnectivityCheckInterval(100*time.Millisecond),
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
