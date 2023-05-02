@@ -308,9 +308,6 @@ func (fc *FlagController) InsecureTransportTLS() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.InsecureTransport)).get(fc.getControlServerValue(keys.InsecureTransportTLS))
 }
 
-func (fc *FlagController) SetIAmBreakingEELicense(disabled bool) error {
-	return fc.setControlServerValue(keys.IAmBreakingEELicense, boolToBytes(disabled))
-}
 func (fc *FlagController) IAmBreakingEELicense() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.IAmBreakingEELicense)).get(fc.getControlServerValue(keys.IAmBreakingEELicense))
 }
@@ -322,9 +319,6 @@ func (fc *FlagController) Debug() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Debug)).get(fc.getControlServerValue(keys.Debug))
 }
 
-func (fc *FlagController) SetDebugLogFile(file string) error {
-	return fc.setControlServerValue(keys.DebugLogFile, []byte(file))
-}
 func (fc *FlagController) DebugLogFile() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.DebugLogFile),

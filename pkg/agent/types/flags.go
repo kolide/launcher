@@ -20,7 +20,6 @@ type Flags interface {
 	KolideServerURL() string
 
 	// KolideHosted true if using Kolide SaaS settings.
-	SetKolideHosted(hosted bool) error
 	KolideHosted() bool
 
 	// EnrollSecret contains the raw enroll secret.
@@ -110,7 +109,6 @@ type Flags interface {
 	InsecureTransportTLS() bool
 
 	// IAmBreakingEELicence disables the EE licence check before running the local server
-	SetIAmBreakingEELicense(disabled bool) error
 	IAmBreakingEELicense() bool
 
 	// Debug enables debug logging.
@@ -118,7 +116,6 @@ type Flags interface {
 	Debug() bool
 
 	// DebugLogFile is an optional file to mirror debug logs to.
-	SetDebugLogFile(file string) error
 	DebugLogFile() string
 
 	// OsqueryVerbose puts osquery into verbose mode.
