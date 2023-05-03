@@ -116,4 +116,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+replace github.com/osquery/osquery-go => github.com/seejdev/osquery-go v0.3.0
+
 go 1.20
