@@ -150,7 +150,7 @@ func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	// the one that matches the response structures.
 	out = bytes.Replace(out, []byte("\n}\n"), []byte("\n};\n"), 2)
 
-	// Adjust the PushToken entry, if present
+	// Adjust the PushToken and SignerCertificates entries, if present
 	out = transformLengthByteEntriesInOutput(out)
 
 	var retOut []byte
