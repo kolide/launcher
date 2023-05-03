@@ -147,6 +147,11 @@ func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	return retOut, nil
 }
 
+// transformPushTokenInOutput adjusts the formatting of the PushToken property to be
+// parseable in a plist.
+//
+// original: `PushToken = {length = 32, bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 };`
+// transformed: `PushToken = {length = 32; bytes = "0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 "; };`
 func transformPushTokenInOutput(out []byte) []byte {
 	matches := pushTokenRegex.FindAllSubmatchIndex(out, -1)
 
@@ -155,7 +160,7 @@ func transformPushTokenInOutput(out []byte) []byte {
 	}
 
 	// Iterate backwards through matches to avoid messing up indices for earlier
-	// matches when performing replacements.
+	// matches when performing insertions.
 	for i := len(matches) - 1; i >= 0; i -= 1 {
 		match := matches[i]
 		// First two items in `match` are start/end indices for entire line; second two items are
