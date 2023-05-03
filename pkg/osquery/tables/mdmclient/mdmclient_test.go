@@ -30,6 +30,10 @@ func TestTransformOutput(t *testing.T) {
 			expectedRows: 96,
 		},
 		{
+			in:           "QueryDeviceInformation_NullAgentResponse.output",
+			expectedRows: 60,
+		},
+		{
 			in:           "QueryInstalledProfiles.output",
 			expectedRows: 30,
 		},

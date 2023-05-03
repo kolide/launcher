@@ -128,6 +128,12 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 // transformOutput has some hackish rules to transform the output into a "proper" gnustep plist
 func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	out := headerRegex.ReplaceAll(in, []byte{})
+
+	// We can't access the agent response when running launcher normally -- we get the error
+	// "[ERROR] Unable to target 'local user' via XPC when running as daemon". In that case,
+	// remove the null agent response.
+	out = bytes.Replace(out, []byte("Agent response: (null)\n"), []byte{}, 1)
+
 	out = bytes.Replace(out, []byte("Daemon response: {"), []byte("DaemonResponse = {"), 1)
 	out = bytes.Replace(out, []byte("Agent response: {"), []byte("AgentResponse = {"), 1)
 
