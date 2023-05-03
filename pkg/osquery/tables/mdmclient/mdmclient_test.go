@@ -35,7 +35,7 @@ func TestTransformOutput(t *testing.T) {
 		},
 		{
 			in:           "QueryInstalledProfiles.output",
-			expectedRows: 30,
+			expectedRows: 32,
 		},
 		{
 			in:           "QuerySecurityInfo.output",

@@ -36,15 +36,22 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 //	Number of <Device> profiles found: 6 (Filtered: 0)
 var headerRegex = regexp.MustCompile(`^=== CPF_GetInstalledProfiles === \(<Device>\)\nNumber of <Device> profiles found: \d+ \(Filtered: \d+\)\n`)
 
-// pushTokenRegex matches the PushToken entry, which we have to manually adjust to be parseable as a
-// plist. The first capture group gets the length property with a comma after it, which we must
-// replace with a semicolon. The second capture group gets the bytes property, which needs to be quoted
-// and have a semicolon appended.
+// lengthBytesRegex matches entries like the PushToken or SignerCertificates entries, which we have to
+// manually adjust to be parseable as a plist. The first capture group gets the length property with
+// a comma after it, which we must replace with a semicolon. The second capture group gets the bytes
+// property, which needs to be quoted and have a semicolon appended.
 //
-// The line takes the following format:
+// The PushToken line takes the following format:
 //
 // PushToken = {length = 32, bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 };
-var pushTokenRegex = regexp.MustCompile(`PushToken = {length = (\d+,) bytes = (0[xX][0-9a-fA-F\.\s]+)};`)
+//
+// The SignerCertificates block takes the following format:
+//
+//	SignerCertificates =             (
+//		{length = 1402, bytes = 0x30820576 3082045e a0030201 02020809 ... afb8b2d1 abcdabcd },
+//		{length = 1052, bytes = 0x30820418 30820300 a0030201 02020804 ... 26cffc17 abcdabcd }
+//	);
+var lengthBytesRegex = regexp.MustCompile(`{length = (\d+,) bytes = (0[xX][0-9a-fA-F\.\s]+)}`)
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -144,7 +151,7 @@ func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	out = bytes.Replace(out, []byte("\n}\n"), []byte("\n};\n"), 2)
 
 	// Adjust the PushToken entry, if present
-	out = transformPushTokenInOutput(out)
+	out = transformLengthByteEntriesInOutput(out)
 
 	var retOut []byte
 	retOut = append(retOut, "{\n"...)
@@ -153,13 +160,14 @@ func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	return retOut, nil
 }
 
-// transformPushTokenInOutput adjusts the formatting of the PushToken property to be
+// transformLengthByteEntriesInOutput adjusts the formatting of nested blocks with length/byte properties to be
 // parseable in a plist.
 //
+// Example --
 // original: `PushToken = {length = 32, bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 };`
 // transformed: `PushToken = {length = 32; bytes = "0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 "; };`
-func transformPushTokenInOutput(out []byte) []byte {
-	matches := pushTokenRegex.FindAllSubmatchIndex(out, -1)
+func transformLengthByteEntriesInOutput(out []byte) []byte {
+	matches := lengthBytesRegex.FindAllSubmatchIndex(out, -1)
 
 	if len(matches) == 0 {
 		return out
