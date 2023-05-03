@@ -40,8 +40,6 @@ func TestControllerBoolFlags(t *testing.T) {
 
 			var value bool
 			assertValues := func(expectedValue bool) {
-				value = fc.KolideHosted()
-				assert.Equal(t, expectedValue, value)
 				value = fc.DesktopEnabled()
 				assert.Equal(t, expectedValue, value)
 				value = fc.DebugServerData()
@@ -56,8 +54,6 @@ func TestControllerBoolFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.InsecureTransportTLS()
 				assert.Equal(t, expectedValue, value)
-				value = fc.IAmBreakingEELicense()
-				assert.Equal(t, expectedValue, value)
 				value = fc.Debug()
 				assert.Equal(t, expectedValue, value)
 				value = fc.OsqueryVerbose()
@@ -68,8 +64,6 @@ func TestControllerBoolFlags(t *testing.T) {
 
 			assertValues(false)
 
-			err = fc.SetKolideHosted(true)
-			require.NoError(t, err)
 			err = fc.SetDesktopEnabled(true)
 			require.NoError(t, err)
 			err = fc.SetDebugServerData(true)
@@ -83,8 +77,6 @@ func TestControllerBoolFlags(t *testing.T) {
 			err = fc.SetInsecureTLS(true)
 			require.NoError(t, err)
 			err = fc.SetInsecureTransportTLS(true)
-			require.NoError(t, err)
-			err = fc.SetIAmBreakingEELicense(true)
 			require.NoError(t, err)
 			err = fc.SetDebug(true)
 			require.NoError(t, err)
@@ -155,8 +147,6 @@ func TestControllerStringFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.ControlServerURL()
 				assert.Equal(t, expectedValue, value)
-				value = fc.DebugLogFile()
-				assert.Equal(t, expectedValue, value)
 				value = fc.NotaryServerURL()
 				assert.Equal(t, expectedValue, value)
 				value = fc.TufServerURL()
@@ -174,8 +164,6 @@ func TestControllerStringFlags(t *testing.T) {
 			err = fc.SetKolideServerURL(tt.valueToSet)
 			require.NoError(t, err)
 			err = fc.SetControlServerURL(tt.valueToSet)
-			require.NoError(t, err)
-			err = fc.SetDebugLogFile(tt.valueToSet)
 			require.NoError(t, err)
 			err = fc.SetNotaryServerURL(tt.valueToSet)
 			require.NoError(t, err)

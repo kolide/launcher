@@ -40,8 +40,8 @@ Daemon response: {
             PayloadUUID = "00000000-1111-1111-1111-222222222222";
             PayloadVersion = 1;
             SignerCertificates =             (
-                <30820576 3082045e 2b97>,
-                <30820418 30820300 9237bb40>
+                {length = 1402, bytes = 0x30820576 3082045e a0030201 02020809 ... afb8b2d1 abcdabcd },
+                {length = 1052, bytes = 0x30820418 30820300 a0030201 02020804 ... 26cffc17 abcdabcd }
             );
         }
     );
