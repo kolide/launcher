@@ -26,6 +26,10 @@ func TestTransformOutput(t *testing.T) {
 			expectedRows: 1659,
 		},
 		{
+			in:           "QueryDeviceInformation_WithHeader.output",
+			expectedRows: 96,
+		},
+		{
 			in:           "QueryInstalledProfiles.output",
 			expectedRows: 30,
 		},

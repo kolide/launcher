@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -27,6 +28,23 @@ import (
 const mdmclientPath = "/usr/libexec/mdmclient"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// headerRegex matches the header that may be included at the beginning of the mdmclient response,
+// which takes the following format:
+//
+//	=== CPF_GetInstalledProfiles === (<Device>)
+//	Number of <Device> profiles found: 6 (Filtered: 0)
+var headerRegex = regexp.MustCompile(`^=== CPF_GetInstalledProfiles === \(<Device>\)\nNumber of <Device> profiles found: \d+ \(Filtered: \d+\)\n`)
+
+// pushTokenRegex matches the PushToken entry, which we have to manually adjust to be parseable as a
+// plist. The first capture group gets the length property with a comma after it, which we must
+// replace with a semicolon. The second capture group gets the bytes property, which needs to be quoted
+// and have a semicolon appended.
+//
+// The line takes the following format:
+//
+// PushToken = {length = 32, bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 };
+var pushTokenRegex = regexp.MustCompile(`PushToken = {length = (\d+,) bytes = (0[xX][0-9a-fA-F\.\s]+)};`)
 
 type Table struct {
 	client    *osquery.ExtensionManagerClient
@@ -109,7 +127,8 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 
 // transformOutput has some hackish rules to transform the output into a "proper" gnustep plist
 func (t *Table) transformOutput(in []byte) ([]byte, error) {
-	out := bytes.Replace(in, []byte("Daemon response: {"), []byte("DaemonResponse = {"), 1)
+	out := headerRegex.ReplaceAll(in, []byte{})
+	out = bytes.Replace(out, []byte("Daemon response: {"), []byte("DaemonResponse = {"), 1)
 	out = bytes.Replace(out, []byte("Agent response: {"), []byte("AgentResponse = {"), 1)
 
 	// This would, honestly, be cleaner as a regex. The \n aren't
@@ -118,9 +137,60 @@ func (t *Table) transformOutput(in []byte) ([]byte, error) {
 	// the one that matches the response structures.
 	out = bytes.Replace(out, []byte("\n}\n"), []byte("\n};\n"), 2)
 
+	// Adjust the PushToken entry, if present
+	out = transformPushTokenInOutput(out)
+
 	var retOut []byte
 	retOut = append(retOut, "{\n"...)
 	retOut = append(retOut, out...)
 	retOut = append(retOut, "\n}\n"...)
 	return retOut, nil
+}
+
+func transformPushTokenInOutput(out []byte) []byte {
+	matches := pushTokenRegex.FindAllSubmatchIndex(out, -1)
+
+	if len(matches) == 0 {
+		return out
+	}
+
+	// Iterate backwards through matches to avoid messing up indices for earlier
+	// matches when performing replacements.
+	for i := len(matches) - 1; i >= 0; i -= 1 {
+		match := matches[i]
+		// First two items in `match` are start/end indices for entire line; second two items are
+		// start/end indices for `length` property (the first capture group); third two items are
+		// start/end indices for `bytes` property (the second capture group).
+		if len(match) != 6 {
+			continue
+		}
+
+		// Replace comma with semicolon for first capture group (e.g. transforming `length = 32,` to `length = 32;`)
+		lengthEndIndex := match[3]
+		out[lengthEndIndex-1] = ';'
+
+		// Quote second capture group and append a semicolon (e.g., transforming
+		// `bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 ` to
+		// `bytes = "0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3";`)
+		bytesStartIndex := match[4]
+		bytesEndIndex := match[5]
+
+		// Insert opening quote mark
+		out = insertAt(out, bytesStartIndex, '"')
+
+		// Insert closing quote mark after `bytes`
+		out = insertAt(out, bytesEndIndex+1, '"')
+
+		// Insert semicolon after previous insertion point
+		out = insertAt(out, bytesEndIndex+2, ';')
+	}
+
+	return out
+}
+
+func insertAt(original []byte, insertIndex int, value byte) []byte {
+	original = append(original[:insertIndex+1], original[insertIndex:]...)
+	original[insertIndex] = value
+
+	return original
 }
