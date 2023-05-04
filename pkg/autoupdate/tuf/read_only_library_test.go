@@ -37,7 +37,23 @@ func TestMostRecentVersion(t *testing.T) {
 func TestPathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO")
+	testBaseDir := filepath.Join(t.TempDir(), "updates")
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+	testLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "expected no error when creating library")
+
+	testVersion := "1.0.7-30-abcdabcd"
+	testTargetFilename := fmt.Sprintf("launcher-%s.tar.gz", testVersion)
+	expectedPath := filepath.Join(testBaseDir, "launcher", testVersion, "launcher")
+	if runtime.GOOS == "darwin" {
+		expectedPath = filepath.Join(testBaseDir, "launcher", testVersion, "Kolide.app", "Contents", "MacOS", "launcher")
+	} else if runtime.GOOS == "windows" {
+		expectedPath = expectedPath + ".exe"
+	}
+
+	actualPath := testLibrary.PathToTargetVersionExecutable(binaryLauncher, testTargetFilename)
+	require.Equal(t, expectedPath, actualPath, "path mismatch")
 }
 
 func TestAvailable(t *testing.T) {
