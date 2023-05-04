@@ -57,7 +57,7 @@ func (rol *readOnlyLibrary) updatesDirectory(binary autoupdatableBinary) string 
 // given binary. If the installed version is the most recent version, it returns an empty string.
 func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary) (string, error) {
 	// Get installed version
-	installedVersion, installedVersionPath, err := InstalledVersion(binary)
+	installedVersion, installedVersionPath, err := rol.installedVersion(binary)
 	if err != nil {
 		return "", fmt.Errorf("could not determine current running version of %s: %w", binary, err)
 	}
@@ -97,7 +97,7 @@ func (rol *readOnlyLibrary) PathToTargetVersionExecutable(binary autoupdatableBi
 // IsInstallVersion checks whether the version in the given target is the same as the one
 // contained in the installation.
 func (rol *readOnlyLibrary) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
-	installedVersion, _, err := InstalledVersion(binary)
+	installedVersion, _, err := rol.installedVersion(binary)
 	if err != nil {
 		level.Debug(rol.logger).Log("msg", "could not get installed version", "binary", binary, "err", err)
 		return false
@@ -152,20 +152,16 @@ func (rol *readOnlyLibrary) sortedVersionsInLibrary(binary autoupdatableBinary) 
 	return versionsInLibraryStr, invalidVersions, nil
 }
 
-// versionFromTarget extracts the semantic version for an update from its filename.
-func versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
-	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s-", binary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
-}
-
-func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
-	// TODO cache it somewhere
+func (rol *readOnlyLibrary) installedVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
 	pathToBinary := findInstallLocation(binary)
 	if pathToBinary == "" {
 		return nil, "", errors.New("could not find install location")
 	}
+
+	if cachedVersion, err := rol.getCachedInstalledVersion(binary); err == nil {
+		return cachedVersion, pathToBinary, nil
+	}
+
 	cmd := exec.Command(pathToBinary, "--version")
 	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE") // Prevents launcher from fork-bombing
 	out, err := cmd.Output()
@@ -187,7 +183,41 @@ func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, erro
 		return nil, "", fmt.Errorf("could not parse binary install version: %w", err)
 	}
 
+	rol.cacheInstalledVersion(binary, v)
+
 	return v, pathToBinary, nil
+}
+
+func (rol *readOnlyLibrary) getCachedInstalledVersion(binary autoupdatableBinary) (*semver.Version, error) {
+	versionBytes, err := os.ReadFile(rol.cachedInstalledVersionLocation(binary))
+	if err != nil {
+		return nil, fmt.Errorf("could not read cached installed version file: %w", err)
+	}
+
+	v, err := semver.NewVersion(string(versionBytes))
+	if err != nil {
+		return nil, fmt.Errorf("could not parse cached installed version file: %w", err)
+	}
+
+	return v, nil
+}
+
+func (rol *readOnlyLibrary) cacheInstalledVersion(binary autoupdatableBinary, installedVersion *semver.Version) {
+	if err := os.WriteFile(rol.cachedInstalledVersionLocation(binary), []byte(installedVersion.Original()), 0755); err != nil {
+		level.Debug(rol.logger).Log("msg", "could not cache installed version", "binary", binary, "err", err)
+	}
+}
+
+func (rol *readOnlyLibrary) cachedInstalledVersionLocation(binary autoupdatableBinary) string {
+	return filepath.Join(rol.baseDir, fmt.Sprintf("%s-installed-version", binary))
+}
+
+// versionFromTarget extracts the semantic version for an update from its filename.
+func versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
+	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
+	prefixToTrim := fmt.Sprintf("%s-", binary)
+
+	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
 }
 
 // parseLauncherVersion parses the launcher version from the output of `launcher --version`.
