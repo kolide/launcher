@@ -222,8 +222,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, err, "did not create binary for test")
 			require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 
-			fmt.Printf("created binary at %s for %s\n\n\n", executablePath, binary)
-
 			// For osqueryd, make sure we check that the running version is not equal to the target version
 			if binary == "osqueryd" {
 				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()

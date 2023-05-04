@@ -235,7 +235,7 @@ proto:
 	@echo "Generated code from proto definitions."
 
 test: generate
-	go test -v -cover -coverprofile=coverage.out -race $(shell go list ./... | grep -v /vendor/)
+	go test -cover -coverprofile=coverage.out -race $(shell go list ./... | grep -v /vendor/)
 
 ##
 ## Lint
