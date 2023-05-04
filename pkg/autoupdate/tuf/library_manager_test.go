@@ -125,32 +125,50 @@ func TestAddToLibrary(t *testing.T) {
 func TestAddToLibrary_alreadyInstalled(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO")
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
 
-	// We only do this particular test for osqueryd because in test, version.Version()
-	// returns `unknown` for everything when we attempt to get the current running version
-	// of launcher, which is not something that the semver library can parse.
+			testBaseDir := t.TempDir()
+			testMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
+			}))
+			defer testMirror.Close()
+			testLibraryManager, err := newUpdateLibraryManager(testMirror.URL, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			require.NoError(t, err, "initializing test library manager")
 
-	testBaseDir := t.TempDir()
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
-	require.NoError(t, err, "initializing test library manager")
+			// Make sure our update directories exist so we can verify they're empty later
+			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
 
-	// Make sure our update directories exist so we can verify they're empty later
-	require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory("osqueryd"), 0755))
+			// Create cached installed version file
+			testVersion := "0.12.1-abcdabcd"
+			require.NoError(t, os.WriteFile(filepath.Join(testBaseDir, fmt.Sprintf("%s-installed-version", binary)), []byte(testVersion), 0755))
 
-	// Ask the library manager to perform the download
-	testVersion := "0.12.1-abcdabcd"
-	require.NoError(t, testLibraryManager.AddToLibrary("osqueryd", fmt.Sprintf("osqueryd-%s.tar.gz", testVersion), data.TargetFileMeta{}), "expected no error on adding already-installed version to library")
+			// Create fake executable in current working directory
+			executablePath, err := os.Executable()
+			require.NoError(t, err)
+			testExecutablePath := executableLocation(filepath.Dir(executablePath), binary)
+			require.NoError(t, os.MkdirAll(filepath.Dir(testExecutablePath), 0755))
+			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+			t.Cleanup(func() {
+				os.Remove(testExecutablePath)
+			})
 
-	// Confirm that there is nothing in the updates directory (no update performed)
-	updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory("osqueryd"), "*"))
-	require.NoError(t, err, "error globbing for matches")
-	require.Equal(t, 0, len(updateMatches), "expected no directories in updates directory but found: %+v", updateMatches)
+			// Ask the library manager to perform the download
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testVersion), data.TargetFileMeta{}), "expected no error on adding already-installed version to library")
 
-	// Confirm that there is nothing in the staged updates directory (no update attempted)
-	stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-	require.NoError(t, err, "error globbing for matches")
-	require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
+			// Confirm that there is nothing in the updates directory (no update performed)
+			updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory(binary), "*"))
+			require.NoError(t, err, "error globbing for matches")
+			require.Equal(t, 0, len(updateMatches), "expected no directories in updates directory but found: %+v", updateMatches)
+
+			// Confirm that there is nothing in the staged updates directory (no update attempted)
+			stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+			require.NoError(t, err, "error globbing for matches")
+			require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
+		})
+	}
 }
 
 func TestAddToLibrary_alreadyAdded(t *testing.T) {
