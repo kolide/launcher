@@ -70,6 +70,7 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 		mirrorUrl:       mirrorUrl,
 		mirrorClient:    mirrorClient,
 		stagingDir:      stagingDir,
+		osquerier:       osquerier,
 		lock:            newLibraryLock(),
 		logger:          log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}

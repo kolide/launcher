@@ -44,6 +44,8 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
 	require.NoError(t, err, "could not stat launcher download dir")
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
+
+	require.NotNil(t, testLibraryManager.osquerier, "osquerier not set on library manager")
 }
 
 func TestAddToLibrary(t *testing.T) {
