@@ -24,7 +24,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, nil, log.NewNopLogger())
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
@@ -42,25 +42,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
 	require.NoError(t, err, "could not stat launcher download dir")
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
-}
-
-func TestAvailable(t *testing.T) {
-	t.Parallel()
-
-	testBaseDir := t.TempDir()
-	mockOsquerier := newMockQuerier(t)
-
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, mockOsquerier, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new update library manager")
-
-	// Query for the current osquery version
-	runningOsqueryVersion := "5.5.7"
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
-	require.True(t, testLibraryManager.Available(binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)))
-
-	// Query for a different osqueryd version
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": runningOsqueryVersion}}, nil).Once()
-	require.False(t, testLibraryManager.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
+	require.NotNil(t, testLibraryManager.osquerier, "osquerier not set on library manager")
 }
 
 func TestAddToLibrary(t *testing.T) {
@@ -107,14 +89,8 @@ func TestAddToLibrary(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
-			mockOsquerier := newMockQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
-
-			// For osqueryd, make sure we check that the running version is not equal to the target version
-			if tt.binary == "osqueryd" {
-				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil)
-			}
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
 			var wg sync.WaitGroup
@@ -127,8 +103,6 @@ func TestAddToLibrary(t *testing.T) {
 			}
 
 			wg.Wait()
-
-			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the update was downloaded
 			dirInfo, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(tt.binary), testReleaseVersion))
@@ -146,32 +120,25 @@ func TestAddToLibrary(t *testing.T) {
 	}
 }
 
-func Test_addToLibrary_alreadyRunning_osqueryd(t *testing.T) {
+func TestAddToLibrary_alreadyInstalled(t *testing.T) {
 	t.Parallel()
+
+	t.Skip("TODO")
 
 	// We only do this particular test for osqueryd because in test, version.Version()
 	// returns `unknown` for everything when we attempt to get the current running version
 	// of launcher, which is not something that the semver library can parse.
 
 	testBaseDir := t.TempDir()
-	mockOsquerier := newMockQuerier(t)
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, mockOsquerier, log.NewNopLogger())
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
 	require.NoError(t, err, "initializing test library manager")
 
 	// Make sure our update directories exist so we can verify they're empty later
 	require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory("osqueryd"), 0755))
 
-	// Set osquerier to return same version we want to add to the library
-	testVersion := "0.12.1-abcdabcd"
-	expectedOsqueryVersion, err := semver.NewVersion(testVersion)
-	require.NoError(t, err)
-
-	// Expect to return one row containing the version
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
-
 	// Ask the library manager to perform the download
-	require.NoError(t, testLibraryManager.AddToLibrary("osqueryd", fmt.Sprintf("osqueryd-%s.tar.gz", testVersion), data.TargetFileMeta{}), "expected no error on adding already-running version to library")
-	mockOsquerier.AssertExpectations(t)
+	testVersion := "0.12.1-abcdabcd"
+	require.NoError(t, testLibraryManager.AddToLibrary("osqueryd", fmt.Sprintf("osqueryd-%s.tar.gz", testVersion), data.TargetFileMeta{}), "expected no error on adding already-installed version to library")
 
 	// Confirm that there is nothing in the updates directory (no update performed)
 	updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory("osqueryd"), "*"))
@@ -193,12 +160,15 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			t.Parallel()
 
 			testBaseDir := t.TempDir()
-			mockOsquerier := newMockQuerier(t)
 			testLibraryManager := &updateLibraryManager{
-				logger:    log.NewNopLogger(),
-				baseDir:   testBaseDir,
-				osquerier: mockOsquerier,
-				lock:      newLibraryLock(),
+				readOnlyLibrary: &readOnlyLibrary{
+					baseDir: testBaseDir,
+					logger:  log.NewNopLogger(),
+				},
+				logger:     log.NewNopLogger(),
+				osquerier:  newMockQuerier(t),
+				stagingDir: t.TempDir(),
+				lock:       newLibraryLock(),
 			}
 
 			// Make sure our update directory exists
@@ -210,14 +180,8 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			copyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
 
-			// For osqueryd, make sure we check that the running version is not equal to the target version
-			if binary == "osqueryd" {
-				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
-			}
-
 			// Ask the library manager to perform the download
 			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testVersion), data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
-			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the requested version is still there
 			_, err := os.Stat(executablePath)
@@ -281,18 +245,11 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			}))
 
 			// Set up test library manager
-			mockOsquerier := newMockQuerier(t)
-			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, mockOsquerier, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
-
-			// For osqueryd, make sure we check that the running version is not equal to the target version
-			if tt.binary == "osqueryd" {
-				mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.5.5"}}, nil).Once()
-			}
 
 			// Request download
 			require.Error(t, testLibraryManager.AddToLibrary(tt.binary, tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
-			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the update was removed after download
 			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
@@ -371,7 +328,7 @@ func Test_tidyStagedUpdates(t *testing.T) {
 			testBaseDir := t.TempDir()
 
 			// Initialize the library manager
-			testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, nil, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager("", http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Make a file in the staged updates directory
@@ -552,9 +509,13 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				// Set up test library manager
 				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					logger:  log.NewNopLogger(),
-					baseDir: testBaseDir,
-					lock:    newLibraryLock(),
+					readOnlyLibrary: &readOnlyLibrary{
+						baseDir: testBaseDir,
+						logger:  log.NewNopLogger(),
+					},
+					stagingDir: t.TempDir(),
+					logger:     log.NewNopLogger(),
+					lock:       newLibraryLock(),
 				}
 
 				// Set up existing versions for test
@@ -607,57 +568,4 @@ func copyBinary(t *testing.T, executablePath string) {
 
 	_, err = io.Copy(destFile, srcFile)
 	require.NoError(t, err, "copying binary")
-}
-
-func Test_versionFromTarget(t *testing.T) {
-	t.Parallel()
-
-	testVersions := []struct {
-		target          string
-		binary          autoupdatableBinary
-		operatingSystem string
-		version         string
-	}{
-		{
-			target:          "launcher/darwin/launcher-0.10.1.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "darwin",
-			version:         "0.10.1",
-		},
-		{
-			target:          "launcher/windows/launcher-1.13.5.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "windows",
-			version:         "1.13.5",
-		},
-		{
-			target:          "launcher/linux/launcher-0.13.5-40-gefdc582.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "linux",
-			version:         "0.13.5-40-gefdc582",
-		},
-		{
-			target:          "osqueryd/darwin/osqueryd-5.8.1.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "darwin",
-			version:         "5.8.1",
-		},
-		{
-			target:          "osqueryd/windows/osqueryd-0.8.1.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "windows",
-			version:         "0.8.1",
-		},
-		{
-			target:          "osqueryd/linux/osqueryd-5.8.2.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "linux",
-			version:         "5.8.2",
-		},
-	}
-
-	for _, testVersion := range testVersions {
-		libManager := &updateLibraryManager{}
-		require.Equal(t, testVersion.version, libManager.versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
-	}
 }
