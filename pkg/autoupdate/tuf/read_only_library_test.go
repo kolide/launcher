@@ -157,3 +157,52 @@ func Test_versionFromTarget(t *testing.T) {
 		require.Equal(t, testVersion.version, versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
 	}
 }
+
+func Test_parseLauncherVersion(t *testing.T) {
+	t.Parallel()
+
+	launcherVersionOutputDev := `launcher - version 1.0.7-45-g2abfc88-dirty
+	branch: 	becca/tuf-find-new-v2
+	revision: 	2abfc8883b96460603b49bc6f5cc44d5756890cf
+	build date: 	2023-05-04
+	build user: 	System Administrator (root)
+	go version: 	go1.19.5`
+	devVersion, err := parseLauncherVersion([]byte(launcherVersionOutputDev))
+	require.NoError(t, err, "should be able to parse launcher dev version without error")
+	require.NotNil(t, devVersion, "should have been able to parse launcher dev version as semver")
+	require.Equal(t, "1.0.7-45-g2abfc88-dirty", devVersion.Original(), "dev semver should match")
+
+	launcherVersionOutputNightly := `{"caller":"main.go:30","msg":"Launcher starting up","revision":"3e305bdb54c301759b62e9038faaa2cfea8abad1","severity":"info","ts":"2023-05-04T17:00:34.564523Z","version":"0.13.5-11-g3e305bd"}
+	launcher - version 0.13.5-11-g3e305bd
+	  branch: 	main
+	  revision: 	3e305bdb54c301759b62e9038faaa2cfea8abad1
+	  build date: 	2023-02-14
+	  build user: 	runner (runner)
+	  go version: 	go1.19.4`
+	nightlyVersion, err := parseLauncherVersion([]byte(launcherVersionOutputNightly))
+	require.NoError(t, err, "should be able to parse launcher nightly version without error")
+	require.NotNil(t, nightlyVersion, "should have been able to parse launcher nightly version as semver")
+	require.Equal(t, "0.13.5-11-g3e305bd", nightlyVersion.Original(), "nightly semver should match")
+
+	launcherVersionOutputStable := `launcher - version 1.0.3
+	  branch: 	main
+	  revision: 	3e305bdb54c301759b62e9038faaa2cfea8abad1
+	  build date: 	2023-02-14
+	  build user: 	runner (runner)
+	  go version: 	go1.19.4`
+	stableVersion, err := parseLauncherVersion([]byte(launcherVersionOutputStable))
+	require.NoError(t, err, "should be able to parse launcher stable version without error")
+	require.NotNil(t, stableVersion, "should have been able to parse launcher stable version as semver")
+	require.Equal(t, "1.0.3", stableVersion.Original(), "stable semver should match")
+}
+
+func Test_parseOsquerydVersion(t *testing.T) {
+	t.Parallel()
+
+	osquerydVersionOutput := `osqueryd version 5.8.1`
+
+	v, err := parseOsquerydVersion([]byte(osquerydVersionOutput))
+	require.NoError(t, err, "should be able to parse osqueryd version without error")
+	require.NotNil(t, v, "should have been able to parse osqueryd version as semver")
+	require.Equal(t, "5.8.1", v.Original(), "osqueryd semver should match")
+}
