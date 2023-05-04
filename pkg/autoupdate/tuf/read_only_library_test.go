@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,7 +81,58 @@ func TestAvailable(t *testing.T) {
 func Test_sortedVersionsInLibrary(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO")
+	// Create update directories
+	testBaseDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+
+	// Create an update in the library that is invalid because it doesn't have a valid version
+	invalidVersion := "not_a_semver_1"
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher", invalidVersion), 0755))
+
+	// Create an update in the library that is invalid because it's corrupted
+	corruptedVersion := "1.0.6-11-abcdabcd"
+	corruptedVersionDirectory := filepath.Join(testBaseDir, "launcher", corruptedVersion)
+	corruptedVersionLocation := executableLocation(corruptedVersionDirectory, binaryLauncher)
+	require.NoError(t, os.MkdirAll(filepath.Dir(corruptedVersionLocation), 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(corruptedVersionLocation),
+		[]byte("not an executable"),
+		0755))
+
+	// Create two valid updates in the library
+	olderValidVersion := "0.13.5"
+	middleValidVersion := "1.0.5-11-abcdabcd"
+	newerValidVersion := "1.0.7"
+	for _, v := range []string{olderValidVersion, middleValidVersion, newerValidVersion} {
+		versionDir := filepath.Join(testBaseDir, "launcher", v)
+		executablePath := executableLocation(versionDir, binaryLauncher)
+		require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+		copyBinary(t, executablePath)
+		require.NoError(t, os.Chmod(executablePath, 0755))
+		_, err := os.Stat(executablePath)
+		require.NoError(t, err, "did not create binary for test")
+		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+	}
+
+	// Set up test library
+	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new read-only library")
+
+	// Get sorted versions
+	validVersions, invalidVersions, err := testReadOnlyLibrary.sortedVersionsInLibrary(binaryLauncher)
+	require.NoError(t, err, "expected no error on sorting versions in library")
+
+	// Confirm invalid versions are the ones we expect
+	require.Equal(t, 2, len(invalidVersions))
+	require.Contains(t, invalidVersions, invalidVersion)
+	require.Contains(t, invalidVersions, corruptedVersion)
+
+	// Confirm valid versions are the ones we expect and that they're sorted in ascending order
+	require.Equal(t, 3, len(validVersions))
+	require.Equal(t, olderValidVersion, validVersions[0], "not sorted")
+	require.Equal(t, middleValidVersion, validVersions[1], "not sorted")
+	require.Equal(t, newerValidVersion, validVersions[2], "not sorted")
 }
 
 func Test_installedVersion_cached(t *testing.T) {
