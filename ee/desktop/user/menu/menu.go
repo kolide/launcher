@@ -74,7 +74,7 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 // getMenuData ingests the shared menu.json file created by the desktop runner
 // It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
 func (m *menu) getMenuData() *MenuData {
-	// Ensure that at a minumum we return a default menu, in case reading/unmarshaling fails
+	// Ensure that at a minimum we return a default menu, in case reading/unmarshaling fails
 	var menu MenuData
 	defer menu.SetDefaults()
 
