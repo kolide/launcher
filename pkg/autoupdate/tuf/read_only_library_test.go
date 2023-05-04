@@ -41,16 +41,24 @@ func TestPathToTargetVersionExecutable(t *testing.T) {
 func TestAvailable(t *testing.T) {
 	t.Parallel()
 
+	// Create update directories
 	testBaseDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
 
+	// Set up test library
 	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
-	// Query for the current osquery version
+	// Set up valid "osquery" executable
 	runningOsqueryVersion := "5.5.7"
-	require.True(t, testReadOnlyLibrary.Available(binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)))
+	runningTarget := fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)
+	executablePath := testReadOnlyLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
+	copyBinary(t, executablePath)
+	require.NoError(t, os.Chmod(executablePath, 0755))
+
+	// Query for the current osquery version
+	require.True(t, testReadOnlyLibrary.Available(binaryOsqueryd, runningTarget))
 
 	// Query for a different osqueryd version
 	require.False(t, testReadOnlyLibrary.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
