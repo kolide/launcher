@@ -209,7 +209,7 @@ func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
 	versionStr := strings.TrimSpace(strings.TrimPrefix(string(versionOutput), "osqueryd version"))
 	osqueryInstallVersion, err := semver.NewVersion(versionStr)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse osquery version %s as semver: %w", versionStr, err)
+		return nil, fmt.Errorf("could not parse osquery version `%s` as semver: %w", versionStr, err)
 	}
 
 	return osqueryInstallVersion, nil
