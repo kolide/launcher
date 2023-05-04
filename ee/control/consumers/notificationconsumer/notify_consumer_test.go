@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop/notify"
+	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"

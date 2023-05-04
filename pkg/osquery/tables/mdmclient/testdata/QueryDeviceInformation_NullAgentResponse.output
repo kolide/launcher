@@ -1,0 +1,78 @@
+=== CPF_GetInstalledProfiles === (<Device>)
+Number of <Device> profiles found: 6 (Filtered: 0)
+Daemon response: {
+	QueryResponses =	 {
+		ActiveManagedUsers =		 (
+			"DD1C35B7-F8DD-441F-ABE1-DEADBEEFCAFE"
+		);
+		AutoSetupAdminAccounts =		 (
+		);
+		AvailableDeviceCapacity = 1761;
+		AwaitingConfiguration = 0;
+		BatteryLevel = 1;
+		BluetoothMAC = "5C:E9:1E:81:35:78";
+		BuildVersion = 22E261;
+		CurrentConsoleManagedUser = "DD1C35B7-F8DD-441F-ABE1-DEADBEEFCAFE";
+		DeviceCapacity = 1995;
+		DeviceName = "Some Device";
+		EACSPreflight = success;
+		EthernetMAC = "5c:e9:1e:85:12:98";
+		HasBattery = 1;
+		HostName = "somedevice.lan";
+		IsActivationLockEnabled = 1;
+		IsActivationLockSupported = 1;
+		IsAppleSilicon = 1;
+		IsSupervised = 1;
+		LocalHostName = "Some-Device";
+		MDMOptions =		 {
+			ActivationLockAllowedWhileSupervised = 1;
+			BootstrapTokenAllowed = 1;
+		};
+		Model = "Mac14,6";
+		ModelName = "MacBook Pro";
+		ModelNumber = "Z176000HGLL/A";
+		OSUpdateSettings =		 {
+			AutoCheckEnabled = 1;
+			AutomaticAppInstallationEnabled = 1;
+			AutomaticOSInstallationEnabled = 1;
+			AutomaticSecurityUpdatesEnabled = 1;
+			BackgroundDownloadEnabled = 1;
+			CatalogURL = "https://swscan.apple.com/content/catalogs/others/index-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz";
+			IsDefaultCatalog = 1;
+			PreviousScanDate = "2023-05-03 07:28:42 +0000";
+			PreviousScanResult = 2;
+		};
+		OSVersion = "13.3.1";
+		OSXSoftwareUpdateStatus =		 {
+			AutoCheckEnabled = 1;
+			AutomaticAppInstallationEnabled = 1;
+			AutomaticOSInstallationEnabled = 1;
+			AutomaticSecurityUpdatesEnabled = 1;
+			BackgroundDownloadEnabled = 1;
+			CatalogURL = "https://swscan.apple.com/content/catalogs/others/index-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz";
+			IsDefaultCatalog = 1;
+			PreviousScanDate = "2023-05-03 07:28:42 +0000";
+			PreviousScanResult = 2;
+		};
+		PINRequiredForDeviceLock = 1;
+		PINRequiredForEraseDevice = 0;
+		ProductName = "Mac14,6";
+		ProvisioningUDID = "00006021-001C28663AF00000";
+		PushToken = {length = 32, bytes = 0x068b4535 172f7bd3 851facee abcdabcd ... 38625271 61731ac3};
+		SerialNumber = GV9T7D0000;
+		SoftwareUpdateDeviceID = J416c00;
+		SupplementalBuildVersion = 22E772610a;
+		SupplementalOSVersionExtra = "(a)";
+		SupportsLOMDevice = 0;
+		SupportsiOSAppInstalls = 1;
+		SystemIntegrityProtectionEnabled = 1;
+		UDID = "048D2650-6A62-5A93-87BE-DEADBEEFCAFE";
+		WiFiMAC = "5c:e9:1e:85:12:98";
+		XsanConfiguration =		 {
+			role = unconfigured;
+		};
+		iTunesStoreAccountHash = "NQBfrI+cV1y9dfhj2iA0000=";
+		iTunesStoreAccountIsActive = 1;
+	};
+}
+Agent response: (null)
