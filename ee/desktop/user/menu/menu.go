@@ -74,23 +74,24 @@ func New(logger log.Logger, hostname, filePath string) *menu {
 // getMenuData ingests the shared menu.json file created by the desktop runner
 // It unmarshals the data into a MenuData struct representing the menu, which is suitable for parsing and building the menu
 func (m *menu) getMenuData() *MenuData {
+	// Ensure that at a minumum we return a default menu, in case reading/unmarshaling fails
+	var menu MenuData
+	defer menu.SetDefaults()
+
 	if m.filePath == "" {
-		return nil
+		return &menu
 	}
 
 	menuFileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
 		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath)
-		return nil
+		return &menu
 	}
 
-	var menu MenuData
 	if err := json.Unmarshal(menuFileBytes, &menu); err != nil {
 		level.Error(m.logger).Log("msg", "failed to unmarshal menu json")
-		return nil
+		return &menu
 	}
-
-	menu.SetDefaults()
 
 	return &menu
 }
