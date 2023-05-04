@@ -243,7 +243,7 @@ func findInstallLocation(binary autoupdatableBinary) string {
 	}
 
 	for _, dir := range likelyDirectories {
-		potentialPath := filepath.Join(filepath.Clean(dir), binaryName)
+		potentialPath := executableLocation(filepath.Clean(dir), binary)
 
 		info, err := os.Stat(potentialPath)
 		if err != nil {

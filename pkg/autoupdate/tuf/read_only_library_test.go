@@ -138,36 +138,41 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 func Test_installedVersion_cached(t *testing.T) {
 	t.Parallel()
 
-	// Create update directories
-	testBaseDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			// Create update directories
+			testBaseDir := t.TempDir()
+			require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+			require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
 
-	// Set up test library
-	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new read-only library")
+			// Set up test library
+			testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new read-only library")
 
-	// Create cached version file
-	expectedVersion := "5.5.5"
-	require.NoError(t, os.WriteFile(filepath.Join(testReadOnlyLibrary.baseDir, "osqueryd-installed-version"), []byte(expectedVersion), 0755))
+			// Create cached version file
+			expectedVersion := "5.5.5"
+			require.NoError(t, os.WriteFile(
+				filepath.Join(testReadOnlyLibrary.baseDir, fmt.Sprintf("%s-installed-version", binary)),
+				[]byte(expectedVersion),
+				0755))
 
-	// Create fake executable in current working directory
-	executablePath, err := os.Executable()
-	require.NoError(t, err)
-	executableName := "osqueryd"
-	if runtime.GOOS == "windows" {
-		executableName += ".exe"
+			// Create fake executable in current working directory
+			executablePath, err := os.Executable()
+			require.NoError(t, err)
+			testExecutablePath := executableLocation(filepath.Dir(executablePath), binary)
+			require.NoError(t, os.MkdirAll(filepath.Dir(testExecutablePath), 0755))
+			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+			t.Cleanup(func() {
+				os.Remove(testExecutablePath)
+			})
+
+			actualVersion, actualPath, err := testReadOnlyLibrary.installedVersion(binary)
+			require.NoError(t, err, "could not get installed version")
+			require.Equal(t, expectedVersion, actualVersion.Original(), "version mismatch")
+			require.Equal(t, testExecutablePath, actualPath)
+		})
 	}
-	testExecutablePath := filepath.Join(filepath.Dir(executablePath), executableName)
-	require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-	t.Cleanup(func() {
-		os.Remove(testExecutablePath)
-	})
-
-	actualVersion, actualPath, err := testReadOnlyLibrary.installedVersion(binaryOsqueryd)
-	require.NoError(t, err, "could not get installed version")
-	require.Equal(t, expectedVersion, actualVersion.Original(), "version mismatch")
-	require.Equal(t, testExecutablePath, actualPath)
 }
 
 func Test_cacheInstalledVersion(t *testing.T) {
