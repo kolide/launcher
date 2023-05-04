@@ -141,6 +141,8 @@ func Test_installedVersion_cached(t *testing.T) {
 	for _, binary := range binaries {
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
 			// Create update directories
 			testBaseDir := t.TempDir()
 			require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
