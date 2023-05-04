@@ -148,8 +148,7 @@ func TestAddToLibrary_alreadyInstalled(t *testing.T) {
 			// Create fake executable in current working directory
 			executablePath, err := os.Executable()
 			require.NoError(t, err)
-			testExecutablePath := executableLocation(filepath.Dir(executablePath), binary)
-			require.NoError(t, os.MkdirAll(filepath.Dir(testExecutablePath), 0755))
+			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
 			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
 			t.Cleanup(func() {
 				os.Remove(testExecutablePath)
