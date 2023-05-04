@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -18,11 +19,13 @@ import (
 )
 
 // readOnlyLibrary provides a read-only view into the updates libraries for all
-// binaries. It is used to determine what version of each binary should be running.
+// binaries.
 type readOnlyLibrary struct {
 	baseDir string
 	logger  log.Logger
 }
+
+var launcherVersionRegex = regexp.MustCompile(`launcher - version (\d+\.\d+\.\d+(?:-.+)?)\n`)
 
 func newReadOnlyLibrary(baseDir string, logger log.Logger) (*readOnlyLibrary, error) {
 	rol := readOnlyLibrary{
@@ -189,11 +192,13 @@ func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, erro
 
 // parseLauncherVersion parses the launcher version from the output of `launcher --version`.
 func parseLauncherVersion(versionOutput []byte) (*semver.Version, error) {
-	// TODO: trim everything that's not line `launcher - version 1.0.7-19-g8c890f3`
-	versionStr := strings.TrimSpace(strings.TrimPrefix("launcher - version", string(versionOutput)))
-	launcherInstallVersion, err := semver.NewVersion(versionStr)
+	matches := launcherVersionRegex.FindStringSubmatch(string(versionOutput))
+	if len(matches) < 2 {
+		return nil, fmt.Errorf("could not parse launcher version from output %s", string(versionOutput))
+	}
+	launcherInstallVersion, err := semver.NewVersion(matches[1])
 	if err != nil {
-		return nil, fmt.Errorf("could not parse launcher version %s as semver: %w", versionStr, err)
+		return nil, fmt.Errorf("could not parse launcher version %s as semver: %w", matches[1], err)
 	}
 
 	return launcherInstallVersion, nil
@@ -210,7 +215,8 @@ func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
 	return osqueryInstallVersion, nil
 }
 
-// TODO ripped directly from findOsquery()
+// findInstallLocation attempts to find the install location for the given binary, looking
+// in well-known locations.
 func findInstallLocation(binary autoupdatableBinary) string {
 	binaryName := string(binary)
 	if runtime.GOOS == "windows" {
@@ -219,20 +225,22 @@ func findInstallLocation(binary autoupdatableBinary) string {
 
 	var likelyDirectories []string
 
-	if exPath, err := os.Executable(); err == nil {
-		likelyDirectories = append(likelyDirectories, filepath.Dir(exPath))
+	if currentExecutablePath, err := os.Executable(); err == nil {
+		likelyDirectories = append(likelyDirectories, filepath.Dir(currentExecutablePath))
 	}
 
-	// Places to check. We could conditionalize on GOOS, but it doesn't
-	// seem important.
+	// Places that we expect to see binaries installed
 	likelyDirectories = append(
 		likelyDirectories,
 		"/usr/local/kolide/bin",
 		"/usr/local/kolide-k2/bin",
 		"/usr/local/bin",
-		`C:\Program Files\osquery`,
 		`C:\Program Files\Kolide\Launcher-kolide-k2\bin`,
 	)
+
+	if binary == binaryOsqueryd {
+		likelyDirectories = append(likelyDirectories, `C:\Program Files\osquery`)
+	}
 
 	for _, dir := range likelyDirectories {
 		potentialPath := filepath.Join(filepath.Clean(dir), binaryName)
@@ -246,13 +254,12 @@ func findInstallLocation(binary autoupdatableBinary) string {
 			continue
 		}
 
-		// I guess it's good enough...
 		return potentialPath
 	}
 
-	// last ditch, check for binary on the PATH
-	if osqPath, err := exec.LookPath(binaryName); err == nil {
-		return osqPath
+	// If we haven't found it anywhere else, look for it on the PATH
+	if potentialPath, err := exec.LookPath(binaryName); err == nil {
+		return potentialPath
 	}
 
 	return ""
