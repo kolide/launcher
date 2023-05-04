@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -36,6 +37,28 @@ func TestMostRecentVersion(t *testing.T) {
 func TestPathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
+	testBaseDir := filepath.Join(t.TempDir(), "updates")
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+	testLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "expected no error when creating library")
+
+	testVersion := "1.0.7-30-abcdabcd"
+	testTargetFilename := fmt.Sprintf("launcher-%s.tar.gz", testVersion)
+	expectedPath := filepath.Join(testBaseDir, "launcher", testVersion, "launcher")
+	if runtime.GOOS == "darwin" {
+		expectedPath = filepath.Join(testBaseDir, "launcher", testVersion, "Kolide.app", "Contents", "MacOS", "launcher")
+	} else if runtime.GOOS == "windows" {
+		expectedPath = expectedPath + ".exe"
+	}
+
+	actualPath := testLibrary.PathToTargetVersionExecutable(binaryLauncher, testTargetFilename)
+	require.Equal(t, expectedPath, actualPath, "path mismatch")
+}
+
+func TestIsInstallVersion(t *testing.T) {
+	t.Parallel()
+
 	t.Skip("TODO")
 }
 
@@ -63,6 +86,12 @@ func TestAvailable(t *testing.T) {
 
 	// Query for a different osqueryd version
 	require.False(t, testReadOnlyLibrary.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
+}
+
+func Test_sortedVersionsInLibrary(t *testing.T) {
+	t.Parallel()
+
+	t.Skip("TODO")
 }
 
 func Test_installedVersion(t *testing.T) {
