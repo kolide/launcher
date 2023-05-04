@@ -209,6 +209,8 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testVersion), binary)
 			copyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
+			_, err := os.Stat(executablePath)
+			require.NoError(t, err, "did not create binary for test")
 
 			fmt.Printf("created binary at %s for %s\n\n\n", executablePath, binary)
 
@@ -222,7 +224,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the requested version is still there
-			_, err := os.Stat(executablePath)
+			_, err = os.Stat(executablePath)
 			require.NoError(t, err, "could not stat update that should have existed")
 		})
 	}
