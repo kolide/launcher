@@ -653,6 +653,20 @@ func (_m *Knapsack) OsquerydPath() string {
 	return r0
 }
 
+// Query provides a mock function with given fields: query, callback
+func (_m *Knapsack) Query(query string, callback func([]map[string]string, error)) error {
+	ret := _m.Called(query, callback)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, func([]map[string]string, error)) error); ok {
+		r0 = rf(query, callback)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RegisterChangeObserver provides a mock function with given fields: observer, flagKeys
 func (_m *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	_va := make([]interface{}, len(flagKeys))

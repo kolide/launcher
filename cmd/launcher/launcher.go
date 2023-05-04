@@ -125,6 +125,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	var runGroup run.Group
+
 	stores, err := agentbbolt.MakeStores(logger, db)
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
@@ -132,7 +135,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db)
+	queuedQuerier := knapsack.NewQueuedQuerier(logger)
+	runGroup.Add(queuedQuerier.ExecuteWithContext(ctx), queuedQuerier.Interrupt)
+
+	k := knapsack.New(stores, flagController, queuedQuerier, db)
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
@@ -167,8 +173,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
 		}
 	}
-	// create a rungroup for all the actors we create to allow for easy start/stop
-	var runGroup run.Group
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
@@ -231,6 +235,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// Sleep to give osquery time to startup before the checkpointer starts using it.
 		time.Sleep(30 * time.Second)
 		checkpointer.SetQuerier(extension)
+		queuedQuerier.SetQuerier(extension)
 	}()
 
 	// Create the control service and services that depend on it

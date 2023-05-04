@@ -6,4 +6,5 @@ type Knapsack interface {
 	Stores
 	BboltDB
 	Flags
+	Querier
 }

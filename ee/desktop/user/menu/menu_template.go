@@ -19,6 +19,7 @@ const (
 	LauncherVersion    string = "LauncherVersion"
 	LauncherRevision   string = "LauncherRevision"
 	GoVersion          string = "GoVersion"
+	OsqueryVersion     string = "OsqueryVersion"
 	ServerHostname     string = "ServerHostname"
 	LastMenuUpdateTime string = "LastMenuUpdateTime"
 	MenuVersion        string = "MenuVersion"

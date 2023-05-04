@@ -111,6 +111,8 @@ type DesktopUsersProcessesRunner struct {
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
 	runnerServer *runnerserver.RunnerServer
+	// osqueryMenuData is lazily populated with data from osquery queries
+	osqueryMenuData osqueryData
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -122,6 +124,11 @@ type processRecord struct {
 	process    *os.Process
 	path       string
 	socketPath string
+}
+
+// osqueryData is a container for data asynchronously provided by osquery
+type osqueryData struct {
+	osqueryVersion string
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
@@ -378,7 +385,10 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 
 // generateMenuFile generates and writes menu data to a shared file
 func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
-	// First generate fresh template data to use for parsing
+	// Queue up queries for template data supplied by osquery
+	r.refreshOsqueryData()
+
+	// Regenerate fresh template data to use for parsing
 	v := version.Version()
 
 	info, err := os.Stat(r.menuTemplatePath())
@@ -390,6 +400,7 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 		menu.LauncherVersion:    v.Version,
 		menu.LauncherRevision:   v.Revision,
 		menu.GoVersion:          v.GoVersion,
+		menu.OsqueryVersion:     r.osqueryMenuData.osqueryVersion,
 		menu.ServerHostname:     r.hostname,
 		menu.LastMenuUpdateTime: info.ModTime().Unix(),
 		menu.MenuVersion:        menu.CurrentMenuVersion,
@@ -720,4 +731,34 @@ func iconFilename() string {
 
 func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
 	return filepath.Join(r.usersFilesRoot, iconFilename())
+}
+
+func (r *DesktopUsersProcessesRunner) refreshOsqueryData() {
+	osqueryVersion := "Unknown"
+	callback := func(result []map[string]string, err error) {
+		if err != nil {
+			level.Debug(r.logger).Log("msg", "could not get osquery version", "err", err)
+		}
+
+		if len(result) < 1 {
+			level.Debug(r.logger).Log("msg", "expected at least one row from the osquery version query")
+		}
+
+		if val, ok := result[0]["osquery_version"]; ok {
+			osqueryVersion = val
+		}
+
+		if osqueryVersion != r.osqueryMenuData.osqueryVersion {
+			r.osqueryMenuData.osqueryVersion = osqueryVersion
+			r.refreshMenu()
+		}
+	}
+
+	err := r.knapsack.Query("SELECT osquery_info.version as osquery_version FROM osquery_info;", callback)
+	if err != nil {
+		level.Debug(r.logger).Log("msg", "could not get osquery version", "err", err)
+		if r.osqueryMenuData.osqueryVersion == "" {
+			r.osqueryMenuData.osqueryVersion = osqueryVersion
+		}
+	}
 }

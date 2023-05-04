@@ -12,8 +12,9 @@ import (
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 type knapsack struct {
-	stores map[storage.Store]types.KVStore
-	flags  types.Flags
+	stores  map[storage.Store]types.KVStore
+	flags   types.Flags
+	querier types.Querier
 
 	// BboltDB is the underlying bbolt database.
 	// Ideally, we can eventually remove this. This is only here because some parts of the codebase
@@ -21,17 +22,14 @@ type knapsack struct {
 	// If we are able to abstract bbolt out completely in these areas, we should be able to
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
-
-	// This struct is a work in progress, and will be iteratively added to as needs arise.
-	// Some potential future additions include:
-	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB) *knapsack {
+func New(stores map[storage.Store]types.KVStore, flags types.Flags, querier types.Querier, db *bbolt.DB) *knapsack {
 	k := &knapsack{
-		db:     db,
-		flags:  flags,
-		stores: stores,
+		stores:  stores,
+		flags:   flags,
+		querier: querier,
+		db:      db,
 	}
 
 	return k
@@ -342,4 +340,14 @@ func (k *knapsack) SetUpdateDirectory(directory string) error {
 }
 func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
+}
+
+// Querier interface methods
+
+func (k *knapsack) Query(query string, callback func(result []map[string]string, err error)) error {
+	// if k.querier == nil {
+	// 	return errors.New("knapsack querier is nil")
+	// }
+
+	return k.querier.Query(query, callback)
 }
