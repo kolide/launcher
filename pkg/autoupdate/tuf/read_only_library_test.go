@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestAvailable(t *testing.T) {
 
 	// Set up test library
 	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new update library manager")
+	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	// Set up valid "osquery" executable
 	runningOsqueryVersion := "5.5.7"
@@ -68,6 +69,41 @@ func Test_installedVersion(t *testing.T) {
 	t.Parallel()
 
 	t.Skip("TODO")
+}
+
+func Test_cacheInstalledVersion(t *testing.T) {
+	t.Parallel()
+
+	// Create update directories
+	testBaseDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+
+	// Set up test library
+	testReadOnlyLibrary, err := newReadOnlyLibrary(testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new read-only library")
+
+	versionToCache, err := semver.NewVersion("1.2.3-45-abcdabcd")
+	require.NoError(t, err, "unexpected error parsing semver")
+
+	for _, binary := range binaries {
+		// Confirm cache file doesn't exist yet
+		expectedCacheFileLocation := testReadOnlyLibrary.cachedInstalledVersionLocation(binary)
+		_, err = os.Stat(expectedCacheFileLocation)
+		require.True(t, os.IsNotExist(err), "cache file exists but should not have been created yet")
+
+		// Cache it
+		testReadOnlyLibrary.cacheInstalledVersion(binary, versionToCache)
+
+		// Confirm cache file exists
+		_, err = os.Stat(expectedCacheFileLocation)
+		require.NoError(t, err, "cache file %s does not exist but should have been created", expectedCacheFileLocation)
+
+		// Compare versions
+		cachedVersion, err := testReadOnlyLibrary.getCachedInstalledVersion(binary)
+		require.NoError(t, err, "expected no error reading cached installed version")
+		require.True(t, versionToCache.Equal(cachedVersion), "versions do not match")
+	}
 }
 
 func Test_versionFromTarget(t *testing.T) {
