@@ -205,6 +205,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 				mirrorClient: http.DefaultClient,
 				logger:       log.NewNopLogger(),
 				baseDir:      testBaseDir,
+				stagingDir:   t.TempDir(),
 				osquerier:    mockOsquerier,
 				lock:         newLibraryLock(),
 			}
@@ -327,7 +328,8 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 	t.Parallel()
 
 	testLibraryManager := &updateLibraryManager{
-		logger: log.NewNopLogger(),
+		logger:     log.NewNopLogger(),
+		stagingDir: t.TempDir(),
 	}
 
 	// In test, version.Version() returns `unknown` for everything, which is not something
@@ -343,8 +345,9 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	mockOsquerier := newMockQuerier(t)
 
 	testLibraryManager := &updateLibraryManager{
-		logger:    log.NewNopLogger(),
-		osquerier: mockOsquerier,
+		logger:     log.NewNopLogger(),
+		stagingDir: t.TempDir(),
+		osquerier:  mockOsquerier,
 	}
 
 	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
@@ -364,8 +367,9 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	mockOsquerier := newMockQuerier(t)
 
 	testLibraryManager := &updateLibraryManager{
-		logger:    log.NewNopLogger(),
-		osquerier: mockOsquerier,
+		logger:     log.NewNopLogger(),
+		osquerier:  mockOsquerier,
+		stagingDir: t.TempDir(),
 	}
 
 	// Expect to return an error
@@ -568,9 +572,10 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				// Set up test library manager
 				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					logger:  log.NewNopLogger(),
-					baseDir: testBaseDir,
-					lock:    newLibraryLock(),
+					logger:     log.NewNopLogger(),
+					baseDir:    testBaseDir,
+					stagingDir: t.TempDir(),
+					lock:       newLibraryLock(),
 				}
 
 				// Set up existing versions for test
