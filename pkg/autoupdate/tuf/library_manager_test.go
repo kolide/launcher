@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
@@ -211,6 +213,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
+			require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 
 			fmt.Printf("created binary at %s for %s\n\n\n", executablePath, binary)
 
