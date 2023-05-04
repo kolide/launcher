@@ -51,8 +51,8 @@ func (rol *readOnlyLibrary) updatesDirectory(binary autoupdatableBinary) string 
 }
 
 // MostRecentVersion returns the path to the most recent, valid version available in the library for the
-// given binary.
-func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary, currentRunningExecutable string) (string, error) {
+// given binary. If the installed version is the most recent version, it returns an empty string.
+func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary) (string, error) {
 	// Get installed version
 	installedVersion, installedVersionPath, err := InstalledVersion(binary)
 	if err != nil {
@@ -77,7 +77,7 @@ func (rol *readOnlyLibrary) MostRecentVersion(binary autoupdatableBinary, curren
 		return "", fmt.Errorf("could not parse most recent version %s in library for %s: %w", mostRecentVersionInLibraryRaw, binary, err)
 	}
 	if installedVersion.GreaterThan(mostRecentVersionInLibrary) {
-		return installedVersionPath, nil
+		return "", nil
 	}
 
 	// The update library version is more recent than the installed version, so return its location
@@ -91,6 +91,8 @@ func (rol *readOnlyLibrary) PathToTargetVersionExecutable(binary autoupdatableBi
 	return executableLocation(versionDir, binary)
 }
 
+// IsInstallVersion checks whether the version in the given target is the same as the one
+// contained in the installation.
 func (rol *readOnlyLibrary) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
 	installedVersion, _, err := InstalledVersion(binary)
 	if err != nil {
@@ -157,8 +159,6 @@ func versionFromTarget(binary autoupdatableBinary, targetFilename string) string
 
 func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
 	// TODO cache it somewhere
-	// TODO this doesn't really work for launcher because it'll still try to find the newest
-	// version for `--version` instead of reporting the install version
 	pathToBinary := findInstallLocation(binary)
 	if pathToBinary == "" {
 		return nil, "", errors.New("could not find install location")
@@ -187,6 +187,7 @@ func InstalledVersion(binary autoupdatableBinary) (*semver.Version, string, erro
 	return v, pathToBinary, nil
 }
 
+// parseLauncherVersion parses the launcher version from the output of `launcher --version`.
 func parseLauncherVersion(versionOutput []byte) (*semver.Version, error) {
 	// TODO: trim everything that's not line `launcher - version 1.0.7-19-g8c890f3`
 	versionStr := strings.TrimSpace(strings.TrimPrefix("launcher - version", string(versionOutput)))
@@ -198,6 +199,7 @@ func parseLauncherVersion(versionOutput []byte) (*semver.Version, error) {
 	return launcherInstallVersion, nil
 }
 
+// parseOsquerydVersion parses the osqueryd version from the output of `osqueryd --version`.
 func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
 	versionStr := strings.TrimSpace(strings.TrimPrefix("osqueryd version", string(versionOutput)))
 	osqueryInstallVersion, err := semver.NewVersion(versionStr)

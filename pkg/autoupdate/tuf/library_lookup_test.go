@@ -7,7 +7,27 @@ func TestNewUpdateLibraryLookup(t *testing.T) {
 	t.Skip("TODO")
 }
 
-func TestCheckOutLatest(t *testing.T) {
+func TestNewUpdateLibraryLookup_cannotInitROLibrary(t *testing.T) {
+	t.Parallel()
+	t.Skip("TODO")
+}
+
+func TestNewUpdateLibraryLookup_cannotInitMetadataClient(t *testing.T) {
+	t.Parallel()
+	t.Skip("TODO")
+}
+
+func TestCheckOutLatest_withTufRepository(t *testing.T) {
+	t.Parallel()
+	t.Skip("TODO")
+}
+
+func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
+	t.Parallel()
+	t.Skip("TODO")
+}
+
+func TestCheckOutLatest_withInstalledVersionIsReleaseVersion(t *testing.T) {
 	t.Parallel()
 	t.Skip("TODO")
 }
