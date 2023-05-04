@@ -28,12 +28,6 @@ func Test_newReadOnlyLibrary(t *testing.T) {
 	require.NoError(t, err, "expected no error when creating library")
 }
 
-func TestMostRecentVersion(t *testing.T) {
-	t.Parallel()
-
-	t.Skip("TODO")
-}
-
 func TestPathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
