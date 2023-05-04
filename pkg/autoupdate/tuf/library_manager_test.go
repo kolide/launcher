@@ -196,11 +196,17 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 
 			testBaseDir := t.TempDir()
 			mockOsquerier := newMockQuerier(t)
+			testMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
+			}))
+			defer testMirror.Close()
 			testLibraryManager := &updateLibraryManager{
-				logger:    log.NewNopLogger(),
-				baseDir:   testBaseDir,
-				osquerier: mockOsquerier,
-				lock:      newLibraryLock(),
+				mirrorUrl:    testMirror.URL,
+				mirrorClient: http.DefaultClient,
+				logger:       log.NewNopLogger(),
+				baseDir:      testBaseDir,
+				osquerier:    mockOsquerier,
+				lock:         newLibraryLock(),
 			}
 
 			// Make sure our update directory exists
@@ -288,6 +294,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			testMaliciousMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				http.ServeFile(w, r, invalidBinaryPath)
 			}))
+			defer testMaliciousMirror.Close()
 
 			// Set up test library manager
 			mockOsquerier := newMockQuerier(t)
