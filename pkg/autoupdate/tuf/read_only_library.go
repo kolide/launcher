@@ -172,7 +172,7 @@ func (rol *readOnlyLibrary) getCachedInstalledVersion(binary autoupdatableBinary
 // cacheInstalledVersion caches the install version in a file in the updates directory, to avoid
 // having to exec the binary to discover its version every time.
 func (rol *readOnlyLibrary) cacheInstalledVersion(binary autoupdatableBinary, installedVersion *semver.Version) {
-	if err := os.WriteFile(rol.cachedInstalledVersionLocation(binary), []byte(installedVersion.Original()), 0755); err != nil {
+	if err := os.WriteFile(rol.cachedInstalledVersionLocation(binary), []byte(installedVersion.Original()), 0644); err != nil {
 		level.Debug(rol.logger).Log("msg", "could not cache installed version", "binary", binary, "err", err)
 	}
 }
