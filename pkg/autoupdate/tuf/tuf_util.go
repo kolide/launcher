@@ -45,5 +45,5 @@ func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel s
 		return filepath.Base(releaseTarget), target, nil
 	}
 
-	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", targetReleaseFile, binary)
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }

@@ -20,10 +20,15 @@ func readOnlyTufMetadataClient(tufRepositoryLocation string) (*client.Client, er
 
 	localStore, err := newReadOnlyLocalStore(tufRepositoryLocation)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize local TUF store: %w", err)
+		return nil, fmt.Errorf("could not initialize read-only local TUF store: %w", err)
 	}
 
-	return client.NewClient(localStore, newNoopRemoteStore()), nil
+	metadataClient := client.NewClient(localStore, newNoopRemoteStore())
+	if err := metadataClient.Init(rootJson); err != nil {
+		return nil, fmt.Errorf("failed to initialize read-only TUF client with root JSON: %w", err)
+	}
+
+	return metadataClient, nil
 }
 
 // Wraps TUF's FileJSONStore to be read-only

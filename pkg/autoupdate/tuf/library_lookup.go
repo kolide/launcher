@@ -46,8 +46,7 @@ func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channe
 	// Initialize a read-only TUF metadata client to parse the data we already have about releases.
 	// We can still pick the most recent version in our library if we can't determine the exact release,
 	// so don't return an error if we can't initialize the client.
-	metadataClient, err := readOnlyTufMetadataClient(l.tufRepositoryLocation)
-	if err == nil {
+	if metadataClient, err := readOnlyTufMetadataClient(l.tufRepositoryLocation); err == nil {
 		l.metadataClient = metadataClient
 	}
 
