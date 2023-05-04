@@ -14,7 +14,7 @@ import (
 // metadata but will not download new metadata.
 func readOnlyTufMetadataClient(tufRepositoryLocation string) (*client.Client, error) {
 	// Initialize a read-only TUF metadata client to parse the data we already have about releases
-	if _, err := os.Stat(tufRepositoryLocation); err == os.ErrNotExist {
+	if _, err := os.Stat(tufRepositoryLocation); os.IsNotExist(err) {
 		return nil, fmt.Errorf("local TUF dir doesn't exist, cannot create read-only client: %w", err)
 	}
 
