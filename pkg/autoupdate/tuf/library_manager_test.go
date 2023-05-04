@@ -223,7 +223,9 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			}
 
 			// Ask the library manager to perform the download
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testVersion), data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
+			require.Equal(t, testVersion, testLibraryManager.versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
 			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the requested version is still there
