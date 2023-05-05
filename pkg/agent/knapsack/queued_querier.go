@@ -12,74 +12,43 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
-type synchronousQuerier interface {
+// querier is an interface for synchronously querying osquery.
+type querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
+// queuedQuerier maintains a queue of queries to be processed asynchronously
+// as queries are added to the queue.
 type queuedQuerier struct {
-	logger      log.Logger
-	cancel      context.CancelFunc
-	queueCh     chan struct{}
-	queue       *queue
-	syncQuerier synchronousQuerier
+	logger  log.Logger
+	cancel  context.CancelFunc
+	queueCh chan struct{}
+	queue   *list.List
+	mutex   sync.Mutex
+	querier querier
 }
 
-type queue struct {
-	items *list.List
-	mutex sync.Mutex
-}
-
-func (q *queue) push(item *queueItem) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
-	q.items.PushBack(item)
-}
-
-func (q *queue) pop() *queueItem {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
-	e := q.items.Front() // First element
-	if e == nil {
-		return nil
-	}
-
-	q.items.Remove(e) // Dequeue
-
-	if e == nil {
-		return nil
-	}
-
-	item, ok := e.Value.(*queueItem)
-	if ok {
-		return item
-	}
-
-	return nil
-}
-
+// queueItem is encapsulates everything that the queuedQuerier needs to process a query and return the error/result.
 type queueItem struct {
 	query    string
 	callback func(result []map[string]string, err error)
 }
 
 func NewQueuedQuerier(logger log.Logger) *queuedQuerier {
-	q := &queue{
-		items: list.New(),
-	}
 	qq := &queuedQuerier{
 		logger:  log.With(logger, "component", "querier"),
-		queue:   q,
 		queueCh: make(chan struct{}, 10),
+		queue:   list.New(),
 	}
 
 	return qq
 }
 
-func (qq *queuedQuerier) SetQuerier(querier synchronousQuerier) {
-	level.Info(qq.logger).Log("msg", "queued querier has synchronous querier")
-	qq.syncQuerier = querier
+// SetQuerier provides the underlying synchronous version of querier. If there are queries in
+// the queue pending processing, those will start processing now.
+func (qq *queuedQuerier) SetQuerier(querier querier) {
+	level.Info(qq.logger).Log("msg", "setting querier for queued querier")
+	qq.querier = querier
 
 	// Wake up in case any queries were received prior to having the synchronous querier
 	qq.queueCh <- struct{}{}
@@ -97,16 +66,17 @@ func (qq *queuedQuerier) ExecuteWithContext(ctx context.Context) func() error {
 func (qq *queuedQuerier) Start(ctx context.Context) {
 	level.Info(qq.logger).Log("msg", "queued querier started")
 	ctx, qq.cancel = context.WithCancel(ctx)
+
 	for {
-		if qq.syncQuerier != nil {
+		if qq.querier != nil {
 			for {
 				// Pop items off the queue until it's empty
-				item := qq.queue.pop()
+				item := qq.pop()
 				if item == nil {
 					break
 				}
 				// Try to run the query
-				result, err := queryWithRetries(qq.syncQuerier, item.query)
+				result, err := queryWithRetries(qq.querier, item.query)
 				// Give the error and/or results back to the client via the callback
 				item.callback(result, err)
 			}
@@ -135,19 +105,54 @@ func (qq *queuedQuerier) Stop() {
 	}
 }
 
+// Query will attempt to send a query to the osquery client. The result of the
+// query will be passed to the callback function provided.
 func (qq *queuedQuerier) Query(query string, callback func(result []map[string]string, err error)) error {
 	if qq == nil {
 		return errors.New("queuedQuerier is nil")
 	}
 
 	// Push the item on to the queue, and notify the channel so the query is processed
-	qq.queue.push(&queueItem{query: query, callback: callback})
+	qq.push(&queueItem{query: query, callback: callback})
 	qq.queueCh <- struct{}{}
 
 	return nil
 }
 
-func queryWithRetries(querier synchronousQuerier, query string) ([]map[string]string, error) {
+// push locks the queue and inserts an item at the back of the queue
+func (qq *queuedQuerier) push(item *queueItem) {
+	qq.mutex.Lock()
+	defer qq.mutex.Unlock()
+
+	qq.queue.PushBack(item)
+}
+
+// pop locks the queue, removes and returns the first item of the queue
+func (qq *queuedQuerier) pop() *queueItem {
+	qq.mutex.Lock()
+	defer qq.mutex.Unlock()
+
+	e := qq.queue.Front() // First element
+	if e == nil {
+		return nil
+	}
+
+	qq.queue.Remove(e) // Dequeue
+
+	if e == nil {
+		return nil
+	}
+
+	item, ok := e.Value.(*queueItem)
+	if ok {
+		return item
+	}
+
+	return nil
+}
+
+// queryWithRetries attempts to run the query, retrying for a perod of time, as necessary
+func queryWithRetries(querier querier, query string) ([]map[string]string, error) {
 	var results []map[string]string
 	var err error
 

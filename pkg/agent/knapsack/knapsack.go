@@ -345,9 +345,5 @@ func (k *knapsack) UpdateDirectory() string {
 // Querier interface methods
 
 func (k *knapsack) Query(query string, callback func(result []map[string]string, err error)) error {
-	// if k.querier == nil {
-	// 	return errors.New("knapsack querier is nil")
-	// }
-
 	return k.querier.Query(query, callback)
 }
