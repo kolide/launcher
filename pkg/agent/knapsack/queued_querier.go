@@ -81,18 +81,20 @@ func (qq *queuedQuerier) Start(ctx context.Context) {
 }
 
 func (qq *queuedQuerier) processQueue() {
-	if qq.querier != nil {
-		for {
-			// Pop items off the queue until it's empty
-			item := qq.pop()
-			if item == nil {
-				break
-			}
-			// Try to run the query
-			result, err := queryWithRetries(qq.querier, item.query)
-			// Give the error and/or results back to the client via the callback
-			item.callback(result, err)
+	if qq.querier == nil {
+		return
+	}
+
+	for {
+		// Pop items off the queue until it's empty
+		item := qq.pop()
+		if item == nil {
+			break
 		}
+		// Try to run the query
+		result, err := queryWithRetries(qq.querier, item.query)
+		// Give the error and/or results back to the client via the callback
+		item.callback(result, err)
 	}
 }
 
