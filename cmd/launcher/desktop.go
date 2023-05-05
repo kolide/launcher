@@ -233,6 +233,15 @@ func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthTo
 			break
 		}
 
+		// we've seen lingering desktop processes owned by root
+		if runtime.GOOS == "darwin" && os.Getuid() < 501 {
+			level.Debug(logger).Log(
+				"msg", "not owned by human, exiting",
+				"uid", os.Getuid(),
+			)
+			break
+		}
+
 		response, err := client.Get(runnerHealthUrl)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
