@@ -120,6 +120,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Query", "SELECT osquery_info.version as osquery_version FROM osquery_info;", mock.Anything).Return(nil)
 
 			r, err := New(
 				mockKnapsack,
@@ -258,6 +259,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Query", "SELECT osquery_info.version as osquery_version FROM osquery_info;", mock.Anything).Return(nil)
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
@@ -291,6 +293,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
+	mockKnapsack.On("Query", "SELECT osquery_info.version as osquery_version FROM osquery_info;", mock.Anything).Return(nil)
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, WithUsersFilesRoot(dir))

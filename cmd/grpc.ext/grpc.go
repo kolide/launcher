@@ -99,7 +99,8 @@ func main() {
 		logutil.Fatal(logger, "err", fmt.Errorf("creating stores: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	f := flags.NewFlagController(logger, stores[storage.AgentFlagsStore])
-	k := knapsack.New(stores, f, db)
+	queuedQuerier := knapsack.NewQueuedQuerier(logger)
+	k := knapsack.New(stores, f, queuedQuerier, db)
 
 	ext, err := grpcext.NewExtension(remote, k, extOpts)
 	if err != nil {
@@ -122,7 +123,9 @@ func main() {
 
 	server.RegisterPlugin(configPlugin, distributedPlugin, loggerPlugin)
 
-	ext.SetQuerier(&queryier{client: client})
+	querier := &queryier{client: client}
+	ext.SetQuerier(querier)
+	queuedQuerier.SetQuerier(querier)
 	ctx := context.Background()
 	_, invalid, err := ext.Enroll(ctx)
 	if err != nil {
