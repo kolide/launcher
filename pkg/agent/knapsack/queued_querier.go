@@ -13,7 +13,7 @@ import (
 )
 
 // querier is an interface for synchronously querying osquery.
-type querier interface {
+type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
 
@@ -25,7 +25,7 @@ type queuedQuerier struct {
 	queueCh chan struct{}
 	queue   *list.List
 	mutex   sync.Mutex
-	querier querier
+	querier Querier
 }
 
 // queueItem is encapsulates everything that the queuedQuerier needs to process a query and return the error/result.
@@ -46,7 +46,7 @@ func NewQueuedQuerier(logger log.Logger) *queuedQuerier {
 
 // SetQuerier provides the underlying synchronous version of querier. If there are queries in
 // the queue pending processing, those will start processing now.
-func (qq *queuedQuerier) SetQuerier(querier querier) {
+func (qq *queuedQuerier) SetQuerier(querier Querier) {
 	level.Info(qq.logger).Log("msg", "setting querier for queued querier")
 	qq.querier = querier
 
@@ -68,19 +68,7 @@ func (qq *queuedQuerier) Start(ctx context.Context) {
 	ctx, qq.cancel = context.WithCancel(ctx)
 
 	for {
-		if qq.querier != nil {
-			for {
-				// Pop items off the queue until it's empty
-				item := qq.pop()
-				if item == nil {
-					break
-				}
-				// Try to run the query
-				result, err := queryWithRetries(qq.querier, item.query)
-				// Give the error and/or results back to the client via the callback
-				item.callback(result, err)
-			}
-		}
+		qq.processQueue()
 
 		select {
 		case <-ctx.Done():
@@ -88,6 +76,22 @@ func (qq *queuedQuerier) Start(ctx context.Context) {
 		case <-qq.queueCh:
 			// Go process the queue
 			continue
+		}
+	}
+}
+
+func (qq *queuedQuerier) processQueue() {
+	if qq.querier != nil {
+		for {
+			// Pop items off the queue until it's empty
+			item := qq.pop()
+			if item == nil {
+				break
+			}
+			// Try to run the query
+			result, err := queryWithRetries(qq.querier, item.query)
+			// Give the error and/or results back to the client via the callback
+			item.callback(result, err)
 		}
 	}
 }
@@ -152,7 +156,7 @@ func (qq *queuedQuerier) pop() *queueItem {
 }
 
 // queryWithRetries attempts to run the query, retrying for a perod of time, as necessary
-func queryWithRetries(querier querier, query string) ([]map[string]string, error) {
+func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {
 	var results []map[string]string
 	var err error
 
