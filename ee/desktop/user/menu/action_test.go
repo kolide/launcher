@@ -31,9 +31,9 @@ func Test_Unmarshal(t *testing.T) {
 			data: `{"type":""}`,
 		},
 		{
-			name:        "unknown action",
-			data:        `{"type":"unknown_action"}`,
-			expectedErr: true,
+			name:   "unknown action",
+			data:   `{"type":"unknown_action"}`,
+			action: Action{Type: "unknown_action", Action: json.RawMessage(nil), Performer: nil},
 		},
 		{
 			name:   "open url",
@@ -55,7 +55,6 @@ func Test_Unmarshal(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.action, a)
-
 		})
 	}
 }
