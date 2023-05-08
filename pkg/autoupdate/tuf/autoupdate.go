@@ -6,6 +6,7 @@ package tuf
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -49,12 +51,17 @@ type librarian interface {
 	IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
-	TidyLibrary()
+	TidyLibrary(binary autoupdatableBinary, currentVersion string)
+}
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
 }
 
 type TufAutoupdater struct {
 	metadataClient *client.Client
 	libraryManager librarian
+	osquerier      querier // used to query for current running osquery version
 	channel        string
 	checkInterval  time.Duration
 	store          types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
@@ -77,6 +84,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 		interrupt:     make(chan struct{}),
 		checkInterval: k.AutoupdateInterval(),
 		store:         k.AutoupdateErrorsStore(),
+		osquerier:     osquerier,
 		logger:        log.NewNopLogger(),
 	}
 
@@ -95,7 +103,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -149,7 +157,7 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 func (ta *TufAutoupdater) Execute() (err error) {
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
-	ta.libraryManager.TidyLibrary()
+	ta.tidyLibrary()
 
 	checkTicker := time.NewTicker(ta.checkInterval)
 	defer checkTicker.Stop()
@@ -174,6 +182,66 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
+}
+
+// tidyLibrary gets the current running version for each binary (so that the current version is not removed)
+// and then asks the update library manager to tidy the update library.
+func (ta *TufAutoupdater) tidyLibrary() {
+	for _, binary := range binaries {
+		// Get the current running version to preserve it when tidying the available updates
+		var currentVersion string
+		var err error
+		switch binary {
+		case binaryOsqueryd:
+			// The osqueryd client may not have initialized yet, so retry the version
+			// check a couple times before giving up
+			osquerydVersionCheckRetries := 5
+			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
+				currentVersion, err = ta.currentRunningVersion(binary)
+				if err == nil {
+					break
+				}
+				time.Sleep(1 * time.Minute)
+			}
+		default:
+			currentVersion, err = ta.currentRunningVersion(binary)
+		}
+
+		if err != nil {
+			level.Debug(ta.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
+			continue
+		}
+
+		ta.libraryManager.TidyLibrary(binary, currentVersion)
+	}
+}
+
+// currentRunningVersion returns the current running version of the given binary.
+func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (string, error) {
+	switch binary {
+	case binaryLauncher:
+		launcherVersion := version.Version().Version
+		if launcherVersion == "unknown" {
+			return "", errors.New("unknown launcher version")
+		}
+		return launcherVersion, nil
+	case binaryOsqueryd:
+		resp, err := ta.osquerier.Query("SELECT version FROM osquery_info;")
+		if err != nil {
+			return "", fmt.Errorf("could not query for osquery version: %w", err)
+		}
+		if len(resp) < 1 {
+			return "", errors.New("osquery version query returned no rows")
+		}
+		osquerydVersion, ok := resp[0]["version"]
+		if !ok {
+			return "", errors.New("osquery version query did not return version")
+		}
+
+		return osquerydVersion, nil
+	default:
+		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
+	}
 }
 
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's

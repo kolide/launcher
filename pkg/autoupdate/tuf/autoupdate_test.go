@@ -16,12 +16,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf"
 )
@@ -76,9 +78,10 @@ func TestExecute(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -102,10 +105,13 @@ func TestExecute(t *testing.T) {
 	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, binaryLauncher, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher")
 
-	// Expect that we attempt to update the library
+	// Expect that we attempt to tidy the library first before running execute loop
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
-	mockLibraryManager.On("TidyLibrary").Return().Once()
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+
+	// Expect that we attempt to update the library
 	mockLibraryManager.On("IsInstallVersion", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("IsInstallVersion", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
@@ -137,6 +143,58 @@ func TestExecute(t *testing.T) {
 	require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
 }
 
+func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
+	t.Parallel()
+
+	mockQuerier := newMockQuerier(t)
+	autoupdater := &TufAutoupdater{
+		logger:    log.NewNopLogger(),
+		osquerier: mockQuerier,
+	}
+
+	// In test, version.Version() returns `unknown` for everything, which is not something
+	// that the semver library can parse. So we only expect an error here.
+	launcherVersion, err := autoupdater.currentRunningVersion("launcher")
+	require.Error(t, err, "expected an error fetching current running version of launcher")
+	require.Equal(t, "", launcherVersion)
+}
+
+func Test_currentRunningVersion_osqueryd(t *testing.T) {
+	t.Parallel()
+
+	mockQuerier := newMockQuerier(t)
+	autoupdater := &TufAutoupdater{
+		logger:    log.NewNopLogger(),
+		osquerier: mockQuerier,
+	}
+
+	// Expect to return one row containing the version
+	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
+	require.NoError(t, err)
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
+
+	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
+	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
+	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
+}
+
+func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
+	t.Parallel()
+
+	mockQuerier := newMockQuerier(t)
+	autoupdater := &TufAutoupdater{
+		logger:    log.NewNopLogger(),
+		osquerier: mockQuerier,
+	}
+
+	// Expect to return an error
+	mockQuerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error")).Once()
+
+	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
+	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
+	require.Equal(t, "", osqueryVersion)
+}
+
 func Test_storeError(t *testing.T) {
 	t.Parallel()
 
@@ -154,8 +212,9 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
 
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -163,7 +222,11 @@ func Test_storeError(t *testing.T) {
 
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
-	mockLibraryManager.On("TidyLibrary").Return().Once()
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
+
+	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
+	// for launcher in tests.
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
@@ -192,6 +255,7 @@ func Test_storeError(t *testing.T) {
 	require.Greater(t, errorCount, 0, "TUF autoupdater did not record error counts")
 
 	mockLibraryManager.AssertExpectations(t)
+	mockQuerier.AssertExpectations(t)
 }
 
 func Test_cleanUpOldErrors(t *testing.T) {

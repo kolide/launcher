@@ -14,5 +14,5 @@ mockery --name <interface name> --filename=mock_<interface_name>_test.go --expor
 For example:
 
 ```
-mockery --name readOnlyUpdateLibrary --filename=mock_read_only_update_library_test.go --exported --inpackage
+mockery --name librarian --filename mock_librarian_test.go --exported --inpackage
 ```

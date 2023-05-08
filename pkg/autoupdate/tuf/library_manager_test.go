@@ -2,7 +2,6 @@ package tuf
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,7 +16,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -26,7 +24,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
@@ -44,14 +42,13 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
 	require.NoError(t, err, "could not stat launcher download dir")
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
-	require.NotNil(t, testLibraryManager.osquerier, "osquerier not set on library manager")
 }
 
 func TestPathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "expected no error when creating library")
 
 	testVersion := "1.0.7-30-abcdabcd"
@@ -74,7 +71,7 @@ func TestAvailable(t *testing.T) {
 	testBaseDir := t.TempDir()
 
 	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	// Set up valid "osquery" executable
@@ -135,7 +132,7 @@ func TestAddToLibrary(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
@@ -179,7 +176,7 @@ func TestAddToLibrary_alreadyInstalled(t *testing.T) {
 				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
 			}))
 			defer testMirror.Close()
-			testLibraryManager, err := newUpdateLibraryManager(testMirror.URL, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(testMirror.URL, http.DefaultClient, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "initializing test library manager")
 
 			// Make sure our update directories exist so we can verify they're empty later
@@ -223,7 +220,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			t.Parallel()
 
 			testBaseDir := t.TempDir()
-			mockOsquerier := newMockQuerier(t)
 			testMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
 			}))
@@ -234,7 +230,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 				logger:       log.NewNopLogger(),
 				baseDir:      testBaseDir,
 				stagingDir:   t.TempDir(),
-				osquerier:    mockOsquerier,
 				lock:         newLibraryLock(),
 			}
 
@@ -254,7 +249,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
 			require.Equal(t, testVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
 			require.NoError(t, testLibraryManager.AddToLibrary(binary, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
-			mockOsquerier.AssertExpectations(t)
 
 			// Confirm the requested version is still there
 			_, err = os.Stat(executablePath)
@@ -319,7 +313,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			defer testMaliciousMirror.Close()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download
@@ -338,62 +332,6 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	}
 }
 
-func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
-	t.Parallel()
-
-	testLibraryManager := &updateLibraryManager{
-		logger:     log.NewNopLogger(),
-		stagingDir: t.TempDir(),
-	}
-
-	// In test, version.Version() returns `unknown` for everything, which is not something
-	// that the semver library can parse. So we only expect an error here.
-	launcherVersion, err := testLibraryManager.currentRunningVersion("launcher")
-	require.Error(t, err, "expected an error fetching current running version of launcher")
-	require.Equal(t, "", launcherVersion)
-}
-
-func Test_currentRunningVersion_osqueryd(t *testing.T) {
-	t.Parallel()
-
-	mockOsquerier := newMockQuerier(t)
-
-	testLibraryManager := &updateLibraryManager{
-		logger:     log.NewNopLogger(),
-		stagingDir: t.TempDir(),
-		osquerier:  mockOsquerier,
-	}
-
-	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
-	require.NoError(t, err)
-
-	// Expect to return one row containing the version
-	mockOsquerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
-
-	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
-	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
-	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
-}
-
-func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
-	t.Parallel()
-
-	mockOsquerier := newMockQuerier(t)
-
-	testLibraryManager := &updateLibraryManager{
-		logger:     log.NewNopLogger(),
-		osquerier:  mockOsquerier,
-		stagingDir: t.TempDir(),
-	}
-
-	// Expect to return an error
-	mockOsquerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error")).Once()
-
-	osqueryVersion, err := testLibraryManager.currentRunningVersion("osqueryd")
-	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
-	require.Equal(t, "", osqueryVersion)
-}
-
 func Test_tidyStagedUpdates(t *testing.T) {
 	t.Parallel()
 
@@ -405,7 +343,7 @@ func Test_tidyStagedUpdates(t *testing.T) {
 			testBaseDir := t.TempDir()
 
 			// Initialize the library manager
-			testLibraryManager, err := newUpdateLibraryManager("", http.DefaultClient, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager("", http.DefaultClient, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Make a file in the staged updates directory
@@ -667,7 +605,7 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	}
 
 	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	// Get sorted versions
@@ -698,7 +636,7 @@ func Test_installedVersion_cached(t *testing.T) {
 			testBaseDir := t.TempDir()
 
 			// Set up test library
-			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new read-only library")
 
 			// Create cached version file
@@ -732,7 +670,7 @@ func Test_cacheInstalledVersion(t *testing.T) {
 	testBaseDir := t.TempDir()
 
 	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, newMockQuerier(t), log.NewNopLogger())
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	versionToCache, err := semver.NewVersion("1.2.3-45-abcdabcd")

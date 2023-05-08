@@ -54,9 +54,9 @@ func (_m *Mocklibrarian) IsInstallVersion(binary autoupdatableBinary, targetFile
 	return r0
 }
 
-// TidyLibrary provides a mock function with given fields:
-func (_m *Mocklibrarian) TidyLibrary() {
-	_m.Called()
+// TidyLibrary provides a mock function with given fields: binary, currentVersion
+func (_m *Mocklibrarian) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
+	_m.Called(binary, currentVersion)
 }
 
 type mockConstructorTestingTNewMocklibrarian interface {

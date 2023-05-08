@@ -3,7 +3,6 @@ package tuf
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,13 +13,11 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
@@ -28,10 +25,6 @@ import (
 )
 
 var launcherVersionRegex = regexp.MustCompile(`launcher - version (\d+\.\d+\.\d+(?:-.+)?)\n`)
-
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
@@ -42,17 +35,15 @@ type updateLibraryManager struct {
 	mirrorClient *http.Client
 	baseDir      string
 	stagingDir   string
-	osquerier    querier // used to query for current running osquery version
 	lock         *libraryLock
 	logger       log.Logger
 }
 
-func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, osquerier querier, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, logger log.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
 		mirrorUrl:    mirrorUrl,
 		mirrorClient: mirrorClient,
 		baseDir:      baseDir,
-		osquerier:    osquerier,
 		lock:         newLibraryLock(),
 		logger:       log.With(logger, "component", "tuf_autoupdater_library_manager"),
 	}
@@ -216,70 +207,17 @@ func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binary
 	}
 }
 
-// currentRunningVersion returns the current running version of the given binary.
-func (ulm *updateLibraryManager) currentRunningVersion(binary autoupdatableBinary) (string, error) {
-	switch binary {
-	case binaryLauncher:
-		launcherVersion := version.Version().Version
-		if launcherVersion == "unknown" {
-			return "", errors.New("unknown launcher version")
-		}
-		return launcherVersion, nil
-	case binaryOsqueryd:
-		resp, err := ulm.osquerier.Query("SELECT version FROM osquery_info;")
-		if err != nil {
-			return "", fmt.Errorf("could not query for osquery version: %w", err)
-		}
-		if len(resp) < 1 {
-			return "", errors.New("osquery version query returned no rows")
-		}
-		osquerydVersion, ok := resp[0]["version"]
-		if !ok {
-			return "", errors.New("osquery version query did not return version")
-		}
-
-		return osquerydVersion, nil
-	default:
-		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
-	}
-}
-
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
-func (ulm *updateLibraryManager) TidyLibrary() {
-	for _, binary := range binaries {
-		// Acquire lock for modifying the library
-		ulm.lock.Lock(binary)
-		defer ulm.lock.Unlock(binary)
+func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
+	// Acquire lock for modifying the library
+	ulm.lock.Lock(binary)
+	defer ulm.lock.Unlock(binary)
 
-		// First, remove old staged archives
-		ulm.tidyStagedUpdates(binary)
+	// First, remove old staged archives
+	ulm.tidyStagedUpdates(binary)
 
-		// Get the current running version to preserve it when tidying the available updates
-		var currentVersion string
-		var err error
-		switch binary {
-		case binaryOsqueryd:
-			// The osqueryd client may not have initialized yet, so retry the version
-			// check a couple times before giving up
-			osquerydVersionCheckRetries := 5
-			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
-				currentVersion, err = ulm.currentRunningVersion(binary)
-				if err == nil {
-					break
-				}
-				time.Sleep(1 * time.Minute)
-			}
-		default:
-			currentVersion, err = ulm.currentRunningVersion(binary)
-		}
-
-		if err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
-			continue
-		}
-
-		ulm.tidyUpdateLibrary(binary, currentVersion)
-	}
+	// Remove any updates we no longer need
+	ulm.tidyUpdateLibrary(binary, currentVersion)
 }
 
 // tidyStagedUpdates removes all old archives from the staged updates directory.
