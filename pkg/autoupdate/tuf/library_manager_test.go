@@ -67,7 +67,108 @@ func TestPathToTargetVersionExecutable(t *testing.T) {
 func TestMostRecentVersion(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO")
+	// Create update directories
+	testBaseDir := t.TempDir()
+
+	// Set up test library
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new library")
+
+	for _, binary := range binaries {
+		// First, create an old install version
+		installVersion, err := semver.NewVersion("1.0.4")
+		require.NoError(t, err, "unexpected error making semver")
+		testLibrary.cacheInstalledVersion(binary, installVersion)
+
+		// Now, create a version in the update library
+		firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
+		firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+		copyBinary(t, firstVersionPath)
+		require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+		// Create an even newer version in the update library
+		secondVersionTarget := fmt.Sprintf("%s-2.5.3.tar.gz", binary)
+		secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
+		copyBinary(t, secondVersionPath)
+		require.NoError(t, os.Chmod(secondVersionPath, 0755))
+
+		pathToVersion, err := testLibrary.MostRecentVersion(binary)
+		require.NoError(t, err, "did not expect error getting most recent version")
+		require.Equal(t, secondVersionPath, pathToVersion)
+	}
+}
+
+func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
+	t.Parallel()
+
+	// Create update directories
+	testBaseDir := t.TempDir()
+
+	// Set up test library
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new library")
+
+	for _, binary := range binaries {
+		// First, create an old install version
+		installVersion, err := semver.NewVersion("1.0.4")
+		require.NoError(t, err, "unexpected error making semver")
+		testLibrary.cacheInstalledVersion(binary, installVersion)
+
+		// Now, create a version in the update library
+		firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
+		firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+		copyBinary(t, firstVersionPath)
+		require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+		// Create an even newer, but also corrupt, version in the update library
+		secondVersionTarget := fmt.Sprintf("%s-2.1.12.tar.gz", binary)
+		secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
+		os.WriteFile(secondVersionPath, []byte{}, 0755)
+
+		pathToVersion, err := testLibrary.MostRecentVersion(binary)
+		require.NoError(t, err, "did not expect error getting most recent version")
+		require.Equal(t, firstVersionPath, pathToVersion)
+	}
+}
+
+func TestMostRecentVersion_InstalledVersionIsMostRecent(t *testing.T) {
+	t.Parallel()
+
+	// Create update directories
+	testBaseDir := t.TempDir()
+
+	// Set up test library
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new library")
+
+	for _, binary := range binaries {
+		// Create a version in the update library
+		firstVersionTarget := fmt.Sprintf("%s-3.1.3.tar.gz", binary)
+		firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+		copyBinary(t, firstVersionPath)
+		require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+		// Create an even newer version in the update library
+		secondVersionTarget := fmt.Sprintf("%s-3.6.3.tar.gz", binary)
+		secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
+		require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
+		copyBinary(t, secondVersionPath)
+		require.NoError(t, os.Chmod(secondVersionPath, 0755))
+
+		// Create an install version that is even newer
+		installVersion, err := semver.NewVersion("3.10.4")
+		require.NoError(t, err, "unexpected error making semver")
+		testLibrary.cacheInstalledVersion(binary, installVersion)
+
+		pathToVersion, err := testLibrary.MostRecentVersion(binary)
+		require.NoError(t, err, "did not expect error getting most recent version")
+		require.Equal(t, "", pathToVersion)
+	}
 }
 
 func TestAvailable(t *testing.T) {
@@ -659,7 +760,7 @@ func Test_cacheInstalledVersion(t *testing.T) {
 
 	// Set up test library
 	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new read-only library")
+	require.NoError(t, err, "unexpected error creating new library")
 
 	versionToCache, err := semver.NewVersion("1.2.3-45-abcdabcd")
 	require.NoError(t, err, "unexpected error parsing semver")
