@@ -10,10 +10,16 @@ type teeLogger struct {
 }
 
 func New(loggers ...log.Logger) log.Logger {
-	l := &teeLogger{
-		loggers: loggers,
-	}
 
+	l := &teeLogger{
+		loggers: make([]log.Logger, 0),
+	}
+	for _, logger := range loggers {
+		if logger == nil {
+			continue
+		}
+		l.loggers = append(l.loggers, logger)
+	}
 	return l
 }
 
