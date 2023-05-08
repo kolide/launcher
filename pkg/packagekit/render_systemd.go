@@ -3,9 +3,9 @@ package packagekit
 import (
 	"context"
 	"fmt"
-	"html/template"
 	"io"
 	"strings"
+	"text/template"
 
 	"go.opencensus.io/trace"
 )
