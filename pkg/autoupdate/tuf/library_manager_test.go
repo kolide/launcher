@@ -3,7 +3,6 @@ package tuf
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -78,7 +78,7 @@ func TestAvailable(t *testing.T) {
 	runningOsqueryVersion := "5.5.7"
 	runningTarget := fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)
 	executablePath := testLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
-	copyBinary(t, executablePath)
+	tufci.CopyBinary(t, executablePath)
 	require.NoError(t, os.Chmod(executablePath, 0755))
 
 	// Query for the current osquery version
@@ -95,7 +95,7 @@ func TestAddToLibrary(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
-	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitLocalTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
@@ -239,7 +239,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			// Ensure that a valid update already exists in that directory for the specified version
 			testVersion := "2.2.2"
 			executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testVersion), binary)
-			copyBinary(t, executablePath)
+			tufci.CopyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
@@ -264,7 +264,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
-	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitLocalTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
@@ -514,7 +514,7 @@ func TestTidyLibrary(t *testing.T) {
 						executablePath = strings.TrimSuffix(executablePath, ".exe")
 					}
 
-					copyBinary(t, executablePath)
+					tufci.CopyBinary(t, executablePath)
 
 					if isExecutable {
 						require.NoError(t, os.Chmod(executablePath, 0755))
@@ -579,7 +579,7 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		versionDir := filepath.Join(testBaseDir, "launcher", v)
 		executablePath := executableLocation(versionDir, binaryLauncher)
 		require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
-		copyBinary(t, executablePath)
+		tufci.CopyBinary(t, executablePath)
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
@@ -788,19 +788,4 @@ func Test_parseOsquerydVersion_Windows(t *testing.T) {
 	require.NoError(t, err, "should be able to parse osqueryd version without error")
 	require.NotNil(t, v, "should have been able to parse osqueryd version as semver")
 	require.Equal(t, "5.8.2", v.Original(), "osqueryd semver should match")
-}
-
-func copyBinary(t *testing.T, executablePath string) {
-	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
-
-	destFile, err := os.Create(executablePath)
-	require.NoError(t, err, "create destination file")
-	defer destFile.Close()
-
-	srcFile, err := os.Open(os.Args[0])
-	require.NoError(t, err, "opening binary to copy for test")
-	defer srcFile.Close()
-
-	_, err = io.Copy(destFile, srcFile)
-	require.NoError(t, err, "copying binary")
 }
