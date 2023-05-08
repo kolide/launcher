@@ -4,9 +4,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"html/template"
 	"io"
 	"strings"
+	"text/template"
 
 	"go.opencensus.io/trace"
 )
