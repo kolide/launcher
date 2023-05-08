@@ -78,14 +78,14 @@ func TestRings(t *testing.T) {
 			expected: [][]byte{[]byte("a"), []byte("b"), []byte("c")},
 		},
 		{
-			size:     4,
-			input:    [][]byte{[]byte("a"), []byte("b"), []byte("c")},
-			expected: [][]byte{nil, []byte("a"), []byte("b"), []byte("c")},
-		},
-		{
 			size:     2,
 			input:    [][]byte{[]byte("a"), []byte("b"), []byte("c")},
 			expected: [][]byte{[]byte("b"), []byte("c")},
+		},
+		{
+			size:     4,
+			input:    [][]byte{[]byte("a"), []byte("b")},
+			expected: [][]byte{[]byte("a"), []byte("b")},
 		},
 	}
 

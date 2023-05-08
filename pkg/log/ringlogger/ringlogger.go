@@ -61,6 +61,9 @@ func (rl *ringLogger) GetAll() ([]map[string]any, error) {
 	dec := json.NewDecoder(reader)
 
 	for i, logLineRaw := range all {
+		if logLineRaw == nil || len(logLineRaw) == 0 {
+			continue
+		}
 		var logLine map[string]any
 		reader.Reset(logLineRaw)
 		if err := dec.Decode(&logLine); err != nil {
