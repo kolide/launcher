@@ -49,7 +49,9 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 		}
 		a.Performer = openURL
 	default:
-		return fmt.Errorf("unknown action type: %s", action.Type)
+		// Silently ignore unrecognized actions because:
+		// 1. We don't have a logger reference here
+		// 2. As new actions are added, we don't want older versions of launcher to fail to unmarshal menus
 	}
 
 	return nil

@@ -456,7 +456,8 @@ func parseLauncherVersion(versionOutput []byte) (*semver.Version, error) {
 
 // parseOsquerydVersion parses the osqueryd version from the output of `osqueryd --version`.
 func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
-	versionStr := strings.TrimSpace(strings.TrimPrefix(string(versionOutput), "osqueryd version"))
+	versionTrimmed := strings.TrimPrefix(strings.TrimPrefix(string(versionOutput), "osqueryd version"), "osqueryd.exe version")
+	versionStr := strings.TrimSpace(versionTrimmed)
 	osqueryInstallVersion, err := semver.NewVersion(versionStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse osquery version `%s` as semver: %w", versionStr, err)

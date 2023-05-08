@@ -101,7 +101,6 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 }
 
 func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
-
 	extensionManagerServer, err := osquery.NewExtensionManagerServer(
 		extensionName,
 		socketPath,

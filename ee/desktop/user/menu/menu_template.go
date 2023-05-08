@@ -14,6 +14,7 @@ const (
 	funcHasCapability     = "hasCapability"
 	funcRelativeTime      = "relativeTime"
 	errorlessTemplateVars = "errorlessTemplateVars" // capability to evaluate undefined template vars without failing
+	errorlessActions      = "errorlessActions"      // capability to evaluate undefined menu item actions without failing
 
 	// TemplateData keys
 	LauncherVersion    string = "LauncherVersion"
@@ -52,6 +53,8 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			case funcRelativeTime:
 				return true
 			case errorlessTemplateVars:
+				return true
+			case errorlessActions:
 				return true
 			}
 			return false

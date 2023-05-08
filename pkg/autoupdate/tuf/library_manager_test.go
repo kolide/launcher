@@ -785,6 +785,17 @@ func Test_parseOsquerydVersion(t *testing.T) {
 	require.Equal(t, "5.8.1", v.Original(), "osqueryd semver should match")
 }
 
+func Test_parseOsquerydVersion_Windows(t *testing.T) {
+	t.Parallel()
+
+	osquerydVersionOutput := `osqueryd.exe version 5.8.2`
+
+	v, err := parseOsquerydVersion([]byte(osquerydVersionOutput))
+	require.NoError(t, err, "should be able to parse osqueryd version without error")
+	require.NotNil(t, v, "should have been able to parse osqueryd version as semver")
+	require.Equal(t, "5.8.2", v.Original(), "osqueryd semver should match")
+}
+
 func copyBinary(t *testing.T, executablePath string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
 
