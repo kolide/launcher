@@ -54,8 +54,7 @@ func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channe
 	return &l, nil
 }
 
-// CheckOutLatest returns the path to the latest downloaded executable for our binary. If the
-// installation is the most recent version, then we return an empty string.
+// CheckOutLatest returns the path to the latest downloaded executable for our binary.
 func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary) (string, error) {
 	releaseVersion, err := l.findExecutableFromRelease(binary)
 	if err == nil {

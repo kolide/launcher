@@ -165,9 +165,24 @@ func TestMostRecentVersion_InstalledVersionIsMostRecent(t *testing.T) {
 		require.NoError(t, err, "unexpected error making semver")
 		testLibrary.cacheInstalledVersion(binary, installVersion)
 
+		// Create fake executable in current working directory to stand in for installed path
+		executablePath, err := os.Executable()
+		require.NoError(t, err)
+		testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+		require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+		t.Cleanup(func() {
+			os.Remove(testExecutablePath)
+		})
+
 		pathToVersion, err := testLibrary.MostRecentVersion(binary)
 		require.NoError(t, err, "did not expect error getting most recent version")
-		require.Equal(t, "", pathToVersion)
+
+		// We don't do an exact comparison with `testExecutablePath` because running tests locally
+		// will pick up real install locations first. Instead, confirm the path isn't empty and that
+		// it's not either of the update paths.
+		require.NotEqual(t, "", pathToVersion)
+		require.NotEqual(t, firstVersionPath, pathToVersion)
+		require.NotEqual(t, secondVersionPath, pathToVersion)
 	}
 }
 

@@ -76,7 +76,7 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 }
 
 // MostRecentVersion returns the path to the most recent, valid version available in the library for the
-// given binary. If the installed version is the most recent version, it returns an empty string.
+// given binary.
 func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, error) {
 	// Get installed version
 	installedVersion, installedVersionPath, err := ulm.installedVersion(binary)
@@ -102,7 +102,7 @@ func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (
 		return "", fmt.Errorf("could not parse most recent version %s in library for %s: %w", mostRecentVersionInLibraryRaw, binary, err)
 	}
 	if installedVersion.GreaterThan(mostRecentVersionInLibrary) {
-		return "", nil
+		return installedVersionPath, nil
 	}
 
 	// The update library version is more recent than the installed version, so return its location
