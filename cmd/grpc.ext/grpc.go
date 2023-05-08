@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -105,6 +106,8 @@ func main() {
 	if err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("starting grpc extension: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
+
+	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	// create an extension server
 	server, err := osquery.NewExtensionManagerServer(

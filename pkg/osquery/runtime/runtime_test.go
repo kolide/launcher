@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
@@ -45,6 +46,8 @@ func TestMain(m *testing.M) {
 	}
 
 	testOsqueryBinaryDirectory = filepath.Join(binDirectory, "osqueryd")
+
+	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
 		fmt.Printf("Failed to download osquery: %v\n", err)
