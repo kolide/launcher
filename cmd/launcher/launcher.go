@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
@@ -56,6 +57,8 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
 	// If delay_start is configured, wait before running launcher.

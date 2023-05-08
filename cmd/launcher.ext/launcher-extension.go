@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
@@ -34,6 +35,8 @@ func main() {
 
 	// allow for osqueryd to create the socket path
 	time.Sleep(2 * time.Second)
+
+	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	// create an extension server
 	server, err := osquery.NewExtensionManagerServer(
