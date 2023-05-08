@@ -65,7 +65,7 @@ func TestExecute(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
-	tufServerUrl, rootJson := tufci.InitLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)

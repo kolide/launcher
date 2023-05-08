@@ -17,9 +17,9 @@ import (
 	"github.com/theupdateframework/go-tuf"
 )
 
-// InitLocalTufServer sets up a local TUF repo with some targets to serve metadata about; returns the URL
+// InitRemoteTufServer sets up a local TUF repo with some targets to serve metadata about; returns the URL
 // of a test HTTP server to serve that metadata and the root JSON needed to initialize a client.
-func InitLocalTufServer(t *testing.T, testReleaseVersion string) (tufServerURL string, rootJson []byte) {
+func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL string, rootJson []byte) {
 	tufDir := t.TempDir()
 
 	// Initialize repo with store

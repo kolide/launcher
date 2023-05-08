@@ -95,7 +95,7 @@ func TestAddToLibrary(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
-	tufServerUrl, rootJson := tufci.InitLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
@@ -264,7 +264,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
-	tufServerUrl, rootJson := tufci.InitLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
