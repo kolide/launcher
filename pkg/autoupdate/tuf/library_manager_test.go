@@ -16,6 +16,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -217,7 +218,7 @@ func TestAddToLibrary(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
-	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
@@ -361,7 +362,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			// Ensure that a valid update already exists in that directory for the specified version
 			testVersion := "2.2.2"
 			executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testVersion), binary)
-			copyBinary(t, executablePath)
+			tufci.CopyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
@@ -386,7 +387,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	// binary. It's unnecessary work since the mirror serves the same data both times.
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
-	tufServerUrl, rootJson := initLocalTufServer(t, testReleaseVersion)
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
@@ -636,7 +637,7 @@ func TestTidyLibrary(t *testing.T) {
 						executablePath = strings.TrimSuffix(executablePath, ".exe")
 					}
 
-					copyBinary(t, executablePath)
+					tufci.CopyBinary(t, executablePath)
 
 					if isExecutable {
 						require.NoError(t, os.Chmod(executablePath, 0755))
