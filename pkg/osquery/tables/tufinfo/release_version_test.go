@@ -25,11 +25,10 @@ func TestTufReleaseVersionTable(t *testing.T) {
 	expectedResults := make(map[string]string, 0)
 
 	testRootDir := t.TempDir()
-	for _, binary := range []string{"launcher", "osqueryd"} {
-		testTarget := fmt.Sprintf("%s-%s.tar.gz", binary, randomSemver())
-		expectedResults[binary] = fmt.Sprintf("%s/%s/%s", binary, runtime.GOOS, testTarget)
-		tufci.SeedLocalTufRepo(t, testTarget, "nightly", binary, testRootDir)
-	}
+	v := randomSemver()
+	expectedResults["launcher"] = fmt.Sprintf("launcher/%s/launcher-%s.tar.gz", runtime.GOOS, v)
+	expectedResults["osqueryd"] = fmt.Sprintf("osqueryd/%s/osqueryd-%s.tar.gz", runtime.GOOS, v)
+	tufci.SeedLocalTufRepo(t, v, testRootDir)
 
 	mockFlags := mocks.NewFlags(t)
 	mockFlags.On("RootDirectory").Return(testRootDir)
