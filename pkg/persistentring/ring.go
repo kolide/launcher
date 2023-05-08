@@ -3,7 +3,7 @@
 // it is most suitable for mid-sized things, perhaps thousands. It should be bechmarked if size or rate gets too high.
 //
 // It is implemented as a map, and not a linked list, because it makes the underlying implementation simpler. And since
-// we don't insert at arbitary places, there is little value in a linked list.
+// we don't insert at arbitrary places, there is little value in a linked list.
 //
 // Encoding and Decoding are the responsibility of the caller. Creating a generic `any` implementation turns to
 // be non-performant because libraries like `gob` need a new decoder per type, which is better handled in the
@@ -85,8 +85,9 @@ func (r *persistentRing) GetAll() ([][]byte, error) {
 	defer r.lock.RUnlock()
 
 	// If we took a callback, we could avoid this allocation.
-	results := make([][]byte, r.size)
+	results := make([][]byte, 0, r.size)
 
+	stillSeeking := true
 	for i := uint16(0); i < r.size; i++ {
 		// Start at the pointer _after_ next, so we get oldest first
 		pos := (r.next + 1 + i) % r.size
@@ -96,7 +97,22 @@ func (r *persistentRing) GetAll() ([][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("getting value from key %s: %w", string(ptr), err)
 		}
-		results[i] = val
+
+		// Handling partially filled rings is a hassle.
+		// ptr points to the _next_ space, which is the oldest, but it can be nil for too many reasons
+		if val == nil {
+			if stillSeeking {
+				continue
+			}
+
+			// If we have some data, then we're not stillSeeking, and we're just done
+			break
+		}
+
+		// If we have data, we can stop seeking
+		stillSeeking = true
+
+		results = append(results, val)
 	}
 
 	return results, nil

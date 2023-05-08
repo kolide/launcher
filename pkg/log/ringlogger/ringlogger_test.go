@@ -10,6 +10,8 @@ import (
 )
 
 func TestRingLogger(t *testing.T) {
+	t.Parallel()
+
 	ringSize := uint16(10)
 
 	s, err := storageci.NewStore(nil, log.NewNopLogger(), "persistenring-test")
