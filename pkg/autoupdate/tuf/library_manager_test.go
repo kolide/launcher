@@ -332,42 +332,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	}
 }
 
-func Test_tidyStagedUpdates(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			testBaseDir := t.TempDir()
-
-			// Initialize the library manager
-			testLibraryManager, err := newUpdateLibraryManager("", http.DefaultClient, testBaseDir, log.NewNopLogger())
-			require.NoError(t, err, "unexpected error creating new update library manager")
-
-			// Make a file in the staged updates directory
-			f1, err := os.Create(filepath.Join(testLibraryManager.stagingDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
-			require.NoError(t, err, "creating fake download file")
-			f1.Close()
-
-			// Confirm we made the files
-			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-			require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-			require.Equal(t, 1, len(matches))
-
-			// Tidy up staged updates and confirm they're removed after
-			testLibraryManager.tidyStagedUpdates(binary)
-			_, err = os.Stat(testLibraryManager.stagingDir)
-			require.NoError(t, err, "could not stat staged download dir")
-			matchesAfter, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-			require.NoError(t, err, "could not glob for files in staged download dir")
-			require.Equal(t, 0, len(matchesAfter))
-		})
-	}
-}
-
-func Test_tidyUpdateLibrary(t *testing.T) {
+func TestTidyLibrary(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -530,6 +495,16 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 					lock:       newLibraryLock(),
 				}
 
+				// Make a file in the staged updates directory
+				f1, err := os.Create(filepath.Join(testLibraryManager.stagingDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
+				require.NoError(t, err, "creating fake download file")
+				f1.Close()
+
+				// Confirm we made the files
+				matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+				require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
+				require.Equal(t, 1, len(matches))
+
 				// Set up existing versions for test
 				for existingVersion, isExecutable := range tt.existingVersions {
 					executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), existingVersion), binary)
@@ -547,7 +522,14 @@ func Test_tidyUpdateLibrary(t *testing.T) {
 				}
 
 				// Tidy the library
-				testLibraryManager.tidyUpdateLibrary(binary, tt.currentlyRunningVersion)
+				testLibraryManager.TidyLibrary(binary, tt.currentlyRunningVersion)
+
+				// Confirm the staging directory was tidied up
+				_, err = os.Stat(testLibraryManager.stagingDir)
+				require.NoError(t, err, "could not stat staged download dir")
+				matchesAfter, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+				require.NoError(t, err, "could not glob for files in staged download dir")
+				require.Equal(t, 0, len(matchesAfter))
 
 				// Confirm that the versions we expect are still there
 				for _, expectedPreservedVersion := range tt.expectedPreservedVersions {
