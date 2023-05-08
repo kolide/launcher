@@ -75,6 +75,41 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 	return filepath.Join(ulm.baseDir, string(binary))
 }
 
+// MostRecentVersion returns the path to the most recent, valid version available in the library for the
+// given binary. If the installed version is the most recent version, it returns an empty string.
+func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, error) {
+	// Get installed version
+	installedVersion, installedVersionPath, err := ulm.installedVersion(binary)
+	if err != nil {
+		return "", fmt.Errorf("could not determine current running version of %s: %w", binary, err)
+	}
+
+	// Pull all available versions from library
+	validVersionsInLibrary, _, err := ulm.sortedVersionsInLibrary(binary)
+	if err != nil {
+		return "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
+	}
+
+	// If we don't have any updates in the library, return the installed version
+	if len(validVersionsInLibrary) < 1 {
+		return installedVersionPath, nil
+	}
+
+	// Compare most recent version in library with the installed version
+	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
+	mostRecentVersionInLibrary, err := semver.NewVersion(mostRecentVersionInLibraryRaw)
+	if err != nil {
+		return "", fmt.Errorf("could not parse most recent version %s in library for %s: %w", mostRecentVersionInLibraryRaw, binary, err)
+	}
+	if installedVersion.GreaterThan(mostRecentVersionInLibrary) {
+		return "", nil
+	}
+
+	// The update library version is more recent than the installed version, so return its location
+	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibraryRaw)
+	return executableLocation(versionDir, binary), nil
+}
+
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	executablePath := ulm.PathToTargetVersionExecutable(binary, targetFilename)

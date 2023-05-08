@@ -64,6 +64,12 @@ func TestPathToTargetVersionExecutable(t *testing.T) {
 	require.Equal(t, expectedPath, actualPath, "path mismatch")
 }
 
+func TestMostRecentVersion(t *testing.T) {
+	t.Parallel()
+
+	t.Skip("TODO")
+}
+
 func TestAvailable(t *testing.T) {
 	t.Parallel()
 
