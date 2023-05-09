@@ -259,8 +259,9 @@ build-docker: sha = $(shell git describe --always --abbrev=12)
 build-docker:
 	docker build -t launcher-build --build-arg gitver=$(sha) .
 
+build-dockerfake: version = $(shell git describe --always --tags --abbrev=12)
 build-dockerfake:
-	docker build -t launcher-fakedata-build --build-arg gitver=v0.11.21 --build-arg FAKE=-fakedata .
+	docker build -t launcher-fakedata-build --build-arg gitver=$(version) --build-arg FAKE=-fakedata .
 
 dockerfake-%:  build-dockerfake
 	@echo '#### Starting to build target: $@'

@@ -5,7 +5,7 @@
 # Note that multistage builds can leverage the tag applied (at build
 # time) to this container
 
-FROM golang:1.15 AS golauncherbuild
+FROM golang:1.20 AS golauncherbuild
 LABEL maintainer="engineering@kolide.co"
 
 # fake data or not?
