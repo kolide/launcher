@@ -191,6 +191,9 @@ func TestAddToLibrary_alreadyInstalled(t *testing.T) {
 			executablePath, err := os.Executable()
 			require.NoError(t, err)
 			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+			if runtime.GOOS == "windows" {
+				testExecutablePath += ".exe"
+			}
 			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
 			t.Cleanup(func() {
 				os.Remove(testExecutablePath)
@@ -667,6 +670,9 @@ func Test_installedVersion_cached(t *testing.T) {
 			executablePath, err := os.Executable()
 			require.NoError(t, err)
 			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+			if runtime.GOOS == "windows" {
+				testExecutablePath += ".exe"
+			}
 			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
 			t.Cleanup(func() {
 				os.Remove(testExecutablePath)
