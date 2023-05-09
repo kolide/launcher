@@ -607,6 +607,40 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	require.Equal(t, newerValidVersion, validVersions[2], "not sorted")
 }
 
+func Test_findInstallLocation(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Create update directories
+			testBaseDir := t.TempDir()
+
+			// Set up test library
+			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new read-only library")
+
+			// Create fake executable in current working directory
+			executablePath, err := os.Executable()
+			require.NoError(t, err)
+			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+			if runtime.GOOS == "windows" {
+				testExecutablePath += ".exe"
+			}
+			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+			t.Cleanup(func() {
+				os.Remove(testExecutablePath)
+			})
+
+			actualPath := testLibrary.findInstallLocation(binary)
+			require.NoError(t, err, "could not get installed version")
+			require.NotEqual(t, "", actualPath)
+		})
+	}
+}
+
 func Test_installedVersion_cached(t *testing.T) {
 	t.Parallel()
 
