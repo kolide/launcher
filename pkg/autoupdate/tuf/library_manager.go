@@ -431,7 +431,7 @@ func (ulm *updateLibraryManager) findInstallLocation(binary autoupdatableBinary)
 
 	// We want to check the current executable path last, since that may pick up updates instead
 	if currentExecutablePath, err := os.Executable(); err == nil {
-		likelyPaths = append(likelyPaths, filepath.Join(filepath.Dir(currentExecutablePath), string(binary)))
+		likelyPaths = append(likelyPaths, filepath.Join(filepath.Dir(currentExecutablePath), binaryName))
 	}
 
 	for _, potentialPath := range likelyPaths {
