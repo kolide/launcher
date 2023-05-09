@@ -81,6 +81,15 @@ func TestMostRecentVersion(t *testing.T) {
 		require.NoError(t, err, "unexpected error making semver")
 		testLibrary.cacheInstalledVersion(binary, installVersion)
 
+		// Create fake executable in current working directory to stand in for installed path
+		executablePath, err := os.Executable()
+		require.NoError(t, err)
+		testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+		require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+		t.Cleanup(func() {
+			os.Remove(testExecutablePath)
+		})
+
 		// Now, create a version in the update library
 		firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
 		firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
@@ -116,6 +125,15 @@ func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 		installVersion, err := semver.NewVersion("1.0.4")
 		require.NoError(t, err, "unexpected error making semver")
 		testLibrary.cacheInstalledVersion(binary, installVersion)
+
+		// Create fake executable in current working directory to stand in for installed path
+		executablePath, err := os.Executable()
+		require.NoError(t, err)
+		testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
+		require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
+		t.Cleanup(func() {
+			os.Remove(testExecutablePath)
+		})
 
 		// Now, create a version in the update library
 		firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
