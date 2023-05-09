@@ -334,7 +334,7 @@ func (ulm *updateLibraryManager) IsInstallVersion(binary autoupdatableBinary, ta
 
 // installedVersion returns the version of, and the path to, the originally-installed binary.
 func (ulm *updateLibraryManager) installedVersion(binary autoupdatableBinary) (*semver.Version, string, error) {
-	pathToBinary := findInstallLocation(binary)
+	pathToBinary := ulm.findInstallLocation(binary)
 	if pathToBinary == "" {
 		return nil, "", fmt.Errorf("could not find install location for `%s`", binary)
 	}
@@ -367,6 +367,65 @@ func (ulm *updateLibraryManager) installedVersion(binary autoupdatableBinary) (*
 	ulm.cacheInstalledVersion(binary, v)
 
 	return v, pathToBinary, nil
+}
+
+// findInstallLocation attempts to find the install location for the given binary, looking
+// in well-known locations.
+func (ulm *updateLibraryManager) findInstallLocation(binary autoupdatableBinary) string {
+	binaryName := string(binary)
+	if runtime.GOOS == "windows" {
+		binaryName = binaryName + ".exe"
+	}
+
+	// Places that we expect to see binaries installed
+	var likelyPaths []string
+
+	if binary == binaryOsqueryd {
+		likelyPaths = append(likelyPaths, executableLocation(`C:\Program Files\osquery`, binary))
+	}
+
+	likelyPaths = append(
+		likelyPaths,
+		executableLocation("/usr/local/kolide", binary),
+		executableLocation("/usr/local/kolide/bin", binary),
+		executableLocation("/usr/local/kolide-k2", binary),
+		executableLocation("/usr/local/kolide-k2/bin", binary),
+		executableLocation("/usr/local/bin", binary),
+		executableLocation(`C:\Program Files\Kolide\Launcher-kolide-k2\bin`, binary),
+	)
+
+	// We want to check the current executable path last, since that may pick up updates instead
+	if currentExecutablePath, err := os.Executable(); err == nil {
+		likelyPaths = append(likelyPaths, filepath.Join(filepath.Dir(currentExecutablePath), string(binary)))
+	}
+
+	for _, potentialPath := range likelyPaths {
+		potentialPath = filepath.Clean(potentialPath)
+
+		info, err := os.Stat(potentialPath)
+		if err != nil {
+			continue
+		}
+
+		if info.IsDir() {
+			continue
+		}
+
+		return potentialPath
+	}
+
+	// If we haven't found it anywhere else, look for it on the PATH
+	if potentialPath, err := exec.LookPath(binaryName); err == nil {
+		return potentialPath
+	}
+
+	level.Debug(ulm.logger).Log(
+		"msg", "could not find install location in any well-known paths",
+		"binary", binaryName,
+		"likely_paths", fmt.Sprintf("%+v", likelyPaths),
+	)
+
+	return ""
 }
 
 // getCachedInstalledVersion reads the install version from a cached file in the updates directory.
@@ -429,57 +488,4 @@ func parseOsquerydVersion(versionOutput []byte) (*semver.Version, error) {
 	}
 
 	return osqueryInstallVersion, nil
-}
-
-// findInstallLocation attempts to find the install location for the given binary, looking
-// in well-known locations.
-func findInstallLocation(binary autoupdatableBinary) string {
-	binaryName := string(binary)
-	if runtime.GOOS == "windows" {
-		binaryName = binaryName + ".exe"
-	}
-
-	// Places that we expect to see binaries installed
-	var likelyPaths []string
-
-	if binary == binaryOsqueryd {
-		likelyPaths = append(likelyPaths, executableLocation(`C:\Program Files\osquery`, binary))
-	}
-
-	likelyPaths = append(
-		likelyPaths,
-		executableLocation("/usr/local/kolide", binary),
-		executableLocation("/usr/local/kolide/bin", binary),
-		executableLocation("/usr/local/kolide-k2", binary),
-		executableLocation("/usr/local/kolide-k2/bin", binary),
-		executableLocation("/usr/local/bin", binary),
-		executableLocation(`C:\Program Files\Kolide\Launcher-kolide-k2\bin`, binary),
-	)
-
-	// We want to check the current executable path last, since that may pick up updates instead
-	if currentExecutablePath, err := os.Executable(); err == nil {
-		likelyPaths = append(likelyPaths, filepath.Join(filepath.Dir(currentExecutablePath), string(binary)))
-	}
-
-	for _, potentialPath := range likelyPaths {
-		potentialPath = filepath.Clean(potentialPath)
-
-		info, err := os.Stat(potentialPath)
-		if err != nil {
-			continue
-		}
-
-		if info.IsDir() {
-			continue
-		}
-
-		return potentialPath
-	}
-
-	// If we haven't found it anywhere else, look for it on the PATH
-	if potentialPath, err := exec.LookPath(binaryName); err == nil {
-		return potentialPath
-	}
-
-	return ""
 }
