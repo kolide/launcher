@@ -134,6 +134,27 @@ func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 	}
 }
 
+func TestMostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Create update directories
+			testBaseDir := t.TempDir()
+
+			// Set up test library
+			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+			require.NoError(t, err, "unexpected error creating new library")
+
+			_, err = testLibrary.MostRecentVersion(binary)
+			require.Error(t, err, "should have returned error when there are no available updates")
+		})
+	}
+}
+
 func TestAvailable(t *testing.T) {
 	t.Parallel()
 
