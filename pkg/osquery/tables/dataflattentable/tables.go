@@ -19,6 +19,7 @@ type DataSourceType int
 const (
 	PlistType DataSourceType = iota + 1
 	JsonType
+	JsonlType
 	ExecType
 	XmlType
 	IniType
@@ -46,6 +47,7 @@ func AllTablePlugins(client *osquery.ExtensionManagerClient, logger log.Logger) 
 		TablePlugin(client, logger, XmlType),
 		TablePlugin(client, logger, IniType),
 		TablePlugin(client, logger, PlistType),
+		TablePlugin(client, logger, JsonlType),
 	}
 }
 
@@ -65,6 +67,9 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger, data
 	case JsonType:
 		t.flattenFileFunc = dataflatten.JsonFile
 		t.tableName = "kolide_json"
+	case JsonlType:
+		t.flattenFileFunc = dataflatten.JsonlFile
+		t.tableName = "kolide_jsonl"
 	case XmlType:
 		t.flattenFileFunc = dataflatten.XmlFile
 		t.tableName = "kolide_xml"
