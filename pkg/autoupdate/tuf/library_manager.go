@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -22,8 +21,6 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
-
-var launcherVersionRegex = regexp.MustCompile(`launcher - version (\d+\.\d+\.\d+(?:-.+)?)\n`)
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
 // It downloads and verifies new updates, and moves them to the appropriate
