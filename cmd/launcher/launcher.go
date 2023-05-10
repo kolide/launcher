@@ -89,8 +89,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
+	var err error
 	if rootDirectory == "" {
-		rootDirectory, err := agent.MkdirTemp(defaultRootDirectory)
+		rootDirectory, err = agent.MkdirTemp(defaultRootDirectory)
 		if err != nil {
 			return fmt.Errorf("creating temporary root directory: %w", err)
 		}

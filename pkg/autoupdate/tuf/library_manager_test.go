@@ -3,7 +3,6 @@ package tuf
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
@@ -80,35 +78,18 @@ func TestMostRecentVersion(t *testing.T) {
 			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new library")
 
-			// First, create an old install version
-			installVersion, err := semver.NewVersion("1.0.4")
-			require.NoError(t, err, "unexpected error making semver")
-			testLibrary.cacheInstalledVersion(binary, installVersion)
-
-			// Create fake executable in current working directory to stand in for installed path
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			if runtime.GOOS == "windows" {
-				testExecutablePath += ".exe"
-			}
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
 			// Now, create a version in the update library
 			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
 			firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
-			copyBinary(t, firstVersionPath)
+			tufci.CopyBinary(t, firstVersionPath)
 			require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
 			// Create an even newer version in the update library
 			secondVersionTarget := fmt.Sprintf("%s-2.5.3.tar.gz", binary)
 			secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
-			copyBinary(t, secondVersionPath)
+			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
 			pathToVersion, err := testLibrary.MostRecentVersion(binary)
@@ -133,28 +114,11 @@ func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new library")
 
-			// First, create an old install version
-			installVersion, err := semver.NewVersion("1.0.4")
-			require.NoError(t, err, "unexpected error making semver")
-			testLibrary.cacheInstalledVersion(binary, installVersion)
-
-			// Create fake executable in current working directory to stand in for installed path
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			if runtime.GOOS == "windows" {
-				testExecutablePath += ".exe"
-			}
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
 			// Now, create a version in the update library
 			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
 			firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
-			copyBinary(t, firstVersionPath)
+			tufci.CopyBinary(t, firstVersionPath)
 			require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
 			// Create an even newer, but also corrupt, version in the update library
@@ -166,65 +130,6 @@ func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			pathToVersion, err := testLibrary.MostRecentVersion(binary)
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, pathToVersion)
-		})
-	}
-}
-
-func TestMostRecentVersion_InstalledVersionIsMostRecent(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			// Create update directories
-			testBaseDir := t.TempDir()
-
-			// Set up test library
-			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-			require.NoError(t, err, "unexpected error creating new library")
-
-			// Create a version in the update library
-			firstVersionTarget := fmt.Sprintf("%s-3.1.3.tar.gz", binary)
-			firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
-			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
-			copyBinary(t, firstVersionPath)
-			require.NoError(t, os.Chmod(firstVersionPath, 0755))
-
-			// Create an even newer version in the update library
-			secondVersionTarget := fmt.Sprintf("%s-3.6.3.tar.gz", binary)
-			secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
-			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
-			copyBinary(t, secondVersionPath)
-			require.NoError(t, os.Chmod(secondVersionPath, 0755))
-
-			// Create an install version that is even newer
-			installVersion, err := semver.NewVersion("3.10.4")
-			require.NoError(t, err, "unexpected error making semver")
-			testLibrary.cacheInstalledVersion(binary, installVersion)
-
-			// Create fake executable in current working directory to stand in for installed path
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			if runtime.GOOS == "windows" {
-				testExecutablePath += ".exe"
-			}
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
-			pathToVersion, err := testLibrary.MostRecentVersion(binary)
-			require.NoError(t, err, "did not expect error getting most recent version")
-
-			// We don't do an exact comparison with `testExecutablePath` because running tests locally
-			// will pick up real install locations first. Instead, confirm the path isn't empty and that
-			// it's not either of the update paths.
-			require.NotEqual(t, "", pathToVersion)
-			require.NotEqual(t, firstVersionPath, pathToVersion)
-			require.NotEqual(t, secondVersionPath, pathToVersion)
 		})
 	}
 }
@@ -243,7 +148,7 @@ func TestAvailable(t *testing.T) {
 	runningOsqueryVersion := "5.5.7"
 	runningTarget := fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)
 	executablePath := testLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
-	copyBinary(t, executablePath)
+	tufci.CopyBinary(t, executablePath)
 	require.NoError(t, os.Chmod(executablePath, 0755))
 
 	// Query for the current osquery version
@@ -324,54 +229,6 @@ func TestAddToLibrary(t *testing.T) {
 			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 			require.NoError(t, err, "checking that staging dir was cleaned")
 			require.Equal(t, 0, len(matches), "unexpected files found in staged updates directory: %+v", matches)
-		})
-	}
-}
-
-func TestAddToLibrary_alreadyInstalled(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			testBaseDir := t.TempDir()
-			testMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
-			}))
-			defer testMirror.Close()
-			testLibraryManager, err := newUpdateLibraryManager(testMirror.URL, http.DefaultClient, testBaseDir, log.NewNopLogger())
-			require.NoError(t, err, "initializing test library manager")
-
-			// Make sure our update directories exist so we can verify they're empty later
-			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
-
-			// Create cached installed version file
-			testVersion := "0.12.1-abcdabcd"
-			require.NoError(t, os.WriteFile(filepath.Join(testBaseDir, fmt.Sprintf("%s-installed-version", binary)), []byte(testVersion), 0755))
-
-			// Create fake executable in current working directory
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
-			// Ask the library manager to perform the download
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, fmt.Sprintf("%s-%s.tar.gz", binary, testVersion), data.TargetFileMeta{}), "expected no error on adding already-installed version to library")
-
-			// Confirm that there is nothing in the updates directory (no update performed)
-			updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory(binary), "*"))
-			require.NoError(t, err, "error globbing for matches")
-			require.Equal(t, 0, len(updateMatches), "expected no directories in updates directory but found: %+v", updateMatches)
-
-			// Confirm that there is nothing in the staged updates directory (no update attempted)
-			stagedUpdateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-			require.NoError(t, err, "error globbing for matches")
-			require.Equal(t, 0, len(stagedUpdateMatches), "expected no directories in staged updates directory but found: %+v", stagedUpdateMatches)
 		})
 	}
 }
@@ -736,15 +593,16 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		[]byte("not an executable"),
 		0755))
 
-	// Create two valid updates in the library
+	// Create a few valid updates in the library
 	olderValidVersion := "0.13.5"
-	middleValidVersion := "1.0.5-11-abcdabcd"
+	middleValidVersion := "1.0.7-11-abcdabcd"
+	secondMiddleValidVersion := "1.0.7-16-g6e6704e1dc33"
 	newerValidVersion := "1.0.7"
-	for _, v := range []string{olderValidVersion, middleValidVersion, newerValidVersion} {
+	for _, v := range []string{olderValidVersion, middleValidVersion, secondMiddleValidVersion, newerValidVersion} {
 		versionDir := filepath.Join(testBaseDir, "launcher", v)
 		executablePath := executableLocation(versionDir, binaryLauncher)
 		require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
-		copyBinary(t, executablePath)
+		tufci.CopyBinary(t, executablePath)
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
@@ -765,116 +623,11 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	require.Contains(t, invalidVersions, corruptedVersion)
 
 	// Confirm valid versions are the ones we expect and that they're sorted in ascending order
-	require.Equal(t, 3, len(validVersions))
+	require.Equal(t, 4, len(validVersions))
 	require.Equal(t, olderValidVersion, validVersions[0], "not sorted")
 	require.Equal(t, middleValidVersion, validVersions[1], "not sorted")
-	require.Equal(t, newerValidVersion, validVersions[2], "not sorted")
-}
-
-func Test_findInstallLocation(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			// Create update directories
-			testBaseDir := t.TempDir()
-
-			// Set up test library
-			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-			require.NoError(t, err, "unexpected error creating new read-only library")
-
-			// Create fake executable in current working directory
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			if runtime.GOOS == "windows" {
-				testExecutablePath += ".exe"
-			}
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
-			actualPath := testLibrary.findInstallLocation(binary)
-			require.NoError(t, err, "could not get installed version")
-			require.NotEqual(t, "", actualPath)
-		})
-	}
-}
-
-func Test_installedVersion_cached(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			// Create update directories
-			testBaseDir := t.TempDir()
-
-			// Set up test library
-			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-			require.NoError(t, err, "unexpected error creating new read-only library")
-
-			// Create cached version file
-			expectedVersion := "5.5.5"
-			require.NoError(t, os.WriteFile(
-				filepath.Join(testLibrary.baseDir, fmt.Sprintf("%s-installed-version", binary)),
-				[]byte(expectedVersion),
-				0755))
-
-			// Create fake executable in current working directory
-			executablePath, err := os.Executable()
-			require.NoError(t, err)
-			testExecutablePath := filepath.Join(filepath.Dir(executablePath), string(binary))
-			require.NoError(t, os.WriteFile(testExecutablePath, []byte("test"), 0755))
-			t.Cleanup(func() {
-				os.Remove(testExecutablePath)
-			})
-
-			actualVersion, actualPath, err := testLibrary.installedVersion(binary)
-			require.NoError(t, err, "could not get installed version")
-			require.NotNil(t, actualVersion)
-			require.NotEqual(t, "", actualPath)
-		})
-	}
-}
-
-func Test_cacheInstalledVersion(t *testing.T) {
-	t.Parallel()
-
-	// Create update directories
-	testBaseDir := t.TempDir()
-
-	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new library")
-
-	versionToCache, err := semver.NewVersion("1.2.3-45-abcdabcd")
-	require.NoError(t, err, "unexpected error parsing semver")
-
-	for _, binary := range binaries {
-		// Confirm cache file doesn't exist yet
-		expectedCacheFileLocation := testLibrary.cachedInstalledVersionLocation(binary)
-		_, err = os.Stat(expectedCacheFileLocation)
-		require.True(t, os.IsNotExist(err), "cache file exists but should not have been created yet")
-
-		// Cache it
-		testLibrary.cacheInstalledVersion(binary, versionToCache)
-
-		// Confirm cache file exists
-		_, err = os.Stat(expectedCacheFileLocation)
-		require.NoError(t, err, "cache file %s does not exist but should have been created", expectedCacheFileLocation)
-
-		// Compare versions
-		cachedVersion, err := testLibrary.getCachedInstalledVersion(binary)
-		require.NoError(t, err, "expected no error reading cached installed version")
-		require.True(t, versionToCache.Equal(cachedVersion), "versions do not match")
-	}
+	require.Equal(t, secondMiddleValidVersion, validVersions[2], "not sorted")
+	require.Equal(t, newerValidVersion, validVersions[3], "not sorted")
 }
 
 func Test_versionFromTarget(t *testing.T) {
@@ -927,79 +680,4 @@ func Test_versionFromTarget(t *testing.T) {
 	for _, testVersion := range testVersions {
 		require.Equal(t, testVersion.version, versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
 	}
-}
-
-func Test_parseLauncherVersion(t *testing.T) {
-	t.Parallel()
-
-	launcherVersionOutputDev := `launcher - version 1.0.7-45-g2abfc88-dirty
-	branch: 	becca/tuf-find-new-v2
-	revision: 	2abfc8883b96460603b49bc6f5cc44d5756890cf
-	build date: 	2023-05-04
-	build user: 	System Administrator (root)
-	go version: 	go1.19.5`
-	devVersion, err := parseLauncherVersion([]byte(launcherVersionOutputDev))
-	require.NoError(t, err, "should be able to parse launcher dev version without error")
-	require.NotNil(t, devVersion, "should have been able to parse launcher dev version as semver")
-	require.Equal(t, "1.0.7-45-g2abfc88-dirty", devVersion.Original(), "dev semver should match")
-
-	launcherVersionOutputNightly := `{"caller":"main.go:30","msg":"Launcher starting up","revision":"3e305bdb54c301759b62e9038faaa2cfea8abad1","severity":"info","ts":"2023-05-04T17:00:34.564523Z","version":"0.13.5-11-g3e305bd"}
-	launcher - version 0.13.5-11-g3e305bd
-	  branch: 	main
-	  revision: 	3e305bdb54c301759b62e9038faaa2cfea8abad1
-	  build date: 	2023-02-14
-	  build user: 	runner (runner)
-	  go version: 	go1.19.4`
-	nightlyVersion, err := parseLauncherVersion([]byte(launcherVersionOutputNightly))
-	require.NoError(t, err, "should be able to parse launcher nightly version without error")
-	require.NotNil(t, nightlyVersion, "should have been able to parse launcher nightly version as semver")
-	require.Equal(t, "0.13.5-11-g3e305bd", nightlyVersion.Original(), "nightly semver should match")
-
-	launcherVersionOutputStable := `launcher - version 1.0.3
-	  branch: 	main
-	  revision: 	3e305bdb54c301759b62e9038faaa2cfea8abad1
-	  build date: 	2023-02-14
-	  build user: 	runner (runner)
-	  go version: 	go1.19.4`
-	stableVersion, err := parseLauncherVersion([]byte(launcherVersionOutputStable))
-	require.NoError(t, err, "should be able to parse launcher stable version without error")
-	require.NotNil(t, stableVersion, "should have been able to parse launcher stable version as semver")
-	require.Equal(t, "1.0.3", stableVersion.Original(), "stable semver should match")
-}
-
-func Test_parseOsquerydVersion(t *testing.T) {
-	t.Parallel()
-
-	osquerydVersionOutput := `osqueryd version 5.8.1`
-
-	v, err := parseOsquerydVersion([]byte(osquerydVersionOutput))
-	require.NoError(t, err, "should be able to parse osqueryd version without error")
-	require.NotNil(t, v, "should have been able to parse osqueryd version as semver")
-	require.Equal(t, "5.8.1", v.Original(), "osqueryd semver should match")
-}
-
-func Test_parseOsquerydVersion_Windows(t *testing.T) {
-	t.Parallel()
-
-	osquerydVersionOutput := `osqueryd.exe version 5.8.2`
-
-	v, err := parseOsquerydVersion([]byte(osquerydVersionOutput))
-	require.NoError(t, err, "should be able to parse osqueryd version without error")
-	require.NotNil(t, v, "should have been able to parse osqueryd version as semver")
-	require.Equal(t, "5.8.2", v.Original(), "osqueryd semver should match")
-}
-
-func copyBinary(t *testing.T, executablePath string) {
-	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
-
-	destFile, err := os.Create(executablePath)
-	require.NoError(t, err, "create destination file")
-	defer destFile.Close()
-
-	srcFile, err := os.Open(os.Args[0])
-	require.NoError(t, err, "opening binary to copy for test")
-	defer srcFile.Close()
-
-	_, err = io.Copy(destFile, srcFile)
-	require.NoError(t, err, "copying binary")
 }

@@ -11,7 +11,6 @@ import (
 
 // Read-only library
 type readOnlyUpdateLibrary interface {
-	IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool
 	MostRecentVersion(binary autoupdatableBinary) (string, error)
 	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string
 	Available(binary autoupdatableBinary, targetFilename string) bool
@@ -84,10 +83,6 @@ func (l *libraryLookup) findExecutableFromRelease(binary autoupdatableBinary) (s
 	targetName, _, err := findRelease(binary, targets, l.channel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
-	}
-
-	if l.library.IsInstallVersion(binary, targetName) {
-		return "", nil
 	}
 
 	if !l.library.Available(binary, targetName) {

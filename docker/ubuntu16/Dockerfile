@@ -1,7 +1,7 @@
 ARG FAKE
 FROM launcher${FAKE}-build as stage1
 
-FROM ubuntu:16.04
+FROM --platform=linux/amd64 ubuntu:16.04
 LABEL maintainer="engineering@kolide.co"
 
 COPY --from=stage1 /usr/local/kolide/bin/* /usr/local/kolide/bin/
