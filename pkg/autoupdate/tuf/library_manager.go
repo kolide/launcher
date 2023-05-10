@@ -106,10 +106,14 @@ func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdata
 
 // AddToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
+
+	if currentVersion == versionFromTarget(binary, targetFilename) {
+		return nil
+	}
 
 	if ulm.Available(binary, targetFilename) {
 		return nil
