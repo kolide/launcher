@@ -1,7 +1,6 @@
 package dataflatten
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +12,8 @@ func JsonlFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Jsonl(bufio.NewReader(f), opts...)
+	defer f.Close()
+	return Jsonl(f, opts...)
 }
 
 func Jsonl(r io.Reader, opts ...FlattenOpts) ([]Row, error) {
