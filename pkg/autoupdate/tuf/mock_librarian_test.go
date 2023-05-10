@@ -40,20 +40,6 @@ func (_m *Mocklibrarian) Available(binary autoupdatableBinary, targetFilename st
 	return r0
 }
 
-// IsInstallVersion provides a mock function with given fields: binary, targetFilename
-func (_m *Mocklibrarian) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
-	ret := _m.Called(binary, targetFilename)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) bool); ok {
-		r0 = rf(binary, targetFilename)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // TidyLibrary provides a mock function with given fields: binary, currentVersion
 func (_m *Mocklibrarian) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
 	_m.Called(binary, currentVersion)

@@ -48,7 +48,6 @@ type ReleaseFileCustomMetadata struct {
 }
 
 type librarian interface {
-	IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
@@ -310,10 +309,6 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 	release, releaseMetadata, err := ta.findRelease(binary, targets)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
-	}
-
-	if ta.libraryManager.IsInstallVersion(binary, release) {
-		return "", nil
 	}
 
 	if ta.libraryManager.Available(binary, release) {
