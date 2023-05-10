@@ -58,14 +58,15 @@ type querier interface {
 }
 
 type TufAutoupdater struct {
-	metadataClient *client.Client
-	libraryManager librarian
-	osquerier      querier // used to query for current running osquery version
-	channel        string
-	checkInterval  time.Duration
-	store          types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	interrupt      chan struct{}
-	logger         log.Logger
+	metadataClient         *client.Client
+	libraryManager         librarian
+	osquerier              querier // used to query for current running osquery version
+	osquerierRetryInterval time.Duration
+	channel                string
+	checkInterval          time.Duration
+	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	interrupt              chan struct{}
+	logger                 log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -79,12 +80,13 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		channel:       k.UpdateChannel(),
-		interrupt:     make(chan struct{}),
-		checkInterval: k.AutoupdateInterval(),
-		store:         k.AutoupdateErrorsStore(),
-		osquerier:     osquerier,
-		logger:        log.NewNopLogger(),
+		channel:                k.UpdateChannel(),
+		interrupt:              make(chan struct{}),
+		checkInterval:          k.AutoupdateInterval(),
+		store:                  k.AutoupdateErrorsStore(),
+		osquerier:              osquerier,
+		osquerierRetryInterval: 1 * time.Minute,
+		logger:                 log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -188,24 +190,7 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 func (ta *TufAutoupdater) tidyLibrary() {
 	for _, binary := range binaries {
 		// Get the current running version to preserve it when tidying the available updates
-		var currentVersion string
-		var err error
-		switch binary {
-		case binaryOsqueryd:
-			// The osqueryd client may not have initialized yet, so retry the version
-			// check a couple times before giving up
-			osquerydVersionCheckRetries := 5
-			for i := 0; i < osquerydVersionCheckRetries; i += 1 {
-				currentVersion, err = ta.currentRunningVersion(binary)
-				if err == nil {
-					break
-				}
-				time.Sleep(1 * time.Minute)
-			}
-		default:
-			currentVersion, err = ta.currentRunningVersion(binary)
-		}
-
+		currentVersion, err := ta.currentRunningVersion(binary)
 		if err != nil {
 			level.Debug(ta.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
 			continue
@@ -216,6 +201,7 @@ func (ta *TufAutoupdater) tidyLibrary() {
 }
 
 // currentRunningVersion returns the current running version of the given binary.
+// It will perform retries for osqueryd.
 func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (string, error) {
 	switch binary {
 	case binaryLauncher:
@@ -225,19 +211,23 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
-		resp, err := ta.osquerier.Query("SELECT version FROM osquery_info;")
-		if err != nil {
-			return "", fmt.Errorf("could not query for osquery version: %w", err)
-		}
-		if len(resp) < 1 {
-			return "", errors.New("osquery version query returned no rows")
-		}
-		osquerydVersion, ok := resp[0]["version"]
-		if !ok {
-			return "", errors.New("osquery version query did not return version")
-		}
+		// The osqueryd client may not have initialized yet, so retry the version
+		// check a couple times before giving up
+		osquerydVersionCheckRetries := 5
+		var err error
+		for i := 0; i < osquerydVersionCheckRetries; i += 1 {
+			var resp []map[string]string
+			resp, err = ta.osquerier.Query("SELECT version FROM osquery_info;")
+			if err == nil && len(resp) > 0 {
+				if osquerydVersion, ok := resp[0]["version"]; ok {
+					return osquerydVersion, nil
+				}
+			}
+			err = fmt.Errorf("error querying for osquery_info: %w; rows returned: %d", err, len(resp))
 
-		return osquerydVersion, nil
+			time.Sleep(ta.osquerierRetryInterval)
+		}
+		return "", err
 	default:
 		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}

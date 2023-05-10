@@ -178,12 +178,13 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		logger:    log.NewNopLogger(),
-		osquerier: mockQuerier,
+		logger:                 log.NewNopLogger(),
+		osquerier:              mockQuerier,
+		osquerierRetryInterval: 1 * time.Millisecond,
 	}
 
-	// Expect to return an error
-	mockQuerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error")).Once()
+	// Expect to return an error (five times, since we perform retries)
+	mockQuerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error"))
 
 	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
