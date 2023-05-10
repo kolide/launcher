@@ -12,16 +12,12 @@ library.
 flowchart TB
     A[Library lookup] --> B{Do we have a local TUF repo?}
     B ---->|No| C[Get most recent version from update library]
-    C --> D{Install version greater than\nmost recent version in library?}
-    D -->|No| I[Return path to most recent version of executable]
-    I --> J[End]
-    D -->|Yes| H[Return path to installed executable]
-    H --> J
+    C --> D[Return path to most recent version of executable]
+    D --> H[End]
     B -->|Yes| E{release.json target metadata exists?}
-    E --> |Yes| F{Target indicated by channel's release.json\nis install version?}
-    F --> |Yes| H
-    F --> |No| K{Target indicated by channel's release.json\nis downloaded to update library?}
-    K --> |Yes| G[Return path to selected executable in update library]
-    K --> |No| C
-    G --> J
+    E -->|No| C
+    E --> |Yes| F{Target indicated by release.json\nis downloaded to update library?}
+    F --> |Yes| G[Return path to selected executable in update library]
+    F --> |No| C
+    G --> H
 ```
