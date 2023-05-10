@@ -59,8 +59,9 @@ func TestPathToTargetVersionExecutable(t *testing.T) {
 		expectedPath = expectedPath + ".exe"
 	}
 
-	actualPath := testLibrary.PathToTargetVersionExecutable(binaryLauncher, testTargetFilename)
+	actualPath, actualVersion := testLibrary.PathToTargetVersionExecutable(binaryLauncher, testTargetFilename)
 	require.Equal(t, expectedPath, actualPath, "path mismatch")
+	require.Equal(t, testVersion, actualVersion, "version mismatch")
 }
 
 func TestMostRecentVersion(t *testing.T) {
@@ -80,21 +81,22 @@ func TestMostRecentVersion(t *testing.T) {
 
 			// Now, create a version in the update library
 			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
-			firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
+			firstVersionPath, _ := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
 			tufci.CopyBinary(t, firstVersionPath)
 			require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
 			// Create an even newer version in the update library
 			secondVersionTarget := fmt.Sprintf("%s-2.5.3.tar.gz", binary)
-			secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
+			secondVersionPath, secondVersion := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
-			pathToVersion, err := testLibrary.MostRecentVersion(binary)
+			pathToVersion, v, err := testLibrary.MostRecentVersion(binary)
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, secondVersionPath, pathToVersion)
+			require.Equal(t, secondVersion, v)
 		})
 	}
 }
@@ -116,20 +118,21 @@ func TestMostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 
 			// Now, create a version in the update library
 			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
-			firstVersionPath := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
+			firstVersionPath, firstVersion := testLibrary.PathToTargetVersionExecutable(binary, firstVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
 			tufci.CopyBinary(t, firstVersionPath)
 			require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
 			// Create an even newer, but also corrupt, version in the update library
 			secondVersionTarget := fmt.Sprintf("%s-2.1.12.tar.gz", binary)
-			secondVersionPath := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
+			secondVersionPath, _ := testLibrary.PathToTargetVersionExecutable(binary, secondVersionTarget)
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			os.WriteFile(secondVersionPath, []byte{}, 0755)
 
-			pathToVersion, err := testLibrary.MostRecentVersion(binary)
+			pathToVersion, v, err := testLibrary.MostRecentVersion(binary)
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, pathToVersion)
+			require.Equal(t, firstVersion, v)
 		})
 	}
 }
@@ -149,7 +152,7 @@ func TestMostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 			testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new library")
 
-			_, err = testLibrary.MostRecentVersion(binary)
+			_, _, err = testLibrary.MostRecentVersion(binary)
 			require.Error(t, err, "should have returned error when there are no available updates")
 		})
 	}
@@ -168,7 +171,7 @@ func TestAvailable(t *testing.T) {
 	// Set up valid "osquery" executable
 	runningOsqueryVersion := "5.5.7"
 	runningTarget := fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)
-	executablePath := testLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
+	executablePath, _ := testLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
 	tufci.CopyBinary(t, executablePath)
 	require.NoError(t, os.Chmod(executablePath, 0755))
 

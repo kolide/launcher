@@ -11,8 +11,8 @@ import (
 
 // Read-only library
 type readOnlyUpdateLibrary interface {
-	MostRecentVersion(binary autoupdatableBinary) (string, error)
-	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string
+	MostRecentVersion(binary autoupdatableBinary) (string, string, error)
+	PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) (string, string)
 	Available(binary autoupdatableBinary, targetFilename string) bool
 }
 
@@ -53,11 +53,12 @@ func NewUpdateLibraryLookup(rootDirectory string, updateDirectory string, channe
 	return &l, nil
 }
 
-// CheckOutLatest returns the path to the latest downloaded executable for our binary.
-func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary) (string, error) {
-	releaseVersion, err := l.findExecutableFromRelease(binary)
+// CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
+// as its version.
+func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary) (string, string, error) {
+	releasePath, releaseVersion, err := l.findExecutableFromRelease(binary)
 	if err == nil {
-		return releaseVersion, nil
+		return releasePath, releaseVersion, nil
 	}
 
 	// If we can't find the specific release version that we should be on, then just return the executable
@@ -66,28 +67,29 @@ func (l *libraryLookup) CheckOutLatest(binary autoupdatableBinary) (string, erro
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
-// given channel. If it's already downloaded, then we return its path.
-func (l *libraryLookup) findExecutableFromRelease(binary autoupdatableBinary) (string, error) {
+// given channel. If it's already downloaded, then we return its path and version.
+func (l *libraryLookup) findExecutableFromRelease(binary autoupdatableBinary) (string, string, error) {
 	// If we couldn't initialize the metadata client on library lookup creation, then we
 	// can't parse our TUF repository now.
 	if l.metadataClient == nil {
-		return "", errors.New("no TUF client initialized, cannot find release")
+		return "", "", errors.New("no TUF client initialized, cannot find release")
 	}
 
 	// From already-downloaded metadata, look for the release version
 	targets, err := l.metadataClient.Targets()
 	if err != nil {
-		return "", fmt.Errorf("could not get target: %w", err)
+		return "", "", fmt.Errorf("could not get target: %w", err)
 	}
 
 	targetName, _, err := findRelease(binary, targets, l.channel)
 	if err != nil {
-		return "", fmt.Errorf("could not find release: %w", err)
+		return "", "", fmt.Errorf("could not find release: %w", err)
 	}
 
 	if !l.library.Available(binary, targetName) {
-		return "", fmt.Errorf("release target %s for binary %s not yet available in library", targetName, binary)
+		return "", "", fmt.Errorf("release target %s for binary %s not yet available in library", targetName, binary)
 	}
 
-	return l.library.PathToTargetVersionExecutable(binary, targetName), nil
+	targetPath, targetVersion := l.library.PathToTargetVersionExecutable(binary, targetName)
+	return targetPath, targetVersion, nil
 }

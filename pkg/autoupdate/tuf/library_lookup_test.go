@@ -69,13 +69,15 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	// Expect that we find the given release and see if it's available in the library
 	mockROLibrary.On("Available", binaryLauncher, expectedTargetName).Return(true)
 	expectedPath := "some/path/to/the/expected/target"
-	mockROLibrary.On("PathToTargetVersionExecutable", binaryLauncher, expectedTargetName).Return(expectedPath)
+	expectedVersion := "3.4.5"
+	mockROLibrary.On("PathToTargetVersionExecutable", binaryLauncher, expectedTargetName).Return(expectedPath, expectedVersion)
 
 	// Check it
-	latestPath, err := testLibLookup.CheckOutLatest(binaryLauncher)
+	latestPath, latestVersion, err := testLibLookup.CheckOutLatest(binaryLauncher)
 	require.NoError(t, err, "unexpected error on checking out latest")
 	mockROLibrary.AssertExpectations(t)
 	require.Equal(t, expectedPath, latestPath)
+	require.Equal(t, expectedVersion, latestVersion)
 }
 
 func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
@@ -96,11 +98,13 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 
 	// Expect that we fall back to picking the most recent update
 	expectedPath := "a/path/to/the/update"
-	mockROLibrary.On("MostRecentVersion", binaryLauncher).Return(expectedPath, nil)
+	expectedVersion := "1.2.3-4-abcdabcdabcd"
+	mockROLibrary.On("MostRecentVersion", binaryLauncher).Return(expectedPath, expectedVersion, nil)
 
 	// Check it
-	latestPath, err := testLibLookup.CheckOutLatest(binaryLauncher)
+	latestPath, latestVersion, err := testLibLookup.CheckOutLatest(binaryLauncher)
 	require.NoError(t, err, "unexpected error on checking out latest")
 	mockROLibrary.AssertExpectations(t)
 	require.Equal(t, expectedPath, latestPath)
+	require.Equal(t, expectedVersion, latestVersion)
 }

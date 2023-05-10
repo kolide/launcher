@@ -23,27 +23,14 @@ func (_m *MockreadOnlyUpdateLibrary) Available(binary autoupdatableBinary, targe
 	return r0
 }
 
-// IsInstallVersion provides a mock function with given fields: binary, targetFilename
-func (_m *MockreadOnlyUpdateLibrary) IsInstallVersion(binary autoupdatableBinary, targetFilename string) bool {
-	ret := _m.Called(binary, targetFilename)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) bool); ok {
-		r0 = rf(binary, targetFilename)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // MostRecentVersion provides a mock function with given fields: binary
-func (_m *MockreadOnlyUpdateLibrary) MostRecentVersion(binary autoupdatableBinary) (string, error) {
+func (_m *MockreadOnlyUpdateLibrary) MostRecentVersion(binary autoupdatableBinary) (string, string, error) {
 	ret := _m.Called(binary)
 
 	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary) (string, error)); ok {
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary) (string, string, error)); ok {
 		return rf(binary)
 	}
 	if rf, ok := ret.Get(0).(func(autoupdatableBinary) string); ok {
@@ -52,27 +39,43 @@ func (_m *MockreadOnlyUpdateLibrary) MostRecentVersion(binary autoupdatableBinar
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(autoupdatableBinary) error); ok {
+	if rf, ok := ret.Get(1).(func(autoupdatableBinary) string); ok {
 		r1 = rf(binary)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(string)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(autoupdatableBinary) error); ok {
+		r2 = rf(binary)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // PathToTargetVersionExecutable provides a mock function with given fields: binary, targetFilename
-func (_m *MockreadOnlyUpdateLibrary) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
+func (_m *MockreadOnlyUpdateLibrary) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) (string, string) {
 	ret := _m.Called(binary, targetFilename)
 
 	var r0 string
+	var r1 string
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) (string, string)); ok {
+		return rf(binary, targetFilename)
+	}
 	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) string); ok {
 		r0 = rf(binary, targetFilename)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(autoupdatableBinary, string) string); ok {
+		r1 = rf(binary, targetFilename)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	return r0, r1
 }
 
 type mockConstructorTestingTNewMockreadOnlyUpdateLibrary interface {

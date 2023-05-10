@@ -73,35 +73,37 @@ func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) st
 }
 
 // MostRecentVersion returns the path to the most recent, valid version available in the library for the
-// given binary.
-func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, error) {
+// given binary, along with its version.
+func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, string, error) {
 	// Pull all available versions from library
 	validVersionsInLibrary, _, err := ulm.sortedVersionsInLibrary(binary)
 	if err != nil {
-		return "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
+		return "", "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
 
 	// No valid versions in the library
 	if len(validVersionsInLibrary) < 1 {
-		return "", errors.New("no versions in library")
+		return "", "", errors.New("no versions in library")
 	}
 
 	// The update library version is more recent than the installed version, so return its location
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
 	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibraryRaw)
-	return executableLocation(versionDir, binary), nil
+	return executableLocation(versionDir, binary), mostRecentVersionInLibraryRaw, nil
 }
 
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
-	executablePath := ulm.PathToTargetVersionExecutable(binary, targetFilename)
+	executablePath, _ := ulm.PathToTargetVersionExecutable(binary, targetFilename)
 	return autoupdate.CheckExecutable(context.TODO(), executablePath, "--version") == nil
 }
 
-// PathToTargetVersionExecutable returns the path to the executable for the desired version.
-func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) string {
-	versionDir := filepath.Join(ulm.updatesDirectory(binary), versionFromTarget(binary, targetFilename))
-	return executableLocation(versionDir, binary)
+// PathToTargetVersionExecutable returns the path to the executable for the desired target,
+// along with its version.
+func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) (string, string) {
+	targetVersion := versionFromTarget(binary, targetFilename)
+	versionDir := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
+	return executableLocation(versionDir, binary), targetVersion
 }
 
 // AddToLibrary adds the given target file to the library for the given binary,
