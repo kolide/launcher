@@ -140,7 +140,7 @@ func TestAddToLibrary(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					require.NoError(t, testLibraryManager.AddToLibrary(tt.binary, tt.targetFile, tt.targetMeta), "expected no error adding to library")
+					require.NoError(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected no error adding to library")
 				}()
 			}
 
@@ -158,6 +158,46 @@ func TestAddToLibrary(t *testing.T) {
 			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
 			require.NoError(t, err, "checking that staging dir was cleaned")
 			require.Equal(t, 0, len(matches), "unexpected files found in staged updates directory: %+v", matches)
+		})
+	}
+}
+
+func TestAddToLibrary_alreadyRunning(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			testBaseDir := t.TempDir()
+			testMirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
+			}))
+			defer testMirror.Close()
+			testLibraryManager := &updateLibraryManager{
+				mirrorUrl:    testMirror.URL,
+				mirrorClient: http.DefaultClient,
+				logger:       log.NewNopLogger(),
+				baseDir:      testBaseDir,
+				stagingDir:   t.TempDir(),
+				lock:         newLibraryLock(),
+			}
+
+			// Make sure our update directory exists
+			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
+
+			// Set the current running version to the version we're going to request to download
+			currentRunningVersion := "4.3.2"
+
+			// Ask the library manager to perform the download
+			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, currentRunningVersion)
+			require.Equal(t, currentRunningVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, currentRunningVersion, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+
+			// Confirm the requested version was not downloaded
+			_, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(binary), currentRunningVersion))
+			require.True(t, os.IsNotExist(err), "should not have downloaded currently-running version")
 		})
 	}
 }
@@ -199,7 +239,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
 			require.Equal(t, testVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, "", targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version is still there
 			_, err = os.Stat(executablePath)
@@ -268,7 +308,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download
-			require.Error(t, testLibraryManager.AddToLibrary(tt.binary, tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
+			require.Error(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
 
 			// Confirm the update was removed after download
 			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))

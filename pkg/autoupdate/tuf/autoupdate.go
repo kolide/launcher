@@ -49,7 +49,7 @@ type ReleaseFileCustomMetadata struct {
 
 type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
-	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
+	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
 }
 
@@ -305,7 +305,13 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", nil
 	}
 
-	if err := ta.libraryManager.AddToLibrary(binary, release, releaseMetadata); err != nil {
+	// Get the current running version if available -- don't error out if we can't
+	// get it, since the worst case is that we download an update whose version matches
+	// our install version.
+	var currentVersion string
+	currentVersion, _ = ta.currentRunningVersion(binary)
+
+	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
 		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}
 

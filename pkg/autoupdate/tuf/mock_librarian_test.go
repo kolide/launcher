@@ -12,13 +12,13 @@ type Mocklibrarian struct {
 	mock.Mock
 }
 
-// AddToLibrary provides a mock function with given fields: binary, targetFilename, targetMetadata
-func (_m *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error {
-	ret := _m.Called(binary, targetFilename, targetMetadata)
+// AddToLibrary provides a mock function with given fields: binary, currentVersion, targetFilename, targetMetadata
+func (_m *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+	ret := _m.Called(binary, currentVersion, targetFilename, targetMetadata)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string, data.TargetFileMeta) error); ok {
-		r0 = rf(binary, targetFilename, targetMetadata)
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string, string, data.TargetFileMeta) error); ok {
+		r0 = rf(binary, currentVersion, targetFilename, targetMetadata)
 	} else {
 		r0 = ret.Error(0)
 	}

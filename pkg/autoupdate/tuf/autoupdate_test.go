@@ -105,14 +105,16 @@ func TestExecute(t *testing.T) {
 	// Expect that we attempt to tidy the library first before running execute loop
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
+	currentLauncherVersion := "" // cannot determine using version package in test
+	currentOsqueryVersion := "1.1.1"
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
 	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
-	mockLibraryManager.On("AddToLibrary", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
