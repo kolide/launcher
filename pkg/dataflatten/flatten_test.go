@@ -472,7 +472,7 @@ func TestFlatten(t *testing.T) {
 	}
 }
 
-func TestFlattenJsonl(t *testing.T) {
+func TestFlattenJsonlErrors(t *testing.T) {
 	t.Parallel()
 
 	var tests = []flattenTestCase{
@@ -481,11 +481,17 @@ func TestFlattenJsonl(t *testing.T) {
 			err: true,
 		},
 		{
+			// this test case was left over from attempting to parse json that
+			// is contained within a file that is not stricly jsonl
+			// it should error, maybe look at this again in the future?
 			comment: "valid json inline text",
 			in:      `valid json is hidden["a"]in me`,
 			err:     true,
 		},
 		{
+			// this test case was left over from attempting to parse json that
+			// is contained within a file that is not stricly jsonl
+			// it should error, maybe look at this again in the future?
 			comment: "valid json sandwich",
 			in: `
 			there is some json under me
