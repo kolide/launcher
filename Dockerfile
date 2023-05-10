@@ -5,7 +5,7 @@
 # Note that multistage builds can leverage the tag applied (at build
 # time) to this container
 
-FROM golang:1.15 AS golauncherbuild
+FROM --platform=linux/amd64 golang:1.20 AS golauncherbuild
 LABEL maintainer="engineering@kolide.co"
 
 # fake data or not?
@@ -31,7 +31,7 @@ RUN cd launcher && git checkout "${gitver}"
 # Build!
 RUN cd launcher && make deps
 RUN cd launcher && make all
-RUN cd launcher && GO111MODULE=on go run cmd/make/make.go -targets=launcher -linkstamp $FAKE
+RUN cd launcher && GO111MODULE=on go run cmd/make/make.go -targets=launcher -linkstamp $FAKE -arch amd64
 
 # Install
 RUN mkdir -p /usr/local/kolide/bin/
