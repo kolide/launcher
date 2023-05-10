@@ -301,15 +301,18 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
-	if ta.libraryManager.Available(binary, release) {
-		return "", nil
-	}
-
 	// Get the current running version if available -- don't error out if we can't
 	// get it, since the worst case is that we download an update whose version matches
 	// our install version.
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
+	if currentVersion == versionFromTarget(binary, release) {
+		return "", nil
+	}
+
+	if ta.libraryManager.Available(binary, release) {
+		return "", nil
+	}
 
 	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
 		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
