@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -256,7 +257,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, data.TargetFileMeta, error) {
 	// First, find the target that the channel release file is pointing to
 	var releaseTarget string
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
+	targetReleaseFile := path.Join(string(binary), runtime.GOOS, runtime.GOARCH, ta.channel, "release.json")
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue

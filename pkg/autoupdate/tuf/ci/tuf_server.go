@@ -52,7 +52,7 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 			// and evaluated.
 			if v == testReleaseVersion {
 				// Create test binary and copy it to the staged targets directory
-				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS)
+				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, runtime.GOARCH)
 				executablePath := executableLocation(stagedTargetsDir, b)
 				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
 				CopyBinary(t, executablePath)
@@ -62,13 +62,13 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
 			} else {
 				// Create and commit a test binary
-				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS), 0777), "could not make staging directory")
-				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, binaryFileName), []byte("I am a test target"), 0777)
+				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, runtime.GOARCH), 0777), "could not make staging directory")
+				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, runtime.GOARCH, binaryFileName), []byte("I am a test target"), 0777)
 				require.NoError(t, err, "could not write test target binary to temp dir")
 			}
 
 			// Add the target
-			require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s", b, runtime.GOOS, binaryFileName), nil), "could not add test target binary to tuf")
+			require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s/%s", b, runtime.GOOS, runtime.GOARCH, binaryFileName), nil), "could not add test target binary to tuf")
 
 			// Commit
 			require.NoError(t, repo.Snapshot(), "could not take snapshot")
@@ -81,11 +81,11 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 
 			// If this is our release version, also create and commit a test release file
 			for _, c := range []string{"stable", "beta", "nightly"} {
-				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c), 0777), "could not make staging directory")
-				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, c, "release.json"), []byte("{}"), 0777)
+				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, runtime.GOARCH, c), 0777), "could not make staging directory")
+				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, runtime.GOARCH, c, "release.json"), []byte("{}"), 0777)
 				require.NoError(t, err, "could not write test target release file to temp dir")
-				customMetadata := fmt.Sprintf("{\"target\":\"%s/%s/%s\"}", b, runtime.GOOS, binaryFileName)
-				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s/release.json", b, runtime.GOOS, c), []byte(customMetadata)), "could not add test target release file to tuf")
+				customMetadata := fmt.Sprintf("{\"target\":\"%s/%s/%s/%s\"}", b, runtime.GOOS, runtime.GOARCH, binaryFileName)
+				require.NoError(t, repo.AddTarget(fmt.Sprintf("%s/%s/%s/%s/release.json", b, runtime.GOOS, runtime.GOARCH, c), []byte(customMetadata)), "could not add test target release file to tuf")
 
 				// Commit
 				require.NoError(t, repo.Snapshot(), "could not take snapshot")
@@ -106,10 +106,10 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 	require.FileExists(t, filepath.Join(tufDir, "repository", "snapshot.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "timestamp.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets.json"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, "stable", "release.json"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, "stable", "release.json"))
-	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, runtime.GOARCH, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, runtime.GOARCH, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, runtime.GOARCH, "stable", "release.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "osqueryd", runtime.GOOS, runtime.GOARCH, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)))
 
 	// Set up a test server to serve these files
 	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

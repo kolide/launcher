@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -144,7 +145,8 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
 
 	// Request download from mirror
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
+	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, runtime.GOARCH, targetFilename)
+	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + downloadPath)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
