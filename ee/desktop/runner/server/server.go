@@ -39,7 +39,7 @@ type controlRequestIntervalOverrider interface {
 func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating net listener: %w", err)
 	}
 
 	rs := &RunnerServer{
