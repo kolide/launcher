@@ -153,7 +153,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 
 	rs, err := runnerserver.New(runner.logger, k)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating desktop runner server: %w", err)
 	}
 
 	runner.runnerServer = rs
