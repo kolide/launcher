@@ -586,10 +586,10 @@ func TestTidyLibrary(t *testing.T) {
 				require.NoError(t, err, "creating fake download file")
 				f1.Close()
 
-				// Confirm we made the files
-				matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-				require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-				require.Equal(t, 1, len(matches))
+				// Confirm we made the staging files
+				stagingMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+				require.NoError(t, err, "could not glob for files in staged download dir")
+				require.Equal(t, 1, len(stagingMatches))
 
 				// Set up existing versions for test
 				for existingVersion, isExecutable := range tt.existingVersions {
@@ -606,6 +606,11 @@ func TestTidyLibrary(t *testing.T) {
 						require.NoError(t, os.Chmod(executablePath, 0755))
 					}
 				}
+
+				// Confirm we made the update files
+				updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory(binary), "*"))
+				require.NoError(t, err, "could not glob for directories in updates dir")
+				require.Equal(t, len(tt.existingVersions), len(updateMatches))
 
 				// Tidy the library
 				testLibraryManager.TidyLibrary(binary, tt.currentlyRunningVersion)
