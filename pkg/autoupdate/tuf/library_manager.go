@@ -86,7 +86,7 @@ func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (
 		return "", "", errors.New("no versions in library")
 	}
 
-	// The update library version is more recent than the installed version, so return its location
+	// Versions are sorted in ascending order -- return the last one
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
 	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibraryRaw)
 	return executableLocation(versionDir, binary), mostRecentVersionInLibraryRaw, nil
