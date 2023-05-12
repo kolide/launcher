@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -21,6 +22,7 @@ func TufReleaseVersionTable(flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("binary"),
 		table.TextColumn("operating_system"),
+		table.TextColumn("architecture"),
 		table.TextColumn("channel"),
 		table.TextColumn("target"),
 	}
@@ -57,7 +59,7 @@ func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 				}
 
 				parts := strings.Split(targetFileName, "/")
-				if len(parts) != 4 {
+				if len(parts) != 5 {
 					// Shouldn't happen given the check above, but just in case
 					continue
 				}
@@ -70,7 +72,8 @@ func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 				results = append(results, map[string]string{
 					"binary":           binary,
 					"operating_system": parts[1],
-					"channel":          parts[2],
+					"architecture":     parts[2],
+					"channel":          parts[3],
 					"target":           metadata.Target,
 				})
 			}
@@ -83,9 +86,15 @@ func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 func expectedReleaseTargets(binary string) map[string]bool {
 	targets := make(map[string]bool, 0)
 	for _, operatingSystem := range []string{"darwin", "windows", "linux"} {
-		for _, channel := range []string{"stable", "beta", "nightly"} {
-			targets[fmt.Sprintf("%s/%s/%s/release.json", binary, operatingSystem, channel)] = true
+		for _, arch := range []string{"universal", "arm64", "amd64"} {
+			if operatingSystem != "darwin" && arch == "universal" {
+				continue
+			}
+			for _, channel := range []string{"stable", "beta", "alpha", "nightly"} {
+				targets[path.Join(binary, operatingSystem, arch, channel, "release.json")] = true
+			}
 		}
+
 	}
 
 	return targets

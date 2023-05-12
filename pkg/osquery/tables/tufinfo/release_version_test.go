@@ -26,8 +26,8 @@ func TestTufReleaseVersionTable(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	v := randomSemver()
-	expectedResults["launcher"] = fmt.Sprintf("launcher/%s/launcher-%s.tar.gz", runtime.GOOS, v)
-	expectedResults["osqueryd"] = fmt.Sprintf("osqueryd/%s/osqueryd-%s.tar.gz", runtime.GOOS, v)
+	expectedResults["launcher"] = fmt.Sprintf("launcher/%s/%s/launcher-%s.tar.gz", runtime.GOOS, runtime.GOARCH, v)
+	expectedResults["osqueryd"] = fmt.Sprintf("osqueryd/%s/%s/osqueryd-%s.tar.gz", runtime.GOOS, runtime.GOARCH, v)
 	tufci.SeedLocalTufRepo(t, v, testRootDir)
 
 	mockFlags := mocks.NewFlags(t)
