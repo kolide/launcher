@@ -8,7 +8,11 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/checkpoint"
 
 	"github.com/fatih/color"
 	"golang.org/x/exp/slices"
@@ -101,6 +105,21 @@ func runDoctor(args []string) error {
 		{
 			name: "Check communication with Kolide",
 			check: func() (string, error) {
+				logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
+				// opts := &launcher.Options{}
+
+				// fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+				// flagController := flags.NewFlagController(logger, nil, fcOpts...)
+
+				mockFlags := mocks.NewFlags(t)
+				if !tt.portDefined {
+					mockFlags.On("InsecureTransportTLS").Return(tt.insecureTransport)
+				}
+
+				k := knapsack.New(nil, flagController, nil)
+				// logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
+				checkpointer := checkpoint.New(logger, k)
+
 				return "Successfully communicated with Kolide", nil
 			},
 		},
