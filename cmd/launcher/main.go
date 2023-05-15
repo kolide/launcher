@@ -121,6 +121,8 @@ func runSubcommands() error {
 		run = runSocket
 	case "query":
 		run = runQuery
+	case "doctor":
+		run = runDoctor
 	case "flare":
 		run = runFlare
 	case "svc":
