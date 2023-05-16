@@ -98,14 +98,19 @@ func (c *checkPointer) logCheckPoint() {
 	c.logOsqueryInfo()
 	c.logDbSize()
 	c.logKolideServerVersion()
-	c.logConnections()
-	c.logIpLookups()
+	c.logger.Log("connections", c.Connections())
+	c.logger.Log("ip look ups", c.IpLookups())
 	c.logNotaryVersions()
 	c.logServerProvidedData()
 }
 
 func (c *checkPointer) logDbSize() {
-	boltStats, err := agent.GetStats(c.knapsack.BboltDB())
+	db := c.knapsack.BboltDB()
+	if db == nil {
+		return
+	}
+
+	boltStats, err := agent.GetStats(db)
 	if err != nil {
 		c.logger.Log("bbolt db size", err.Error())
 	} else {
@@ -143,14 +148,14 @@ func (c *checkPointer) logNotaryVersions() {
 	}
 }
 
-func (c *checkPointer) logConnections() {
+func (c *checkPointer) Connections() map[string]string {
 	dialer := &net.Dialer{Timeout: requestTimeout}
-	c.logger.Log("connections", testConnections(dialer, urlsToTest(c.knapsack)...))
+	return testConnections(dialer, urlsToTest(c.knapsack)...)
 }
 
-func (c *checkPointer) logIpLookups() {
+func (c *checkPointer) IpLookups() map[string]interface{} {
 	ipLookuper := &net.Resolver{}
-	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...))
+	return lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...)
 }
 
 func urlsToTest(flags types.Flags) []*url.URL {

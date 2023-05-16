@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -43,6 +44,10 @@ func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ..
 // getControlServerValue looks for a control-server-provided value for the key and returns it.
 // If a control server value is not found, nil is returned.
 func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
+	if fc == nil || fc.agentFlagsStore == nil {
+		return nil
+	}
+
 	value, err := fc.agentFlagsStore.Get([]byte(key))
 	if err != nil {
 		level.Debug(fc.logger).Log("msg", "failed to get control server key", "key", key, "err", err)
@@ -54,6 +59,10 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 
 // setControlServerValue stores a control-server-provided value in the agent flags store.
 func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) error {
+	if fc == nil || fc.agentFlagsStore == nil {
+		return errors.New("agentFlagsStore is nil")
+	}
+
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {
 		level.Debug(fc.logger).Log("msg", "failed to set control server key", "key", key, "err", err)
