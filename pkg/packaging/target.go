@@ -12,6 +12,7 @@ type Target struct {
 	Init     InitFlavor
 	Package  PackageFlavor
 	Platform PlatformFlavor
+	Arch     ArchFlavor
 }
 
 type InitFlavor string
@@ -51,6 +52,20 @@ const (
 
 var knownPackageFlavors = [...]PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman}
 
+type ArchFlavor string
+
+const (
+	Arm64     ArchFlavor = "arm64"
+	Amd64     ArchFlavor = "amd64"
+	Universal ArchFlavor = "universal" // Darwin only
+)
+
+var defaultArchMap = map[PlatformFlavor]ArchFlavor{
+	Darwin:  Universal,
+	Windows: Amd64,
+	Linux:   Amd64,
+}
+
 // Parse parses a string in the form platform-init-package and sets the target accordingly.
 func (t *Target) Parse(s string) error {
 	components := strings.Split(s, "-")
@@ -68,6 +83,13 @@ func (t *Target) Parse(s string) error {
 
 	if err := t.PackageFromString(components[2]); err != nil {
 		return err
+	}
+
+	// For now, set the default arch according to the given platform
+	if defaultArch, ok := defaultArchMap[t.Platform]; ok {
+		t.Arch = defaultArch
+	} else {
+		return fmt.Errorf("cannot select default arch for unknown platform %s", t.Platform)
 	}
 
 	return nil
