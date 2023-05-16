@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/log/level"
+	"github.com/go-kit/kit/log/level"
 	agenttypes "github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/ringlogger"
@@ -83,7 +83,7 @@ func (lr *logRouter) GetRecentDebugLogs() ([]map[string]any, error) {
 func (lr *logRouter) Replay(logger log.Logger) error {
 	logs, err := lr.logRing.GetAll()
 	if err != nil {
-		return fmt.Errorf("gettings logs to replay: %w)")
+		return fmt.Errorf("gettings logs to replay: %w", err)
 	}
 	for _, l := range logs {
 		pairs := make([]any, 2*len(l))
@@ -114,19 +114,20 @@ func (lr *logRouter) AddPersistStore(store storeInt) error {
 		return fmt.Errorf("creating stored ringlogger: %w", err)
 	}
 
-	// Filter these to Info.
-	logger = level.NewFilter(logger, level.AllowInfo())
-
 	lr.persistRing = logger
+
+	// Most of this logger use is filtered.
+	filteredLogger := level.NewFilter(logger, level.AllowInfo())
 
 	// Replay logs. Note that there's a small race condition between replaying the logs, and adding the new logger.
 	// However, it does not seem worth adding a mutext, and blocking all logging on it.
-	if err := lr.Replay(logger); err != nil {
+	if err := lr.Replay(filteredLogger); err != nil {
 		return fmt.Errorf("setting up debug log: %w", err)
 	}
 
-	// Merge
-	lr.loggerTee.Add(logger)
+	// Merge (but only info and higher)
+	// Filter these to Info.
+	lr.loggerTee.Add(filteredLogger)
 
 	return nil
 }
