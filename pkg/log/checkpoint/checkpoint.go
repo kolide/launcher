@@ -100,7 +100,12 @@ func (c *checkPointer) logCheckPoint() {
 	c.logKolideServerVersion()
 	c.logger.Log("connections", c.Connections())
 	c.logger.Log("ip look ups", c.IpLookups())
-	c.logNotaryVersions()
+	notaryVersions, err := c.NotaryVersions()
+	if err != nil {
+		c.logger.Log("notary versions", err)
+	} else {
+		c.logger.Log("notary versions", notaryVersions)
+	}
 	c.logServerProvidedData()
 }
 
@@ -133,18 +138,17 @@ func (c *checkPointer) logKolideServerVersion() {
 	}
 }
 
-func (c *checkPointer) logNotaryVersions() {
+func (c *checkPointer) NotaryVersions() (map[string]string, error) {
 	if !c.knapsack.KolideHosted() || !c.knapsack.Autoupdate() {
-		return
+		return nil, nil
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
-
 	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.knapsack.NotaryServerURL()), c.knapsack)
 	if err != nil {
-		c.logger.Log("notary versions", err)
+		return nil, err
 	} else {
-		c.logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
+		return fetchNotaryVersions(httpClient, notaryUrl), nil
 	}
 }
 

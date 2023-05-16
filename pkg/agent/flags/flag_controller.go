@@ -130,7 +130,7 @@ func (fc *FlagController) SetKolideHosted(hosted bool) error {
 	return fc.setControlServerValue(keys.KolideHosted, boolToBytes(hosted))
 }
 func (fc *FlagController) KolideHosted() bool {
-	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.KolideHosted))
+	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.KolideHosted)).get(fc.getControlServerValue(keys.KolideHosted))
 }
 
 func (fc *FlagController) EnrollSecret() string {
