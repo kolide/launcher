@@ -74,8 +74,14 @@ func Test_Parse(t *testing.T) {
 			output: "This Menu Was Last Updated 7 Seconds Ago.",
 		},
 		{
-			name:   "relativeTime just now",
+			name:   "relativeTime one second",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-1 * time.Second).Unix()},
+			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
+			output: "This Menu Was Last Updated Just Now.",
+		},
+		{
+			name:   "relativeTime just now",
+			td:     &TemplateData{LastMenuUpdateTime: time.Now().Unix()},
 			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated Just Now.",
 		},
