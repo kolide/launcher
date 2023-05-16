@@ -30,12 +30,12 @@ import (
 )
 
 var (
+	// Command line colors and printing functions
 	cRunning = color.New(color.FgCyan)
 	cHeader  = color.New(color.FgHiWhite).Add(color.Bold)
 	cWarn    = color.New(color.FgHiYellow)
-
-	pass = color.New(color.FgGreen).PrintlnFunc()
-	fail = color.New(color.FgRed).Add(color.Bold).PrintlnFunc()
+	pass     = color.New(color.FgGreen).PrintlnFunc()
+	fail     = color.New(color.FgRed).Add(color.Bold).PrintlnFunc()
 
 	// Println functions for checkup details
 	cInfo = color.New(color.FgWhite)
@@ -55,7 +55,7 @@ var (
 	configFile string
 )
 
-// checkup is
+// checkup encapsulates a launcher health checkup
 type checkup struct {
 	name   string
 	check  func() (string, error)
@@ -138,6 +138,7 @@ func runDoctor(args []string) error {
 	return nil
 }
 
+// parseDoctorOptions parses command line options and provides defaults
 func parseDoctorOptions(args []string) (*launcher.Options, error) {
 	flagset := flag.NewFlagSet("launcher doctor", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
@@ -350,6 +351,7 @@ func parseDoctorOptions(args []string) (*launcher.Options, error) {
 	return opts, nil
 }
 
+// run logs the results of a checkup being run
 func (c *checkup) run() {
 	if c.check == nil {
 	}
@@ -368,6 +370,7 @@ func (c *checkup) run() {
 	}
 }
 
+// checkupPlatform verifies that the current platform is supported by launcher
 func checkupPlatform(os string) (string, error) {
 	if slices.Contains([]string{"windows", "darwin", "linux"}, os) {
 		return fmt.Sprintf("Platform: %s", os), nil
@@ -380,6 +383,7 @@ type launcherFile struct {
 	found bool
 }
 
+// checkupRootDir tests for the presence of important files in the launcher root directory
 func checkupRootDir(filepaths []string) (string, error) {
 	importantFiles := []*launcherFile{
 		{
@@ -420,6 +424,7 @@ func checkupRootDir(filepaths []string) (string, error) {
 	return "", fmt.Errorf("%d root directory files not found", failures)
 }
 
+// checkupConnectivity tests connections to Kolide cloud services
 func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	var failures int
 	checkpointer := checkpoint.New(logger, k)
@@ -451,6 +456,7 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	}
 
 	for k, v := range notaryVersions {
+		// Check for failure if the notary version isn't a parsable integer
 		if _, err := strconv.ParseInt(v, 10, 32); err == nil {
 			good(fmt.Sprintf("%s - %s", k, v))
 		} else {
@@ -466,6 +472,7 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	return "", fmt.Errorf("%d failures encountered while attempting communication with Kolide", failures)
 }
 
+// checkupVersion tests to see if the current launcher version is up to date
 func checkupVersion(v version.Info) (string, error) {
 	info(fmt.Sprintf("Current version: %s", v.Version))
 	// TODO: Query TUF for latest available version for this launcher instance
@@ -479,6 +486,7 @@ func checkupVersion(v version.Info) (string, error) {
 	return "", fmt.Errorf("launcher is out of date")
 }
 
+// checkupConfigFile tests that the config file is valid and logs it's contents
 func checkupConfigFile(filepath string) (string, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -494,6 +502,7 @@ func checkupConfigFile(filepath string) (string, error) {
 	return "Config file found", nil
 }
 
+// checkupLogFiles checks to see if expected log files are present
 func checkupLogFiles(filepaths []string) (string, error) {
 	var foundCurrentLogFile bool
 	for _, f := range filepaths {
@@ -519,6 +528,7 @@ func checkupLogFiles(filepaths []string) (string, error) {
 	return "", fmt.Errorf("No log file found")
 }
 
+// getFilepaths returns a list of file paths matching the pattern
 func getFilepaths(elem ...string) []string {
 	fileGlob := filepath.Join(elem...)
 	filepaths, err := filepath.Glob(fileGlob)
