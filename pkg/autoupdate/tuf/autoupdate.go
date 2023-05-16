@@ -5,11 +5,14 @@ package tuf
 
 import (
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -27,9 +30,8 @@ var rootJson []byte
 
 // Configuration defaults
 const (
-	DefaultTufServer     = "https://tuf.kolide.com"
-	tufDirectoryName     = "tuf"
-	releaseVersionFormat = "%s/%s/%s/release.json" // <binary>/<os>/<channel>/release.json
+	DefaultTufServer = "https://tuf.kolide.com"
+	tufDirectoryName = "tuf"
 )
 
 // Binaries handled by autoupdater
@@ -101,7 +103,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
 	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
+		updateDirectory = defaultLibraryDirectory(k.RootDirectory())
 	}
 	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
@@ -147,7 +149,7 @@ func LocalTufDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
-func DefaultLibraryDirectory(rootDirectory string) string {
+func defaultLibraryDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, "updates")
 }
 
@@ -318,6 +320,45 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 	}
 
 	return release, nil
+}
+
+// findRelease checks the latest data from TUF (in `targets`) to see whether a new release
+// has been published for the given channel. If it has, it returns the target for that release
+// and its associated metadata.
+func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
+	// First, find the target that the channel release file is pointing to
+	var releaseTarget string
+	targetReleaseFile := path.Join(string(binary), runtime.GOOS, channel, "release.json")
+	for targetName, target := range targets {
+		if targetName != targetReleaseFile {
+			continue
+		}
+
+		// We found the release file that matches our OS and binary. Evaluate it
+		// to see if we're on this latest version.
+		var custom ReleaseFileCustomMetadata
+		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
+			return "", data.TargetFileMeta{}, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+		}
+
+		releaseTarget = custom.Target
+		break
+	}
+
+	if releaseTarget == "" {
+		return "", data.TargetFileMeta{}, fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+	}
+
+	// Now, get the metadata for our release target
+	for targetName, target := range targets {
+		if targetName != releaseTarget {
+			continue
+		}
+
+		return filepath.Base(releaseTarget), target, nil
+	}
+
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }
 
 // storeError saves errors that occur during the periodic check for updates, so that they

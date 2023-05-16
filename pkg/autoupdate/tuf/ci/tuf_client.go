@@ -11,7 +11,7 @@ import (
 )
 
 // SeedLocalTufRepo creates a local TUF repo with a valid release under the given version `testTargetVersion`
-func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string) []byte {
+func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string) {
 	serverUrl, testRootJson := InitRemoteTufServer(t, testTargetVersion)
 
 	// Now set up local repo
@@ -31,6 +31,4 @@ func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string
 
 	_, err = metadataClient.Update()
 	require.NoError(t, err, "could not update TUF client")
-
-	return testRootJson
 }

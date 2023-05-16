@@ -3,7 +3,6 @@ package tuf
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,7 +58,7 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 
 	// Create the update library
 	for _, binary := range binaries {
-		if err := os.MkdirAll(ulm.updatesDirectory(binary), 0755); err != nil {
+		if err := os.MkdirAll(updatesDirectory(binary, baseDir), 0755); err != nil {
 			return nil, fmt.Errorf("could not make updates directory for %s: %w", binary, err)
 		}
 	}
@@ -68,41 +67,21 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 }
 
 // updatesDirectory returns the update library location for the given binary.
-func (ulm *updateLibraryManager) updatesDirectory(binary autoupdatableBinary) string {
-	return filepath.Join(ulm.baseDir, string(binary))
-}
-
-// MostRecentVersion returns the path to the most recent, valid version available in the library for the
-// given binary, along with its version.
-func (ulm *updateLibraryManager) MostRecentVersion(binary autoupdatableBinary) (string, string, error) {
-	// Pull all available versions from library
-	validVersionsInLibrary, _, err := ulm.sortedVersionsInLibrary(binary)
-	if err != nil {
-		return "", "", fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
-	}
-
-	// No valid versions in the library
-	if len(validVersionsInLibrary) < 1 {
-		return "", "", errors.New("no versions in library")
-	}
-
-	// Versions are sorted in ascending order -- return the last one
-	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
-	versionDir := filepath.Join(ulm.updatesDirectory(binary), mostRecentVersionInLibraryRaw)
-	return executableLocation(versionDir, binary), mostRecentVersionInLibraryRaw, nil
+func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) string {
+	return filepath.Join(baseUpdateDirectory, string(binary))
 }
 
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
-	executablePath, _ := ulm.PathToTargetVersionExecutable(binary, targetFilename)
+	executablePath, _ := pathToTargetVersionExecutable(binary, targetFilename, ulm.baseDir)
 	return autoupdate.CheckExecutable(context.TODO(), executablePath, "--version") == nil
 }
 
-// PathToTargetVersionExecutable returns the path to the executable for the desired target,
+// pathToTargetVersionExecutable returns the path to the executable for the desired target,
 // along with its version.
-func (ulm *updateLibraryManager) PathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string) (string, string) {
+func pathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename string, baseUpdateDirectory string) (string, string) {
 	targetVersion := versionFromTarget(binary, targetFilename)
-	versionDir := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
+	versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), targetVersion)
 	return executableLocation(versionDir, binary), targetVersion
 }
 
@@ -208,7 +187,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	}
 
 	// All good! Shelve it in the library under its version
-	newUpdateDirectory := filepath.Join(ulm.updatesDirectory(binary), targetVersion)
+	newUpdateDirectory := filepath.Join(updatesDirectory(binary, ulm.baseDir), targetVersion)
 	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
 		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
@@ -218,7 +197,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 
 // removeUpdate removes a given version from the given binary's update library.
 func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binaryVersion string) {
-	directoryToRemove := filepath.Join(ulm.updatesDirectory(binary), binaryVersion)
+	directoryToRemove := filepath.Join(updatesDirectory(binary, ulm.baseDir), binaryVersion)
 	if err := os.RemoveAll(directoryToRemove); err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
 	} else {
@@ -265,7 +244,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 	const numberOfVersionsToKeep = 3
 
-	versionsInLibrary, invalidVersionsInLibrary, err := ulm.sortedVersionsInLibrary(binary)
+	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(binary, ulm.baseDir)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
 		return
@@ -302,8 +281,8 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
-func (ulm *updateLibraryManager) sortedVersionsInLibrary(binary autoupdatableBinary) ([]string, []string, error) {
-	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(ulm.updatesDirectory(binary), "*"))
+func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(updatesDirectory(binary, baseUpdateDirectory), "*"))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not glob for updates in library: %w", err)
 	}
@@ -318,7 +297,7 @@ func (ulm *updateLibraryManager) sortedVersionsInLibrary(binary autoupdatableBin
 			continue
 		}
 
-		versionDir := filepath.Join(ulm.updatesDirectory(binary), rawVersion)
+		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
 		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue

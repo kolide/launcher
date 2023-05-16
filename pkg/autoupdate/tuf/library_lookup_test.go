@@ -6,105 +6,157 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewUpdateLibraryLookup(t *testing.T) {
-	t.Parallel()
-
-	// Set up an update library
-	rootDir := t.TempDir()
-	updateDir := DefaultLibraryDirectory(rootDir)
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "launcher"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "osqueryd"), 0755))
-
-	// Set up a local TUF repo
-	require.NoError(t, os.MkdirAll(LocalTufDirectory(rootDir), 0755))
-
-	// Create new library lookup
-	_, err := NewUpdateLibraryLookup(rootDir, "", "stable", log.NewNopLogger())
-	require.NoError(t, err)
-}
-
-func TestNewUpdateLibraryLookup_cannotInitMetadataClient(t *testing.T) {
-	t.Parallel()
-
-	// Set up an update library, but no TUF repo
-	rootDir := t.TempDir()
-	updateDir := DefaultLibraryDirectory(rootDir)
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "launcher"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "osqueryd"), 0755))
-
-	// Create new library lookup
-	_, err := NewUpdateLibraryLookup(rootDir, "", "stable", log.NewNopLogger())
-	require.NoError(t, err)
-}
-
 func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	t.Parallel()
 
-	// Set up an update library
-	rootDir := t.TempDir()
-	updateDir := DefaultLibraryDirectory(rootDir)
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "launcher"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "osqueryd"), 0755))
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
 
-	// Set up a local TUF repo
-	tufDir := LocalTufDirectory(rootDir)
-	require.NoError(t, os.MkdirAll(tufDir, 488))
-	testReleaseVersion := "1.0.30"
-	expectedTargetName := fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)
-	testRootJson := tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+			// Set up an update library
+			rootDir := t.TempDir()
+			updateDir := defaultLibraryDirectory(rootDir)
 
-	// Create the test library lookup
-	testLibLookup, err := NewUpdateLibraryLookup(rootDir, "", "stable", log.NewNopLogger())
-	require.NoError(t, err)
-	require.NotNil(t, testLibLookup.metadataClient)
-	mockROLibrary := NewMockreadOnlyUpdateLibrary(t)
-	testLibLookup.library = mockROLibrary
-	require.NoError(t, testLibLookup.metadataClient.Init(testRootJson), "could not initialize metadata client with test root JSON")
+			// Set up a local TUF repo
+			tufDir := LocalTufDirectory(rootDir)
+			require.NoError(t, os.MkdirAll(tufDir, 488))
+			testReleaseVersion := "1.0.30"
+			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)
+			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
 
-	// Expect that we find the given release and see if it's available in the library
-	mockROLibrary.On("Available", binaryLauncher, expectedTargetName).Return(true)
-	expectedPath := "some/path/to/the/expected/target"
-	expectedVersion := "3.4.5"
-	mockROLibrary.On("PathToTargetVersionExecutable", binaryLauncher, expectedTargetName).Return(expectedPath, expectedVersion)
+			// Create a corresponding downloaded target
+			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+			tufci.CopyBinary(t, executablePath)
+			require.NoError(t, os.Chmod(executablePath, 0755))
 
-	// Check it
-	latestPath, latestVersion, err := testLibLookup.CheckOutLatest(binaryLauncher)
-	require.NoError(t, err, "unexpected error on checking out latest")
-	mockROLibrary.AssertExpectations(t)
-	require.Equal(t, expectedPath, latestPath)
-	require.Equal(t, expectedVersion, latestVersion)
+			// Make a more recent version that we should ignore since it isn't the release version
+			tooRecentTarget := fmt.Sprintf("%s-2.1.1.tar.gz", binary)
+			tooRecentPath, _ := pathToTargetVersionExecutable(binary, tooRecentTarget, updateDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(tooRecentPath), 0755))
+			tufci.CopyBinary(t, tooRecentPath)
+			require.NoError(t, os.Chmod(tooRecentPath, 0755))
+
+			// Check it
+			latestPath, latestVersion, err := CheckOutLatest(binary, rootDir, "", "stable")
+			require.NoError(t, err, "unexpected error on checking out latest")
+			require.Equal(t, executablePath, latestPath)
+			require.Equal(t, executableVersion, latestVersion)
+		})
+	}
 }
 
 func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 	t.Parallel()
 
-	// Set up an update library, but no TUF repo
-	rootDir := t.TempDir()
-	updateDir := DefaultLibraryDirectory(rootDir)
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "launcher"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(updateDir, "osqueryd"), 0755))
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
 
-	// Create the test library lookup
-	testLibLookup, err := NewUpdateLibraryLookup(rootDir, "", "stable", log.NewNopLogger())
-	require.NoError(t, err)
-	require.Nil(t, testLibLookup.metadataClient)
-	mockROLibrary := NewMockreadOnlyUpdateLibrary(t)
-	testLibLookup.library = mockROLibrary
+			// Set up an update library, but no TUF repo
+			rootDir := t.TempDir()
+			updateDir := defaultLibraryDirectory(rootDir)
+			target := fmt.Sprintf("%s-1.1.1.tar.gz", binary)
+			executablePath, executableVersion := pathToTargetVersionExecutable(binary, target, updateDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+			tufci.CopyBinary(t, executablePath)
+			require.NoError(t, os.Chmod(executablePath, 0755))
+			_, err := os.Stat(executablePath)
+			require.NoError(t, err, "did not make test binary")
 
-	// Expect that we fall back to picking the most recent update
-	expectedPath := "a/path/to/the/update"
-	expectedVersion := "1.2.3-4-abcdabcdabcd"
-	mockROLibrary.On("MostRecentVersion", binaryLauncher).Return(expectedPath, expectedVersion, nil)
+			// Check it
+			latestPath, latestVersion, err := CheckOutLatest(binary, rootDir, "", "stable")
+			require.NoError(t, err, "unexpected error on checking out latest")
+			require.Equal(t, executablePath, latestPath)
+			require.Equal(t, executableVersion, latestVersion)
+		})
+	}
+}
 
-	// Check it
-	latestPath, latestVersion, err := testLibLookup.CheckOutLatest(binaryLauncher)
-	require.NoError(t, err, "unexpected error on checking out latest")
-	mockROLibrary.AssertExpectations(t)
-	require.Equal(t, expectedPath, latestPath)
-	require.Equal(t, expectedVersion, latestVersion)
+func Test_mostRecentVersion(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Create update directories
+			testBaseDir := t.TempDir()
+
+			// Now, create a version in the update library
+			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
+			firstVersionPath, _ := pathToTargetVersionExecutable(binary, firstVersionTarget, testBaseDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+			tufci.CopyBinary(t, firstVersionPath)
+			require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+			// Create an even newer version in the update library
+			secondVersionTarget := fmt.Sprintf("%s-2.5.3.tar.gz", binary)
+			secondVersionPath, secondVersion := pathToTargetVersionExecutable(binary, secondVersionTarget, testBaseDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
+			tufci.CopyBinary(t, secondVersionPath)
+			require.NoError(t, os.Chmod(secondVersionPath, 0755))
+
+			pathToVersion, v, err := mostRecentVersion(binary, testBaseDir)
+			require.NoError(t, err, "did not expect error getting most recent version")
+			require.Equal(t, secondVersionPath, pathToVersion)
+			require.Equal(t, secondVersion, v)
+		})
+	}
+}
+
+func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Create update directories
+			testBaseDir := t.TempDir()
+
+			// Now, create a version in the update library
+			firstVersionTarget := fmt.Sprintf("%s-2.2.3.tar.gz", binary)
+			firstVersionPath, firstVersion := pathToTargetVersionExecutable(binary, firstVersionTarget, testBaseDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+			tufci.CopyBinary(t, firstVersionPath)
+			require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+			// Create an even newer, but also corrupt, version in the update library
+			secondVersionTarget := fmt.Sprintf("%s-2.1.12.tar.gz", binary)
+			secondVersionPath, _ := pathToTargetVersionExecutable(binary, secondVersionTarget, testBaseDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
+			os.WriteFile(secondVersionPath, []byte{}, 0755)
+
+			pathToVersion, v, err := mostRecentVersion(binary, testBaseDir)
+			require.NoError(t, err, "did not expect error getting most recent version")
+			require.Equal(t, firstVersionPath, pathToVersion)
+			require.Equal(t, firstVersion, v)
+		})
+	}
+}
+
+func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Create update directories
+			testBaseDir := t.TempDir()
+
+			_, _, err := mostRecentVersion(binary, testBaseDir)
+			require.Error(t, err, "should have returned error when there are no available updates")
+		})
+	}
 }
