@@ -133,12 +133,12 @@ func TestCheckupRootDir(t *testing.T) {
 	}{
 		{
 			name:        "present",
-			filepaths:   []string{},
+			filepaths:   []string{"debug.json", "launcher.db", "osquery.db"},
 			expectedErr: false,
 		},
 		{
 			name:        "not present",
-			filepaths:   []string{},
+			filepaths:   []string{"not-an-important-file"},
 			expectedErr: true,
 		},
 	}

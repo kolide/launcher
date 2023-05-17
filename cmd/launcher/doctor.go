@@ -58,21 +58,6 @@ var (
 	binDir     string
 )
 
-func getAppBinaryPaths() []string {
-	var paths []string
-	switch runtime.GOOS {
-	case "darwin":
-		paths = []string{
-			filepath.Join(binDir, "Kolide.app", "Contents", "MacOS", "launcher"),
-		}
-	case "linux":
-		paths = []string{}
-	case "windows":
-		paths = []string{}
-	}
-	return paths
-}
-
 // checkup encapsulates a launcher health checkup
 type checkup struct {
 	name  string
@@ -115,12 +100,17 @@ func runDoctor(args []string) error {
 			},
 		},
 		{
-			name: "Application binaries",
+			name: "Launcher application",
 			check: func() (string, error) {
 				return checkupAppBinaries(getAppBinaryPaths())
 			},
 		},
-		// TODO: Check osquery binaries
+		{
+			name: "Osquery",
+			check: func() (string, error) {
+				return checkupOsquery(getAppBinaryPaths())
+			},
+		},
 		{
 			name: "Check communication with Kolide",
 			check: func() (string, error) {
@@ -155,23 +145,10 @@ func runDoctor(args []string) error {
 // parseDoctorOptions parses command line options and provides defaults
 func parseDoctorOptions(args []string) (*launcher.Options, error) {
 	flagset := flag.NewFlagSet("launcher doctor", flag.ExitOnError)
-	flagset.Usage = func() { usage(flagset) }
+	flagset.Usage = commandUsage(flagset, "launcher doctor")
 
 	var defaultRootDir, defaultEtcDir, defaultConfigFile string
-	switch runtime.GOOS {
-	case "darwin":
-		defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
-		defaultEtcDir = "/etc/kolide-k2/"
-		binDir = "/usr/local/kolide-k2/"
-		defaultConfigFile = filepath.Join(defaultEtcDir, "launcher.flags")
-	case "linux":
-		defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
-		defaultEtcDir = "/etc/kolide-k2/"
-		binDir = "/usr/local/kolide-k2/"
-		defaultConfigFile = filepath.Join(defaultEtcDir, "launcher.flags")
-	case "windows":
-		// TODO
-	}
+	getDefaults(&defaultRootDir, &defaultEtcDir, &binDir, &defaultConfigFile)
 
 	var (
 		// Primary options
@@ -472,6 +449,13 @@ func checkupAppBinaries(filepaths []string) (string, error) {
 	return checkupFilesPresent(filepaths, importantFiles)
 }
 
+// checkupOsquery tests for the presence of files important to osquery
+func checkupOsquery(filepaths []string) (string, error) {
+	// TODO
+	warn("Osquery status unknown")
+	return "", nil
+}
+
 func checkupFilesPresent(filepaths []string, importantFiles []*launcherFile) (string, error) {
 	if filepaths != nil && len(filepaths) > 0 {
 		for _, fp := range filepaths {
@@ -606,16 +590,4 @@ func checkupLogFiles(filepaths []string) (string, error) {
 		return "Log file found", nil
 	}
 	return "", fmt.Errorf("No log file found")
-}
-
-// getFilepaths returns a list of file paths matching the pattern
-func getFilepaths(elem ...string) []string {
-	fileGlob := filepath.Join(elem...)
-	filepaths, err := filepath.Glob(fileGlob)
-
-	if err == nil && len(filepaths) > 0 {
-		return filepaths
-	}
-
-	return nil
 }
