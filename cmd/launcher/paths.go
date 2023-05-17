@@ -18,7 +18,10 @@ func getDefaults(defaultRootDir, defaultEtcDir, binDir, defaultConfigFile *strin
 		*binDir = "/usr/local/kolide-k2/"
 		*defaultConfigFile = filepath.Join(*defaultEtcDir, "launcher.flags")
 	case "windows":
-		// TODO
+		*defaultRootDir = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
+		*defaultEtcDir = ""
+		*binDir = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
+		*defaultConfigFile = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 	}
 }
 
@@ -30,9 +33,13 @@ func getAppBinaryPaths() []string {
 			filepath.Join(binDir, "Kolide.app", "Contents", "MacOS", "launcher"),
 		}
 	case "linux":
-		paths = []string{}
+		paths = []string{
+			filepath.Join(binDir, "launcher.exe"),
+		}
 	case "windows":
-		paths = []string{}
+		paths = []string{
+			filepath.Join(binDir, "launcher.exe"),
+		}
 	}
 	return paths
 }
