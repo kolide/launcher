@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/peterbourgon/ff/v3"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/fatih/color"
 	"golang.org/x/exp/slices"
@@ -133,6 +134,12 @@ func runDoctor(args []string) error {
 			name: "Check logs",
 			check: func() (string, error) {
 				return checkupLogFiles(getFilepaths(k.RootDirectory(), "debug*"))
+			},
+		},
+		{
+			name: "Process report",
+			check: func() (string, error) {
+				return checkupProcessReport()
 			},
 		},
 	}
@@ -590,4 +597,30 @@ func checkupLogFiles(filepaths []string) (string, error) {
 		return "Log file found", nil
 	}
 	return "", fmt.Errorf("No log file found")
+}
+
+// checkupProcessReport finds processes that look like Kolide launcher/osquery processes
+func checkupProcessReport() (string, error) {
+	ps, err := process.Processes()
+	if err != nil {
+		return "", fmt.Errorf("No processes found")
+	}
+
+	var foundKolide bool
+	for _, p := range ps {
+		exe, _ := p.Exe()
+
+		if strings.Contains(strings.ToLower(exe), "kolide") {
+			foundKolide = true
+			name, _ := p.Name()
+			args, _ := p.Cmdline()
+			user, _ := p.Username()
+			info(fmt.Sprintf("%s %d  %s  %s", user, p.Pid, name, args))
+		}
+	}
+
+	if foundKolide {
+		return "Launcher processes found", nil
+	}
+	return "", fmt.Errorf("No launcher processes found")
 }
