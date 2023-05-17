@@ -55,7 +55,6 @@ var (
 	}
 
 	configFile string
-	etcDir     string
 	binDir     string
 )
 
