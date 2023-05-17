@@ -42,6 +42,40 @@ func TestCheckupPlatform(t *testing.T) {
 	}
 }
 
+func TestCheckupArch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		os          string
+		expectedErr bool
+	}{
+		{
+			name:        "supported",
+			os:          runtime.GOARCH,
+			expectedErr: false,
+		},
+		{
+			name:        "unsupported",
+			os:          "not-an-arch",
+			expectedErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := checkupArch(tt.os)
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestCheckupVersion(t *testing.T) {
 	t.Parallel()
 

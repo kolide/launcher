@@ -88,6 +88,12 @@ func runDoctor(args []string) error {
 			},
 		},
 		{
+			name: "Check architecture",
+			check: func() (string, error) {
+				return checkupArch(runtime.GOARCH)
+			},
+		},
+		{
 			name: "Root directory contents",
 			check: func() (string, error) {
 				return checkupRootDir(getFilepaths(k.RootDirectory(), "*"))
@@ -377,12 +383,20 @@ func (c *checkup) run() {
 	}
 }
 
-// checkupPlatform verifies that the current platform is supported by launcher
+// checkupPlatform verifies that the current OS is supported by launcher
 func checkupPlatform(os string) (string, error) {
 	if slices.Contains([]string{"windows", "darwin", "linux"}, os) {
 		return fmt.Sprintf("Platform: %s", os), nil
 	}
 	return "", fmt.Errorf("Unsupported platform: %s", os)
+}
+
+// checkupArch verifies that the current architecture is supported by launcher
+func checkupArch(arch string) (string, error) {
+	if slices.Contains([]string{"386", "amd64", "arm64"}, arch) {
+		return fmt.Sprintf("Architecture: %s", arch), nil
+	}
+	return "", fmt.Errorf("Unsupported architecture: %s", arch)
 }
 
 type launcherFile struct {
