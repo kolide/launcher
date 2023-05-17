@@ -53,15 +53,30 @@ var (
 		whiteText.Println(fmt.Sprintf("✅  %s", a...))
 	}
 
-	// File path of the launcher flags file
 	configFile string
+	etcDir     string
+	binDir     string
 )
+
+func getAppBinaryPaths() []string {
+	var paths []string
+	switch runtime.GOOS {
+	case "darwin":
+		paths = []string{
+			filepath.Join(binDir, "Kolide.app", "Contents", "MacOS", "launcher"),
+		}
+	case "linux":
+		paths = []string{}
+	case "windows":
+		paths = []string{}
+	}
+	return paths
+}
 
 // checkup encapsulates a launcher health checkup
 type checkup struct {
-	name   string
-	check  func() (string, error)
-	failed bool
+	name  string
+	check func() (string, error)
 }
 
 func runDoctor(args []string) error {
@@ -99,7 +114,13 @@ func runDoctor(args []string) error {
 				return checkupRootDir(getFilepaths(k.RootDirectory(), "*"))
 			},
 		},
-		// TODO: Check application directories for launcher & osquery binaries
+		{
+			name: "Application binaries",
+			check: func() (string, error) {
+				return checkupAppBinaries(getAppBinaryPaths())
+			},
+		},
+		// TODO: Check osquery binaries
 		{
 			name: "Check communication with Kolide",
 			check: func() (string, error) {
@@ -136,7 +157,21 @@ func parseDoctorOptions(args []string) (*launcher.Options, error) {
 	flagset := flag.NewFlagSet("launcher doctor", flag.ExitOnError)
 	flagset.Usage = func() { usage(flagset) }
 
-	// TODO: Provide platform-specific defaults for files/dirs in case a config file doesn't exist
+	var defaultRootDir, defaultEtcDir, defaultConfigFile string
+	switch runtime.GOOS {
+	case "darwin":
+		defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
+		defaultEtcDir = "/etc/kolide-k2/"
+		binDir = "/usr/local/kolide-k2/"
+		defaultConfigFile = filepath.Join(defaultEtcDir, "launcher.flags")
+	case "linux":
+		defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
+		defaultEtcDir = "/etc/kolide-k2/"
+		binDir = "/usr/local/kolide-k2/"
+		defaultConfigFile = filepath.Join(defaultEtcDir, "launcher.flags")
+	case "windows":
+		// TODO
+	}
 
 	var (
 		// Primary options
@@ -151,13 +186,13 @@ func parseDoctorOptions(args []string) (*launcher.Options, error) {
 		flTransport              = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
 		flLoggingInterval        = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath           = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flRootDirectory          = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootDirectory          = flagset.String("root_directory", defaultRootDir, "The location of the local database, pidfiles, etc.")
 		flRootPEM                = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion                = flagset.Bool("version", false, "Print Launcher version and exit")
 		flLogMaxBytesPerBatch    = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
 		flOsqueryFlags           arrayFlags // set below with flagset.Var
 		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
-		flConfigFile             = flagset.String("config", "", "config file to parse options from (optional)")
+		flConfigFile             = flagset.String("config", defaultConfigFile, "config file to parse options from (optional)")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -349,14 +384,17 @@ func runCheckups(checkups []*checkup) {
 
 	// Sequentially run all of the checkups
 	for _, c := range checkups {
-		c.run()
+		err := c.run()
+		if err != nil {
+			failedCheckups = append(failedCheckups, c)
+		}
 	}
 
 	if len(failedCheckups) > 0 {
 		redText("\nSome checkups failed:")
 
 		for _, c := range failedCheckups {
-			redText("%s\n", c.name)
+			fail(fmt.Sprintf("    %s\n", c.name))
 		}
 	} else {
 		greenText("\nAll checkups passed! Your Kolide launcher is healthy.")
@@ -364,9 +402,9 @@ func runCheckups(checkups []*checkup) {
 }
 
 // run logs the results of a checkup being run
-func (c *checkup) run() {
+func (c *checkup) run() error {
 	if c.check == nil {
-		return
+		return errors.New("checkup is nil")
 	}
 
 	cyanText.Printf("\nRunning checkup: ")
@@ -377,10 +415,13 @@ func (c *checkup) run() {
 		info(result)
 		fail(err)
 		redText("𐄂 Checkup failed!")
+		return err
 	} else {
 		pass(result)
 		greenText("✔ Checkup passed!")
 	}
+
+	return nil
 }
 
 // checkupPlatform verifies that the current OS is supported by launcher
@@ -418,6 +459,20 @@ func checkupRootDir(filepaths []string) (string, error) {
 		},
 	}
 
+	return checkupFilesPresent(filepaths, importantFiles)
+}
+
+func checkupAppBinaries(filepaths []string) (string, error) {
+	importantFiles := []*launcherFile{
+		{
+			name: "launcher",
+		},
+	}
+
+	return checkupFilesPresent(filepaths, importantFiles)
+}
+
+func checkupFilesPresent(filepaths []string, importantFiles []*launcherFile) (string, error) {
 	if filepaths != nil && len(filepaths) > 0 {
 		for _, fp := range filepaths {
 			for _, f := range importantFiles {
@@ -439,10 +494,10 @@ func checkupRootDir(filepaths []string) (string, error) {
 	}
 
 	if failures == 0 {
-		return "Root directory files found", nil
+		return "Files found", nil
 	}
 
-	return "", fmt.Errorf("%d root directory files not found", failures)
+	return "", fmt.Errorf("%d files not found", failures)
 }
 
 // checkupConnectivity tests connections to Kolide cloud services
