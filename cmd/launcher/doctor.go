@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,28 +29,31 @@ import (
 )
 
 var (
-	// Command line colors and printing functions
-	cRunning = color.New(color.FgCyan)
-	cHeader  = color.New(color.FgHiWhite).Add(color.Bold)
-	cWarn    = color.New(color.FgHiYellow)
-	pass     = color.New(color.FgGreen).PrintlnFunc()
-	fail     = color.New(color.FgRed).Add(color.Bold).PrintlnFunc()
+	// Command line colors
+	cyanText   = color.New(color.FgCyan)
+	headerText = color.New(color.FgHiWhite).Add(color.Bold)
+	yellowText = color.New(color.FgHiYellow)
 
 	// Println functions for checkup details
-	cInfo = color.New(color.FgWhite)
-	info  = func(a ...interface{}) {
-		cInfo.Println(fmt.Sprintf("    %s", a...))
+	whiteText = color.New(color.FgWhite)
+	greenText = color.New(color.FgGreen).PrintlnFunc()
+	redText   = color.New(color.FgRed).Add(color.Bold).PrintlnFunc()
+
+	// Indented output for checkup results
+	info = func(a ...interface{}) {
+		whiteText.Println(fmt.Sprintf("    %s", a...))
 	}
 	warn = func(a ...interface{}) {
-		cWarn.Println(fmt.Sprintf("    %s", a...))
+		yellowText.Println(fmt.Sprintf("    %s", a...))
 	}
-	bad = func(a ...interface{}) {
-		cInfo.Println(fmt.Sprintf("❌  %s", a...))
+	fail = func(a ...interface{}) {
+		whiteText.Println(fmt.Sprintf("❌  %s", a...))
 	}
-	good = func(a ...interface{}) {
-		cInfo.Println(fmt.Sprintf("✅  %s", a...))
+	pass = func(a ...interface{}) {
+		whiteText.Println(fmt.Sprintf("✅  %s", a...))
 	}
 
+	// File path of the launcher flags file
 	configFile string
 )
 
@@ -74,9 +76,9 @@ func runDoctor(args []string) error {
 	flagController := flags.NewFlagController(logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil)
 
-	cRunning.Println("Kolide launcher doctor version:")
+	cyanText.Println("Kolide launcher doctor version:")
 	version.PrintFull()
-	cRunning.Println("\nRunning Kolide launcher checkups...")
+	cyanText.Println("\nRunning Kolide launcher checkups...")
 
 	checkups := []*checkup{
 		{
@@ -118,22 +120,7 @@ func runDoctor(args []string) error {
 		},
 	}
 
-	failedCheckups := []*checkup{}
-
-	// Sequentially run all of the checkups
-	for _, c := range checkups {
-		c.run()
-	}
-
-	if len(failedCheckups) > 0 {
-		fail("\nSome checkups failed:")
-
-		for _, c := range failedCheckups {
-			fail("%s\n", c.name)
-		}
-	} else {
-		pass("\nAll checkups passed! Your Kolide launcher is healthy.")
-	}
+	runCheckups(checkups)
 
 	return nil
 }
@@ -351,22 +338,42 @@ func parseDoctorOptions(args []string) (*launcher.Options, error) {
 	return opts, nil
 }
 
+func runCheckups(checkups []*checkup) {
+	failedCheckups := []*checkup{}
+
+	// Sequentially run all of the checkups
+	for _, c := range checkups {
+		c.run()
+	}
+
+	if len(failedCheckups) > 0 {
+		redText("\nSome checkups failed:")
+
+		for _, c := range failedCheckups {
+			redText("%s\n", c.name)
+		}
+	} else {
+		greenText("\nAll checkups passed! Your Kolide launcher is healthy.")
+	}
+}
+
 // run logs the results of a checkup being run
 func (c *checkup) run() {
 	if c.check == nil {
+		return
 	}
 
-	cRunning.Printf("\nRunning checkup: ")
-	cHeader.Printf("%s\n", c.name)
+	cyanText.Printf("\nRunning checkup: ")
+	headerText.Printf("%s\n", c.name)
 
 	result, err := c.check()
 	if err != nil {
 		info(result)
-		bad(err)
-		fail("𐄂 Checkup failed!")
+		fail(err)
+		redText("𐄂 Checkup failed!")
 	} else {
-		good(result)
-		pass("✔ Checkup passed!")
+		pass(result)
+		greenText("✔ Checkup passed!")
 	}
 }
 
@@ -410,9 +417,9 @@ func checkupRootDir(filepaths []string) (string, error) {
 	var failures int
 	for _, f := range importantFiles {
 		if f.found {
-			good(f.name)
+			pass(f.name)
 		} else {
-			bad(f.name)
+			fail(f.name)
 			failures = failures + 1
 		}
 	}
@@ -431,9 +438,9 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	connections := checkpointer.Connections()
 	for k, v := range connections {
 		if v == "successful tcp connection" {
-			good(fmt.Sprintf("%s - %s", k, v))
+			pass(fmt.Sprintf("%s - %s", k, v))
 		} else {
-			bad(fmt.Sprintf("%s - %s", k, v))
+			fail(fmt.Sprintf("%s - %s", k, v))
 			failures = failures + 1
 		}
 	}
@@ -442,25 +449,25 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	for k, v := range ipLookups {
 		valStrSlice, ok := v.([]string)
 		if ok && len(valStrSlice) > 0 {
-			good(fmt.Sprintf("%s - %s", k, valStrSlice))
+			pass(fmt.Sprintf("%s - %s", k, valStrSlice))
 		} else {
-			bad(fmt.Sprintf("%s - %s", k, valStrSlice))
+			fail(fmt.Sprintf("%s - %s", k, valStrSlice))
 			failures = failures + 1
 		}
 	}
 
 	notaryVersions, err := checkpointer.NotaryVersions()
 	if err != nil {
-		bad(fmt.Errorf("could not fetch notary versions: %w", err))
+		fail(fmt.Errorf("could not fetch notary versions: %w", err))
 		failures = failures + 1
 	}
 
 	for k, v := range notaryVersions {
 		// Check for failure if the notary version isn't a parsable integer
 		if _, err := strconv.ParseInt(v, 10, 32); err == nil {
-			good(fmt.Sprintf("%s - %s", k, v))
+			pass(fmt.Sprintf("%s - %s", k, v))
 		} else {
-			bad(fmt.Sprintf("%s - %s", k, v))
+			fail(fmt.Sprintf("%s - %s", k, v))
 			failures = failures + 1
 		}
 	}
@@ -494,12 +501,16 @@ func checkupConfigFile(filepath string) (string, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		info(scanner.Text())
-	}
+	// Parse the config file how launcher would
+	err = ff.PlainParser(file, func(name, value string) error {
+		info(fmt.Sprintf("%s %s", name, value))
+		return nil
+	})
 
-	return "Config file found", nil
+	if err == nil {
+		return "Config file found", nil
+	}
+	return "", fmt.Errorf("Invalid config file")
 }
 
 // checkupLogFiles checks to see if expected log files are present
