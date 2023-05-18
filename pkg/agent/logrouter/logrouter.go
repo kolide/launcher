@@ -79,18 +79,38 @@ func (lr *logRouter) GetRecentDebugLogs() ([]map[string]any, error) {
 	return lr.logRing.GetAll()
 }
 
-// Replay will replay the logs from the memory ring to a new logger
+// Replay will replay the logs from the memory ring to a new logger. Because we're serliazing everything down to a
+// string, handling the leveling is cumbersome.
 func (lr *logRouter) Replay(logger log.Logger) error {
 	logs, err := lr.logRing.GetAll()
 	if err != nil {
 		return fmt.Errorf("gettings logs to replay: %w", err)
 	}
 	for _, l := range logs {
+		var levelFn func(logger log.Logger) log.Logger
+
 		pairs := make([]any, 2*len(l))
+		pairs = append(pairs, "replayed", true)
 		for k, v := range l {
+			if k == level.Key() {
+				switch v {
+				case level.DebugValue().String():
+					levelFn = level.Debug
+				case level.InfoValue().String():
+					levelFn = level.Info
+				case level.WarnValue().String():
+					levelFn = level.Warn
+				case level.ErrorValue().String():
+					levelFn = level.Error
+				}
+			}
 			pairs = append(pairs, k, v)
 		}
-		logger.Log(pairs...)
+		if levelFn != nil {
+			levelFn(logger).Log(pairs...)
+		} else {
+			logger.Log(pairs...)
+		}
 	}
 
 	return nil
