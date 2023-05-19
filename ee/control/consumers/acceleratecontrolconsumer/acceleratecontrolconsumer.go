@@ -10,7 +10,7 @@ import (
 
 const (
 	// Identifier for this consumer.
-	ControlRequestAccelerateSubsystem = "accelerate_control"
+	AccelerateControlSubsystem = "accelerate_control"
 )
 
 type AccelerateControlConsumer struct {
