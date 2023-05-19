@@ -86,11 +86,11 @@ func (t *Target) Parse(s string) error {
 	}
 
 	// For now, set the default arch according to the given platform
-	if defaultArch, ok := defaultArchMap[t.Platform]; ok {
-		t.Arch = defaultArch
-	} else {
+	defaultArch, ok := defaultArchMap[t.Platform]
+	if !ok {
 		return fmt.Errorf("cannot select default arch for unknown platform %s", t.Platform)
 	}
+	t.Arch = defaultArch
 
 	return nil
 }
