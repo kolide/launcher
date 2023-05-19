@@ -54,6 +54,7 @@ require (
 )
 
 require (
+	github.com/apache/thrift v0.16.0
 	github.com/kolide/systray v1.10.4
 	github.com/kolide/toast v1.0.0
 	github.com/shirou/gopsutil/v3 v3.23.3
@@ -64,13 +65,12 @@ require (
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/WatchBeam/clock v0.0.0-20170901150240-b08e6b4da7ea // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
-	github.com/apache/thrift v0.16.0 // indirect
 	github.com/bugsnag/bugsnag-go v1.3.2 // indirect
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/cloudflare/cfssl v0.0.0-20181102015659-ea4033a214e7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/distribution v2.8.0+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go v1.5.1-1 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
