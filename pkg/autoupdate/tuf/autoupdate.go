@@ -6,9 +6,11 @@ package tuf
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -47,18 +50,24 @@ type ReleaseFileCustomMetadata struct {
 
 type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
-	AddToLibrary(binary autoupdatableBinary, targetFilename string, targetMetadata data.TargetFileMeta) error
-	TidyLibrary()
+	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error
+	TidyLibrary(binary autoupdatableBinary, currentVersion string)
+}
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
 }
 
 type TufAutoupdater struct {
-	metadataClient *client.Client
-	libraryManager librarian
-	channel        string
-	checkInterval  time.Duration
-	store          types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	interrupt      chan struct{}
-	logger         log.Logger
+	metadataClient         *client.Client
+	libraryManager         librarian
+	osquerier              querier // used to query for current running osquery version
+	osquerierRetryInterval time.Duration
+	channel                string
+	checkInterval          time.Duration
+	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	interrupt              chan struct{}
+	logger                 log.Logger
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -69,14 +78,16 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
-	mirrorHttpClient *http.Client, osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
+	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		channel:       k.UpdateChannel(),
-		interrupt:     make(chan struct{}),
-		checkInterval: k.AutoupdateInterval(),
-		store:         k.AutoupdateErrorsStore(),
-		logger:        log.NewNopLogger(),
+		channel:                k.UpdateChannel(),
+		interrupt:              make(chan struct{}),
+		checkInterval:          k.AutoupdateInterval(),
+		store:                  k.AutoupdateErrorsStore(),
+		osquerier:              osquerier,
+		osquerierRetryInterval: 1 * time.Minute,
+		logger:                 log.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
@@ -92,9 +103,9 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client,
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
 	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = filepath.Join(k.RootDirectory(), "updates")
+		updateDirectory = defaultLibraryDirectory(k.RootDirectory())
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, osquerier, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -138,13 +149,17 @@ func LocalTufDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
+func defaultLibraryDirectory(rootDirectory string) string {
+	return filepath.Join(rootDirectory, "updates")
+}
+
 // Execute is the TufAutoupdater run loop. It periodically checks to see if a new release
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
-	ta.libraryManager.TidyLibrary()
+	ta.tidyLibrary()
 
 	checkTicker := time.NewTicker(ta.checkInterval)
 	defer checkTicker.Stop()
@@ -169,6 +184,54 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
+}
+
+// tidyLibrary gets the current running version for each binary (so that the current version is not removed)
+// and then asks the update library manager to tidy the update library.
+func (ta *TufAutoupdater) tidyLibrary() {
+	for _, binary := range binaries {
+		// Get the current running version to preserve it when tidying the available updates
+		currentVersion, err := ta.currentRunningVersion(binary)
+		if err != nil {
+			level.Debug(ta.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
+			continue
+		}
+
+		ta.libraryManager.TidyLibrary(binary, currentVersion)
+	}
+}
+
+// currentRunningVersion returns the current running version of the given binary.
+// It will perform retries for osqueryd.
+func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (string, error) {
+	switch binary {
+	case binaryLauncher:
+		launcherVersion := version.Version().Version
+		if launcherVersion == "unknown" {
+			return "", errors.New("unknown launcher version")
+		}
+		return launcherVersion, nil
+	case binaryOsqueryd:
+		// The osqueryd client may not have initialized yet, so retry the version
+		// check a couple times before giving up
+		osquerydVersionCheckRetries := 5
+		var err error
+		for i := 0; i < osquerydVersionCheckRetries; i += 1 {
+			var resp []map[string]string
+			resp, err = ta.osquerier.Query("SELECT version FROM osquery_info;")
+			if err == nil && len(resp) > 0 {
+				if osquerydVersion, ok := resp[0]["version"]; ok {
+					return osquerydVersion, nil
+				}
+			}
+			err = fmt.Errorf("error querying for osquery_info: %w; rows returned: %d", err, len(resp))
+
+			time.Sleep(ta.osquerierRetryInterval)
+		}
+		return "", err
+	default:
+		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
+	}
 }
 
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
@@ -234,16 +297,25 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := ta.findRelease(binary, targets)
+	release, releaseMetadata, err := findRelease(binary, targets, ta.channel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
+	}
+
+	// Get the current running version if available -- don't error out if we can't
+	// get it, since the worst case is that we download an update whose version matches
+	// our install version.
+	var currentVersion string
+	currentVersion, _ = ta.currentRunningVersion(binary)
+	if currentVersion == versionFromTarget(binary, release) {
+		return "", nil
 	}
 
 	if ta.libraryManager.Available(binary, release) {
 		return "", nil
 	}
 
-	if err := ta.libraryManager.AddToLibrary(binary, release, releaseMetadata); err != nil {
+	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
 		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}
 
@@ -251,12 +323,12 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 }
 
 // findRelease checks the latest data from TUF (in `targets`) to see whether a new release
-// has been published for our channel. If it has, it returns the target for that release
+// has been published for the given channel. If it has, it returns the target for that release
 // and its associated metadata.
-func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.TargetFiles) (string, data.TargetFileMeta, error) {
+func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
 	// First, find the target that the channel release file is pointing to
 	var releaseTarget string
-	targetReleaseFile := fmt.Sprintf("%s/%s/%s/release.json", binary, runtime.GOOS, ta.channel)
+	targetReleaseFile := path.Join(string(binary), runtime.GOOS, channel, "release.json")
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -286,7 +358,7 @@ func (ta *TufAutoupdater) findRelease(binary autoupdatableBinary, targets data.T
 		return filepath.Base(releaseTarget), target, nil
 	}
 
-	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", targetReleaseFile, binary)
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }
 
 // storeError saves errors that occur during the periodic check for updates, so that they
