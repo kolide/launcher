@@ -7,8 +7,10 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 )
 
-// VersionForChannel returns the tagged version of the given binary for the given release channel.
-func VersionForChannel(binary, channel, tufServerUrl string) (string, error) {
+// GetChannelVersionFromTufServer returns the tagged version of the given binary for the given release channel.
+// It is intended for use in e.g. packaging and `launcher doctor`, where we want to determine the correct
+// version tag for the channel but do not necessarily have access to a local TUF repo.
+func GetChannelVersionFromTufServer(binary, channel, tufServerUrl string) (string, error) {
 	tempTufRepoDir, err := agent.MkdirTemp("temp-tuf")
 	if err != nil {
 		return "", fmt.Errorf("could not make temporary directory: %w", err)
