@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string) (string, string, error) {
+func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (string, string, error) {
 	if updateDirectory == "" {
 		updateDirectory = defaultLibraryDirectory(rootDirectory)
 	}
@@ -20,6 +22,8 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 	if err == nil {
 		return releasePath, releaseVersion, nil
 	}
+
+	level.Debug(logger).Log("msg", "could not find executable from release", "err", err)
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
