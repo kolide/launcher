@@ -11,14 +11,14 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
-type BinaryUpdate struct {
+type BinaryUpdateInfo struct {
 	Path    string
 	Version string
 }
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdate, error) {
+func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	if updateDirectory == "" {
 		updateDirectory = defaultLibraryDirectory(rootDirectory)
 	}
@@ -37,7 +37,7 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
-func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdate, error) {
+func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
@@ -60,7 +60,7 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 		return nil, fmt.Errorf("version %s from target %s either not yet downloaded or corrupted: %w", targetVersion, targetName, err)
 	}
 
-	return &BinaryUpdate{
+	return &BinaryUpdateInfo{
 		Path:    targetPath,
 		Version: targetVersion,
 	}, nil
@@ -68,7 +68,7 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdate, error) {
+func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	// Pull all available versions from library
 	validVersionsInLibrary, _, err := sortedVersionsInLibrary(binary, baseUpdateDirectory)
 	if err != nil {
@@ -83,7 +83,7 @@ func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (
 	// Versions are sorted in ascending order -- return the last one
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
 	versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), mostRecentVersionInLibraryRaw)
-	return &BinaryUpdate{
+	return &BinaryUpdateInfo{
 		Path:    executableLocation(versionDir, binary),
 		Version: mostRecentVersionInLibraryRaw,
 	}, nil
