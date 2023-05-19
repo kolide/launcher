@@ -253,7 +253,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
-		// controlRequestAccelerate handles control server interval acceleration requests from control server
+		// accelerateControlConsumer handles control server interval acceleration requests from control server
 		controlService.RegisterConsumer(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		runner, err = desktopRunner.New(
