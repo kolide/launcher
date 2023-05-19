@@ -22,7 +22,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control/consumers/controlrequestaccelerateconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -254,7 +254,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
 		// controlRequestAccelerate handles control server interval acceleration requests from control server
-		controlService.RegisterConsumer(controlrequestaccelerateconsumer.ControlRequestAccelerateSubsystem, controlrequestaccelerateconsumer.New(k))
+		controlService.RegisterConsumer(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		runner, err = desktopRunner.New(
 			k,
