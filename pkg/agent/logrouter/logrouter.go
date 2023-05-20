@@ -36,7 +36,7 @@ type logRouter struct {
 
 func New(systemLogger log.Logger) (*logRouter, error) {
 	// We always have exactly one in memory ring logger. This recieves _all_ the logs. It's used to replay into new
-	// desinatations, and is expected to be a query target
+	// desinatations, and is expected to be a query target for recent logs
 	logRing, err := ringlogger.New(persistentring.NewInMemory(1000))
 	if err != nil {
 		return nil, fmt.Errorf("creating memory ringlogger: %w", err)
@@ -153,7 +153,7 @@ func (lr *logRouter) AddPersistStore(store storeInt) error {
 }
 
 // AddDebugLog sets up a log destination to the provided path. It will be rotated.
-func (lr *logRouter) AddDebugLog(logpath string) error {
+func (lr *logRouter) AddDebugFile(logpath string) error {
 	logger := locallogger.NewKitLogger(logpath)
 
 	// Replay logs. Note that there's a small race condition between replaying the logs, and adding the new logger.
@@ -166,5 +166,4 @@ func (lr *logRouter) AddDebugLog(logpath string) error {
 	lr.loggerTee.Add(logger)
 
 	return nil
-
 }
