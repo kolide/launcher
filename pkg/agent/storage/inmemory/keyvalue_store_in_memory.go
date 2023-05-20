@@ -46,7 +46,13 @@ func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.items[string(key)] = value
+
+	// Because this takes an array, it is always passed by reference. And, there are some cases where that ends up
+	// causing issues (ringlogger, I'm looking at you). So we generaet a copy. this is not an issue with bbolt backed
+	// storage, because that inherently does a serialization to disk.
+	s.items[string(key)] = make([]byte, len(value))
+	copy(s.items[string(key)], value)
+
 	return nil
 }
 
