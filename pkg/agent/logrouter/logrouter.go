@@ -1,3 +1,25 @@
+// Package logrouter holds several connected tee loggers, log destinations, and a small amount of logic to route
+// between them. It should allow for designs like:
+//
+//	-> systemLogger -----> tee ---->  filter 	--------> System Logs
+//	                        |        by level
+//	 	       	       	    |
+//	 	       	       	    |
+//	-> logger  -------------o------> tee ---------------> debug.json
+//	                                  |
+//	                                  +-----------------> memory ring
+//	                                  |
+//	                                  +-----> filter ---> persisted ring
+//	                                         by level
+//
+// While several destinations are passed in, these fufill different purposes:
+//  1. System Logs: This is meant for logs to be read be the end user. While end users can read the full debug.json,
+//     system logs are meant to be more meaningful. (Note that the filter is applied upstream, and passed
+//     a on initialization. This allows the command line flags to work)
+//  2. debug.json: This is meant as a comprehensive log, suitable for sending to support
+//  3. memory ring: This is meant to hold all recent logs. Because the debug level can be noisy
+//  4. persisted ring: This handles recent info+ logs. It is persisted to the database, and can be queried
+
 package logrouter
 
 import (
