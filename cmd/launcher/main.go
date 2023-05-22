@@ -10,11 +10,12 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/log/locallogger"
@@ -39,9 +40,6 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	// If there's a newer version of launcher on disk, use it.
-	// This does not call DeleteOldUpdates, on the theory that
-	// it's better left to the service to handle cleanup. This is
-	// a straight forward exec.
 	//
 	// launcher is _also_ called when we're checking update
 	// validity (with autoupdate.checkExecutable). This is
@@ -51,26 +49,7 @@ func main() {
 	// skip exec'ing an update. This helps prevent launcher from
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
-	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		newerBinary, err := autoupdate.FindNewestSelf(ctx)
-		if err != nil {
-			logutil.Fatal(logger, err, "checking for updated version")
-		}
-
-		if newerBinary != "" {
-			level.Debug(logger).Log(
-				"msg", "preparing to exec new binary",
-				"oldVersion", version.Version().Version,
-				"newBinary", newerBinary,
-			)
-			if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
-				logutil.Fatal(logger, err, "exec")
-			}
-			panic("how")
-		} else {
-			level.Debug(logger).Log("msg", "Nothing new")
-		}
-	}
+	runLatestLauncher(ctx, logger)
 
 	// if the launcher is being ran with a positional argument,
 	// handle that argument. Fall-back to running launcher
@@ -112,6 +91,46 @@ func main() {
 		level.Debug(logger).Log(err, "run launcher", "stack", fmt.Sprintf("%+v", err))
 		logutil.Fatal(logger, err, "run launcher")
 	}
+}
+
+func runLatestLauncher(ctx context.Context, logger log.Logger) {
+	if env.Bool("LAUNCHER_SKIP_UPDATES", false) {
+		return
+	}
+
+	// Parse startup options -- just the couple that we need to check out the latest version of launcher
+	opts, err := parseStartupOptions(os.Args[1:])
+	if err != nil {
+		level.Error(logger).Log("msg", "could not parse startup options", "err", err)
+		return
+	}
+
+	newerBinary, err := tuf.CheckOutLatest("launcher", opts.RootDirectory, opts.UpdateDirectory, opts.UpdateChannel.String(), logger)
+	if err != nil {
+		level.Error(logger).Log(
+			"msg", "could not check out latest launcher, will continue running current",
+			"err", err,
+		)
+		return
+	}
+
+	if newerBinary.Version == version.Version().Version {
+		level.Error(logger).Log("msg", "already running latest launcher")
+		return
+	}
+
+	level.Error(logger).Log(
+		"msg", "preparing to exec new launcher binary",
+		"old_version", version.Version().Version,
+		"new_binary_version", newerBinary.Version,
+		"new_binary_path", newerBinary.Path,
+	)
+
+	if err := execwrapper.Exec(ctx, newerBinary.Path, os.Args, os.Environ()); err != nil {
+		logutil.Fatal(logger, err, "exec")
+	}
+
+	panic("how")
 }
 
 func runSubcommands() error {

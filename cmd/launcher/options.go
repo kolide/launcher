@@ -37,6 +37,79 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
+func parseStartupOptions(args []string) (*launcher.Options, error) {
+	configFilePath := getConfigFilePathFromArgs(args)
+	if len(configFilePath) == 0 {
+		var err error
+		configFilePath, err = getConfigFilePathFromWellKnownLocation()
+		if err != nil {
+			return nil, fmt.Errorf("config file not provided and its location could not be determined: %w", err)
+		}
+	}
+
+	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
+	flagset.Usage = func() { usage(flagset) }
+
+	var (
+		flRootDirectory   = flagset.String("root_directory", defaultRootDirectoryPath(), "The location of the local database, pidfiles, etc.")
+		flUpdateChannel   = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
+		flUpdateDirectory = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
+	)
+
+	ffOpts := []ff.Option{
+		ff.WithConfigFile(configFilePath),
+		ff.WithConfigFileParser(ff.PlainParser),
+		ff.WithIgnoreUndefined(true),
+	}
+
+	ff.Parse(flagset, []string{}, ffOpts...)
+
+	return &launcher.Options{
+		RootDirectory:   *flRootDirectory,
+		UpdateChannel:   autoupdate.UpdateChannel(*flUpdateChannel),
+		UpdateDirectory: *flUpdateDirectory,
+	}, nil
+}
+
+func getConfigFilePathFromArgs(args []string) string {
+	for i, arg := range args {
+		if arg == "--config" || arg == "-config" {
+			return strings.Trim(args[i+1], `"'`)
+		}
+	}
+
+	return ""
+}
+
+func getConfigFilePathFromWellKnownLocation() (string, error) {
+	var configFilePath string
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		configFilePath = "/etc/kolide-k2/launcher.flags"
+	case "windows":
+		configFilePath = `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`
+	default:
+		return "", fmt.Errorf("cannot find config file for unsupported OS %s", runtime.GOOS)
+	}
+
+	if _, err := os.Stat(configFilePath); err != nil && os.IsNotExist(err) {
+		return "", fmt.Errorf("could not read config file because it does not exist at %s: %w", configFilePath, err)
+	}
+
+	return configFilePath, nil
+}
+
+func defaultRootDirectoryPath() string {
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		return "/var/kolide-k2/k2device.kolide.com"
+	case "windows":
+		return `C:\Program Files\Kolide\Launcher-kolide-k2\data`
+	default:
+		return ""
+	}
+}
+
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
