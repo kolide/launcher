@@ -59,7 +59,7 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
