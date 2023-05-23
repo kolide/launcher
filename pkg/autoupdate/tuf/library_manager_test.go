@@ -43,12 +43,10 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
-func TestPathToTargetVersionExecutable(t *testing.T) {
+func Test_pathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
-	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "expected no error when creating library")
+	testBaseDir := defaultLibraryDirectory(t.TempDir())
 
 	testVersion := "1.0.7-30-abcdabcd"
 	testTargetFilename := fmt.Sprintf("launcher-%s.tar.gz", testVersion)
@@ -59,8 +57,9 @@ func TestPathToTargetVersionExecutable(t *testing.T) {
 		expectedPath = expectedPath + ".exe"
 	}
 
-	actualPath := testLibrary.PathToTargetVersionExecutable(binaryLauncher, testTargetFilename)
+	actualPath, actualVersion := pathToTargetVersionExecutable(binaryLauncher, testTargetFilename, testBaseDir)
 	require.Equal(t, expectedPath, actualPath, "path mismatch")
+	require.Equal(t, testVersion, actualVersion, "version mismatch")
 }
 
 func TestAvailable(t *testing.T) {
@@ -76,7 +75,7 @@ func TestAvailable(t *testing.T) {
 	// Set up valid "osquery" executable
 	runningOsqueryVersion := "5.5.7"
 	runningTarget := fmt.Sprintf("osqueryd-%s.tar.gz", runningOsqueryVersion)
-	executablePath := testLibrary.PathToTargetVersionExecutable(binaryOsqueryd, runningTarget)
+	executablePath, _ := pathToTargetVersionExecutable(binaryOsqueryd, runningTarget, testBaseDir)
 	tufci.CopyBinary(t, executablePath)
 	require.NoError(t, os.Chmod(executablePath, 0755))
 
@@ -147,10 +146,10 @@ func TestAddToLibrary(t *testing.T) {
 			wg.Wait()
 
 			// Confirm the update was downloaded
-			dirInfo, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(tt.binary), testReleaseVersion))
+			dirInfo, err := os.Stat(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion))
 			require.NoError(t, err, "checking that update was downloaded")
 			require.True(t, dirInfo.IsDir())
-			executableInfo, err := os.Stat(executableLocation(filepath.Join(testLibraryManager.updatesDirectory(tt.binary), testReleaseVersion), tt.binary))
+			executableInfo, err := os.Stat(executableLocation(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion), tt.binary))
 			require.NoError(t, err, "checking that downloaded update includes executable")
 			require.False(t, executableInfo.IsDir())
 
@@ -185,7 +184,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			}
 
 			// Make sure our update directory exists
-			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
+			require.NoError(t, os.MkdirAll(updatesDirectory(binary, testBaseDir), 0755))
 
 			// Set the current running version to the version we're going to request to download
 			currentRunningVersion := "4.3.2"
@@ -196,7 +195,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			require.NoError(t, testLibraryManager.AddToLibrary(binary, currentRunningVersion, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version was not downloaded
-			_, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(binary), currentRunningVersion))
+			_, err := os.Stat(filepath.Join(updatesDirectory(binary, testBaseDir), currentRunningVersion))
 			require.True(t, os.IsNotExist(err), "should not have downloaded currently-running version")
 		})
 	}
@@ -225,11 +224,11 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			}
 
 			// Make sure our update directory exists
-			require.NoError(t, os.MkdirAll(testLibraryManager.updatesDirectory(binary), 0755))
+			require.NoError(t, os.MkdirAll(updatesDirectory(binary, testBaseDir), 0755))
 
 			// Ensure that a valid update already exists in that directory for the specified version
 			testVersion := "2.2.2"
-			executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), testVersion), binary)
+			executablePath := executableLocation(filepath.Join(updatesDirectory(binary, testBaseDir), testVersion), binary)
 			tufci.CopyBinary(t, executablePath)
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
@@ -316,7 +315,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			require.Equal(t, 0, len(downloadMatches), "unexpected files found in staged updates directory: %+v", downloadMatches)
 
 			// Confirm the update was not added to the library
-			updateMatches, err := filepath.Glob(filepath.Join(testLibraryManager.updatesDirectory(tt.binary), "*"))
+			updateMatches, err := filepath.Glob(filepath.Join(updatesDirectory(tt.binary, testBaseDir), "*"))
 			require.NoError(t, err, "checking that updates directory does not contain any updates")
 			require.Equal(t, 0, len(updateMatches), "unexpected files found in updates directory: %+v", updateMatches)
 		})
@@ -491,14 +490,14 @@ func TestTidyLibrary(t *testing.T) {
 				require.NoError(t, err, "creating fake download file")
 				f1.Close()
 
-				// Confirm we made the files
-				matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-				require.NoError(t, err, "could not glob for files in staged osqueryd download dir")
-				require.Equal(t, 1, len(matches))
+				// Confirm we made the staging files
+				stagingMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
+				require.NoError(t, err, "could not glob for files in staged download dir")
+				require.Equal(t, 1, len(stagingMatches))
 
 				// Set up existing versions for test
 				for existingVersion, isExecutable := range tt.existingVersions {
-					executablePath := executableLocation(filepath.Join(testLibraryManager.updatesDirectory(binary), existingVersion), binary)
+					executablePath := executableLocation(filepath.Join(updatesDirectory(binary, testBaseDir), existingVersion), binary)
 					if !isExecutable && runtime.GOOS == "windows" {
 						// We check file extension .exe to confirm executable on Windows, so trim the extension
 						// if this test does not expect the file to be executable.
@@ -512,6 +511,11 @@ func TestTidyLibrary(t *testing.T) {
 					}
 				}
 
+				// Confirm we made the update files
+				updateMatches, err := filepath.Glob(filepath.Join(updatesDirectory(binary, testBaseDir), "*"))
+				require.NoError(t, err, "could not glob for directories in updates dir")
+				require.Equal(t, len(tt.existingVersions), len(updateMatches))
+
 				// Tidy the library
 				testLibraryManager.TidyLibrary(binary, tt.currentlyRunningVersion)
 
@@ -524,14 +528,14 @@ func TestTidyLibrary(t *testing.T) {
 
 				// Confirm that the versions we expect are still there
 				for _, expectedPreservedVersion := range tt.expectedPreservedVersions {
-					info, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(binary), expectedPreservedVersion))
+					info, err := os.Stat(filepath.Join(updatesDirectory(binary, testBaseDir), expectedPreservedVersion))
 					require.NoError(t, err, "could not stat update dir that was expected to exist: %s", expectedPreservedVersion)
 					require.True(t, info.IsDir())
 				}
 
 				// Confirm all other versions were removed
 				for _, expectedRemovedVersion := range tt.expectedRemovedVersions {
-					_, err := os.Stat(filepath.Join(testLibraryManager.updatesDirectory(binary), expectedRemovedVersion))
+					_, err := os.Stat(filepath.Join(updatesDirectory(binary, testBaseDir), expectedRemovedVersion))
 					require.Error(t, err, "expected version to be removed: %s", expectedRemovedVersion)
 					require.True(t, os.IsNotExist(err))
 				}
@@ -578,12 +582,8 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
-	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new read-only library")
-
 	// Get sorted versions
-	validVersions, invalidVersions, err := testLibrary.sortedVersionsInLibrary(binaryLauncher)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect
