@@ -82,7 +82,7 @@ func runDoctor(args []string) error {
 
 	checkups := []*checkup{
 		{
-			name: "Check platform",
+			name: "Platform",
 			check: func() (string, error) {
 				return checkupPlatform(runtime.GOOS)
 			},
