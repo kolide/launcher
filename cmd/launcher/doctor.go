@@ -379,9 +379,10 @@ func runCheckups(checkups []*checkup) {
 		for _, c := range failedCheckups {
 			fail(fmt.Sprintf("    %s\n", c.name))
 		}
-	} else {
-		greenText("\nAll checkups passed! Your Kolide launcher is healthy.")
+		return
 	}
+	
+	greenText("\nAll checkups passed! Your Kolide launcher is healthy.")
 }
 
 // run logs the results of a checkup being run
@@ -399,11 +400,10 @@ func (c *checkup) run() error {
 		fail(err)
 		redText("𐄂 Checkup failed!")
 		return err
-	} else {
-		pass(result)
-		greenText("✔ Checkup passed!")
 	}
-
+	
+	pass(result)
+	greenText("✔ Checkup passed!")
 	return nil
 }
 
@@ -496,23 +496,23 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	checkpointer := checkpoint.New(logger, k)
 	connections := checkpointer.Connections()
 	for k, v := range connections {
-		if v == "successful tcp connection" {
-			pass(fmt.Sprintf("%s - %s", k, v))
-		} else {
+		if v != "successful tcp connection" {
 			fail(fmt.Sprintf("%s - %s", k, v))
 			failures = failures + 1
+			continue
 		}
+		pass(fmt.Sprintf("%s - %s", k, v))
 	}
 
 	ipLookups := checkpointer.IpLookups()
 	for k, v := range ipLookups {
 		valStrSlice, ok := v.([]string)
-		if ok && len(valStrSlice) > 0 {
-			pass(fmt.Sprintf("%s - %s", k, valStrSlice))
-		} else {
+		if !ok || len(valStrSlice) == 0 {
 			fail(fmt.Sprintf("%s - %s", k, valStrSlice))
 			failures = failures + 1
+			continue
 		}
+		pass(fmt.Sprintf("%s - %s", k, valStrSlice))
 	}
 
 	notaryVersions, err := checkpointer.NotaryVersions()
@@ -523,12 +523,12 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 
 	for k, v := range notaryVersions {
 		// Check for failure if the notary version isn't a parsable integer
-		if _, err := strconv.ParseInt(v, 10, 32); err == nil {
-			pass(fmt.Sprintf("%s - %s", k, v))
-		} else {
+		if _, err := strconv.ParseInt(v, 10, 32); err != nil {
 			fail(fmt.Sprintf("%s - %s", k, v))
 			failures = failures + 1
+			continue
 		}
+		pass(fmt.Sprintf("%s - %s", k, v)
 	}
 
 	if failures == 0 {
@@ -566,10 +566,10 @@ func checkupConfigFile(filepath string) (string, error) {
 		return nil
 	})
 
-	if err == nil {
-		return "Config file found", nil
+	if err != nil {
+		return "", fmt.Errorf("Invalid config file")
 	}
-	return "", fmt.Errorf("Invalid config file")
+	return "Config file found", nil
 }
 
 // checkupLogFiles checks to see if expected log files are present
@@ -578,24 +578,30 @@ func checkupLogFiles(filepaths []string) (string, error) {
 	for _, f := range filepaths {
 		filename := filepath.Base(f)
 		info(filename)
-
-		if filename == "debug.json" {
-			foundCurrentLogFile = true
-
-			fi, err := os.Stat(f)
-			if err == nil {
-				info("")
-				info(fmt.Sprintf("Most recent log file: %s", filename))
-				info(fmt.Sprintf("Latest modification: %s", fi.ModTime().String()))
-				info(fmt.Sprintf("File size (B): %d", fi.Size()))
-			}
+		
+		if filename != "debug.json" {
+		    continue
 		}
+
+	        foundCurrentLogFile = true
+        
+	        fi, err := os.Stat(f)
+	        if err != nil {
+	            continue
+	        }
+
+		info("")
+		info(fmt.Sprintf("Most recent log file: %s", filename))
+		info(fmt.Sprintf("Latest modification: %s", fi.ModTime().String()))
+		info(fmt.Sprintf("File size (B): %d", fi.Size()))
 	}
 
-	if foundCurrentLogFile {
-		return "Log file found", nil
+	if !foundCurrentLogFile {
+	    return "", fmt.Errorf("No log file found")
 	}
-	return "", fmt.Errorf("No log file found")
+	
+	return "Log file found", nil
+
 }
 
 // checkupProcessReport finds processes that look like Kolide launcher/osquery processes
@@ -618,8 +624,8 @@ func checkupProcessReport() (string, error) {
 		}
 	}
 
-	if foundKolide {
-		return "Launcher processes found", nil
+	if !foundKolide {
+	        return "", fmt.Errorf("No launcher processes found")
 	}
-	return "", fmt.Errorf("No launcher processes found")
+	return "Launcher processes found", nil
 }
