@@ -75,7 +75,7 @@ func (tp *templateParser) Parse(text string) (string, error) {
 				return "One Minute Ago"
 			case diff < -5: // more than 5 seconds ago
 				return fmt.Sprintf("%d Seconds Ago", -diff)
-			case diff < 0: // in the last 5 seconds
+			case diff <= 0: // in the last 5 seconds
 				return "Just Now"
 			case diff < 60*10: // less than 10 minutes
 				return "Very Soon"

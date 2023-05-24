@@ -59,7 +59,7 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -365,7 +365,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 1 * time.Minute
 		mirrorClient := http.DefaultClient
-		mirrorClient.Timeout = 5 * time.Minute // gives us extra time to avoid a timeout on download
+		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			k,
 			metadataClient,
