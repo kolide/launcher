@@ -5,40 +5,43 @@ import (
 	"runtime"
 )
 
-func getDefaults(defaultRootDir, defaultEtcDir, binDir, defaultConfigFile *string) {
+// setDefaultPaths populates the default file/dir paths
+// call this before calling parseOptions if you want to assume these paths exist
+func setDefaultPaths() {
 	switch runtime.GOOS {
 	case "darwin":
-		*defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
-		*defaultEtcDir = "/etc/kolide-k2/"
-		*binDir = "/usr/local/kolide-k2/"
-		*defaultConfigFile = filepath.Join(*defaultEtcDir, "launcher.flags")
+		defaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		defaultEtcDirectoryPath = "/etc/kolide-k2/"
+		defaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		defaultConfigFilePath = filepath.Join(defaultEtcDirectoryPath, "launcher.flags")
 	case "linux":
-		*defaultRootDir = "/var/kolide-k2/k2device.kolide.com/"
-		*defaultEtcDir = "/etc/kolide-k2/"
-		*binDir = "/usr/local/kolide-k2/"
-		*defaultConfigFile = filepath.Join(*defaultEtcDir, "launcher.flags")
+		defaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		defaultEtcDirectoryPath = "/etc/kolide-k2/"
+		defaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		defaultConfigFilePath = filepath.Join(defaultEtcDirectoryPath, "launcher.flags")
 	case "windows":
-		*defaultRootDir = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
-		*defaultEtcDir = ""
-		*binDir = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
-		*defaultConfigFile = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
+		defaultRootDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
+		defaultEtcDirectoryPath = ""
+		defaultBinDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
+		defaultConfigFilePath = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 	}
 }
 
+// getAppBinaryPaths returns the platform specific path where binaries are installed
 func getAppBinaryPaths() []string {
 	var paths []string
 	switch runtime.GOOS {
 	case "darwin":
 		paths = []string{
-			filepath.Join(binDir, "Kolide.app", "Contents", "MacOS", "launcher"),
+			filepath.Join(defaultBinDirectoryPath, "Kolide.app", "Contents", "MacOS", "launcher"),
 		}
 	case "linux":
 		paths = []string{
-			filepath.Join(binDir, "launcher"),
+			filepath.Join(defaultBinDirectoryPath, "launcher"),
 		}
 	case "windows":
 		paths = []string{
-			filepath.Join(binDir, "launcher.exe"),
+			filepath.Join(defaultBinDirectoryPath, "launcher.exe"),
 		}
 	}
 	return paths
