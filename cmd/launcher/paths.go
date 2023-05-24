@@ -34,7 +34,7 @@ func getAppBinaryPaths() []string {
 		}
 	case "linux":
 		paths = []string{
-			filepath.Join(binDir, "launcher.exe"),
+			filepath.Join(binDir, "launcher"),
 		}
 	case "windows":
 		paths = []string{
