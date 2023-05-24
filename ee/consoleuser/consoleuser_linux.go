@@ -31,6 +31,11 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 
 	var uids []string
 	for _, s := range sessions {
+		// generally human users start at 1000 on linux
+		if s.UID < 1000 {
+			continue
+		}
+
 		// if there is no seat, this is not a graphical session
 		if s.Seat == "" {
 			continue
