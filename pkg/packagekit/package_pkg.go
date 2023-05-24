@@ -22,7 +22,7 @@ import (
 //go:embed assets/distribution.dist
 var distributionTemplate []byte
 
-func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
+func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions, arch string) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
 	defer span.End()
 
@@ -43,7 +43,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions) error {
 		return fmt.Errorf("running pkgbuild: %w", err)
 	}
 
-	if err := runProductbuild(ctx, flatPkgPath, distributionPkgPath, po); err != nil {
+	if err := runProductbuild(ctx, flatPkgPath, distributionPkgPath, arch, po); err != nil {
 		return fmt.Errorf("running productbuild: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 // package. It does this by execing productbuild.
 //
 // See https://github.com/kolide/launcher/issues/407 and associated links
-func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath string, po *PackageOptions) error {
+func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath string, arch string, po *PackageOptions) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.runProductbuild")
 	defer span.End()
 
@@ -178,15 +178,17 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 	defer fh.Close()
 
 	var templateData = struct {
-		Title      string
-		Identifier string
-		Version    string
-		PkgName    string
+		Title             string
+		Identifier        string
+		Version           string
+		PkgName           string
+		HostArchitectures string
 	}{
-		Title:      po.Title,
-		Identifier: po.Identifier,
-		Version:    po.Version,
-		PkgName:    filepath.Base(flatPkgPath),
+		Title:             po.Title,
+		Identifier:        po.Identifier,
+		Version:           po.Version,
+		PkgName:           filepath.Base(flatPkgPath),
+		HostArchitectures: hostArchitectures(arch),
 	}
 	t, err := template.New("distribution").Parse(string(distributionTemplate))
 	if err != nil {
@@ -234,4 +236,17 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 	}
 
 	return nil
+}
+
+func hostArchitectures(arch string) string {
+	switch arch {
+	case "universal":
+		return "x86_64,arm64"
+	case "amd64":
+		return "x86_64"
+	case "arm64":
+		return "arm64"
+	default:
+		return "x86_64,arm64"
+	}
 }
