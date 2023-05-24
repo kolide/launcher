@@ -3,12 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
@@ -16,37 +18,53 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/v3/process"
 
-	"github.com/fatih/color"
 	"golang.org/x/exp/slices"
 )
 
 var (
+	doctorWriter io.Writer
+
 	// Command line colors
 	cyanText   = color.New(color.FgCyan)
-	headerText = color.New(color.FgHiWhite).Add(color.Bold)
+	headerText = color.New(color.Bold, color.FgHiWhite)
 	yellowText = color.New(color.FgHiYellow)
+	whiteText  = color.New(color.FgWhite)
+	greenText  = color.New(color.FgGreen)
+	redText    = color.New(color.Bold, color.FgRed)
+
+	// Printf functions
+	cyan = func(format string, a ...interface{}) {
+		cyanText.Fprintf(doctorWriter, format, a...)
+	}
+	header = func(format string, a ...interface{}) {
+		headerText.Fprintf(doctorWriter, format, a...)
+	}
 
 	// Println functions for checkup details
-	whiteText = color.New(color.FgWhite)
-	greenText = color.New(color.FgGreen).PrintlnFunc()
-	redText   = color.New(color.FgRed).Add(color.Bold).PrintlnFunc()
+	green = func(a ...interface{}) {
+		greenText.Fprintln(doctorWriter, a...)
+	}
+	red = func(a ...interface{}) {
+		redText.Fprintln(doctorWriter, a...)
+	}
 
 	// Indented output for checkup results
 	info = func(a ...interface{}) {
-		whiteText.Println(fmt.Sprintf("    %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("    %s", a...))
 	}
 	warn = func(a ...interface{}) {
-		yellowText.Println(fmt.Sprintf("    %s", a...))
+		yellowText.FprintlnFunc()(doctorWriter, fmt.Sprintf("    %s", a...))
 	}
 	fail = func(a ...interface{}) {
-		whiteText.Println(fmt.Sprintf("❌  %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("❌  %s", a...))
 	}
 	pass = func(a ...interface{}) {
-		whiteText.Println(fmt.Sprintf("✅  %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("✅  %s", a...))
 	}
 )
 
@@ -74,9 +92,19 @@ func runDoctor(args []string) error {
 	flagController := flags.NewFlagController(logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil)
 
-	cyanText.Println("Kolide launcher doctor version:")
+	buildAndRunCheckups(logger, k, opts, os.Stdout)
+
+	return nil
+}
+
+// buildAndRunCheckups creates a list of checkups and executes them
+func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Options, w io.Writer) error {
+	// Set the writer to be used for doctor output
+	doctorWriter = w
+
+	cyan("Kolide launcher doctor version:\n")
 	version.PrintFull()
-	cyanText.Println("\nRunning Kolide launcher checkups...")
+	cyan("\nRunning Kolide launcher checkups...\n")
 
 	checkups := []*checkup{
 		{
@@ -159,7 +187,7 @@ func runCheckups(checkups []*checkup) {
 	}
 
 	if len(failedCheckups) > 0 {
-		redText("\nSome checkups failed:")
+		red("\nSome checkups failed:")
 
 		for _, c := range failedCheckups {
 			fail(fmt.Sprintf("    %s\n", c.name))
@@ -167,7 +195,7 @@ func runCheckups(checkups []*checkup) {
 		return
 	}
 
-	greenText("\nAll checkups passed! Your Kolide launcher is healthy.")
+	green("\nAll checkups passed! Your Kolide launcher is healthy.")
 }
 
 // run logs the results of a checkup being run
@@ -176,19 +204,19 @@ func (c *checkup) run() error {
 		return errors.New("checkup is nil")
 	}
 
-	cyanText.Printf("\nRunning checkup: ")
-	headerText.Printf("%s\n", c.name)
+	cyan("\nRunning checkup: ")
+	header("%s\n", c.name)
 
 	result, err := c.check()
 	if err != nil {
 		info(result)
 		fail(err)
-		redText("𐄂 Checkup failed!")
+		red("𐄂 Checkup failed!")
 		return err
 	}
 
 	pass(result)
-	greenText("✔ Checkup passed!")
+	green("✔ Checkup passed!")
 	return nil
 }
 
