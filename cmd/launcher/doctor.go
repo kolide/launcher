@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -137,7 +139,7 @@ func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Opt
 		{
 			name: "Osquery",
 			check: func() (string, error) {
-				return checkupOsquery(getAppBinaryPaths())
+				return checkupOsquery(opts.UpdateChannel.String(), opts.TufServerURL, opts.OsquerydPath)
 			},
 		},
 		{
@@ -147,7 +149,7 @@ func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Opt
 			},
 		},
 		{
-			name: "Check version",
+			name: "Check launcher version",
 			check: func() (string, error) {
 				return checkupVersion(opts.UpdateChannel.String(), opts.TufServerURL, version.Version())
 			},
@@ -272,10 +274,40 @@ func checkupAppBinaries(filepaths []string) (string, error) {
 }
 
 // checkupOsquery tests for the presence of files important to osquery
-func checkupOsquery(filepaths []string) (string, error) {
-	// TODO
-	warn("Osquery status unknown")
-	return "", nil
+func checkupOsquery(updateChannel, tufServerURL, osquerydPath string) (string, error) {
+	if osquerydPath == "" {
+		return "", fmt.Errorf("osqueryd path unknown")
+	}
+
+	_, err := os.Stat(osquerydPath)
+	if err != nil {
+		return "", fmt.Errorf("osqueryd does not exist")
+	}
+
+	osqueryArgs := []string{"--version"}
+	cmd := exec.CommandContext(context.TODO(), osquerydPath, osqueryArgs...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("error occurred while querying osquery version output %s: err: %w", out, err)
+	}
+
+	currentVersion := strings.TrimLeft(string(out), "osqueryd version ")
+	currentVersion = strings.TrimRight(currentVersion, "\n")
+
+	info(fmt.Sprintf("Current version:\t%s", currentVersion))
+
+	// Query the TUF repo for what the target version of osquery is
+	targetVersion, err := tuf.GetChannelVersionFromTufServer("osqueryd", updateChannel, tufServerURL)
+	if err != nil {
+		return "", fmt.Errorf("Failed to query TUF server: %w", err)
+	}
+
+	info(fmt.Sprintf("Target version:\t%s", targetVersion))
+
+	if targetVersion != currentVersion {
+		return "", fmt.Errorf("osqueryd is out of date")
+	}
+	return "Up to date!", nil
 }
 
 func checkupFilesPresent(filepaths []string, importantFiles []*launcherFile) (string, error) {
@@ -368,10 +400,10 @@ func checkupVersion(updateChannel, tufServerURL string, v version.Info) (string,
 
 	info(fmt.Sprintf("Target version:\t%s", targetVersion))
 
-	if targetVersion == v.Version {
-		return "Up to date!", nil
+	if targetVersion != v.Version {
+		return "", fmt.Errorf("launcher is out of date")
 	}
-	return "", fmt.Errorf("launcher is out of date")
+	return "Up to date!", nil
 }
 
 // checkupConfigFile tests that the config file is valid and logs it's contents
