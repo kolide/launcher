@@ -295,7 +295,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	if err := backoff.WaitFor(func() error {
 		return os.RemoveAll(paths.extensionSocketPath)
 	}, 1*time.Minute, 1*time.Second); err != nil {
-		return fmt.Errorf("timeout waiting for osqueryd to create socket: %w", err)
+		return fmt.Errorf("timeout attempthing to remove osquery extension socket at %s: %w", paths.extensionSocketPath, err)
 	}
 
 	// Launch osquery process (async)
@@ -319,7 +319,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		_, err := os.Stat(paths.extensionSocketPath)
 		return err
 	}, 1*time.Minute, 1*time.Second); err != nil {
-		return fmt.Errorf("timeout waiting for osqueryd to create socket: %w", err)
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
 	}
 
 	stats, err := history.NewInstance()
