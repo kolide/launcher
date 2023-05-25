@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/fatih/color"
 	"github.com/go-kit/kit/log"
@@ -56,16 +57,16 @@ var (
 
 	// Indented output for checkup results
 	info = func(a ...interface{}) {
-		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("    %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("\t%s", a...))
 	}
 	warn = func(a ...interface{}) {
-		yellowText.FprintlnFunc()(doctorWriter, fmt.Sprintf("    %s", a...))
+		yellowText.FprintlnFunc()(doctorWriter, fmt.Sprintf("\t%s", a...))
 	}
 	fail = func(a ...interface{}) {
-		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("❌  %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("❌\t%s", a...))
 	}
 	pass = func(a ...interface{}) {
-		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("✅  %s", a...))
+		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("✅\t%s", a...))
 	}
 )
 
@@ -101,7 +102,8 @@ func runDoctor(args []string) error {
 // buildAndRunCheckups creates a list of checkups and executes them
 func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Options, w io.Writer) error {
 	// Set the writer to be used for doctor output
-	doctorWriter = w
+	writer := tabwriter.NewWriter(w, 0, 8, 1, '\t', tabwriter.AlignRight)
+	doctorWriter = writer
 
 	cyan("Kolide launcher doctor version:\n")
 	version.PrintFull()
@@ -191,7 +193,7 @@ func runCheckups(checkups []*checkup) {
 		red("\nSome checkups failed:")
 
 		for _, c := range failedCheckups {
-			fail(fmt.Sprintf("    %s\n", c.name))
+			fail(fmt.Sprintf("\t%s\n", c.name))
 		}
 		return
 	}
@@ -212,12 +214,12 @@ func (c *checkup) run() error {
 	if err != nil {
 		info(result)
 		fail(err)
-		red("𐄂 Checkup failed!")
+		red("𐄂\tCheckup failed!")
 		return err
 	}
 
 	pass(result)
-	green("✔ Checkup passed!")
+	green("✔\tCheckup passed!")
 	return nil
 }
 
@@ -226,7 +228,7 @@ func checkupPlatform(os string) (string, error) {
 	if slices.Contains([]string{"windows", "darwin", "linux"}, os) {
 		return fmt.Sprintf("Platform: %s", os), nil
 	}
-	return "", fmt.Errorf("Unsupported platform: %s", os)
+	return "", fmt.Errorf("Unsupported platform:\t%s", os)
 }
 
 // checkupArch verifies that the current architecture is supported by launcher
@@ -234,7 +236,7 @@ func checkupArch(arch string) (string, error) {
 	if slices.Contains([]string{"386", "amd64", "arm64"}, arch) {
 		return fmt.Sprintf("Architecture: %s", arch), nil
 	}
-	return "", fmt.Errorf("Unsupported architecture: %s", arch)
+	return "", fmt.Errorf("Unsupported architecture:\t%s", arch)
 }
 
 type launcherFile struct {
@@ -311,22 +313,22 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	connections := checkpointer.Connections()
 	for k, v := range connections {
 		if v != "successful tcp connection" {
-			fail(fmt.Sprintf("%s - %s", k, v))
+			fail(fmt.Sprintf("%s\t%s", k, v))
 			failures = failures + 1
 			continue
 		}
-		pass(fmt.Sprintf("%s - %s", k, v))
+		pass(fmt.Sprintf("%s\t%s", k, v))
 	}
 
 	ipLookups := checkpointer.IpLookups()
 	for k, v := range ipLookups {
 		valStrSlice, ok := v.([]string)
 		if !ok || len(valStrSlice) == 0 {
-			fail(fmt.Sprintf("%s - %s", k, valStrSlice))
+			fail(fmt.Sprintf("%s\t%s", k, valStrSlice))
 			failures = failures + 1
 			continue
 		}
-		pass(fmt.Sprintf("%s - %s", k, valStrSlice))
+		pass(fmt.Sprintf("%s\t%s", k, valStrSlice))
 	}
 
 	notaryVersions, err := checkpointer.NotaryVersions()
@@ -338,11 +340,11 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 	for k, v := range notaryVersions {
 		// Check for failure if the notary version isn't a parsable integer
 		if _, err := strconv.ParseInt(v, 10, 32); err != nil {
-			fail(fmt.Sprintf("%s - %s", k, v))
+			fail(fmt.Sprintf("%s\t%s", k, v))
 			failures = failures + 1
 			continue
 		}
-		pass(fmt.Sprintf("%s - %s", k, v))
+		pass(fmt.Sprintf("%s\t%s", k, v))
 	}
 
 	if failures == 0 {
@@ -354,9 +356,9 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 
 // checkupVersion tests to see if the current launcher version is up to date
 func checkupVersion(updateChannel, tufServerURL string, v version.Info) (string, error) {
-	info(fmt.Sprintf("Update Channel: %s", updateChannel))
-	info(fmt.Sprintf("TUF Server: %s", tufServerURL))
-	info(fmt.Sprintf("Current version: %s", v.Version))
+	info(fmt.Sprintf("Update Channel:\t%s", updateChannel))
+	info(fmt.Sprintf("TUF Server:\t%s", tufServerURL))
+	info(fmt.Sprintf("Current version:\t%s", v.Version))
 
 	// Query the TUF repo for what the target version of launcher is
 	targetVersion, err := tuf.GetChannelVersionFromTufServer("launcher", updateChannel, tufServerURL)
@@ -364,7 +366,7 @@ func checkupVersion(updateChannel, tufServerURL string, v version.Info) (string,
 		return "", fmt.Errorf("Failed to query TUF server: %w", err)
 	}
 
-	info(fmt.Sprintf("Target version: %s", targetVersion))
+	info(fmt.Sprintf("Target version:\t%s", targetVersion))
 
 	if targetVersion == v.Version {
 		return "Up to date!", nil
@@ -382,7 +384,7 @@ func checkupConfigFile(filepath string) (string, error) {
 
 	// Parse the config file how launcher would
 	err = ff.PlainParser(file, func(name, value string) error {
-		info(fmt.Sprintf("%s %s", name, value))
+		info(fmt.Sprintf("%s\t%s", name, value))
 		return nil
 	})
 
@@ -411,9 +413,9 @@ func checkupLogFiles(filepaths []string) (string, error) {
 		}
 
 		info("")
-		info(fmt.Sprintf("Most recent log file: %s", filename))
-		info(fmt.Sprintf("Latest modification: %s", fi.ModTime().String()))
-		info(fmt.Sprintf("File size (B): %d", fi.Size()))
+		info(fmt.Sprintf("Most recent log file:\t%s", filename))
+		info(fmt.Sprintf("Latest modification:\t%s", fi.ModTime().String()))
+		info(fmt.Sprintf("File size (B):\t%d", fi.Size()))
 	}
 
 	if !foundCurrentLogFile {
@@ -440,7 +442,7 @@ func checkupProcessReport() (string, error) {
 			name, _ := p.Name()
 			args, _ := p.Cmdline()
 			user, _ := p.Username()
-			info(fmt.Sprintf("%s %d  %s  %s", user, p.Pid, name, args))
+			info(fmt.Sprintf("%s\t%d\t%s\t%s", user, p.Pid, name, args))
 		}
 	}
 
