@@ -291,6 +291,13 @@ func (r *Runner) launchOsqueryInstance() error {
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
+	// remove osquery socket if exists
+	if err := backoff.WaitFor(func() error {
+		return os.RemoveAll(paths.extensionSocketPath)
+	}, 1*time.Minute, 1*time.Second); err != nil {
+		return fmt.Errorf("timeout waiting for osqueryd to create socket: %w", err)
+	}
+
 	// Launch osquery process (async)
 	err = o.cmd.Start()
 	if err != nil {
