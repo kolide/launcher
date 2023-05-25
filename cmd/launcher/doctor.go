@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/peterbourgon/ff/v3"
@@ -146,7 +147,7 @@ func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Opt
 		{
 			name: "Check version",
 			check: func() (string, error) {
-				return checkupVersion(version.Version())
+				return checkupVersion(opts.UpdateChannel.String(), opts.TufServerURL, version.Version())
 			},
 		},
 		{
@@ -352,16 +353,22 @@ func checkupConnectivity(logger log.Logger, k types.Knapsack) (string, error) {
 }
 
 // checkupVersion tests to see if the current launcher version is up to date
-func checkupVersion(v version.Info) (string, error) {
+func checkupVersion(updateChannel, tufServerURL string, v version.Info) (string, error) {
+	info(fmt.Sprintf("Update Channel: %s", updateChannel))
+	info(fmt.Sprintf("TUF Server: %s", tufServerURL))
 	info(fmt.Sprintf("Current version: %s", v.Version))
-	// TODO: Query TUF for latest available version for this launcher instance
-	warn(fmt.Sprintf("Target version: %s", "Unknown"))
 
-	// TODO: Choose failure based on current >= target
-	if true {
-		return "Up to date!", nil
+	// Query the TUF repo for what the target version of launcher is
+	targetVersion, err := tuf.GetChannelVersionFromTufServer("launcher", updateChannel, tufServerURL)
+	if err != nil {
+		return "", fmt.Errorf("Failed to query TUF server: %w", err)
 	}
 
+	info(fmt.Sprintf("Target version: %s", targetVersion))
+
+	if targetVersion == v.Version {
+		return "Up to date!", nil
+	}
 	return "", fmt.Errorf("launcher is out of date")
 }
 
