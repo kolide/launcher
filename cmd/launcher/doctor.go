@@ -30,12 +30,12 @@ var (
 	doctorWriter io.Writer
 
 	// Command line colors
-	cyanText   = color.New(color.FgCyan)
-	headerText = color.New(color.Bold, color.FgHiWhite)
-	yellowText = color.New(color.FgHiYellow)
-	whiteText  = color.New(color.FgWhite)
-	greenText  = color.New(color.FgGreen)
-	redText    = color.New(color.Bold, color.FgRed)
+	cyanText   = color.New(color.FgCyan, color.BgBlack)
+	headerText = color.New(color.Bold, color.FgHiWhite, color.BgBlack)
+	yellowText = color.New(color.FgHiYellow, color.BgBlack)
+	whiteText  = color.New(color.FgWhite, color.BgBlack)
+	greenText  = color.New(color.FgGreen, color.BgBlack)
+	redText    = color.New(color.Bold, color.FgRed, color.BgBlack)
 
 	// Printf functions
 	cyan = func(format string, a ...interface{}) {
