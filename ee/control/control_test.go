@@ -302,3 +302,42 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 		})
 	}
 }
+
+func TestControlServiceReceivedMessageTracking(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                 string
+		subsystemExistingIds map[string]string
+		subsystemNewMessages map[string][]string
+		hashData             map[string]any
+		subsystems           map[string]string
+	}{
+		{
+			name: "happy path",
+			subsystemExistingIds: map[string]string{
+				"subsystem_A_received_messages": `["1", "2"]`,
+			},
+			subsystems: map[string]string{"desktop": "502a42f0"},
+			hashData:   map[string]any{"502a42f0": "status"},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &mockStore{keyValues: tt.subsystemExistingIds}
+			data := &TestClient{tt.subsystems, tt.hashData}
+			controlOpts := []Option{WithStore(store)}
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+
+			// mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			// mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+
+			err := cs.fetchAndUpdate("test", "test")
+			require.NoError(t, err)
+		})
+	}
+}

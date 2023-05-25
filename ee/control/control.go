@@ -213,6 +213,22 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		return errors.New("control data is nil")
 	}
 
+	if newId := cs.messageId(data); newId != "" {
+		existingIds := cs.getSubsystemReceivedMessageIds(subsystem)
+
+		for _, existingId := range existingIds {
+			if newId == existingId {
+				// we have a matching id, so we don't need to update
+				return nil
+			}
+		}
+
+		existingIds = append(existingIds, newId)
+		if err := cs.setSubsystemReceivedMessageIds(subsystem, existingIds); err != nil {
+			return fmt.Errorf("failed to set subsystem received message ids: %w", err)
+		}
+	}
+
 	// Consumer and subscriber(s) notified now
 	err = cs.update(subsystem, data)
 	if err != nil {
@@ -266,4 +282,50 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 	}
 
 	return nil
+}
+
+func (cs *ControlService) messageId(data io.Reader) string {
+	type IdType struct {
+		Id string `json:"id"`
+	}
+
+	var id IdType
+	if err := json.NewDecoder(data).Decode(&id); err != nil {
+		return ""
+	}
+
+	return id.Id
+}
+
+func (cs *ControlService) getSubsystemReceivedMessageIds(subsystem string) []string {
+	allIdsRaw, err := cs.store.Get([]byte(subsystemReceivedMessagesKey(subsystem)))
+	if err != nil {
+		return []string{}
+	}
+
+	var allIds []string
+	if err := json.Unmarshal(allIdsRaw, &allIds); err != nil {
+		return []string{}
+	}
+
+	return allIds
+}
+
+// setSubsystemReceivedMessageIds - converts a slice of strings to json and stores it
+// removing the first element from the slice if it's len is greater than max length
+func (cs *ControlService) setSubsystemReceivedMessageIds(subsystem string, ids []string) error {
+	if len(ids) > 10 {
+		ids = ids[1:]
+	}
+
+	allIdsRaw, err := json.Marshal(ids)
+	if err != nil {
+		return fmt.Errorf("marshaling new subsystem received ids json: %w", err)
+	}
+
+	return cs.store.Set([]byte(subsystemReceivedMessagesKey(subsystem)), allIdsRaw)
+}
+
+func subsystemReceivedMessagesKey(subsystem string) string {
+	return fmt.Sprintf("%s_received_messages", subsystem)
 }
