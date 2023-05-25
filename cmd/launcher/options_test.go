@@ -206,11 +206,3 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 
 	return args, opts
 }
-
-func windowsAddExe(in string) string {
-	if runtime.GOOS == "windows" {
-		return in + ".exe"
-	}
-
-	return in
-}

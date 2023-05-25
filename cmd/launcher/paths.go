@@ -58,3 +58,12 @@ func getFilepaths(elem ...string) []string {
 
 	return nil
 }
+
+// windowsAddExe appends ".exe" to the input string when running on Windows
+func windowsAddExe(in string) string {
+	if runtime.GOOS == "windows" {
+		return in + ".exe"
+	}
+
+	return in
+}

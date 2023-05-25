@@ -288,7 +288,7 @@ func checkupRootDir(filepaths []string) (string, error) {
 func checkupAppBinaries(filepaths []string) (string, error) {
 	importantFiles := []*launcherFile{
 		{
-			name: "launcher",
+			name: windowsAddExe("launcher"),
 		},
 	}
 
@@ -313,7 +313,7 @@ func checkupOsquery(updateChannel, tufServerURL, osquerydPath string) (string, e
 		return "", fmt.Errorf("error occurred while querying osquery version output %s: err: %w", out, err)
 	}
 
-	currentVersion := strings.TrimLeft(string(out), "osqueryd version ")
+	currentVersion := strings.TrimLeft(string(out), fmt.Sprintf("%s version ", windowsAddExe("osqueryd")))
 	currentVersion = strings.TrimRight(currentVersion, "\n")
 
 	info(fmt.Sprintf("Current version:\t%s", currentVersion))
@@ -321,7 +321,7 @@ func checkupOsquery(updateChannel, tufServerURL, osquerydPath string) (string, e
 	// Query the TUF repo for what the target version of osquery is
 	targetVersion, err := tuf.GetChannelVersionFromTufServer("osqueryd", updateChannel, tufServerURL)
 	if err != nil {
-		return "", fmt.Errorf("Failed to query TUF server: %w", err)
+		return "", fmt.Errorf("failed to query TUF server: %w", err)
 	}
 
 	info(fmt.Sprintf("Target version:\t%s", targetVersion))
