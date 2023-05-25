@@ -325,11 +325,7 @@ func checkupOsquery(updateChannel, tufServerURL, osquerydPath string) (string, e
 	}
 
 	info(fmt.Sprintf("Target version:\t%s", targetVersion))
-
-	if targetVersion != currentVersion {
-		return "", fmt.Errorf("osqueryd is out of date")
-	}
-	return "Up to date!", nil
+	return "Osquery version checks complete", nil
 }
 
 func checkupFilesPresent(filepaths []string, importantFiles []*launcherFile) (string, error) {
@@ -421,11 +417,7 @@ func checkupVersion(updateChannel, tufServerURL string, v version.Info) (string,
 	}
 
 	info(fmt.Sprintf("Target version:\t%s", targetVersion))
-
-	if targetVersion != v.Version {
-		return "", fmt.Errorf("launcher is out of date")
-	}
-	return "Up to date!", nil
+	return "Launcher version checks complete", nil
 }
 
 // checkupConfigFile tests that the config file is valid and logs it's contents
