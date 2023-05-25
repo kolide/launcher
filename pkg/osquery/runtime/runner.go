@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -304,6 +305,14 @@ func (r *Runner) launchOsqueryInstance() error {
 
 		level.Info(o.logger).Log(msgPairs...)
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	}
+
+	// wait for osquery to create the socket before moving on
+	if err := backoff.WaitFor(func() error {
+		_, err := os.Stat(paths.extensionSocketPath)
+		return err
+	}, 1*time.Minute, 1*time.Second); err != nil {
+		return fmt.Errorf("timeout waiting for osqueryd to create socket: %w", err)
 	}
 
 	stats, err := history.NewInstance()
