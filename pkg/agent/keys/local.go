@@ -52,6 +52,9 @@ func SetupLocalDbKey(logger log.Logger, store types.GetterSetter) (*dbKey, error
 
 func fetchKey(store types.Getter) (*ecdsa.PrivateKey, error) {
 	raw, _ := store.Get([]byte(localKey))
+	if raw == nil {
+		return nil, nil
+	}
 	return x509.ParseECPrivateKey(raw)
 }
 
