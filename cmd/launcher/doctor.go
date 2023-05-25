@@ -15,7 +15,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/flags"
@@ -34,12 +33,40 @@ var (
 	doctorWriter io.Writer
 
 	// Command line colors
-	cyanText   = color.New(color.FgCyan, color.BgBlack)
+	cyanText   *color.Color
+	headerText *color.Color
+	yellowText *color.Color
+	whiteText  *color.Color
+	greenText  *color.Color
+	redText    *color.Color
+
+	// Printf functions
+	cyan   func(format string, a ...interface{})
+	header func(format string, a ...interface{})
+
+	// Println functions for checkup details
+	green func(a ...interface{})
+	red   func(a ...interface{})
+
+	// Indented output for checkup results
+	info func(a ...interface{})
+	warn func(a ...interface{})
+	fail func(a ...interface{})
+	pass func(a ...interface{})
+)
+
+func configureOutput(w io.Writer) {
+	// Set the writer to be used for doctor output
+	writer := tabwriter.NewWriter(w, 0, 8, 1, '\t', tabwriter.AlignRight)
+	doctorWriter = writer
+
+	// Command line colors
+	cyanText = color.New(color.FgCyan, color.BgBlack)
 	headerText = color.New(color.Bold, color.FgHiWhite, color.BgBlack)
 	yellowText = color.New(color.FgHiYellow, color.BgBlack)
-	whiteText  = color.New(color.FgWhite, color.BgBlack)
-	greenText  = color.New(color.FgGreen, color.BgBlack)
-	redText    = color.New(color.Bold, color.FgRed, color.BgBlack)
+	whiteText = color.New(color.FgWhite, color.BgBlack)
+	greenText = color.New(color.FgGreen, color.BgBlack)
+	redText = color.New(color.Bold, color.FgRed, color.BgBlack)
 
 	// Printf functions
 	cyan = func(format string, a ...interface{}) {
@@ -70,7 +97,7 @@ var (
 	pass = func(a ...interface{}) {
 		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("✅\t%s", a...))
 	}
-)
+}
 
 // checkup encapsulates a launcher health checkup
 type checkup struct {
@@ -85,14 +112,13 @@ func runDoctor(args []string) error {
 	defaultAutoupdate = true
 	setDefaultPaths()
 
-	logger := log.With(logutil.NewCLILogger(true), "caller", log.DefaultCaller)
 	opts, err := parseOptions("doctor", os.Args[2:])
 	if err != nil {
-		level.Info(logger).Log("err", err)
-		os.Exit(1)
+		return err
 	}
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	logger := log.With(logutil.NewCLILogger(true), "caller", log.DefaultCaller)
 	flagController := flags.NewFlagController(logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil)
 
@@ -102,10 +128,8 @@ func runDoctor(args []string) error {
 }
 
 // buildAndRunCheckups creates a list of checkups and executes them
-func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Options, w io.Writer) error {
-	// Set the writer to be used for doctor output
-	writer := tabwriter.NewWriter(w, 0, 8, 1, '\t', tabwriter.AlignRight)
-	doctorWriter = writer
+func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Options, w io.Writer) {
+	configureOutput(w)
 
 	cyan("Kolide launcher doctor version:\n")
 	version.PrintFull()
@@ -175,8 +199,6 @@ func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Opt
 	}
 
 	runCheckups(checkups)
-
-	return nil
 }
 
 // runCheckups iterates through the checkups and logs success/failure information

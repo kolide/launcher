@@ -22,6 +22,8 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/flags"
+	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/service"
@@ -29,7 +31,17 @@ import (
 )
 
 func runFlare(args []string) error {
-	flagset := flag.NewFlagSet("launcher flare", flag.ExitOnError)
+	// Flare assumes a launcher installation (at least partially) exists
+	// Overriding some of the default values allows options to be parsed making this assumption
+	defaultKolideHosted = true
+	defaultAutoupdate = true
+	setDefaultPaths()
+
+	opts, err := parseOptions("flare", args)
+	if err != nil {
+		return err
+	}
+
 	var (
 		flHostname = flag.String("hostname", "dababe.launcher.kolide.com:443", "")
 
@@ -39,19 +51,19 @@ func runFlare(args []string) error {
 		insecureTLS       = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
 		insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
 		flareSocketPath   = env.String("FLARE_SOCKET_PATH", agent.TempPath("flare.sock"))
+		tarDirPath        = env.String("KOLIDE_LAUNCHER_FLARE_TAR_DIR_PATH", "")
 
 		certPins [][]byte
 		rootPool *x509.CertPool
 	)
-	flagset.Usage = commandUsage(flagset, "launcher flare")
-	if err := flagset.Parse(args); err != nil {
-		return err
-	}
 
 	id := ulid.New()
 	b := new(bytes.Buffer)
 	reportName := fmt.Sprintf("kolide_launcher_flare_report_%s", id)
-	tarOut, err := os.Create(fmt.Sprintf("%s.tar.gz", reportName))
+	reportPath := fmt.Sprintf("%s.tar.gz", filepath.Join(tarDirPath, reportName))
+	output(b, stdout, fmt.Sprintf("Generating flare report file: %s\n", reportPath))
+
+	tarOut, err := os.Create(reportPath)
 	if err != nil {
 		fatal(b, err)
 	}
@@ -111,6 +123,16 @@ func runFlare(args []string) error {
 	output(b, stdout, "%v\n", string(jsonVersion))
 
 	logger := log.NewLogfmtLogger(b)
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	flagController := flags.NewFlagController(logger, nil, fcOpts...)
+	k := knapsack.New(nil, flagController, nil)
+
+	output(b, stdout, "\nStarting Launcher Doctor\n")
+	// Run doctor but disable color output since this is being directed to a file
+	os.Setenv("NO_COLOR", "1")
+	buildAndRunCheckups(logger, k, opts, b)
+	output(b, stdout, "\nEnd of Launcher Doctor\n")
+
 	err = reportGRPCNetwork(
 		logger,
 		serverURL,
