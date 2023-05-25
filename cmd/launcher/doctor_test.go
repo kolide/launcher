@@ -2,12 +2,19 @@ package main
 
 import (
 	"errors"
+	"io"
 	"runtime"
 	"testing"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	// We don't care about the actual CLI output
+	doctorWriter = io.Discard
+}
 
 func TestRunCheckups(t *testing.T) {
 	t.Parallel()
@@ -161,14 +168,18 @@ func TestCheckupVersion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		version     version.Info
-		expectedErr bool
+		name          string
+		updateChannel string
+		tufServerURL  string
+		version       version.Info
+		expectedErr   bool
 	}{
 		{
-			name:        "happy path",
-			version:     version.Version(),
-			expectedErr: false,
+			name:          "happy path",
+			updateChannel: autoupdate.Stable.String(),
+			tufServerURL:  "https://tuf.kolide.com",
+			version:       version.Version(),
+			expectedErr:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -176,7 +187,7 @@ func TestCheckupVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := checkupVersion(tt.version)
+			_, err := checkupVersion(tt.updateChannel, tt.tufServerURL, tt.version)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
