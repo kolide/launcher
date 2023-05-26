@@ -28,7 +28,7 @@ func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 		}
 	}
 
-	opts, err := parseOptions(testFlags)
+	opts, err := parseOptions("", testFlags)
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -50,7 +50,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
 		require.NoError(t, os.Setenv(name, val))
 	}
-	opts, err := parseOptions([]string{})
+	opts, err := parseOptions("", []string{})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -63,6 +63,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	flagFile, err := os.CreateTemp("", "flag-file")
 	require.NoError(t, err)
 	defer os.Remove(flagFile.Name())
+	expectedOpts.ConfigFilePath = flagFile.Name()
 
 	for k, val := range testArgs {
 		var err error
@@ -81,7 +82,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := parseOptions([]string{"-config", flagFile.Name()})
+	opts, err := parseOptions("", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -160,7 +161,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 		tt := tt
 		os.Clearenv()
 		t.Run(tt.testName, func(t *testing.T) {
-			opts, err := parseOptions(tt.testFlags)
+			opts, err := parseOptions("", tt.testFlags)
 			require.NoError(t, err, "could not parse options")
 			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
 			require.Equal(t, tt.expectedInsecureControlTLS, opts.InsecureControlTLS, "incorrect insecure TLS")
@@ -204,12 +205,4 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	return args, opts
-}
-
-func windowsAddExe(in string) string {
-	if runtime.GOOS == "windows" {
-		return in + ".exe"
-	}
-
-	return in
 }
