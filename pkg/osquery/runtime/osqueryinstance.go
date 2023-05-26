@@ -208,15 +208,6 @@ func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
 	}
 }
 
-// WithStartFunc defines the function that will be used to exeute the osqueryd
-// start command. It is useful during testing to simulate osquery startdelays or
-// osquery instability.
-func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.startFunc = f
-	}
-}
-
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
