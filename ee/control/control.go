@@ -213,40 +213,47 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		return errors.New("control data is nil")
 	}
 
-	if newId := cs.messageId(data); newId != "" {
-		existingIds := cs.getSubsystemReceivedMessageIds(subsystem)
+	// Remember the hash of the last fetched version of this subsystem's data
+	cs.lastFetched[subsystem] = hash
 
-		for _, existingId := range existingIds {
-			if newId == existingId {
-				// we have a matching id, so we don't need to update
-				return nil
-			}
-		}
+	// controlCommandMessage, err := parseControlCommandMessage(data)
+	// // parse without error and it's a command message
+	// if err == nil && controlCommandMessage.isCommandMessage() {
+	// 	if controlCommandMessage.isExpired() {
+	// 		return nil
+	// 	}
 
-		existingIds = append(existingIds, newId)
-		if err := cs.setSubsystemReceivedMessageIds(subsystem, existingIds); err != nil {
-			return fmt.Errorf("failed to set subsystem received message ids: %w", err)
-		}
-	}
+	// 	existingIds := cs.getSubsystemReceivedMessageIds(subsystem)
+	// 	for _, existingId := range existingIds {
+	// 		if controlCommandMessage.Id == existingId {
+	// 			// already processed this message, return
+	// 			return nil
+	// 		}
+	// 	}
+
+	// 	// this is a new id
+	// 	existingIds = append(existingIds, controlCommandMessage.Id)
+	// 	if err := cs.setSubsystemReceivedMessageIds(subsystem, existingIds); err != nil {
+	// 		return fmt.Errorf("failed to set subsystem received message ids: %w", err)
+	// 	}
+	// }
 
 	// Consumer and subscriber(s) notified now
-	err = cs.update(subsystem, data)
-	if err != nil {
+	if err := cs.update(subsystem, data); err != nil {
 		// Although we failed to update, the payload may be bad and there's no
 		// sense in repeatedly attempting to apply a bad update.
 		// A new update will have a new hash, so continue and remember this hash.
 		level.Debug(logger).Log("msg", "failed to update consumers and subscribers", "err", err)
 	}
 
-	// Remember the hash of the last fetched version of this subsystem's data
-	cs.lastFetched[subsystem] = hash
+	// can't store hash if we dont have store
+	if cs.store == nil {
+		return nil
+	}
 
-	if cs.store != nil {
-		// Store the hash so we can persist the last fetched data across launcher restarts
-		err = cs.store.Set([]byte(subsystem), []byte(hash))
-		if err != nil {
-			level.Error(logger).Log("msg", "failed to store last fetched control data", "err", err)
-		}
+	// Store the hash so we can persist the last fetched data across launcher restarts
+	if err := cs.store.Set([]byte(subsystem), []byte(hash)); err != nil {
+		level.Error(logger).Log("msg", "failed to store last fetched control data", "err", err)
 	}
 
 	return nil
@@ -284,48 +291,55 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 	return nil
 }
 
-func (cs *ControlService) messageId(data io.Reader) string {
-	type IdType struct {
-		Id string `json:"id"`
-	}
+// func (cs *ControlService) getSubsystemReceivedMessageIds(subsystem string) []string {
+// 	allIdsRaw, err := cs.store.Get([]byte(subsystemReceivedMessagesKey(subsystem)))
+// 	if err != nil {
+// 		return []string{}
+// 	}
 
-	var id IdType
-	if err := json.NewDecoder(data).Decode(&id); err != nil {
-		return ""
-	}
+// 	var allIds []string
+// 	if err := json.Unmarshal(allIdsRaw, &allIds); err != nil {
+// 		return []string{}
+// 	}
 
-	return id.Id
-}
-
-func (cs *ControlService) getSubsystemReceivedMessageIds(subsystem string) []string {
-	allIdsRaw, err := cs.store.Get([]byte(subsystemReceivedMessagesKey(subsystem)))
-	if err != nil {
-		return []string{}
-	}
-
-	var allIds []string
-	if err := json.Unmarshal(allIdsRaw, &allIds); err != nil {
-		return []string{}
-	}
-
-	return allIds
-}
+// 	return allIds
+// }
 
 // setSubsystemReceivedMessageIds - converts a slice of strings to json and stores it
 // removing the first element from the slice if it's len is greater than max length
-func (cs *ControlService) setSubsystemReceivedMessageIds(subsystem string, ids []string) error {
-	if len(ids) > 10 {
-		ids = ids[1:]
-	}
+// func (cs *ControlService) setSubsystemReceivedMessageIds(subsystem string, ids []string) error {
+// 	if len(ids) > 10 {
+// 		ids = ids[1:]
+// 	}
 
-	allIdsRaw, err := json.Marshal(ids)
-	if err != nil {
-		return fmt.Errorf("marshaling new subsystem received ids json: %w", err)
-	}
+// 	allIdsRaw, err := json.Marshal(ids)
+// 	if err != nil {
+// 		return fmt.Errorf("marshaling new subsystem received ids json: %w", err)
+// 	}
 
-	return cs.store.Set([]byte(subsystemReceivedMessagesKey(subsystem)), allIdsRaw)
-}
+// 	return cs.store.Set([]byte(subsystemReceivedMessagesKey(subsystem)), allIdsRaw)
+// }
 
-func subsystemReceivedMessagesKey(subsystem string) string {
-	return fmt.Sprintf("%s_received_messages", subsystem)
-}
+// func subsystemReceivedMessagesKey(subsystem string) string {
+// 	return fmt.Sprintf("%s_received_messages", subsystem)
+// }
+
+// func parseControlCommandMessage(data io.Reader) (*controlCommandMessage, error) {
+// 	var msg controlCommandMessage
+// 	if err := json.NewDecoder(data).Decode(&msg); err != nil {
+// 		return nil, fmt.Errorf("decoding control command message: %w", err)
+// 	}
+
+// 	return &msg, nil
+// }
+
+// func (c *controlCommandMessage) isCommandMessage() bool {
+// 	return c.Id != "" && c.ValidUntil != 0
+// }
+
+// func (c *controlCommandMessage) isExpired() bool {
+// 	// TODO: check if we should be checking against utc or local time
+// 	// currently the notification consumer check is against time.now
+// 	// without utc
+// 	return time.Unix(c.ValidUntil, 0).After(time.Now())
+// }

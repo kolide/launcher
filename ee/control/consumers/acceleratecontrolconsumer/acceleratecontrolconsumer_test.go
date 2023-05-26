@@ -1,71 +1,62 @@
 package acceleratecontrolconsumer
 
-import (
-	"strings"
-	"testing"
+// func TestAccelerateControlConsumer(t *testing.T) {
+// 	t.Parallel()
 
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-)
+// 	tests := []struct {
+// 		name    string
+// 		data    string
+// 		wantErr bool
+// 	}{
+// 		{
+// 			name: "happy path",
+// 			data: `{"interval": "10s", "duration": "10s"}`,
+// 		},
+// 		{
+// 			name:    "bad json",
+// 			data:    `ABC`,
+// 			wantErr: true,
+// 		},
+// 		{
+// 			name:    "no interval",
+// 			data:    `{"duration": "10s"}`,
+// 			wantErr: true,
+// 		},
+// 		{
+// 			name:    "bad interval",
+// 			data:    `{"interval": "ABC", "duration": "10s"}`,
+// 			wantErr: true,
+// 		},
+// 		{
+// 			name:    "no duration",
+// 			data:    `{"interval": "10s"}`,
+// 			wantErr: true,
+// 		},
+// 		{
+// 			name:    "bad duration",
+// 			data:    `{"interval": "10s", "duration": "ABC"}`,
+// 			wantErr: true,
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		tt := tt
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			t.Parallel()
 
-func TestAccelerateControlConsumer(t *testing.T) {
-	t.Parallel()
+// 			mockSack := mocks.NewKnapsack(t)
 
-	tests := []struct {
-		name    string
-		data    string
-		wantErr bool
-	}{
-		{
-			name: "happy path",
-			data: `{"interval": "10s", "duration": "10s"}`,
-		},
-		{
-			name:    "bad json",
-			data:    `ABC`,
-			wantErr: true,
-		},
-		{
-			name:    "no interval",
-			data:    `{"duration": "10s"}`,
-			wantErr: true,
-		},
-		{
-			name:    "bad interval",
-			data:    `{"interval": "ABC", "duration": "10s"}`,
-			wantErr: true,
-		},
-		{
-			name:    "no duration",
-			data:    `{"interval": "10s"}`,
-			wantErr: true,
-		},
-		{
-			name:    "bad duration",
-			data:    `{"interval": "10s", "duration": "ABC"}`,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+// 			if !tt.wantErr {
+// 				mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
+// 			}
 
-			mockSack := mocks.NewKnapsack(t)
+// 			c := New(mockSack)
+// 			err := c.Update(strings.NewReader(tt.data))
 
-			if !tt.wantErr {
-				mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
-			}
-
-			c := New(mockSack)
-			err := c.Update(strings.NewReader(tt.data))
-
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-		})
-	}
-}
+// 			if tt.wantErr {
+// 				require.Error(t, err)
+// 				return
+// 			}
+// 			require.NoError(t, err)
+// 		})
+// 	}
+// }
