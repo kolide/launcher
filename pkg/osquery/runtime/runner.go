@@ -321,6 +321,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	// a socket
 	if err := backoff.WaitFor(func() error {
 		_, err := os.Stat(paths.extensionSocketPath)
+		if err != nil {
+			level.Debug(o.logger).Log("msg", "osquery extension socket not created yet ... will retry", "path", paths.extensionSocketPath)
+		}
 		return err
 	}, 1*time.Minute, 1*time.Second); err != nil {
 		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
