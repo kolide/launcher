@@ -52,6 +52,7 @@ func runFlare(args []string) error {
 		insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
 		flareSocketPath   = env.String("FLARE_SOCKET_PATH", agent.TempPath("flare.sock"))
 		tarDirPath        = env.String("KOLIDE_LAUNCHER_FLARE_TAR_DIR_PATH", "")
+		tarUpload         = env.Bool("KOLIDE_LAUNCHER_TAR_UPLOAD", false)
 
 		certPins [][]byte
 		rootPool *x509.CertPool
@@ -88,6 +89,11 @@ func runFlare(args []string) error {
 		fatal(b, err)
 	}
 
+	defer func() {
+		if tarUpload {
+			// TODO
+		}
+	}()
 	defer func() {
 		hdr := &tar.Header{
 			Name: filepath.Join(baseDir, fmt.Sprintf("%s.log", id)),

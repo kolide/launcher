@@ -11,6 +11,7 @@ type actionType string
 const (
 	DoNothing actionType = "" // Omitted action implies do nothing
 	OpenURL              = "open-url"
+	Flare                = "flare"
 )
 
 // Action encapsulates what action should be performed when a menu item is invoked
@@ -48,6 +49,8 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("failed to unmarshal ActionOpenURL: %w", err)
 		}
 		a.Performer = openURL
+	case Flare:
+		a.Performer = actionFlare{}
 	default:
 		// Silently ignore unrecognized actions because:
 		// 1. We don't have a logger reference here
