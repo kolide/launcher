@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -260,6 +261,25 @@ func TestSimplePath(t *testing.T) {
 	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
 	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
 
+	require.NoError(t, runner.Shutdown())
+}
+
+func TestOsquerySlowStart(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithStartFunc(func(cmd *exec.Cmd) error {
+			time.Sleep(2 * time.Second)
+			return cmd.Start()
+		}),
+	)
+	require.NoError(t, err)
+	waitHealthy(t, runner)
 	require.NoError(t, runner.Shutdown())
 }
 

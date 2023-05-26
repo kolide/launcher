@@ -291,15 +291,16 @@ func (r *Runner) launchOsqueryInstance() error {
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
-	// remove osquery socket if exists
-	if err := backoff.WaitFor(func() error {
-		return os.RemoveAll(paths.extensionSocketPath)
-	}, 1*time.Minute, 1*time.Second); err != nil {
-		return fmt.Errorf("timeout attempthing to remove osquery extension socket at %s: %w", paths.extensionSocketPath, err)
+	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
+		level.Info(o.logger).Log(
+			"msg", "error removing osquery extension socket",
+			"path", paths.extensionSocketPath,
+			"err", err,
+		)
 	}
 
 	// Launch osquery process (async)
-	err = o.cmd.Start()
+	err = o.startFunc(o.cmd)
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -314,7 +315,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
-	// wait for osquery to create the socket before moving on
+	// wait for osquery to create the socket before moving on,
+	// this is intended to serve as a kind of health check
+	// for osquery, if it's started successfully it will create
+	// a socket
 	if err := backoff.WaitFor(func() error {
 		_, err := os.Stat(paths.extensionSocketPath)
 		return err

@@ -208,6 +208,15 @@ func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
 	}
 }
 
+// WithStartFunc defines the function that will be used to exeute the osqueryd
+// start command. It is useful during testing to simulate osquery startdelays or
+// osquery instability.
+func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.startFunc = f
+	}
+}
+
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
@@ -227,6 +236,7 @@ type OsqueryInstance struct {
 	rmRootDirectory         func()
 	usingTempDir            bool
 	stats                   *history.Instance
+	startFunc               func(cmd *exec.Cmd) error
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -348,6 +358,10 @@ func newInstance() *OsqueryInstance {
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
 	i.logger = log.NewNopLogger()
+
+	i.startFunc = func(cmd *exec.Cmd) error {
+		return cmd.Start()
+	}
 
 	return i
 }
