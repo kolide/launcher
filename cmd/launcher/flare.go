@@ -89,30 +89,11 @@ func runFlare(args []string) error {
 		fatal(b, err)
 	}
 
-	defer func() {
-		if tarUpload {
-			// TODO
-		}
-	}()
-	defer func() {
-		hdr := &tar.Header{
-			Name: filepath.Join(baseDir, fmt.Sprintf("%s.log", id)),
-			Mode: int64(os.ModePerm),
-			Size: int64(b.Len()),
-		}
+	defer tarPostProcessing(tarUpload)
 
-		if err := tw.WriteHeader(hdr); err != nil {
-			fatal(b, err)
-		}
+	defer closeTar(tw)
 
-		if _, err := tw.Write(b.Bytes()); err != nil {
-			fatal(b, err)
-		}
-
-		if err := tw.Close(); err != nil {
-			fatal(b, err)
-		}
-	}()
+	defer writeFile(filepath.Join(baseDir, fmt.Sprintf("%s.log", id)), tw, b)
 
 	output(b, stdout, "Starting Launcher Diagnostics\n")
 	output(b, stdout, "ID: %s\n", id)
@@ -133,11 +114,14 @@ func runFlare(args []string) error {
 	flagController := flags.NewFlagController(logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil)
 
-	output(b, stdout, "\nStarting Launcher Doctor\n")
+	doctorOutput := new(bytes.Buffer)
+
+	// output(b, stdout, "\nStarting Launcher Doctor\n")
 	// Run doctor but disable color output since this is being directed to a file
 	os.Setenv("NO_COLOR", "1")
-	buildAndRunCheckups(logger, k, opts, b)
-	output(b, stdout, "\nEnd of Launcher Doctor\n")
+	buildAndRunCheckups(logger, k, opts, doctorOutput)
+	// output(b, stdout, "\nEnd of Launcher Doctor\n")
+	defer writeFile(filepath.Join(baseDir, "doctor.log"), tw, b)
 
 	err = reportGRPCNetwork(
 		logger,
@@ -367,4 +351,56 @@ func reportNotaryPing(
 	defer resp.Body.Close()
 	logger.Log(keyvals...)
 	return nil
+}
+
+func tarPostProcessing(upload bool) {
+	if upload {
+		// TODO
+	}
+}
+
+// func writeLogFile(name string, tw *tar.Writer, b *bytes.Buffer) {
+// 	hdr := &tar.Header{
+// 		Name: name,
+// 		Mode: int64(os.ModePerm),
+// 		Size: int64(b.Len()),
+// 	}
+
+// 	if err := tw.WriteHeader(hdr); err != nil {
+// 		fatal(b, err)
+// 	}
+
+// 	if _, err := tw.Write(b.Bytes()); err != nil {
+// 		fatal(b, err)
+// 	}
+
+// 	if err := tw.Close(); err != nil {
+// 		fatal(b, err)
+// 	}
+// }
+
+func writeFile(name string, tw *tar.Writer, b *bytes.Buffer) {
+	hdr := &tar.Header{
+		Name: name,
+		Mode: int64(os.ModePerm),
+		Size: int64(b.Len()),
+	}
+
+	if err := tw.WriteHeader(hdr); err != nil {
+		fatal(b, err)
+	}
+
+	if _, err := tw.Write(b.Bytes()); err != nil {
+		fatal(b, err)
+	}
+
+	// if err := tw.Close(); err != nil {
+	// 	fatal(b, err)
+	// }
+}
+
+func closeTar(tw *tar.Writer) {
+	if err := tw.Close(); err != nil {
+		// fatal(b, err)
+	}
 }

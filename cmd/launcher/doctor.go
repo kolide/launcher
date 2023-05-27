@@ -131,8 +131,6 @@ func runDoctor(args []string) error {
 func buildAndRunCheckups(logger log.Logger, k types.Knapsack, opts *launcher.Options, w io.Writer) {
 	configureOutput(w)
 
-	cyan("Kolide launcher doctor version:\n")
-	version.PrintFull()
 	cyan("\nRunning Kolide launcher checkups...\n")
 
 	checkups := []*checkup{
