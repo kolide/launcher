@@ -544,7 +544,7 @@ func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
-		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2)
+		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.MaxWaitTime(maxSocketWaitTime))
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
 		return nil, fmt.Errorf("could not create an extension client: %w", err)
@@ -555,7 +555,7 @@ func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
-func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, plugins []osquery.OsqueryPlugin) error {
+func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin) error {
 	logger := log.With(o.logger, "extensionMangerServer", name)
 
 	level.Debug(logger).Log("msg", "Starting startOsqueryExtensionManagerServer")
@@ -567,6 +567,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 			name,
 			socketPath,
 			osquery.ServerTimeout(1*time.Minute),
+			osquery.WithClient(client),
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {

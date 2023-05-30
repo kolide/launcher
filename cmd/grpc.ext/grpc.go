@@ -51,7 +51,7 @@ func main() {
 
 	logger := logutil.NewServerLogger(*flVerbose)
 
-	client, err := osquery.NewClient(*flSocketPath, timeout)
+	client, err := osquery.NewClient(*flSocketPath, timeout, osquery.MaxWaitTime(30*time.Second))
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
 	}
@@ -114,6 +114,7 @@ func main() {
 		"com.kolide.grpc_extension",
 		*flSocketPath,
 		osquery.ServerTimeout(timeout),
+		osquery.WithClient(client),
 	)
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))

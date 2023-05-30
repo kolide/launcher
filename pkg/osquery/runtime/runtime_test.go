@@ -390,7 +390,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
 
-	client, err := osquery.NewClient(extensionSocketPath, 5*time.Second)
+	client, err := osquery.NewClient(extensionSocketPath, 5*time.Second, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(1*time.Minute))
 	require.NoError(t, err)
 	defer client.Close()
 
