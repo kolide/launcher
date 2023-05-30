@@ -404,7 +404,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// We've seen this fail, so add some retry logic.
 	var enrollDetails service.EnrollmentDetails
 	if err := backoff.WaitFor(func() error {
-		enrollDetails, err = getEnrollDetails(e.osqueryClient)
+		enrollDetails, err = getEnrollDetails(e.knapsack.OsquerydPath())
 		return err
 	}, 2*time.Minute, 10*time.Second); err != nil {
 		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {

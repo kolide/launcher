@@ -1,19 +1,24 @@
 package osquery
 
 import (
+	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/pkg/errors"
 )
 
-func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
+func getEnrollDetails(osquerydPath string) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 
 	// To facilitate manual testing around missing enrollment details,
@@ -22,11 +27,11 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		return details, errors.New("Skipping enrollment details")
 	}
 
-	// This condition is indicative of a misordering (or race) in
-	// startup. Enrollment has started before `SetQuerier` has
-	// been called.
-	if client == nil {
-		return details, errors.New("no querier")
+	// If the binary doesn't exist, bail out early.
+	if info, err := os.Stat(osquerydPath); os.IsNotExist(err) {
+		return details, fmt.Errorf("no binary at %s", osquerydPath)
+	} else if info.IsDir() {
+		return details, fmt.Errorf("%s is a directory", osquerydPath)
 	}
 
 	query := `
@@ -46,10 +51,32 @@ func getEnrollDetails(client Querier) (service.EnrollmentDetails, error) {
 		os_version,
 		system_info,
 		osquery_info;
+
 `
-	resp, err := client.Query(query)
+
+	var respBytes bytes.Buffer
+
+	osq, err := runsimple.NewOsqueryProcess(
+		osquerydPath,
+		runsimple.RunSql([]byte(query)),
+		runsimple.WithStdout(&respBytes),
+	)
 	if err != nil {
+		return details, fmt.Errorf("create osquery for enrollment details: %w", err)
+	}
+
+	osqCtx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
+
+	if err := osq.Execute(osqCtx); osqCtx.Err() != nil {
+		return details, fmt.Errorf("query enrollment details context error: %w", osqCtx.Err())
+	} else if err != nil {
 		return details, fmt.Errorf("query enrollment details: %w", err)
+
+	}
+
+	var resp []map[string]string
+	if err := json.Unmarshal(respBytes.Bytes(), &resp); err != nil {
+		return details, fmt.Errorf("json decode enrollment details: %w", err)
 	}
 
 	if len(resp) < 1 {
