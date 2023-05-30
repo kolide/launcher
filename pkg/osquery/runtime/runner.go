@@ -291,6 +291,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
+	// remove any socket already at the extension socket path to ensure
+	// that it's not left over from a previous instance
 	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
 		level.Info(o.logger).Log(
 			"msg", "error removing osquery extension socket",
