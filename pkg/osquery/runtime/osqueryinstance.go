@@ -219,10 +219,9 @@ type OsqueryInstance struct {
 	doneCtx                 context.Context
 	cancel                  context.CancelFunc
 	cmd                     *exec.Cmd
-	emsLock                 sync.RWMutex
+	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers []*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
-	clientLock              sync.Mutex
 	paths                   *osqueryFilePaths
 	rmRootDirectory         func()
 	usingTempDir            bool
@@ -233,6 +232,7 @@ type OsqueryInstance struct {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (o *OsqueryInstance) Healthy() error {
+	// Do not add/remove servers from o.extensionManagerServers while we're accessing them
 	o.emsLock.RLock()
 	defer o.emsLock.RUnlock()
 
@@ -253,9 +253,6 @@ func (o *OsqueryInstance) Healthy() error {
 		}
 	}
 
-	o.clientLock.Lock()
-	defer o.clientLock.Unlock()
-
 	clientStatus, err := o.extensionManagerClient.Ping()
 	if err != nil {
 		return fmt.Errorf("could not ping osquery extension client: %w", err)
@@ -271,9 +268,6 @@ func (o *OsqueryInstance) Healthy() error {
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
-	o.clientLock.Lock()
-	defer o.clientLock.Unlock()
-
 	if o.extensionManagerClient == nil {
 		return nil, errors.New("client not ready")
 	}
