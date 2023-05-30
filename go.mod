@@ -55,6 +55,7 @@ require (
 
 require (
 	github.com/apache/thrift v0.16.0
+	github.com/fatih/color v1.15.0
 	github.com/kolide/systray v1.10.4
 	github.com/kolide/toast v1.0.0
 	github.com/shirou/gopsutil/v3 v3.23.3
@@ -87,6 +88,8 @@ require (
 	github.com/jinzhu/inflection v0.0.0-20180308033659-04140366298a // indirect
 	github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/miekg/pkcs11 v0.0.0-20180208123018-5f6e0d0dad6f // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
