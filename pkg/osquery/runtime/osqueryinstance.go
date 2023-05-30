@@ -227,6 +227,7 @@ type OsqueryInstance struct {
 	rmRootDirectory         func()
 	usingTempDir            bool
 	stats                   *history.Instance
+	startFunc               func(cmd *exec.Cmd) error
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -348,6 +349,10 @@ func newInstance() *OsqueryInstance {
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
 	i.logger = log.NewNopLogger()
+
+	i.startFunc = func(cmd *exec.Cmd) error {
+		return cmd.Start()
+	}
 
 	return i
 }
