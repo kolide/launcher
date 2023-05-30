@@ -19,7 +19,7 @@ func Test_OsquerySingleSqlNoIO(t *testing.T) {
 		t.Skip("No osquery. Not implemented")
 	}
 
-	osq, err := newOsqueryProcess(osquerydPath, RunSql([]byte("select 1")))
+	osq, err := NewOsqueryProcess(osquerydPath, RunSql([]byte("select 1")))
 	require.NoError(t, err)
 
 	require.NoError(t, osq.Execute(context.TODO()))
@@ -75,7 +75,7 @@ func Test_OsquerySingleSqlErr(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
 
-			osq, err := newOsqueryProcess(
+			osq, err := NewOsqueryProcess(
 				osquerydPath,
 				RunSql([]byte(tt.sql)),
 				WithStdout(&stdout),

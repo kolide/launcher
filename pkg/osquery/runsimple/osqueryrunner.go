@@ -65,7 +65,7 @@ func RunSql(sql []byte) osqueryProcessOpt {
 	}
 }
 
-func newOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osqueryProcess, error) {
+func NewOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osqueryProcess, error) {
 	p := &osqueryProcess{
 		osquerydPath: osquerydPath,
 	}
