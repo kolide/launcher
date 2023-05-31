@@ -11,6 +11,11 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type bytesFlattener interface {
@@ -77,6 +82,11 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher").Start(ctx, "generate")
+	span.SetAttributes(attribute.String("table_name", t.tableName))
+	defer span.End()
+
 	var results []map[string]string
 
 	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.execPaths, t.execArgs, t.includeStderr)
@@ -85,6 +95,8 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, nil
 	}
