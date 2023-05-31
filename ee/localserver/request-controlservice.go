@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {
@@ -12,30 +17,42 @@ func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 }
 
 func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *http.Request) {
+	_, span := otel.Tracer("launcher").Start(r.Context(), "requestAccelerateControlFunc", trace.WithAttributes(attribute.String("path", r.URL.Path)))
+	defer span.End()
+
 	if r.Body == nil {
+		span.SetStatus(codes.Error, "request body is nil")
 		sendClientError(w, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	interval, err := durationFromMap("interval", body)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error parsing interval: %s", err))
 		return
 	}
 
 	duration, err := durationFromMap("duration", body)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error parsing duration: %s", err))
 		return
 	}
 
 	ls.knapsack.SetControlRequestIntervalOverride(interval, duration)
+
+	span.AddEvent("control_accelerated")
 }
 
 func durationFromMap(key string, body map[string]string) (time.Duration, error) {

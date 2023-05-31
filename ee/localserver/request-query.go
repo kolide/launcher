@@ -9,6 +9,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/osquery/osquery-go/plugin/distributed"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (ls *localServer) requestQueryHandler() http.Handler {
@@ -16,31 +20,42 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
+	_, span := otel.Tracer("launcher").Start(r.Context(), "requestQueryHanlderFunc", trace.WithAttributes(attribute.String("path", r.URL.Path)))
+	defer span.End()
+
 	if r.Body == nil {
+		span.SetStatus(codes.Error, "request body is nil")
 		sendClientError(w, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	query, ok := body["query"]
 	if !ok || query == "" {
+		span.SetStatus(codes.Error, "no query key found in request body json")
 		sendClientError(w, "no query key found in request body json")
 		return
 	}
 
 	results, err := queryWithRetries(ls.querier, query)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error executing query: %s", err))
 		return
 	}
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
 		return
 	}
@@ -55,6 +70,9 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	_, span := otel.Tracer("launcher").Start(r.Context(), "requestScheduledQueryHandlerFunc", trace.WithAttributes(attribute.String("path", r.URL.Path)))
+	defer span.End()
+
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.
 	// This means there is a limit on the size of the query. This endpoint is intended to be a work around for that. It ought to work like this:
 	//
@@ -65,18 +83,22 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 	// 5. Launcher returns results
 
 	if r.Body == nil {
+		span.SetStatus(codes.Error, "request body is nil")
 		sendClientError(w, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	name, ok := body["name"]
 	if !ok || name == "" {
+		span.SetStatus(codes.Error, "no name key found in request body json")
 		sendClientError(w, "no name key found in request body json")
 		return
 	}
@@ -85,6 +107,8 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
@@ -115,6 +139,8 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
 		return
 	}

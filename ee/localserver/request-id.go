@@ -14,6 +14,10 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type identifiers struct {
@@ -68,6 +72,9 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
+	_, span := otel.Tracer("launcher").Start(req.Context(), "requestIdHandlerFunc", trace.WithAttributes(attribute.String("path", req.URL.Path)))
+	defer span.End()
+
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
@@ -76,6 +83,9 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	consoleUsers, err := consoleUsers()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+
 		level.Error(ls.logger).Log(
 			"msg", "getting console users",
 			"err", err,
@@ -87,6 +97,9 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+
 		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
 		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
 	}
