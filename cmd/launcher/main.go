@@ -19,18 +19,11 @@ import (
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "main")
-	defer span.End()
 
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be

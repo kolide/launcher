@@ -44,7 +44,7 @@ require (
 	golang.org/x/image v0.5.0
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.6.0
+	golang.org/x/sys v0.8.0
 	golang.org/x/text v0.7.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.38.0
@@ -111,7 +111,9 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel v1.16.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.16.0 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.16.0 // indirect
 	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect

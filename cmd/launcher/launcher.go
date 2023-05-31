@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -46,7 +47,10 @@ import (
 	"go.etcd.io/bbolt"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 const (
@@ -60,13 +64,34 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "runLauncher")
-	defer span.End()
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+
+	// Set up telemetry exporter
+	f, err := os.Create("/var/kolide-k2/k2device-preprod.kolide.com/traces.txt")
+	if err != nil {
+		level.Info(logger).Log("msg", "could not create file for otel", "err", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	exp, err := newExporter(f)
+	if err != nil {
+		level.Info(logger).Log("msg", "could not create exporter for otel", "err", err)
+		os.Exit(1)
+	}
+
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exp),
+		trace.WithResource(newResource()),
+	)
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			level.Info(logger).Log("msg", "could not shut down tracer provider", "err", err)
+		}
+	}()
+	otel.SetTracerProvider(tp)
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
-
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -96,7 +121,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
-	var err error
 	if rootDirectory == "" {
 		rootDirectory, err = agent.MkdirTemp(defaultRootDirectory)
 		if err != nil {
@@ -401,4 +425,26 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
+}
+
+// newExporter returns a console exporter.
+func newExporter(w io.Writer) (trace.SpanExporter, error) {
+	return stdouttrace.New(
+		stdouttrace.WithWriter(w),
+		// Use human-readable output.
+		stdouttrace.WithPrettyPrint(),
+	)
+}
+
+// newResource returns a resource describing this application.
+func newResource() *resource.Resource {
+	r, _ := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("launcher"),
+			semconv.ServiceVersion(version.Version().Version),
+		),
+	)
+	return r
 }

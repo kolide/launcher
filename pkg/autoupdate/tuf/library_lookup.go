@@ -24,7 +24,7 @@ type BinaryUpdateInfo struct {
 // as its version.
 func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	var span trace.Span
-	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "CheckOutLatest")
+	ctx, span = otel.Tracer("launcher").Start(ctx, "CheckOutLatest")
 	span.SetAttributes(attribute.String("binary", string(binary)))
 	defer span.End()
 
@@ -48,7 +48,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 // given channel. If it's already downloaded, then we return its path and version.
 func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	var span trace.Span
-	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "findExecutableFromRelease")
+	ctx, span = otel.Tracer("launcher").Start(ctx, "findExecutableFromRelease")
 	defer span.End()
 
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
@@ -83,7 +83,7 @@ func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, 
 // given binary, along with its version.
 func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	var span trace.Span
-	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "mostRecentVersion")
+	ctx, span = otel.Tracer("launcher").Start(ctx, "mostRecentVersion")
 	defer span.End()
 
 	// Pull all available versions from library
