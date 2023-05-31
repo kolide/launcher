@@ -8,9 +8,7 @@ import (
 	"os/exec"
 )
 
-// We default to x-www-browser first because, if available, it appears to be better at picking
-// the correct default browser.
-var browserLaunchers = []string{"x-www-browser", "xdg-open"}
+var browserLaunchers = []string{"xdg-open", "x-www-browser"}
 
 func open(url string) error {
 	errList := make([]error, 0)
