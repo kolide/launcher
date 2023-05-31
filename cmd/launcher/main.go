@@ -22,9 +22,6 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be
 	// re-leveled during options parsing.
@@ -35,6 +32,9 @@ func main() {
 		"version", version.Version().Version,
 		"revision", version.Version().Revision,
 	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
