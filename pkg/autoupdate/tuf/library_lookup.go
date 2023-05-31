@@ -9,11 +9,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type BinaryUpdateInfo struct {
@@ -23,17 +18,12 @@ type BinaryUpdateInfo struct {
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "CheckOutLatest")
-	span.SetAttributes(attribute.String("binary", string(binary)))
-	defer span.End()
-
+func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	if updateDirectory == "" {
 		updateDirectory = defaultLibraryDirectory(rootDirectory)
 	}
 
-	update, err := findExecutableFromRelease(ctx, binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
+	update, err := findExecutableFromRelease(binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
 	if err == nil {
 		return update, nil
 	}
@@ -42,43 +32,31 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
-	return mostRecentVersion(ctx, binary, updateDirectory)
+	return mostRecentVersion(binary, updateDirectory)
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
-func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "findExecutableFromRelease")
-	defer span.End()
-
+func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
 		return nil, errors.New("could not initialize TUF client, cannot find release")
 	}
 
 	// From already-downloaded metadata, look for the release version
 	targets, err := metadataClient.Targets()
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not get target: %w", err)
 	}
 
-	targetName, _, err := findRelease(ctx, binary, targets, channel)
+	targetName, _, err := findRelease(binary, targets, channel)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not find release: %w", err)
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if autoupdate.CheckExecutable(ctx, targetPath, "--version") != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+	if autoupdate.CheckExecutable(context.TODO(), targetPath, "--version") != nil {
 		return nil, fmt.Errorf("version %s from target %s either not yet downloaded or corrupted: %w", targetVersion, targetName, err)
 	}
 
@@ -90,16 +68,10 @@ func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, 
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "mostRecentVersion")
-	defer span.End()
-
+func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
 	// Pull all available versions from library
-	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, binary, baseUpdateDirectory)
+	validVersionsInLibrary, _, err := sortedVersionsInLibrary(binary, baseUpdateDirectory)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
 

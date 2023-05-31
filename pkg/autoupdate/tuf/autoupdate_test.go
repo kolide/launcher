@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -109,13 +108,13 @@ func TestExecute(t *testing.T) {
 	currentLauncherVersion := "" // cannot determine using version package in test
 	currentOsqueryVersion := "1.1.1"
 	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
-	mockLibraryManager.On("TidyLibrary", mock.Anything, binaryOsqueryd, mock.Anything).Return().Once()
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
-	mockLibraryManager.On("Available", mock.Anything, binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("Available", mock.Anything, binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("AddToLibrary", mock.Anything, binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
-	mockLibraryManager.On("AddToLibrary", mock.Anything, binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
+	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
@@ -152,7 +151,7 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 
 	// In test, version.Version() returns `unknown` for everything, which is not something
 	// that the semver library can parse. So we only expect an error here.
-	launcherVersion, err := autoupdater.currentRunningVersion(context.TODO(), "launcher")
+	launcherVersion, err := autoupdater.currentRunningVersion("launcher")
 	require.Error(t, err, "expected an error fetching current running version of launcher")
 	require.Equal(t, "", launcherVersion)
 }
@@ -171,7 +170,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	require.NoError(t, err)
 	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
 
-	osqueryVersion, err := autoupdater.currentRunningVersion(context.TODO(), "osqueryd")
+	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
 	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
 }
@@ -189,7 +188,7 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	// Expect to return an error (five times, since we perform retries)
 	mockQuerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error"))
 
-	osqueryVersion, err := autoupdater.currentRunningVersion(context.TODO(), "osqueryd")
+	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
 	require.Equal(t, "", osqueryVersion)
 }
@@ -225,7 +224,7 @@ func Test_storeError(t *testing.T) {
 
 	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
 	// for launcher in tests.
-	mockLibraryManager.On("TidyLibrary", mock.Anything, binaryOsqueryd, mock.Anything).Return().Once()
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
@@ -288,7 +287,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	require.Equal(t, 4, keyCountBeforeCleanup, "did not correctly seed errors in bucket")
 
 	// Call the cleanup function
-	autoupdater.cleanUpOldErrors(context.TODO())
+	autoupdater.cleanUpOldErrors()
 
 	keyCount := 0
 	err = autoupdater.store.ForEach(func(_, _ []byte) error {

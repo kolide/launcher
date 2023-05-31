@@ -3,8 +3,6 @@
 package tuf
 
 import (
-	context "context"
-
 	mock "github.com/stretchr/testify/mock"
 	data "github.com/theupdateframework/go-tuf/data"
 )
@@ -14,13 +12,13 @@ type Mocklibrarian struct {
 	mock.Mock
 }
 
-// AddToLibrary provides a mock function with given fields: ctx, binary, currentVersion, targetFilename, targetMetadata
-func (_m *Mocklibrarian) AddToLibrary(ctx context.Context, binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
-	ret := _m.Called(ctx, binary, currentVersion, targetFilename, targetMetadata)
+// AddToLibrary provides a mock function with given fields: binary, currentVersion, targetFilename, targetMetadata
+func (_m *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+	ret := _m.Called(binary, currentVersion, targetFilename, targetMetadata)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, autoupdatableBinary, string, string, data.TargetFileMeta) error); ok {
-		r0 = rf(ctx, binary, currentVersion, targetFilename, targetMetadata)
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string, string, data.TargetFileMeta) error); ok {
+		r0 = rf(binary, currentVersion, targetFilename, targetMetadata)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -28,13 +26,13 @@ func (_m *Mocklibrarian) AddToLibrary(ctx context.Context, binary autoupdatableB
 	return r0
 }
 
-// Available provides a mock function with given fields: ctx, binary, targetFilename
-func (_m *Mocklibrarian) Available(ctx context.Context, binary autoupdatableBinary, targetFilename string) bool {
-	ret := _m.Called(ctx, binary, targetFilename)
+// Available provides a mock function with given fields: binary, targetFilename
+func (_m *Mocklibrarian) Available(binary autoupdatableBinary, targetFilename string) bool {
+	ret := _m.Called(binary, targetFilename)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(context.Context, autoupdatableBinary, string) bool); ok {
-		r0 = rf(ctx, binary, targetFilename)
+	if rf, ok := ret.Get(0).(func(autoupdatableBinary, string) bool); ok {
+		r0 = rf(binary, targetFilename)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -42,9 +40,9 @@ func (_m *Mocklibrarian) Available(ctx context.Context, binary autoupdatableBina
 	return r0
 }
 
-// TidyLibrary provides a mock function with given fields: ctx, binary, currentVersion
-func (_m *Mocklibrarian) TidyLibrary(ctx context.Context, binary autoupdatableBinary, currentVersion string) {
-	_m.Called(ctx, binary, currentVersion)
+// TidyLibrary provides a mock function with given fields: binary, currentVersion
+func (_m *Mocklibrarian) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
+	_m.Called(binary, currentVersion)
 }
 
 type mockConstructorTestingTNewMocklibrarian interface {

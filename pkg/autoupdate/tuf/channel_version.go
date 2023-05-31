@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -27,7 +26,7 @@ func GetChannelVersionFromTufServer(binary, channel, tufServerUrl string) (strin
 		return "", fmt.Errorf("could not update targets: %w", err)
 	}
 
-	releaseTarget, _, err := findRelease(context.Background(), autoupdatableBinary(binary), targets, channel)
+	releaseTarget, _, err := findRelease(autoupdatableBinary(binary), targets, channel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
