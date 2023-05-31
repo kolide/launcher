@@ -44,6 +44,9 @@ import (
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -57,6 +60,10 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher").Start(ctx, "runLauncher")
+	defer span.End()
+
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
@@ -372,6 +379,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			mirrorClient,
 			extension,
 			tuf.WithLogger(logger),
+			tuf.WithContext(ctx),
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet

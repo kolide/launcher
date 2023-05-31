@@ -20,6 +20,10 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
@@ -72,7 +76,11 @@ func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) st
 }
 
 // Available determines if the given target is already available in the update library.
-func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
+func (ulm *updateLibraryManager) Available(ctx context.Context, binary autoupdatableBinary, targetFilename string) bool {
+	_, span := otel.Tracer("launcher.tuf").Start(ctx, "Available")
+	span.SetAttributes(attribute.String("target_filename", targetFilename))
+	defer span.End()
+
 	executablePath, _ := pathToTargetVersionExecutable(binary, targetFilename, ulm.baseDir)
 	return autoupdate.CheckExecutable(context.TODO(), executablePath, "--version") == nil
 }
@@ -87,7 +95,12 @@ func pathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename st
 
 // AddToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+func (ulm *updateLibraryManager) AddToLibrary(ctx context.Context, binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "AddToLibrary")
+	span.SetAttributes(attribute.String("target_filename", targetFilename))
+	defer span.End()
+
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
@@ -96,19 +109,19 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 		return nil
 	}
 
-	if ulm.Available(binary, targetFilename) {
+	if ulm.Available(ctx, binary, targetFilename) {
 		return nil
 	}
 
 	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
-	defer ulm.tidyStagedUpdates(binary)
+	defer ulm.tidyStagedUpdates(ctx, binary)
 
-	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(binary, targetFilename, targetMetadata)
+	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(ctx, binary, targetFilename, targetMetadata)
 	if err != nil {
 		return fmt.Errorf("could not stage update: %w", err)
 	}
 
-	if err := ulm.moveVerifiedUpdate(binary, targetFilename, stagedUpdatePath); err != nil {
+	if err := ulm.moveVerifiedUpdate(ctx, binary, targetFilename, stagedUpdatePath); err != nil {
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
@@ -117,7 +130,10 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
-func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
+func (ulm *updateLibraryManager) stageAndVerifyUpdate(ctx context.Context, binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
+	_, span := otel.Tracer("launcher.tuf").Start(ctx, "stageAndVerifyUpdate")
+	defer span.End()
+
 	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
 
 	// Request download from mirror
@@ -160,7 +176,11 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 
 // moveVerifiedUpdate untars the update and performs final checks to make sure that it's a valid, working update.
 // Finally, it moves the update to its correct versioned location in the update library for the given binary.
-func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
+func (ulm *updateLibraryManager) moveVerifiedUpdate(ctx context.Context, binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "moveVerifiedUpdate")
+	defer span.End()
+
 	targetVersion := versionFromTarget(binary, targetFilename)
 	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
 	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
@@ -170,19 +190,19 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	// Untar the archive. Note that `UntarBundle` calls `filepath.Dir(destination)`, so the inclusion of `binary`
 	// here doesn't matter as it's immediately stripped off.
 	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
+		ulm.removeUpdate(ctx, binary, targetVersion)
 		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
 	// Make sure that the binary is executable
 	if err := os.Chmod(executableLocation(stagedVersionedDirectory, binary), 0755); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
+		ulm.removeUpdate(ctx, binary, targetVersion)
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
 	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
+		ulm.removeUpdate(ctx, binary, targetVersion)
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
 
@@ -196,7 +216,10 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 }
 
 // removeUpdate removes a given version from the given binary's update library.
-func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binaryVersion string) {
+func (ulm *updateLibraryManager) removeUpdate(ctx context.Context, binary autoupdatableBinary, binaryVersion string) {
+	_, span := otel.Tracer("launcher.tuf").Start(ctx, "removeUpdate")
+	defer span.End()
+
 	directoryToRemove := filepath.Join(updatesDirectory(binary, ulm.baseDir), binaryVersion)
 	if err := os.RemoveAll(directoryToRemove); err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
@@ -206,20 +229,27 @@ func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binary
 }
 
 // TidyLibrary removes unneeded files from the staged updates and updates directories.
-func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
+func (ulm *updateLibraryManager) TidyLibrary(ctx context.Context, binary autoupdatableBinary, currentVersion string) {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "TidyLibrary")
+	defer span.End()
+
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
 
 	// First, remove old staged archives
-	ulm.tidyStagedUpdates(binary)
+	ulm.tidyStagedUpdates(ctx, binary)
 
 	// Remove any updates we no longer need
-	ulm.tidyUpdateLibrary(binary, currentVersion)
+	ulm.tidyUpdateLibrary(ctx, binary, currentVersion)
 }
 
 // tidyStagedUpdates removes all old archives from the staged updates directory.
-func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
+func (ulm *updateLibraryManager) tidyStagedUpdates(ctx context.Context, binary autoupdatableBinary) {
+	_, span := otel.Tracer("launcher.tuf").Start(ctx, "tidyStagedUpdates")
+	defer span.End()
+
 	matches, err := filepath.Glob(filepath.Join(ulm.stagingDir, "*"))
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not glob for staged updates to tidy updates library", "err", err)
@@ -236,7 +266,11 @@ func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
 // tidyUpdateLibrary reviews all updates in the library for the binary and removes any old versions
 // that are no longer needed. It will always preserve the current running binary, and then the
 // two most recent valid versions. It will remove versions it cannot validate.
-func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, currentRunningVersion string) {
+func (ulm *updateLibraryManager) tidyUpdateLibrary(ctx context.Context, binary autoupdatableBinary, currentRunningVersion string) {
+	var span trace.Span
+	ctx, span = otel.Tracer("launcher.tuf").Start(ctx, "tidyUpdateLibrary")
+	defer span.End()
+
 	if currentRunningVersion == "" {
 		level.Debug(ulm.logger).Log("msg", "cannot tidy update library without knowing current running version")
 		return
@@ -244,7 +278,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 	const numberOfVersionsToKeep = 3
 
-	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(binary, ulm.baseDir)
+	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(ctx, binary, ulm.baseDir)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
 		return
@@ -252,7 +286,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 
 	for _, invalidVersion := range invalidVersionsInLibrary {
 		level.Debug(ulm.logger).Log("msg", "updates library contains invalid version", "err", err, "library_path", invalidVersion)
-		ulm.removeUpdate(binary, invalidVersion)
+		ulm.removeUpdate(ctx, binary, invalidVersion)
 	}
 
 	if len(versionsInLibrary) <= numberOfVersionsToKeep {
@@ -270,7 +304,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 		// If we've already hit the number of versions to keep, then start to remove the older ones.
 		// We want to keep numberOfVersionsToKeep total, saving a spot for the currently running version.
 		if nonCurrentlyRunningVersionsKept >= numberOfVersionsToKeep-1 {
-			ulm.removeUpdate(binary, versionsInLibrary[i])
+			ulm.removeUpdate(ctx, binary, versionsInLibrary[i])
 			continue
 		}
 
@@ -281,7 +315,10 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
-func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+	_, span := otel.Tracer("launcher.tuf").Start(ctx, "sortedVersionsInLibrary")
+	defer span.End()
+
 	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(updatesDirectory(binary, baseUpdateDirectory), "*"))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not glob for updates in library: %w", err)

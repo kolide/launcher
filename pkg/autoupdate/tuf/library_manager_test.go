@@ -80,10 +80,10 @@ func TestAvailable(t *testing.T) {
 	require.NoError(t, os.Chmod(executablePath, 0755))
 
 	// Query for the current osquery version
-	require.True(t, testLibrary.Available(binaryOsqueryd, runningTarget))
+	require.True(t, testLibrary.Available(context.TODO(), binaryOsqueryd, runningTarget))
 
 	// Query for a different osqueryd version
-	require.False(t, testLibrary.Available(binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
+	require.False(t, testLibrary.Available(context.TODO(), binaryOsqueryd, "osqueryd-5.6.7.tar.gz"))
 }
 
 func TestAddToLibrary(t *testing.T) {
@@ -139,7 +139,7 @@ func TestAddToLibrary(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					require.NoError(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected no error adding to library")
+					require.NoError(t, testLibraryManager.AddToLibrary(context.TODO(), tt.binary, "", tt.targetFile, tt.targetMeta), "expected no error adding to library")
 				}()
 			}
 
@@ -192,7 +192,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, currentRunningVersion)
 			require.Equal(t, currentRunningVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, currentRunningVersion, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			require.NoError(t, testLibraryManager.AddToLibrary(context.TODO(), binary, currentRunningVersion, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version was not downloaded
 			_, err := os.Stat(filepath.Join(updatesDirectory(binary, testBaseDir), currentRunningVersion))
@@ -238,7 +238,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
 			require.Equal(t, testVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, "", targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			require.NoError(t, testLibraryManager.AddToLibrary(context.TODO(), binary, "", targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version is still there
 			_, err = os.Stat(executablePath)
@@ -307,7 +307,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download
-			require.Error(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
+			require.Error(t, testLibraryManager.AddToLibrary(context.TODO(), tt.binary, "", tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
 
 			// Confirm the update was removed after download
 			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
@@ -517,7 +517,7 @@ func TestTidyLibrary(t *testing.T) {
 				require.Equal(t, len(tt.existingVersions), len(updateMatches))
 
 				// Tidy the library
-				testLibraryManager.TidyLibrary(binary, tt.currentlyRunningVersion)
+				testLibraryManager.TidyLibrary(context.TODO(), binary, tt.currentlyRunningVersion)
 
 				// Confirm the staging directory was tidied up
 				_, err = os.Stat(testLibraryManager.stagingDir)
@@ -583,7 +583,7 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect

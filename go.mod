@@ -32,7 +32,7 @@ require (
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/theupdateframework/notary v0.6.1
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
@@ -77,6 +77,8 @@ require (
 	github.com/docker/go-metrics v0.0.0-20181218153428-b84716841b82 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-tpm v0.3.3 // indirect
@@ -108,6 +110,9 @@ require (
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	go.opentelemetry.io/otel v1.16.0 // indirect
+	go.opentelemetry.io/otel/metric v1.16.0 // indirect
+	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
