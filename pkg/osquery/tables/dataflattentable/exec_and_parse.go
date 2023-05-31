@@ -15,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type bytesFlattener interface {
@@ -82,8 +81,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	var span trace.Span
-	ctx, span = otel.Tracer("launcher").Start(ctx, "generate")
+	ctx, span := otel.Tracer("launcher").Start(ctx, "generate")
 	span.SetAttributes(attribute.String("table_name", t.tableName))
 	defer span.End()
 

@@ -64,35 +64,9 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
-
-	// Set up telemetry exporter
-	f, err := os.Create("/var/kolide-k2/k2device-preprod.kolide.com/traces.txt")
-	if err != nil {
-		level.Info(logger).Log("msg", "could not create file for otel", "err", err)
-		os.Exit(1)
-	}
-	defer f.Close()
-
-	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
-	exp, err := otlptrace.New(ctx, traceClient)
-	if err != nil {
-		level.Info(logger).Log("msg", "could not create exporter for otel", "err", err)
-		os.Exit(1)
-	}
-
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
-		trace.WithResource(newResource()),
-	)
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			level.Info(logger).Log("msg", "could not shut down tracer provider", "err", err)
-		}
-	}()
-	otel.SetTracerProvider(tp)
-
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+
+	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -104,6 +78,24 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	level.Debug(logger).Log("msg", "runLauncher starting")
+
+	// Set up telemetry exporter
+	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
+	exp, err := otlptrace.New(ctx, traceClient)
+	if err != nil {
+		level.Info(logger).Log("msg", "could not create exporter for otel", "err", err)
+		os.Exit(1)
+	}
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exp),
+		trace.WithResource(newResource()),
+	)
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			level.Info(logger).Log("msg", "could not shut down tracer provider", "err", err)
+		}
+	}()
+	otel.SetTracerProvider(tp)
 
 	// We've seen launcher intermittently be unable to recover from
 	// DNS failures in the past, so this check gives us a little bit
