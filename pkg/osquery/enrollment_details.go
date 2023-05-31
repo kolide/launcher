@@ -65,13 +65,13 @@ func getEnrollDetails(osquerydPath string) (service.EnrollmentDetails, error) {
 		return details, fmt.Errorf("create osquery for enrollment details: %w", err)
 	}
 
-	osqCtx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
+	osqCtx, osqCancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer osqCancel()
 
 	if err := osq.Execute(osqCtx); osqCtx.Err() != nil {
 		return details, fmt.Errorf("query enrollment details context error: %w", osqCtx.Err())
 	} else if err != nil {
 		return details, fmt.Errorf("query enrollment details: %w", err)
-
 	}
 
 	var resp []map[string]string
