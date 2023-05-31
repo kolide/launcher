@@ -27,6 +27,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -73,7 +74,6 @@ type TufAutoupdater struct {
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
 	logger                 log.Logger
-	ctx                    context.Context
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -81,12 +81,6 @@ type TufAutoupdaterOption func(*TufAutoupdater)
 func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	return func(ta *TufAutoupdater) {
 		ta.logger = log.With(logger, "component", "tuf_autoupdater")
-	}
-}
-
-func WithContext(ctx context.Context) TufAutoupdaterOption {
-	return func(ta *TufAutoupdater) {
-		ta.ctx = ctx
 	}
 }
 
@@ -100,7 +94,6 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 		osquerier:              osquerier,
 		osquerierRetryInterval: 1 * time.Minute,
 		logger:                 log.NewNopLogger(),
-		ctx:                    context.Background(),
 	}
 
 	for _, opt := range opts {
@@ -172,7 +165,7 @@ func defaultLibraryDirectory(rootDirectory string) string {
 func (ta *TufAutoupdater) Execute() (err error) {
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
-	ta.tidyLibrary(ta.ctx)
+	ta.tidyLibrary(context.Background())
 
 	checkTicker := time.NewTicker(ta.checkInterval)
 	defer checkTicker.Stop()
@@ -182,12 +175,13 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	for {
 		select {
 		case <-checkTicker.C:
-			if err := ta.checkForUpdate(ta.ctx); err != nil {
-				ta.storeError(ta.ctx, err)
+			ctx := context.Background()
+			if err := ta.checkForUpdate(ctx); err != nil {
+				ta.storeError(ctx, err)
 				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
 			}
 		case <-cleanupTicker.C:
-			ta.cleanUpOldErrors(ta.ctx)
+			ta.cleanUpOldErrors(context.Background())
 		case <-ta.interrupt:
 			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
 			return nil
@@ -210,6 +204,8 @@ func (ta *TufAutoupdater) tidyLibrary(ctx context.Context) {
 		// Get the current running version to preserve it when tidying the available updates
 		currentVersion, err := ta.currentRunningVersion(ctx, binary)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			level.Debug(ta.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
 			continue
 		}
@@ -282,6 +278,8 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context) error {
 	// Find the newest release for our channel
 	targets, err := ta.metadataClient.Targets()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
@@ -329,6 +327,8 @@ func (ta *TufAutoupdater) downloadUpdate(ctx context.Context, binary autoupdatab
 
 	release, releaseMetadata, err := findRelease(ctx, binary, targets, ta.channel)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
@@ -402,6 +402,8 @@ func (ta *TufAutoupdater) storeError(ctx context.Context, autoupdateErr error) {
 
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ta.logger).Log("msg", "could not store autoupdater error", "err", err)
 	}
 }
@@ -433,11 +435,15 @@ func (ta *TufAutoupdater) cleanUpOldErrors(ctx context.Context) {
 
 		return nil
 	}); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ta.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
 	}
 
 	// Delete all old keys
 	if err := ta.store.Delete(keysToDelete...); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
 	}
 }

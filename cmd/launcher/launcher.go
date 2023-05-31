@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -47,7 +46,8 @@ import (
 	"go.etcd.io/bbolt"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -74,7 +74,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 	defer f.Close()
 
-	exp, err := newExporter(f)
+	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
+	exp, err := otlptrace.New(ctx, traceClient)
 	if err != nil {
 		level.Info(logger).Log("msg", "could not create exporter for otel", "err", err)
 		os.Exit(1)
@@ -403,7 +404,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			mirrorClient,
 			extension,
 			tuf.WithLogger(logger),
-			tuf.WithContext(ctx),
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
@@ -425,15 +425,6 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
-}
-
-// newExporter returns a console exporter.
-func newExporter(w io.Writer) (trace.SpanExporter, error) {
-	return stdouttrace.New(
-		stdouttrace.WithWriter(w),
-		// Use human-readable output.
-		stdouttrace.WithPrettyPrint(),
-	)
 }
 
 // newResource returns a resource describing this application.

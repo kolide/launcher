@@ -23,6 +23,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -118,10 +119,14 @@ func (ulm *updateLibraryManager) AddToLibrary(ctx context.Context, binary autoup
 
 	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(ctx, binary, targetFilename, targetMetadata)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not stage update: %w", err)
 	}
 
 	if err := ulm.moveVerifiedUpdate(ctx, binary, targetFilename, stagedUpdatePath); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not move verified update: %w", err)
 	}
 
@@ -139,6 +144,8 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(ctx context.Context, binar
 	// Request download from mirror
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + fmt.Sprintf("/kolide/%s/%s/%s", binary, runtime.GOOS, targetFilename))
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
 	defer resp.Body.Close()
@@ -150,24 +157,34 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(ctx context.Context, binar
 	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
 	actualTargetMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	// Verify the actual download against the confirmed local metadata
 	if err := tufutil.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
 	// Everything looks good: create the file and write it to disk
 	out, err := os.Create(stagedUpdatePath)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
 	if _, err := io.Copy(out, &fileBuffer); err != nil {
 		out.Close()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 	if err := out.Close(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return stagedUpdatePath, fmt.Errorf("could not close downloaded target file %s after writing: %w", targetFilename, err)
 	}
 
@@ -184,6 +201,8 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(ctx context.Context, binary 
 	targetVersion := versionFromTarget(binary, targetFilename)
 	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
 	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
 	}
 
@@ -191,24 +210,32 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(ctx context.Context, binary 
 	// here doesn't matter as it's immediately stripped off.
 	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
 		ulm.removeUpdate(ctx, binary, targetVersion)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
 	// Make sure that the binary is executable
 	if err := os.Chmod(executableLocation(stagedVersionedDirectory, binary), 0755); err != nil {
 		ulm.removeUpdate(ctx, binary, targetVersion)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
 	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
 		ulm.removeUpdate(ctx, binary, targetVersion)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
 
 	// All good! Shelve it in the library under its version
 	newUpdateDirectory := filepath.Join(updatesDirectory(binary, ulm.baseDir), targetVersion)
 	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
 
@@ -222,6 +249,8 @@ func (ulm *updateLibraryManager) removeUpdate(ctx context.Context, binary autoup
 
 	directoryToRemove := filepath.Join(updatesDirectory(binary, ulm.baseDir), binaryVersion)
 	if err := os.RemoveAll(directoryToRemove); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
 	} else {
 		level.Debug(ulm.logger).Log("msg", "removed update", "directory", directoryToRemove)
@@ -252,12 +281,16 @@ func (ulm *updateLibraryManager) tidyStagedUpdates(ctx context.Context, binary a
 
 	matches, err := filepath.Glob(filepath.Join(ulm.stagingDir, "*"))
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ulm.logger).Log("msg", "could not glob for staged updates to tidy updates library", "err", err)
 		return
 	}
 
 	for _, match := range matches {
 		if err := os.Remove(match); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			level.Debug(ulm.logger).Log("msg", "could not remove staged update when tidying update library", "file", match, "err", err)
 		}
 	}
@@ -280,6 +313,8 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(ctx context.Context, binary a
 
 	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(ctx, binary, ulm.baseDir)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
 		return
 	}

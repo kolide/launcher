@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -54,22 +55,30 @@ func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, 
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, errors.New("could not initialize TUF client, cannot find release")
 	}
 
 	// From already-downloaded metadata, look for the release version
 	targets, err := metadataClient.Targets()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not get target: %w", err)
 	}
 
 	targetName, _, err := findRelease(ctx, binary, targets, channel)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not find release: %w", err)
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if autoupdate.CheckExecutable(context.TODO(), targetPath, "--version") != nil {
+	if autoupdate.CheckExecutable(ctx, targetPath, "--version") != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("version %s from target %s either not yet downloaded or corrupted: %w", targetVersion, targetName, err)
 	}
 
@@ -89,6 +98,8 @@ func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpda
 	// Pull all available versions from library
 	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, binary, baseUpdateDirectory)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
 
