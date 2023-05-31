@@ -52,6 +52,7 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 
 func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m := mocks.NewKnapsack(t)
+	m.On("OsquerydPath").Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	return m
@@ -94,9 +95,9 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 }
 
 func TestGetHostIdentifier(t *testing.T) {
-
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
+
 	k := makeKnapsack(t, db)
 	e, err := NewExtension(&mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
