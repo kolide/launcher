@@ -18,10 +18,11 @@ func open(url string) error {
 		cmd := exec.Command(browserLauncher, url)
 		if err := cmd.Start(); err != nil {
 			errList = append(errList, fmt.Errorf("could not open browser with %s: %w", browserLauncher, err))
-		} else {
-			// Successfully opened URL, nothing else to do here
-			return nil
+			continue
 		}
+
+		// Successfully opened URL, nothing else to do here
+		return nil
 	}
 	return fmt.Errorf("could not successfully open browser with any given launchers: %+v", errList)
 }
