@@ -7,8 +7,7 @@ import (
 	"runtime"
 
 	"go.opentelemetry.io/otel"
-
-	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -26,13 +25,14 @@ func New(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, t
 	pc, file, line, ok := runtime.Caller(1)
 	if ok {
 		opts = append(opts, trace.WithAttributes(
-			attribute.String("code.filepath", file),
-			attribute.Int("code.lineno", line),
+			semconv.CodeFilepath(file),
+			semconv.CodeLineNumber(line),
 		))
 
 		if f := runtime.FuncForPC(pc); f != nil {
 			spanName = filepath.Base(f.Name())
-			opts = append(opts, trace.WithAttributes(attribute.String("code.function", f.Name())))
+
+			opts = append(opts, trace.WithAttributes(semconv.CodeFunction(f.Name())))
 		}
 	}
 
