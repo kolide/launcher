@@ -17,7 +17,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
-	"go.opentelemetry.io/otel"
+	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
@@ -50,7 +50,7 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, span := otel.Tracer("launcher").Start(r.Context(), "kryptoEcMiddleware")
+		ctx, span := traces.New(r.Context())
 		defer span.End()
 
 		if r.Body != nil {
@@ -106,7 +106,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				Path:   cmdReq.Path,
 			},
 		}
-		newReq = newReq.WithContext(ctx) // set span in context
+		newReq = newReq.WithContext(ctx) // allows the trace to continue to the inner request
 
 		// the body of the cmdReq become the body of the next http request
 		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {

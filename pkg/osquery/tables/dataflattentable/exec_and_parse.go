@@ -9,12 +9,13 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type bytesFlattener interface {
@@ -81,8 +82,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := otel.Tracer("launcher").Start(ctx, "generate")
-	span.SetAttributes(attribute.String("table_name", t.tableName))
+	ctx, span := traces.New(ctx, trace.WithAttributes(attribute.String(traces.AttributeName("dataflattentable", "table_name"), t.tableName)))
 	defer span.End()
 
 	var results []map[string]string

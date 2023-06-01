@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
-	"go.opentelemetry.io/otel"
+	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -72,7 +72,7 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
-	_, span := otel.Tracer("launcher").Start(req.Context(), "requestIdHandlerFunc", trace.WithAttributes(attribute.String("path", req.URL.Path)))
+	_, span := traces.New(req.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), req.URL.Path)))
 	defer span.End()
 
 	response := requestIdsResponse{
