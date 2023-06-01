@@ -41,16 +41,10 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces/exporter"
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 const (
@@ -79,24 +73,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	level.Debug(logger).Log("msg", "runLauncher starting")
 
-	// Set up telemetry exporter
-	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
-	exp, err := otlptrace.New(ctx, traceClient)
-	if err != nil {
-		level.Info(logger).Log("msg", "could not create exporter for otel", "err", err)
-		os.Exit(1)
-	}
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
-		trace.WithResource(newResource()),
-	)
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			level.Info(logger).Log("msg", "could not shut down tracer provider", "err", err)
-		}
-	}()
-	otel.SetTracerProvider(tp)
-
 	// We've seen launcher intermittently be unable to recover from
 	// DNS failures in the past, so this check gives us a little bit
 	// of room to ensure that we are able to resolve DNS requests
@@ -114,6 +90,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
+	var err error
 	if rootDirectory == "" {
 		rootDirectory, err = agent.MkdirTemp(defaultRootDirectory)
 		if err != nil {
@@ -405,6 +382,16 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 
+	// Set up our tracing instrumentation
+	if exp, err := exporter.NewTraceExporter(ctx, k.ServerProvidedDataStore(), extension); err != nil {
+		level.Debug(logger).Log(
+			"msg", "could not set up trace exporter",
+			"err", err,
+		)
+	} else {
+		runGroup.Add(exp.Execute, exp.Interrupt)
+	}
+
 	if err := runGroup.Run(); err != nil {
 		return fmt.Errorf("run service: %w", err)
 	}
@@ -417,17 +404,4 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
-}
-
-// newResource returns a resource describing this application.
-func newResource() *resource.Resource {
-	r, _ := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName("launcher"),
-			semconv.ServiceVersion(version.Version().Version),
-		),
-	)
-	return r
 }

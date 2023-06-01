@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	applicationName = "launcher"
+	ApplicationName = "launcher"
 	defaultSpanName = "launcher/unknown"
 )
 
@@ -36,11 +36,11 @@ func New(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, t
 		}
 	}
 
-	return otel.Tracer(applicationName).Start(ctx, spanName, opts...)
+	return otel.Tracer(ApplicationName).Start(ctx, spanName, opts...)
 }
 
 // AttributeName returns a standardized, namespaced, and appropriately specific name for the
 // given attribute, in the format `launcher.<pkg>.<attr>`, e.g. launcher.tablehelpers.args.
 func AttributeName(packageName string, baseAttrName string) string {
-	return fmt.Sprintf("%s.%s.%s", applicationName, packageName, baseAttrName)
+	return fmt.Sprintf("%s.%s.%s", ApplicationName, packageName, baseAttrName)
 }
