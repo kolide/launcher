@@ -104,11 +104,6 @@ func (m *menu) cleanup() {
 	doneChans = nil
 }
 
-// Returns true if launcher is running in production
-func (m *menu) isProd() bool {
-	return m.hostname == "k2device-preprod.kolide.com" || m.hostname == "k2device.kolide.com"
-}
-
 // makeActionHandler creates a handler to execute the desired action when a menu item is clicked
 func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 	if ap == nil {

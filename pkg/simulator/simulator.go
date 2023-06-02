@@ -32,7 +32,6 @@ type HostSimulation struct {
 	host                   QueryRunner
 	uuid                   string
 	enrollSecret           string
-	grpcURL                string
 	insecure               bool
 	insecureGrpc           bool
 	requestQueriesInterval time.Duration
