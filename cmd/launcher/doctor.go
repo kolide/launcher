@@ -35,6 +35,7 @@ var (
 	// Command line colors
 	cyanText   *color.Color
 	headerText *color.Color
+	yellowText *color.Color // nolint:unused
 	whiteText  *color.Color
 	greenText  *color.Color
 	redText    *color.Color
@@ -49,6 +50,7 @@ var (
 
 	// Indented output for checkup results
 	info func(a ...interface{})
+	warn func(a ...interface{}) // nolint:unused
 	fail func(a ...interface{})
 	pass func(a ...interface{})
 )
@@ -61,6 +63,7 @@ func configureOutput(w io.Writer) {
 	// Command line colors
 	cyanText = color.New(color.FgCyan, color.BgBlack)
 	headerText = color.New(color.Bold, color.FgHiWhite, color.BgBlack)
+	yellowText = color.New(color.FgHiYellow, color.BgBlack) // nolint:unused
 	whiteText = color.New(color.FgWhite, color.BgBlack)
 	greenText = color.New(color.FgGreen, color.BgBlack)
 	redText = color.New(color.Bold, color.FgRed, color.BgBlack)
@@ -84,6 +87,9 @@ func configureOutput(w io.Writer) {
 	// Indented output for checkup results
 	info = func(a ...interface{}) {
 		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("\t%s", a...))
+	}
+	warn = func(a ...interface{}) {
+		yellowText.FprintlnFunc()(doctorWriter, fmt.Sprintf("\t%s", a...))
 	}
 	fail = func(a ...interface{}) {
 		whiteText.FprintlnFunc()(doctorWriter, fmt.Sprintf("❌\t%s", a...))
