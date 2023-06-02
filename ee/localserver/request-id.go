@@ -17,7 +17,6 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type identifiers struct {
@@ -72,7 +71,7 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
-	_, span := traces.StartSpan(req.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), req.URL.Path)))
+	_, span := traces.StartSpan(req.Context(), attribute.String("path", req.URL.Path))
 	defer span.End()
 
 	response := requestIdsResponse{

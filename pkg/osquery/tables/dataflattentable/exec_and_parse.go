@@ -15,7 +15,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type bytesFlattener interface {
@@ -82,7 +81,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, trace.WithAttributes(attribute.String(traces.AttributeName("dataflattentable", "table_name"), t.tableName)))
+	ctx, span := traces.StartSpan(ctx, attribute.String("table_name", t.tableName))
 	defer span.End()
 
 	var results []map[string]string

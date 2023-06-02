@@ -14,7 +14,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
@@ -26,9 +25,9 @@ import (
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx, trace.WithAttributes(
-		attribute.StringSlice(traces.AttributeName("tablehelpers", "possible_binaries"), possibleBins),
-		attribute.StringSlice(traces.AttributeName("tablehelpers", "args"), args)))
+	ctx, span := traces.StartSpan(ctx,
+		attribute.StringSlice("possible_binaries", possibleBins),
+		attribute.StringSlice("args", args))
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
