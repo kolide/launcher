@@ -9,9 +9,9 @@ import (
 var (
 	buildMutex sync.Mutex
 	doneChans  []chan<- struct{}
-	// We rely on systray to notify us if it's appearance is dark mode or not
+	// We rely on systray to notify us if its appearance is dark mode or not
 	// systrayDarkMode caches this flag so we build the menu properly
-	systrayDarkMode bool
+	systrayDarkMode bool // nolint:unused
 	// systrayMenuIcon caches the icon type, so that we can re-set the icon when changing between dark & light modes
 	systrayMenuIcon menuIcon
 )
