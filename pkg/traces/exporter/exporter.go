@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -27,30 +28,16 @@ var archAttributeMap = map[string]attribute.KeyValue{
 }
 
 type TraceExporter struct {
-	provider *trace.TracerProvider
+	provider                *trace.TracerProvider
+	serverProvidedDataStore types.Getter
+	osqueryClient           osquery.Querier
+	attrs                   []attribute.KeyValue // resource attributes, identifying this device + installation
+	attrLock                sync.RWMutex
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
 func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter, client osquery.Querier) (*TraceExporter, error) {
-	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
-	exp, err := otlptrace.New(ctx, traceClient)
-	if err != nil {
-		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
-	}
-
-	traceExporter := &TraceExporter{}
-
-	// Set up the exporter in the background -- we need to wait for the osquery client to be available, but don't
-	// want to block on it.
-	go traceExporter.configureProvider(exp, serverProvidedDataStore, client)
-
-	return traceExporter, nil
-}
-
-// configureProvider sets up the trace provider attributes describing this application and installation,
-// uniquely identifying the source of these traces.
-func (t *TraceExporter) configureProvider(exp *otlptrace.Exporter, serverProvidedDataStore types.Getter, client osquery.Querier) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(traces.ApplicationName),
@@ -61,24 +48,75 @@ func (t *TraceExporter) configureProvider(exp *otlptrace.Exporter, serverProvide
 		attrs = append(attrs, archAttr)
 	}
 
-	// Device identifiers -- available in bucket data.
-	if deviceId, err := serverProvidedDataStore.Get([]byte("device_id")); err == nil {
-		attrs = append(attrs, semconv.ServiceInstanceID(string(deviceId)))
+	t := &TraceExporter{
+		serverProvidedDataStore: serverProvidedDataStore,
+		osqueryClient:           client,
+		attrs:                   attrs,
+		attrLock:                sync.RWMutex{},
 	}
 
-	if munemo, err := serverProvidedDataStore.Get([]byte("munemo")); err == nil {
-		attrs = append(attrs, attribute.String("launcher.munemo", string(munemo)))
+	t.addDeviceIdentifyingAttributes()
+
+	// Set the provider with as many resource attributes as we could get immediately
+	exp, err := newExporter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not create new exporter: %w", err)
+	}
+	t.setNewGlobalProvider(exp)
+
+	// In the background, wait for osquery to be ready so that we can fetch more resource
+	// attributes for our traces, then replace the provider with a new one.
+	go func() {
+		t.addAttributesFromOsquery()
+		if exp, err := newExporter(ctx); err == nil {
+			t.setNewGlobalProvider(exp)
+		}
+	}()
+
+	return t, nil
+}
+
+// newExporter returns an exporter that will send traces with OTLP over HTTP.
+func newExporter(ctx context.Context) (*otlptrace.Exporter, error) {
+	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
+	exp, err := otlptrace.New(ctx, traceClient)
+	if err != nil {
+		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
 	}
 
-	if orgId, err := serverProvidedDataStore.Get([]byte("organization_id")); err == nil {
-		attrs = append(attrs, attribute.String("launcher.organization_id", string(orgId)))
+	return exp, nil
+}
+
+// addDeviceIdentifyingAttributes gets device identifiers from the server-provided
+// data and adds them to our resource attributes.
+func (t *TraceExporter) addDeviceIdentifyingAttributes() {
+	t.attrLock.Lock()
+	defer t.attrLock.Unlock()
+
+	if deviceId, err := t.serverProvidedDataStore.Get([]byte("device_id")); err == nil {
+		t.attrs = append(t.attrs, semconv.ServiceInstanceID(string(deviceId)))
 	}
 
-	if serialNumber, err := serverProvidedDataStore.Get([]byte("serial_number")); err == nil {
-		attrs = append(attrs, attribute.String("launcher.serial", string(serialNumber)))
+	if munemo, err := t.serverProvidedDataStore.Get([]byte("munemo")); err == nil {
+		t.attrs = append(t.attrs, attribute.String("launcher.munemo", string(munemo)))
 	}
 
-	// Device and OS details -- available via osquery.
+	if orgId, err := t.serverProvidedDataStore.Get([]byte("organization_id")); err == nil {
+		t.attrs = append(t.attrs, attribute.String("launcher.organization_id", string(orgId)))
+	}
+
+	if serialNumber, err := t.serverProvidedDataStore.Get([]byte("serial_number")); err == nil {
+		t.attrs = append(t.attrs, attribute.String("launcher.serial", string(serialNumber)))
+	}
+}
+
+// addAttributesFromOsquery retrieves device and OS details from osquery and adds them
+// to our resource attributes. Since this is called on startup when the osquery client
+// may not be ready yet, we perform a few retries.
+func (t *TraceExporter) addAttributesFromOsquery() {
+	t.attrLock.Lock()
+	defer t.attrLock.Unlock()
+
 	// The osqueryd client may not have initialized yet, so retry a few times on error.
 	osquerydRetries := 5
 	for i := 0; i < osquerydRetries; i += 1 {
@@ -94,35 +132,48 @@ FROM
 	osquery_info;
 `
 
-		resp, err := client.Query(query)
+		resp, err := t.osqueryClient.Query(query)
 		if err != nil || len(resp) == 0 {
 			time.Sleep(30 * time.Second)
 			continue
 		}
 
-		attrs = append(attrs,
+		t.attrs = append(t.attrs,
 			attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
 			semconv.OSName(resp[0]["os_name"]),
 			semconv.OSVersion(resp[0]["os_version"]),
 			semconv.HostName("hostname"),
 		)
-		break
+		return
 	}
+}
+
+// setNewGlobalProvider creates and sets a new global provider with the currently-available
+// attributes. If a provider was previously set, it will be shut down.
+func (t *TraceExporter) setNewGlobalProvider(exp *otlptrace.Exporter) {
+	t.attrLock.RLock()
+	defer t.attrLock.RUnlock()
 
 	r, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
+		resource.NewWithAttributes(semconv.SchemaURL, t.attrs...),
 	)
 	if err != nil {
 		r = resource.Default()
 	}
 
-	t.provider = trace.NewTracerProvider(
+	newProvider := trace.NewTracerProvider(
 		trace.WithBatcher(exp),
 		trace.WithResource(r),
 	)
 
-	otel.SetTracerProvider(t.provider)
+	otel.SetTracerProvider(newProvider)
+
+	if t.provider != nil {
+		t.provider.Shutdown(context.Background())
+	}
+
+	t.provider = newProvider
 }
 
 func (t *TraceExporter) Execute() error {
