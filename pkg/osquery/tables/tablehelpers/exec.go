@@ -26,7 +26,7 @@ import (
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
-	ctx, span := traces.New(ctx, trace.WithAttributes(
+	ctx, span := traces.StartSpan(ctx, trace.WithAttributes(
 		attribute.StringSlice(traces.AttributeName("tablehelpers", "possible_binaries"), possibleBins),
 		attribute.StringSlice(traces.AttributeName("tablehelpers", "args"), args)))
 	defer span.End()

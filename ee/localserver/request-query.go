@@ -20,7 +20,7 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.New(r.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), r.URL.Path)))
+	_, span := traces.StartSpan(r.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), r.URL.Path)))
 	defer span.End()
 
 	if r.Body == nil {
@@ -70,7 +70,7 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.New(r.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), r.URL.Path)))
+	_, span := traces.StartSpan(r.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), r.URL.Path)))
 	defer span.End()
 
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.

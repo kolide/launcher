@@ -72,7 +72,7 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
-	_, span := traces.New(req.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), req.URL.Path)))
+	_, span := traces.StartSpan(req.Context(), trace.WithAttributes(attribute.String(traces.AttributeName("localserver", "path"), req.URL.Path)))
 	defer span.End()
 
 	response := requestIdsResponse{

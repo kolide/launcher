@@ -50,7 +50,7 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, span := traces.New(r.Context())
+		ctx, span := traces.StartSpan(r.Context())
 		defer span.End()
 
 		if r.Body != nil {

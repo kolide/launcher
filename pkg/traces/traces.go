@@ -16,10 +16,10 @@ const (
 	defaultSpanName = "launcher/unknown"
 )
 
-// New returns a new context and span, including information about the calling function
+// StartSpan returns a new context and span, including information about the calling function
 // as appropriate. Standardizes the tracer name. The caller is always responsible for
 // ending the span.
-func New(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+func StartSpan(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	spanName := defaultSpanName
 
 	pc, file, line, ok := runtime.Caller(1)
