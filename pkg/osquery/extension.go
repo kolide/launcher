@@ -401,19 +401,26 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
-	// We've seen this fail, so add some retry logic.
+	// We used to see the enrollment details fail, but now that we're running as an exec,
+	// it seems less likely. Try a couple times, but backoff fast.
 	var enrollDetails service.EnrollmentDetails
-	if err := backoff.WaitFor(func() error {
-		enrollDetails, err = getEnrollDetails(e.knapsack.OsquerydPath())
-		return err
-	}, 2*time.Minute, 10*time.Second); err != nil {
-		if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-			return "", true, fmt.Errorf("query enrollment details: %w", err)
+	if e.knapsack.OsquerydPath() == "" {
+		level.Info(logger).Log("msg", "Cannot get additional enrollment details without an osqueryd path. This is probably CI")
+	} else {
+		if err := backoff.WaitFor(func() error {
+			enrollDetails, err = getEnrollDetails(e.knapsack.OsquerydPath())
+			if err != nil {
+				level.Debug(logger).Log("msg", "getEnrollDetails failed in backoff", "err", err)
+			}
+			return err
+		}, 5*time.Second, 5*time.Second); err != nil {
+			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
+				return "", true, fmt.Errorf("query enrollment details: %w", err)
+			}
+
+			level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 		}
-
-		level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
 	}
-
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)

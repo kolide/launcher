@@ -153,9 +153,11 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
+
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
+
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.SetQuerier(mockClient{})
@@ -607,6 +609,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("OsquerydPath").Maybe().Return("")
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
