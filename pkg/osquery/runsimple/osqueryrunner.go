@@ -57,11 +57,12 @@ func WithStdin(r io.Reader) osqueryProcessOpt {
 	}
 }
 
+// RunSql will run a given blob by passing it in as stdin. Note that osquery is perticular. It needs the
+// trailing semicolon, but it's real weird about line breaks, an may return as multiline json output. It
+// is the responsibility of the caller to get the details right.
 func RunSql(sql []byte) osqueryProcessOpt {
 	return func(p *osqueryProcess) {
-		// TODO: When we're passing in via stdin, we need to ensure we have a trailing semicolon. Such is the
-		// life of shell nonsense.
-		p.sql = append(sql, []byte("\n;")...)
+		p.sql = sql
 	}
 }
 
@@ -104,7 +105,7 @@ func (p *osqueryProcess) Execute(ctx context.Context) error {
 
 		p.stdin = bytes.NewReader(p.sql)
 	} else {
-		panic("Not supported wothout specified sql")
+		panic("Not supported without specified sql")
 	}
 
 	p.cmd = exec.CommandContext(ctx, p.osquerydPath, args...)
