@@ -115,7 +115,6 @@ func (p *osqueryProcess) Execute(ctx context.Context) error {
 	p.cmd.Stdout = p.stdout
 	p.cmd.Stderr = p.stderr
 
-	//fmt.Printf("About to run %s\n", p.cmd.String())
 	return p.cmd.Run()
 }
 
