@@ -31,7 +31,6 @@ var (
 	defaultEtcDirectoryPath  string
 	defaultBinDirectoryPath  string
 	defaultConfigFilePath    string
-	defaultKolideHosted      bool
 	defaultAutoupdate        bool
 )
 

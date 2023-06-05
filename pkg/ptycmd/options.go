@@ -13,19 +13,19 @@ type Option func(*Cmd)
 // Cmd is a shelled out command and an attached pty
 type Cmd struct {
 	// the command that is being relayed
-	command string
+	command string // nolint:unused
 
 	// args passed to the command
-	argv []string
+	argv []string // nolint:unused
 
 	// the external command struct
-	cmd *exec.Cmd
+	cmd *exec.Cmd // nolint:unused
 
 	// the pseudoterminal attached to the command
 	pty *os.File
 
 	// channel to signal closing the pty
-	ptyClosed chan struct{}
+	ptyClosed chan struct{} // nolint:unused
 
 	// signal to close process
 	closeSignal syscall.Signal
