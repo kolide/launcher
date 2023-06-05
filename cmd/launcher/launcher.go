@@ -387,13 +387,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 
 	// Set up our tracing instrumentation
-	if exp, err := exporter.NewTraceExporter(ctx, k.ServerProvidedDataStore(), extension); err != nil {
-		level.Debug(logger).Log(
-			"msg", "could not set up trace exporter",
-			"err", err,
-		)
-	} else {
-		runGroup.Add(exp.Execute, exp.Interrupt)
+	if k.ExportTraces() {
+		if exp, err := exporter.NewTraceExporter(ctx, k.ServerProvidedDataStore(), extension); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
+		}
 	}
 
 	if err := runGroup.Run(); err != nil {

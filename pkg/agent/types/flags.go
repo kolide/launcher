@@ -168,4 +168,8 @@ type Flags interface {
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
+
+	// ExportTraces enables exporting our traces
+	SetExportTraces(enabled bool) error
+	ExportTraces() bool
 }

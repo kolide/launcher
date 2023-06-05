@@ -444,3 +444,12 @@ func (fc *FlagController) UpdateDirectory() string {
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
 }
+
+func (fc *FlagController) SetExportTraces(enabled bool) error {
+	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
+}
+func (fc *FlagController) ExportTraces() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
+	).get(fc.getControlServerValue(keys.ExportTraces))
+}

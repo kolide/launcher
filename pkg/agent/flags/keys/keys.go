@@ -9,6 +9,7 @@ type FlagKey string
 // 3. Implement the getter and setter in the Knapsack, which delegates the call to the FlagController
 // 4. Implement the getter and setter in the FlagController, providing defaults, limits, and overrides
 // 4. Implement tests for any new APIs, sanitizers, limits, overrides.
+// 5. Update mocks -- in pkg/agent/types, run `mockery --name Knapsack` and `mockery --name Flags`.
 const (
 	KolideServerURL            FlagKey = "hostname"
 	KolideHosted               FlagKey = "kolide_hosted"
@@ -41,6 +42,7 @@ const (
 	NotaryPrefix               FlagKey = "notary_prefix"
 	AutoupdateInitialDelay     FlagKey = "autoupdater_initial_delay"
 	UpdateDirectory            FlagKey = "update_directory"
+	ExportTraces               FlagKey = "export_traces"
 )
 
 func (key FlagKey) String() string {
