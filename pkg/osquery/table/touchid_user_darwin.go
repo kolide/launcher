@@ -38,16 +38,6 @@ func TouchIDUserConfig(client *osquery.ExtensionManagerClient, logger log.Logger
 type touchIDUserConfigTable struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
-	config *touchIDUserConfig
-}
-
-type touchIDUserConfig struct {
-	uid                    int
-	fingerprintsRegistered int
-	touchIDUnlock          int
-	touchIDApplePay        int
-	effectiveUnlock        int
-	effectiveApplePay      int
 }
 
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

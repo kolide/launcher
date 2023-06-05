@@ -33,14 +33,6 @@ func TouchIDSystemConfig(client *osquery.ExtensionManagerClient, logger log.Logg
 type touchIDSystemConfigTable struct {
 	client *osquery.ExtensionManagerClient
 	logger log.Logger
-	config *touchIDSystemConfig
-}
-
-type touchIDSystemConfig struct {
-	touchIDCompatible int
-	secureEnclaveCPU  string
-	touchIDEnabled    int
-	touchIDUnlock     int
 }
 
 // TouchIDSystemConfigGenerate will be called whenever the table is queried.

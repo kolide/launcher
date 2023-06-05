@@ -6,15 +6,11 @@ import (
 	"testing"
 
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/launcher"
 )
 
 func Test_urlsToTest(t *testing.T) {
 	t.Parallel()
 
-	type args struct {
-		opts launcher.Options
-	}
 	tests := []struct {
 		name string
 		mock func(t *testing.T) *mocks.Flags
@@ -129,7 +125,6 @@ func Test_parseUrl(t *testing.T) {
 
 	type args struct {
 		addr string
-		opts launcher.Options
 	}
 	tests := []struct {
 		name              string

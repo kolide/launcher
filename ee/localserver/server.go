@@ -339,12 +339,3 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-func (ls *localServer) kryptoBoxOutboundHandler(http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	})
-}
-
-func (ls *localServer) verify(message []byte, sig []byte) error {
-	return krypto.RsaVerify(ls.serverKey, message, sig)
-}
