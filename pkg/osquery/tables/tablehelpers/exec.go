@@ -12,7 +12,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/traces"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -26,8 +25,8 @@ import (
 // This is not suitable for high performance work -- it allocates new buffers each time.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx,
-		attribute.StringSlice("possible_binaries", possibleBins),
-		attribute.StringSlice("args", args))
+		"possible_binaries", possibleBins,
+		"args", args)
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)

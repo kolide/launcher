@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -19,7 +18,7 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), attribute.String("path", r.URL.Path))
+	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {
@@ -69,7 +68,7 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), attribute.String("path", r.URL.Path))
+	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
 	defer span.End()
 
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -16,7 +15,7 @@ func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 }
 
 func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), attribute.String("path", r.URL.Path))
+	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {

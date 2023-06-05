@@ -13,7 +13,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -81,7 +80,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, attribute.String("table_name", t.tableName))
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
 	defer span.End()
 
 	var results []map[string]string
