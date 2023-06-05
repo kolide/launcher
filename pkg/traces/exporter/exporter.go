@@ -77,7 +77,7 @@ func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter,
 }
 
 // newExporter returns an exporter that will send traces with OTLP over HTTP.
-func newExporter(ctx context.Context) (*otlptrace.Exporter, error) {
+func newExporter(ctx context.Context) (trace.SpanExporter, error) {
 	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
 	exp, err := otlptrace.New(ctx, traceClient)
 	if err != nil {
@@ -150,7 +150,7 @@ FROM
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider(exp *otlptrace.Exporter) {
+func (t *TraceExporter) setNewGlobalProvider(exp trace.SpanExporter) {
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
