@@ -3,16 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/kardianos/osext"
 )
-
-type thingy struct {
-	binaryName string
-	stagedFile string
-}
 
 type processNotes struct {
 	Pid     int
@@ -70,30 +64,4 @@ func main() {
 
 	fmt.Printf("Finished Main (pid %d)\n", ProcessNotes.Pid)
 
-}
-
-func (b *thingy) rename() error {
-	tmpCurFile := fmt.Sprintf("%s-old", b.binaryName)
-
-	fmt.Println("os.Rename cur to old")
-	if err := os.Rename(b.binaryName, tmpCurFile); err != nil {
-		return fmt.Errorf("os.Rename cur top old: %w", err)
-	}
-
-	fmt.Println("os.Rename stage to cur")
-	if err := os.Rename(b.stagedFile, b.binaryName); err != nil {
-		return fmt.Errorf("os.Rename staged to cur: %w", err)
-	}
-
-	fmt.Println("os.Chmod")
-	if err := os.Chmod(b.binaryName, 0755); err != nil {
-		return fmt.Errorf("os.Chmod: %w", err)
-	}
-
-	fmt.Println("syscall.Exec")
-	if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-		return fmt.Errorf("syscall.Exec: %w", err)
-	}
-
-	return nil
 }

@@ -15,14 +15,16 @@ import (
 // are *not* the tool options, but instead our own representation of
 // the arguments.w
 type signtoolOptions struct {
-	extraArgs       []string
-	subjectName     string // If present, use this as the `/n` argument
+	extraArgs []string
+	// If present, use this as the `/n` argument
+	subjectName     string // nolint:unused
 	skipValidation  bool
 	signtoolPath    string
-	timestampServer string
-	rfc3161Server   string
+	timestampServer string // nolint:unused
+	rfc3161Server   string // nolint:unused
 
-	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
+	// Allows test overrides
+	execCC func(context.Context, string, ...string) *exec.Cmd // nolint:unused
 
 }
 
@@ -48,6 +50,7 @@ func WithSigntoolPath(path string) SigntoolOpt {
 	}
 }
 
+// nolint:unused
 func (so *signtoolOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, string, error) {
 	logger := ctxlog.FromContext(ctx)
 

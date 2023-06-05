@@ -223,7 +223,6 @@ type OsqueryInstance struct {
 	extensionManagerServers []*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
 	clientLock              sync.Mutex
-	paths                   *osqueryFilePaths
 	rmRootDirectory         func()
 	usingTempDir            bool
 	stats                   *history.Instance
@@ -303,7 +302,6 @@ type osqueryOptions struct {
 	enrollSecretPath      string
 	loggerPluginFlag      string
 	osqueryFlags          []string
-	retries               uint
 	rootDirectory         string
 	stderr                io.Writer
 	stdout                io.Writer

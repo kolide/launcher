@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
-// nolint: deadcode
+// nolint:unused
 func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyInt, error) {
 	priData, pubData, err := fetchKeyData(store)
 	if err != nil {

@@ -35,7 +35,7 @@ var (
 	// Command line colors
 	cyanText   *color.Color
 	headerText *color.Color
-	yellowText *color.Color
+	yellowText *color.Color // nolint:unused
 	whiteText  *color.Color
 	greenText  *color.Color
 	redText    *color.Color
@@ -50,7 +50,7 @@ var (
 
 	// Indented output for checkup results
 	info func(a ...interface{})
-	warn func(a ...interface{})
+	warn func(a ...interface{}) // nolint:unused
 	fail func(a ...interface{})
 	pass func(a ...interface{})
 )
@@ -63,7 +63,7 @@ func configureOutput(w io.Writer) {
 	// Command line colors
 	cyanText = color.New(color.FgCyan, color.BgBlack)
 	headerText = color.New(color.Bold, color.FgHiWhite, color.BgBlack)
-	yellowText = color.New(color.FgHiYellow, color.BgBlack)
+	yellowText = color.New(color.FgHiYellow, color.BgBlack) // nolint:unused
 	whiteText = color.New(color.FgWhite, color.BgBlack)
 	greenText = color.New(color.FgGreen, color.BgBlack)
 	redText = color.New(color.Bold, color.FgRed, color.BgBlack)
@@ -108,7 +108,6 @@ type checkup struct {
 func runDoctor(args []string) error {
 	// Doctor assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
-	defaultKolideHosted = true
 	defaultAutoupdate = true
 	setDefaultPaths()
 
