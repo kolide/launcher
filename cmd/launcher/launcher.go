@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -77,8 +78,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// DNS failures in the past, so this check gives us a little bit
 	// of room to ensure that we are able to resolve DNS requests
 	// before proceeding with starting launcher.
+	//
+	// Note that the SplitN won't work for bare ip6 addresses.
 	if err := backoff.WaitFor(func() error {
-		_, lookupErr := net.LookupIP(opts.KolideServerURL)
+		hostport := strings.SplitN(opts.KolideServerURL, ":", 2)
+		_, lookupErr := net.LookupIP(hostport[0])
 		return lookupErr
 	}, 10*time.Second, 1*time.Second); err != nil {
 		level.Info(logger).Log(
