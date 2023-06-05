@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (ls *localServer) requestQueryHandler() http.Handler {
@@ -22,39 +24,31 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 	defer span.End()
 
 	if r.Body == nil {
-		span.SetStatus(codes.Error, "request body is nil")
-		sendClientError(w, "request body is nil")
+		sendClientError(w, span, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	query, ok := body["query"]
 	if !ok || query == "" {
-		span.SetStatus(codes.Error, "no query key found in request body json")
-		sendClientError(w, "no query key found in request body json")
+		sendClientError(w, span, "no query key found in request body json")
 		return
 	}
 
 	results, err := queryWithRetries(ls.querier, query)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error executing query: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error executing query: %s", err))
 		return
 	}
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error marshalling results to json: %s", err))
 		return
 	}
 
@@ -81,23 +75,19 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 	// 5. Launcher returns results
 
 	if r.Body == nil {
-		span.SetStatus(codes.Error, "request body is nil")
-		sendClientError(w, "request body is nil")
+		sendClientError(w, span, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	name, ok := body["name"]
 	if !ok || name == "" {
-		span.SetStatus(codes.Error, "no name key found in request body json")
-		sendClientError(w, "no name key found in request body json")
+		sendClientError(w, span, "no name key found in request body json")
 		return
 	}
 
@@ -105,9 +95,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
+		sendClientError(w, span, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
 
@@ -137,18 +125,19 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error marshalling results to json: %s", err))
 		return
 	}
 
 	w.Write(jsonBytes)
 }
 
-func sendClientError(w http.ResponseWriter, msg string) {
+func sendClientError(w http.ResponseWriter, span trace.Span, msg string) {
 	w.WriteHeader(http.StatusBadRequest)
 	w.Write([]byte(msg))
+
+	span.RecordError(errors.New(msg))
+	span.SetStatus(codes.Error, msg)
 }
 
 func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
-	"go.opentelemetry.io/otel/codes"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {
@@ -19,32 +18,25 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 	defer span.End()
 
 	if r.Body == nil {
-		span.SetStatus(codes.Error, "request body is nil")
-		sendClientError(w, "request body is nil")
+		sendClientError(w, span, "request body is nil")
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	interval, err := durationFromMap("interval", body)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error parsing interval: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error parsing interval: %s", err))
 		return
 	}
 
 	duration, err := durationFromMap("duration", body)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		sendClientError(w, fmt.Sprintf("error parsing duration: %s", err))
+		sendClientError(w, span, fmt.Sprintf("error parsing duration: %s", err))
 		return
 	}
 
