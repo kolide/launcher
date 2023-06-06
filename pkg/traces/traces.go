@@ -57,6 +57,9 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyValue {
 	callerDir := defaultAttributeNamespace
 	if callerFile != "" {
+		// This is the closest we get to grabbing the package name from the caller -- e.g. if
+		// the calling function is `/some/path/to/ee/localserver/request-controlservice.go`,
+		// this will extract `localserver`.
 		callerDir = filepath.Base(filepath.Dir(callerFile))
 	}
 
