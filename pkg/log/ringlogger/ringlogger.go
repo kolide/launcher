@@ -48,6 +48,9 @@ func (rl *ringLogger) Log(keyvals ...interface{}) error {
 	return nil
 }
 
+// GetAll returns all the logs in a map structure. Depending on the size of the ring, this may be quite large.
+//
+// TODO: Add an iterate
 func (rl *ringLogger) GetAll() ([]map[string]any, error) {
 
 	all, err := rl.ring.GetAll()

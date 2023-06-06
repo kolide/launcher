@@ -103,6 +103,8 @@ func (lr *logRouter) GetRecentDebugLogs() ([]map[string]any, error) {
 
 // Replay will replay the logs from the memory ring to a new logger. Because we're serliazing everything down to a
 // string, handling the leveling is cumbersome.
+//
+// TODO: This should probably move to the underlying ringlogger
 func (lr *logRouter) Replay(logger log.Logger) error {
 	logs, err := lr.logRing.GetAll()
 	if err != nil {
@@ -141,7 +143,7 @@ func (lr *logRouter) Replay(logger log.Logger) error {
 // AddPersistStore uses the provided store, to create a persisted ring. This is used to store important logs across
 // restarts.
 func (lr *logRouter) AddPersistStore(store storeInt) error {
-	// Today, it only makes sense to have one of these. So error if not. (We could support an array, but _why_)
+	// Today, it only makes sense to have one of these. So error if already set. (We could support an array, but _why_)
 	if lr.persistRing != nil {
 		return errors.New("already have a persited logger")
 	}
@@ -161,8 +163,9 @@ func (lr *logRouter) AddPersistStore(store storeInt) error {
 	// Most of this logger use is filtered.
 	filteredLogger := level.NewFilter(logger, level.AllowInfo())
 
-	// Replay logs. Note that there's a small race condition between replaying the logs, and adding the new logger.
-	// However, it does not seem worth adding a mutext, and blocking all logging on it.
+	// Replay logs. Note that there's a small timing condition between replaying the logs, and adding the new logger.
+	// Logs that come in during replay, will be missed. However, it does not seem worth adding a mutex, and blocking
+	// all logging on it.
 	if err := lr.Replay(filteredLogger); err != nil {
 		return fmt.Errorf("setting up debug log: %w", err)
 	}
