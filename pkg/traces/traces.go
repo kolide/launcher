@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"runtime"
 
 	"go.opentelemetry.io/otel"
@@ -53,7 +52,8 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 
 // buildAttributes takes the given keyVals, expected to be pairs representing the key
 // and value of each attribute, and parses them appropriately, ensuring that the keys
-// have consistent and specific names. Pairs that cannot be parsed will be discarded.
+// have consistent and specific names. Pairs with invalid keys or values will be added
+// as string attributes.
 func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyValue {
 	callerDir := defaultAttributeNamespace
 	if callerFile != "" {
@@ -64,13 +64,17 @@ func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyV
 
 	for i := 0; i < len(keyVals); i += 2 {
 		// Keys must always be strings
-		if reflect.TypeOf(keyVals[i]).String() != "string" {
+		if _, ok := keyVals[i].(string); !ok {
+			attrs = append(attrs, attribute.String(
+				fmt.Sprintf("bad key type %T: %v", keyVals[i], keyVals[i]),
+				fmt.Sprintf("%v", keyVals[i+1]),
+			))
 			continue
 		}
+
 		key := fmt.Sprintf("%s.%s.%s", ApplicationName, callerDir, keyVals[i])
 
-		// Create an attribute of the appropriate type, dropping ones we cannot determine
-		// or do not support
+		// Create an attribute of the appropriate type
 		switch keyVals[i+1].(type) {
 		case bool:
 			attrs = append(attrs, attribute.Bool(key, keyVals[i+1].(bool)))
@@ -92,6 +96,8 @@ func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyV
 			attrs = append(attrs, attribute.String(key, keyVals[i+1].(string)))
 		case []string:
 			attrs = append(attrs, attribute.StringSlice(key, keyVals[i+1].([]string)))
+		default:
+			attrs = append(attrs, attribute.String(key, fmt.Sprintf("unsupported value of type %T: %v", keyVals[i+1], keyVals[i+1])))
 		}
 	}
 

@@ -90,10 +90,16 @@ func Test_buildAttributes(t *testing.T) {
 			expectedOutput: []attribute.KeyValue{},
 		},
 		{
-			testName:       "unsupported keyval",
+			testName:       "unsupported key",
+			keyVals:        []interface{}{1, complex64(2)},
+			filename:       "some/path/to/a/package",
+			expectedOutput: []attribute.KeyValue{attribute.String("bad key type int: 1", "(2+0i)")},
+		},
+		{
+			testName:       "unsupported value",
 			keyVals:        []interface{}{"something", uint8(2)},
 			filename:       "some/path/to/a/package",
-			expectedOutput: []attribute.KeyValue{},
+			expectedOutput: []attribute.KeyValue{attribute.String("launcher.a.something", "unsupported value of type uint8: 2")},
 		},
 		{
 			testName: "multiple keyvals",
