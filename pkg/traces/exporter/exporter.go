@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -79,7 +79,7 @@ func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter,
 
 // newExporter returns an exporter that will send traces with OTLP over HTTP.
 func newExporter(ctx context.Context) (trace.SpanExporter, error) {
-	traceClient := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
+	traceClient := otlptracegrpc.NewClient(otlptracegrpc.WithInsecure())
 	exp, err := otlptrace.New(ctx, traceClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
