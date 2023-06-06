@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -19,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
+
+const applicationName = "launcher"
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -40,7 +41,7 @@ type TraceExporter struct {
 func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter, client osquery.Querier) (*TraceExporter, error) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
-		semconv.ServiceName(traces.ApplicationName),
+		semconv.ServiceName(applicationName),
 		semconv.ServiceVersion(version.Version().Version),
 	}
 

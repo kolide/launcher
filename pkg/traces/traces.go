@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ApplicationName           = "launcher"
+	instrumentationPkg        = "github.com/kolide/launcher/pkg/traces"
 	defaultSpanName           = "launcher/unknown"
 	defaultAttributeNamespace = "unknown"
 )
@@ -48,7 +48,7 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 
 	opts = append(opts, trace.WithAttributes(buildAttributes(callerFile, keyVals...)...))
 
-	return otel.Tracer(ApplicationName).Start(ctx, spanName, opts...)
+	return otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
 }
 
 // SetError records the error on the span and sets the span's status to error.
@@ -82,7 +82,7 @@ func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyV
 			continue
 		}
 
-		key := fmt.Sprintf("%s.%s.%s", ApplicationName, callerDir, keyVals[i])
+		key := fmt.Sprintf("launcher.%s.%s", callerDir, keyVals[i])
 
 		// Create an attribute of the appropriate type
 		switch keyVals[i+1].(type) {
