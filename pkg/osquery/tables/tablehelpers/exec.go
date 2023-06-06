@@ -11,8 +11,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/traces"
-
-	"go.opentelemetry.io/otel/codes"
 )
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
@@ -60,8 +58,7 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 			continue
 		default:
 			// an actual error
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
+			traces.SetError(span, err)
 			return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
 		}
 

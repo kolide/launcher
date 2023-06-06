@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
-	"go.opentelemetry.io/otel/codes"
 )
 
 type identifiers struct {
@@ -81,9 +80,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	consoleUsers, err := consoleUsers()
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-
+		traces.SetError(span, err)
 		level.Error(ls.logger).Log(
 			"msg", "getting console users",
 			"err", err,
@@ -95,9 +92,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-
+		traces.SetError(span, err)
 		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
 		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
 	}

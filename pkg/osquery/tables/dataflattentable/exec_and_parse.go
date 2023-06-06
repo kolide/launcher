@@ -12,8 +12,6 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
-
-	"go.opentelemetry.io/otel/codes"
 )
 
 type bytesFlattener interface {
@@ -91,8 +89,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		traces.SetError(span, err)
 		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, nil
 	}

@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -18,25 +19,25 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 	defer span.End()
 
 	if r.Body == nil {
-		sendClientError(w, span, "request body is nil")
+		sendClientError(w, span, errors.New("request body is nil"))
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Errorf("error unmarshaling request body: %w", err))
 		return
 	}
 
 	interval, err := durationFromMap("interval", body)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error parsing interval: %s", err))
+		sendClientError(w, span, fmt.Errorf("error parsing interval: %w", err))
 		return
 	}
 
 	duration, err := durationFromMap("duration", body)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error parsing duration: %s", err))
+		sendClientError(w, span, fmt.Errorf("error parsing duration: %w", err))
 		return
 	}
 

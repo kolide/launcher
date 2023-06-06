@@ -59,18 +59,14 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "unable to verify signature", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -90,9 +86,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -131,9 +125,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return

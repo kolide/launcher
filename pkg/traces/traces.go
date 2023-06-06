@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -48,6 +49,12 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 	opts = append(opts, trace.WithAttributes(buildAttributes(callerFile, keyVals...)...))
 
 	return otel.Tracer(ApplicationName).Start(ctx, spanName, opts...)
+}
+
+// SetError records the error on the span and sets the span's status to error.
+func SetError(span trace.Span, err error) {
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
 }
 
 // buildAttributes takes the given keyVals, expected to be pairs representing the key

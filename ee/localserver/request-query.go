@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -24,31 +23,31 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 	defer span.End()
 
 	if r.Body == nil {
-		sendClientError(w, span, "request body is nil")
+		sendClientError(w, span, errors.New("request body is nil"))
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Errorf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	query, ok := body["query"]
 	if !ok || query == "" {
-		sendClientError(w, span, "no query key found in request body json")
+		sendClientError(w, span, errors.New("no query key found in request body json"))
 		return
 	}
 
 	results, err := queryWithRetries(ls.querier, query)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error executing query: %s", err))
+		sendClientError(w, span, fmt.Errorf("error executing query: %s", err))
 		return
 	}
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Errorf("error marshalling results to json: %s", err))
 		return
 	}
 
@@ -75,19 +74,19 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 	// 5. Launcher returns results
 
 	if r.Body == nil {
-		sendClientError(w, span, "request body is nil")
+		sendClientError(w, span, errors.New("request body is nil"))
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendClientError(w, span, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Errorf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	name, ok := body["name"]
 	if !ok || name == "" {
-		sendClientError(w, span, "no name key found in request body json")
+		sendClientError(w, span, errors.New("no name key found in request body json"))
 		return
 	}
 
@@ -95,7 +94,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
+		sendClientError(w, span, fmt.Errorf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
 
@@ -125,19 +124,18 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		sendClientError(w, span, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Errorf("error marshalling results to json: %w", err))
 		return
 	}
 
 	w.Write(jsonBytes)
 }
 
-func sendClientError(w http.ResponseWriter, span trace.Span, msg string) {
+func sendClientError(w http.ResponseWriter, span trace.Span, err error) {
 	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte(msg))
+	w.Write([]byte(err.Error()))
 
-	span.RecordError(errors.New(msg))
-	span.SetStatus(codes.Error, msg)
+	traces.SetError(span, err)
 }
 
 func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {
