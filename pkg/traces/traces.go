@@ -85,27 +85,27 @@ func buildAttributes(callerFile string, keyVals ...interface{}) []attribute.KeyV
 		key := fmt.Sprintf("launcher.%s.%s", callerDir, keyVals[i])
 
 		// Create an attribute of the appropriate type
-		switch keyVals[i+1].(type) {
+		switch v := keyVals[i+1].(type) {
 		case bool:
-			attrs = append(attrs, attribute.Bool(key, keyVals[i+1].(bool)))
+			attrs = append(attrs, attribute.Bool(key, v))
 		case []bool:
-			attrs = append(attrs, attribute.BoolSlice(key, keyVals[i+1].([]bool)))
+			attrs = append(attrs, attribute.BoolSlice(key, v))
 		case int:
-			attrs = append(attrs, attribute.Int(key, keyVals[i+1].(int)))
+			attrs = append(attrs, attribute.Int(key, v))
 		case []int:
-			attrs = append(attrs, attribute.IntSlice(key, keyVals[i+1].([]int)))
+			attrs = append(attrs, attribute.IntSlice(key, v))
 		case int64:
-			attrs = append(attrs, attribute.Int64(key, keyVals[i+1].(int64)))
+			attrs = append(attrs, attribute.Int64(key, v))
 		case []int64:
-			attrs = append(attrs, attribute.Int64Slice(key, keyVals[i+1].([]int64)))
+			attrs = append(attrs, attribute.Int64Slice(key, v))
 		case float64:
-			attrs = append(attrs, attribute.Float64(key, keyVals[i+1].(float64)))
+			attrs = append(attrs, attribute.Float64(key, v))
 		case []float64:
-			attrs = append(attrs, attribute.Float64Slice(key, keyVals[i+1].([]float64)))
+			attrs = append(attrs, attribute.Float64Slice(key, v))
 		case string:
-			attrs = append(attrs, attribute.String(key, keyVals[i+1].(string)))
+			attrs = append(attrs, attribute.String(key, v))
 		case []string:
-			attrs = append(attrs, attribute.StringSlice(key, keyVals[i+1].([]string)))
+			attrs = append(attrs, attribute.StringSlice(key, v))
 		default:
 			attrs = append(attrs, attribute.String(key, fmt.Sprintf("unsupported value of type %T: %v", keyVals[i+1], keyVals[i+1])))
 		}
