@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
@@ -29,7 +29,7 @@ var archAttributeMap = map[string]attribute.KeyValue{
 }
 
 type TraceExporter struct {
-	provider                *trace.TracerProvider
+	provider                *sdktrace.TracerProvider
 	serverProvidedDataStore types.Getter
 	osqueryClient           osquery.Querier
 	attrs                   []attribute.KeyValue // resource attributes, identifying this device + installation
@@ -78,7 +78,7 @@ func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter,
 }
 
 // newExporter returns an exporter that will send traces with OTLP over HTTP.
-func newExporter(ctx context.Context) (trace.SpanExporter, error) {
+func newExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
 	traceClient := otlptracegrpc.NewClient(otlptracegrpc.WithInsecure())
 	exp, err := otlptrace.New(ctx, traceClient)
 	if err != nil {
@@ -151,7 +151,7 @@ FROM
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider(exp trace.SpanExporter) {
+func (t *TraceExporter) setNewGlobalProvider(exp sdktrace.SpanExporter) {
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
@@ -163,9 +163,10 @@ func (t *TraceExporter) setNewGlobalProvider(exp trace.SpanExporter) {
 		r = resource.Default()
 	}
 
-	newProvider := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
-		trace.WithResource(r),
+	newProvider := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(r),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	otel.SetTracerProvider(newProvider)
