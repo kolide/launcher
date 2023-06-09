@@ -74,6 +74,11 @@ func runFlare(args []string) error {
 		}
 	}()
 
+	logger := log.NewLogfmtLogger(b)
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	flagController := flags.NewFlagController(logger, nil, fcOpts...)
+	k := knapsack.New(nil, flagController, nil)
+
 	tw := tar.NewWriter(tarOut)
 
 	// create directory at root of tar file
@@ -85,13 +90,33 @@ func runFlare(args []string) error {
 		Typeflag: tar.TypeDir,
 	}
 
+	logsDir := filepath.ToSlash("logs")
+	logsDirHdr := &tar.Header{
+		Name:     logsDir + "/",
+		Mode:     0755,
+		ModTime:  time.Now().UTC(),
+		Typeflag: tar.TypeDir,
+	}
+
 	if err := tw.WriteHeader(hdr); err != nil {
+		fatal(b, err)
+	}
+
+	if err := tw.WriteHeader(logsDirHdr); err != nil {
 		fatal(b, err)
 	}
 
 	defer tarPostProcessing(tarUpload)
 
 	defer closeTar(tw)
+
+	b1 := new(bytes.Buffer)
+	defer writeFile(filepath.Join(logsDir, "loggy.log"), tw, b1)
+
+	logFiles := getFilepaths(k.RootDirectory(), "debug*")
+	for _, f := range logFiles {
+
+	}
 
 	defer writeFile(filepath.Join(baseDir, fmt.Sprintf("%s.log", id)), tw, b)
 
@@ -108,11 +133,6 @@ func runFlare(args []string) error {
 		fatal(b, err)
 	}
 	output(b, stdout, "%v\n", string(jsonVersion))
-
-	logger := log.NewLogfmtLogger(b)
-	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, nil, fcOpts...)
-	k := knapsack.New(nil, flagController, nil)
 
 	doctorOutput := new(bytes.Buffer)
 
