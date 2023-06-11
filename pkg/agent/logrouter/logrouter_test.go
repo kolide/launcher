@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -204,5 +205,36 @@ func TestLogRouting(t *testing.T) {
 			tt.expectPersistRing(t, string(recentLogsAsBytes), tt.msg, "destination internal persist ring")
 		})
 	}
+}
 
+func TestReplaceSystemLogger(t *testing.T) {
+	t.Parallel()
+
+	var systemLogBuffer1 threadsafebuffer.ThreadSafeBuffer
+	systemlogger1 := log.NewJSONLogger(&systemLogBuffer1)
+
+	var systemLogBuffer2 threadsafebuffer.ThreadSafeBuffer
+	systemlogger2 := log.NewJSONLogger(&systemLogBuffer2)
+
+	msg1 := "msg1 " + ulid.New()
+	msg2 := "msg2 " + ulid.New()
+
+	lr, err := New(systemlogger1)
+	require.NoError(t, err)
+
+	level.Debug(lr.SystemLogger()).Log("msg", msg1)
+	lr.ReplaceSystemLogger(systemlogger2)
+	level.Debug(lr.SystemLogger()).Log("msg", msg2)
+
+	t.Run("original", func(t *testing.T) {
+		t.Parallel()
+		assert.Contains(t, systemLogBuffer1.String(), msg1)
+		assert.NotContains(t, systemLogBuffer1.String(), msg2)
+	})
+
+	t.Run("replaced", func(t *testing.T) {
+		t.Parallel()
+		assert.NotContains(t, systemLogBuffer2.String(), msg1)
+		assert.Contains(t, systemLogBuffer2.String(), msg2)
+	})
 }

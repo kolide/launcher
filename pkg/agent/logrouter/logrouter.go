@@ -77,6 +77,11 @@ func New(systemLogger log.Logger) (*logRouter, error) {
 	}, nil
 }
 
+func (lr *logRouter) ReplaceSystemLogger(newSystemLogger log.Logger) {
+	newSystemTee := teelogger.New(newSystemLogger, lr.loggerTee)
+	lr.systemTee = newSystemTee
+}
+
 func (lr *logRouter) Log(keyvals ...interface{}) error {
 	return lr.loggerTee.Log(keyvals...)
 }
