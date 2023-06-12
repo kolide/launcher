@@ -33,7 +33,6 @@ import (
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
-	defaultKolideHosted = true
 	defaultAutoupdate = true
 	setDefaultPaths()
 

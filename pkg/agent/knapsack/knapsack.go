@@ -343,3 +343,10 @@ func (k *knapsack) SetUpdateDirectory(directory string) error {
 func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
 }
+
+func (k *knapsack) SetExportTraces(enabled bool) error {
+	return k.flags.SetExportTraces(enabled)
+}
+func (k *knapsack) ExportTraces() bool {
+	return k.flags.ExportTraces()
+}

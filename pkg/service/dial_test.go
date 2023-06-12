@@ -52,7 +52,7 @@ func startServer(t *testing.T, conf *tls.Config) func() {
 	return grpcServer.Stop
 }
 
-//nolint:deadcode
+//nolint:unused
 const (
 	badCert = "testdata/bad-cert.pem"
 	badKey  = "testdata/bad-key.pem"
