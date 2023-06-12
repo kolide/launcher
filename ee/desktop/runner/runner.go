@@ -262,7 +262,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	case <-time.After(r.interruptTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
 		for uid, processRecord := range r.uidProcs {
-			if !processExists(processRecord) {
+			if !r.processExists(processRecord) {
 				continue
 			}
 			if err := processRecord.process.Kill(); err != nil {
@@ -575,7 +575,7 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	}
 
 	// have a record of process, but it died for some reason, log it
-	if !processExists(proc) {
+	if !r.processExists(proc) {
 		level.Info(r.logger).Log(
 			"msg", "found existing desktop process dead for console user",
 			"pid", r.uidProcs[uid].process.Pid,
@@ -590,18 +590,31 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	return true
 }
 
-func processExists(processRecord processRecord) bool {
+func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	// the call to process.NewProcessWithContext ensures process exists
 	proc, err := process.NewProcessWithContext(ctx, int32(processRecord.process.Pid))
 	if err != nil {
+		level.Info(r.logger).Log(
+			"msg", "looking up existing desktop process",
+			"pid", processRecord.process.Pid,
+			"process_path", processRecord.path,
+			"err", err,
+		)
 		return false
 	}
 
 	path, err := proc.ExeWithContext(ctx)
 	if err != nil || path != processRecord.path {
+		level.Info(r.logger).Log(
+			"msg", "error or path mismatch checking existing desktop process path",
+			"pid", processRecord.process.Pid,
+			"process_record_path", processRecord.path,
+			"err", err,
+			"found_path", path,
+		)
 		return false
 	}
 
