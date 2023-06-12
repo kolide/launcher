@@ -172,4 +172,8 @@ type Flags interface {
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error
 	ExportTraces() bool
+
+	// IngestServerURL is the URL of the ingest server for logs and traces
+	SetIngestServerURL(url string) error
+	IngestServerURL() string
 }

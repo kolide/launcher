@@ -453,3 +453,12 @@ func (fc *FlagController) ExportTraces() bool {
 		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
+
+func (fc *FlagController) SetIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.IngestServerURL, []byte(url))
+}
+func (fc *FlagController) IngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.IngestServerURL),
+	).get(fc.getControlServerValue(keys.IngestServerURL))
+}

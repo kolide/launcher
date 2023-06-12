@@ -43,6 +43,7 @@ const (
 	AutoupdateInitialDelay     FlagKey = "autoupdater_initial_delay"
 	UpdateDirectory            FlagKey = "update_directory"
 	ExportTraces               FlagKey = "export_traces"
+	IngestServerURL            FlagKey = "ingest_url"
 )
 
 func (key FlagKey) String() string {

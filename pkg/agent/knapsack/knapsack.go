@@ -350,3 +350,10 @@ func (k *knapsack) SetExportTraces(enabled bool) error {
 func (k *knapsack) ExportTraces() bool {
 	return k.flags.ExportTraces()
 }
+
+func (k *knapsack) SetIngestServerURL(url string) error {
+	return k.flags.SetIngestServerURL(url)
+}
+func (k *knapsack) IngestServerURL() string {
+	return k.flags.IngestServerURL()
+}

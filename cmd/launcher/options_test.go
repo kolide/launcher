@@ -192,6 +192,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		ControlServerURL:       "",
 		ControlRequestInterval: 60 * time.Second,
 		ExportTraces:           false,
+		IngestServerURL:        "localhost:4317",
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,
 		MirrorServerURL:        "https://dl.kolide.co",

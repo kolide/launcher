@@ -105,6 +105,8 @@ type Options struct {
 	DelayStart time.Duration
 	// ExportTraces enables exporting traces.
 	ExportTraces bool
+	// IngestServerURL is the URL that traces and logs will be exported to
+	IngestServerURL string
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string

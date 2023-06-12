@@ -381,6 +381,20 @@ func (_m *Knapsack) IAmBreakingEELicense() bool {
 	return r0
 }
 
+// IngestServerURL provides a mock function with given fields:
+func (_m *Knapsack) IngestServerURL() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // InitialResultsStore provides a mock function with given fields:
 func (_m *Knapsack) InitialResultsStore() types.GetterSetterDeleterIteratorUpdater {
 	ret := _m.Called()
@@ -935,6 +949,20 @@ func (_m *Knapsack) SetForceControlSubsystems(force bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(force)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetIngestServerURL provides a mock function with given fields: url
+func (_m *Knapsack) SetIngestServerURL(url string) error {
+	ret := _m.Called(url)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(url)
 	} else {
 		r0 = ret.Error(0)
 	}
