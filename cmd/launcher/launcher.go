@@ -42,6 +42,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces/exporter"
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
@@ -382,6 +383,18 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
 		} else {
 			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+		}
+	}
+
+	// Set up our tracing instrumentation
+	if k.ExportTraces() {
+		if exp, err := exporter.NewTraceExporter(ctx, k.ServerProvidedDataStore(), extension); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
 		}
 	}
 

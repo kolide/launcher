@@ -103,6 +103,8 @@ type Options struct {
 	IAmBreakingEELicense bool
 	// DelayStart allows for delaying launcher startup for a configurable amount of time
 	DelayStart time.Duration
+	// ExportTraces enables exporting traces.
+	ExportTraces bool
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string

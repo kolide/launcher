@@ -87,15 +87,12 @@ func (ms *RunnerServer) Shutdown(ctx context.Context) error {
 }
 
 // RegisterClient registers a desktop proc with the server under the provided key.
+// If a desktop proc already exists with the provided key, it will be replaced and
+// no longer recognized.
 // Returns the generated auth token.
 func (ms *RunnerServer) RegisterClient(key string) string {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-
-	v, ok := ms.desktopProcAuthTokens[key]
-	if ok {
-		return v
-	}
 
 	token := ulid.New()
 	ms.desktopProcAuthTokens[key] = token

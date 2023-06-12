@@ -458,6 +458,11 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			continue
 		}
 
+		// we've decided to spawn a new desktop user process for this user
+		// make sure any existing user desktop processes stop being
+		// recognized by the runner server
+		r.runnerServer.DeRegisterClient(uid)
+
 		socketPath, err := r.socketPath(uid)
 		if err != nil {
 			return fmt.Errorf("getting socket path: %w", err)
