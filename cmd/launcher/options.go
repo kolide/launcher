@@ -82,6 +82,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flOsqueryFlags           arrayFlags // set below with flagset.Var
 		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		flConfigFilePath         = flagset.String("config", defaultConfigFilePath, "config file to parse options from (optional)")
+		flExportTraces           = flagset.Bool("export_traces", false, "Whether to export traces")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -243,6 +244,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
+		ExportTraces:                       *flExportTraces,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,

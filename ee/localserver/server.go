@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
 
@@ -129,7 +130,9 @@ func New(k types.Knapsack, opts ...LocalServerOption) (*localServer, error) {
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
 	srv := &http.Server{
-		Handler:           ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))),
+		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return r.URL.Path
+		})),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
