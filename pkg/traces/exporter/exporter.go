@@ -30,7 +30,7 @@ import (
 
 const (
 	applicationName     = "launcher"
-	TracesSubsystem     = "traces"
+	IngestSubsystem     = "ingest"
 	configStoreTokenKey = "ingest_server_token"
 )
 
@@ -84,6 +84,10 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		ingestUrl:       k.IngestServerURL(),
 		enabled:         k.ExportTraces(),
 	}
+
+	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
+	// to export to
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.IngestServerURL)
 
 	if !t.enabled {
 		return t, nil
@@ -266,6 +270,8 @@ func (t *TraceExporter) Update(data io.Reader) error {
 // that we care about, which are ingest_url and export_traces.
 func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	needsNewProvider := false
+
+	// Handle export_traces toggle
 	if slices.Contains(flagKeys, keys.ExportTraces) {
 		if !t.enabled && t.knapsack.ExportTraces() {
 			// Newly enabled
@@ -285,6 +291,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		}
 	}
 
+	// Handle ingest_url updates
 	if slices.Contains(flagKeys, keys.IngestServerURL) {
 		if t.ingestUrl != t.knapsack.IngestServerURL() {
 			t.ingestUrl = t.knapsack.IngestServerURL()

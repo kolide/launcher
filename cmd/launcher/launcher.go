@@ -288,6 +288,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 			return fmt.Errorf("failed to register notify consumer: %w", err)
 		}
+
+		// Set up our tracing instrumentation
+		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
+			if err := controlService.RegisterConsumer(exporter.IngestSubsystem, exp); err != nil {
+				return fmt.Errorf("failed to register notify consumer: %w", err)
+			}
+		}
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
@@ -384,16 +397,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		} else {
 			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 		}
-	}
-
-	// Set up our tracing instrumentation
-	if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
-		level.Debug(logger).Log(
-			"msg", "could not set up trace exporter",
-			"err", err,
-		)
-	} else {
-		runGroup.Add(exp.Execute, exp.Interrupt)
 	}
 
 	if err := runGroup.Run(); err != nil {
