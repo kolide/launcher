@@ -32,7 +32,7 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 	// code.lineno, code.function) and to set more specific span and attribute names.
 	// runtime.Caller(0) would return information about `StartSpan` -- calling
 	// runtime.Caller(1) will return information about the function calling `StartSpan`.
-	pc, callerFile, callerLine, ok := runtime.Caller(1)
+	programCounter, callerFile, callerLine, ok := runtime.Caller(1)
 	if ok {
 		opts = append(opts, trace.WithAttributes(
 			semconv.CodeFilepath(callerFile),
@@ -40,7 +40,7 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 		))
 
 		// Extract the calling function name and use it to set code.function and the span name.
-		if f := runtime.FuncForPC(pc); f != nil {
+		if f := runtime.FuncForPC(programCounter); f != nil {
 			spanName = filepath.Base(f.Name())
 			opts = append(opts, trace.WithAttributes(semconv.CodeFunction(f.Name())))
 		}

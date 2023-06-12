@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -27,6 +29,8 @@ var archAttributeMap = map[string]attribute.KeyValue{
 	"arm64": semconv.HostArchARM64,
 	"arm":   semconv.HostArchARM32,
 }
+
+var osqueryClientRecheckInterval = 30 * time.Second
 
 type TraceExporter struct {
 	provider                *sdktrace.TracerProvider
@@ -118,35 +122,40 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 	t.attrLock.Lock()
 	defer t.attrLock.Unlock()
 
-	// The osqueryd client may not have initialized yet, so retry a few times on error.
-	osquerydRetries := 5
-	for i := 0; i < osquerydRetries; i += 1 {
-		query := `
-SELECT
-	osquery_info.version as osquery_version,
-	os_version.name as os_name,
-	os_version.version as os_version,
-	system_info.hostname
-FROM
-	os_version,
-	system_info,
-	osquery_info;
-`
+	osqueryInfoQuery := `
+	SELECT
+		osquery_info.version as osquery_version,
+		os_version.name as os_name,
+		os_version.version as os_version,
+		system_info.hostname
+	FROM
+		os_version,
+		system_info,
+		osquery_info;
+	`
 
-		resp, err := t.osqueryClient.Query(query)
-		if err != nil || len(resp) == 0 {
-			time.Sleep(30 * time.Second)
-			continue
+	// The osqueryd client may not have initialized yet, so retry for up to three minutes on error.
+	var resp []map[string]string
+	if err := backoff.WaitFor(func() error {
+		var err error
+		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
+		if err != nil {
+			return err
 		}
-
-		t.attrs = append(t.attrs,
-			attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
-			semconv.OSName(resp[0]["os_name"]),
-			semconv.OSVersion(resp[0]["os_version"]),
-			semconv.HostName("hostname"),
-		)
+		if len(resp) == 0 {
+			return errors.New("no results returned")
+		}
+		return nil
+	}, 3*time.Minute, osqueryClientRecheckInterval); err != nil {
 		return
 	}
+
+	t.attrs = append(t.attrs,
+		attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
+		semconv.OSName(resp[0]["os_name"]),
+		semconv.OSVersion(resp[0]["os_version"]),
+		semconv.HostName("hostname"),
+	)
 }
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
