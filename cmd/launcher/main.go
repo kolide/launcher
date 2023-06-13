@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -17,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
+	"github.com/kolide/launcher/pkg/log/httpbuffer"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 )
@@ -95,6 +97,9 @@ func main() {
 		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
+
+	// TODO add based on option, unhard code stuffz
+	logger = teelogger.New(logger, log.NewJSONLogger(httpbuffer.New("http://localhost:8080/log", httpbuffer.WithSendSize(1))))
 
 	defer func() {
 		if r := recover(); r != nil {
