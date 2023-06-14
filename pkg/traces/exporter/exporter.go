@@ -2,10 +2,7 @@ package exporter
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"runtime"
 	"sync"
 	"time"
@@ -13,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/control/consumers/tokenconsumer"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -28,15 +26,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	applicationName     = "launcher"
-	IngestSubsystem     = "ingest"
-	configStoreTokenKey = "ingest_server_token"
-)
-
-type traceSubsystemConfig struct {
-	IngestToken string `json:"ingest_token"`
-}
+const applicationName = "launcher"
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -74,7 +64,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		attrs = append(attrs, archAttr)
 	}
 
-	currentToken, _ := k.ConfigStore().Get([]byte(configStoreTokenKey))
+	currentToken, _ := k.ConfigStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
 
 	t := &TraceExporter{
 		knapsack:                  k,
@@ -245,25 +235,19 @@ func (t *TraceExporter) Interrupt(_ error) {
 	}
 }
 
-// Update satisfies control.consumer interface -- handles updates to `traces` subsystem,
-// which amounts to a new bearer auth token being provided
-func (t *TraceExporter) Update(data io.Reader) error {
-	var updatedCfg traceSubsystemConfig
-	if err := json.NewDecoder(data).Decode(&updatedCfg); err != nil {
-		return fmt.Errorf("failed to decode trace subsystem data: %w", err)
-	}
-
-	t.ingestAuthToken = updatedCfg.IngestToken
-
-	if err := t.knapsack.ConfigStore().Set([]byte(configStoreTokenKey), []byte(updatedCfg.IngestToken)); err != nil {
-		level.Debug(t.logger).Log("msg", "could not store trace ingest token after update", "err", err)
+// Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
+// which amounts to a new bearer auth token being provided.
+func (t *TraceExporter) Ping() {
+	newToken, err := t.knapsack.ConfigStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
+		return
 	}
 
 	// No need to replace the entire global provider on token update -- we can swap
 	// to the new token in place.
+	t.ingestAuthToken = string(newToken)
 	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
-
-	return nil
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags

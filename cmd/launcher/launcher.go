@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/tokenconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
@@ -290,6 +291,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// Set up our tracing instrumentation
+		ingestConsumer := tokenconsumer.NewIngestTokenConsumer(k.ConfigStore())
+		if err := controlService.RegisterConsumer(tokenconsumer.IngestSubsystem, ingestConsumer); err != nil {
+			return fmt.Errorf("failed to register ingest consumer: %w", err)
+		}
+
 		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
 			level.Debug(logger).Log(
 				"msg", "could not set up trace exporter",
@@ -297,9 +303,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			)
 		} else {
 			runGroup.Add(exp.Execute, exp.Interrupt)
-			if err := controlService.RegisterConsumer(exporter.IngestSubsystem, exp); err != nil {
-				return fmt.Errorf("failed to register notify consumer: %w", err)
-			}
+			controlService.RegisterSubscriber(tokenconsumer.IngestSubsystem, exp)
 		}
 	}
 
