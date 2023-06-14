@@ -48,16 +48,17 @@ var archAttributeMap = map[string]attribute.KeyValue{
 var osqueryClientRecheckInterval = 30 * time.Second
 
 type TraceExporter struct {
-	provider         *sdktrace.TracerProvider
-	knapsack         types.Knapsack
-	osqueryClient    osquery.Querier
-	logger           log.Logger
-	attrs            []attribute.KeyValue // resource attributes, identifying this device + installation
-	attrLock         sync.RWMutex
-	ingestAuthToken  string
-	ingestUrl        string
-	disableIngestTLS bool
-	enabled          bool
+	provider                  *sdktrace.TracerProvider
+	knapsack                  types.Knapsack
+	osqueryClient             osquery.Querier
+	logger                    log.Logger
+	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
+	attrLock                  sync.RWMutex
+	ingestClientAuthenticator *clientAuthenticator
+	ingestAuthToken           string
+	ingestUrl                 string
+	disableIngestTLS          bool
+	enabled                   bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -76,15 +77,16 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	currentToken, _ := k.ConfigStore().Get([]byte(configStoreTokenKey))
 
 	t := &TraceExporter{
-		knapsack:         k,
-		osqueryClient:    client,
-		logger:           log.With(logger, "component", "trace_exporter"),
-		attrs:            attrs,
-		attrLock:         sync.RWMutex{},
-		ingestAuthToken:  string(currentToken),
-		ingestUrl:        k.ObservabilityIngestServerURL(),
-		disableIngestTLS: k.DisableObservabilityIngestTLS(),
-		enabled:          k.ExportTraces(),
+		knapsack:                  k,
+		osqueryClient:             client,
+		logger:                    log.With(logger, "component", "trace_exporter"),
+		attrs:                     attrs,
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator(string(currentToken)),
+		ingestAuthToken:           string(currentToken),
+		ingestUrl:                 k.ObservabilityIngestServerURL(),
+		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
+		enabled:                   k.ExportTraces(),
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
@@ -109,25 +111,6 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	}()
 
 	return t, nil
-}
-
-// newExporter returns an exporter that will send traces with OTLP over gRPC.
-func newExporter(ctx context.Context, token string, url string, insecure bool) (sdktrace.SpanExporter, error) {
-	opts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(url),
-		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(newClientAuthenticator(token))),
-	}
-	if insecure {
-		opts = append(opts, otlptracegrpc.WithInsecure())
-	}
-
-	traceClient := otlptracegrpc.NewClient(opts...)
-	exp, err := otlptrace.New(ctx, traceClient)
-	if err != nil {
-		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
-	}
-
-	return exp, nil
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -207,7 +190,16 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
 func (t *TraceExporter) setNewGlobalProvider() {
-	exp, err := newExporter(context.Background(), t.ingestAuthToken, t.ingestUrl, t.disableIngestTLS)
+	opts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(t.ingestUrl),
+		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
+	}
+	if t.disableIngestTLS {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	}
+
+	traceClient := otlptracegrpc.NewClient(opts...)
+	exp, err := otlptrace.New(context.Background(), traceClient)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
 		return
@@ -267,7 +259,9 @@ func (t *TraceExporter) Update(data io.Reader) error {
 		level.Debug(t.logger).Log("msg", "could not store trace ingest token after update", "err", err)
 	}
 
-	t.setNewGlobalProvider()
+	// No need to replace the entire global provider on token update -- we can swap
+	// to the new token in place.
+	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
 
 	return nil
 }

@@ -16,6 +16,12 @@ func newClientAuthenticator(token string) *clientAuthenticator {
 	}
 }
 
+// setToken updates the token used as the bearer auth token -- this is used
+// to swap the bearer auth token in-place before it expires.
+func (c *clientAuthenticator) setToken(token string) {
+	c.token = token
+}
+
 // GetRequestMetadata adds the necessary authentication header to the request.
 func (c *clientAuthenticator) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
 	return map[string]string{
