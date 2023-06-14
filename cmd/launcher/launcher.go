@@ -291,7 +291,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// Set up our tracing instrumentation
-		ingestConsumer := tokenconsumer.NewIngestTokenConsumer(k.ConfigStore())
+		ingestConsumer := tokenconsumer.NewIngestTokenConsumer(k.TokenStore())
 		if err := controlService.RegisterConsumer(tokenconsumer.IngestSubsystem, ingestConsumer); err != nil {
 			return fmt.Errorf("failed to register ingest consumer: %w", err)
 		}

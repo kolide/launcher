@@ -64,7 +64,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		attrs = append(attrs, archAttr)
 	}
 
-	currentToken, _ := k.ConfigStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
+	currentToken, _ := k.TokenStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
 
 	t := &TraceExporter{
 		knapsack:                  k,
@@ -238,7 +238,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
 // which amounts to a new bearer auth token being provided.
 func (t *TraceExporter) Ping() {
-	newToken, err := t.knapsack.ConfigStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
+	newToken, err := t.knapsack.TokenStore().Get(tokenconsumer.ObservabilityIngestTokenKey)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
 		return

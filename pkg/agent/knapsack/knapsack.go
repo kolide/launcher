@@ -85,6 +85,10 @@ func (k *knapsack) ServerProvidedDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerProvidedDataStore)
 }
 
+func (k *knapsack) TokenStore() types.KVStore {
+	return k.getKVStore(storage.TokenStore)
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil

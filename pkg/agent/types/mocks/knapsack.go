@@ -1182,6 +1182,22 @@ func (_m *Knapsack) StatusLogsStore() types.GetterSetterDeleterIteratorUpdater {
 	return r0
 }
 
+// TokenStore provides a mock function with given fields:
+func (_m *Knapsack) TokenStore() types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
+	}
+
+	return r0
+}
+
 // Transport provides a mock function with given fields:
 func (_m *Knapsack) Transport() string {
 	ret := _m.Called()
