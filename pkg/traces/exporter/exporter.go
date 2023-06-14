@@ -48,15 +48,16 @@ var archAttributeMap = map[string]attribute.KeyValue{
 var osqueryClientRecheckInterval = 30 * time.Second
 
 type TraceExporter struct {
-	provider        *sdktrace.TracerProvider
-	knapsack        types.Knapsack
-	osqueryClient   osquery.Querier
-	logger          log.Logger
-	attrs           []attribute.KeyValue // resource attributes, identifying this device + installation
-	attrLock        sync.RWMutex
-	ingestAuthToken string
-	ingestUrl       string
-	enabled         bool
+	provider         *sdktrace.TracerProvider
+	knapsack         types.Knapsack
+	osqueryClient    osquery.Querier
+	logger           log.Logger
+	attrs            []attribute.KeyValue // resource attributes, identifying this device + installation
+	attrLock         sync.RWMutex
+	ingestAuthToken  string
+	ingestUrl        string
+	disableIngestTLS bool
+	enabled          bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -75,19 +76,20 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	currentToken, _ := k.ConfigStore().Get([]byte(configStoreTokenKey))
 
 	t := &TraceExporter{
-		knapsack:        k,
-		osqueryClient:   client,
-		logger:          log.With(logger, "component", "trace_exporter"),
-		attrs:           attrs,
-		attrLock:        sync.RWMutex{},
-		ingestAuthToken: string(currentToken),
-		ingestUrl:       k.IngestServerURL(),
-		enabled:         k.ExportTraces(),
+		knapsack:         k,
+		osqueryClient:    client,
+		logger:           log.With(logger, "component", "trace_exporter"),
+		attrs:            attrs,
+		attrLock:         sync.RWMutex{},
+		ingestAuthToken:  string(currentToken),
+		ingestUrl:        k.ObservabilityIngestServerURL(),
+		disableIngestTLS: k.DisableObservabilityIngestTLS(),
+		enabled:          k.ExportTraces(),
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
 	// to export to
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.IngestServerURL)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
 
 	if !t.enabled {
 		return t, nil
@@ -110,12 +112,16 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 }
 
 // newExporter returns an exporter that will send traces with OTLP over gRPC.
-func newExporter(ctx context.Context, token string, url string) (sdktrace.SpanExporter, error) {
-	traceClient := otlptracegrpc.NewClient(
-		otlptracegrpc.WithInsecure(),
+func newExporter(ctx context.Context, token string, url string, insecure bool) (sdktrace.SpanExporter, error) {
+	opts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(url),
 		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(newClientAuthenticator(token))),
-	)
+	}
+	if insecure {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	}
+
+	traceClient := otlptracegrpc.NewClient(opts...)
 	exp, err := otlptrace.New(ctx, traceClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
@@ -201,7 +207,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
 func (t *TraceExporter) setNewGlobalProvider() {
-	exp, err := newExporter(context.Background(), t.ingestAuthToken, t.ingestUrl)
+	exp, err := newExporter(context.Background(), t.ingestAuthToken, t.ingestUrl, t.disableIngestTLS)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
 		return
@@ -292,11 +298,20 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 
 	// Handle ingest_url updates
-	if slices.Contains(flagKeys, keys.IngestServerURL) {
-		if t.ingestUrl != t.knapsack.IngestServerURL() {
-			t.ingestUrl = t.knapsack.IngestServerURL()
+	if slices.Contains(flagKeys, keys.ObservabilityIngestServerURL) {
+		if t.ingestUrl != t.knapsack.ObservabilityIngestServerURL() {
+			t.ingestUrl = t.knapsack.ObservabilityIngestServerURL()
 			needsNewProvider = true
 			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
+		}
+	}
+
+	// Handle disable_ingest_tls updates
+	if slices.Contains(flagKeys, keys.DisableObservabilityIngestTLS) {
+		if t.disableIngestTLS != t.knapsack.DisableObservabilityIngestTLS() {
+			t.disableIngestTLS = t.knapsack.DisableObservabilityIngestTLS()
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_ingest_tls", t.disableIngestTLS)
 		}
 	}
 

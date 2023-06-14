@@ -351,9 +351,16 @@ func (k *knapsack) ExportTraces() bool {
 	return k.flags.ExportTraces()
 }
 
-func (k *knapsack) SetIngestServerURL(url string) error {
-	return k.flags.SetIngestServerURL(url)
+func (k *knapsack) SetObservabilityIngestServerURL(url string) error {
+	return k.flags.SetObservabilityIngestServerURL(url)
 }
-func (k *knapsack) IngestServerURL() string {
-	return k.flags.IngestServerURL()
+func (k *knapsack) ObservabilityIngestServerURL() string {
+	return k.flags.ObservabilityIngestServerURL()
+}
+
+func (k *knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
+	return k.flags.SetDisableObservabilityIngestTLS(enabled)
+}
+func (k *knapsack) DisableObservabilityIngestTLS() bool {
+	return k.flags.DisableObservabilityIngestTLS()
 }

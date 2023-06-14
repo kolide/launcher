@@ -83,7 +83,8 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		flConfigFilePath         = flagset.String("config", defaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces           = flagset.Bool("export_traces", false, "Whether to export traces")
-		flIngestServerURL        = flagset.String("ingest_url", "localhost:4317", "Where to export traces and logs")
+		flIngestServerURL        = flagset.String("ingest_url", "", "Where to export traces and logs")
+		flDisableIngestTLS       = flagset.Bool("disable_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -246,7 +247,8 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
-		IngestServerURL:                    *flIngestServerURL,
+		ObservabilityIngestServerURL:       *flIngestServerURL,
+		DisableObservabilityIngestTLS:      *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,

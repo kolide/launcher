@@ -173,7 +173,11 @@ type Flags interface {
 	SetExportTraces(enabled bool) error
 	ExportTraces() bool
 
-	// IngestServerURL is the URL of the ingest server for logs and traces
-	SetIngestServerURL(url string) error
-	IngestServerURL() string
+	// ObservabilityIngestServerURL is the URL of the ingest server for logs and traces
+	SetObservabilityIngestServerURL(url string) error
+	ObservabilityIngestServerURL() string
+
+	// DisableObservabilityIngestTLS disables TLS for observability ingest server communication
+	SetDisableObservabilityIngestTLS(enabled bool) error
+	DisableObservabilityIngestTLS() bool
 }

@@ -297,6 +297,20 @@ func (_m *Knapsack) DisableControlTLS() bool {
 	return r0
 }
 
+// DisableObservabilityIngestTLS provides a mock function with given fields:
+func (_m *Knapsack) DisableObservabilityIngestTLS() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // EnableInitialRunner provides a mock function with given fields:
 func (_m *Knapsack) EnableInitialRunner() bool {
 	ret := _m.Called()
@@ -376,20 +390,6 @@ func (_m *Knapsack) IAmBreakingEELicense() bool {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// IngestServerURL provides a mock function with given fields:
-func (_m *Knapsack) IngestServerURL() string {
-	ret := _m.Called()
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
 	}
 
 	return r0
@@ -539,6 +539,20 @@ func (_m *Knapsack) NotaryPrefix() string {
 
 // NotaryServerURL provides a mock function with given fields:
 func (_m *Knapsack) NotaryServerURL() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// ObservabilityIngestServerURL provides a mock function with given fields:
+func (_m *Knapsack) ObservabilityIngestServerURL() string {
 	ret := _m.Called()
 
 	var r0 string
@@ -928,6 +942,20 @@ func (_m *Knapsack) SetDisableControlTLS(disabled bool) error {
 	return r0
 }
 
+// SetDisableObservabilityIngestTLS provides a mock function with given fields: enabled
+func (_m *Knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetExportTraces provides a mock function with given fields: enabled
 func (_m *Knapsack) SetExportTraces(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -949,20 +977,6 @@ func (_m *Knapsack) SetForceControlSubsystems(force bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(force)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetIngestServerURL provides a mock function with given fields: url
-func (_m *Knapsack) SetIngestServerURL(url string) error {
-	ret := _m.Called(url)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(url)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1070,6 +1084,20 @@ func (_m *Knapsack) SetNotaryPrefix(prefix string) error {
 
 // SetNotaryServerURL provides a mock function with given fields: url
 func (_m *Knapsack) SetNotaryServerURL(url string) error {
+	ret := _m.Called(url)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetObservabilityIngestServerURL provides a mock function with given fields: url
+func (_m *Knapsack) SetObservabilityIngestServerURL(url string) error {
 	ret := _m.Called(url)
 
 	var r0 error
