@@ -105,6 +105,10 @@ type Options struct {
 	DelayStart time.Duration
 	// ExportTraces enables exporting traces.
 	ExportTraces bool
+	// ObservabilityIngestServerURL is the URL that traces and logs will be exported to
+	ObservabilityIngestServerURL string
+	// DisableObservabilityIngestTLS allows for disabling TLS when connecting to the observability ingest server
+	DisableObservabilityIngestTLS bool
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string

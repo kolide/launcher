@@ -453,3 +453,21 @@ func (fc *FlagController) ExportTraces() bool {
 		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
+
+func (fc *FlagController) SetObservabilityIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.ObservabilityIngestServerURL, []byte(url))
+}
+func (fc *FlagController) ObservabilityIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.ObservabilityIngestServerURL),
+	).get(fc.getControlServerValue(keys.ObservabilityIngestServerURL))
+}
+
+func (fc *FlagController) SetDisableObservabilityIngestTLS(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableObservabilityIngestTLS, boolToBytes(enabled))
+}
+func (fc *FlagController) DisableObservabilityIngestTLS() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.DisableObservabilityIngestTLS),
+	).get(fc.getControlServerValue(keys.DisableObservabilityIngestTLS))
+}

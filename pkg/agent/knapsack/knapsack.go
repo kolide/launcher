@@ -85,6 +85,10 @@ func (k *knapsack) ServerProvidedDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerProvidedDataStore)
 }
 
+func (k *knapsack) TokenStore() types.KVStore {
+	return k.getKVStore(storage.TokenStore)
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil
@@ -349,4 +353,18 @@ func (k *knapsack) SetExportTraces(enabled bool) error {
 }
 func (k *knapsack) ExportTraces() bool {
 	return k.flags.ExportTraces()
+}
+
+func (k *knapsack) SetObservabilityIngestServerURL(url string) error {
+	return k.flags.SetObservabilityIngestServerURL(url)
+}
+func (k *knapsack) ObservabilityIngestServerURL() string {
+	return k.flags.ObservabilityIngestServerURL()
+}
+
+func (k *knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
+	return k.flags.SetDisableObservabilityIngestTLS(enabled)
+}
+func (k *knapsack) DisableObservabilityIngestTLS() bool {
+	return k.flags.DisableObservabilityIngestTLS()
 }

@@ -3,12 +3,14 @@ package exporter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -19,9 +21,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"golang.org/x/exp/slices"
+	"google.golang.org/grpc"
 )
 
 const applicationName = "launcher"
+
+var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -33,16 +39,22 @@ var archAttributeMap = map[string]attribute.KeyValue{
 var osqueryClientRecheckInterval = 30 * time.Second
 
 type TraceExporter struct {
-	provider                *sdktrace.TracerProvider
-	serverProvidedDataStore types.Getter
-	osqueryClient           osquery.Querier
-	attrs                   []attribute.KeyValue // resource attributes, identifying this device + installation
-	attrLock                sync.RWMutex
+	provider                  *sdktrace.TracerProvider
+	knapsack                  types.Knapsack
+	osqueryClient             osquery.Querier
+	logger                    log.Logger
+	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
+	attrLock                  sync.RWMutex
+	ingestClientAuthenticator *clientAuthenticator
+	ingestAuthToken           string
+	ingestUrl                 string
+	disableIngestTLS          bool
+	enabled                   bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter, client osquery.Querier) (*TraceExporter, error) {
+func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Querier, logger log.Logger) (*TraceExporter, error) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(applicationName),
@@ -53,43 +65,43 @@ func NewTraceExporter(ctx context.Context, serverProvidedDataStore types.Getter,
 		attrs = append(attrs, archAttr)
 	}
 
+	currentToken, _ := k.TokenStore().Get(observabilityIngestTokenKey)
+
 	t := &TraceExporter{
-		serverProvidedDataStore: serverProvidedDataStore,
-		osqueryClient:           client,
-		attrs:                   attrs,
-		attrLock:                sync.RWMutex{},
+		knapsack:                  k,
+		osqueryClient:             client,
+		logger:                    log.With(logger, "component", "trace_exporter"),
+		attrs:                     attrs,
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator(string(currentToken)),
+		ingestAuthToken:           string(currentToken),
+		ingestUrl:                 k.ObservabilityIngestServerURL(),
+		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
+		enabled:                   k.ExportTraces(),
+	}
+
+	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
+	// to export to
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
+
+	if !t.enabled {
+		return t, nil
 	}
 
 	t.addDeviceIdentifyingAttributes()
 
-	// Set the provider with as many resource attributes as we could get immediately
-	exp, err := newExporter(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not create new exporter: %w", err)
-	}
-	t.setNewGlobalProvider(exp)
+	// Set the provider with as many resource attributes as we can get immediately
+	t.setNewGlobalProvider()
 
 	// In the background, wait for osquery to be ready so that we can fetch more resource
 	// attributes for our traces, then replace the provider with a new one.
 	go func() {
 		t.addAttributesFromOsquery()
-		if exp, err := newExporter(ctx); err == nil {
-			t.setNewGlobalProvider(exp)
-		}
+		t.setNewGlobalProvider()
+		level.Debug(t.logger).Log("msg", "successfully replaced global provider after adding osquery attributes")
 	}()
 
 	return t, nil
-}
-
-// newExporter returns an exporter that will send traces with OTLP over HTTP.
-func newExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	traceClient := otlptracegrpc.NewClient(otlptracegrpc.WithInsecure())
-	exp, err := otlptrace.New(ctx, traceClient)
-	if err != nil {
-		return nil, fmt.Errorf("could not create exporter for traces: %w", err)
-	}
-
-	return exp, nil
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -98,19 +110,27 @@ func (t *TraceExporter) addDeviceIdentifyingAttributes() {
 	t.attrLock.Lock()
 	defer t.attrLock.Unlock()
 
-	if deviceId, err := t.serverProvidedDataStore.Get([]byte("device_id")); err == nil {
+	if deviceId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
+		level.Debug(t.logger).Log("msg", "could not get device id", "err", err)
+	} else {
 		t.attrs = append(t.attrs, semconv.ServiceInstanceID(string(deviceId)))
 	}
 
-	if munemo, err := t.serverProvidedDataStore.Get([]byte("munemo")); err == nil {
+	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
+		level.Debug(t.logger).Log("msg", "could not get munemo", "err", err)
+	} else {
 		t.attrs = append(t.attrs, attribute.String("launcher.munemo", string(munemo)))
 	}
 
-	if orgId, err := t.serverProvidedDataStore.Get([]byte("organization_id")); err == nil {
+	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
+		level.Debug(t.logger).Log("msg", "could not get organization id", "err", err)
+	} else {
 		t.attrs = append(t.attrs, attribute.String("launcher.organization_id", string(orgId)))
 	}
 
-	if serialNumber, err := t.serverProvidedDataStore.Get([]byte("serial_number")); err == nil {
+	if serialNumber, err := t.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
+		level.Debug(t.logger).Log("msg", "could not get serial number", "err", err)
+	} else {
 		t.attrs = append(t.attrs, attribute.String("launcher.serial", string(serialNumber)))
 	}
 }
@@ -160,7 +180,22 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider(exp sdktrace.SpanExporter) {
+func (t *TraceExporter) setNewGlobalProvider() {
+	opts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(t.ingestUrl),
+		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
+	}
+	if t.disableIngestTLS {
+		opts = append(opts, otlptracegrpc.WithInsecure())
+	}
+
+	traceClient := otlptracegrpc.NewClient(opts...)
+	exp, err := otlptrace.New(context.Background(), traceClient)
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
+		return
+	}
+
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
@@ -187,6 +222,8 @@ func (t *TraceExporter) setNewGlobalProvider(exp sdktrace.SpanExporter) {
 	t.provider = newProvider
 }
 
+// Execute is a no-op -- the exporter is already running in the background. The TraceExporter
+// otherwise only responds to control server events.
 func (t *TraceExporter) Execute() error {
 	// Does nothing, just waiting for launcher to exit
 	<-context.Background().Done()
@@ -197,4 +234,69 @@ func (t *TraceExporter) Interrupt(_ error) {
 	if t.provider != nil {
 		t.provider.Shutdown(context.Background())
 	}
+}
+
+// Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
+// which amounts to a new bearer auth token being provided.
+func (t *TraceExporter) Ping() {
+	newToken, err := t.knapsack.TokenStore().Get(observabilityIngestTokenKey)
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
+		return
+	}
+
+	// No need to replace the entire global provider on token update -- we can swap
+	// to the new token in place.
+	t.ingestAuthToken = string(newToken)
+	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which are ingest_url and export_traces.
+func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
+	needsNewProvider := false
+
+	// Handle export_traces toggle
+	if slices.Contains(flagKeys, keys.ExportTraces) {
+		if !t.enabled && t.knapsack.ExportTraces() {
+			// Newly enabled
+			// Get any identifying attributes we may not have stored yet
+			t.addDeviceIdentifyingAttributes()
+			t.addAttributesFromOsquery()
+			t.enabled = true
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "enabling trace export")
+		} else if t.enabled && !t.knapsack.ExportTraces() {
+			// Newly disabled
+			if t.provider != nil {
+				t.provider.Shutdown(context.Background())
+			}
+			t.enabled = false
+			level.Debug(t.logger).Log("msg", "disabling trace export")
+		}
+	}
+
+	// Handle ingest_url updates
+	if slices.Contains(flagKeys, keys.ObservabilityIngestServerURL) {
+		if t.ingestUrl != t.knapsack.ObservabilityIngestServerURL() {
+			t.ingestUrl = t.knapsack.ObservabilityIngestServerURL()
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
+		}
+	}
+
+	// Handle disable_ingest_tls updates
+	if slices.Contains(flagKeys, keys.DisableObservabilityIngestTLS) {
+		if t.disableIngestTLS != t.knapsack.DisableObservabilityIngestTLS() {
+			t.disableIngestTLS = t.knapsack.DisableObservabilityIngestTLS()
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_ingest_tls", t.disableIngestTLS)
+		}
+	}
+
+	if !t.enabled || !needsNewProvider {
+		return
+	}
+
+	t.setNewGlobalProvider()
 }

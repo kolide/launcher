@@ -53,6 +53,7 @@ const (
 	agentFlagsSubsystemName  = "agent_flags"
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
+	authTokensSubsystemName  = "auth_tokens"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -288,6 +289,22 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 			return fmt.Errorf("failed to register notify consumer: %w", err)
 		}
+
+		// Set up our tracing instrumentation
+		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
+		if err := controlService.RegisterConsumer(authTokensSubsystemName, authTokenConsumer); err != nil {
+			return fmt.Errorf("failed to register auth token consumer: %w", err)
+		}
+
+		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
+			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
+		}
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
@@ -383,18 +400,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
 		} else {
 			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
-		}
-	}
-
-	// Set up our tracing instrumentation
-	if k.ExportTraces() {
-		if exp, err := exporter.NewTraceExporter(ctx, k.ServerProvidedDataStore(), extension); err != nil {
-			level.Debug(logger).Log(
-				"msg", "could not set up trace exporter",
-				"err", err,
-			)
-		} else {
-			runGroup.Add(exp.Execute, exp.Interrupt)
 		}
 	}
 
