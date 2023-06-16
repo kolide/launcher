@@ -236,6 +236,7 @@ func (hb *SendBuffer) sendAndPurge() error {
 
 	// have lock on write mutex and send mutex at this point
 	if err := hb.purge(removeDataKeysToIndex); err != nil {
+		hb.sendMutex.Unlock()
 		return fmt.Errorf("purging data from kv store: %w", err)
 	}
 
