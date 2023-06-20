@@ -20,6 +20,60 @@ import (
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
 // to avoid race condition complaints.
 
+func Test_addDeviceIdentifyingAttributes(t *testing.T) {
+	t.Parallel()
+
+	s := testServerProvidedDataStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("ServerProvidedDataStore").Return(s)
+
+	// Set expected data
+	expectedDeviceId := "123"
+	s.Set([]byte("device_id"), []byte(expectedDeviceId))
+
+	expectedMunemo := "nababe"
+	s.Set([]byte("munemo"), []byte(expectedMunemo))
+
+	expectedOrganizationId := "100"
+	s.Set([]byte("organization_id"), []byte(expectedOrganizationId))
+
+	expectedSerialNumber := "abcd"
+	s.Set([]byte("serial_number"), []byte(expectedSerialNumber))
+
+	traceExporter := &TraceExporter{
+		knapsack:                  mockKnapsack,
+		osqueryClient:             mocks.NewQuerier(t),
+		logger:                    log.NewNopLogger(),
+		attrs:                     make([]attribute.KeyValue, 0),
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator("test token"),
+		ingestAuthToken:           "test token",
+		ingestUrl:                 "localhost:4317",
+		disableIngestTLS:          false,
+		enabled:                   true,
+		traceSamplingRate:         1.0,
+	}
+
+	traceExporter.addDeviceIdentifyingAttributes()
+
+	// Confirm all expected attributes were added
+	require.Equal(t, 4, len(traceExporter.attrs))
+	for _, actualAttr := range traceExporter.attrs {
+		switch actualAttr.Key {
+		case "service.instance.id":
+			require.Equal(t, expectedDeviceId, actualAttr.Value.AsString())
+		case "launcher.munemo":
+			require.Equal(t, expectedMunemo, actualAttr.Value.AsString())
+		case "launcher.organization_id":
+			require.Equal(t, expectedOrganizationId, actualAttr.Value.AsString())
+		case "launcher.serial":
+			require.Equal(t, expectedSerialNumber, actualAttr.Value.AsString())
+		default:
+			t.Fatalf("unexpected attr %s", actualAttr.Key)
+		}
+	}
+}
+
 func Test_addAttributesFromOsquery(t *testing.T) {
 	t.Parallel()
 
