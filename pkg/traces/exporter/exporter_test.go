@@ -16,6 +16,45 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+func TestPing(t *testing.T) {
+	t.Parallel()
+
+	// Set up the client authenticator + exporter with an initial token
+	initialTestToken := "test token A"
+	clientAuthenticator := newClientAuthenticator(initialTestToken)
+
+	s := testTokenStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("TokenStore").Return(s)
+
+	traceExporter := &TraceExporter{
+		knapsack:                  mockKnapsack,
+		osqueryClient:             mocks.NewQuerier(t),
+		logger:                    log.NewNopLogger(),
+		attrs:                     make([]attribute.KeyValue, 0),
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: clientAuthenticator,
+		ingestAuthToken:           initialTestToken,
+		ingestUrl:                 "localhost:4317",
+		disableIngestTLS:          false,
+		enabled:                   true,
+		traceSamplingRate:         1.0,
+	}
+
+	// Simulate a new token being set by updating the data store
+	newToken := "test token B"
+	require.NoError(t, s.Set(observabilityIngestTokenKey, []byte(newToken)))
+
+	// Alert the exporter that the token has changed
+	traceExporter.Ping()
+
+	// Confirm that token has changed for exporter
+	require.Equal(t, newToken, traceExporter.ingestAuthToken)
+
+	// Confirm that the token was replaced in the client authenticator
+	require.Equal(t, newToken, clientAuthenticator.token)
+}
+
 func TestFlagsChanged_ExportTraces(t *testing.T) {
 	t.Parallel()
 
@@ -56,7 +95,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
-			s := setupStorage(t)
+			s := testServerProvidedDataStore(t)
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("ExportTraces").Return(tt.newEnableValue)
 			osqueryClient := mocks.NewQuerier(t)
@@ -308,8 +347,14 @@ func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) {
 	}
 }
 
-func setupStorage(t *testing.T) types.KVStore {
+func testServerProvidedDataStore(t *testing.T) types.KVStore {
 	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	return s
+}
+
+func testTokenStore(t *testing.T) types.KVStore {
+	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	return s
 }
