@@ -44,6 +44,7 @@ type querier interface {
 
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
+	providerLock              sync.Mutex
 	knapsack                  types.Knapsack
 	osqueryClient             querier
 	logger                    log.Logger
@@ -73,6 +74,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	currentToken, _ := k.TokenStore().Get(observabilityIngestTokenKey)
 
 	t := &TraceExporter{
+		providerLock:              sync.Mutex{},
 		knapsack:                  k,
 		osqueryClient:             client,
 		logger:                    log.With(logger, "component", "trace_exporter"),
@@ -187,6 +189,9 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
 func (t *TraceExporter) setNewGlobalProvider() {
+	t.providerLock.Lock()
+	defer t.providerLock.Unlock()
+
 	opts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(t.ingestUrl),
 		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),

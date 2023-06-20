@@ -1,11 +1,14 @@
 package exporter
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
@@ -19,6 +22,93 @@ import (
 
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
 // to avoid race condition complaints.
+
+func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
+	mockKnapsack := typesmocks.NewKnapsack(t)
+
+	tokenStore := testTokenStore(t)
+	mockKnapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(observabilityIngestTokenKey, []byte("test token"))
+
+	serverProvidedDataStore := testServerProvidedDataStore(t)
+	mockKnapsack.On("ServerProvidedDataStore").Return(serverProvidedDataStore)
+	serverProvidedDataStore.Set([]byte("device_id"), []byte("500"))
+	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
+	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
+	serverProvidedDataStore.Set([]byte("serial_number"), []byte("abcdabcd"))
+
+	mockKnapsack.On("ObservabilityIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("DisableObservabilityIngestTLS").Return(false)
+	mockKnapsack.On("ExportTraces").Return(true)
+	mockKnapsack.On("TraceSamplingRate").Return(1.0)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
+
+	osqueryClient := mocks.NewQuerier(t)
+	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
+		{
+			"osquery_version": "5.8.0",
+			"os_name":         runtime.GOOS,
+			"os_version":      "3.4.5",
+			"hostname":        "Test-Hostname2",
+		},
+	}, nil)
+
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, osqueryClient, log.NewNopLogger())
+	require.NoError(t, err)
+
+	// Wait a few seconds to allow the osquery queries to go through
+	time.Sleep(5 * time.Second)
+
+	// We expect a total of 11 attributes: 3 initial attributes, 4 from the ServerProvidedDataStore, and 4 from osquery
+	traceExporter.attrLock.RLock()
+	defer traceExporter.attrLock.RUnlock()
+	require.Equal(t, 11, len(traceExporter.attrs))
+
+	// Confirm we set a provider
+	traceExporter.providerLock.Lock()
+	defer traceExporter.providerLock.Unlock()
+	require.NotNil(t, traceExporter.provider, "expected provider to be created")
+
+	mockKnapsack.AssertExpectations(t)
+	osqueryClient.AssertExpectations(t)
+}
+
+func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
+	t.Parallel()
+
+	tokenStore := testTokenStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(observabilityIngestTokenKey, []byte("test token"))
+	mockKnapsack.On("ObservabilityIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("DisableObservabilityIngestTLS").Return(false)
+	mockKnapsack.On("ExportTraces").Return(false)
+	mockKnapsack.On("TraceSamplingRate").Return(0.0)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
+
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
+	require.NoError(t, err)
+
+	// Confirm we didn't set a provider
+	require.Nil(t, traceExporter.provider, "expected disabled exporter to not create a provider but one was created")
+
+	// Confirm we added basic attributes
+	require.Equal(t, 3, len(traceExporter.attrs))
+	for _, actualAttr := range traceExporter.attrs {
+		switch actualAttr.Key {
+		case "service.name":
+			require.Equal(t, applicationName, actualAttr.Value.AsString())
+		case "service.version":
+			require.Equal(t, version.Version().Version, actualAttr.Value.AsString())
+		case "host.arch":
+			require.Equal(t, runtime.GOARCH, actualAttr.Value.AsString())
+		default:
+			t.Fatalf("unexpected attr %s", actualAttr.Key)
+		}
+	}
+
+	mockKnapsack.AssertExpectations(t)
+}
 
 func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	t.Parallel()
@@ -72,6 +162,8 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 			t.Fatalf("unexpected attr %s", actualAttr.Key)
 		}
 	}
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_addAttributesFromOsquery(t *testing.T) {
@@ -124,6 +216,8 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 			t.Fatalf("unexpected attr %s", actualAttr.Key)
 		}
 	}
+
+	osqueryClient.AssertExpectations(t)
 }
 
 func TestPing(t *testing.T) {
@@ -163,6 +257,8 @@ func TestPing(t *testing.T) {
 
 	// Confirm that the token was replaced in the client authenticator
 	require.Equal(t, newToken, clientAuthenticator.token)
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
