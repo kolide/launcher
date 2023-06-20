@@ -16,6 +16,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
+// to avoid race condition complaints.
+
 func TestPing(t *testing.T) {
 	t.Parallel()
 
@@ -55,9 +58,7 @@ func TestPing(t *testing.T) {
 	require.Equal(t, newToken, clientAuthenticator.token)
 }
 
-func TestFlagsChanged_ExportTraces(t *testing.T) {
-	t.Parallel()
-
+func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		testName              string
 		currentEnableValue    bool
@@ -90,11 +91,9 @@ func TestFlagsChanged_ExportTraces(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
 			s := testServerProvidedDataStore(t)
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("ExportTraces").Return(tt.newEnableValue)
@@ -140,9 +139,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) {
 	}
 }
 
-func TestFlagsChanged_TraceSamplingRate(t *testing.T) {
-	t.Parallel()
-
+func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		testName                 string
 		currentTraceSamplingRate float64
@@ -173,11 +170,9 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceSamplingRate").Return(tt.newTraceSamplingRate)
 			osqueryClient := mocks.NewQuerier(t)
@@ -209,9 +204,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) {
 	}
 }
 
-func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) {
-	t.Parallel()
-
+func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		testName                            string
 		currentObservabilityIngestServerURL string
@@ -220,21 +213,21 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) {
 		shouldReplaceProvider               bool
 	}{
 		{
-			testName:                            "update",
+			testName:                            "update ingest URL",
 			currentObservabilityIngestServerURL: "localhost:3417",
 			newObservabilityIngestServerURL:     "localhost:3418",
 			tracingEnabled:                      true,
 			shouldReplaceProvider:               true,
 		},
 		{
-			testName:                            "update but tracing not enabled",
+			testName:                            "update ingest URL, but tracing not enabled",
 			currentObservabilityIngestServerURL: "localhost:3417",
 			newObservabilityIngestServerURL:     "localhost:3418",
 			tracingEnabled:                      false,
 			shouldReplaceProvider:               false,
 		},
 		{
-			testName:                            "no update",
+			testName:                            "no update to ingest URL",
 			currentObservabilityIngestServerURL: "localhost:3417",
 			newObservabilityIngestServerURL:     "localhost:3417",
 			tracingEnabled:                      true,
@@ -242,11 +235,9 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("ObservabilityIngestServerURL").Return(tt.newObservabilityIngestServerURL)
 			osqueryClient := mocks.NewQuerier(t)
@@ -278,9 +269,7 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) {
 	}
 }
 
-func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) {
-	t.Parallel()
-
+func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		testName                             string
 		currentDisableObservabilityIngestTLS bool
@@ -289,21 +278,21 @@ func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) {
 		shouldReplaceProvider                bool
 	}{
 		{
-			testName:                             "update",
+			testName:                             "update ingest TLS value",
 			currentDisableObservabilityIngestTLS: true,
 			newDisableObservabilityIngestTLS:     false,
 			tracingEnabled:                       true,
 			shouldReplaceProvider:                true,
 		},
 		{
-			testName:                             "update but tracing not enabled",
+			testName:                             "update ingest TLS value, but tracing not enabled",
 			currentDisableObservabilityIngestTLS: true,
 			newDisableObservabilityIngestTLS:     false,
 			tracingEnabled:                       false,
 			shouldReplaceProvider:                false,
 		},
 		{
-			testName:                             "no update",
+			testName:                             "no update to ingest TLS value",
 			currentDisableObservabilityIngestTLS: false,
 			newDisableObservabilityIngestTLS:     false,
 			tracingEnabled:                       true,
@@ -311,11 +300,9 @@ func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("DisableObservabilityIngestTLS").Return(tt.newDisableObservabilityIngestTLS)
 			osqueryClient := mocks.NewQuerier(t)
