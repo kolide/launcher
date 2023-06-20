@@ -180,7 +180,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 		attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
 		semconv.OSName(resp[0]["os_name"]),
 		semconv.OSVersion(resp[0]["os_version"]),
-		semconv.HostName("hostname"),
+		semconv.HostName(resp[0]["hostname"]),
 	)
 }
 

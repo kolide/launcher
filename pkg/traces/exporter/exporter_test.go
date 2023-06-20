@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 
@@ -18,6 +19,58 @@ import (
 
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
 // to avoid race condition complaints.
+
+func Test_addAttributesFromOsquery(t *testing.T) {
+	t.Parallel()
+
+	expectedOsqueryVersion := "5.7.1"
+	expectedOsName := runtime.GOOS
+	expectedOsVersion := "1.2.3"
+	expectedHostname := "Test-Hostname"
+
+	osqueryClient := mocks.NewQuerier(t)
+	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
+		{
+			"osquery_version": expectedOsqueryVersion,
+			"os_name":         expectedOsName,
+			"os_version":      expectedOsVersion,
+			"hostname":        expectedHostname,
+		},
+	}, nil)
+
+	traceExporter := &TraceExporter{
+		knapsack:                  typesmocks.NewKnapsack(t),
+		osqueryClient:             osqueryClient,
+		logger:                    log.NewNopLogger(),
+		attrs:                     make([]attribute.KeyValue, 0),
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator("test token"),
+		ingestAuthToken:           "test token",
+		ingestUrl:                 "localhost:4317",
+		disableIngestTLS:          false,
+		enabled:                   true,
+		traceSamplingRate:         1.0,
+	}
+
+	traceExporter.addAttributesFromOsquery()
+
+	// Confirm all expected attributes were added
+	require.Equal(t, 4, len(traceExporter.attrs))
+	for _, actualAttr := range traceExporter.attrs {
+		switch actualAttr.Key {
+		case "launcher.osquery_version":
+			require.Equal(t, expectedOsqueryVersion, actualAttr.Value.AsString())
+		case "os.name":
+			require.Equal(t, expectedOsName, actualAttr.Value.AsString())
+		case "os.version":
+			require.Equal(t, expectedOsVersion, actualAttr.Value.AsString())
+		case "host.name":
+			require.Equal(t, expectedHostname, actualAttr.Value.AsString())
+		default:
+			t.Fatalf("unexpected attr %s", actualAttr.Key)
+		}
+	}
+}
 
 func TestPing(t *testing.T) {
 	t.Parallel()
