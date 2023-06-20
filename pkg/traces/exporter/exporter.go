@@ -38,10 +38,14 @@ var archAttributeMap = map[string]attribute.KeyValue{
 
 var osqueryClientRecheckInterval = 30 * time.Second
 
+type querier interface {
+	Query(query string) ([]map[string]string, error)
+}
+
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	knapsack                  types.Knapsack
-	osqueryClient             osquery.Querier
+	osqueryClient             querier
 	logger                    log.Logger
 	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
 	attrLock                  sync.RWMutex
@@ -50,6 +54,7 @@ type TraceExporter struct {
 	ingestUrl                 string
 	disableIngestTLS          bool
 	enabled                   bool
+	traceSamplingRate         float64
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -78,11 +83,12 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		ingestUrl:                 k.ObservabilityIngestServerURL(),
 		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
 		enabled:                   k.ExportTraces(),
+		traceSamplingRate:         k.TraceSamplingRate(),
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
 	// to export to
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
 
 	if !t.enabled {
 		return t, nil
@@ -207,10 +213,15 @@ func (t *TraceExporter) setNewGlobalProvider() {
 		r = resource.Default()
 	}
 
+	// Sample root spans based on t.traceSamplingRate, then sample child spans based on the
+	// decision made for their parent: if parent is sampled, then children should be as well;
+	// otherwise, do not sample child spans.
+	parentBasedSampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(t.traceSamplingRate))
+
 	newProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(r),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithSampler(parentBasedSampler),
 	)
 
 	otel.SetTracerProvider(newProvider)
@@ -273,6 +284,15 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			}
 			t.enabled = false
 			level.Debug(t.logger).Log("msg", "disabling trace export")
+		}
+	}
+
+	// Handle trace_sampling_rate updates
+	if slices.Contains(flagKeys, keys.TraceSamplingRate) {
+		if t.traceSamplingRate != t.knapsack.TraceSamplingRate() {
+			t.traceSamplingRate = t.knapsack.TraceSamplingRate()
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "updating trace sampling rate", "new_sampling_rate", t.traceSamplingRate)
 		}
 	}
 
