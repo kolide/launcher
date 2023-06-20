@@ -38,38 +38,38 @@ type SendBuffer struct {
 type option func(*SendBuffer)
 
 func WithMaxSize(maxSize int) option {
-	return func(hb *SendBuffer) {
-		hb.maxSize = maxSize
+	return func(sb *SendBuffer) {
+		sb.maxSize = maxSize
 	}
 }
 
 func WithMaxSendSize(sendSize int) option {
-	return func(hb *SendBuffer) {
-		hb.maxSendSize = sendSize
+	return func(sb *SendBuffer) {
+		sb.maxSendSize = sendSize
 	}
 }
 
 func WithLogger(logger log.Logger) option {
-	return func(hb *SendBuffer) {
-		hb.logger = logger
+	return func(sb *SendBuffer) {
+		sb.logger = logger
 	}
 }
 
 func WithKVStore(kvStore types.KVStore) option {
-	return func(hb *SendBuffer) {
-		hb.kvStore = kvStore
+	return func(sb *SendBuffer) {
+		sb.kvStore = kvStore
 	}
 }
 
 // WithSendInterval sets the interval at which the buffer will send data.
 func WithSendInterval(sendInterval time.Duration) option {
-	return func(hb *SendBuffer) {
-		hb.sendInterval = sendInterval
+	return func(sb *SendBuffer) {
+		sb.sendInterval = sendInterval
 	}
 }
 
 func New(sender sender, opts ...option) *SendBuffer {
-	hb := &SendBuffer{
+	sb := &SendBuffer{
 		maxSize:         defaultMaxSize,
 		maxSendSize:     defaultMaxSendSize,
 		dataKeys:        make([][]byte, 0),
@@ -82,40 +82,40 @@ func New(sender sender, opts ...option) *SendBuffer {
 	}
 
 	for _, opt := range opts {
-		opt(hb)
+		opt(sb)
 	}
 
-	hb.logger = log.With(hb.logger, "component", "sendbuffer")
+	sb.logger = log.With(sb.logger, "component", "sendbuffer")
 
 	// get all data keys and calculate starting size
-	hb.kvStore.ForEach(func(k, v []byte) error {
-		hb.size += len(k) + len(v)
-		hb.dataKeys = append(hb.dataKeys, k)
+	sb.kvStore.ForEach(func(k, v []byte) error {
+		sb.size += len(k) + len(v)
+		sb.dataKeys = append(sb.dataKeys, k)
 		return nil
 	})
 
 	// sort the keys
-	sort.Slice(hb.dataKeys, func(i, j int) bool {
-		return bytes.Compare(hb.dataKeys[i], hb.dataKeys[j]) < 0
+	sort.Slice(sb.dataKeys, func(i, j int) bool {
+		return bytes.Compare(sb.dataKeys[i], sb.dataKeys[j]) < 0
 	})
 
-	return hb
+	return sb
 }
 
-func (hb *SendBuffer) Write(data []byte) (int, error) {
-	hb.writeMutex.Lock()
-	defer hb.writeMutex.Unlock()
+func (sb *SendBuffer) Write(data []byte) (int, error) {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
 
 	if len(data) == 0 {
 		return 0, nil
 	}
 
 	// if the single data piece is larger than the max send size, drop it and log
-	if len(data) > hb.maxSendSize {
-		hb.logger.Log(
+	if len(data) > sb.maxSendSize {
+		sb.logger.Log(
 			"msg", "dropped data because element greater than max send size",
 			"size_of_data", len(data),
-			"max_send_size", hb.maxSendSize,
+			"max_send_size", sb.maxSendSize,
 			"head", string(data)[0:minInt(len(data), 100)],
 		)
 		return len(data), nil
@@ -123,75 +123,75 @@ func (hb *SendBuffer) Write(data []byte) (int, error) {
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(data)+hb.size > hb.maxSize {
-		hb.logger.Log(
+	if len(data)+sb.size > sb.maxSize {
+		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
 			"size_of_data", len(data),
-			"buffer_size", hb.size,
-			"size_plus_data", hb.size+len(data),
-			"max_size", hb.maxSize,
+			"buffer_size", sb.size,
+			"size_plus_data", sb.size+len(data),
+			"max_size", sb.maxSize,
 		)
 
-		if err := hb.purge(len(hb.dataKeys)); err != nil {
+		if err := sb.purge(len(sb.dataKeys)); err != nil {
 			// something has gone horribly wrong
-			hb.logger.Log("msg", "failed to purge", "err", err)
+			sb.logger.Log("msg", "failed to purge", "err", err)
 			return len(data), nil
 		}
 
-		hb.size = 0
+		sb.size = 0
 	}
 
 	dataKey := []byte(ulid.New())
-	if err := hb.kvStore.Set(dataKey, data); err != nil {
+	if err := sb.kvStore.Set(dataKey, data); err != nil {
 		// log it and move on
-		hb.logger.Log("msg", "failed to store data", "err", err)
+		sb.logger.Log("msg", "failed to store data", "err", err)
 		return len(data), nil
 	}
 
-	hb.dataKeys = append(hb.dataKeys, dataKey)
-	hb.size += len(data) + len(dataKey)
+	sb.dataKeys = append(sb.dataKeys, dataKey)
+	sb.size += len(data) + len(dataKey)
 	return len(data), nil
 }
 
-func (hb *SendBuffer) StartSending() {
-	if hb.isSending {
+func (sb *SendBuffer) StartSending() {
+	if sb.isSending {
 		return
 	}
 
-	hb.isSending = true
+	sb.isSending = true
 
 	go func() {
-		ticker := time.NewTicker(hb.sendInterval)
+		ticker := time.NewTicker(sb.sendInterval)
 		defer ticker.Stop()
 
 		for {
-			if err := hb.sendAndPurge(); err != nil {
-				hb.logger.Log("msg", "failed to send and purge", "err", err)
+			if err := sb.sendAndPurge(); err != nil {
+				sb.logger.Log("msg", "failed to send and purge", "err", err)
 			}
 
 			select {
 			case <-ticker.C:
 				continue
-			case <-hb.stopSendingChan:
-				hb.isSending = false
+			case <-sb.stopSendingChan:
+				sb.isSending = false
 				return
 			}
 		}
 	}()
 }
 
-func (hb *SendBuffer) StopSending() {
+func (sb *SendBuffer) StopSending() {
 	select {
-	case hb.stopSendingChan <- struct{}{}:
+	case sb.stopSendingChan <- struct{}{}:
 	default:
 	}
 }
 
-func (hb *SendBuffer) sendAndPurge() error {
-	hb.writeMutex.Lock()
-	defer hb.writeMutex.Unlock()
+func (sb *SendBuffer) sendAndPurge() error {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
 
-	if len(hb.dataKeys) == 0 {
+	if len(sb.dataKeys) == 0 {
 		return nil
 	}
 
@@ -199,16 +199,16 @@ func (hb *SendBuffer) sendAndPurge() error {
 	sendBuffer := &bytes.Buffer{}
 	bytesToDelete := 0
 
-	for _, dataKey := range hb.dataKeys {
-		data, err := hb.kvStore.Get(dataKey)
+	for _, dataKey := range sb.dataKeys {
+		data, err := sb.kvStore.Get(dataKey)
 		if err != nil {
-			hb.logger.Log("msg", "could not fetch data from kv store", "data_key", dataKey)
+			sb.logger.Log("msg", "could not fetch data from kv store", "data_key", dataKey)
 			removeDataKeysToIndex++
 			continue
 		}
 
 		// ready to send, break from loop
-		if len(data)+sendBuffer.Len() > hb.maxSendSize {
+		if len(data)+sendBuffer.Len() > sb.maxSendSize {
 			break
 		}
 
@@ -221,37 +221,37 @@ func (hb *SendBuffer) sendAndPurge() error {
 		removeDataKeysToIndex++
 	}
 
-	if !hb.sendMutex.TryLock() {
-		hb.logger.Log("msg", "could not get lock on send mutex, will retry")
+	if !sb.sendMutex.TryLock() {
+		sb.logger.Log("msg", "could not get lock on send mutex, will retry")
 		return nil
 	}
 
 	// have lock on write mutex and send mutex at this point
-	if err := hb.purge(removeDataKeysToIndex); err != nil {
-		hb.sendMutex.Unlock()
+	if err := sb.purge(removeDataKeysToIndex); err != nil {
+		sb.sendMutex.Unlock()
 		return fmt.Errorf("purging data from kv store: %w", err)
 	}
 
-	hb.size -= bytesToDelete
+	sb.size -= bytesToDelete
 
 	// send off async
 	go func() {
-		defer hb.sendMutex.Unlock()
-		if err := hb.sender.Send(sendBuffer); err != nil {
-			hb.logger.Log("msg", "failed to send, dropping data", "err", err)
+		defer sb.sendMutex.Unlock()
+		if err := sb.sender.Send(sendBuffer); err != nil {
+			sb.logger.Log("msg", "failed to send, dropping data", "err", err)
 		}
 	}()
 
 	return nil
 }
 
-func (hb *SendBuffer) purge(toIndex int) error {
-	keysToRemove := hb.dataKeys[:toIndex]
-	if err := hb.kvStore.Delete(keysToRemove...); err != nil {
+func (sb *SendBuffer) purge(toIndex int) error {
+	keysToRemove := sb.dataKeys[:toIndex]
+	if err := sb.kvStore.Delete(keysToRemove...); err != nil {
 		return fmt.Errorf("deleting data from kv store: %w", err)
 	}
 
-	hb.dataKeys = hb.dataKeys[toIndex:]
+	sb.dataKeys = sb.dataKeys[toIndex:]
 	return nil
 }
 
