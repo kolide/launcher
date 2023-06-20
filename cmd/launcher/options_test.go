@@ -192,6 +192,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		ControlServerURL:              "",
 		ControlRequestInterval:        60 * time.Second,
 		ExportTraces:                  false,
+		TraceSamplingRate:             0.0,
 		ObservabilityIngestServerURL:  "",
 		DisableObservabilityIngestTLS: false,
 		KolideServerURL:               randomHostname,
