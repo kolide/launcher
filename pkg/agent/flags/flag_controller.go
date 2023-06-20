@@ -454,6 +454,17 @@ func (fc *FlagController) ExportTraces() bool {
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
 
+func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
+	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
+}
+func (fc *FlagController) TraceSamplingRate() float64 {
+	return NewFloat64FlagValue(fc.logger, keys.LoggingInterval,
+		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
+		WithFloat64ValueMin(0.0),
+		WithFloat64ValueMax(1.0),
+	).get(fc.getControlServerValue(keys.TraceSamplingRate))
+}
+
 func (fc *FlagController) SetObservabilityIngestServerURL(url string) error {
 	return fc.setControlServerValue(keys.ObservabilityIngestServerURL, []byte(url))
 }

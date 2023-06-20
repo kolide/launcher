@@ -355,6 +355,13 @@ func (k *knapsack) ExportTraces() bool {
 	return k.flags.ExportTraces()
 }
 
+func (k *knapsack) SetTraceSamplingRate(rate float64) error {
+	return k.flags.SetTraceSamplingRate(rate)
+}
+func (k *knapsack) TraceSamplingRate() float64 {
+	return k.flags.TraceSamplingRate()
+}
+
 func (k *knapsack) SetObservabilityIngestServerURL(url string) error {
 	return k.flags.SetObservabilityIngestServerURL(url)
 }

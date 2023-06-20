@@ -43,6 +43,7 @@ const (
 	AutoupdateInitialDelay        FlagKey = "autoupdater_initial_delay"
 	UpdateDirectory               FlagKey = "update_directory"
 	ExportTraces                  FlagKey = "export_traces"
+	TraceSamplingRate             FlagKey = "trace_sampling_rate"
 	ObservabilityIngestServerURL  FlagKey = "ingest_url"
 	DisableObservabilityIngestTLS FlagKey = "disable_ingest_tls"
 )

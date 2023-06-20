@@ -173,6 +173,10 @@ type Flags interface {
 	SetExportTraces(enabled bool) error
 	ExportTraces() bool
 
+	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
+	SetTraceSamplingRate(rate float64) error
+	TraceSamplingRate() float64
+
 	// ObservabilityIngestServerURL is the URL of the ingest server for logs and traces
 	SetObservabilityIngestServerURL(url string) error
 	ObservabilityIngestServerURL() string

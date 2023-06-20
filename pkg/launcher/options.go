@@ -105,6 +105,8 @@ type Options struct {
 	DelayStart time.Duration
 	// ExportTraces enables exporting traces.
 	ExportTraces bool
+	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
+	TraceSamplingRate float64
 	// ObservabilityIngestServerURL is the URL that traces and logs will be exported to
 	ObservabilityIngestServerURL string
 	// DisableObservabilityIngestTLS allows for disabling TLS when connecting to the observability ingest server

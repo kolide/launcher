@@ -1124,6 +1124,20 @@ func (_m *Knapsack) SetOsqueryVerbose(verbose bool) error {
 	return r0
 }
 
+// SetTraceSamplingRate provides a mock function with given fields: rate
+func (_m *Knapsack) SetTraceSamplingRate(rate float64) error {
+	ret := _m.Called(rate)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(float64) error); ok {
+		r0 = rf(rate)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetTufServerURL provides a mock function with given fields: url
 func (_m *Knapsack) SetTufServerURL(url string) error {
 	ret := _m.Called(url)
@@ -1193,6 +1207,20 @@ func (_m *Knapsack) TokenStore() types.GetterSetterDeleterIteratorUpdater {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
 		}
+	}
+
+	return r0
+}
+
+// TraceSamplingRate provides a mock function with given fields:
+func (_m *Knapsack) TraceSamplingRate() float64 {
+	ret := _m.Called()
+
+	var r0 float64
+	if rf, ok := ret.Get(0).(func() float64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(float64)
 	}
 
 	return r0
