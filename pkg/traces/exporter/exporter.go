@@ -80,7 +80,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		logger:                    log.With(logger, "component", "trace_exporter"),
 		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
-		ingestClientAuthenticator: newClientAuthenticator(string(currentToken)),
+		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableObservabilityIngestTLS()),
 		ingestAuthToken:           string(currentToken),
 		ingestUrl:                 k.ObservabilityIngestServerURL(),
 		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
@@ -313,6 +313,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	// Handle disable_ingest_tls updates
 	if slices.Contains(flagKeys, keys.DisableObservabilityIngestTLS) {
 		if t.disableIngestTLS != t.knapsack.DisableObservabilityIngestTLS() {
+			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableObservabilityIngestTLS())
 			t.disableIngestTLS = t.knapsack.DisableObservabilityIngestTLS()
 			needsNewProvider = true
 			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_ingest_tls", t.disableIngestTLS)

@@ -136,7 +136,7 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 		logger:                    log.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
-		ingestClientAuthenticator: newClientAuthenticator("test token"),
+		ingestClientAuthenticator: newClientAuthenticator("test token", false),
 		ingestAuthToken:           "test token",
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
@@ -190,7 +190,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 		logger:                    log.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
-		ingestClientAuthenticator: newClientAuthenticator("test token"),
+		ingestClientAuthenticator: newClientAuthenticator("test token", false),
 		ingestAuthToken:           "test token",
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
@@ -225,7 +225,7 @@ func TestPing(t *testing.T) {
 
 	// Set up the client authenticator + exporter with an initial token
 	initialTestToken := "test token A"
-	clientAuthenticator := newClientAuthenticator(initialTestToken)
+	clientAuthenticator := newClientAuthenticator(initialTestToken, false)
 
 	s := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
@@ -320,7 +320,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
-				ingestClientAuthenticator: newClientAuthenticator("test token"),
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
 				ingestUrl:                 "localhost:4317",
 				disableIngestTLS:          false,
@@ -386,7 +386,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
-				ingestClientAuthenticator: newClientAuthenticator("test token"),
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
 				ingestUrl:                 "localhost:4317",
 				disableIngestTLS:          false,
@@ -451,7 +451,7 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) { //nolint:para
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
-				ingestClientAuthenticator: newClientAuthenticator("test token"),
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
 				ingestUrl:                 tt.currentObservabilityIngestServerURL,
 				disableIngestTLS:          false,
@@ -510,13 +510,15 @@ func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) { //nolint:par
 			mockKnapsack.On("DisableObservabilityIngestTLS").Return(tt.newDisableObservabilityIngestTLS)
 			osqueryClient := mocks.NewQuerier(t)
 
+			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableObservabilityIngestTLS)
+
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				osqueryClient:             osqueryClient,
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
-				ingestClientAuthenticator: newClientAuthenticator("test token"),
+				ingestClientAuthenticator: clientAuthenticator,
 				ingestAuthToken:           "test token",
 				ingestUrl:                 "localhost:4317",
 				disableIngestTLS:          tt.currentDisableObservabilityIngestTLS,
@@ -527,6 +529,7 @@ func TestFlagsChanged_DisableObservabilityIngestTLS(t *testing.T) { //nolint:par
 			traceExporter.FlagsChanged(keys.DisableObservabilityIngestTLS)
 
 			require.Equal(t, tt.newDisableObservabilityIngestTLS, traceExporter.disableIngestTLS, "ingest TLS value not updated")
+			require.Equal(t, tt.newDisableObservabilityIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
 
 			if tt.shouldReplaceProvider {
 				require.NotNil(t, traceExporter.provider)
