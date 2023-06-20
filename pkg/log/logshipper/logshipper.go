@@ -26,7 +26,6 @@ func New(k types.Knapsack) *LogShipper {
 
 	sendInterval := time.Minute * 5
 	if k.Debug() {
-		// get a fast interval if we're debugging so we
 		sendInterval = time.Second * 1
 	}
 

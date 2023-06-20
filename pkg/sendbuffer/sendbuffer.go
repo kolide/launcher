@@ -133,10 +133,9 @@ func (hb *SendBuffer) Write(data []byte) (int, error) {
 		)
 
 		if err := hb.purge(len(hb.dataKeys)); err != nil {
-			hb.logger.Log(
-				"msg", "failed to purge",
-				"err", err,
-			)
+			// something has gone horribly wrong
+			hb.logger.Log("msg", "failed to purge", "err", err)
+			return len(data), nil
 		}
 
 		hb.size = 0
@@ -165,21 +164,14 @@ func (hb *SendBuffer) StartSending() {
 		ticker := time.NewTicker(hb.sendInterval)
 		defer ticker.Stop()
 
-		f := func() {
-			if err := hb.sendAndPurge(); err != nil {
-				hb.logger.Log(
-					"msg", "failed to send and purge",
-					"err", err,
-				)
-			}
-		}
-
-		f()
-
 		for {
+			if err := hb.sendAndPurge(); err != nil {
+				hb.logger.Log("msg", "failed to send and purge", "err", err)
+			}
+
 			select {
 			case <-ticker.C:
-				f()
+				continue
 			case <-hb.stopSendingChan:
 				hb.isSending = false
 				return
