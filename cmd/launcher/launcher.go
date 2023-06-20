@@ -39,6 +39,8 @@ import (
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
+	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
@@ -143,6 +145,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db)
+
+	// Need to set up the log shipper so that we can get the logger early
+	// and pass it to the various systems.
+	var logShipper *logshipper.LogShipper
+	if k.ControlServerURL() != "" {
+		logShipper = logshipper.New(k)
+		logger = teelogger.New(logger, logShipper.Logger())
+	}
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
@@ -305,6 +315,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			runGroup.Add(exp.Execute, exp.Interrupt)
 			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
 		}
+
+		// begin log shipping and subsribe to token updates
+		runGroup.Add(logShipper.StartShipping, logShipper.StopShipping)
+		controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()

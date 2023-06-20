@@ -1,43 +1,29 @@
-package httpsenderlog
+package logshipper
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/sendbuffer"
 )
 
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
 )
 
-type httpSenderLog struct {
-	logger     log.Logger
-	sendBuffer *sendbuffer.SendBuffer
+type logger struct {
+	logger log.Logger
 }
 
-func New(endpoint string) *httpSenderLog {
-	sender := sendbuffer.NewHttpSender(endpoint)
-	sendBuffer := sendbuffer.New(sender)
-	sendBuffer.StartSending()
-
-	return &httpSenderLog{
-		sendBuffer: sendBuffer,
-		logger:     log.NewJSONLogger(sendBuffer),
+func newLogger(w io.Writer) *logger {
+	return &logger{
+		logger: log.NewJSONLogger(w),
 	}
 }
 
-func (h *httpSenderLog) Log(keyvals ...interface{}) error {
+func (h *logger) Log(keyvals ...interface{}) error {
 	filterResults(keyvals...)
 	return h.logger.Log(keyvals...)
-}
-
-func (h *httpSenderLog) StartSending() {
-	h.sendBuffer.StartSending()
-}
-
-func (h *httpSenderLog) StopSending() {
-	h.sendBuffer.StopSending()
 }
 
 // filterResults filteres out the osquery results,

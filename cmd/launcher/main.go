@@ -17,7 +17,6 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
-	"github.com/kolide/launcher/pkg/log/httpsenderlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 )
@@ -96,9 +95,6 @@ func main() {
 		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
-
-	// TODO add based on option, unhard code stuffz
-	logger = teelogger.New(logger, httpsenderlog.New("http://localhost:8080/log"))
 
 	defer func() {
 		if r := recover(); r != nil {
