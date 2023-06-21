@@ -80,7 +80,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator(string(currentToken)),
 		ingestAuthToken:           string(currentToken),
-		ingestUrl:                 k.ObservabilityIngestServerURL(),
+		ingestUrl:                 k.TraceIngestServerURL(),
 		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
@@ -89,6 +89,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
 	// to export to
 	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceIngestServerURL, keys.TraceIngestServerURL)
 
 	if !t.enabled {
 		return t, nil
@@ -297,9 +298,9 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 
 	// Handle ingest_url updates
-	if slices.Contains(flagKeys, keys.ObservabilityIngestServerURL) {
-		if t.ingestUrl != t.knapsack.ObservabilityIngestServerURL() {
-			t.ingestUrl = t.knapsack.ObservabilityIngestServerURL()
+	if slices.Contains(flagKeys, keys.TraceIngestServerURL) {
+		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
+			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
 			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
 		}

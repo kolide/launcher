@@ -474,6 +474,15 @@ func (fc *FlagController) ObservabilityIngestServerURL() string {
 	).get(fc.getControlServerValue(keys.ObservabilityIngestServerURL))
 }
 
+func (fc *FlagController) SetTraceIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
+}
+func (fc *FlagController) TraceIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.TraceIngestServerURL),
+	).get(fc.getControlServerValue(keys.TraceIngestServerURL))
+}
+
 func (fc *FlagController) SetDisableObservabilityIngestTLS(enabled bool) error {
 	return fc.setControlServerValue(keys.DisableObservabilityIngestTLS, boolToBytes(enabled))
 }
