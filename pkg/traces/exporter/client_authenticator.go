@@ -7,12 +7,14 @@ import (
 
 // Implements google.golang.org/grpc/credentials.PerRPCCredentials interface
 type clientAuthenticator struct {
-	token string
+	token      string
+	disableTLS bool
 }
 
-func newClientAuthenticator(token string) *clientAuthenticator {
+func newClientAuthenticator(token string, disableTLS bool) *clientAuthenticator {
 	return &clientAuthenticator{
-		token: token,
+		token:      token,
+		disableTLS: disableTLS,
 	}
 }
 
@@ -20,6 +22,12 @@ func newClientAuthenticator(token string) *clientAuthenticator {
 // to swap the bearer auth token in-place before it expires.
 func (c *clientAuthenticator) setToken(token string) {
 	c.token = token
+}
+
+// setDisableTLS updates the return value of RequireTransportSecurity. TLS should
+// be disabled only for local testing.
+func (c *clientAuthenticator) setDisableTLS(disableTLS bool) {
+	c.disableTLS = disableTLS
 }
 
 // GetRequestMetadata adds the necessary authentication header to the request.
@@ -32,5 +40,5 @@ func (c *clientAuthenticator) GetRequestMetadata(ctx context.Context, uri ...str
 // RequireTransportSecurity indicates whether the credentials requires
 // transport security.
 func (c *clientAuthenticator) RequireTransportSecurity() bool {
-	return false
+	return !c.disableTLS
 }
