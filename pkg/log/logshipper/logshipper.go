@@ -22,7 +22,7 @@ type LogShipper struct {
 
 func New(k types.Knapsack) *LogShipper {
 	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
-	sender := newAuthHttpSender(logEndpoint(k.ObservabilityIngestServerURL()), string(token))
+	sender := newAuthHttpSender(logEndpoint(k), string(token))
 
 	sendInterval := time.Minute * 5
 	if k.Debug() {
@@ -47,7 +47,7 @@ func (ls *LogShipper) Logger() log.Logger {
 func (ls *LogShipper) Ping() {
 	token, _ := ls.knapsack.TokenStore().Get(observabilityIngestTokenKey)
 	ls.sender.authtoken = string(token)
-	ls.sender.endpoint = logEndpoint(ls.knapsack.ObservabilityIngestServerURL())
+	ls.sender.endpoint = logEndpoint(ls.knapsack)
 }
 
 // StartShipping is a no-op -- the exporter is already running in the background. The TraceExporter
@@ -64,7 +64,11 @@ func (t *LogShipper) StopShipping(_ error) {
 	t.sendBuffer.StopSending()
 }
 
-func logEndpoint(url string) string {
-	// TODO: add new value for logging endpoint
-	return fmt.Sprintf("http://localhost:8080/log")
+func logEndpoint(k types.Knapsack) string {
+	scheme := "https"
+	if k.DisableObservabilityIngestTLS() {
+		scheme = "http"
+	}
+
+	return fmt.Sprintf("%s://%s/log", scheme, k.ObservabilityIngestServerURL())
 }
