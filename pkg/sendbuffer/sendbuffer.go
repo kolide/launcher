@@ -2,6 +2,7 @@ package sendbuffer
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"sync"
 	"time"
@@ -25,7 +26,6 @@ type SendBuffer struct {
 	logger                            log.Logger
 	sender                            sender
 	sendInterval                      time.Duration
-	stopSendingChan                   chan struct{}
 	isSending                         bool
 }
 
@@ -58,13 +58,12 @@ func WithSendInterval(sendInterval time.Duration) option {
 
 func New(sender sender, opts ...option) *SendBuffer {
 	sb := &SendBuffer{
-		maxStorageSize:  defaultMaxSize,
-		maxSendSize:     defaultMaxSendSize,
-		sender:          sender,
-		sendInterval:    1 * time.Minute,
-		logger:          log.NewNopLogger(),
-		stopSendingChan: make(chan struct{}),
-		isSending:       false,
+		maxStorageSize: defaultMaxSize,
+		maxSendSize:    defaultMaxSendSize,
+		sender:         sender,
+		sendInterval:   1 * time.Minute,
+		logger:         log.NewNopLogger(),
+		isSending:      false,
 	}
 
 	for _, opt := range opts {
@@ -113,37 +112,30 @@ func (sb *SendBuffer) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
-func (sb *SendBuffer) StartSending() {
+func (sb *SendBuffer) Run(ctx context.Context) {
 	if sb.isSending {
 		return
 	}
 
 	sb.isSending = true
-
-	go func() {
-		ticker := time.NewTicker(sb.sendInterval)
-		defer ticker.Stop()
-
-		for {
-			if err := sb.sendAndPurge(); err != nil {
-				sb.logger.Log("msg", "failed to send and purge", "err", err)
-			}
-
-			select {
-			case <-ticker.C:
-				continue
-			case <-sb.stopSendingChan:
-				sb.isSending = false
-				return
-			}
-		}
+	defer func() {
+		sb.isSending = false
 	}()
-}
 
-func (sb *SendBuffer) StopSending() {
-	select {
-	case sb.stopSendingChan <- struct{}{}:
-	default:
+	ticker := time.NewTicker(sb.sendInterval)
+	defer ticker.Stop()
+
+	for {
+		if err := sb.sendAndPurge(); err != nil {
+			sb.logger.Log("msg", "failed to send and purge", "err", err)
+		}
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			break
+		}
 	}
 }
 

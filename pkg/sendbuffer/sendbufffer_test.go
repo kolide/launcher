@@ -2,6 +2,7 @@ package sendbuffer
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -138,21 +139,23 @@ func TestSendBufferConcurrent(t *testing.T) {
 			t.Parallel()
 
 			testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
-			hb := New(
+			sb := New(
 				testSender,
 				WithMaxSendSize(tt.maxSendSize),
 				// run interval in background quickly
 				WithSendInterval(1*time.Millisecond),
 			)
 
-			hb.StartSending()
+			go func() {
+				sb.Run(context.Background())
+			}()
 
 			var wg sync.WaitGroup
 			wg.Add(len(tt.writes))
 			for _, write := range tt.writes {
 				write := write
 				go func() {
-					_, err := hb.Write([]byte(write))
+					_, err := sb.Write([]byte(write))
 					require.NoError(t, err)
 					wg.Done()
 				}()
@@ -161,7 +164,7 @@ func TestSendBufferConcurrent(t *testing.T) {
 			wg.Wait()
 
 			// check that size reported is correct
-			requireStoreSizeEqualsHttpBufferReportedSize(t, hb)
+			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
 			expectedAggregatedReceives := ""
 			for _, write := range tt.writes {
@@ -171,17 +174,17 @@ func TestSendBufferConcurrent(t *testing.T) {
 			// make sure were done writing, done sending, and
 			// have sent all data
 			done := func() bool {
-				if !hb.sendMutex.TryLock() {
+				if !sb.sendMutex.TryLock() {
 					return false
 				}
-				defer hb.sendMutex.Unlock()
+				defer sb.sendMutex.Unlock()
 
-				if !hb.writeMutex.TryLock() {
+				if !sb.writeMutex.TryLock() {
 					return false
 				}
-				defer hb.writeMutex.Unlock()
+				defer sb.writeMutex.Unlock()
 
-				return hb.size == 0
+				return sb.size == 0
 			}
 
 			for !done() {
@@ -189,9 +192,9 @@ func TestSendBufferConcurrent(t *testing.T) {
 			}
 
 			// check that size reported is correct
-			requireStoreSizeEqualsHttpBufferReportedSize(t, hb)
+			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
-			hb.StopSending()
+			// sb.StopSending()
 
 			expected := []rune(expectedAggregatedReceives)
 			actual := []rune(string(testSender.aggregateAllReceived()))
@@ -200,16 +203,16 @@ func TestSendBufferConcurrent(t *testing.T) {
 	}
 }
 
-func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, hb *SendBuffer) {
-	hb.writeMutex.Lock()
-	defer hb.writeMutex.Unlock()
+func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, sb *SendBuffer) {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
 
 	storeSize := 0
-	for _, v := range hb.logs {
+	for _, v := range sb.logs {
 		storeSize += len(v)
 	}
 
-	require.Equal(t, hb.size, storeSize, "actual store size should match buffer size")
+	require.Equal(t, sb.size, storeSize, "actual store size should match buffer size")
 }
 
 type testSender struct {

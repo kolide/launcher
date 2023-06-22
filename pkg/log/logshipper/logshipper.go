@@ -18,9 +18,11 @@ type LogShipper struct {
 	sendBuffer *sendbuffer.SendBuffer
 	logger     *logger
 	knapsack   types.Knapsack
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
-func New(k types.Knapsack) *LogShipper {
+func New(ctx context.Context, k types.Knapsack) *LogShipper {
 	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
 	sender := newAuthHttpSender(logEndpoint(k), string(token))
 
@@ -32,11 +34,15 @@ func New(k types.Knapsack) *LogShipper {
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
 	logger := newLogger(sendBuffer)
 
+	thisCtx, cancel := context.WithCancel(ctx)
+
 	return &LogShipper{
 		sender:     sender,
 		sendBuffer: sendBuffer,
 		logger:     logger,
 		knapsack:   k,
+		ctx:        thisCtx,
+		cancel:     cancel,
 	}
 }
 
@@ -53,15 +59,12 @@ func (ls *LogShipper) Ping() {
 // StartShipping is a no-op -- the exporter is already running in the background. The TraceExporter
 // otherwise only responds to control server events.
 func (ls *LogShipper) StartShipping() error {
-	ls.sendBuffer.StartSending()
-
-	// nothing else to do, wait for launcher to exit
-	<-context.Background().Done()
+	ls.sendBuffer.Run(ls.ctx)
 	return nil
 }
 
-func (t *LogShipper) StopShipping(_ error) {
-	t.sendBuffer.StopSending()
+func (ls *LogShipper) StopShipping(_ error) {
+	ls.cancel()
 }
 
 func logEndpoint(k types.Knapsack) string {
