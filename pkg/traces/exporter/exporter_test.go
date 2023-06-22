@@ -59,10 +59,10 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	// Wait a few seconds to allow the osquery queries to go through
 	time.Sleep(5 * time.Second)
 
-	// We expect a total of 11 attributes: 3 initial attributes, 4 from the ServerProvidedDataStore, and 4 from osquery
+	// We expect a total of 12 attributes: 3 initial attributes, 5 from the ServerProvidedDataStore, and 4 from osquery
 	traceExporter.attrLock.RLock()
 	defer traceExporter.attrLock.RUnlock()
-	require.Equal(t, 11, len(traceExporter.attrs))
+	require.Equal(t, 12, len(traceExporter.attrs))
 
 	// Confirm we set a provider
 	traceExporter.providerLock.Lock()
@@ -147,14 +147,14 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	traceExporter.addDeviceIdentifyingAttributes()
 
 	// Confirm all expected attributes were added
-	require.Equal(t, 4, len(traceExporter.attrs))
+	require.Equal(t, 5, len(traceExporter.attrs))
 	for _, actualAttr := range traceExporter.attrs {
 		switch actualAttr.Key {
-		case "service.instance.id":
+		case "service.instance.id", "k2.device_id":
 			require.Equal(t, expectedDeviceId, actualAttr.Value.AsString())
-		case "launcher.munemo":
+		case "k2.munemo":
 			require.Equal(t, expectedMunemo, actualAttr.Value.AsString())
-		case "launcher.organization_id":
+		case "k2.organization_id":
 			require.Equal(t, expectedOrganizationId, actualAttr.Value.AsString())
 		case "launcher.serial":
 			require.Equal(t, expectedSerialNumber, actualAttr.Value.AsString())
