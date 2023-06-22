@@ -37,11 +37,11 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
 	serverProvidedDataStore.Set([]byte("serial_number"), []byte("abcdabcd"))
 
-	mockKnapsack.On("ObservabilityIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableObservabilityIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
 
 	osqueryClient := mocks.NewQuerier(t)
 	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
@@ -80,11 +80,11 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(observabilityIngestTokenKey, []byte("test token"))
-	mockKnapsack.On("ObservabilityIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableObservabilityIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableObservabilityIngestTLS).Return(nil)
 
 	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
 	require.NoError(t, err)
@@ -407,34 +407,34 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) { //nolint:paralleltest
+func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
-		testName                            string
-		currentObservabilityIngestServerURL string
-		newObservabilityIngestServerURL     string
-		tracingEnabled                      bool
-		shouldReplaceProvider               bool
+		testName                        string
+		currentTraceIngestServerURL     string
+		newObservabilityIngestServerURL string
+		tracingEnabled                  bool
+		shouldReplaceProvider           bool
 	}{
 		{
-			testName:                            "update ingest URL",
-			currentObservabilityIngestServerURL: "localhost:3417",
-			newObservabilityIngestServerURL:     "localhost:3418",
-			tracingEnabled:                      true,
-			shouldReplaceProvider:               true,
+			testName:                        "update ingest URL",
+			currentTraceIngestServerURL:     "localhost:3417",
+			newObservabilityIngestServerURL: "localhost:3418",
+			tracingEnabled:                  true,
+			shouldReplaceProvider:           true,
 		},
 		{
-			testName:                            "update ingest URL, but tracing not enabled",
-			currentObservabilityIngestServerURL: "localhost:3417",
-			newObservabilityIngestServerURL:     "localhost:3418",
-			tracingEnabled:                      false,
-			shouldReplaceProvider:               false,
+			testName:                        "update ingest URL, but tracing not enabled",
+			currentTraceIngestServerURL:     "localhost:3417",
+			newObservabilityIngestServerURL: "localhost:3418",
+			tracingEnabled:                  false,
+			shouldReplaceProvider:           false,
 		},
 		{
-			testName:                            "no update to ingest URL",
-			currentObservabilityIngestServerURL: "localhost:3417",
-			newObservabilityIngestServerURL:     "localhost:3417",
-			tracingEnabled:                      true,
-			shouldReplaceProvider:               false,
+			testName:                        "no update to ingest URL",
+			currentTraceIngestServerURL:     "localhost:3417",
+			newObservabilityIngestServerURL: "localhost:3417",
+			tracingEnabled:                  true,
+			shouldReplaceProvider:           false,
 		},
 	}
 
@@ -442,7 +442,7 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) { //nolint:para
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
-			mockKnapsack.On("ObservabilityIngestServerURL").Return(tt.newObservabilityIngestServerURL)
+			mockKnapsack.On("TraceIngestServerURL").Return(tt.newObservabilityIngestServerURL)
 			osqueryClient := mocks.NewQuerier(t)
 
 			traceExporter := &TraceExporter{
@@ -453,13 +453,13 @@ func TestFlagsChanged_ObservabilityIngestServerURL(t *testing.T) { //nolint:para
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
-				ingestUrl:                 tt.currentObservabilityIngestServerURL,
+				ingestUrl:                 tt.currentTraceIngestServerURL,
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
 			}
 
-			traceExporter.FlagsChanged(keys.ObservabilityIngestServerURL)
+			traceExporter.FlagsChanged(keys.TraceIngestServerURL)
 
 			require.Equal(t, tt.newObservabilityIngestServerURL, traceExporter.ingestUrl, "ingest url value not updated")
 

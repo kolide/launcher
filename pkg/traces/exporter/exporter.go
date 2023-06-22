@@ -90,8 +90,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
 	// to export to
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceIngestServerURL, keys.TraceIngestServerURL)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableObservabilityIngestTLS)
 
 	if !t.enabled {
 		return t, nil
