@@ -152,10 +152,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if k.ControlServerURL() != "" {
 		logShipper, err = logshipper.New(ctx, k)
 		if err != nil {
-			return fmt.Errorf("creating log shipper: %w", err)
+			logger.Log("msg", "failed to create log shipper", "err", err)
+		} else {
+			logger = teelogger.New(logger, logShipper)
 		}
-
-		logger = teelogger.New(logger, logShipper)
 	}
 
 	// construct the appropriate http client based on security settings
@@ -321,8 +321,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// begin log shipping and subsribe to token updates
-		runGroup.Add(logShipper.Run, logShipper.Stop)
-		controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
+		// nil check incase it failed to create for some reason
+		if logShipper != nil {
+			runGroup.Add(logShipper.Run, logShipper.Stop)
+			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
+		}
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
