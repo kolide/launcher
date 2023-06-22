@@ -19,21 +19,21 @@ var (
 )
 
 type SendBuffer struct {
-	logs                       [][]byte
-	size, maxSize, maxSendSize int
-	writeMutex, sendMutex      sync.Mutex
-	logger                     log.Logger
-	sender                     sender
-	sendInterval               time.Duration
-	stopSendingChan            chan struct{}
-	isSending                  bool
+	logs                                     [][]byte
+	storageSize, maxStorageSize, maxSendSize int
+	writeMutex, sendMutex                    sync.Mutex
+	logger                                   log.Logger
+	sender                                   sender
+	sendInterval                             time.Duration
+	stopSendingChan                          chan struct{}
+	isSending                                bool
 }
 
 type option func(*SendBuffer)
 
 func WithMaxSize(maxSize int) option {
 	return func(sb *SendBuffer) {
-		sb.maxSize = maxSize
+		sb.maxStorageSize = maxSize
 	}
 }
 
@@ -58,7 +58,7 @@ func WithSendInterval(sendInterval time.Duration) option {
 
 func New(sender sender, opts ...option) *SendBuffer {
 	sb := &SendBuffer{
-		maxSize:         defaultMaxSize,
+		maxStorageSize:  defaultMaxSize,
 		maxSendSize:     defaultMaxSendSize,
 		sender:          sender,
 		sendInterval:    5 * time.Second,
@@ -97,13 +97,13 @@ func (sb *SendBuffer) Write(data []byte) (int, error) {
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(data)+sb.size > sb.maxSize {
+	if len(data)+sb.storageSize > sb.maxStorageSize {
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
 			"size_of_data", len(data),
-			"buffer_size", sb.size,
-			"size_plus_data", sb.size+len(data),
-			"max_size", sb.maxSize,
+			"buffer_size", sb.storageSize,
+			"size_plus_data", sb.storageSize+len(data),
+			"max_size", sb.maxStorageSize,
 		)
 
 		sb.deleteLogs(len(sb.logs))
@@ -201,12 +201,12 @@ func (sb *SendBuffer) deleteLogs(toIndex int) {
 	}
 
 	sb.logs = sb.logs[toIndex:]
-	sb.size -= sizeDeleted
+	sb.storageSize -= sizeDeleted
 }
 
 func (sb *SendBuffer) addLog(data []byte) {
 	sb.logs = append(sb.logs, data)
-	sb.size += len(data)
+	sb.storageSize += len(data)
 }
 
 func minInt(a, b int) int {
