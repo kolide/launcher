@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -165,7 +167,11 @@ func (l *OsqueryLogAdapter) runAndLogPs(pid int) {
 	}
 
 	pidStr := strconv.Itoa(pid)
-	cmd := exec.Command("ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
@@ -190,7 +196,11 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pid int) {
 	}
 
 	pidStr := strconv.Itoa(pid)
-	cmd := exec.Command("lsof", "-R", "-n", "-p", pidStr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", "-p", pidStr)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
@@ -216,7 +226,11 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 	}
 
 	fullPidfile := filepath.Join(l.rootDirectory, "osquery.pid")
-	cmd := exec.Command("lsof", "-R", "-n", fullPidfile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", fullPidfile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
