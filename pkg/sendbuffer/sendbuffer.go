@@ -19,14 +19,14 @@ var (
 )
 
 type SendBuffer struct {
-	logs                                     [][]byte
-	storageSize, maxStorageSize, maxSendSize int
-	writeMutex, sendMutex                    sync.Mutex
-	logger                                   log.Logger
-	sender                                   sender
-	sendInterval                             time.Duration
-	stopSendingChan                          chan struct{}
-	isSending                                bool
+	logs                              [][]byte
+	size, maxStorageSize, maxSendSize int
+	writeMutex, sendMutex             sync.Mutex
+	logger                            log.Logger
+	sender                            sender
+	sendInterval                      time.Duration
+	stopSendingChan                   chan struct{}
+	isSending                         bool
 }
 
 type option func(*SendBuffer)
@@ -97,12 +97,12 @@ func (sb *SendBuffer) Write(data []byte) (int, error) {
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(data)+sb.storageSize > sb.maxStorageSize {
+	if len(data)+sb.size > sb.maxStorageSize {
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
 			"size_of_data", len(data),
-			"buffer_size", sb.storageSize,
-			"size_plus_data", sb.storageSize+len(data),
+			"buffer_size", sb.size,
+			"size_plus_data", sb.size+len(data),
 			"max_size", sb.maxStorageSize,
 		)
 
@@ -201,12 +201,12 @@ func (sb *SendBuffer) deleteLogs(toIndex int) {
 	}
 
 	sb.logs = sb.logs[toIndex:]
-	sb.storageSize -= sizeDeleted
+	sb.size -= sizeDeleted
 }
 
 func (sb *SendBuffer) addLog(data []byte) {
 	sb.logs = append(sb.logs, data)
-	sb.storageSize += len(data)
+	sb.size += len(data)
 }
 
 func minInt(a, b int) int {

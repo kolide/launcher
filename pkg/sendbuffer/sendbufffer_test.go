@@ -180,7 +180,7 @@ func TestSendBufferConcurrent(t *testing.T) {
 				}
 				defer hb.writeMutex.Unlock()
 
-				return hb.storageSize == 0
+				return hb.size == 0
 			}
 
 			for !done() {
@@ -208,7 +208,7 @@ func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, hb *SendBuffer) 
 		storeSize += len(v)
 	}
 
-	require.Equal(t, hb.storageSize, storeSize, "actual store size should match buffer size")
+	require.Equal(t, hb.size, storeSize, "actual store size should match buffer size")
 }
 
 type testSender struct {
