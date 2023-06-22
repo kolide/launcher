@@ -8,9 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,30 +35,6 @@ func TestSendBuffer(t *testing.T) {
 			expectedReceives: []string{"0", "1", "2"},
 		},
 		{
-			name:             "staring data, multiple write, multiple send",
-			maxSize:          1000,
-			maxSendSize:      1,
-			startingData:     []string{"0", "1", "2"},
-			writes:           []string{"3", "4", "5"},
-			expectedReceives: []string{"0", "1", "2", "3", "4", "5"},
-		},
-		{
-			name:             "starting data, multiple write, single send",
-			maxSize:          1000,
-			maxSendSize:      10,
-			startingData:     []string{"01", "2"},
-			writes:           []string{"345", "6789"},
-			expectedReceives: []string{"0123456789"},
-		},
-		{
-			name:             "starting data, multiple write, multiple combined sends",
-			maxSize:          1000,
-			maxSendSize:      5,
-			startingData:     []string{"012"},
-			writes:           []string{"34", "56789"},
-			expectedReceives: []string{"01234", "56789"},
-		},
-		{
 			name:             "does not exceed max size",
 			maxSize:          4,
 			maxSendSize:      1000,
@@ -83,48 +56,37 @@ func TestSendBuffer(t *testing.T) {
 			t.Parallel()
 
 			// set up storage, adding starting data
-			store := inmemory.NewStore(log.NewNopLogger())
-			for _, v := range tt.startingData {
-				// need tiny bit of sleep for ulid to sort by time generated
-				time.Sleep(1 * time.Millisecond)
-
-				key := []byte(ulid.New())
-				value := []byte(v)
-				store.Set(key, value)
-			}
-
 			lastReceivedData := &bytes.Buffer{}
 
-			hb := New(
+			sb := New(
 				&testSender{lastReceived: lastReceivedData, t: t},
 				WithMaxSize(tt.maxSize),
 				WithMaxSendSize(tt.maxSendSize),
 				WithSendInterval(1*time.Hour),
-				WithKVStore(store),
 			)
 
-			requireStoreSizeEqualsHttpBufferReportedSize(t, hb)
+			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
 			for _, write := range tt.writes {
-				_, err := hb.Write([]byte(write))
+				_, err := sb.Write([]byte(write))
 				require.NoError(t, err)
-				requireStoreSizeEqualsHttpBufferReportedSize(t, hb)
+				requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 			}
 
 			for i := 0; i < len(tt.expectedReceives); i++ {
-				require.NoError(t, hb.sendAndPurge())
+				require.NoError(t, sb.sendAndPurge())
 
 				for {
 					// wait for the send to finish
-					if hb.sendMutex.TryLock() {
-						hb.sendMutex.Unlock()
+					if sb.sendMutex.TryLock() {
+						sb.sendMutex.Unlock()
 						break
 					}
 					time.Sleep(1 * time.Millisecond)
 				}
 
 				require.Equal(t, tt.expectedReceives[i], string(lastReceivedData.Bytes()))
-				requireStoreSizeEqualsHttpBufferReportedSize(t, hb)
+				requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 			}
 		})
 	}
@@ -242,10 +204,9 @@ func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, hb *SendBuffer) 
 	defer hb.writeMutex.Unlock()
 
 	storeSize := 0
-	hb.kvStore.ForEach(func(k, v []byte) error {
-		storeSize += len(k) + len(v)
-		return nil
-	})
+	for _, v := range hb.logs {
+		storeSize += len(v)
+	}
 
 	require.Equal(t, hb.size, storeSize, "actual store size should match buffer size")
 }
