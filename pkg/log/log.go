@@ -85,7 +85,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	// information here about the process locking the pidfile.
 	// See: https://github.com/osquery/osquery/issues/7796
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
-		l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
 	}
 
 	msg := strings.TrimSpace(string(p))
