@@ -122,18 +122,19 @@ func (t *TraceExporter) addDeviceIdentifyingAttributes() {
 		level.Debug(t.logger).Log("msg", "could not get device id", "err", err)
 	} else {
 		t.attrs = append(t.attrs, semconv.ServiceInstanceID(string(deviceId)))
+		t.attrs = append(t.attrs, attribute.String("k2.device_id", string(deviceId)))
 	}
 
 	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
 		level.Debug(t.logger).Log("msg", "could not get munemo", "err", err)
 	} else {
-		t.attrs = append(t.attrs, attribute.String("launcher.munemo", string(munemo)))
+		t.attrs = append(t.attrs, attribute.String("k2.munemo", string(munemo)))
 	}
 
 	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
 		level.Debug(t.logger).Log("msg", "could not get organization id", "err", err)
 	} else {
-		t.attrs = append(t.attrs, attribute.String("launcher.organization_id", string(orgId)))
+		t.attrs = append(t.attrs, attribute.String("k2.organization_id", string(orgId)))
 	}
 
 	if serialNumber, err := t.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
