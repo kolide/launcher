@@ -24,7 +24,7 @@ func New(k types.Knapsack) *LogShipper {
 	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
 	sender := newAuthHttpSender(logEndpoint(k), string(token))
 
-	sendInterval := time.Minute * 5
+	sendInterval := time.Minute * 1
 	if k.Debug() {
 		sendInterval = time.Second * 1
 	}

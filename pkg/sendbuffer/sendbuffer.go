@@ -31,7 +31,7 @@ type SendBuffer struct {
 
 type option func(*SendBuffer)
 
-func WithMaxSize(maxSize int) option {
+func WithMaxStorageSize(maxSize int) option {
 	return func(sb *SendBuffer) {
 		sb.maxStorageSize = maxSize
 	}
@@ -61,7 +61,7 @@ func New(sender sender, opts ...option) *SendBuffer {
 		maxStorageSize:  defaultMaxSize,
 		maxSendSize:     defaultMaxSendSize,
 		sender:          sender,
-		sendInterval:    5 * time.Second,
+		sendInterval:    1 * time.Minute,
 		logger:          log.NewNopLogger(),
 		stopSendingChan: make(chan struct{}),
 		isSending:       false,

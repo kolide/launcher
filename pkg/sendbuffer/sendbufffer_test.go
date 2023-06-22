@@ -15,35 +15,41 @@ func TestSendBuffer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                     string
-		maxSize, maxSendSize     int
-		startingData             []string
-		writes, expectedReceives []string
+		name                        string
+		maxStorageSize, maxSendSize int
+		writes, expectedReceives    []string
 	}{
 		{
 			name:             "single write, single send",
-			maxSize:          1000,
+			maxStorageSize:   1000,
 			maxSendSize:      1000,
 			writes:           []string{"hello"},
 			expectedReceives: []string{"hello"},
 		},
 		{
 			name:             "multiple write, multiple send",
-			maxSize:          1000,
-			maxSendSize:      1,
+			maxStorageSize:   1000,
+			maxSendSize:      2,
+			writes:           []string{"01", "2", "3", "4"},
+			expectedReceives: []string{"01", "23", "4"},
+		},
+		{
+			name:             "multiple write, single send",
+			maxStorageSize:   1000,
+			maxSendSize:      3,
 			writes:           []string{"0", "1", "2"},
-			expectedReceives: []string{"0", "1", "2"},
+			expectedReceives: []string{"012"},
 		},
 		{
 			name:             "does not exceed max size",
-			maxSize:          4,
+			maxStorageSize:   4,
 			maxSendSize:      1000,
 			writes:           []string{"hello"},
 			expectedReceives: nil,
 		},
 		{
 			name:             "does not exceed max send size",
-			maxSize:          1000,
+			maxStorageSize:   1000,
 			maxSendSize:      4,
 			writes:           []string{"hello"},
 			expectedReceives: nil,
@@ -60,9 +66,8 @@ func TestSendBuffer(t *testing.T) {
 
 			sb := New(
 				&testSender{lastReceived: lastReceivedData, t: t},
-				WithMaxSize(tt.maxSize),
+				WithMaxStorageSize(tt.maxStorageSize),
 				WithMaxSendSize(tt.maxSendSize),
-				WithSendInterval(1*time.Hour),
 			)
 
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
@@ -106,25 +111,22 @@ func TestSendBufferConcurrent(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                 string
-		maxSize, maxSendSize int
-		writes               []string
+		name        string
+		maxSendSize int
+		writes      []string
 	}{
 		{
 			name:        "a little concurrent",
-			maxSize:     defaultMaxSize,
 			maxSendSize: 1,
 			writes:      testStringArray(10),
 		},
 		{
 			name:        "more concurrent",
-			maxSize:     defaultMaxSize,
 			maxSendSize: 10,
 			writes:      testStringArray(100),
 		},
 		{
 			name:        "a lot concurrent",
-			maxSize:     defaultMaxSize,
 			maxSendSize: 100,
 			writes:      testStringArray(1000),
 		},
@@ -138,7 +140,6 @@ func TestSendBufferConcurrent(t *testing.T) {
 			testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
 			hb := New(
 				testSender,
-				WithMaxSize(tt.maxSize),
 				WithMaxSendSize(tt.maxSendSize),
 				// run interval in background quickly
 				WithSendInterval(1*time.Millisecond),
