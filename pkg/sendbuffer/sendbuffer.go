@@ -3,6 +3,7 @@ package sendbuffer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -97,6 +98,8 @@ func (sb *SendBuffer) Write(data []byte) (int, error) {
 	// if we are full, something has backed up
 	// purge everything
 	if len(data)+sb.size > sb.maxStorageSize {
+		sb.deleteLogs(len(sb.logs))
+
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
 			"size_of_data", len(data),
@@ -104,17 +107,15 @@ func (sb *SendBuffer) Write(data []byte) (int, error) {
 			"size_plus_data", sb.size+len(data),
 			"max_size", sb.maxStorageSize,
 		)
-
-		sb.deleteLogs(len(sb.logs))
 	}
 
 	sb.addLog(data)
 	return len(data), nil
 }
 
-func (sb *SendBuffer) Run(ctx context.Context) {
+func (sb *SendBuffer) Run(ctx context.Context) error {
 	if sb.isSending {
-		return
+		return errors.New("already running")
 	}
 
 	sb.isSending = true

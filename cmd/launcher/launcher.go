@@ -150,8 +150,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
 	if k.ControlServerURL() != "" {
-		logShipper = logshipper.New(ctx, k)
-		logger = teelogger.New(logger, logShipper.Logger())
+		logShipper, err = logshipper.New(ctx, k)
+		if err != nil {
+			return fmt.Errorf("creating log shipper: %w", err)
+		}
+
+		logger = teelogger.New(logger, logShipper)
 	}
 
 	// construct the appropriate http client based on security settings
@@ -317,7 +321,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// begin log shipping and subsribe to token updates
-		runGroup.Add(logShipper.StartShipping, logShipper.StopShipping)
+		runGroup.Add(logShipper.Run, logShipper.Stop)
 		controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 	}
 

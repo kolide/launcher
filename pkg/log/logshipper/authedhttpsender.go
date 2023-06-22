@@ -4,17 +4,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type authedHttpSender struct {
 	endpoint  string
 	authtoken string
+	client    *http.Client
 }
 
 func newAuthHttpSender(endpoint, authtoken string) *authedHttpSender {
 	return &authedHttpSender{
 		endpoint:  endpoint,
 		authtoken: authtoken,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
@@ -26,7 +31,7 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.authtoken))
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}

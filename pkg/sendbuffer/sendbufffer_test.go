@@ -194,8 +194,6 @@ func TestSendBufferConcurrent(t *testing.T) {
 			// check that size reported is correct
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
-			// sb.StopSending()
-
 			expected := []rune(expectedAggregatedReceives)
 			actual := []rune(string(testSender.aggregateAllReceived()))
 			require.ElementsMatch(t, expected, actual)

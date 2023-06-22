@@ -2,7 +2,9 @@ package logshipper
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -13,18 +15,28 @@ import (
 // TODO: consolidate this var, but where?
 var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
+const (
+	truncatedFormatString = "%s[TRUNCATED]"
+)
+
 type LogShipper struct {
 	sender     *authedHttpSender
 	sendBuffer *sendbuffer.SendBuffer
-	logger     *logger
+	logger     log.Logger
 	knapsack   types.Knapsack
 	ctx        context.Context
 	cancel     context.CancelFunc
 }
 
-func New(ctx context.Context, k types.Knapsack) *LogShipper {
+func New(ctx context.Context, k types.Knapsack) (*LogShipper, error) {
 	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
-	sender := newAuthHttpSender(logEndpoint(k), string(token))
+
+	logEndpoint, err := logEndpoint(k)
+	if err != nil {
+		return nil, err
+	}
+
+	sender := newAuthHttpSender(logEndpoint, string(token))
 
 	sendInterval := time.Minute * 1
 	if k.Debug() {
@@ -32,7 +44,7 @@ func New(ctx context.Context, k types.Knapsack) *LogShipper {
 	}
 
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
-	logger := newLogger(sendBuffer)
+	logger := log.NewJSONLogger(sendBuffer)
 
 	thisCtx, cancel := context.WithCancel(ctx)
 
@@ -43,35 +55,67 @@ func New(ctx context.Context, k types.Knapsack) *LogShipper {
 		knapsack:   k,
 		ctx:        thisCtx,
 		cancel:     cancel,
-	}
-}
-
-func (ls *LogShipper) Logger() log.Logger {
-	return ls.logger
+	}, nil
 }
 
 func (ls *LogShipper) Ping() {
 	token, _ := ls.knapsack.TokenStore().Get(observabilityIngestTokenKey)
 	ls.sender.authtoken = string(token)
-	ls.sender.endpoint = logEndpoint(ls.knapsack)
+
+	endpoint, err := logEndpoint(ls.knapsack)
+	if err != nil {
+		ls.logger.Log("msg", "failed to get endpoint", "err", err)
+		return
+	}
+	ls.sender.endpoint = endpoint
 }
 
-// StartShipping is a no-op -- the exporter is already running in the background. The TraceExporter
-// otherwise only responds to control server events.
-func (ls *LogShipper) StartShipping() error {
-	ls.sendBuffer.Run(ls.ctx)
-	return nil
+func (ls *LogShipper) Run() error {
+	return ls.sendBuffer.Run(ls.ctx)
 }
 
-func (ls *LogShipper) StopShipping(_ error) {
+func (ls *LogShipper) Stop(_ error) {
 	ls.cancel()
 }
 
-func logEndpoint(k types.Knapsack) string {
-	scheme := "https"
-	if k.DisableObservabilityIngestTLS() {
-		scheme = "http"
+func logEndpoint(k types.Knapsack) (string, error) {
+	u, err := url.Parse(k.ObservabilityIngestServerURL())
+	if err != nil {
+		return "", err
 	}
 
-	return fmt.Sprintf("%s://%s/log", scheme, k.ObservabilityIngestServerURL())
+	if u.Scheme == "" {
+		u.Scheme = "https"
+
+		if k.DisableObservabilityIngestTLS() {
+			u.Scheme = "http"
+		}
+	}
+
+	if u.Scheme != "https" && !k.DisableObservabilityIngestTLS() {
+		return "", errors.New("logshipper requires HTTPS")
+	}
+
+	return u.String(), nil
+}
+
+func (ls *LogShipper) Log(keyvals ...interface{}) error {
+	filterResults(keyvals...)
+	return ls.logger.Log(keyvals...)
+}
+
+// filterResults filteres out the osquery results,
+// which just make a lot of noise in our debug logs.
+// It's a bit fragile, since it parses keyvals, but
+// hopefully that's good enough
+func filterResults(keyvals ...interface{}) {
+	// Consider switching on `method` as well?
+	for i := 0; i < len(keyvals); i += 2 {
+		if keyvals[i] == "results" && len(keyvals) > i+1 {
+			str, ok := keyvals[i+1].(string)
+			if ok && len(str) > 100 {
+				keyvals[i+1] = fmt.Sprintf(truncatedFormatString, str[0:99])
+			}
+		}
+	}
 }
