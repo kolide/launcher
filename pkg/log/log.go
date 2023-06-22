@@ -215,7 +215,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 		return
 	}
 
-	fullPidfile := filepath.Join("/private", l.rootDirectory, "osquery.pid")
+	fullPidfile := filepath.Join(l.rootDirectory, "osquery.pid")
 	cmd := exec.Command("lsof", "-R", fullPidfile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
