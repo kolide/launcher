@@ -190,7 +190,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pid int) {
 	}
 
 	pidStr := strconv.Itoa(pid)
-	cmd := exec.Command("lsof", "-R", "-p", pidStr)
+	cmd := exec.Command("lsof", "-R", "-n", "-p", pidStr)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
@@ -216,7 +216,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 	}
 
 	fullPidfile := filepath.Join(l.rootDirectory, "osquery.pid")
-	cmd := exec.Command("lsof", "-R", fullPidfile)
+	cmd := exec.Command("lsof", "-R", "-n", fullPidfile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
