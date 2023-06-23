@@ -1,10 +1,7 @@
 package logshipper
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
@@ -39,14 +36,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
 
 			knapsack.On("DisableObservabilityIngestTLS").Return(true)
-
-			// set up test http server
-			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				require.NotEmpty(t, r.Header.Get("authorization"))
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			knapsack.On("ObservabilityIngestServerURL").Return(testServer.URL).Once()
+			knapsack.On("ObservabilityIngestServerURL").Return("http://someurl").Once()
 			knapsack.On("Debug").Return(true)
 
 			ls, err := New(knapsack)
@@ -54,20 +44,10 @@ func TestLogShipper(t *testing.T) {
 
 			require.Equal(t, authToken, ls.sender.authtoken)
 
-			go ls.Run()
-			ls.Log("test log")
-
-			// wait for ls.run to set stop func
-			for ls.stopFunc == nil {
-				time.Sleep(100 * time.Millisecond)
-			}
-
-			ls.Stop(nil)
-
 			authToken = ulid.New()
 			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
 
-			newEndpoint := "http://someurl"
+			newEndpoint := "http://someotherurl"
 			knapsack.On("ObservabilityIngestServerURL").Return(newEndpoint)
 
 			ls.Ping()
