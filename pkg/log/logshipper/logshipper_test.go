@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
@@ -55,6 +56,12 @@ func TestLogShipper(t *testing.T) {
 
 			go ls.Run()
 			ls.Log("test log")
+
+			// wait for ls.run to set stop func
+			for ls.stopFunc == nil {
+				time.Sleep(100 * time.Millisecond)
+			}
+
 			ls.Stop(nil)
 
 			authToken = ulid.New()
@@ -66,7 +73,6 @@ func TestLogShipper(t *testing.T) {
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
 			require.Equal(t, newEndpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
-
 		})
 	}
 }
