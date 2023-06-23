@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/pkg/agent/types"
 )
@@ -27,18 +26,20 @@ func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyI
 		// short-circuiting and returning early for now.
 		return nil, errors.New("secure enclave is not currently supported")
 
-		level.Info(logger).Log("msg", "Generating new keys")
+		/*
+			level.Info(logger).Log("msg", "Generating new keys")
 
-		var err error
-		pubData, err = secureenclave.CreateKey()
-		if err != nil {
-			return nil, fmt.Errorf("creating key: %w", err)
-		}
+			var err error
+			pubData, err = secureenclave.CreateKey()
+			if err != nil {
+				return nil, fmt.Errorf("creating key: %w", err)
+			}
 
-		if err := storeKeyData(store, nil, pubData); err != nil {
-			clearKeyData(logger, store)
-			return nil, fmt.Errorf("storing key: %w", err)
-		}
+			if err := storeKeyData(store, nil, pubData); err != nil {
+				clearKeyData(logger, store)
+				return nil, fmt.Errorf("storing key: %w", err)
+			}
+		*/
 	}
 
 	k, err := secureenclave.New(pubData)
