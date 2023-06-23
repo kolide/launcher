@@ -28,7 +28,7 @@ type LogShipper struct {
 	cancel     context.CancelFunc
 }
 
-func New(ctx context.Context, k types.Knapsack) (*LogShipper, error) {
+func New(k types.Knapsack) (*LogShipper, error) {
 	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
 
 	logEndpoint, err := logEndpoint(k)
@@ -46,7 +46,7 @@ func New(ctx context.Context, k types.Knapsack) (*LogShipper, error) {
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
 	logger := log.NewJSONLogger(sendBuffer)
 
-	thisCtx, cancel := context.WithCancel(ctx)
+	thisCtx, cancel := context.WithCancel(context.Background())
 
 	return &LogShipper{
 		sender:     sender,

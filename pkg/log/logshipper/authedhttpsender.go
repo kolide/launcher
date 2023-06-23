@@ -29,7 +29,7 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.authtoken))
+	req.Header.Set("authorization", a.authtoken)
 
 	resp, err := a.client.Do(req)
 	if err != nil {
