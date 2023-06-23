@@ -24,8 +24,7 @@ type LogShipper struct {
 	sendBuffer *sendbuffer.SendBuffer
 	logger     log.Logger
 	knapsack   types.Knapsack
-	ctx        context.Context
-	cancel     context.CancelFunc
+	stopFunc   context.CancelFunc
 }
 
 func New(k types.Knapsack) (*LogShipper, error) {
@@ -46,15 +45,11 @@ func New(k types.Knapsack) (*LogShipper, error) {
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
 	logger := log.NewJSONLogger(sendBuffer)
 
-	thisCtx, cancel := context.WithCancel(context.Background())
-
 	return &LogShipper{
 		sender:     sender,
 		sendBuffer: sendBuffer,
 		logger:     logger,
 		knapsack:   k,
-		ctx:        thisCtx,
-		cancel:     cancel,
 	}, nil
 }
 
@@ -71,11 +66,13 @@ func (ls *LogShipper) Ping() {
 }
 
 func (ls *LogShipper) Run() error {
-	return ls.sendBuffer.Run(ls.ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	ls.stopFunc = cancel
+	return ls.sendBuffer.Run(ctx)
 }
 
 func (ls *LogShipper) Stop(_ error) {
-	ls.cancel()
+	ls.stopFunc()
 }
 
 func logEndpoint(k types.Knapsack) (string, error) {
