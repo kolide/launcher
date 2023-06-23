@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-kit/kit/log"
@@ -20,6 +21,12 @@ func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyI
 	}
 
 	if pubData == nil {
+		// We're seeing issues where launcher hangs (and does not complete startup) on the
+		// Sonoma Beta 2 release when trying to interact with the secure enclave below, on
+		// CreateKey. Since we don't expect this to work at the moment anyway, we are
+		// short-circuiting and returning early for now.
+		return nil, errors.New("secure enclave is not currently supported")
+
 		level.Info(logger).Log("msg", "Generating new keys")
 
 		var err error
