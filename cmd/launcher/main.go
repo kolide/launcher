@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/logrouter"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -28,9 +28,14 @@ func main() {
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be
 	// re-leveled during options parsing.
-	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
+	// TODO: seph thinks this relevling is weird, and should get changed
+	systemLogger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
+	logrouter, err := logrouter.New(systemLogger)
+	if err != nil {
+		logutil.Fatal(systemLogger, err, "Unable to create logrouter")
+	}
 
-	level.Info(logger).Log(
+	level.Info(logrouter.SystemLogger()).Log(
 		"msg", "Launcher starting up",
 		"version", version.Version().Version,
 		"revision", version.Version().Revision,
@@ -39,7 +44,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ctx = ctxlog.NewContext(ctx, logger)
+	// Stash the logrouter's internal logger into context. Some of our downstreams things use it. One effect
+	// here, is that it forces anything to use the internal logger, not the system one.
+	ctx = ctxlog.NewContext(ctx, logrouter)
 
 	// If there's a newer version of launcher on disk, use it.
 	// This does not call DeleteOldUpdates, on the theory that
@@ -62,37 +69,28 @@ func main() {
 	// handle that argument. Fall-back to running launcher
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(); err != nil {
-			logutil.Fatal(logger, "err", fmt.Errorf("run with positional args: %w", err))
+			logutil.Fatal(logrouter.SystemLogger(), "err", fmt.Errorf("run with positional args: %w", err))
 		}
 		os.Exit(0)
 	}
 
 	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
-		level.Info(logger).Log("err", err)
+		level.Info(logrouter.SystemLogger()).Log("err", err)
 		os.Exit(1)
 	}
 
-	// recreate the logger with  the appropriate level.
-	logger = logutil.NewServerLogger(opts.Debug)
-
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
-	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
-	}
+	logrouter.ReplaceSystemLogger(logutil.NewServerLogger(opts.Debug))
 
 	defer func() {
 		if r := recover(); r != nil {
-			level.Info(logger).Log(
+			level.Info(logrouter.SystemLogger()).Log(
 				"msg", "panic occurred",
 				"err", r,
 			)
 			time.Sleep(time.Second)
 		}
 	}()
-
-	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
