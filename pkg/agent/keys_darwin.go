@@ -5,28 +5,26 @@ package agent
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // nolint:unused
 func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyInt, error) {
-	_, pubData, err := fetchKeyData(store)
-	if err != nil {
-		return nil, err
-	}
+	// We're seeing issues where launcher hangs (and does not complete startup) on the
+	// Sonoma Beta 2 release when trying to interact with the secure enclave below, on
+	// CreateKey. Since we don't expect this to work at the moment anyway, we are
+	// short-circuiting and returning early for now.
+	return nil, errors.New("secure enclave is not currently supported")
 
-	if pubData == nil {
-		// We're seeing issues where launcher hangs (and does not complete startup) on the
-		// Sonoma Beta 2 release when trying to interact with the secure enclave below, on
-		// CreateKey. Since we don't expect this to work at the moment anyway, we are
-		// short-circuiting and returning early for now.
-		return nil, errors.New("secure enclave is not currently supported")
+	/*
+		_, pubData, err := fetchKeyData(store)
+		if err != nil {
+			return nil, err
+		}
 
-		/*
+		if pubData == nil {
 			level.Info(logger).Log("msg", "Generating new keys")
 
 			var err error
@@ -39,13 +37,13 @@ func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyI
 				clearKeyData(logger, store)
 				return nil, fmt.Errorf("storing key: %w", err)
 			}
-		*/
-	}
+		}
 
-	k, err := secureenclave.New(pubData)
-	if err != nil {
-		return nil, fmt.Errorf("creating secureenclave signer: %w", err)
-	}
+		k, err := secureenclave.New(pubData)
+		if err != nil {
+			return nil, fmt.Errorf("creating secureenclave signer: %w", err)
+		}
 
-	return k, nil
+		return k, nil
+	*/
 }
