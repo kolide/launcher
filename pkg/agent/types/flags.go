@@ -188,4 +188,8 @@ type Flags interface {
 	// DisableObservabilityIngestTLS disables TLS for observability ingest server communication
 	SetDisableObservabilityIngestTLS(enabled bool) error
 	DisableObservabilityIngestTLS() bool
+
+	// SetLogShippingEnabled is true when shipping logs
+	SetLogShippingEnabled(enabled bool) error
+	LogShippingEnabled() bool
 }

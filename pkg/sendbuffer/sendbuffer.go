@@ -140,6 +140,10 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 	}
 }
 
+func (sb *SendBuffer) DeleteAllLogs() {
+	sb.logs = nil
+}
+
 func (sb *SendBuffer) sendAndPurge() error {
 	if !sb.sendMutex.TryLock() {
 		sb.logger.Log("msg", "could not get lock on send mutex, will retry")

@@ -63,6 +63,10 @@ func (ls *LogShipper) Ping() {
 		return
 	}
 	ls.sender.endpoint = endpoint
+
+	if !ls.knapsack.LogShippingEnabled() {
+		ls.sendBuffer.DeleteAllLogs()
+	}
 }
 
 func (ls *LogShipper) Run() error {
@@ -97,6 +101,10 @@ func logEndpoint(k types.Knapsack) (string, error) {
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
+	if !ls.knapsack.LogShippingEnabled() {
+		return nil
+	}
+
 	filterResults(keyvals...)
 	return ls.logger.Log(keyvals...)
 }

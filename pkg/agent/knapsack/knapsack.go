@@ -382,3 +382,10 @@ func (k *knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
 func (k *knapsack) DisableObservabilityIngestTLS() bool {
 	return k.flags.DisableObservabilityIngestTLS()
 }
+
+func (k *knapsack) SetLogShippingEnabled(enabled bool) error {
+	return k.flags.SetLogShippingEnabled(enabled)
+}
+func (k *knapsack) LogShippingEnabled() bool {
+	return k.flags.LogShippingEnabled()
+}

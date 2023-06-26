@@ -47,6 +47,7 @@ const (
 	ObservabilityIngestServerURL  FlagKey = "ingest_url"
 	TraceIngestServerURL          FlagKey = "trace_ingest_url"
 	DisableObservabilityIngestTLS FlagKey = "disable_ingest_tls"
+	LogShippingEnabled            FlagKey = "log_shipping_enabled"
 )
 
 func (key FlagKey) String() string {

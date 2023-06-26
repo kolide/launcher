@@ -148,9 +148,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
-	isShippingLogs := k.ObservabilityIngestServerURL() != ""
 	var logShipper *logshipper.LogShipper
-	if isShippingLogs {
+	if k.ControlServerURL() != "" {
 		logShipper, err = logshipper.New(k)
 		if err != nil {
 			logger.Log("msg", "failed to create log shipper", "err", err)
@@ -323,9 +322,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// begin log shipping and subsribe to token updates
 		// nil check incase it failed to create for some reason
-		if isShippingLogs && logShipper != nil {
+		if logShipper != nil {
 			runGroup.Add(logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
+			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
 	}
 
