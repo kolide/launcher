@@ -20,7 +20,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-12
+          - macos-11
           - windows-latest
     steps:
     - name: Check out code
@@ -56,6 +56,10 @@ jobs:
 
     - name: Get dependencies
       run: make deps
+
+    - name: Test now
+      if: ${{ contains(matrix.os, 'macos') }}
+      run: go test -v -race ./pkg/autoupdate --run TestCheckExecutable
 
     - name: Run govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...

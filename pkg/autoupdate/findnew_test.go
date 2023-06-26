@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -528,7 +527,8 @@ func TestHelperProcess(t *testing.T) {
 
 	switch args[0] {
 	case "sleep":
-		time.Sleep(10 * time.Second)
+		// time.Sleep(10 * time.Second)
+		select {}
 	case "exit0":
 		os.Exit(0)
 	case "exit1":
