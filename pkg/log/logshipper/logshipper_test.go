@@ -36,6 +36,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
 
 			knapsack.On("DisableObservabilityIngestTLS").Return(true)
+			knapsack.On("LogShippingEnabled").Return(true)
 			knapsack.On("ObservabilityIngestServerURL").Return("http://someurl").Once()
 			knapsack.On("Debug").Return(true)
 
