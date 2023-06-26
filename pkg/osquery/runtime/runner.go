@@ -317,6 +317,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
+	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
+
 	// wait for osquery to create the socket before moving on,
 	// this is intended to serve as a kind of health check
 	// for osquery, if it's started successfully it will create

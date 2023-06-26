@@ -96,6 +96,11 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		return t, nil
 	}
 
+	// Set our own error handler to avoid otel printing errors
+	otel.SetErrorHandler(newErrorHandler(
+		log.With(logger, "component", "trace_exporter"),
+	))
+
 	t.addDeviceIdentifyingAttributes()
 
 	// Set the provider with as many resource attributes as we can get immediately
