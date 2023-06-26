@@ -65,7 +65,7 @@ func (ls *LogShipper) Ping() {
 	ls.sender.endpoint = endpoint
 
 	if !ls.knapsack.LogShippingEnabled() {
-		ls.sendBuffer.DeleteAllLogs()
+		ls.sendBuffer.DeleteAllData()
 	}
 }
 

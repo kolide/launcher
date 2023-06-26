@@ -140,7 +140,7 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 	}
 }
 
-func (sb *SendBuffer) DeleteAllLogs() {
+func (sb *SendBuffer) DeleteAllData() {
 	sb.logs = nil
 }
 
