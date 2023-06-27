@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -17,6 +16,8 @@ var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
+	defaultSendInterval   = 1 * time.Minute
+	debugSendInterval     = 1 * time.Second
 )
 
 type LogShipper struct {
@@ -28,48 +29,57 @@ type LogShipper struct {
 	isShippingEnabled bool
 }
 
-func New(k types.Knapsack) (*LogShipper, error) {
-	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
+func New(k types.Knapsack) *LogShipper {
+	startEnabled := k.LogIngestServerURL() != ""
 
 	logEndpoint, err := logEndpoint(k)
 	if err != nil {
-		return nil, err
+		// If we have a bad endpoint, just disable for now.
+		// It will get renabled when control server sends a
+		// valid endpoint.
+		startEnabled = false
 	}
 
+	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
 	sender := newAuthHttpSender(logEndpoint, string(token))
 
-	sendInterval := time.Minute * 1
+	sendInterval := defaultSendInterval
 	if k.Debug() {
-		sendInterval = time.Second * 1
+		sendInterval = debugSendInterval
 	}
 
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
 	logger := log.NewJSONLogger(sendBuffer)
 
 	return &LogShipper{
-		sender:     sender,
-		sendBuffer: sendBuffer,
-		logger:     logger,
-		knapsack:   k,
-	}, nil
+		sender:            sender,
+		sendBuffer:        sendBuffer,
+		logger:            logger,
+		knapsack:          k,
+		isShippingEnabled: startEnabled,
+	}
 }
 
 func (ls *LogShipper) Ping() {
+	// set up new auth token
 	token, _ := ls.knapsack.TokenStore().Get(observabilityIngestTokenKey)
 	ls.sender.authtoken = string(token)
 
+	shouldEnable := ls.knapsack.LogIngestServerURL() != ""
 	endpoint, err := logEndpoint(ls.knapsack)
 	if err != nil {
-		ls.logger.Log("msg", "failed to get endpoint", "err", err)
-		return
+		// If we have a bad endpoint, just disable for now.
+		// It will get renabled when control server sends a
+		// valid endpoint.
+		shouldEnable = false
 	}
+
 	ls.sender.endpoint = endpoint
-	ls.isShippingEnabled = ls.knapsack.LogIngestServerURL() != ""
+	ls.isShippingEnabled = shouldEnable
 
 	if !ls.isShippingEnabled {
 		ls.sendBuffer.DeleteAllData()
 	}
-
 }
 
 func (ls *LogShipper) Run() error {
@@ -84,15 +94,6 @@ func (ls *LogShipper) Stop(_ error) {
 
 func logEndpoint(k types.Knapsack) (string, error) {
 	endpoint := k.LogIngestServerURL()
-
-	if !strings.HasPrefix(endpoint, "http") {
-		scheme := "https"
-		if k.DisableObservabilityIngestTLS() {
-			scheme = "http"
-		}
-		endpoint = fmt.Sprintf("%s://%s", scheme, endpoint)
-	}
-
 	parsedUrl, err := url.Parse(endpoint)
 	if err != nil {
 		return "", err

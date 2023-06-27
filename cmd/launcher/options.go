@@ -86,7 +86,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flTraceSamplingRate      = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
 		flLogIngestServerURL     = flagset.String("log_ingest_url", "", "Where to export logs")
 		flTraceIngestServerURL   = flagset.String("trace_ingest_url", "", "Where to export traces")
-		flDisableIngestTLS       = flagset.Bool("disable_ingest_tls", false, "Disable TLS for observability ingest server communication")
+		flDisableIngestTLS       = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -251,7 +251,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		ExportTraces:                       *flExportTraces,
 		LogIngestServerURL:                 *flLogIngestServerURL,
 		TraceIngestServerURL:               *flTraceIngestServerURL,
-		DisableObservabilityIngestTLS:      *flDisableIngestTLS,
+		DisableTraceIngestTLS:              *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,

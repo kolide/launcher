@@ -216,8 +216,8 @@ func (_m *Flags) DisableControlTLS() bool {
 	return r0
 }
 
-// DisableObservabilityIngestTLS provides a mock function with given fields:
-func (_m *Flags) DisableObservabilityIngestTLS() bool {
+// DisableTraceIngestTLS provides a mock function with given fields:
+func (_m *Flags) DisableTraceIngestTLS() bool {
 	ret := _m.Called()
 
 	var r0 bool
@@ -781,8 +781,8 @@ func (_m *Flags) SetDisableControlTLS(disabled bool) error {
 	return r0
 }
 
-// SetDisableObservabilityIngestTLS provides a mock function with given fields: enabled
-func (_m *Flags) SetDisableObservabilityIngestTLS(enabled bool) error {
+// SetDisableTraceIngestTLS provides a mock function with given fields: enabled
+func (_m *Flags) SetDisableTraceIngestTLS(enabled bool) error {
 	ret := _m.Called(enabled)
 
 	var r0 error

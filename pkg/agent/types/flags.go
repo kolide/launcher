@@ -185,7 +185,7 @@ type Flags interface {
 	SetTraceIngestServerURL(url string) error
 	TraceIngestServerURL() string
 
-	// DisableObservabilityIngestTLS disables TLS for observability ingest server communication
-	SetDisableObservabilityIngestTLS(enabled bool) error
-	DisableObservabilityIngestTLS() bool
+	// DisableTraceIngestTLS disables TLS for observability ingest server communication
+	SetDisableTraceIngestTLS(enabled bool) error
+	DisableTraceIngestTLS() bool
 }

@@ -39,8 +39,7 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("LogIngestServerURL").Return("http://someurl").Once()
 			knapsack.On("Debug").Return(true)
 
-			ls, err := New(knapsack)
-			require.NoError(t, err)
+			ls := New(knapsack)
 
 			require.Equal(t, authToken, ls.sender.authtoken)
 
@@ -49,7 +48,6 @@ func TestLogShipper(t *testing.T) {
 
 			newEndpoint := "someotherurl"
 			knapsack.On("LogIngestServerURL").Return(newEndpoint)
-			knapsack.On("DisableObservabilityIngestTLS").Return(true)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")

@@ -483,11 +483,11 @@ func (fc *FlagController) TraceIngestServerURL() string {
 	).get(fc.getControlServerValue(keys.TraceIngestServerURL))
 }
 
-func (fc *FlagController) SetDisableObservabilityIngestTLS(enabled bool) error {
-	return fc.setControlServerValue(keys.DisableObservabilityIngestTLS, boolToBytes(enabled))
+func (fc *FlagController) SetDisableTraceIngestTLS(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableTraceIngestTLS, boolToBytes(enabled))
 }
-func (fc *FlagController) DisableObservabilityIngestTLS() bool {
+func (fc *FlagController) DisableTraceIngestTLS() bool {
 	return NewBoolFlagValue(
-		WithDefaultBool(fc.cmdLineOpts.DisableObservabilityIngestTLS),
-	).get(fc.getControlServerValue(keys.DisableObservabilityIngestTLS))
+		WithDefaultBool(fc.cmdLineOpts.DisableTraceIngestTLS),
+	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
 }

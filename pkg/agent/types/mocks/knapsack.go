@@ -297,8 +297,8 @@ func (_m *Knapsack) DisableControlTLS() bool {
 	return r0
 }
 
-// DisableObservabilityIngestTLS provides a mock function with given fields:
-func (_m *Knapsack) DisableObservabilityIngestTLS() bool {
+// DisableTraceIngestTLS provides a mock function with given fields:
+func (_m *Knapsack) DisableTraceIngestTLS() bool {
 	ret := _m.Called()
 
 	var r0 bool
@@ -942,8 +942,8 @@ func (_m *Knapsack) SetDisableControlTLS(disabled bool) error {
 	return r0
 }
 
-// SetDisableObservabilityIngestTLS provides a mock function with given fields: enabled
-func (_m *Knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
+// SetDisableTraceIngestTLS provides a mock function with given fields: enabled
+func (_m *Knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 	ret := _m.Called(enabled)
 
 	var r0 error

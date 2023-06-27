@@ -111,8 +111,8 @@ type Options struct {
 	LogIngestServerURL string
 	// TraceIngestServerURL is the URL that traces will be exported to
 	TraceIngestServerURL string
-	// DisableObservabilityIngestTLS allows for disabling TLS when connecting to the observability ingest server
-	DisableObservabilityIngestTLS bool
+	// DisableTraceIngestTLS allows for disabling TLS when connecting to the observability ingest server
+	DisableTraceIngestTLS bool
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string

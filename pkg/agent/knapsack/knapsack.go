@@ -369,11 +369,11 @@ func (k *knapsack) TraceIngestServerURL() string {
 	return k.flags.TraceIngestServerURL()
 }
 
-func (k *knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
-	return k.flags.SetDisableObservabilityIngestTLS(enabled)
+func (k *knapsack) SetDisableTraceIngestTLS(enabled bool) error {
+	return k.flags.SetDisableTraceIngestTLS(enabled)
 }
-func (k *knapsack) DisableObservabilityIngestTLS() bool {
-	return k.flags.DisableObservabilityIngestTLS()
+func (k *knapsack) DisableTraceIngestTLS() bool {
+	return k.flags.DisableTraceIngestTLS()
 }
 
 func (k *knapsack) SetLogIngestServerURL(url string) error {
