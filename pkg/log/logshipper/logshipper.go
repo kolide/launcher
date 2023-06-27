@@ -2,9 +2,9 @@ package logshipper
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -80,24 +80,22 @@ func (ls *LogShipper) Stop(_ error) {
 }
 
 func logEndpoint(k types.Knapsack) (string, error) {
-	u, err := url.Parse(k.ObservabilityIngestServerURL())
+	endpoint := k.ObservabilityIngestServerURL()
+
+	if !strings.HasPrefix("http", endpoint) {
+		scheme := "https"
+		if k.DisableObservabilityIngestTLS() {
+			scheme = "http"
+		}
+		endpoint = fmt.Sprintf("%s://%s", scheme, endpoint)
+	}
+
+	parsedUrl, err := url.Parse(endpoint)
 	if err != nil {
 		return "", err
 	}
 
-	if u.Scheme == "" {
-		u.Scheme = "https"
-
-		if k.DisableObservabilityIngestTLS() {
-			u.Scheme = "http"
-		}
-	}
-
-	if u.Scheme != "https" && !k.DisableObservabilityIngestTLS() {
-		return "", errors.New("logshipper requires HTTPS")
-	}
-
-	return u.String(), nil
+	return parsedUrl.String(), nil
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
