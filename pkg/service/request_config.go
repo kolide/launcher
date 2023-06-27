@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type configRequest struct {
@@ -97,6 +98,9 @@ func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (inter
 
 func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		ctx, span := traces.StartSpan(ctx)
+		defer span.End()
+
 		req := request.(configRequest)
 		config, valid, err := svc.RequestConfig(ctx, req.NodeKey)
 		return configResponse{

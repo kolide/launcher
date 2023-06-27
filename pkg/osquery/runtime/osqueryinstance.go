@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
 
 	"golang.org/x/sync/errgroup"
@@ -271,6 +272,9 @@ func (o *OsqueryInstance) Healthy() error {
 }
 
 func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	o.clientLock.Lock()
 	defer o.clientLock.Unlock()
 
@@ -278,11 +282,13 @@ func (o *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 		return nil, errors.New("client not ready")
 	}
 
-	resp, err := o.extensionManagerClient.Query(query)
+	resp, err := o.extensionManagerClient.QueryContext(ctx, query)
 	if err != nil {
+		traces.SetError(span, err)
 		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
+		traces.SetError(span, errors.New(resp.Status.Message))
 		return nil, errors.New(resp.Status.Message)
 	}
 

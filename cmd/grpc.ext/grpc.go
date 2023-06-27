@@ -21,6 +21,7 @@ import (
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -51,7 +52,7 @@ func main() {
 
 	logger := logutil.NewServerLogger(*flVerbose)
 
-	client, err := osquery.NewClient(*flSocketPath, timeout)
+	client, err := osquery.NewClient(*flSocketPath, timeout, osquery.MaxWaitTime(30*time.Second))
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
 	}
@@ -114,6 +115,7 @@ func main() {
 		"com.kolide.grpc_extension",
 		*flSocketPath,
 		osquery.ServerTimeout(timeout),
+		osquery.WithClient(client),
 	)
 	if err != nil {
 		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
@@ -150,11 +152,16 @@ type queryier struct {
 }
 
 func (q *queryier) Query(query string) ([]map[string]string, error) {
-	resp, err := q.client.Query(query)
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
+	resp, err := q.client.QueryContext(ctx, query)
 	if err != nil {
+		traces.SetError(span, err)
 		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
+		traces.SetError(span, err)
 		return nil, errors.New(resp.Status.Message)
 	}
 	return resp.Response, nil

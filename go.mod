@@ -1,5 +1,7 @@
 module github.com/kolide/launcher
 
+replace github.com/osquery/osquery-go v0.0.0-20230501171314-2fc54ff75669 => ../osquery-go
+
 require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.4.11
@@ -42,10 +44,10 @@ require (
 	golang.org/x/crypto v0.4.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/image v0.5.0
-	golang.org/x/net v0.8.0
+	golang.org/x/net v0.10.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/sys v0.8.0
-	golang.org/x/text v0.8.0
+	golang.org/x/text v0.9.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.55.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -67,6 +69,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 )

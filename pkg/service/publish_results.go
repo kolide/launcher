@@ -13,6 +13,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/distributed"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type resultCollection struct {
@@ -146,6 +147,9 @@ func encodeJSONRPCPublishResultsResponse(_ context.Context, obj interface{}) (js
 
 func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		ctx, span := traces.StartSpan(ctx)
+		defer span.End()
+
 		req := request.(resultCollection)
 		message, errcode, valid, err := svc.PublishResults(ctx, req.NodeKey, req.Results)
 		return publishResultsResponse{
