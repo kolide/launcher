@@ -20,11 +20,12 @@ const (
 )
 
 type LogShipper struct {
-	sender     *authedHttpSender
-	sendBuffer *sendbuffer.SendBuffer
-	logger     log.Logger
-	knapsack   types.Knapsack
-	stopFunc   context.CancelFunc
+	sender            *authedHttpSender
+	sendBuffer        *sendbuffer.SendBuffer
+	logger            log.Logger
+	knapsack          types.Knapsack
+	stopFunc          context.CancelFunc
+	isShippingEnabled bool
 }
 
 func New(k types.Knapsack) (*LogShipper, error) {
@@ -63,10 +64,12 @@ func (ls *LogShipper) Ping() {
 		return
 	}
 	ls.sender.endpoint = endpoint
+	ls.isShippingEnabled = ls.knapsack.LogShippingEnabled()
 
-	if !ls.knapsack.LogShippingEnabled() {
+	if !ls.isShippingEnabled {
 		ls.sendBuffer.DeleteAllData()
 	}
+
 }
 
 func (ls *LogShipper) Run() error {
@@ -99,7 +102,7 @@ func logEndpoint(k types.Knapsack) (string, error) {
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
-	if !ls.knapsack.LogShippingEnabled() {
+	if !ls.isShippingEnabled {
 		return nil
 	}
 
