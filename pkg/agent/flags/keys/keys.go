@@ -44,7 +44,7 @@ const (
 	UpdateDirectory               FlagKey = "update_directory"
 	ExportTraces                  FlagKey = "export_traces"
 	TraceSamplingRate             FlagKey = "trace_sampling_rate"
-	ObservabilityIngestServerURL  FlagKey = "ingest_url"
+	LogIngestServerURL            FlagKey = "log_ingest_url"
 	TraceIngestServerURL          FlagKey = "trace_ingest_url"
 	DisableObservabilityIngestTLS FlagKey = "disable_ingest_tls"
 	LogShippingEnabled            FlagKey = "log_shipping_enabled"

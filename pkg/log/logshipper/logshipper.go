@@ -83,7 +83,7 @@ func (ls *LogShipper) Stop(_ error) {
 }
 
 func logEndpoint(k types.Knapsack) (string, error) {
-	endpoint := k.ObservabilityIngestServerURL()
+	endpoint := k.LogIngestServerURL()
 
 	if !strings.HasPrefix(endpoint, "http") {
 		scheme := "https"

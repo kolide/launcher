@@ -84,7 +84,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flConfigFilePath         = flagset.String("config", defaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces           = flagset.Bool("export_traces", false, "Whether to export traces")
 		flTraceSamplingRate      = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
-		flIngestServerURL        = flagset.String("ingest_url", "", "Where to export logs and other observability data")
+		flLogIngestServerURL     = flagset.String("log_ingest_url", "", "Where to export logs")
 		flTraceIngestServerURL   = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS       = flagset.Bool("disable_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
@@ -249,7 +249,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
-		ObservabilityIngestServerURL:       *flIngestServerURL,
+		LogIngestServerURL:                 *flLogIngestServerURL,
 		TraceIngestServerURL:               *flTraceIngestServerURL,
 		DisableObservabilityIngestTLS:      *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,

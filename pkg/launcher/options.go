@@ -107,8 +107,8 @@ type Options struct {
 	ExportTraces bool
 	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
 	TraceSamplingRate float64
-	// ObservabilityIngestServerURL is the URL that logs and other observability data will be exported to
-	ObservabilityIngestServerURL string
+	// LogIngestServerURL is the URL that logs and other observability data will be exported to
+	LogIngestServerURL string
 	// TraceIngestServerURL is the URL that traces will be exported to
 	TraceIngestServerURL string
 	// DisableObservabilityIngestTLS allows for disabling TLS when connecting to the observability ingest server

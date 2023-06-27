@@ -565,8 +565,8 @@ func (_m *Knapsack) NotaryServerURL() string {
 	return r0
 }
 
-// ObservabilityIngestServerURL provides a mock function with given fields:
-func (_m *Knapsack) ObservabilityIngestServerURL() string {
+// LogIngestServerURL provides a mock function with given fields:
+func (_m *Knapsack) LogIngestServerURL() string {
 	ret := _m.Called()
 
 	var r0 string
@@ -1124,8 +1124,8 @@ func (_m *Knapsack) SetNotaryServerURL(url string) error {
 	return r0
 }
 
-// SetObservabilityIngestServerURL provides a mock function with given fields: url
-func (_m *Knapsack) SetObservabilityIngestServerURL(url string) error {
+// SetLogIngestServerURL provides a mock function with given fields: url
+func (_m *Knapsack) SetLogIngestServerURL(url string) error {
 	ret := _m.Called(url)
 
 	var r0 error

@@ -465,13 +465,13 @@ func (fc *FlagController) TraceSamplingRate() float64 {
 	).get(fc.getControlServerValue(keys.TraceSamplingRate))
 }
 
-func (fc *FlagController) SetObservabilityIngestServerURL(url string) error {
-	return fc.setControlServerValue(keys.ObservabilityIngestServerURL, []byte(url))
+func (fc *FlagController) SetLogIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.LogIngestServerURL, []byte(url))
 }
-func (fc *FlagController) ObservabilityIngestServerURL() string {
+func (fc *FlagController) LogIngestServerURL() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.ObservabilityIngestServerURL),
-	).get(fc.getControlServerValue(keys.ObservabilityIngestServerURL))
+		WithDefaultString(fc.cmdLineOpts.LogIngestServerURL),
+	).get(fc.getControlServerValue(keys.LogIngestServerURL))
 }
 
 func (fc *FlagController) SetLogShippingEnabled(enabled bool) error {
