@@ -495,20 +495,6 @@ func (_m *Knapsack) LogMaxBytesPerBatch() int {
 	return r0
 }
 
-// LogShippingEnabled provides a mock function with given fields:
-func (_m *Knapsack) LogShippingEnabled() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // LoggingInterval provides a mock function with given fields:
 func (_m *Knapsack) LoggingInterval() time.Duration {
 	ret := _m.Called()
@@ -1054,8 +1040,8 @@ func (_m *Knapsack) SetKolideServerURL(url string) error {
 	return r0
 }
 
-// SetLogShippingEnabled provides a mock function with given fields: enabled
-func (_m *Knapsack) SetLogShippingEnabled(enabled bool) error {
+// Set provides a mock function with given fields: enabled
+func (_m *Knapsack) Set(enabled bool) error {
 	ret := _m.Called(enabled)
 
 	var r0 error

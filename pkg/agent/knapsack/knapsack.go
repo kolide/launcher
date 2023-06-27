@@ -382,10 +382,3 @@ func (k *knapsack) SetLogIngestServerURL(url string) error {
 func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
 }
-
-func (k *knapsack) SetLogShippingEnabled(enabled bool) error {
-	return k.flags.SetLogShippingEnabled(enabled)
-}
-func (k *knapsack) LogShippingEnabled() bool {
-	return k.flags.LogShippingEnabled()
-}

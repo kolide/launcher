@@ -64,7 +64,7 @@ func (ls *LogShipper) Ping() {
 		return
 	}
 	ls.sender.endpoint = endpoint
-	ls.isShippingEnabled = ls.knapsack.LogShippingEnabled()
+	ls.isShippingEnabled = ls.knapsack.LogIngestServerURL() != ""
 
 	if !ls.isShippingEnabled {
 		ls.sendBuffer.DeleteAllData()

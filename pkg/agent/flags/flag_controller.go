@@ -474,13 +474,6 @@ func (fc *FlagController) LogIngestServerURL() string {
 	).get(fc.getControlServerValue(keys.LogIngestServerURL))
 }
 
-func (fc *FlagController) SetLogShippingEnabled(enabled bool) error {
-	return fc.setControlServerValue(keys.LogShippingEnabled, boolToBytes(enabled))
-}
-func (fc *FlagController) LogShippingEnabled() bool {
-	return NewBoolFlagValue(WithDefaultBool(false)).get(fc.getControlServerValue(keys.LogShippingEnabled))
-}
-
 func (fc *FlagController) SetTraceIngestServerURL(url string) error {
 	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
 }
