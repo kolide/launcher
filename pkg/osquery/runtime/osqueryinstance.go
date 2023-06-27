@@ -222,7 +222,6 @@ type OsqueryInstance struct {
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers []*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
-	clientLock              sync.Mutex
 	rmRootDirectory         func()
 	usingTempDir            bool
 	stats                   *history.Instance
