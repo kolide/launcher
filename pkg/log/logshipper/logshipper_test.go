@@ -1,6 +1,7 @@
 package logshipper
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -35,7 +36,6 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("TokenStore").Return(tokenStore)
 			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
 
-			knapsack.On("DisableObservabilityIngestTLS").Return(true)
 			knapsack.On("LogShippingEnabled").Return(true)
 			knapsack.On("ObservabilityIngestServerURL").Return("http://someurl").Once()
 			knapsack.On("Debug").Return(true)
@@ -48,12 +48,13 @@ func TestLogShipper(t *testing.T) {
 			authToken = ulid.New()
 			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
 
-			newEndpoint := "http://someotherurl"
+			newEndpoint := "someotherurl"
 			knapsack.On("ObservabilityIngestServerURL").Return(newEndpoint)
+			knapsack.On("DisableObservabilityIngestTLS").Return(true)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, newEndpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.Equal(t, fmt.Sprintf("%s://%s", "http", newEndpoint), ls.sender.endpoint, "log shipper should update endpoint on sender")
 		})
 	}
 }
