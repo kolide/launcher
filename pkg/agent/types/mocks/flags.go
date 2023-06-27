@@ -398,6 +398,20 @@ func (_m *Flags) LogMaxBytesPerBatch() int {
 	return r0
 }
 
+// LogShippingEnabled provides a mock function with given fields:
+func (_m *Flags) LogShippingEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // LoggingInterval provides a mock function with given fields:
 func (_m *Flags) LoggingInterval() time.Duration {
 	ret := _m.Called()
@@ -872,6 +886,20 @@ func (_m *Flags) SetKolideServerURL(url string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetLogShippingEnabled provides a mock function with given fields: enabled
+func (_m *Flags) SetLogShippingEnabled(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
 	} else {
 		r0 = ret.Error(0)
 	}
