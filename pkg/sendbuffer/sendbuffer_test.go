@@ -201,6 +201,25 @@ func TestSendBufferConcurrent(t *testing.T) {
 	}
 }
 
+func TestSendBuffer_DeleteAllData(t *testing.T) {
+	t.Parallel()
+
+	testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
+	sb := New(
+		testSender,
+	)
+
+	sb.Write([]byte("here is some data"))
+
+	require.NotEmpty(t, sb.logs)
+	require.NotZero(t, sb.size)
+
+	sb.DeleteAllData()
+
+	require.Empty(t, sb.logs)
+	require.Zero(t, sb.size)
+}
+
 func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, sb *SendBuffer) {
 	sb.writeMutex.Lock()
 	defer sb.writeMutex.Unlock()

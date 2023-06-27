@@ -141,7 +141,10 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 }
 
 func (sb *SendBuffer) DeleteAllData() {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
 	sb.logs = nil
+	sb.size = 0
 }
 
 func (sb *SendBuffer) sendAndPurge() error {
