@@ -168,4 +168,20 @@ type Flags interface {
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
+
+	// ExportTraces enables exporting our traces
+	SetExportTraces(enabled bool) error
+	ExportTraces() bool
+
+	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
+	SetTraceSamplingRate(rate float64) error
+	TraceSamplingRate() float64
+
+	// ObservabilityIngestServerURL is the URL of the ingest server for logs and traces
+	SetObservabilityIngestServerURL(url string) error
+	ObservabilityIngestServerURL() string
+
+	// DisableObservabilityIngestTLS disables TLS for observability ingest server communication
+	SetDisableObservabilityIngestTLS(enabled bool) error
+	DisableObservabilityIngestTLS() bool
 }

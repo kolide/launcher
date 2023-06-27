@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -41,6 +42,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces/exporter"
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
@@ -51,6 +53,7 @@ const (
 	agentFlagsSubsystemName  = "agent_flags"
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
+	authTokensSubsystemName  = "auth_tokens"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -76,8 +79,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// DNS failures in the past, so this check gives us a little bit
 	// of room to ensure that we are able to resolve DNS requests
 	// before proceeding with starting launcher.
+	//
+	// Note that the SplitN won't work for bare ip6 addresses.
 	if err := backoff.WaitFor(func() error {
-		_, lookupErr := net.LookupIP(opts.KolideServerURL)
+		hostport := strings.SplitN(opts.KolideServerURL, ":", 2)
+		_, lookupErr := net.LookupIP(hostport[0])
 		return lookupErr
 	}, 10*time.Second, 1*time.Second); err != nil {
 		level.Info(logger).Log(
@@ -282,6 +288,22 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 			return fmt.Errorf("failed to register notify consumer: %w", err)
+		}
+
+		// Set up our tracing instrumentation
+		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
+		if err := controlService.RegisterConsumer(authTokensSubsystemName, authTokenConsumer); err != nil {
+			return fmt.Errorf("failed to register auth token consumer: %w", err)
+		}
+
+		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
+			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
 		}
 	}
 

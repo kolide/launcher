@@ -31,7 +31,6 @@ var (
 	defaultEtcDirectoryPath  string
 	defaultBinDirectoryPath  string
 	defaultConfigFilePath    string
-	defaultKolideHosted      bool
 	defaultAutoupdate        bool
 )
 
@@ -83,6 +82,10 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flOsqueryFlags           arrayFlags // set below with flagset.Var
 		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		flConfigFilePath         = flagset.String("config", defaultConfigFilePath, "config file to parse options from (optional)")
+		flExportTraces           = flagset.Bool("export_traces", false, "Whether to export traces")
+		flTraceSamplingRate      = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
+		flIngestServerURL        = flagset.String("ingest_url", "", "Where to export traces and logs")
+		flDisableIngestTLS       = flagset.Bool("disable_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -244,6 +247,9 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
+		ExportTraces:                       *flExportTraces,
+		ObservabilityIngestServerURL:       *flIngestServerURL,
+		DisableObservabilityIngestTLS:      *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,
@@ -266,6 +272,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		OsquerydPath:                       osquerydPath,
 		RootDirectory:                      *flRootDirectory,
 		RootPEM:                            *flRootPEM,
+		TraceSamplingRate:                  *flTraceSamplingRate,
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
 		UpdateDirectory:                    *flUpdateDirectory,

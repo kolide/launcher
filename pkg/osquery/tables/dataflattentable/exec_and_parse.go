@@ -9,6 +9,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -77,6 +78,9 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.execPaths, t.execArgs, t.includeStderr)
@@ -85,6 +89,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
+		traces.SetError(span, err)
 		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, nil
 	}

@@ -120,7 +120,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				cancel()
 				time.Sleep(100 * time.Millisecond)
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-				return
+				return ssec, errno
 			default:
 				level.Info(w.logger).Log("err", "unexpected control request", "control_request", c)
 			}

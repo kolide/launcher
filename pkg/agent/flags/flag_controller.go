@@ -444,3 +444,41 @@ func (fc *FlagController) UpdateDirectory() string {
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
 }
+
+func (fc *FlagController) SetExportTraces(enabled bool) error {
+	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
+}
+func (fc *FlagController) ExportTraces() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
+	).get(fc.getControlServerValue(keys.ExportTraces))
+}
+
+func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
+	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
+}
+func (fc *FlagController) TraceSamplingRate() float64 {
+	return NewFloat64FlagValue(fc.logger, keys.LoggingInterval,
+		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
+		WithFloat64ValueMin(0.0),
+		WithFloat64ValueMax(1.0),
+	).get(fc.getControlServerValue(keys.TraceSamplingRate))
+}
+
+func (fc *FlagController) SetObservabilityIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.ObservabilityIngestServerURL, []byte(url))
+}
+func (fc *FlagController) ObservabilityIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.ObservabilityIngestServerURL),
+	).get(fc.getControlServerValue(keys.ObservabilityIngestServerURL))
+}
+
+func (fc *FlagController) SetDisableObservabilityIngestTLS(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableObservabilityIngestTLS, boolToBytes(enabled))
+}
+func (fc *FlagController) DisableObservabilityIngestTLS() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.DisableObservabilityIngestTLS),
+	).get(fc.getControlServerValue(keys.DisableObservabilityIngestTLS))
+}
