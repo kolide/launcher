@@ -28,7 +28,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 
 	tokenStore := testTokenStore(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
-	tokenStore.Set(observabilityIngestTokenKey, []byte("test token"))
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
 
 	serverProvidedDataStore := testServerProvidedDataStore(t)
 	mockKnapsack.On("ServerProvidedDataStore").Return(serverProvidedDataStore)
@@ -79,7 +79,7 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	tokenStore := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
-	tokenStore.Set(observabilityIngestTokenKey, []byte("test token"))
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
 	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
@@ -247,7 +247,7 @@ func TestPing(t *testing.T) {
 
 	// Simulate a new token being set by updating the data store
 	newToken := "test token B"
-	require.NoError(t, s.Set(observabilityIngestTokenKey, []byte(newToken)))
+	require.NoError(t, s.Set(storage.ObservabilityIngestAuthTokenKey, []byte(newToken)))
 
 	// Alert the exporter that the token has changed
 	traceExporter.Ping()
