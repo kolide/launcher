@@ -110,13 +110,12 @@ func runFlare(args []string) error {
 
 	defer closeTar(tw)
 
+	// TODO: Here is where we would want to get a callback from the
+	// logs checkup for each log file found, along with a io.Reader
+	// for the log file. Slurp the file into a buffer, and pass it to
+	// writeFile with a path of logsDir + logFileName
 	b1 := new(bytes.Buffer)
 	defer writeFile(filepath.Join(logsDir, "loggy.log"), tw, b1)
-
-	logFiles := getFilepaths(k.RootDirectory(), "debug*")
-	for _, f := range logFiles {
-
-	}
 
 	defer writeFile(filepath.Join(baseDir, fmt.Sprintf("%s.log", id)), tw, b)
 
@@ -375,29 +374,10 @@ func reportNotaryPing(
 
 func tarPostProcessing(upload bool) {
 	if upload {
-		// TODO
+		// TODO if the client asked for the TAR to be uploaded to the
+		// ingest server, here's where that happens.
 	}
 }
-
-// func writeLogFile(name string, tw *tar.Writer, b *bytes.Buffer) {
-// 	hdr := &tar.Header{
-// 		Name: name,
-// 		Mode: int64(os.ModePerm),
-// 		Size: int64(b.Len()),
-// 	}
-
-// 	if err := tw.WriteHeader(hdr); err != nil {
-// 		fatal(b, err)
-// 	}
-
-// 	if _, err := tw.Write(b.Bytes()); err != nil {
-// 		fatal(b, err)
-// 	}
-
-// 	if err := tw.Close(); err != nil {
-// 		fatal(b, err)
-// 	}
-// }
 
 func writeFile(name string, tw *tar.Writer, b *bytes.Buffer) {
 	hdr := &tar.Header{
