@@ -100,7 +100,7 @@ OUTER:
 				continue
 			}
 
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, "", rowData)...)
 			continue
 		}
 
