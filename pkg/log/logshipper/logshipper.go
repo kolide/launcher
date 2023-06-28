@@ -7,12 +7,10 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/sendbuffer"
 )
-
-// TODO: consolidate this var, but where?
-var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
@@ -21,27 +19,19 @@ const (
 )
 
 type LogShipper struct {
-	sender            *authedHttpSender
-	sendBuffer        *sendbuffer.SendBuffer
-	logger            log.Logger
+	sender     *authedHttpSender
+	sendBuffer *sendbuffer.SendBuffer
+	//shippingLogger is the logs that will be shipped
+	shippingLogger log.Logger
+	//baseLogger is for logShipper interal logging
+	baseLogger        log.Logger
 	knapsack          types.Knapsack
 	stopFunc          context.CancelFunc
 	isShippingEnabled bool
 }
 
-func New(k types.Knapsack) *LogShipper {
-	startEnabled := k.LogIngestServerURL() != ""
-
-	logEndpoint, err := logEndpoint(k)
-	if err != nil {
-		// If we have a bad endpoint, just disable for now.
-		// It will get renabled when control server sends a
-		// valid endpoint.
-		startEnabled = false
-	}
-
-	token, _ := k.TokenStore().Get(observabilityIngestTokenKey)
-	sender := newAuthHttpSender(logEndpoint, string(token))
+func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
+	sender := newAuthHttpSender()
 
 	sendInterval := defaultSendInterval
 	if k.Debug() {
@@ -49,32 +39,41 @@ func New(k types.Knapsack) *LogShipper {
 	}
 
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
-	logger := log.NewJSONLogger(sendBuffer)
+	shippingLogger := log.NewJSONLogger(sendBuffer)
 
-	return &LogShipper{
-		sender:            sender,
-		sendBuffer:        sendBuffer,
-		logger:            logger,
-		knapsack:          k,
-		isShippingEnabled: startEnabled,
+	ls := &LogShipper{
+		sender:         sender,
+		sendBuffer:     sendBuffer,
+		shippingLogger: shippingLogger,
+		baseLogger:     baseLogger,
+		knapsack:       k,
 	}
+
+	ls.Ping()
+	return ls
 }
 
+// Ping gets the latest token and endpoint from knapsack and updates the sender
 func (ls *LogShipper) Ping() {
 	// set up new auth token
-	token, _ := ls.knapsack.TokenStore().Get(observabilityIngestTokenKey)
+	token, _ := ls.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	ls.sender.authtoken = string(token)
 
 	shouldEnable := ls.knapsack.LogIngestServerURL() != ""
-	endpoint, err := logEndpoint(ls.knapsack)
-	if err != nil {
+	parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
+	if err != nil || parsedUrl.String() == "" {
 		// If we have a bad endpoint, just disable for now.
 		// It will get renabled when control server sends a
 		// valid endpoint.
 		shouldEnable = false
+		ls.baseLogger.Log(
+			"msg", "error parsing log ingest server url, shipping disabled",
+			"err", err,
+			"log_ingest_url", ls.knapsack.LogIngestServerURL(),
+		)
 	}
 
-	ls.sender.endpoint = endpoint
+	ls.sender.endpoint = parsedUrl.String()
 	ls.isShippingEnabled = shouldEnable
 
 	if !ls.isShippingEnabled {
@@ -92,23 +91,13 @@ func (ls *LogShipper) Stop(_ error) {
 	ls.stopFunc()
 }
 
-func logEndpoint(k types.Knapsack) (string, error) {
-	endpoint := k.LogIngestServerURL()
-	parsedUrl, err := url.Parse(endpoint)
-	if err != nil {
-		return "", err
-	}
-
-	return parsedUrl.String(), nil
-}
-
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
 	if !ls.isShippingEnabled {
 		return nil
 	}
 
 	filterResults(keyvals...)
-	return ls.logger.Log(keyvals...)
+	return ls.shippingLogger.Log(keyvals...)
 }
 
 // filterResults filteres out the osquery results,

@@ -38,7 +38,9 @@ func Test_authedHttpSender_Send(t *testing.T) {
 			}))
 			defer ts.Close()
 
-			authedSender := newAuthHttpSender(ts.URL, token)
+			authedSender := newAuthHttpSender()
+			authedSender.endpoint = ts.URL
+			authedSender.authtoken = token
 			authedSender.Send(bytes.NewBuffer(dataToSend))
 
 			wg.Wait()

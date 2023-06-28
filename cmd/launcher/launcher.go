@@ -150,7 +150,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
 	if k.ControlServerURL() != "" {
-		logShipper = logshipper.New(k)
+		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 	}
 

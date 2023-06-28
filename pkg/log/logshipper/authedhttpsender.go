@@ -13,10 +13,8 @@ type authedHttpSender struct {
 	client    *http.Client
 }
 
-func newAuthHttpSender(endpoint, authtoken string) *authedHttpSender {
+func newAuthHttpSender() *authedHttpSender {
 	return &authedHttpSender{
-		endpoint:  endpoint,
-		authtoken: authtoken,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},

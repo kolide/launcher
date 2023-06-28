@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -26,8 +27,6 @@ import (
 )
 
 const applicationName = "launcher"
-
-var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -71,7 +70,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		attrs = append(attrs, archAttr)
 	}
 
-	currentToken, _ := k.TokenStore().Get(observabilityIngestTokenKey)
+	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 
 	t := &TraceExporter{
 		providerLock:              sync.Mutex{},
@@ -261,7 +260,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
 // which amounts to a new bearer auth token being provided.
 func (t *TraceExporter) Ping() {
-	newToken, err := t.knapsack.TokenStore().Get(observabilityIngestTokenKey)
+	newToken, err := t.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
 		return

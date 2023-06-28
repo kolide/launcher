@@ -1,7 +1,6 @@
 package logshipper
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -34,24 +33,36 @@ func TestLogShipper(t *testing.T) {
 			authToken := ulid.New()
 
 			knapsack.On("TokenStore").Return(tokenStore)
-			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
+			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
-			knapsack.On("LogIngestServerURL").Return("http://someurl").Once()
+			endpoint := "https://someurl"
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
 			knapsack.On("Debug").Return(true)
 
-			ls := New(knapsack)
+			ls := New(knapsack, log.NewNopLogger())
 
 			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, endpoint, ls.sender.endpoint)
+			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
 
 			authToken = ulid.New()
-			tokenStore.Set(observabilityIngestTokenKey, []byte(authToken))
+			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
-			newEndpoint := "someotherurl"
-			knapsack.On("LogIngestServerURL").Return(newEndpoint)
+			endpoint = "http://someotherurl"
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, fmt.Sprintf("%s://%s", "http", newEndpoint), ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
+
+			endpoint = ""
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(3)
+			ls.Ping()
+
+			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
+			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to bad endpoint")
 		})
 	}
 }
