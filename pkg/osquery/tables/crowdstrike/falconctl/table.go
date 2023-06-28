@@ -3,6 +3,7 @@ package falconctl
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -89,13 +90,26 @@ OUTER:
 		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args, false)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "exec failed", "err", err)
-			return nil, err
+			synthisized_data := map[string]string{
+				"_error": fmt.Sprintf("falconctl parse failure: %s", err),
+			}
+
+			flattened, err := dataflatten.Flatten(synthisized_data)
+			if err != nil {
+				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+				continue
+			}
+
+			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+			continue
 		}
 
 		parsed, err := parseOptions(bytes.NewReader(output))
 		if err != nil {
 			level.Info(t.logger).Log("msg", "parse failed", "err", err)
-			return nil, err
+			parsed = map[string]string{
+				"_error": fmt.Sprintf("falconctl parse failure: %s", err),
+			}
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
