@@ -84,7 +84,7 @@ func setInstance(r *DesktopUsersProcessesRunner) {
 	})
 }
 
-func InstanceDesktopProcessRecords() map[string]ProcessRecord {
+func InstanceDesktopProcessRecords() map[string]processRecord {
 	if instance == nil {
 		return nil
 	}
@@ -104,7 +104,7 @@ type DesktopUsersProcessesRunner struct {
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
 	// uidProcs is a map of uid to desktop process
-	uidProcs map[string]ProcessRecord
+	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
 	// interruptTimeout how long to wait for desktop proccesses to finish on interrupt
@@ -130,12 +130,12 @@ type DesktopUsersProcessesRunner struct {
 	runnerServer *runnerserver.RunnerServer
 }
 
-// ProcessRecord is used to track spawned desktop processes.
+// processRecord is used to track spawned desktop processes.
 // The path is used to ensure another process has not taken the same pid.
 // The existence of a process record does not mean the process is running.
 // If, for example, a user logs out, the process record will remain until the
 // user logs in again and it is replaced.
-type ProcessRecord struct {
+type processRecord struct {
 	Process                    *os.Process
 	StartTime, LastHealthCheck time.Time
 	path                       string
@@ -147,7 +147,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
-		uidProcs:               make(map[string]ProcessRecord),
+		uidProcs:               make(map[string]processRecord),
 		updateInterval:         k.DesktopUpdateInterval(),
 		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
 		procsWg:                &sync.WaitGroup{},
@@ -545,7 +545,7 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 		return fmt.Errorf("getting process path: %w", err)
 	}
 
-	r.uidProcs[uid] = ProcessRecord{
+	r.uidProcs[uid] = processRecord{
 		Process:    osProcess,
 		StartTime:  time.Now().UTC(),
 		path:       path,
@@ -618,7 +618,7 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	return true
 }
 
-func (r *DesktopUsersProcessesRunner) processExists(processRecord ProcessRecord) bool {
+func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 

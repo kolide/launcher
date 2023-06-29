@@ -82,7 +82,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				}
 				user, err := user.Current()
 				require.NoError(t, err)
-				r.uidProcs[user.Uid] = ProcessRecord{
+				r.uidProcs[user.Uid] = processRecord{
 					Process: &os.Process{},
 					path:    "test",
 				}
