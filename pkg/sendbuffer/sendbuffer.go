@@ -76,41 +76,47 @@ func New(sender sender, opts ...option) *SendBuffer {
 	return sb
 }
 
-func (sb *SendBuffer) Write(data []byte) (int, error) {
+func (sb *SendBuffer) Write(in []byte) (int, error) {
 	sb.writeMutex.Lock()
 	defer sb.writeMutex.Unlock()
 
-	if len(data) == 0 {
+	if len(in) == 0 {
 		return 0, nil
 	}
 
 	// if the single data piece is larger than the max send size, drop it and log
-	if len(data) > sb.maxSendSize {
+	if len(in) > sb.maxSendSize {
 		sb.logger.Log(
 			"msg", "dropped data because element greater than max send size",
-			"size_of_data", len(data),
+			"size_of_data", len(in),
 			"max_send_size", sb.maxSendSize,
-			"head", string(data)[0:minInt(len(data), 100)],
+			"head", string(in)[0:minInt(len(in), 100)],
 		)
-		return len(data), nil
+		return len(in), nil
 	}
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(data)+sb.size > sb.maxStorageSize {
+	if len(in)+sb.size > sb.maxStorageSize {
 		sb.deleteLogs(len(sb.logs))
 
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
-			"size_of_data", len(data),
+			"size_of_data", len(in),
 			"buffer_size", sb.size,
-			"size_plus_data", sb.size+len(data),
+			"size_plus_data", sb.size+len(in),
 			"max_size", sb.maxStorageSize,
 		)
 	}
 
-	sb.addLog(data)
-	return len(data), nil
+	// If we don't make a copy of the data, we get data loss in the logs array.
+	// It seems the input gets concurrenlty overridden somewhere under the hood.
+	data := make([]byte, len(in))
+	copy(data, in)
+
+	sb.logs = append(sb.logs, data)
+	sb.size += len(data)
+	return len(in), nil
 }
 
 func (sb *SendBuffer) Run(ctx context.Context) error {
@@ -202,11 +208,6 @@ func (sb *SendBuffer) deleteLogs(toIndex int) {
 
 	sb.logs = sb.logs[toIndex:]
 	sb.size -= sizeDeleted
-}
-
-func (sb *SendBuffer) addLog(data []byte) {
-	sb.logs = append(sb.logs, data)
-	sb.size += len(data)
 }
 
 func minInt(a, b int) int {
