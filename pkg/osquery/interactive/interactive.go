@@ -101,19 +101,20 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 }
 
 func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
+	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
+	if err != nil {
+		return nil, fmt.Errorf("error creating osquery client: %w", err)
+	}
+
 	extensionManagerServer, err := osquery.NewExtensionManagerServer(
 		extensionName,
 		socketPath,
 		osquery.ServerTimeout(10*time.Second),
+		osquery.WithClient(client),
 	)
 
 	if err != nil {
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
-	}
-
-	client, err := osquery.NewClient(socketPath, 10*time.Second)
-	if err != nil {
-		return extensionManagerServer, fmt.Errorf("error creating osquery client: %w", err)
 	}
 
 	extensionManagerServer.RegisterPlugin(table.PlatformTables(client, log.NewNopLogger(), osquerydPath)...)
