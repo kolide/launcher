@@ -38,21 +38,22 @@ func main() {
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
+	client, err := osquery.NewClient(*flSocketPath, timeout, osquery.MaxWaitTime(30*time.Second))
+	if err != nil {
+		level.Debug(logger).Log("err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
+		logutil.Fatal(logger, "err", err, "creating osquery extension client")
+	}
+
 	// create an extension server
 	server, err := osquery.NewExtensionManagerServer(
 		"com.kolide.standalone_extension",
 		*flSocketPath,
 		osquery.ServerTimeout(timeout),
+		osquery.WithClient(client),
 	)
 	if err != nil {
 		level.Debug(logger).Log("err", err, "msg", "creating osquery extension server", "stack", fmt.Sprintf("%+v", err))
 		logutil.Fatal(logger, "err", err, "msg", "creating osquery extension server")
-	}
-
-	client, err := osquery.NewClient(*flSocketPath, timeout)
-	if err != nil {
-		level.Debug(logger).Log("err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
-		logutil.Fatal(logger, "err", err, "creating osquery extension client")
 	}
 
 	var plugins []osquery.OsqueryPlugin
