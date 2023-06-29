@@ -198,12 +198,14 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 	// create the logging adapters for osquery
 	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
 		logger,
+		k.RootDirectory(),
 		kolidelog.WithLevelFunc(level.Info),
 		kolidelog.WithKeyValue("component", "osquery"),
 		kolidelog.WithKeyValue("osqlevel", "stderr"),
 	)
 	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
 		logger,
+		k.RootDirectory(),
 		kolidelog.WithLevelFunc(level.Debug),
 		kolidelog.WithKeyValue("component", "osquery"),
 		kolidelog.WithKeyValue("osqlevel", "stdout"),

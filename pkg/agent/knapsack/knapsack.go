@@ -85,6 +85,10 @@ func (k *knapsack) ServerProvidedDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerProvidedDataStore)
 }
 
+func (k *knapsack) TokenStore() types.KVStore {
+	return k.getKVStore(storage.TokenStore)
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil
@@ -342,4 +346,39 @@ func (k *knapsack) SetUpdateDirectory(directory string) error {
 }
 func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
+}
+
+func (k *knapsack) SetExportTraces(enabled bool) error {
+	return k.flags.SetExportTraces(enabled)
+}
+func (k *knapsack) ExportTraces() bool {
+	return k.flags.ExportTraces()
+}
+
+func (k *knapsack) SetTraceSamplingRate(rate float64) error {
+	return k.flags.SetTraceSamplingRate(rate)
+}
+func (k *knapsack) TraceSamplingRate() float64 {
+	return k.flags.TraceSamplingRate()
+}
+
+func (k *knapsack) SetTraceIngestServerURL(url string) error {
+	return k.flags.SetTraceIngestServerURL(url)
+}
+func (k *knapsack) TraceIngestServerURL() string {
+	return k.flags.TraceIngestServerURL()
+}
+
+func (k *knapsack) SetDisableTraceIngestTLS(enabled bool) error {
+	return k.flags.SetDisableTraceIngestTLS(enabled)
+}
+func (k *knapsack) DisableTraceIngestTLS() bool {
+	return k.flags.DisableTraceIngestTLS()
+}
+
+func (k *knapsack) SetLogIngestServerURL(url string) error {
+	return k.flags.SetLogIngestServerURL(url)
+}
+func (k *knapsack) LogIngestServerURL() string {
+	return k.flags.LogIngestServerURL()
 }

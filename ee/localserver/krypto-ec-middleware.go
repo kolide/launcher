@@ -17,6 +17,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/pkg/traces"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -47,18 +50,23 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, span := traces.StartSpan(r.Context())
+		defer span.End()
+
 		if r.Body != nil {
 			defer r.Body.Close()
 		}
 
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "unable to verify signature", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -68,6 +76,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
 		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
+			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
+			span.SetStatus(codes.Error, "timestamp is out of range")
+
 			level.Debug(e.logger).Log("msg", "timestamp is out of range", "delta", timestampDelta)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -75,6 +86,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -88,6 +100,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				Path:   cmdReq.Path,
 			},
 		}
+		newReq = newReq.WithContext(ctx) // allows the trace to continue to the inner request
 
 		// the body of the cmdReq become the body of the next http request
 		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
@@ -95,6 +108,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
+		span.AddEvent("challenge_success")
 
 		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
@@ -111,6 +125,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		if err != nil {
+			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return

@@ -36,10 +36,8 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 func PlatformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
-		BestPractices(client),
 		ChromeLoginDataEmails(client, logger),
 		ChromeUserProfiles(client, logger),
-		EmailAddresses(client, logger),
 		KeyInfo(client, logger),
 		OnePasswordAccounts(client, logger),
 		SlackConfig(client, logger),

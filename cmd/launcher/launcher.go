@@ -39,9 +39,12 @@ import (
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
+	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces/exporter"
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
@@ -52,6 +55,7 @@ const (
 	agentFlagsSubsystemName  = "agent_flags"
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
+	authTokensSubsystemName  = "auth_tokens"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -141,6 +145,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db)
+
+	// Need to set up the log shipper so that we can get the logger early
+	// and pass it to the various systems.
+	var logShipper *logshipper.LogShipper
+	if k.ControlServerURL() != "" {
+		logShipper = logshipper.New(k, logger)
+		logger = teelogger.New(logger, logShipper)
+	}
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
@@ -286,6 +298,30 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
 			return fmt.Errorf("failed to register notify consumer: %w", err)
+		}
+
+		// Set up our tracing instrumentation
+		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
+		if err := controlService.RegisterConsumer(authTokensSubsystemName, authTokenConsumer); err != nil {
+			return fmt.Errorf("failed to register auth token consumer: %w", err)
+		}
+
+		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add(exp.Execute, exp.Interrupt)
+			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
+		}
+
+		// begin log shipping and subsribe to token updates
+		// nil check incase it failed to create for some reason
+		if logShipper != nil {
+			runGroup.Add(logShipper.Run, logShipper.Stop)
+			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
+			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type identifiers struct {
@@ -68,6 +69,9 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
+	_, span := traces.StartSpan(req.Context(), "path", req.URL.Path)
+	defer span.End()
+
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
@@ -76,6 +80,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	consoleUsers, err := consoleUsers()
 	if err != nil {
+		traces.SetError(span, err)
 		level.Error(ls.logger).Log(
 			"msg", "getting console users",
 			"err", err,
@@ -87,6 +92,7 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
+		traces.SetError(span, err)
 		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
 		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
 	}
