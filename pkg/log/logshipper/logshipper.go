@@ -40,6 +40,8 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	}
 
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
+
+	// setting a ulid as session_ulid allows us to follow a single run of launcher
 	shippingLogger := log.With(log.NewJSONLogger(sendBuffer), "caller", log.Caller(6), "session_ulid", ulid.New())
 
 	ls := &LogShipper{
