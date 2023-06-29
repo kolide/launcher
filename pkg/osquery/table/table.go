@@ -4,6 +4,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/desktopprocs"
 	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
 	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
 	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
@@ -29,6 +30,7 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 		osquery_instance_history.TablePlugin(),
 		tufinfo.TufReleaseVersionTable(k),
 		launcher_db.TablePlugin("kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
+		desktopprocs.TablePlugin(),
 	}
 }
 
