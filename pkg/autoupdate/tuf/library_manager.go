@@ -122,7 +122,7 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
 
 	// Request download from mirror
-	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, runtime.GOARCH, targetFilename)
+	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
 	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + downloadPath)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)

@@ -328,7 +328,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
 	// First, find the target that the channel release file is pointing to
 	var releaseTarget string
-	targetReleaseFile := path.Join(string(binary), runtime.GOOS, runtime.GOARCH, channel, "release.json")
+	targetReleaseFile := path.Join(string(binary), runtime.GOOS, PlatformArch(), channel, "release.json")
 	for targetName, target := range targets {
 		if targetName != targetReleaseFile {
 			continue
@@ -359,6 +359,16 @@ func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel s
 	}
 
 	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
+}
+
+// PlatformArch returns the correct arch for the runtime OS. For now, since osquery doesn't publish an arm64 release,
+// we use the universal binaries for darwin.
+func PlatformArch() string {
+	if runtime.GOOS == "darwin" {
+		return "universal"
+	}
+
+	return runtime.GOARCH
 }
 
 // storeError saves errors that occur during the periodic check for updates, so that they

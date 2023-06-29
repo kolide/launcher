@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
 	"github.com/osquery/osquery-go/gen/osquery"
 
@@ -26,8 +27,8 @@ func TestTufReleaseVersionTable(t *testing.T) {
 
 	testRootDir := t.TempDir()
 	v := randomSemver()
-	expectedResults["launcher"] = fmt.Sprintf("launcher/%s/%s/launcher-%s.tar.gz", runtime.GOOS, runtime.GOARCH, v)
-	expectedResults["osqueryd"] = fmt.Sprintf("osqueryd/%s/%s/osqueryd-%s.tar.gz", runtime.GOOS, runtime.GOARCH, v)
+	expectedResults["launcher"] = fmt.Sprintf("launcher/%s/%s/launcher-%s.tar.gz", runtime.GOOS, tuf.PlatformArch(), v)
+	expectedResults["osqueryd"] = fmt.Sprintf("osqueryd/%s/%s/osqueryd-%s.tar.gz", runtime.GOOS, tuf.PlatformArch(), v)
 	tufci.SeedLocalTufRepo(t, v, testRootDir)
 
 	mockFlags := mocks.NewFlags(t)
