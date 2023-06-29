@@ -362,16 +362,23 @@ func (k *knapsack) TraceSamplingRate() float64 {
 	return k.flags.TraceSamplingRate()
 }
 
-func (k *knapsack) SetObservabilityIngestServerURL(url string) error {
-	return k.flags.SetObservabilityIngestServerURL(url)
+func (k *knapsack) SetTraceIngestServerURL(url string) error {
+	return k.flags.SetTraceIngestServerURL(url)
 }
-func (k *knapsack) ObservabilityIngestServerURL() string {
-	return k.flags.ObservabilityIngestServerURL()
+func (k *knapsack) TraceIngestServerURL() string {
+	return k.flags.TraceIngestServerURL()
 }
 
-func (k *knapsack) SetDisableObservabilityIngestTLS(enabled bool) error {
-	return k.flags.SetDisableObservabilityIngestTLS(enabled)
+func (k *knapsack) SetDisableTraceIngestTLS(enabled bool) error {
+	return k.flags.SetDisableTraceIngestTLS(enabled)
 }
-func (k *knapsack) DisableObservabilityIngestTLS() bool {
-	return k.flags.DisableObservabilityIngestTLS()
+func (k *knapsack) DisableTraceIngestTLS() bool {
+	return k.flags.DisableTraceIngestTLS()
+}
+
+func (k *knapsack) SetLogIngestServerURL(url string) error {
+	return k.flags.SetLogIngestServerURL(url)
+}
+func (k *knapsack) LogIngestServerURL() string {
+	return k.flags.LogIngestServerURL()
 }

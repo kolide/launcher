@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -26,8 +27,6 @@ import (
 )
 
 const applicationName = "launcher"
-
-var observabilityIngestTokenKey = []byte("observability_ingest_auth_token")
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -71,7 +70,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		attrs = append(attrs, archAttr)
 	}
 
-	currentToken, _ := k.TokenStore().Get(observabilityIngestTokenKey)
+	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 
 	t := &TraceExporter{
 		providerLock:              sync.Mutex{},
@@ -80,17 +79,17 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		logger:                    log.With(logger, "component", "trace_exporter"),
 		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
-		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableObservabilityIngestTLS()),
+		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableTraceIngestTLS()),
 		ingestAuthToken:           string(currentToken),
-		ingestUrl:                 k.ObservabilityIngestServerURL(),
-		disableIngestTLS:          k.DisableObservabilityIngestTLS(),
+		ingestUrl:                 k.TraceIngestServerURL(),
+		disableIngestTLS:          k.DisableTraceIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
 	// to export to
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.ObservabilityIngestServerURL, keys.DisableObservabilityIngestTLS)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS)
 
 	if !t.enabled {
 		return t, nil
@@ -261,7 +260,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
 // which amounts to a new bearer auth token being provided.
 func (t *TraceExporter) Ping() {
-	newToken, err := t.knapsack.TokenStore().Get(observabilityIngestTokenKey)
+	newToken, err := t.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
 		return
@@ -308,21 +307,21 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 
 	// Handle ingest_url updates
-	if slices.Contains(flagKeys, keys.ObservabilityIngestServerURL) {
-		if t.ingestUrl != t.knapsack.ObservabilityIngestServerURL() {
-			t.ingestUrl = t.knapsack.ObservabilityIngestServerURL()
+	if slices.Contains(flagKeys, keys.TraceIngestServerURL) {
+		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
+			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
 			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
 		}
 	}
 
-	// Handle disable_ingest_tls updates
-	if slices.Contains(flagKeys, keys.DisableObservabilityIngestTLS) {
-		if t.disableIngestTLS != t.knapsack.DisableObservabilityIngestTLS() {
-			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableObservabilityIngestTLS())
-			t.disableIngestTLS = t.knapsack.DisableObservabilityIngestTLS()
+	// Handle disable_trace_ingest_tls updates
+	if slices.Contains(flagKeys, keys.DisableTraceIngestTLS) {
+		if t.disableIngestTLS != t.knapsack.DisableTraceIngestTLS() {
+			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableTraceIngestTLS())
+			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_ingest_tls", t.disableIngestTLS)
+			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_trace_ingest_tls", t.disableIngestTLS)
 		}
 	}
 
