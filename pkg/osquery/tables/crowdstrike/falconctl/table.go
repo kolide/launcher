@@ -90,11 +90,11 @@ OUTER:
 		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args, false)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "exec failed", "err", err)
-			synthisized_data := map[string]string{
+			synthesizedData := map[string]string{
 				"_error": fmt.Sprintf("falconctl parse failure: %s", err),
 			}
 
-			flattened, err := dataflatten.Flatten(synthisized_data)
+			flattened, err := dataflatten.Flatten(synthesizedData)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
 				continue
