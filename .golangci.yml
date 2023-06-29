@@ -6,7 +6,7 @@ run:
 linters:
   enable:
     - bodyclose
-    - deadcode
+    - unused
     - gofmt
     - govet
     - misspell
@@ -24,7 +24,6 @@ linters:
     - noctx
     - staticcheck
     - structcheck
-    - unused
     - varcheck
 
 linters-settings:

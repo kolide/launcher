@@ -388,24 +388,24 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 
 	switch {
 	case p.target.Package == Deb:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Rpm:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 
 	case p.target.Package == Tar:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsTar(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsTar(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Pacman:
-		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsPacman(), packagekit.WithReplaces(oldPackageNames)); err != nil {
+		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsPacman(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Pkg:
-		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops); err != nil {
+		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops, string(p.target.Arch)); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	case p.target.Package == Msi:

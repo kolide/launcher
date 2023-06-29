@@ -27,7 +27,7 @@ func runInteractive(args []string) error {
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
 
-	flagset.Usage = commandUsage(flagset, "interactive")
+	flagset.Usage = commandUsage(flagset, "launcher interactive")
 	if err := flagset.Parse(args); err != nil {
 		return err
 	}

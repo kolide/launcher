@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	osquery "github.com/osquery/osquery-go"
 
 	"github.com/stretchr/testify/assert"
@@ -398,6 +400,47 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
+}
+
+func TestOsquerySlowStart(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+
+	runner, err := LaunchInstance(
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithLogger(log.NewLogfmtLogger(&logBytes)),
+		WithStartFunc(func(cmd *exec.Cmd) error {
+			err := cmd.Start()
+			// suspend the process right away
+			cmd.Process.Signal(syscall.SIGTSTP)
+			go func() {
+				// wait a while before resuming the process
+				time.Sleep(3 * time.Second)
+				cmd.Process.Signal(syscall.SIGCONT)
+			}()
+			return err
+		}),
+	)
+	require.NoError(t, err)
+	waitHealthy(t, runner)
+
+	// ensure that we actually had to wait on the socket
+	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
+	require.NoError(t, runner.Shutdown())
+}
+
+// WithStartFunc defines the function that will be used to exeute the osqueryd
+// start command. It is useful during testing to simulate osquery start delays or
+// osquery instability.
+func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.startFunc = f
+	}
 }
 
 // sets up an osquery instance with a running extension to be used in tests.

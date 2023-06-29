@@ -98,14 +98,24 @@ func (c *checkPointer) logCheckPoint() {
 	c.logOsqueryInfo()
 	c.logDbSize()
 	c.logKolideServerVersion()
-	c.logConnections()
-	c.logIpLookups()
-	c.logNotaryVersions()
+	c.logger.Log("connections", c.Connections())
+	c.logger.Log("ip look ups", c.IpLookups())
+	notaryVersions, err := c.NotaryVersions()
+	if err != nil {
+		c.logger.Log("notary versions", err)
+	} else {
+		c.logger.Log("notary versions", notaryVersions)
+	}
 	c.logServerProvidedData()
 }
 
 func (c *checkPointer) logDbSize() {
-	boltStats, err := agent.GetStats(c.knapsack.BboltDB())
+	db := c.knapsack.BboltDB()
+	if db == nil {
+		return
+	}
+
+	boltStats, err := agent.GetStats(db)
 	if err != nil {
 		c.logger.Log("bbolt db size", err.Error())
 	} else {
@@ -128,29 +138,28 @@ func (c *checkPointer) logKolideServerVersion() {
 	}
 }
 
-func (c *checkPointer) logNotaryVersions() {
+func (c *checkPointer) NotaryVersions() (map[string]string, error) {
 	if !c.knapsack.KolideHosted() || !c.knapsack.Autoupdate() {
-		return
+		return nil, nil
 	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
-
 	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.knapsack.NotaryServerURL()), c.knapsack)
 	if err != nil {
-		c.logger.Log("notary versions", err)
+		return nil, err
 	} else {
-		c.logger.Log("notary versions", fetchNotaryVersions(httpClient, notaryUrl))
+		return fetchNotaryVersions(httpClient, notaryUrl), nil
 	}
 }
 
-func (c *checkPointer) logConnections() {
+func (c *checkPointer) Connections() map[string]string {
 	dialer := &net.Dialer{Timeout: requestTimeout}
-	c.logger.Log("connections", testConnections(dialer, urlsToTest(c.knapsack)...))
+	return testConnections(dialer, urlsToTest(c.knapsack)...)
 }
 
-func (c *checkPointer) logIpLookups() {
+func (c *checkPointer) IpLookups() map[string]interface{} {
 	ipLookuper := &net.Resolver{}
-	c.logger.Log("ip look ups", lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...))
+	return lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...)
 }
 
 func urlsToTest(flags types.Flags) []*url.URL {

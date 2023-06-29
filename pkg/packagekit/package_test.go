@@ -36,7 +36,7 @@ func TestPackageTrivial(t *testing.T) {
 	err = PackageFPM(context.TODO(), io.Discard, po, AsRPM())
 	require.NoError(t, err)
 
-	err = PackagePkg(context.TODO(), io.Discard, po)
+	err = PackagePkg(context.TODO(), io.Discard, po, "universal")
 	require.NoError(t, err)
 
 }

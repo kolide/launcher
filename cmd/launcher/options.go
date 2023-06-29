@@ -24,6 +24,16 @@ const (
 	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 )
 
+var (
+	// When launcher proper runs, it's expected that these defaults are their zero values
+	// However, special launcher subcommands such as launcher doctor can override these
+	defaultRootDirectoryPath string
+	defaultEtcDirectoryPath  string
+	defaultBinDirectoryPath  string
+	defaultConfigFilePath    string
+	defaultAutoupdate        bool
+)
+
 // Adapted from
 // https://stackoverflow.com/questions/28322997/how-to-get-a-list-of-values-into-a-flag-in-golang/28323276#28323276
 type arrayFlags []string
@@ -40,9 +50,17 @@ func (i *arrayFlags) Set(value string) error {
 // parseOptions parses the options that may be configured via command-line flags
 // and/or environment variables, determines order of precedence and returns a
 // typed struct of options for further application use
-func parseOptions(args []string) (*launcher.Options, error) {
-	flagset := flag.NewFlagSet("launcher", flag.ExitOnError)
-	flagset.Usage = func() { usage(flagset) }
+func parseOptions(subcommandName string, args []string) (*launcher.Options, error) {
+	flagsetName := "launcher"
+	if subcommandName != "" {
+		flagsetName = fmt.Sprintf("launcher %s", subcommandName)
+	}
+	flagset := flag.NewFlagSet(flagsetName, flag.ExitOnError)
+	if subcommandName != "" {
+		flagset.Usage = func() { usage(flagset) }
+	} else {
+		flagset.Usage = commandUsage(flagset, flagsetName)
+	}
 
 	var (
 		// Primary options
@@ -57,13 +75,18 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flTransport              = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
 		flLoggingInterval        = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath           = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flRootDirectory          = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flRootDirectory          = flagset.String("root_directory", defaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
 		flRootPEM                = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion                = flagset.Bool("version", false, "Print Launcher version and exit")
 		flLogMaxBytesPerBatch    = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
 		flOsqueryFlags           arrayFlags // set below with flagset.Var
 		flCompactDbMaxTx         = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
-		_                        = flagset.String("config", "", "config file to parse options from (optional)")
+		flConfigFilePath         = flagset.String("config", defaultConfigFilePath, "config file to parse options from (optional)")
+		flExportTraces           = flagset.Bool("export_traces", false, "Whether to export traces")
+		flTraceSamplingRate      = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
+		flLogIngestServerURL     = flagset.String("log_ingest_url", "", "Where to export logs")
+		flTraceIngestServerURL   = flagset.String("trace_ingest_url", "", "Where to export traces")
+		flDisableIngestTLS       = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -73,7 +96,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		flOsqTlsDistWrite = flagset.String("distributed_tls_write_endpoint", "", "Distributed write endpoint for the osquery tls transport")
 
 		// Autoupdate options
-		flAutoupdate             = flagset.Bool("autoupdate", false, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flAutoupdate             = flagset.Bool("autoupdate", defaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
 		flTufServerURL           = flagset.String("tuf_url", tuf.DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
 		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
@@ -214,6 +237,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
 		CertPins:                           certPins,
 		CompactDbMaxTx:                     *flCompactDbMaxTx,
+		ConfigFilePath:                     *flConfigFilePath,
 		Control:                            false,
 		ControlServerURL:                   controlServerURL,
 		ControlRequestInterval:             *flControlRequestInterval,
@@ -224,6 +248,10 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		EnableInitialRunner:                *flInitialRunner,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
+		ExportTraces:                       *flExportTraces,
+		LogIngestServerURL:                 *flLogIngestServerURL,
+		TraceIngestServerURL:               *flTraceIngestServerURL,
+		DisableTraceIngestTLS:              *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,
@@ -246,6 +274,7 @@ func parseOptions(args []string) (*launcher.Options, error) {
 		OsquerydPath:                       osquerydPath,
 		RootDirectory:                      *flRootDirectory,
 		RootPEM:                            *flRootPEM,
+		TraceSamplingRate:                  *flTraceSamplingRate,
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
 		UpdateDirectory:                    *flUpdateDirectory,

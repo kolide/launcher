@@ -6,7 +6,7 @@
 			<bundle CFBundleShortVersionString="{{.Version}}" CFBundleVersion="{{.Version}}" id="com.{{.Identifier}}.launcher" path="usr/local/{{.Identifier}}/Kolide.app"/>
 		</bundle-version>
 	</pkg-ref>
-	<options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+	<options customize="never" require-scripts="false" hostArchitectures="{{.HostArchitectures}}"/>
 	<choices-outline>
 		<line choice="default">
 			<line choice="com.{{.Identifier}}.launcher"/>

@@ -16,9 +16,14 @@ var serverProvidedDataKeys = []string{
 // logServerProvidedData sends a subset of the server data into the checkpoint logs. This iterates over the
 // desired keys, as a way to handle missing values.
 func (c *checkPointer) logServerProvidedData() {
+	db := c.knapsack.BboltDB()
+	if db == nil {
+		return
+	}
+
 	data := make(map[string]string, len(serverProvidedDataKeys))
 
-	if err := c.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
+	if err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(storage.ServerProvidedDataStore))
 		if b == nil {
 			return nil

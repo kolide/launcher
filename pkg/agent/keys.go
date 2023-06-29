@@ -59,10 +59,11 @@ func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 // This duplicates some of pkg/osquery/extension.go but that feels like the wrong place.
 // Really, we should have a simpler interface over a storage layer.
 const (
-	privateEccData = "privateEccData"
-	publicEccData  = "publicEccData"
+	privateEccData = "privateEccData" // nolint:unused
+	publicEccData  = "publicEccData"  // nolint:unused
 )
 
+// nolint:unused
 func fetchKeyData(store types.Getter) ([]byte, []byte, error) {
 	pri, err := store.Get([]byte(privateEccData))
 	if err != nil {
@@ -77,6 +78,7 @@ func fetchKeyData(store types.Getter) ([]byte, []byte, error) {
 	return pri, pub, nil
 }
 
+// nolint:unused
 func storeKeyData(store types.Setter, pri, pub []byte) error {
 	if pri != nil {
 		if err := store.Set([]byte(privateEccData), pri); err != nil {
@@ -95,6 +97,7 @@ func storeKeyData(store types.Setter, pri, pub []byte) error {
 
 // clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
+// nolint:unused
 func clearKeyData(logger log.Logger, deleter types.Deleter) {
 	level.Info(logger).Log("msg", "Clearing keys")
 	_ = deleter.Delete([]byte(privateEccData), []byte(publicEccData))

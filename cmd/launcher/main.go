@@ -81,7 +81,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	opts, err := parseOptions(os.Args[1:])
+	opts, err := parseOptions("", os.Args[1:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)
@@ -121,6 +121,8 @@ func runSubcommands() error {
 		run = runSocket
 	case "query":
 		run = runQuery
+	case "doctor":
+		run = runDoctor
 	case "flare":
 		run = runFlare
 	case "svc":

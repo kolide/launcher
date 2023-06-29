@@ -78,14 +78,12 @@ func WithBuildDir(path string) WixOpt {
 func WithDocker(image string) WixOpt {
 	return func(wo *wixTool) {
 		wo.dockerImage = image
-
 	}
 }
 
 func WithUI() WixOpt {
 	return func(wo *wixTool) {
 		wo.ui = true
-
 	}
 }
 

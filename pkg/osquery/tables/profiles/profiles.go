@@ -143,12 +143,3 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 	return results, nil
 }
-
-func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
-	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
-		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-	}
-
-	return dataflatten.Plist(systemOutput, flattenOpts...)
-}

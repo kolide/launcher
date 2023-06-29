@@ -32,6 +32,7 @@ func runUninstall(args []string) error {
 		ff.WithEnvVarNoPrefix(),
 	}
 
+	flagset.Usage = commandUsage(flagset, "launcher uninstall")
 	if err := ff.Parse(flagset, args, ffOpts...); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}

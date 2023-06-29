@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -290,8 +291,18 @@ func (r *Runner) launchOsqueryInstance() error {
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
+	// remove any socket already at the extension socket path to ensure
+	// that it's not left over from a previous instance
+	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
+		level.Info(o.logger).Log(
+			"msg", "error removing osquery extension socket",
+			"path", paths.extensionSocketPath,
+			"err", err,
+		)
+	}
+
 	// Launch osquery process (async)
-	err = o.cmd.Start()
+	err = o.startFunc(o.cmd)
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -304,6 +315,22 @@ func (r *Runner) launchOsqueryInstance() error {
 
 		level.Info(o.logger).Log(msgPairs...)
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	}
+
+	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
+
+	// wait for osquery to create the socket before moving on,
+	// this is intended to serve as a kind of health check
+	// for osquery, if it's started successfully it will create
+	// a socket
+	if err := backoff.WaitFor(func() error {
+		_, err := os.Stat(paths.extensionSocketPath)
+		if err != nil {
+			level.Debug(o.logger).Log("msg", "osquery extension socket not created yet ... will retry", "path", paths.extensionSocketPath)
+		}
+		return err
+	}, 1*time.Minute, 1*time.Second); err != nil {
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
 	}
 
 	stats, err := history.NewInstance()
@@ -419,7 +446,7 @@ func (r *Runner) launchOsqueryInstance() error {
 				// better for a Limiter
 				maxHealthChecks := 5
 				for i := 1; i <= maxHealthChecks; i++ {
-					if err := o.Healthy(); err != nil {
+					if err := r.Healthy(); err != nil {
 						if i == maxHealthChecks {
 							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
 							return fmt.Errorf("health check failed: %w", err)

@@ -79,7 +79,7 @@ func runDesktop(args []string) error {
 	logger := logutil.NewServerLogger(*fldebug)
 	logger = log.With(logger,
 		"subprocess", "desktop",
-		"pid", os.Getpid(),
+		"session_pid", os.Getpid(),
 	)
 
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though

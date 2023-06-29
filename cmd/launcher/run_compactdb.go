@@ -10,7 +10,7 @@ import (
 )
 
 func runCompactDb(args []string) error {
-	opts, err := parseOptions(args)
+	opts, err := parseOptions("compactdb", args)
 	if err != nil {
 		return err
 	}
