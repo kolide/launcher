@@ -122,6 +122,12 @@ func Test_Parse(t *testing.T) {
 			output: "This Is Starting In One Day.",
 		},
 		{
+			name:   "relativeTime 44 hours",
+			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
+			text:   fmt.Sprintf("This Is Starting {{if hasCapability `relativeTime`}}{{relativeTime %d}}{{else}}never{{end}}.", time.Now().Add(44*time.Hour+30*time.Second).Unix()),
+			output: "This Is Starting In 44 Hours.",
+		},
+		{
 			name:   "relativeTime three days",
 			td:     &TemplateData{ServerHostname: "localhost", LauncherVersion: "0.0.0"},
 			text:   fmt.Sprintf("This Is Starting {{if hasCapability `relativeTime`}}{{relativeTime %d}}{{else}}never{{end}}.", time.Now().Add(3*24*time.Hour+30*time.Second).Unix()),
