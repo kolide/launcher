@@ -37,6 +37,7 @@ func TestLogShipper(t *testing.T) {
 
 			endpoint := "https://someurl"
 			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 			knapsack.On("Debug").Return(true)
 
 			ls := New(knapsack, log.NewNopLogger())
