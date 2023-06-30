@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -69,7 +70,7 @@ func (ls *LogShipper) Ping() {
 		// It will get renabled when control server sends a
 		// valid endpoint.
 		shouldEnable = false
-		ls.baseLogger.Log(
+		level.Debug(ls.baseLogger).Log(
 			"msg", "error parsing log ingest server url, shipping disabled",
 			"err", err,
 			"log_ingest_url", ls.knapsack.LogIngestServerURL(),
@@ -78,6 +79,7 @@ func (ls *LogShipper) Ping() {
 
 	ls.sender.endpoint = parsedUrl.String()
 	ls.isShippingEnabled = shouldEnable
+	ls.addDeviceIdentifyingAttributesToLogger()
 
 	if !ls.isShippingEnabled {
 		ls.sendBuffer.DeleteAllData()
@@ -116,5 +118,33 @@ func filterResults(keyvals ...interface{}) {
 				keyvals[i+1] = fmt.Sprintf(truncatedFormatString, str[0:99])
 			}
 		}
+	}
+}
+
+// addDeviceIdentifyingAttributesToLogger gets device identifiers from the server-provided
+// data and adds them as attributes on the logger.
+func (ls *LogShipper) addDeviceIdentifyingAttributesToLogger() {
+	if deviceId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
+		level.Debug(ls.baseLogger).Log("msg", "could not get device id", "err", err)
+	} else {
+		ls.shippingLogger = log.With(ls.shippingLogger, "k2_device_id", string(deviceId))
+	}
+
+	if munemo, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
+		level.Debug(ls.baseLogger).Log("msg", "could not get munemo", "err", err)
+	} else {
+		ls.shippingLogger = log.With(ls.shippingLogger, "k2_munemo", string(munemo))
+	}
+
+	if orgId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
+		level.Debug(ls.baseLogger).Log("msg", "could not get organization id", "err", err)
+	} else {
+		ls.shippingLogger = log.With(ls.shippingLogger, "k2_organization_id", string(orgId))
+	}
+
+	if serialNumber, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
+		level.Debug(ls.baseLogger).Log("msg", "could not get serial number", "err", err)
+	} else {
+		ls.shippingLogger = log.With(ls.shippingLogger, "serial_number", string(serialNumber))
 	}
 }
