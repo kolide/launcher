@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
 )
@@ -107,6 +108,11 @@ func (c *checkPointer) logCheckPoint() {
 		c.logger.Log("notary versions", notaryVersions)
 	}
 	c.logServerProvidedData()
+	c.logDesktopProcs()
+}
+
+func (c *checkPointer) logDesktopProcs() {
+	c.logger.Log("user_desktop_processes", runner.InstanceDesktopProcessRecords())
 }
 
 func (c *checkPointer) logDbSize() {

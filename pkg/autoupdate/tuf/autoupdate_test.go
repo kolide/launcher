@@ -97,9 +97,9 @@ func TestExecute(t *testing.T) {
 	// Get metadata for each release
 	_, err = autoupdater.metadataClient.Update()
 	require.NoError(t, err, "could not update metadata client to fetch target metadata")
-	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, binaryOsqueryd, testReleaseVersion))
+	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for osqueryd")
-	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, binaryLauncher, testReleaseVersion))
+	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher")
 
 	// Expect that we attempt to tidy the library first before running execute loop

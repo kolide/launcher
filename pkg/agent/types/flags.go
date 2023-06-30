@@ -177,11 +177,15 @@ type Flags interface {
 	SetTraceSamplingRate(rate float64) error
 	TraceSamplingRate() float64
 
-	// ObservabilityIngestServerURL is the URL of the ingest server for logs and traces
-	SetObservabilityIngestServerURL(url string) error
-	ObservabilityIngestServerURL() string
+	// LogIngestServerURL is the URL of the ingest server for logs
+	SetLogIngestServerURL(url string) error
+	LogIngestServerURL() string
 
-	// DisableObservabilityIngestTLS disables TLS for observability ingest server communication
-	SetDisableObservabilityIngestTLS(enabled bool) error
-	DisableObservabilityIngestTLS() bool
+	// TraceIngestServerURL is the URL of the ingest server for traces
+	SetTraceIngestServerURL(url string) error
+	TraceIngestServerURL() string
+
+	// DisableTraceIngestTLS disables TLS for observability ingest server communication
+	SetDisableTraceIngestTLS(enabled bool) error
+	DisableTraceIngestTLS() bool
 }

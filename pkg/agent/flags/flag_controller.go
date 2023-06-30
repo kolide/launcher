@@ -465,20 +465,29 @@ func (fc *FlagController) TraceSamplingRate() float64 {
 	).get(fc.getControlServerValue(keys.TraceSamplingRate))
 }
 
-func (fc *FlagController) SetObservabilityIngestServerURL(url string) error {
-	return fc.setControlServerValue(keys.ObservabilityIngestServerURL, []byte(url))
+func (fc *FlagController) SetLogIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.LogIngestServerURL, []byte(url))
 }
-func (fc *FlagController) ObservabilityIngestServerURL() string {
+func (fc *FlagController) LogIngestServerURL() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.ObservabilityIngestServerURL),
-	).get(fc.getControlServerValue(keys.ObservabilityIngestServerURL))
+		WithDefaultString(fc.cmdLineOpts.LogIngestServerURL),
+	).get(fc.getControlServerValue(keys.LogIngestServerURL))
 }
 
-func (fc *FlagController) SetDisableObservabilityIngestTLS(enabled bool) error {
-	return fc.setControlServerValue(keys.DisableObservabilityIngestTLS, boolToBytes(enabled))
+func (fc *FlagController) SetTraceIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
 }
-func (fc *FlagController) DisableObservabilityIngestTLS() bool {
+func (fc *FlagController) TraceIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.TraceIngestServerURL),
+	).get(fc.getControlServerValue(keys.TraceIngestServerURL))
+}
+
+func (fc *FlagController) SetDisableTraceIngestTLS(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableTraceIngestTLS, boolToBytes(enabled))
+}
+func (fc *FlagController) DisableTraceIngestTLS() bool {
 	return NewBoolFlagValue(
-		WithDefaultBool(fc.cmdLineOpts.DisableObservabilityIngestTLS),
-	).get(fc.getControlServerValue(keys.DisableObservabilityIngestTLS))
+		WithDefaultBool(fc.cmdLineOpts.DisableTraceIngestTLS),
+	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
 }
