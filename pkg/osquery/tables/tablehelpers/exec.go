@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
@@ -21,6 +22,11 @@ import (
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx,
+		"possible_binaries", possibleBins,
+		"args", args)
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -52,6 +58,7 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 			continue
 		default:
 			// an actual error
+			traces.SetError(span, err)
 			return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
 		}
 

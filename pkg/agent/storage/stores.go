@@ -14,6 +14,7 @@ const (
 	SentNotificationsStore      Store = "sent_notifications"       // The store used for sent notifications.
 	StatusLogsStore             Store = "status_logs"              // The store used for buffered status logs.
 	ServerProvidedDataStore     Store = "server_provided_data"     // The store used for pushing values from server-backed tables.
+	TokenStore                  Store = "token_store"              // The store used for holding bearer auth tokens, e.g. the ones used to authenticate with the observability ingest server.
 )
 
 func (storeType Store) String() string {

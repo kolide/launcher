@@ -30,6 +30,7 @@ const (
 type fpmOptions struct {
 	outputType outputType
 	replaces   []string
+	arch       string
 }
 
 type FpmOpt func(*fpmOptions)
@@ -67,6 +68,12 @@ func WithReplaces(r []string) FpmOpt {
 	}
 }
 
+func WithArch(arch string) FpmOpt {
+	return func(f *fpmOptions) {
+		f.arch = arch
+	}
+}
+
 func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ...FpmOpt) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageRPM")
 	defer span.End()
@@ -79,6 +86,10 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 
 	if f.outputType == "" {
 		return errors.New("Missing output type")
+	}
+
+	if f.arch == "" {
+		return errors.New("missing architecture")
 	}
 
 	if err := isDirectory(po.Root); err != nil {
@@ -99,6 +110,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"-t", string(f.outputType),
 		"-n", fmt.Sprintf("%s-%s", po.Name, po.Identifier),
 		"-v", po.Version,
+		"-a", f.arch,
 		"-p", filepath.Join("/out", outputFilename),
 		"-C", "/pkgsrc",
 	}

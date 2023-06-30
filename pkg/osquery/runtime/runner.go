@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -21,14 +22,20 @@ import (
 	"github.com/osquery/osquery-go/plugin/logger"
 )
 
-// How long to wait before erroring because we cannot open the osquery
-// extension socket.
-const socketOpenTimeout = 10 * time.Second
+const (
+	// How long to wait before erroring because we cannot open the osquery
+	// extension socket.
+	socketOpenTimeout = 10 * time.Second
 
-// How often to try to open the osquery extension socket
-const socketOpenInterval = 200 * time.Millisecond
+	// How often to try to open the osquery extension socket
+	socketOpenInterval = 200 * time.Millisecond
 
-const healthCheckInterval = 60 * time.Second
+	// How frequently we should healthcheck the client/server
+	healthCheckInterval = 60 * time.Second
+
+	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
+	maxSocketWaitTime = 30 * time.Second
+)
 
 type Runner struct {
 	instance     *OsqueryInstance
@@ -290,8 +297,18 @@ func (r *Runner) launchOsqueryInstance() error {
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
+	// remove any socket already at the extension socket path to ensure
+	// that it's not left over from a previous instance
+	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
+		level.Info(o.logger).Log(
+			"msg", "error removing osquery extension socket",
+			"path", paths.extensionSocketPath,
+			"err", err,
+		)
+	}
+
 	// Launch osquery process (async)
-	err = o.cmd.Start()
+	err = o.startFunc(o.cmd)
 	if err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
@@ -304,6 +321,22 @@ func (r *Runner) launchOsqueryInstance() error {
 
 		level.Info(o.logger).Log(msgPairs...)
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	}
+
+	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
+
+	// wait for osquery to create the socket before moving on,
+	// this is intended to serve as a kind of health check
+	// for osquery, if it's started successfully it will create
+	// a socket
+	if err := backoff.WaitFor(func() error {
+		_, err := os.Stat(paths.extensionSocketPath)
+		if err != nil {
+			level.Debug(o.logger).Log("msg", "osquery extension socket not created yet ... will retry", "path", paths.extensionSocketPath)
+		}
+		return err
+	}, 1*time.Minute, 1*time.Second); err != nil {
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
 	}
 
 	stats, err := history.NewInstance()
@@ -366,16 +399,16 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc. It's called `kolide_grpc` for mostly historic reasons
-	if len(o.opts.extensionPlugins) > 0 {
-		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
-			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
-			return fmt.Errorf("could not create an extension server: %w", err)
-		}
-	}
-
 	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
 		return fmt.Errorf("could not create an extension client: %w", err)
+	}
+
+	if len(o.opts.extensionPlugins) > 0 {
+		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.extensionManagerClient, o.opts.extensionPlugins); err != nil {
+			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
+			return fmt.Errorf("could not create an extension server: %w", err)
+		}
 	}
 
 	if err := o.stats.Connected(o); err != nil {
@@ -396,7 +429,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			return nil
 		}
 
-		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, plugins); err != nil {
+		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, o.extensionManagerClient, plugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create tables extension server. Stopping", "err", err)
 			return fmt.Errorf("could not create a table extension server: %w", err)
 		}
@@ -419,7 +452,7 @@ func (r *Runner) launchOsqueryInstance() error {
 				// better for a Limiter
 				maxHealthChecks := 5
 				for i := 1; i <= maxHealthChecks; i++ {
-					if err := o.Healthy(); err != nil {
+					if err := r.Healthy(); err != nil {
 						if i == maxHealthChecks {
 							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
 							return fmt.Errorf("health check failed: %w", err)

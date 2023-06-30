@@ -28,7 +28,7 @@ func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 		}
 	}
 
-	opts, err := parseOptions(testFlags)
+	opts, err := parseOptions("", testFlags)
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -50,7 +50,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
 		require.NoError(t, os.Setenv(name, val))
 	}
-	opts, err := parseOptions([]string{})
+	opts, err := parseOptions("", []string{})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -63,6 +63,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	flagFile, err := os.CreateTemp("", "flag-file")
 	require.NoError(t, err)
 	defer os.Remove(flagFile.Name())
+	expectedOpts.ConfigFilePath = flagFile.Name()
 
 	for k, val := range testArgs {
 		var err error
@@ -81,7 +82,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := parseOptions([]string{"-config", flagFile.Name()})
+	opts, err := parseOptions("", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -160,7 +161,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 		tt := tt
 		os.Clearenv()
 		t.Run(tt.testName, func(t *testing.T) {
-			opts, err := parseOptions(tt.testFlags)
+			opts, err := parseOptions("", tt.testFlags)
 			require.NoError(t, err, "could not parse options")
 			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
 			require.Equal(t, tt.expectedInsecureControlTLS, opts.InsecureControlTLS, "incorrect insecure TLS")
@@ -190,6 +191,10 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		Control:                false,
 		ControlServerURL:       "",
 		ControlRequestInterval: 60 * time.Second,
+		ExportTraces:           false,
+		TraceSamplingRate:      0.0,
+		LogIngestServerURL:     "",
+		DisableTraceIngestTLS:  false,
 		KolideServerURL:        randomHostname,
 		LoggingInterval:        time.Duration(randomInt) * time.Second,
 		MirrorServerURL:        "https://dl.kolide.co",
@@ -204,79 +209,4 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	return args, opts
-}
-
-func windowsAddExe(in string) string {
-	if runtime.GOOS == "windows" {
-		return in + ".exe"
-	}
-
-	return in
-}
-
-func Test_getConfigFilePathFromArgs(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		testName               string
-		expectedConfigFilePath string
-		args                   []string
-	}{
-		{
-			testName:               "darwin+linux/version subcommand",
-			expectedConfigFilePath: "/etc/kolide-k2/launcher.flags",
-			args: []string{
-				"version",
-				"--config",
-				"/etc/kolide-k2/launcher.flags",
-			},
-		},
-		{
-			testName:               "darwin+linux/version flag",
-			expectedConfigFilePath: "/etc/kolide-k2/launcher.flags",
-			args: []string{
-				"--version",
-				"--config",
-				"/etc/kolide-k2/launcher.flags",
-			},
-		},
-		{
-			testName:               "darwin+linux/interactive subcommand",
-			expectedConfigFilePath: "/etc/kolide-k2/launcher.flags",
-			args: []string{
-				"interactive",
-				"--config",
-				"/etc/kolide-k2/launcher.flags",
-			},
-		},
-		{
-			testName:               "darwin+linux/no subcommand",
-			expectedConfigFilePath: "/etc/kolide-k2/launcher.flags",
-			args: []string{
-				"--config",
-				"/etc/kolide-k2/launcher.flags",
-			},
-		},
-		{
-			testName:               "windows/svc subcommand",
-			expectedConfigFilePath: `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`,
-			args: []string{
-				`"C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe"`,
-				"svc",
-				"-config",
-				`"C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags"`,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-
-			actualPath := getConfigFilePathFromArgs(tt.args)
-
-			require.Equal(t, tt.expectedConfigFilePath, actualPath, "unexpected actual path")
-		})
-	}
 }
