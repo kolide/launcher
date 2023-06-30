@@ -371,9 +371,6 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
-	defer span.End()
-
 	logger := log.With(e.logger, "method", "enroll")
 
 	level.Debug(logger).Log("msg", "starting enrollment")
