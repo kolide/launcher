@@ -13,7 +13,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/logger"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type logCollection struct {
@@ -137,9 +136,6 @@ func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (
 
 func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		ctx, span := traces.StartSpan(ctx)
-		defer span.End()
-
 		req := request.(logCollection)
 		message, errcode, valid, err := svc.PublishLogs(ctx, req.NodeKey, req.LogType, req.Logs)
 		return publishLogsResponse{

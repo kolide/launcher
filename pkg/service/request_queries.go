@@ -13,7 +13,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/distributed"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type queriesRequest struct {
@@ -115,9 +114,6 @@ func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawM
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		ctx, span := traces.StartSpan(ctx)
-		defer span.End()
-
 		req := request.(queriesRequest)
 		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
 		if err != nil {

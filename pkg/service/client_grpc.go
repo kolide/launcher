@@ -12,7 +12,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -119,8 +118,6 @@ func DialGRPC(
 	)
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTimeout(time.Second),
-		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	}
 	if insecureTransport {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())

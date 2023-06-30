@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type enrollmentRequest struct {
@@ -155,9 +154,6 @@ func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (inter
 
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		ctx, span := traces.StartSpan(ctx)
-		defer span.End()
-
 		req := request.(enrollmentRequest)
 		nodeKey, valid, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
 		return enrollmentResponse{
