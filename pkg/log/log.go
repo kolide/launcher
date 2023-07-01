@@ -109,7 +109,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
-	pid, err := strconv.Atoi(pidStr)
+	pid, err := strconv.ParseUint(pidStr, 10, 32)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "could not extract PID of non-osqueryd process using pidfile",
@@ -119,8 +119,8 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 		return
 	}
 
-	l.runAndLogPs(pid)
-	l.runAndLogLsofByPID(pid)
+	l.runAndLogPs(pidStr)
+	l.runAndLogLsofByPID(pidStr)
 	l.runAndLogLsofOnPidfile()
 
 	unknownProcess, err := process.NewProcess(int32(pid))
@@ -161,12 +161,10 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 }
 
 // runAndLogPs runs ps filtering on the given PID, and logs the output.
-func (l *OsqueryLogAdapter) runAndLogPs(pid int) {
+func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
 	if runtime.GOOS == "windows" {
 		return
 	}
-
-	pidStr := strconv.Itoa(pid)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -176,7 +174,7 @@ func (l *OsqueryLogAdapter) runAndLogPs(pid int) {
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error running ps on non-osqueryd process using pidfile",
-			"pid", pid,
+			"pid", pidStr,
 			"err", err,
 		)
 		return
@@ -184,18 +182,16 @@ func (l *OsqueryLogAdapter) runAndLogPs(pid int) {
 
 	level.Debug(l.logger).Log(
 		"msg", "ran ps on non-osqueryd process using pidfile",
-		"pid", pid,
+		"pid", pidStr,
 		"output", string(out),
 	)
 }
 
 // runAndLogLsofByPID runs lsof filtering on the given PID, and logs the output.
-func (l *OsqueryLogAdapter) runAndLogLsofByPID(pid int) {
+func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
 	if runtime.GOOS == "windows" {
 		return
 	}
-
-	pidStr := strconv.Itoa(pid)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -205,7 +201,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pid int) {
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error running lsof on non-osqueryd process using pidfile",
-			"pid", pid,
+			"pid", pidStr,
 			"err", err,
 		)
 		return
@@ -213,7 +209,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pid int) {
 
 	level.Debug(l.logger).Log(
 		"msg", "ran lsof on non-osqueryd process using pidfile",
-		"pid", pid,
+		"pid", pidStr,
 		"output", string(out),
 	)
 }
