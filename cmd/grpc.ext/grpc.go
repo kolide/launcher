@@ -21,7 +21,6 @@ import (
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -152,16 +151,11 @@ type queryier struct {
 }
 
 func (q *queryier) Query(query string) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(context.Background())
-	defer span.End()
-
-	resp, err := q.client.QueryContext(ctx, query)
+	resp, err := q.client.Query(query)
 	if err != nil {
-		traces.SetError(span, err)
 		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
-		traces.SetError(span, err)
 		return nil, errors.New(resp.Status.Message)
 	}
 	return resp.Response, nil
