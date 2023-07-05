@@ -89,6 +89,8 @@ func (tp *templateParser) Parse(text string) (string, error) {
 				return fmt.Sprintf("In %d Hours", diff/3600)
 			case diff < 60*60*36: // less than 36 hours
 				return "In One Day"
+			case diff < 60*60*48: // less than 48 hours
+				return fmt.Sprintf("In %d Hours", diff/3600)
 			case diff < 60*60*24*14: // less than 14 days
 				return fmt.Sprintf("In %d Days", diff/86400)
 			default: // 2 weeks or more
