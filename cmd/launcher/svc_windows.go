@@ -148,6 +148,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	level.Debug(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
+	p := newPowerEventWatcher(log.With(w.logger, "component", "power_event_watcher"))
+	p.subscribeToPowerEvents()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -158,6 +161,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
+			p.shutdown()
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
@@ -167,6 +171,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
 		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
+		p.shutdown()
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		os.Exit(0)
 	}()
@@ -188,7 +193,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
-				level.Info(w.logger).Log("err", "unexpected control request", "control_request", c)
+				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
 			}
 		}
 	}
