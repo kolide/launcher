@@ -99,10 +99,11 @@ func (p *powerEventWatcher) shutdown() {
 }
 
 // onPowerEvent implements EVT_SUBSCRIBE_CALLBACK -- see https://learn.microsoft.com/en-us/windows/win32/api/winevt/nc-winevt-evt_subscribe_callback
-func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle uintptr) (ret uintptr) {
+func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle uintptr) uintptr {
+	var ret uintptr // We never do anything with this and neither does Windows -- it's here to satisfy the interface
 	if action == 0 {
 		level.Debug(p.logger).Log("msg", "received EvtSubscribeActionError when watching power events", "err_code", uint32(eventHandle))
-		return
+		return ret
 	}
 
 	// We've been delivered an event! Call EvtRender to get the details of that event, using the eventHandle.
@@ -123,7 +124,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	)
 	if err != nil && err.Error() != operationSuccessfulMsg {
 		level.Debug(p.logger).Log("msg", "error calling EvtRender to get event details", "last_err", err)
-		return
+		return ret
 	}
 
 	// Prevent us from indexing beyond the size of the array.
@@ -140,13 +141,13 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	utf8bytes, err := decoder.Bytes(buf)
 	if err != nil {
 		level.Debug(p.logger).Log("msg", "error decoding from utf16 to utf8", "err", err)
-		return
+		return ret
 	}
 
 	var e eventLogEntry
 	if err := xml.Unmarshal(utf8bytes, &e); err != nil {
 		level.Debug(p.logger).Log("msg", "error unmarshalling event log entry", "err", err)
-		return
+		return ret
 	}
 
 	if e.System.EventID == eventIdEnteringModernStandby || e.System.EventID == eventIdEnteringSleep {
@@ -160,5 +161,5 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		level.Debug(p.logger).Log("msg", "received unexpected event ID in log", "event_id", e.System.EventID, "raw_event", string(utf8bytes))
 	}
 
-	return
+	return ret
 }
