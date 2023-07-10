@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
+	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -235,6 +236,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	)
 
 	otel.SetTracerProvider(newProvider)
+	osquerygotraces.SetTracerProvider(newProvider)
 
 	if t.provider != nil {
 		t.provider.Shutdown(context.Background())
