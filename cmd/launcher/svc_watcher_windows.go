@@ -127,9 +127,9 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		return ret
 	}
 
-	// Prevent us from indexing beyond the size of the array.
-	// This shouldn't happen? I did definitely see it in test at least once, where I'd allocated 3000 bytes
-	// but it reported a BufferUsed of over 5000.
+	// Prevent us from indexing beyond the size of the array -- this seems like it should not
+	// happen, given that we pass in bufferSize, but more than once saw a return value for bufUsed
+	// that was greater than bufferSize.
 	if bufUsed > uint32(bufferSize) {
 		bufUsed = uint32(bufferSize)
 	}
@@ -151,12 +151,9 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	}
 
 	if e.System.EventID == eventIdEnteringModernStandby || e.System.EventID == eventIdEnteringSleep {
-		level.Debug(p.logger).Log("msg", "system is sleeping")
-		// TODO -- do something! Make launcher stop operations? Make launcher ignore errors that would otherwise
-		// make it restart itself?
+		level.Debug(p.logger).Log("msg", "system is sleeping", "event_id", e.System.EventID)
 	} else if e.System.EventID == eventIdExitingModernStandby {
-		level.Debug(p.logger).Log("msg", "system is waking")
-		// TODO -- wake launcher back up too
+		level.Debug(p.logger).Log("msg", "system is waking", "event_id", e.System.EventID)
 	} else {
 		level.Debug(p.logger).Log("msg", "received unexpected event ID in log", "event_id", e.System.EventID, "raw_event", string(utf8bytes))
 	}
