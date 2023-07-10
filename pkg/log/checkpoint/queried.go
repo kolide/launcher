@@ -54,7 +54,7 @@ func (c *checkPointer) logQueriedInfo() {
 	defer c.lock.RUnlock()
 
 	for k, v := range c.queriedInfo {
-		c.logger.Log(k, v)
+		c.logger.Log(k, fmt.Sprintf("%+v", v))
 	}
 }
 
