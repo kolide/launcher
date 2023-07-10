@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package main
+package eventwatcher
 
 import (
 	"encoding/xml"
@@ -41,7 +41,7 @@ const (
 	operationSuccessfulMsg = "The operation completed successfully."
 )
 
-func newPowerEventWatcher(logger log.Logger) *powerEventWatcher {
+func New(logger log.Logger) *powerEventWatcher {
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")
 
 	return &powerEventWatcher{
@@ -53,7 +53,7 @@ func newPowerEventWatcher(logger log.Logger) *powerEventWatcher {
 }
 
 // subscribeToPowerEvents sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func (p *powerEventWatcher) subscribeToPowerEvents() {
+func (p *powerEventWatcher) SubscribeToPowerEvents() {
 	// WINEVENT_CHANNEL_GLOBAL_SYSTEM is "System"
 	channelPath, err := syscall.UTF16PtrFromString("System")
 	if err != nil {
@@ -92,7 +92,7 @@ func (p *powerEventWatcher) subscribeToPowerEvents() {
 	p.subscriptionHandle = subscriptionHandle
 }
 
-func (p *powerEventWatcher) shutdown() {
+func (p *powerEventWatcher) Shutdown() {
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)
 	level.Debug(p.logger).Log("msg", "unsubscribed from power events", "ret", fmt.Sprintf("%+v", ret), "last_err", err)
