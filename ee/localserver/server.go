@@ -256,7 +256,7 @@ func (ls *localServer) Start() error {
 	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
 		level.Debug(ls.logger).Log("message", "Using TLS")
 
-		tlsConfig := &tls.Config{Certificates: ls.tlsCerts, InsecureSkipVerify: true} // lgtm[go/disabled-certificate-check]
+		tlsConfig := &tls.Config{Certificates: ls.tlsCerts}
 
 		l = tls.NewListener(l, tlsConfig)
 	} else {
