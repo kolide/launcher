@@ -75,6 +75,23 @@ func WithUsersFilesRoot(usersFilesRoot string) desktopUsersProcessesRunnerOption
 	}
 }
 
+var instance *DesktopUsersProcessesRunner
+var instanceSet = &sync.Once{}
+
+func setInstance(r *DesktopUsersProcessesRunner) {
+	instanceSet.Do(func() {
+		instance = r
+	})
+}
+
+func InstanceDesktopProcessRecords() map[string]processRecord {
+	if instance == nil {
+		return nil
+	}
+
+	return instance.uidProcs
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -119,9 +136,10 @@ type DesktopUsersProcessesRunner struct {
 // If, for example, a user logs out, the process record will remain until the
 // user logs in again and it is replaced.
 type processRecord struct {
-	process    *os.Process
-	path       string
-	socketPath string
+	Process                    *os.Process
+	StartTime, LastHealthCheck time.Time
+	path                       string
+	socketPath                 string
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
@@ -166,6 +184,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		}
 	}()
 
+	setInstance(runner)
 	return runner, nil
 }
 
@@ -239,7 +258,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 			level.Error(r.logger).Log(
 				"msg", "error sending shutdown command to user desktop process",
 				"uid", uid,
-				"pid", proc.process.Pid,
+				"pid", proc.Process.Pid,
 				"path", proc.path,
 				"err", err,
 			)
@@ -262,14 +281,14 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	case <-time.After(r.interruptTimeout):
 		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
 		for uid, processRecord := range r.uidProcs {
-			if !processExists(processRecord) {
+			if !r.processExists(processRecord) {
 				continue
 			}
-			if err := processRecord.process.Kill(); err != nil {
+			if err := processRecord.Process.Kill(); err != nil {
 				level.Error(r.logger).Log(
 					"msg", "error killing desktop process",
 					"uid", uid,
-					"pid", processRecord.process.Pid,
+					"pid", processRecord.Process.Pid,
 					"path", processRecord.path,
 					"err", err,
 				)
@@ -368,7 +387,7 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 			level.Error(r.logger).Log(
 				"msg", "error sending refresh command to desktop process",
 				"uid", uid,
-				"pid", proc.process.Pid,
+				"pid", proc.Process.Pid,
 				"path", proc.path,
 				"err", err,
 			)
@@ -445,7 +464,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	consoleUsers, err := consoleuser.CurrentUids(ctx)
@@ -457,6 +476,11 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		if r.userHasDesktopProcess(uid) {
 			continue
 		}
+
+		// we've decided to spawn a new desktop user process for this user
+		// make sure any existing user desktop processes stop being
+		// recognized by the runner server
+		r.runnerServer.DeRegisterClient(uid)
 
 		socketPath, err := r.socketPath(uid)
 		if err != nil {
@@ -522,7 +546,8 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 	}
 
 	r.uidProcs[uid] = processRecord{
-		process:    osProcess,
+		Process:    osProcess,
+		StartTime:  time.Now().UTC(),
 		path:       path,
 		socketPath: socketPath,
 	}
@@ -575,10 +600,10 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 	}
 
 	// have a record of process, but it died for some reason, log it
-	if !processExists(proc) {
+	if !r.processExists(proc) {
 		level.Info(r.logger).Log(
 			"msg", "found existing desktop process dead for console user",
-			"pid", r.uidProcs[uid].process.Pid,
+			"pid", r.uidProcs[uid].Process.Pid,
 			"process_path", r.uidProcs[uid].path,
 			"uid", uid,
 		)
@@ -586,22 +611,38 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 		return false
 	}
 
+	proc.LastHealthCheck = time.Now().UTC()
+	r.uidProcs[uid] = proc
+
 	// have running process
 	return true
 }
 
-func processExists(processRecord processRecord) bool {
+func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	// the call to process.NewProcessWithContext ensures process exists
-	proc, err := process.NewProcessWithContext(ctx, int32(processRecord.process.Pid))
+	proc, err := process.NewProcessWithContext(ctx, int32(processRecord.Process.Pid))
 	if err != nil {
+		level.Info(r.logger).Log(
+			"msg", "looking up existing desktop process",
+			"pid", processRecord.Process.Pid,
+			"process_path", processRecord.path,
+			"err", err,
+		)
 		return false
 	}
 
 	path, err := proc.ExeWithContext(ctx)
 	if err != nil || path != processRecord.path {
+		level.Info(r.logger).Log(
+			"msg", "error or path mismatch checking existing desktop process path",
+			"pid", processRecord.Process.Pid,
+			"process_record_path", processRecord.path,
+			"err", err,
+			"found_path", path,
+		)
 		return false
 	}
 

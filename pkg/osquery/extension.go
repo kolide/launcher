@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -812,6 +813,9 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	return e.getQueriesWithReenroll(ctx, true)
 }
 
@@ -853,6 +857,9 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 // WriteResults will publish results of the executed distributed queries back
 // to the server.
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	return e.writeResultsWithReenroll(ctx, results, true)
 }
 

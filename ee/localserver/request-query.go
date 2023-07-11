@@ -2,13 +2,16 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (ls *localServer) requestQueryHandler() http.Handler {
@@ -16,32 +19,35 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
+	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
+	defer span.End()
+
 	if r.Body == nil {
-		sendClientError(w, "request body is nil")
+		sendClientError(w, span, errors.New("request body is nil"))
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Errorf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	query, ok := body["query"]
 	if !ok || query == "" {
-		sendClientError(w, "no query key found in request body json")
+		sendClientError(w, span, errors.New("no query key found in request body json"))
 		return
 	}
 
 	results, err := queryWithRetries(ls.querier, query)
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error executing query: %s", err))
+		sendClientError(w, span, fmt.Errorf("error executing query: %s", err))
 		return
 	}
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Errorf("error marshalling results to json: %s", err))
 		return
 	}
 
@@ -55,6 +61,9 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
+	defer span.End()
+
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.
 	// This means there is a limit on the size of the query. This endpoint is intended to be a work around for that. It ought to work like this:
 	//
@@ -65,19 +74,19 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 	// 5. Launcher returns results
 
 	if r.Body == nil {
-		sendClientError(w, "request body is nil")
+		sendClientError(w, span, errors.New("request body is nil"))
 		return
 	}
 
 	var body map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sendClientError(w, fmt.Sprintf("error unmarshaling request body: %s", err))
+		sendClientError(w, span, fmt.Errorf("error unmarshaling request body: %s", err))
 		return
 	}
 
 	name, ok := body["name"]
 	if !ok || name == "" {
-		sendClientError(w, "no name key found in request body json")
+		sendClientError(w, span, errors.New("no name key found in request body json"))
 		return
 	}
 
@@ -85,7 +94,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
+		sendClientError(w, span, fmt.Errorf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
 	}
 
@@ -115,16 +124,18 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	jsonBytes, err := json.Marshal(results)
 	if err != nil {
-		sendClientError(w, fmt.Sprintf("error marshalling results to json: %s", err))
+		sendClientError(w, span, fmt.Errorf("error marshalling results to json: %w", err))
 		return
 	}
 
 	w.Write(jsonBytes)
 }
 
-func sendClientError(w http.ResponseWriter, msg string) {
+func sendClientError(w http.ResponseWriter, span trace.Span, err error) {
 	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte(msg))
+	w.Write([]byte(err.Error()))
+
+	traces.SetError(span, err)
 }
 
 func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {

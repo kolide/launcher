@@ -22,14 +22,20 @@ import (
 	"github.com/osquery/osquery-go/plugin/logger"
 )
 
-// How long to wait before erroring because we cannot open the osquery
-// extension socket.
-const socketOpenTimeout = 10 * time.Second
+const (
+	// How long to wait before erroring because we cannot open the osquery
+	// extension socket.
+	socketOpenTimeout = 10 * time.Second
 
-// How often to try to open the osquery extension socket
-const socketOpenInterval = 200 * time.Millisecond
+	// How often to try to open the osquery extension socket
+	socketOpenInterval = 200 * time.Millisecond
 
-const healthCheckInterval = 60 * time.Second
+	// How frequently we should healthcheck the client/server
+	healthCheckInterval = 60 * time.Second
+
+	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
+	maxSocketWaitTime = 30 * time.Second
+)
 
 type Runner struct {
 	instance     *OsqueryInstance
@@ -317,6 +323,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
+	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
+
 	// wait for osquery to create the socket before moving on,
 	// this is intended to serve as a kind of health check
 	// for osquery, if it's started successfully it will create
@@ -391,16 +399,16 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc. It's called `kolide_grpc` for mostly historic reasons
-	if len(o.opts.extensionPlugins) > 0 {
-		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.opts.extensionPlugins); err != nil {
-			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
-			return fmt.Errorf("could not create an extension server: %w", err)
-		}
-	}
-
 	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
 		return fmt.Errorf("could not create an extension client: %w", err)
+	}
+
+	if len(o.opts.extensionPlugins) > 0 {
+		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.extensionManagerClient, o.opts.extensionPlugins); err != nil {
+			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
+			return fmt.Errorf("could not create an extension server: %w", err)
+		}
 	}
 
 	if err := o.stats.Connected(o); err != nil {
@@ -421,7 +429,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			return nil
 		}
 
-		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, plugins); err != nil {
+		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, o.extensionManagerClient, plugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create tables extension server. Stopping", "err", err)
 			return fmt.Errorf("could not create a table extension server: %w", err)
 		}

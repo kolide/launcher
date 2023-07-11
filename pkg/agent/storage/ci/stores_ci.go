@@ -27,6 +27,7 @@ func MakeStores(t *testing.T, logger log.Logger, db *bbolt.DB) (map[storage.Stor
 		storage.SentNotificationsStore,
 		storage.StatusLogsStore,
 		storage.ServerProvidedDataStore,
+		storage.TokenStore,
 	}
 
 	if os.Getenv("CI") == "true" {

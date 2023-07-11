@@ -7,12 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockQueryRunner struct{}
-
-func (h *mockQueryRunner) RunQuery(sql string) (results []map[string]string, err error) {
-	return []map[string]string{}, nil
-}
-
 func TestFunctionalOptions(t *testing.T) {
 	t.Parallel()
 

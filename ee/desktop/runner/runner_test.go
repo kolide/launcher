@@ -83,7 +83,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				user, err := user.Current()
 				require.NoError(t, err)
 				r.uidProcs[user.Uid] = processRecord{
-					process: &os.Process{},
+					Process: &os.Process{},
 					path:    "test",
 				}
 			},
@@ -170,13 +170,13 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				// the cleanup of the t.TempDir() will happen before the binary built for the tests is closed,
 				// on windows this will cause an error, so just wait for all the processes to finish
 				for _, p := range r.uidProcs {
-					if !processExists(p) {
+					if !r.processExists(p) {
 						continue
 					}
 					// intentionally ignoring the error here
 					// CI will intermittently fail with "wait: no child processes" due runner.go also calling process.Wait()
 					// racing with this code to remove the child process
-					p.process.Wait()
+					p.Process.Wait()
 				}
 			})
 		})

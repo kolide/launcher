@@ -81,7 +81,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		firmwarepasswd.TablePlugin(client, logger),
 		GDriveSyncConfig(client, logger),
 		GDriveSyncHistoryInfo(client, logger),
-		KolideVulnerabilities(client, logger),
 		MDMInfo(logger),
 		macos_software_update.MacOSUpdate(client),
 		macos_software_update.RecommendedUpdates(logger),

@@ -2,11 +2,16 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -17,9 +22,10 @@ import (
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
 // to the osquery stdout/stderr
 type OsqueryLogAdapter struct {
-	logger       kitlog.Logger
-	levelFunc    func(kitlog.Logger) kitlog.Logger
-	extraKeyVals []interface{} // log.With expects an interface, not string
+	logger        kitlog.Logger
+	levelFunc     func(kitlog.Logger) kitlog.Logger
+	extraKeyVals  []interface{} // log.With expects an interface, not string
+	rootDirectory string
 }
 
 type Option func(*OsqueryLogAdapter)
@@ -44,11 +50,12 @@ func extractOsqueryCaller(msg string) string {
 	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
 }
 
-func NewOsqueryLogAdapter(logger kitlog.Logger, opts ...Option) *OsqueryLogAdapter {
+func NewOsqueryLogAdapter(logger kitlog.Logger, rootDirectory string, opts ...Option) *OsqueryLogAdapter {
 	l := &OsqueryLogAdapter{
-		logger:       logger,
-		levelFunc:    level.Debug,
-		extraKeyVals: []interface{}{},
+		logger:        logger,
+		levelFunc:     level.Debug,
+		extraKeyVals:  []interface{}{},
+		rootDirectory: rootDirectory,
 	}
 
 	for _, opt := range opts {
@@ -78,7 +85,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	// information here about the process locking the pidfile.
 	// See: https://github.com/osquery/osquery/issues/7796
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
-		l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
 	}
 
 	msg := strings.TrimSpace(string(p))
@@ -102,7 +109,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
-	pid, err := strconv.Atoi(pidStr)
+	pid, err := strconv.ParseUint(pidStr, 10, 32)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "could not extract PID of non-osqueryd process using pidfile",
@@ -111,6 +118,10 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 		)
 		return
 	}
+
+	l.runAndLogPs(pidStr)
+	l.runAndLogLsofByPID(pidStr)
+	l.runAndLogLsofOnPidfile()
 
 	unknownProcess, err := process.NewProcess(int32(pid))
 	if err != nil {
@@ -147,6 +158,90 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
+}
+
+// runAndLogPs runs ps filtering on the given PID, and logs the output.
+func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error running ps on non-osqueryd process using pidfile",
+			"pid", pidStr,
+			"err", err,
+		)
+		return
+	}
+
+	level.Debug(l.logger).Log(
+		"msg", "ran ps on non-osqueryd process using pidfile",
+		"pid", pidStr,
+		"output", string(out),
+	)
+}
+
+// runAndLogLsofByPID runs lsof filtering on the given PID, and logs the output.
+func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", "-p", pidStr)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error running lsof on non-osqueryd process using pidfile",
+			"pid", pidStr,
+			"err", err,
+		)
+		return
+	}
+
+	level.Debug(l.logger).Log(
+		"msg", "ran lsof on non-osqueryd process using pidfile",
+		"pid", pidStr,
+		"output", string(out),
+	)
+}
+
+// runAndLogLsofOnPidfile runs lsof filtering by the osquery pidfile, and logs
+// the output.
+func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	fullPidfile := filepath.Join(l.rootDirectory, "osquery.pid")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", fullPidfile)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error running lsof on osqueryd pidfile",
+			"pidfile", fullPidfile,
+			"err", err,
+		)
+		return
+	}
+
+	level.Debug(l.logger).Log(
+		"msg", "ran lsof on osqueryd pidfile",
+		"pidfile", fullPidfile,
+		"output", string(out),
+	)
 }
 
 // getStringStat is a small wrapper around gopsutil/process functions

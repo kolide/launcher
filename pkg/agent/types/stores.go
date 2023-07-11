@@ -11,4 +11,5 @@ type Stores interface {
 	SentNotificationsStore() KVStore
 	StatusLogsStore() KVStore
 	ServerProvidedDataStore() KVStore
+	TokenStore() KVStore
 }

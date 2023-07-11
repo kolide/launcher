@@ -444,3 +444,50 @@ func (fc *FlagController) UpdateDirectory() string {
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
 }
+
+func (fc *FlagController) SetExportTraces(enabled bool) error {
+	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
+}
+func (fc *FlagController) ExportTraces() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
+	).get(fc.getControlServerValue(keys.ExportTraces))
+}
+
+func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
+	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
+}
+func (fc *FlagController) TraceSamplingRate() float64 {
+	return NewFloat64FlagValue(fc.logger, keys.LoggingInterval,
+		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
+		WithFloat64ValueMin(0.0),
+		WithFloat64ValueMax(1.0),
+	).get(fc.getControlServerValue(keys.TraceSamplingRate))
+}
+
+func (fc *FlagController) SetLogIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.LogIngestServerURL, []byte(url))
+}
+func (fc *FlagController) LogIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.LogIngestServerURL),
+	).get(fc.getControlServerValue(keys.LogIngestServerURL))
+}
+
+func (fc *FlagController) SetTraceIngestServerURL(url string) error {
+	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
+}
+func (fc *FlagController) TraceIngestServerURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.TraceIngestServerURL),
+	).get(fc.getControlServerValue(keys.TraceIngestServerURL))
+}
+
+func (fc *FlagController) SetDisableTraceIngestTLS(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableTraceIngestTLS, boolToBytes(enabled))
+}
+func (fc *FlagController) DisableTraceIngestTLS() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(fc.cmdLineOpts.DisableTraceIngestTLS),
+	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
+}
