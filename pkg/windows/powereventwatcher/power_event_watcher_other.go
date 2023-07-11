@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-package eventwatcher
+package powereventwatcher
 
 import (
 	"github.com/go-kit/kit/log"
