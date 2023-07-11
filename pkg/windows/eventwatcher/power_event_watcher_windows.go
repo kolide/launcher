@@ -30,6 +30,7 @@ type (
 		subscribeProcedure      *syscall.LazyProc
 		unsubscribeProcedure    *syscall.LazyProc
 		renderEventLogProcedure *syscall.LazyProc
+		interrupt               chan struct{}
 	}
 )
 
@@ -41,24 +42,22 @@ const (
 	operationSuccessfulMsg = "The operation completed successfully."
 )
 
-func New(logger log.Logger) *powerEventWatcher {
+// New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
+func New(logger log.Logger) (*powerEventWatcher, error) {
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")
 
-	return &powerEventWatcher{
+	p := &powerEventWatcher{
 		logger:                  logger,
 		subscribeProcedure:      evtApi.NewProc("EvtSubscribe"),
 		unsubscribeProcedure:    evtApi.NewProc("EvtClose"),
 		renderEventLogProcedure: evtApi.NewProc("EvtRender"),
+		interrupt:               make(chan struct{}),
 	}
-}
 
-// Start sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func (p *powerEventWatcher) Start() {
 	// WINEVENT_CHANNEL_GLOBAL_SYSTEM is "System"
 	channelPath, err := syscall.UTF16PtrFromString("System")
 	if err != nil {
-		level.Debug(p.logger).Log("msg", "error creating pointer to channel path", "err", err)
-		return
+		return nil, fmt.Errorf("could not create pointer to channel path: %w", err)
 	}
 
 	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d)]]",
@@ -68,8 +67,7 @@ func (p *powerEventWatcher) Start() {
 	)
 	query, err := syscall.UTF16PtrFromString(queryStr)
 	if err != nil {
-		level.Debug(p.logger).Log("msg", "error creating pointer to query", "err", err)
-		return
+		return nil, fmt.Errorf("could not create pointer to query: %w", err)
 	}
 
 	// EvtSubscribe: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtsubscribe
@@ -85,17 +83,27 @@ func (p *powerEventWatcher) Start() {
 		uintptr(uint32(1)),                   // Flags -- EvtSubscribeToFutureEvents has value 1
 	)
 	if err != nil && err.Error() != operationSuccessfulMsg {
-		level.Debug(p.logger).Log("msg", "error subscribing to future power events", "last_err", err)
+		return nil, fmt.Errorf("could not subscribe to future power events: %w", err)
 	}
 
 	// Save the handle so that we can close it later
 	p.subscriptionHandle = subscriptionHandle
+
+	return p, nil
 }
 
-func (p *powerEventWatcher) Shutdown() {
+// Execute is a no-op, since we've already registered our subscription
+func (p *powerEventWatcher) Execute() error {
+	<-p.interrupt
+	return nil
+}
+
+func (p *powerEventWatcher) Interrupt(_ error) {
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)
 	level.Debug(p.logger).Log("msg", "unsubscribed from power events", "ret", fmt.Sprintf("%+v", ret), "last_err", err)
+
+	p.interrupt <- struct{}{}
 }
 
 // onPowerEvent implements EVT_SUBSCRIBE_CALLBACK -- see https://learn.microsoft.com/en-us/windows/win32/api/winevt/nc-winevt-evt_subscribe_callback

@@ -20,7 +20,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
-	"github.com/kolide/launcher/pkg/windows/eventwatcher"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -149,9 +148,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	level.Debug(w.logger).Log("msg", "windows service starting")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
-	p := eventwatcher.New(log.With(w.logger, "component", "power_event_watcher"))
-	p.Start()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -162,7 +158,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
-			p.Shutdown()
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			os.Exit(1)
 		}
@@ -172,7 +167,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
 		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
-		p.Shutdown()
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		os.Exit(0)
 	}()
