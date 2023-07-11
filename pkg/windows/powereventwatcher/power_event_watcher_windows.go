@@ -158,11 +158,12 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		return ret
 	}
 
-	if e.System.EventID == eventIdEnteringModernStandby || e.System.EventID == eventIdEnteringSleep {
+	switch e.System.EventID {
+	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		level.Debug(p.logger).Log("msg", "system is sleeping", "event_id", e.System.EventID)
-	} else if e.System.EventID == eventIdExitingModernStandby {
+	case eventIdExitingModernStandby:
 		level.Debug(p.logger).Log("msg", "system is waking", "event_id", e.System.EventID)
-	} else {
+	default:
 		level.Debug(p.logger).Log("msg", "received unexpected event ID in log", "event_id", e.System.EventID, "raw_event", string(utf8bytes))
 	}
 
