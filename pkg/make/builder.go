@@ -585,7 +585,15 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 				return fmt.Errorf("failed to open $GITHUB_OUTPUT file: %w", err)
 			}
 
-			defer f.Close()
+			defer func() {
+				if err := f.Close(); err != nil {
+					level.Error(ctxlog.FromContext(ctx)).Log(
+						"mgs", "Got Error writing GITHUB_OUTPUT",
+						"app_name", appName,
+						"err", err,
+					)
+				}
+			}()
 
 			if _, err = f.WriteString(fmt.Sprintf("binary=%s\n", output)); err != nil {
 				return fmt.Errorf("failed to write to $GITHUB_OUTPUT file: %w", err)
