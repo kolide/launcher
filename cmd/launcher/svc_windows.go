@@ -150,7 +150,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	p := eventwatcher.New(log.With(w.logger, "component", "power_event_watcher"))
-	p.SubscribeToPowerEvents()
+	p.Start()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

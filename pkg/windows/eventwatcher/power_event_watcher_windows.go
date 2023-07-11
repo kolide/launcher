@@ -52,8 +52,8 @@ func New(logger log.Logger) *powerEventWatcher {
 	}
 }
 
-// subscribeToPowerEvents sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func (p *powerEventWatcher) SubscribeToPowerEvents() {
+// Start sets up a subscription to relevant power events with a callback to `onPowerEvent`.
+func (p *powerEventWatcher) Start() {
 	// WINEVENT_CHANNEL_GLOBAL_SYSTEM is "System"
 	channelPath, err := syscall.UTF16PtrFromString("System")
 	if err != nil {
