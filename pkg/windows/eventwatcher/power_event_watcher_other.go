@@ -3,6 +3,10 @@
 
 package eventwatcher
 
+import (
+	"github.com/go-kit/kit/log"
+)
+
 type noOpPowerEventWatcher struct {
 	interrupt chan struct{}
 }
@@ -14,7 +18,7 @@ func New(_ log.Logger) (*noOpPowerEventWatcher, error) {
 }
 
 func (n *noOpPowerEventWatcher) Execute() error {
-	<-neither.interrupt
+	<-n.interrupt
 	return nil
 }
 
