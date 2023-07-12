@@ -31,9 +31,9 @@ const (
 	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
 )
 
-// We default to x-www-browser first because, if available, it appears to be better at picking
+// We default to xdg-open first because, if available, it appears to be better at picking
 // the correct default browser.
-var browserLaunchers = []string{"x-www-browser", "xdg-open"}
+var browserLaunchers = []string{"xdg-open", "x-www-browser"}
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
