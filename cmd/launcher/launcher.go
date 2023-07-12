@@ -45,6 +45,7 @@ import (
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces/exporter"
+	"github.com/kolide/launcher/pkg/windows/powereventwatcher"
 	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
@@ -208,6 +209,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		cancel()
 		close(sigChannel)
 	})
+
+	powerEventWatcher, err := powereventwatcher.New(log.With(logger, "component", "power_event_watcher"))
+	if err != nil {
+		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
+	} else {
+		runGroup.Add(powerEventWatcher.Execute, powerEventWatcher.Interrupt)
+	}
 
 	var client service.KolideService
 	{
