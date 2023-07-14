@@ -9,6 +9,8 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/crowdstrike/falconctl"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptsetup"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/apt"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dpkg"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/simple_array"
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
@@ -39,5 +41,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 			dataflattentable.WithBinDirs("/usr/bin", "/bin"),
 		),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), []string{"/opt/CrowdStrike/falconctl", "-g", "--systags"}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, []string{"/usr/bin/apt", "list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dpkg_version_info", dpkg.Parser, []string{"/usr/bin/dpkg", "-p"}, dataflattentable.WithIncludeStderr()),
 	}
 }
