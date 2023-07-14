@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 					"version": "12ubuntu4",
 					"description": "Debian base system miscellaneous files",
 				},
-				{	
+				{
 					"package": "base-passwd",
 					"essential": "yes",
 					"priority": "required",
@@ -70,7 +70,7 @@ func TestParse(t *testing.T) {
 					"version": "5.1-6ubuntu1",
 					"description": "GNU Bourne Again SHell",
 				},
-				{	
+				{
 					"package": "cron",
 					"priority": "standard",
 					"section": "admin",
@@ -84,7 +84,7 @@ func TestParse(t *testing.T) {
 					"version": "1.19.2-2",
 					"description": "MIT Kerberos runtime libraries",
 				},
-				{	
+				{
 					"package": "liblocale-gettext-perl",
 					"priority": "important",
 					"section": "perl",
@@ -98,7 +98,7 @@ func TestParse(t *testing.T) {
 					"version": "1.9.9-1ubuntu2",
 					"description": "Provide limited super user privileges to specific users",
 				},
-				{	
+				{
 					"package": "whiptail",
 					"priority": "important",
 					"section": "utils",
@@ -119,7 +119,7 @@ func TestParse(t *testing.T) {
 					"version": "2.33-1",
 					"description": "X Keyboard Extension (XKB) configuration data",
 				},
-				{	
+				{
 					"package": "xxd",
 					"priority": "important",
 					"section": "editors",
