@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed test-data/output.txt
-var output []byte
+//go:embed test-data/dpkg_info.txt
+var dpkg_info []byte
 
 func TestParse(t *testing.T) {
 	t.Parallel()
@@ -20,8 +20,8 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
-			name:  "output",
-			input: output,
+			name:  "dpkg_info",
+			input: dpkg_info,
 			expected: []map[string]string{
 				{
 					"package": "adduser",

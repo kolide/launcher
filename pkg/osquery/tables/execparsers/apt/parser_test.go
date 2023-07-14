@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed test-data/output.txt
-var output []byte
+//go:embed test-data/apt_upgradeable.txt
+var apt_upgradeable []byte
 
 func TestParse(t *testing.T) {
 	t.Parallel()
@@ -20,8 +20,8 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
-			name:  "output",
-			input: output,
+			name:  "apt_upgradeable",
+			input: apt_upgradeable,
 			expected: []map[string]string{
 				{
 					"package": "accountsservice",
