@@ -26,19 +26,7 @@ func runFlare(args []string) error {
 	}
 
 	var (
-		//flHostname = flag.String("hostname", "dababe.launcher.kolide.com:443", "")
-
-		// not documented via flags on purpose
-		//enrollSecret      = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "flare_ping")
-		//serverURL         = env.String("KOLIDE_LAUNCHER_HOSTNAME", *flHostname)
-		//insecureTLS       = env.Bool("KOLIDE_LAUNCHER_INSECURE", false)
-		//insecureTransport = env.Bool("KOLIDE_LAUNCHER_INSECURE_TRANSPORT", false)
-		//flareSocketPath   = env.String("FLARE_SOCKET_PATH", agent.TempPath("flare.sock"))
 		dirPath = env.String("KOLIDE_AGENT_FLARE_ZIP_DIR_PATH", "")
-		//upload  = env.Bool("KOLIDE_AGENT_FLARE_UPLOAD", false)
-
-		//certPins [][]byte
-		//rootPool *x509.CertPool
 	)
 
 	id := ulid.New()
