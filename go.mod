@@ -58,6 +58,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/kolide/systray v1.10.4
 	github.com/kolide/toast v1.0.0
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/shirou/gopsutil/v3 v3.23.3
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
