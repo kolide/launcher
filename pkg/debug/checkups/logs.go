@@ -27,6 +27,8 @@ func (c *Logs) Run(_ context.Context, fullFH io.Writer) error {
 
 	stat, err := os.Stat(debugLog)
 	if err != nil {
+		// Failure to stat logs isn't really a checkup error -- it's probably indicative of no logs or no permission,
+		// or similar. Which is more of a failed check, then a validity error with the checkup.
 		c.status = Failing
 		c.summary = fmt.Sprintf("failed to stat debug log: %s", err)
 		return nil

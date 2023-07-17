@@ -1,13 +1,12 @@
 // Package checkups contains small debugging funtions. These are designed to run as part of `doctor`, `flare` and
-// `logCheckpoint`
+// `logCheckpoint`. They return a general status, and several types of information:
 //
-// Finding a common interface is somewhat tricky. There are 4 chunks of data, and different callers use different ones.
 //  1. There is the _status_. This is an enum
-//  2. There is a _summery_. This is meant to be a short string
+//  2. There is a _summary_. This is meant to be a short string displayed during doctor and in logs
 //  3. There may be a _data_ artifact. This is of type any, and is meant to end up in log checkpoints
-//  4. There may be a _detailed_ log, this is an io stream and is designed to be additional information and is used by flare.
+//  4. There may be extra data, this is an io stream and is designed to be additional information to package into flare.
 //
-// The tricky part is that these get generated at different times. The detailed log is generated during a checkup, but
+// The tricky part is that these get generated at different times. The extra data is generated during a checkup, but
 // the other pieces happen after completion. This has some implications for how method signatures and data buffering work.
 // Namely, it does not make sense to have the checkups comform to interfaces, and let the callers deal. Instead, we define
 // a basic checkup interface, and export wrapper functions.
@@ -34,11 +33,11 @@ type Status string
 
 const (
 	Unknown       Status = "Unknown"
-	Erroring      Status = "Error"         // The checkup had an error generating data
-	Informational Status = "Informational" // Just an FYI
-	Passing       Status = "Passing"       // Checkup passes
+	Erroring      Status = "Error"         // The checkup was unable to run. Equivelent to a protocol error
+	Informational Status = "Informational" // Checkup does not have pass/fail status, information only
+	Passing       Status = "Passing"       // Checkup is passing
 	Warning       Status = "Warning"       // Checkup is warning
-	Failing       Status = "Failing"       // Checkup fails
+	Failing       Status = "Failing"       // Checkup is failing
 )
 
 func CharFor(s Status) string {
@@ -60,12 +59,12 @@ func CharFor(s Status) string {
 
 // checkupInt is the generalized checkup interface. It is not meant to be exported.
 type checkupInt interface {
-	Name() string
-	Run(ctx context.Context, fullWriter io.Writer) error
-	ExtraFileName() string
-	Summary() string
-	Status() Status
-	Data() any
+	Name() string                                        // Checkup name
+	Run(ctx context.Context, fullWriter io.Writer) error // Run the checkup. Errors here are protocol level
+	ExtraFileName() string                               // If this checkup will have extra data, what name should it use in flare
+	Summary() string                                     // Short summary string about the status
+	Status() Status                                      // State of this checkup
+	Data() any                                           // What data objects exist, if any
 }
 
 // DoctorCheckup runs a checkup for the doctor command line. Its a small bit of sugar over the io channels
@@ -88,6 +87,7 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 	// zip can only have a single open file. So defer writing the summary.
 	summary := bytes.Buffer{}
 	defer func() {
+		// This path is used by the zip writer, thus not filepath
 		summaryFlareFH, err := flare.Create(path.Join(c.Name(), "summary.log"))
 		if err != nil {
 			fmt.Fprintf(combinedSummary, "%s %s: error creating flare summary file: %s\n", CharFor(Erroring), c.Name(), err)
@@ -146,7 +146,7 @@ func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) {
 		"name", c.Name(),
 		"msg", c.Summary(),
 		"status", c.Status(),
-		"data", c.Data(),
+		"data", c.Data(), // NOTE: on windows, this can serialize poorly. Consider #1246
 	)
 }
 

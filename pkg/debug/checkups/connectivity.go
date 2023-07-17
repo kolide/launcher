@@ -39,6 +39,7 @@ func (c *Connectivity) Run(ctx context.Context, fullFH io.Writer) error {
 		"control server": c.k.ControlServerURL(),
 	}
 
+	var failing bool
 	for n, v := range hosts {
 		fmt.Fprintf(fullFH, "Response from %s / %s:\n", n, v)
 		if err := checkKolideServer(c.k, httpClient, fullFH, v); err != nil {
