@@ -73,7 +73,7 @@ func (c *Connectivity) Data() any {
 func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, server string) error {
 	parsedUrl, err := parseUrl(k, fmt.Sprintf("%s/version", server))
 	if err != nil {
-		return fmt.Errorf("parsing url: %w", server, err)
+		return fmt.Errorf("parsing url(%s): %w", server, err)
 	}
 
 	response, err := client.Get(parsedUrl.String())
