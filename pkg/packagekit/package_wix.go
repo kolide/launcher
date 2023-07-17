@@ -38,7 +38,7 @@ var wixTemplateBytes []byte
 var assets embed.FS
 
 const (
-	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64\signtool.exe`
+	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\signtool.exe`
 )
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
