@@ -146,7 +146,7 @@ func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolin
 		"name", c.Name(),
 		"msg", c.Summary(),
 		"status", c.Status(),
-		"data", c.Data(), // NOTE: on windows, this can serialize poorly. Consider #1246
+		"data", c.Data(), // NOTE: on windows, this may serialize poorly. Consider #1246
 	)
 }
 
@@ -158,6 +158,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 		&RootDirectory{k: k},
 		&Connectivity{k: k},
 		&Logs{k: k},
+		&BinaryDirectory{},
 	}
 
 	failingCheckups := []string{}
@@ -204,6 +205,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer) erro
 		&RootDirectory{k: k},
 		&Connectivity{k: k},
 		&Logs{k: k},
+		&BinaryDirectory{},
 	}
 
 	flare := zip.NewWriter(flareStream)

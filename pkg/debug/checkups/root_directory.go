@@ -20,8 +20,10 @@ func (c *RootDirectory) Name() string {
 	return "Root directory contents"
 }
 
-func (c *RootDirectory) Run(_ context.Context, fullFH io.Writer) error {
-	files, err := os.ReadDir(c.k.RootDirectory())
+func (c *RootDirectory) Run(_ context.Context, extraFH io.Writer) error {
+
+	filecount, err := recursiveDirectoryContents(extraFH, c.k.RootDirectory())
+
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		c.status = Failing
@@ -29,14 +31,12 @@ func (c *RootDirectory) Run(_ context.Context, fullFH io.Writer) error {
 	case err != nil:
 		c.status = Erroring
 		c.summary = fmt.Sprintf("listing files in root directory (%s): %s", c.k.RootDirectory(), err)
-	case len(files) == 0:
+	case filecount == 0:
 		c.status = Warning
 		c.summary = fmt.Sprintf("root directory (%s) empty", c.k.RootDirectory())
 	default:
 		c.status = Passing
-		c.summary = fmt.Sprintf("root directory (%s) contains %d files", c.k.RootDirectory(), len(files))
-
-		fmt.Fprintf(fullFH, "%s\n", files)
+		c.summary = fmt.Sprintf("root directory (%s) contains %d files", c.k.RootDirectory(), filecount)
 	}
 	return nil
 }
