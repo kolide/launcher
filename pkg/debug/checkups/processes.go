@@ -54,7 +54,7 @@ func (c *Processes) ExtraFileName() string {
 }
 
 func (c *Processes) Status() Status {
-	if c.kolideCount > 2 {
+	if c.kolideCount >= 2 {
 		return Passing
 	}
 
