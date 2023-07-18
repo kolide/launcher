@@ -11,7 +11,6 @@ import (
 )
 
 type Processes struct {
-	summary     string
 	kolideCount int
 	data        []string // FIXME: this should be more structured
 }

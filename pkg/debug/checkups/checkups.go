@@ -33,7 +33,7 @@ type Status string
 
 const (
 	Unknown       Status = "Unknown"
-	Erroring      Status = "Error"         // The checkup was unable to run. Equivelent to a protocol error
+	Erroring      Status = "Error"         // The checkup was unable to run. Equivalent to a protocol error
 	Informational Status = "Informational" // Checkup does not have pass/fail status, information only
 	Passing       Status = "Passing"       // Checkup is passing
 	Warning       Status = "Warning"       // Checkup is warning
@@ -131,7 +131,7 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 	}
 }
 
-func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) {
+func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolint:unused
 	if err := c.Run(ctx, io.Discard); err != nil {
 		level.Debug(logger).Log(
 			"name", c.Name(),
