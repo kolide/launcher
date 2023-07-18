@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/pkg/errors"
 )
 
 const requestTimeout = time.Second * 5
@@ -102,6 +103,10 @@ func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, serv
 		return nil, fmt.Errorf("fetching url: %w", err)
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("expected status 200, got %d", response.StatusCode)
+	}
 
 	bytes, err := io.ReadAll(io.LimitReader(response.Body, 256))
 	if err != nil {
