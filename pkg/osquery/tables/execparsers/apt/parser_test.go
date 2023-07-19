@@ -20,6 +20,22 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
+			name:     "empty input",
+			expected: make([]map[string]string, 0),
+		},
+		{
+			name:  "malformed input",
+			input: []byte("Listing...\naccounts\\jammy-updates, jammy-security  1 amd64 [%& . 22.07.5-2ubuntu1.3)\n\n\nfoobarservice/jammy-updates,jammy-security,security 22.05ubun1.2vv aarch [upgradable from: 22.05ubun1.3vv]\ntestshort/ubuntu-security 22.05 [upgradeable from: 22.05.1]\n\n"),
+			expected: []map[string]string{
+				{
+					"package":         "foobarservice",
+					"sources":         "jammy-updates,jammy-security,security",
+					"update_version":  "22.05ubun1.2vv",
+					"current_version": "22.05ubun1.3vv",
+				},
+			},
+		},
+		{
 			name:  "apt_upgradeable",
 			input: apt_upgradeable,
 			expected: []map[string]string{
@@ -121,12 +137,12 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			p := New()
+			result, err := p.Parse(bytes.NewReader(tt.input))
+			require.NoError(t, err, "unexpected error parsing input")
+
+			require.ElementsMatch(t, tt.expected, result)
 		})
-
-		p := New()
-		result, err := p.Parse(bytes.NewReader(tt.input))
-		require.NoError(t, err, "unexpected error parsing input")
-
-		require.ElementsMatch(t, tt.expected, result)
 	}
 }

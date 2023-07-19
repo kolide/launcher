@@ -20,6 +20,21 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
+			name:     "empty input",
+			expected: make([]map[string]string, 0),
+		},
+		{
+			name:  "malformed input",
+			input: []byte("\n\n\nPackage/ foo\nPriority; bar\n\nBlah: word\nSection: admin\nVersion: ubun2.5v\nPackage: test\n\n"),
+			expected: []map[string]string{
+				{
+					"package": "test",
+					"section": "admin",
+					"version": "ubun2.5v",
+				},
+			},
+		},
+		{
 			name:  "dpkg_info",
 			input: dpkg_info,
 			expected: []map[string]string{
@@ -29,7 +44,7 @@ func TestParse(t *testing.T) {
 					"section":         "admin",
 					"version":         "3.118ubuntu5",
 					"description":     "add and remove users and groups",
-					"build_essential": "yes",
+					"build-essential": "yes",
 				},
 				{
 					"package":         "apt",
@@ -37,7 +52,7 @@ func TestParse(t *testing.T) {
 					"section":         "admin",
 					"version":         "2.4.5",
 					"description":     "commandline package manager",
-					"build_essential": "yes",
+					"build-essential": "yes",
 				},
 				{
 					"package":     "apt-utils",
@@ -141,12 +156,12 @@ func TestParse(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			p := New()
+			result, err := p.Parse(bytes.NewReader(tt.input))
+			require.NoError(t, err, "unexpected error parsing input")
+
+			require.ElementsMatch(t, tt.expected, result)
 		})
-
-		p := New()
-		result, err := p.Parse(bytes.NewReader(tt.input))
-		require.NoError(t, err, "unexpected error parsing input")
-
-		require.ElementsMatch(t, tt.expected, result)
 	}
 }
