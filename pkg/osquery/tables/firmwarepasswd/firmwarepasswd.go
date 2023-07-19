@@ -115,13 +115,13 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 	cmd.Stdout = output
 
 	if err := cmd.Run(); err != nil {
-		level.Info(t.logger).Log(
+		level.Debug(t.logger).Log(
 			"msg", "Error running firmwarepasswd",
 			"stderr", strings.TrimSpace(stderr.String()),
 			"stdout", strings.TrimSpace(output.String()),
 			"err", err,
 		)
-		return fmt.Errorf("running osquery: %w", err)
+		return fmt.Errorf("running firmwarepasswd: %w", err)
 	}
 	return nil
 }
