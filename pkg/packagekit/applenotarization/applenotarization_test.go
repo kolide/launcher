@@ -20,19 +20,19 @@ func TestCheckSuccess(t *testing.T) {
 		expectedStatus string
 	}{
 		{
-			fakeFile:       "testdata/info.xml",
+			fakeFile:       "testdata/info.json",
 			uuid:           "11111111-2222-3333-4444-f4b2a99e443a",
-			expectedStatus: "success",
+			expectedStatus: "Accepted",
 		},
 		{
-			fakeFile:      "testdata/info.xml",
+			fakeFile:      "testdata/info.json",
 			uuid:          "mismatched uuid",
 			expectedError: true,
 		},
 		{
-			fakeFile:       "testdata/infoinprogress.xml",
+			fakeFile:       "testdata/infoinprogress.json",
 			uuid:           "77777777-1111-4444-aaaa-111111111111",
-			expectedStatus: "in progress",
+			expectedStatus: "In Progress",
 		},
 	}
 
@@ -66,12 +66,8 @@ func TestSubmit(t *testing.T) {
 		expectedUuid string
 	}{
 		{
-			fakeFile:     "testdata/submit.xml",
+			fakeFile:     "testdata/submit.json",
 			expectedUuid: "11111111-aaaa-4444-aaaa-bbbbbbbbbbbb",
-		},
-		{
-			fakeFile:     "testdata/submitduplicate.xml",
-			expectedUuid: "22222222-dddd-4444-4444-cccccccccccc",
 		},
 	}
 
