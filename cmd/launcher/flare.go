@@ -17,8 +17,10 @@ import (
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
+	// TODO this stuff needs some deeper thinking
 	defaultAutoupdate = true
 	setDefaultPaths()
+	_ = defaultBinDirectoryPath
 
 	opts, err := parseOptions("flare", args)
 	if err != nil {

@@ -34,7 +34,7 @@ func (c *BinaryDirectory) Run(_ context.Context, extraFH io.Writer) error {
 		c.summary = fmt.Sprintf("binary directory (%s) not present", bindir)
 	case err != nil:
 		c.status = Erroring
-		c.summary = fmt.Sprintf("listing files in binary directory (%s): %s", bindir)
+		c.summary = fmt.Sprintf("listing files in binary directory (%s): %s", bindir, err)
 	case filecount == 0:
 		c.status = Warning
 		c.summary = fmt.Sprintf("binary directory (%s) empty", bindir)
