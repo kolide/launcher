@@ -6,16 +6,13 @@
 package applenotarization
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
@@ -44,7 +41,17 @@ func New(
 // Submit an file to apple's notarization service. Returns the uuid of
 // the submission
 func (n *Notarizer) Submit(ctx context.Context, filePath string, primaryBundleId string) (string, error) {
-	return n.runNotarytool(ctx, filePath)
+	rawResp, err := n.runNotarytool(ctx, "submit", filePath, []string{"--no-wait", "--timeout", "3m"})
+	if err != nil {
+		return "", fmt.Errorf("could not run notarytool submit: %w", err)
+	}
+
+	var r notarizationResponse
+	if err := json.Unmarshal(rawResp, &r); err != nil {
+		return "", fmt.Errorf("could not unmarshal notarization response: %w", err)
+	}
+
+	return r.ID, nil
 }
 
 // Check the notarization status of a uuid
@@ -54,116 +61,57 @@ func (n *Notarizer) Check(ctx context.Context, uuid string) (string, error) {
 		"request-uuid", uuid,
 	)
 
-	response, err := n.runAltool(ctx, []string{"--notarization-info", uuid})
+	rawResp, err := n.runNotarytool(ctx, "info", uuid, nil)
 	if err != nil {
-		level.Error(logger).Log(
-			"msg", "error getting notarization-info",
-			"error-messages", fmt.Sprintf("%+v", response.ProductErrors),
-		)
-		return "", fmt.Errorf("exec: %w", err)
+		return "", fmt.Errorf("fetching notarization info: %w", err)
 	}
 
-	if response.NotarizationInfo.RequestUUID != uuid {
-		return "", fmt.Errorf("Something went wrong. Expected response for %s, but got %s",
-			response.NotarizationInfo.RequestUUID,
-			uuid)
-
+	var r notarizationInfoResponse
+	if err := json.Unmarshal(rawResp, &r); err != nil {
+		return "", fmt.Errorf("could not unmarshal notarization info response: %w", err)
 	}
 
-	if response.NotarizationInfo.Status != "success" {
+	if r.ID != uuid {
+		return "", fmt.Errorf("something went wrong. Expected response for %s, but got %s", r.ID, uuid)
+	}
+
+	if r.Status != "Accepted" {
 		level.Info(logger).Log(
 			"msg", "Not successful. Examine log",
-			"logfile", response.NotarizationInfo.LogFileURL,
+			"status", r.Status,
 		)
 	}
 
-	return response.NotarizationInfo.Status, nil
+	return r.Status, nil
 }
 
 func Staple(ctx context.Context) {
 }
 
-func (n *Notarizer) runNotarytool(ctx context.Context, file string) (string, error) {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "applenotarization.runNotarytool")
-
+func (n *Notarizer) runNotarytool(ctx context.Context, command string, target string, additionalArgs []string) ([]byte, error) {
 	baseArgs := []string{
 		"notarytool",
-		"submit",
-		file,
+		command,
+		target,
 		"--apple-id", n.username,
 		"--password", n.password,
 		"--team-id", n.account,
 		"--output-format", "json",
-		"--no-wait",
-		"--timeout", "3m",
+	}
+	if len(additionalArgs) > 0 {
+		baseArgs = append(baseArgs, additionalArgs...)
+	}
+
+	if n.fakeResponse != "" {
+		return []byte(n.fakeResponse), nil
 	}
 
 	cmd := exec.CommandContext(ctx, "xcrun", baseArgs...)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("notarizing error: error `%w`, output `%s`", err, string(out))
+		return nil, fmt.Errorf("notarizing error: error `%w`, output `%s`", err, string(out))
 	}
 
-	type notarizationResponse struct {
-		Message string `json:"message"`
-		ID      string `json:"id"`
-		Path    string `json:"path"`
-	}
-	var r notarizationResponse
-	if err := json.Unmarshal(out, &r); err != nil {
-		return "", fmt.Errorf("could not unmarshal notarization response: %w", err)
-	}
-
-	level.Debug(logger).Log(
-		"msg", "successfully submitted for notarization",
-		"response_msg", r.Message,
-		"response_uuid", r.ID,
-		"response_path", r.Path,
-	)
-
-	return r.ID, nil
-}
-
-func (n *Notarizer) runAltool(ctx context.Context, cmdArgs []string) (*notarizationResponse, error) {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "applenotarization.runAltool")
-
-	baseArgs := []string{
-		"altool",
-		"--username", n.username,
-		"--password", "@env:N_PASS",
-		"--asc-provider", n.account,
-		"--output-format", "xml",
-	}
-
-	cmd := exec.CommandContext(ctx, "xcrun", append(baseArgs, cmdArgs...)...)
-	cmd.Env = append(cmd.Env, fmt.Sprintf("N_PASS=%s", n.password))
-
-	level.Debug(logger).Log(
-		"msg", "Execing altool as",
-		"cmd", strings.Join(cmd.Args, " "),
-	)
-
-	if n.fakeResponse != "" {
-		response := &notarizationResponse{}
-		if err := plist.NewXMLDecoder(strings.NewReader(n.fakeResponse)).Decode(response); err != nil {
-			return nil, fmt.Errorf("plist decode: %w", err)
-		}
-
-		// This isn't quite right -- we're returng nil, and
-		// not the command error. But it's good enough...
-		return response, nil
-	}
-
-	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	cmdErr := cmd.Run()
-
-	// So far, we get xml output even in the face of errors. So we may as well try to parse it here.
-	response := &notarizationResponse{}
-	if err := plist.NewXMLDecoder(stdout).Decode(response); err != nil {
-		return nil, fmt.Errorf("plist decode: %w", err)
-	}
-
-	return response, cmdErr
+	return out, nil
 }
