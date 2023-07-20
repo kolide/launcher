@@ -77,6 +77,10 @@ func (k *knapsack) SentNotificationsStore() types.KVStore {
 	return k.getKVStore(storage.SentNotificationsStore)
 }
 
+func (k *knapsack) ControlServerActionsStore() types.KVStore {
+	return k.getKVStore(storage.ControlServerActionsStore)
+}
+
 func (k *knapsack) StatusLogsStore() types.KVStore {
 	return k.getKVStore(storage.StatusLogsStore)
 }

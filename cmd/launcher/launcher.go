@@ -23,8 +23,8 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
-	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/control/actionmiddleware"
+	"github.com/kolide/launcher/ee/control/actionqueue"
+	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -34,7 +34,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -286,9 +285,29 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
-		if err := addNotificationConsumer(ctx, logger, runner, k.SentNotificationsStore(), controlService, runGroup); err != nil {
-			return fmt.Errorf("failed to add notification consumer: %w", err)
+		// create notification consumer
+		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
+			runner,
+			ctx,
+			notificationconsumer.WithLogger(logger),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
+
+		// create an action queue for all other action style commands
+		actionsQueue := actionqueue.New(
+			actionqueue.WithContext(ctx),
+			actionqueue.WithLogger(logger),
+			actionqueue.WithStore(k.ControlServerActionsStore()),
+		)
+		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
+		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
+
+		// register notifications consumer
+		actionsQueue.RegisterUpdater(notificationconsumer.NotificationSubsystem, notificationConsumer)
+		// register accelerate control consumer
+		actionsQueue.RegisterUpdater(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
@@ -422,38 +441,5 @@ func writePidFile(path string) error {
 	if err := os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
-	return nil
-}
-
-func addNotificationConsumer(
-	ctx context.Context,
-	logger log.Logger,
-	runner *desktopRunner.DesktopUsersProcessesRunner,
-	store types.KVStore,
-	controlService *control.ControlService,
-	rungroup run.Group) error {
-	notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-		runner,
-		ctx,
-		notificationconsumer.WithLogger(logger),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to set up notifier: %w", err)
-	}
-
-	amw := actionmiddleware.New(
-		actionmiddleware.WithContext(ctx),
-		actionmiddleware.WithLogger(logger),
-		actionmiddleware.WithCleanupInterval(notificationconsumer.CleanupInterval),
-		actionmiddleware.WithActionRetentionPeriod(notificationconsumer.RetentionPeriod),
-		actionmiddleware.WithStore(store),
-		actionmiddleware.WithUpdater(notificationconsumer.NotificationSubsystem, notificationConsumer),
-	)
-
-	if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, amw); err != nil {
-		return fmt.Errorf("failed to register notify consumer: %w", err)
-	}
-
-	rungroup.Add(amw.StartCleanup, amw.StopCleanup)
 	return nil
 }

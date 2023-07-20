@@ -1,4 +1,4 @@
-package actionmiddleware
+package actionqueue
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/control/actionmiddleware/mocks"
+	"github.com/kolide/launcher/ee/control/actionqueue/mocks"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -50,9 +50,10 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 	mockUpdater := mocks.NewUpdater(t)
 	mockUpdater.On("Update", mock.Anything).Return(nil).Once()
 
-	actionMiddleWare := New(WithUpdater(testUpdaterType, mockUpdater))
+	actionqueue := New()
+	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
 
-	require.NoError(t, actionMiddleWare.Update(testNotificationsData))
+	require.NoError(t, actionqueue.Update(testNotificationsData))
 }
 
 func TestUpdate_HandlesMultipleTypes(t *testing.T) {
@@ -103,12 +104,12 @@ func TestUpdate_HandlesMultipleTypes(t *testing.T) {
 	anotherMockUpdater := mocks.NewUpdater(t)
 	anotherMockUpdater.On("Update", mock.Anything).Return(nil).Twice()
 
-	actionMiddleWare := New(
-		WithUpdater(testUpdaterType, mockUpdater),
-		WithUpdater(anotherUpdaterType, anotherMockUpdater),
-	)
+	actionqueue := New()
 
-	require.NoError(t, actionMiddleWare.Update(testNotificationsData))
+	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	actionqueue.RegisterUpdater(anotherUpdaterType, anotherMockUpdater)
+
+	require.NoError(t, actionqueue.Update(testNotificationsData))
 }
 
 func TestUpdate_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
@@ -138,8 +139,9 @@ func TestUpdate_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
 	mockUpdater.On("Update", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
 	// Call update and assert our expectations about sent notifications
-	actionMiddleWare := New(WithUpdater(testUpdaterType, mockUpdater))
-	require.NoError(t, actionMiddleWare.Update(testActionsData))
+	actionqueue := New()
+	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
 func TestCleanup(t *testing.T) {
@@ -151,12 +153,11 @@ func TestCleanup(t *testing.T) {
 	logger := log.NewLogfmtLogger(&logBytes)
 	amw := New(
 		WithStore(store),
-		WithUpdater(testUpdaterType, mockUpdater),
 		WithLogger(logger),
-		WithActionRetentionPeriod(1*time.Hour),
 		WithCleanupInterval(100*time.Millisecond),
 		WithContext(context.Background()),
 	)
+	amw.RegisterUpdater(testUpdaterType, mockUpdater)
 
 	// Save two entries in the db -- one sent a year ago, and one sent now.
 	notificationIdToDelete := "should_be_deleted"
@@ -238,8 +239,9 @@ func TestUpdate_HandlesMalformedActions(t *testing.T) {
 
 	// Expect that the updater is still called once, to send the good notification
 	mockUpdater.On("Update", bytes.NewReader(goodActionRaw)).Return(nil)
-	actionMiddleWare := New(WithUpdater(testUpdaterType, mockUpdater))
-	require.NoError(t, actionMiddleWare.Update(testActionsData))
+	actionqueue := New()
+	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
 func setupStorage(t *testing.T) types.KVStore {

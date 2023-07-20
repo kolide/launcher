@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -14,12 +13,10 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 )
 
-// Consumes notifications from control server, tracks when notifications are sent to end user
+// Consumes notifications from control server
 type NotificationConsumer struct {
 	runner userProcessesRunner
 	logger log.Logger
-	ctx    context.Context
-	cancel context.CancelFunc
 }
 
 // The desktop runner fullfils this interface -- it exists for testing purposes.
@@ -30,12 +27,6 @@ type userProcessesRunner interface {
 const (
 	// Identifier for this consumer.
 	NotificationSubsystem = "desktop_notifier"
-
-	// Approximately 6 months
-	RetentionPeriod = time.Hour * 24 * 30 * 6
-
-	// How frequently to check for old notifications
-	CleanupInterval = time.Hour * 12
 )
 
 type notificationConsumerOption func(*NotificationConsumer)
@@ -52,7 +43,6 @@ func NewNotifyConsumer(runner *desktopRunner.DesktopUsersProcessesRunner, ctx co
 	nc := &NotificationConsumer{
 		runner: runner,
 		logger: log.NewNopLogger(),
-		ctx:    ctx,
 	}
 
 	for _, opt := range opts {

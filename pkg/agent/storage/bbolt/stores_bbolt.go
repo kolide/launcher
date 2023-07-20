@@ -26,6 +26,7 @@ func MakeStores(logger log.Logger, db *bbolt.DB) (map[storage.Store]types.KVStor
 		storage.StatusLogsStore,
 		storage.ServerProvidedDataStore,
 		storage.TokenStore,
+		storage.ControlServerActionsStore,
 	}
 
 	for _, storeName := range storeNames {
