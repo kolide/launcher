@@ -188,7 +188,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
-				level.Info(w.logger).Log("err", "unexpected control request", "control_request", c)
+				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
 			}
 		}
 	}

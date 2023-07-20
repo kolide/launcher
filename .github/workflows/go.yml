@@ -8,9 +8,6 @@ on:
   pull_request:
     branches: '**'
 
-env:
-  GOVER: '1.20.5'
-
 jobs:
   build_and_test:
     name: launcher
@@ -32,7 +29,8 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: ${{env.GOVER}}
+        go-version-file: './go.mod'
+        check-latest: true
       id: go
 
     # use bash, because the powershell syntax is different and this is a cross platform workflow
@@ -144,7 +142,8 @@ jobs:
 
     - uses: actions/setup-go@v3
       with:
-        go-version: ${{env.GOVER}}
+        go-version-file: './go.mod'
+        check-latest: true
       id: go
 
     - id: go-cache-paths

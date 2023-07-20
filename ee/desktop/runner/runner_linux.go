@@ -116,22 +116,22 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 			envVars["DISPLAY"] = r.displayFromX11(ctx, session)
 			break
 		} else if sessionType == "wayland" {
-			// For opening links with x-www-browser, we only need DISPLAY.
 			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
 
-			// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
-			// files to figure out what application to launch.
-
-			// We take the default value according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html,
-			// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
-			// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
-			envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
 			break
 		} else {
 			// Not a graphical session
 			continue
 		}
 	}
+
+	// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
+	// files to figure out what application to launch.
+
+	// We take the default value according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html,
+	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
+	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
+	envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
 
 	return envVars
 }
@@ -147,7 +147,12 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 		return defaultDisplay
 	}
 
-	return strings.Trim(string(xDisplayOutput), "\n")
+	display := strings.Trim(string(xDisplayOutput), "\n")
+	if display == "" {
+		return defaultDisplay
+	}
+
+	return display
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
