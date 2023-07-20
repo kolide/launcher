@@ -278,7 +278,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
-		// accelerateControlConsumer handles control server interval acceleration requests from control server
 
 		runner, err = desktopRunner.New(
 			k,
@@ -293,6 +292,18 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
+		// create an action queue for all other action style commands
+		actionsQueue := actionqueue.New(
+			actionqueue.WithContext(ctx),
+			actionqueue.WithLogger(logger),
+			actionqueue.WithStore(k.ControlServerActionsStore()),
+		)
+		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
+		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
+
+		// register accelerate control consumer
+		actionsQueue.RegisterUpdater(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
+
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			runner,
@@ -303,19 +314,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
 
-		// create an action queue for all other action style commands
-		actionsQueue := actionqueue.New(
-			actionqueue.WithContext(ctx),
-			actionqueue.WithLogger(logger),
-			actionqueue.WithStore(k.ControlServerActionsStore()),
-		)
-		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
-		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
-
 		// register notifications consumer
 		actionsQueue.RegisterUpdater(notificationconsumer.NotificationSubsystem, notificationConsumer)
-		// register accelerate control consumer
-		actionsQueue.RegisterUpdater(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())

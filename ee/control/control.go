@@ -213,31 +213,6 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		return errors.New("control data is nil")
 	}
 
-	// Remember the hash of the last fetched version of this subsystem's data
-	cs.lastFetched[subsystem] = hash
-
-	// controlCommandMessage, err := parseControlCommandMessage(data)
-	// // parse without error and it's a command message
-	// if err == nil && controlCommandMessage.isCommandMessage() {
-	// 	if controlCommandMessage.isExpired() {
-	// 		return nil
-	// 	}
-
-	// 	existingIds := cs.getSubsystemReceivedMessageIds(subsystem)
-	// 	for _, existingId := range existingIds {
-	// 		if controlCommandMessage.Id == existingId {
-	// 			// already processed this message, return
-	// 			return nil
-	// 		}
-	// 	}
-
-	// 	// this is a new id
-	// 	existingIds = append(existingIds, controlCommandMessage.Id)
-	// 	if err := cs.setSubsystemReceivedMessageIds(subsystem, existingIds); err != nil {
-	// 		return fmt.Errorf("failed to set subsystem received message ids: %w", err)
-	// 	}
-	// }
-
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(subsystem, data); err != nil {
 		// Although we failed to update, the payload may be bad and there's no
@@ -245,6 +220,9 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 		// A new update will have a new hash, so continue and remember this hash.
 		level.Debug(logger).Log("msg", "failed to update consumers and subscribers", "err", err)
 	}
+
+	// Remember the hash of the last fetched version of this subsystem's data
+	cs.lastFetched[subsystem] = hash
 
 	// can't store hash if we dont have store
 	if cs.store == nil {
