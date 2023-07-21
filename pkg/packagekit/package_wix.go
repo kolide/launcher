@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -38,7 +39,7 @@ var wixTemplateBytes []byte
 var assets embed.FS
 
 const (
-	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\signtool.exe`
+	defaultSigntoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\signtool.exe`
 )
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
@@ -151,7 +152,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		if err := authenticode.Sign(
 			ctx, msiFile,
 			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
-			authenticode.WithSigntoolPath(signtoolPath),
+			authenticode.WithSigntoolPath(getSigntoolPath()),
 		); err != nil {
 			return fmt.Errorf("authenticode signing: %w", err)
 		}
@@ -171,6 +172,19 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	setInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
+}
+
+// getSigntoolPath attempts to look up the location of signtool so that
+// we do not have to rely on a hard-coded signtool location that will change
+// when we upgrade to a new version of signtool.
+func getSigntoolPath() string {
+	signtoolPath, err := exec.LookPath("signtool.exe")
+	if err != nil {
+		// Default to a well-known signtool install location
+		return defaultSigntoolPath
+	}
+
+	return signtoolPath
 }
 
 // generateMicrosoftProductCode create a stable guid from a set of
