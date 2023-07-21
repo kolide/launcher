@@ -6,9 +6,10 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"text/template"
@@ -178,9 +179,24 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 // we do not have to rely on a hard-coded signtool location that will change
 // when we upgrade to a new version of signtool.
 func getSigntoolPath() string {
-	signtoolPath, err := exec.LookPath("signtool.exe")
-	if err != nil {
-		// Default to a well-known signtool install location
+	var signtoolPath string
+	root := `C:\Program Files (x86)\Windows Kits` // restrict our lookup to a well-known location
+	fileSystem := os.DirFS(root)
+
+	if err := fs.WalkDir(fileSystem, ".", func(currentPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(currentPath, `x64/signtool.exe`) {
+			signtoolPath = filepath.Join(root, currentPath)
+		}
+		return nil
+	}); err != nil {
+		return defaultSigntoolPath
+	}
+
+	if signtoolPath == "" {
+		// Not found -- default to well-known version/location
 		return defaultSigntoolPath
 	}
 
