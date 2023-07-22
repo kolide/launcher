@@ -59,8 +59,7 @@ func charFor(s Status) string {
 }
 
 func writeSummary(w io.Writer, s Status, name, msg string) {
-	// TODO: tab writer?
-	fmt.Fprintf(w, "%s %s: %s\n", charFor(s), name, msg)
+	fmt.Fprintf(w, "%s\t%s: %s\n", charFor(s), name, msg)
 }
 
 // checkupInt is the generalized checkup interface. It is not meant to be exported.
