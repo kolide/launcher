@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -40,7 +41,7 @@ const (
 	Failing       Status = "Failing"       // Checkup is failing
 )
 
-func CharFor(s Status) string {
+func charFor(s Status) string {
 	switch s {
 	case Informational:
 		return " "
@@ -57,26 +58,75 @@ func CharFor(s Status) string {
 	}
 }
 
-// checkupInt is the generalized checkup interface. It is not meant to be exported.
-type checkupInt interface {
-	Name() string                                        // Checkup name
-	Run(ctx context.Context, fullWriter io.Writer) error // Run the checkup. Errors here are protocol level
-	ExtraFileName() string                               // If this checkup will have extra data, what name should it use in flare
-	Summary() string                                     // Short summary string about the status
-	Status() Status                                      // State of this checkup
-	Data() any                                           // What data objects exist, if any
+func writeSummary(w io.Writer, s Status, name, msg string) {
+	// TODO: tab writer?
+	fmt.Fprintf(w, "%s %s: %s\n", charFor(s), name, msg)
 }
 
-// DoctorCheckup runs a checkup for the doctor command line. Its a small bit of sugar over the io channels
-func doctorCheckup(ctx context.Context, c checkupInt, w io.Writer) {
-	// TODO: maybe a tab writer?
+// checkupInt is the generalized checkup interface. It is not meant to be exported.
+type checkupInt interface {
+	Name() string                                         // Checkup name
+	Run(ctx context.Context, extraWriter io.Writer) error // Run the checkup. Errors here are protocol level
+	ExtraFileName() string                                // If this checkup will have extra data, what name should it use in flare
+	Summary() string                                      // Short summary string about the status
+	Status() Status                                       // State of this checkup
+	Data() any                                            // What data objects exist, if any
+}
 
+type targetBits uint8
+
+const (
+	doctorSupported targetBits = 1 << iota
+	flareSupported
+	logSupported
+)
+
+//const checkupFor iota
+
+func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
+	// This encodes what checkups run in which contexts. This could be pushed down into the checkups directly,
+	// but it seems nice to have it here. TBD
+	var potentialCheckups = []struct {
+		c       checkupInt
+		targets targetBits
+	}{
+		{&Processes{}, doctorSupported | flareSupported},
+		{&Platform{}, doctorSupported | flareSupported},
+		{&Version{k: k}, doctorSupported | flareSupported},
+		{&RootDirectory{k: k}, doctorSupported | flareSupported},
+		{&Connectivity{k: k}, doctorSupported | flareSupported},
+		{&Logs{k: k}, doctorSupported | flareSupported},
+		{&BinaryDirectory{}, doctorSupported | flareSupported},
+		{&launchdCheckup{}, doctorSupported | flareSupported},
+	}
+
+	checkupsToRun := make([]checkupInt, 0)
+	for _, p := range potentialCheckups {
+		if p.targets&target == 0 {
+			continue
+		}
+
+		// Use the absence of a name as a shorthand for not supported. This lets is avoid  platform
+		// flavors of this method
+		if p.c.Name() == "" {
+			continue
+		}
+
+		checkupsToRun = append(checkupsToRun, p.c)
+	}
+
+	return checkupsToRun
+
+}
+
+// doctorCheckup runs a checkup for the doctor command line. Its a small bit of sugar over the io channels
+func doctorCheckup(ctx context.Context, c checkupInt, w io.Writer) {
 	if err := c.Run(ctx, io.Discard); err != nil {
-		fmt.Fprintf(w, "%s %s: Failed to run: %s\n", CharFor(Erroring), c.Name(), err)
+		writeSummary(w, Erroring, c.Name(), fmt.Sprintf("failed to run: %s", err))
 		return
 	}
 
-	fmt.Fprintf(w, "%s %s: %s\n", CharFor(c.Status()), c.Name(), c.Summary())
+	writeSummary(w, c.Status(), c.Name(), c.Summary())
 }
 
 type zipFile interface {
@@ -90,7 +140,7 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 		// This path is used by the zip writer, thus not filepath
 		summaryFlareFH, err := flare.Create(path.Join(c.Name(), "summary.log"))
 		if err != nil {
-			fmt.Fprintf(combinedSummary, "%s %s: error creating flare summary file: %s\n", CharFor(Erroring), c.Name(), err)
+			writeSummary(&summary, Erroring, c.Name(), fmt.Sprintf("error creating flare summary file: %s", err))
 			return
 		}
 
@@ -105,27 +155,27 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 		fullFH, err = flare.Create(path.Join(c.Name(), filename))
 
 		if err != nil {
-			fmt.Fprintf(&summary, "%s %s: error creating flare full file: %s\n", CharFor(Erroring), c.Name(), err)
+			writeSummary(&summary, Erroring, c.Name(), fmt.Sprintf("error creating flare full file: %s", err))
 			return
 		}
 	}
 
 	if err := c.Run(ctx, fullFH); err != nil {
-		fmt.Fprintf(&summary, "%s %s: Failed to run: %s\n", CharFor(Erroring), c.Name(), err)
+		writeSummary(&summary, Erroring, c.Name(), fmt.Sprintf("failed to run: %s", err))
 		return
 	}
 
-	fmt.Fprintf(&summary, "%s %s: %s\n", CharFor(c.Status()), c.Name(), c.Summary())
+	writeSummary(&summary, c.Status(), c.Name(), c.Summary())
 
 	if data := c.Data(); data != nil {
 		dataFH, err := flare.Create(path.Join(c.Name(), "data.json"))
 		if err != nil {
-			fmt.Fprintf(&summary, "%s %s: error creating flare data.json file: %s\n", CharFor(Erroring), c.Name(), err)
+			writeSummary(&summary, Erroring, c.Name(), fmt.Sprintf("error creating flare data.json file: %s", err))
 			return
 		}
 
 		if err := json.NewEncoder(dataFH).Encode(data); err != nil {
-			fmt.Fprintf(&summary, "%s %s: unable to marshal data: %s\n", CharFor(Erroring), c.Name(), err)
+			writeSummary(&summary, Erroring, c.Name(), fmt.Sprintf("unable to marshal data: %s", err))
 			return
 		}
 	}
@@ -151,20 +201,10 @@ func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolin
 }
 
 func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
-	var checkupsToRun = []checkupInt{
-		&Processes{},
-		&Platform{},
-		&Version{k: k},
-		&RootDirectory{k: k},
-		&Connectivity{k: k},
-		&Logs{k: k},
-		&BinaryDirectory{},
-	}
-
 	failingCheckups := []string{}
 	warningCheckups := []string{}
 
-	for _, c := range checkupsToRun {
+	for _, c := range checkupsFor(k, doctorSupported) {
 		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 		defer cancel()
 
@@ -197,17 +237,14 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	}
 }
 
-func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer) error {
-	var checkupsToRun = []checkupInt{
-		&Processes{},
-		&Platform{},
-		&Version{k: k},
-		&RootDirectory{k: k},
-		&Connectivity{k: k},
-		&Logs{k: k},
-		&BinaryDirectory{},
-	}
+type runtimeEnvironmentTyp string
 
+const (
+	StandaloneEnviroment runtimeEnvironmentTyp = "standalone"
+	InSituEnvironment    runtimeEnvironmentTyp = "in situ"
+)
+
+func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runtimeEnvironment runtimeEnvironmentTyp) error {
 	flare := zip.NewWriter(flareStream)
 	defer func() {
 		_ = flare.Close()
@@ -225,7 +262,13 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer) erro
 		zipSummary.Write(combinedSummary.Bytes())
 	}()
 
-	for _, c := range checkupsToRun {
+	// Note our runtime context.
+	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
+	if _, err := flare.Create(fmt.Sprintf("FLARE_RUNNING_%s", strings.ReplaceAll(strings.ToUpper(string(runtimeEnvironment)), " ", "_"))); err != nil {
+		return fmt.Errorf("making env note file: %s", err)
+	}
+
+	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
 			return fmt.Errorf("writing flare file: %w", err)
