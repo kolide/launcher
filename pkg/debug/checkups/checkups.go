@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
@@ -262,15 +264,39 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runt
 
 	// Note our runtime context.
 	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
-	if _, err := flare.Create(fmt.Sprintf("FLARE_RUNNING_%s", strings.ReplaceAll(strings.ToUpper(string(runtimeEnvironment)), " ", "_"))); err != nil {
-		return fmt.Errorf("making env note file: %s", err)
-	}
+	writeFlareEnv(flare, runtimeEnvironment)
 
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
 			return fmt.Errorf("writing flare file: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func writeFlareEnv(z *zip.Writer, runtimeEnvironment runtimeEnvironmentTyp) error {
+	if _, err := z.Create(fmt.Sprintf("FLARE_RUNNING_%s", strings.ReplaceAll(strings.ToUpper(string(runtimeEnvironment)), " ", "_"))); err != nil {
+		return fmt.Errorf("making env note file: %s", err)
+	}
+
+	flareEnvironment := map[string]any{
+		"goos":    runtime.GOOS,
+		"goarch":  runtime.GOARCH,
+		"mode":    runtimeEnvironment,
+		"version": version.Version(),
+	}
+
+	flareEnvironmentPlatformSpecifics(flareEnvironment)
+
+	out, err := z.Create("metadata.json")
+	if err != nil {
+		return fmt.Errorf("making metadata.json: %s", err)
+	}
+
+	if err := json.NewEncoder(out).Encode(flareEnvironment); err != nil {
+		return fmt.Errorf("marshaling metadata.json: %s", err)
 	}
 
 	return nil
