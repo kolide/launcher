@@ -11,16 +11,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type secretCheckup struct {
+type enrollSecretCheckup struct {
 	summary string
 	status  Status
 }
 
-func (c *secretCheckup) Name() string {
+func (c *enrollSecretCheckup) Name() string {
 	return "Enrollment Secret"
 }
 
-func (c *secretCheckup) Run(_ context.Context, extraFH io.Writer) error {
+func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	secretStatus := make(map[string]Status, 0)
 	secretSummary := make(map[string]string, 0)
 
@@ -58,19 +58,19 @@ func (c *secretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (c *secretCheckup) ExtraFileName() string {
+func (c *enrollSecretCheckup) ExtraFileName() string {
 	return "secret-info.log"
 }
 
-func (c *secretCheckup) Status() Status {
+func (c *enrollSecretCheckup) Status() Status {
 	return c.status
 }
 
-func (c *secretCheckup) Summary() string {
+func (c *enrollSecretCheckup) Summary() string {
 	return c.summary
 }
 
-func (c *secretCheckup) Data() any {
+func (c *enrollSecretCheckup) Data() any {
 	return nil
 }
 
