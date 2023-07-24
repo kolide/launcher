@@ -2,6 +2,7 @@ package checkups
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 
 type Processes struct {
 	kolideCount int
-	data        []string // FIXME: this should be more structured
+	data        []map[string]any
 }
 
 func (c *Processes) Name() string {
@@ -24,32 +25,44 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		return errors.New("missing io.Writer")
 	}
 
-	c.data = []string{}
+	c.data = []map[string]any{}
 
 	ps, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting process list: %w", err)
 	}
 
+	jsonWriter := json.NewEncoder(fullWriter)
+
 	for _, p := range ps {
+		// This doesn't feel great yet. I'm not sure what data we need, and some of the gopsutil stuff has
+		// weird extraneous exec routines. So this is a starting point
+		pMap := map[string]any{
+			"pid":         p.Pid,
+			"exe":         naIfError(p.ExeWithContext(ctx)),
+			"cmdline":     naIfError(p.CmdlineSliceWithContext(ctx)),
+			"create_time": naIfError(p.CreateTimeWithContext(ctx)),
+			"ppid":        naIfError(p.PpidWithContext(ctx)),
+			"mem_info":    naIfError(p.MemoryInfoWithContext(ctx)),
+			"mem_info_ex": naIfError(p.MemoryInfoExWithContext(ctx)),
+			"cpu_times":   naIfError(p.TimesWithContext(ctx)),
+			"status":      naIfError(p.StatusWithContext(ctx)),
+			"uids":        naIfError(p.UidsWithContext(ctx)),
+		}
+		_ = jsonWriter.Encode(pMap)
+
 		exe, _ := p.Exe()
-
-		// full gets the full process logs. This lets us examine them for processes that might interfere.
-		fmt.Fprintf(fullWriter, p.String())
-
 		if strings.Contains(strings.ToLower(exe), "kolide") {
 			c.kolideCount += 1
+			c.data = append(c.data, pMap)
 		}
-
-		// FIXME: this should be more structured
-		c.data = append(c.data, p.String())
 	}
 
 	return nil
 }
 
 func (c *Processes) ExtraFileName() string {
-	return "process.txt"
+	return "process.json"
 }
 
 func (c *Processes) Status() Status {
@@ -66,4 +79,12 @@ func (c *Processes) Summary() string {
 
 func (c *Processes) Data() any {
 	return c.data
+}
+
+func naIfError(val any, err error) any {
+
+	if err != nil {
+		return fmt.Sprintf("error: %s", err)
+	}
+	return val
 }
