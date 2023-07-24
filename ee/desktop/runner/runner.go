@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -671,17 +672,14 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 		return "", fmt.Errorf("chowning user folder: %w", err)
 	}
 
-	path := filepath.Join(userFolderPath, "kolide_desktop.sock")
+	rand.Seed(time.Now().UnixNano())
+
+	// using random 4 digit number instead of ulid to keep name short so we don't
+	// exceed char limit
+	path := filepath.Join(userFolderPath, fmt.Sprintf("desktop_%d.sock", rand.Intn(10000)))
 	const maxSocketLength = 103
 	if len(path) > maxSocketLength {
 		return "", fmt.Errorf("socket path %s (length %d) is too long, max is %d", path, len(path), maxSocketLength)
-	}
-
-	// remove existing socket if it exists
-	if err := backoff.WaitFor(func() error {
-		return os.RemoveAll(path)
-	}, 5*time.Second, 250*time.Millisecond); err != nil {
-		return "", fmt.Errorf("removing desktop socket: %w", err)
 	}
 
 	return path, nil
