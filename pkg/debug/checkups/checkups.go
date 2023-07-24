@@ -43,7 +43,7 @@ const (
 	Failing       Status = "Failing"       // Checkup is failing
 )
 
-func charFor(s Status) string {
+func (s Status) Emoji() string {
 	switch s {
 	case Informational:
 		return " "
@@ -61,7 +61,7 @@ func charFor(s Status) string {
 }
 
 func writeSummary(w io.Writer, s Status, name, msg string) {
-	fmt.Fprintf(w, "%s\t%s: %s\n", charFor(s), name, msg)
+	fmt.Fprintf(w, "%s\t%s: %s\n", s.Emoji(), name, msg)
 }
 
 // checkupInt is the generalized checkup interface. It is not meant to be exported.
