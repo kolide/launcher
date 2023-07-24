@@ -53,16 +53,15 @@ func TestGenerateMicrosoftProductCode(t *testing.T) {
 func Test_getSigntoolPath(t *testing.T) {
 	t.Parallel()
 
-	signtoolPath := getSigntoolPath()
+	signtoolPath, err := getSigntoolPath()
 
 	switch runtime.GOOS {
 	case "windows":
-		// We should expect to find signtool somewhere, but not necessarily at
-		// our default path.
+		// We should expect to find signtool somewhere.
+		require.NoError(t, err, "did not expect error finding signtool")
 		require.True(t, strings.HasSuffix(signtoolPath, "signtool.exe"))
 	case "darwin", "linux":
-		// Tests the case where signtool.exe won't be found. We don't actually
-		// expect to run wix on darwin or linux.
-		require.Equal(t, defaultSigntoolPath, signtoolPath, "expected fallback to default signtool path when signtool isn't present")
+		// Tests the case where signtool.exe won't be found.
+		require.Error(t, err, "expected to error when signtool is not present")
 	}
 }
