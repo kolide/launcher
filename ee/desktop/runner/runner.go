@@ -672,8 +672,6 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 		return "", fmt.Errorf("chowning user folder: %w", err)
 	}
 
-	rand.Seed(time.Now().UnixNano())
-
 	// using random 4 digit number instead of ulid to keep name short so we don't
 	// exceed char limit
 	path := filepath.Join(userFolderPath, fmt.Sprintf("desktop_%d.sock", rand.Intn(10000)))
