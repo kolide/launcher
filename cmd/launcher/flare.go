@@ -49,7 +49,7 @@ func runFlare(args []string) error {
 	k := knapsack.New(nil, flagController, nil)
 
 	ctx := context.Background()
-	checkups.RunFlare(ctx, k, flare)
+	checkups.RunFlare(ctx, k, flare, checkups.StandaloneEnviroment)
 
 	return nil
 }
