@@ -677,6 +677,13 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 		return "", fmt.Errorf("socket path %s (length %d) is too long, max is %d", path, len(path), maxSocketLength)
 	}
 
+	// remove existing socket if it exists
+	if err := backoff.WaitFor(func() error {
+		return os.RemoveAll(path)
+	}, 5*time.Second, 250*time.Millisecond); err != nil {
+		return "", fmt.Errorf("removing desktop socket: %w", err)
+	}
+
 	return path, nil
 }
 
