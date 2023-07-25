@@ -18,6 +18,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
@@ -110,8 +111,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		)
 	}
 
-	if err := os.MkdirAll(rootDirectory, 0700); err != nil {
+	if err := os.MkdirAll(rootDirectory, fsutil.DirMode); err != nil {
 		return fmt.Errorf("creating root directory: %w", err)
+	}
+	// Ensure permissions are correct, regardless of umask settings -- we use
+	// DirMode (0755) because the desktop processes that run as the user
+	// must be able to access the root directory as well.
+	if err := os.Chmod(filepath.Dir(rootDirectory), fsutil.DirMode); err != nil {
+		return fmt.Errorf("chmodding root directory parent: %w", err)
+	}
+	if err := os.Chmod(rootDirectory, fsutil.DirMode); err != nil {
+		return fmt.Errorf("chmodding root directory: %w", err)
 	}
 
 	if _, err := osquery.DetectPlatform(); err != nil {
