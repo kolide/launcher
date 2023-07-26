@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/peterbourgon/ff/v3"
 )
 
 type BinaryUpdateInfo struct {
@@ -16,9 +20,88 @@ type BinaryUpdateInfo struct {
 	Version string
 }
 
+type autoupdateConfig struct {
+	rootDirectory   string
+	updateDirectory string
+	channel         string
+}
+
+// CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
+// searching for launcher configuration values in its config file.
+// For now, it is only available when launcher is on the nightly update channel.
+func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
+	cfg, err := getAutoupdateConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
+	}
+
+	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+}
+
+// getAutoupdateConfig reads launcher's config file to determine the configuration values
+// needed to work with the autoupdate library.
+func getAutoupdateConfig() (*autoupdateConfig, error) {
+	configFilePath := getConfigFilePath()
+	if configFilePath == "" {
+		return nil, errors.New("could not get config file path")
+	}
+	if _, err := os.Stat(configFilePath); err != nil && os.IsNotExist(err) {
+		return nil, fmt.Errorf("could not read config file because it does not exist at %s: %w", configFilePath, err)
+	}
+
+	cfgFileHandle, err := os.Open(configFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file %s for reading: %w", configFilePath, err)
+	}
+	defer cfgFileHandle.Close()
+
+	cfg := &autoupdateConfig{}
+	if err := ff.PlainParser(cfgFileHandle, func(name, value string) error {
+		switch name {
+		case "root_directory":
+			cfg.rootDirectory = value
+		case "update_directory":
+			cfg.updateDirectory = value
+		case "update_channel":
+			cfg.channel = value
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("could not parse config file %s: %w", configFilePath, err)
+	}
+
+	return cfg, nil
+}
+
+// getConfigFilePath returns the path to launcher's launcher.flags file. If the path
+// is available in the command-line args, it will return that path; otherwise, it
+// will fall back to a well-known location.
+func getConfigFilePath() string {
+	for i, arg := range os.Args[1:] {
+		if arg == "--config" || arg == "-config" {
+			return strings.Trim(os.Args[i+1], `"'`)
+		}
+	}
+
+	// Not found in command-line arguments -- return well-known location instead
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		return "/etc/kolide-k2/launcher.flags"
+	case "windows":
+		return `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`
+	default:
+		return ""
+	}
+}
+
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
 func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
+	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
+	if channel != "nightly" {
+		return nil, fmt.Errorf("not rolling out new TUF to non-nightly channel %s", channel)
+	}
+
 	if updateDirectory == "" {
 		updateDirectory = defaultLibraryDirectory(rootDirectory)
 	}

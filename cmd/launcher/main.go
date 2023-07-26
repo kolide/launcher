@@ -10,11 +10,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/log/locallogger"
@@ -52,7 +54,7 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		newerBinary, err := autoupdate.FindNewestSelf(ctx)
+		newerBinary, err := latestLauncherPath(ctx, logger)
 		if err != nil {
 			logutil.Fatal(logger, err, "checking for updated version")
 		}
@@ -149,6 +151,39 @@ func runSubcommands() error {
 
 	return nil
 
+}
+
+// latestLauncherPath looks for the latest version of launcher in the new autoupdate library,
+// falling back to the old library if necessary.
+func latestLauncherPath(ctx context.Context, logger log.Logger) (string, error) {
+	newerBinary, err := tuf.CheckOutLatestWithoutConfig("launcher", logger)
+	if err != nil {
+		level.Error(logger).Log(
+			"msg", "could not check out latest launcher, will fall back to old autoupdate library",
+			"err", err,
+		)
+
+		// Fall back to legacy autoupdate library
+		newerBinaryPath, err := autoupdate.FindNewestSelf(ctx)
+		if err != nil {
+			return "", fmt.Errorf("finding newest self: %w", err)
+		}
+
+		return newerBinaryPath, nil
+	}
+
+	if newerBinary.Version != version.Version().Version {
+		level.Error(logger).Log(
+			"msg", "got new version of launcher to run",
+			"old_version", version.Version().Version,
+			"new_binary_version", newerBinary.Version,
+			"new_binary_path", newerBinary.Path,
+		) // TODO RM
+		return newerBinary.Path, nil
+	}
+
+	// Already running latest version, nothing to do here
+	return "", nil
 }
 
 func commandUsage(fs *flag.FlagSet, short string) func() {
