@@ -117,11 +117,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// Ensure permissions are correct, regardless of umask settings -- we use
 	// DirMode (0755) because the desktop processes that run as the user
 	// must be able to access the root directory as well.
-	if err := os.Chmod(filepath.Dir(rootDirectory), fsutil.DirMode); err != nil {
-		return fmt.Errorf("chmodding root directory parent: %w", err)
-	}
 	if err := os.Chmod(rootDirectory, fsutil.DirMode); err != nil {
 		return fmt.Errorf("chmodding root directory: %w", err)
+	}
+	if filepath.Dir(rootDirectory) == "/var/kolide-k2" {
+		// We need to ensure the same for the parent of the root directory, but we only
+		// want to do the same for Kolide-created directories.
+		if err := os.Chmod(filepath.Dir(rootDirectory), fsutil.DirMode); err != nil {
+			return fmt.Errorf("chmodding root directory parent: %w", err)
+		}
 	}
 
 	if _, err := osquery.DetectPlatform(); err != nil {
