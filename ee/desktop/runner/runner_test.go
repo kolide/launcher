@@ -304,6 +304,10 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" {
+		t.Skip("windows sockets differently, test does not apply")
+	}
+
 	runner := DesktopUsersProcessesRunner{}
 
 	u, err := user.Current()
