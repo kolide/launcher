@@ -300,3 +300,74 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	err = r.SendNotification(notify.Notification{Title: "test", Body: "test"})
 	require.Error(t, err, "should not be able to send notification when there are no child processes")
 }
+
+func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
+	t.Parallel()
+
+	runner := DesktopUsersProcessesRunner{}
+
+	u, err := user.Current()
+	require.NoError(t, err)
+
+	socketPath, err := runner.setupSocketPath(u.Uid)
+	require.NoError(t, err)
+
+	// get dir of socket path
+	socketDir := filepath.Dir(socketPath)
+
+	shouldNotBeDeletedFilePath := filepath.Join(socketDir, "dont_delete_me")
+	require.NoError(t, os.WriteFile(shouldNotBeDeletedFilePath, []byte{}, 0600))
+
+	// create some fake socket files to get cleaned up
+	for i := 0; i < 3; i++ {
+		socketPath := filepath.Join(socketDir, fmt.Sprintf("%s%d", nonWindowsDesktopSocketPrefix, i))
+		require.NoError(t, os.WriteFile(socketPath, []byte{}, 0600))
+	}
+
+	// sanity check that files got created
+	count, err := countFilesWithPrefix(socketDir, "")
+	require.Equal(t, 4, count)
+
+	// calling set up socket path should remove the fake socket files
+	_, err = runner.setupSocketPath(u.Uid)
+	require.NoError(t, err)
+
+	// make sure all old sockets got deleted
+	count, err = countFilesWithPrefix(socketDir, nonWindowsDesktopSocketPrefix)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	// make sure non socket file did not get deleted
+	count, err = countFilesWithPrefix(socketDir, "")
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// clean up the extra file
+	require.NoError(t, os.Remove(shouldNotBeDeletedFilePath))
+}
+
+func countFilesWithPrefix(folderPath, prefix string) (int, error) {
+	count := 0
+
+	if err := filepath.WalkDir(folderPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !strings.HasPrefix(d.Name(), prefix) {
+			return nil
+		}
+
+		// not dir, has prefix
+		count++
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

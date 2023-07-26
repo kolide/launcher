@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,8 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
+
+const nonWindowsDesktopSocketPrefix = "desktop.sock"
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
 
@@ -483,7 +486,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		// recognized by the runner server
 		r.runnerServer.DeRegisterClient(uid)
 
-		socketPath, err := r.socketPath(uid)
+		socketPath, err := r.setupSocketPath(uid)
 		if err != nil {
 			return fmt.Errorf("getting socket path: %w", err)
 		}
@@ -650,10 +653,11 @@ func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord)
 	return true
 }
 
-// socketPath returns standard pipe path for windows.
-// On posix systems, it creates a folder and changes owner to the user
-// then provides a path to the socket in that folder
-func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
+// setupSocketPath returns standard pipe path for windows.
+// On posix systems, it creates a directory and changes owner to the user,
+// deletes any existing desktop sockets in the directory,
+// then provides a path to the socket in that folder.
+func (r *DesktopUsersProcessesRunner) setupSocketPath(uid string) (string, error) {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf(`\\.\pipe\kolide_desktop_%s`, ulid.New()), nil
 	}
@@ -672,9 +676,17 @@ func (r *DesktopUsersProcessesRunner) socketPath(uid string) (string, error) {
 		return "", fmt.Errorf("chowning user folder: %w", err)
 	}
 
+	if err := removeFilesWithPrefix(userFolderPath, nonWindowsDesktopSocketPrefix); err != nil {
+		level.Info(r.logger).Log(
+			"msg", "removing existing desktop sockets for user",
+			"uid", uid,
+			"err", err,
+		)
+	}
+
 	// using random 4 digit number instead of ulid to keep name short so we don't
 	// exceed char limit
-	path := filepath.Join(userFolderPath, fmt.Sprintf("desktop_%d.sock", rand.Intn(10000)))
+	path := filepath.Join(userFolderPath, fmt.Sprintf("%s_%d", nonWindowsDesktopSocketPrefix, rand.Intn(10000)))
 	const maxSocketLength = 103
 	if len(path) > maxSocketLength {
 		return "", fmt.Errorf("socket path %s (length %d) is too long, max is %d", path, len(path), maxSocketLength)
@@ -764,4 +776,23 @@ func iconFilename() string {
 
 func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
 	return filepath.Join(r.usersFilesRoot, iconFilename())
+}
+
+func removeFilesWithPrefix(folderPath, prefix string) error {
+	return filepath.WalkDir(folderPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !strings.HasPrefix(d.Name(), prefix) {
+			return nil
+		}
+
+		// not dir, has prefix
+		return os.Remove(path)
+	})
 }
