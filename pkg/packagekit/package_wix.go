@@ -6,8 +6,11 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"text/template"
@@ -37,9 +40,7 @@ var wixTemplateBytes []byte
 //go:embed assets/*
 var assets embed.FS
 
-const (
-	signtoolPath = `C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\signtool.exe`
-)
+var signtoolVersionRegex = regexp.MustCompile(`^(.+)\/x64\/signtool\.exe$`)
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
 	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
@@ -148,6 +149,10 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	// Sign?
 	if po.WindowsUseSigntool {
+		signtoolPath, err := getSigntoolPath()
+		if err != nil {
+			return fmt.Errorf("looking up signtool location: %w", err)
+		}
 		if err := authenticode.Sign(
 			ctx, msiFile,
 			authenticode.WithExtraArgs(po.WindowsSigntoolArgs),
@@ -171,6 +176,49 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	setInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
+}
+
+// getSigntoolPath attempts to look up the location of signtool so that
+// we do not have to rely on a hard-coded signtool location that will change
+// when we upgrade to a new version of signtool.
+func getSigntoolPath() (string, error) {
+	var signtoolPath string
+	signtoolVersion := "0.0.0.0"
+
+	root := `C:\Program Files (x86)\Windows Kits\10\bin` // restrict our lookup to a well-known location
+	fileSystem := os.DirFS(root)
+
+	if err := fs.WalkDir(fileSystem, ".", func(currentPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		// We expect signing to happen on a build machine with 64-bit architecture, so we restrict
+		// our matches accordingly
+		if !d.IsDir() && strings.HasSuffix(currentPath, `x64/signtool.exe`) {
+			// Parse out the version -- we expect the current path to look something like 10.0.18362.0/x64/signtool.exe
+			versionMatches := signtoolVersionRegex.FindStringSubmatch(currentPath)
+			if len(versionMatches) < 2 {
+				return nil
+			}
+
+			// We can't parse it as a semver, but simple string comparison works fine.
+			if versionMatches[1] > signtoolVersion {
+				signtoolVersion = versionMatches[1]
+				signtoolPath = filepath.Join(root, currentPath)
+			}
+
+			return nil
+		}
+		return nil
+	}); err != nil {
+		return "", fmt.Errorf("walking %s: %w", root, err)
+	}
+
+	if signtoolPath == "" {
+		return "", fmt.Errorf("signtool.exe not found in %s", root)
+	}
+
+	return signtoolPath, nil
 }
 
 // generateMicrosoftProductCode create a stable guid from a set of
