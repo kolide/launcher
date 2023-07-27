@@ -116,4 +116,7 @@ type Options struct {
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string
+
+	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
+	LocalDevelopmentPath string
 }

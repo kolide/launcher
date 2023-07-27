@@ -38,11 +38,11 @@ func runInteractive(args []string) error {
 	if osquerydPath == "" {
 		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", log.NewNopLogger())
 		if err != nil {
-			// Fall back to old autoupdate library
 			osquerydPath = findOsquery()
 			if osquerydPath == "" {
 				return errors.New("could not find osqueryd binary")
 			}
+			// Fall back to old autoupdate library
 			osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
 		} else {
 			osquerydPath = latestOsquerydBinary.Path

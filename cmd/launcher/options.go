@@ -114,6 +114,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
+		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -250,6 +251,7 @@ func parseOptions(subcommandName string, args []string) (*launcher.Options, erro
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
 		LogIngestServerURL:                 *flLogIngestServerURL,
+		LocalDevelopmentPath:               *flLocalDevelopmentPath,
 		TraceIngestServerURL:               *flTraceIngestServerURL,
 		DisableTraceIngestTLS:              *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,

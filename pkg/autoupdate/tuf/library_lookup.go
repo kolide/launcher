@@ -21,9 +21,10 @@ type BinaryUpdateInfo struct {
 }
 
 type autoupdateConfig struct {
-	rootDirectory   string
-	updateDirectory string
-	channel         string
+	rootDirectory        string
+	updateDirectory      string
+	channel              string
+	localDevelopmentPath string
 }
 
 var channelsUsingLegacyAutoupdate = map[string]bool{
@@ -38,6 +39,11 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 	cfg, err := getAutoupdateConfig()
 	if err != nil {
 		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
+	}
+
+	// Short-circuit lookup for local launcher test builds
+	if binary == binaryLauncher && cfg.localDevelopmentPath != "" {
+		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
 	}
 
 	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
@@ -69,6 +75,8 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 			cfg.updateDirectory = value
 		case "update_channel":
 			cfg.channel = value
+		case "localdev_path":
+			cfg.localDevelopmentPath = value
 		}
 		return nil
 	}); err != nil {
