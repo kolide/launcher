@@ -26,6 +26,11 @@ type autoupdateConfig struct {
 	channel         string
 }
 
+var channelsUsingLegacyAutoupdate = map[string]bool{
+	"stable": true,
+	"beta":   true,
+}
+
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
 // For now, it is only available when launcher is on the nightly update channel.
@@ -98,8 +103,8 @@ func getConfigFilePath() string {
 // as its version.
 func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
-	if channel != "nightly" {
-		return nil, fmt.Errorf("not rolling out new TUF to non-nightly channel %s", channel)
+	if _, ok := channelsUsingLegacyAutoupdate[channel]; ok {
+		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
 	}
 
 	if updateDirectory == "" {
@@ -160,7 +165,7 @@ func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (
 
 	// No valid versions in the library
 	if len(validVersionsInLibrary) < 1 {
-		return nil, errors.New("no versions in library")
+		return nil, fmt.Errorf("no versions of %s in library at %s", binary, baseUpdateDirectory)
 	}
 
 	// Versions are sorted in ascending order -- return the last one
