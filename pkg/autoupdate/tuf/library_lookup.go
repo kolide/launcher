@@ -153,7 +153,7 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
 	if autoupdate.CheckExecutable(context.TODO(), targetPath, "--version") != nil {
-		return nil, fmt.Errorf("version %s from target %s either not yet downloaded or corrupted: %w", targetVersion, targetName, err)
+		return nil, fmt.Errorf("version %s from target %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, err)
 	}
 
 	return &BinaryUpdateInfo{
