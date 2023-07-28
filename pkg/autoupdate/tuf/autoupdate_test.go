@@ -115,6 +115,7 @@ func TestExecute(t *testing.T) {
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
 	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
+	mockLibraryManager.On("Close").Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
@@ -225,6 +226,7 @@ func Test_storeError(t *testing.T) {
 	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
 	// for launcher in tests.
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+	mockLibraryManager.On("Close").Return(nil)
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
