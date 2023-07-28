@@ -214,7 +214,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		signal.Notify(sigChannel, os.Interrupt)
 		select {
 		case <-sigChannel:
-			level.Info(logger).Log("msg", "beginnning shutdown via signal")
+			level.Info(logger).Log("msg", "beginning shutdown via signal")
 			return nil
 		}
 	}, func(err error) {
@@ -434,6 +434,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			mirrorClient,
 			extension,
 			tuf.WithLogger(logger),
+			tuf.WithOsqueryRestart(runnerRestart),
 		)
 		if err != nil {
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
