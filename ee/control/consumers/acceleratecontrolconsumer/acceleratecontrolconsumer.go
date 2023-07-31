@@ -33,25 +33,19 @@ func (c *AccelerateControlConsumer) Update(data io.Reader) error {
 	}
 
 	accelerate_data := struct {
-		Interval string `json:"interval"`
-		Duration string `json:"duration"`
+		// expected to come in from contorl server in seconds
+		Interval int `json:"interval"`
+		Duration int `json:"duration"`
 	}{}
 
 	if err := json.NewDecoder(data).Decode(&accelerate_data); err != nil {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
-	intervalDuration, err := time.ParseDuration(accelerate_data.Interval)
-	if err != nil {
-		return fmt.Errorf("failed to parse interval: %w", err)
-	}
-
-	durationDuration, err := time.ParseDuration(accelerate_data.Duration)
-	if err != nil {
-		return fmt.Errorf("failed to parse duration: %w", err)
-	}
-
-	c.overrider.SetControlRequestIntervalOverride(intervalDuration, durationDuration)
+	c.overrider.SetControlRequestIntervalOverride(
+		time.Duration(accelerate_data.Interval)*time.Second,
+		time.Duration(accelerate_data.Duration)*time.Second,
+	)
 
 	return nil
 }

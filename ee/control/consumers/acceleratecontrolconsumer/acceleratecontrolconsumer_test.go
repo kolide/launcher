@@ -3,9 +3,9 @@ package acceleratecontrolconsumer
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,13 +13,17 @@ func TestAccelerateControlConsumer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		data    string
-		wantErr bool
+		name             string
+		data             string
+		expectedInterval time.Duration
+		expectedDuration time.Duration
+		wantErr          bool
 	}{
 		{
-			name: "happy path",
-			data: `{"interval": "10s", "duration": "10s"}`,
+			name:             "happy path",
+			data:             `{"interval": 123, "duration": 456}`,
+			expectedInterval: 123 * time.Second,
+			expectedDuration: 456 * time.Second,
 		},
 		{
 			name:    "bad json",
@@ -27,23 +31,13 @@ func TestAccelerateControlConsumer(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "no interval",
-			data:    `{"duration": "10s"}`,
-			wantErr: true,
-		},
-		{
 			name:    "bad interval",
-			data:    `{"interval": "ABC", "duration": "10s"}`,
-			wantErr: true,
-		},
-		{
-			name:    "no duration",
-			data:    `{"interval": "10s"}`,
+			data:    `{"interval": "ABC", "duration": 10}`,
 			wantErr: true,
 		},
 		{
 			name:    "bad duration",
-			data:    `{"interval": "10s", "duration": "ABC"}`,
+			data:    `{"interval": 10, "duration": "ABC"}`,
 			wantErr: true,
 		},
 	}
@@ -55,7 +49,7 @@ func TestAccelerateControlConsumer(t *testing.T) {
 			mockSack := mocks.NewKnapsack(t)
 
 			if !tt.wantErr {
-				mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
+				mockSack.On("SetControlRequestIntervalOverride", tt.expectedInterval, tt.expectedDuration)
 			}
 
 			c := New(mockSack)
@@ -65,6 +59,7 @@ func TestAccelerateControlConsumer(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
+
 			require.NoError(t, err)
 		})
 	}
