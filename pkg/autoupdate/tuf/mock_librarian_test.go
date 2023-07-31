@@ -40,6 +40,20 @@ func (_m *Mocklibrarian) Available(binary autoupdatableBinary, targetFilename st
 	return r0
 }
 
+// Close provides a mock function with given fields:
+func (_m *Mocklibrarian) Close() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // TidyLibrary provides a mock function with given fields: binary, currentVersion
 func (_m *Mocklibrarian) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
 	_m.Called(binary, currentVersion)

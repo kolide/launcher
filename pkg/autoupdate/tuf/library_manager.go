@@ -67,6 +67,14 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 	return &ulm, nil
 }
 
+// Close cleans up the temporary staging directory
+func (ulm *updateLibraryManager) Close() error {
+	if err := os.RemoveAll(ulm.stagingDir); err != nil {
+		return fmt.Errorf("could not remove staging dir %s: %w", ulm.stagingDir, err)
+	}
+	return nil
+}
+
 // updatesDirectory returns the update library location for the given binary.
 func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) string {
 	return filepath.Join(baseUpdateDirectory, string(binary))
@@ -168,23 +176,26 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
 		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
 	}
+	defer func() {
+		// In case of error, clean up the staged version
+		if err := os.RemoveAll(stagedVersionedDirectory); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not remove staged update", "err", err, "directory", stagedVersionedDirectory)
+		}
+	}()
 
 	// Untar the archive. Note that `UntarBundle` calls `filepath.Dir(destination)`, so the inclusion of `binary`
 	// here doesn't matter as it's immediately stripped off.
 	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
 	// Make sure that the binary is executable
 	if err := os.Chmod(executableLocation(stagedVersionedDirectory, binary), 0755); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
 	// Validate the executable
 	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
-		ulm.removeUpdate(binary, targetVersion)
 		return fmt.Errorf("could not verify executable: %w", err)
 	}
 
@@ -229,7 +240,7 @@ func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
 	}
 
 	for _, match := range matches {
-		if err := os.Remove(match); err != nil {
+		if err := os.RemoveAll(match); err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not remove staged update when tidying update library", "file", match, "err", err)
 		}
 	}

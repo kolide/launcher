@@ -27,38 +27,6 @@ func setDefaultPaths() {
 	}
 }
 
-// getAppBinaryPaths returns the platform specific path where binaries are installed
-func getAppBinaryPaths() []string {
-	var paths []string
-	switch runtime.GOOS {
-	case "darwin":
-		paths = []string{
-			filepath.Join(defaultBinDirectoryPath, "Kolide.app", "Contents", "MacOS", "launcher"),
-		}
-	case "linux":
-		paths = []string{
-			filepath.Join(defaultBinDirectoryPath, "launcher"),
-		}
-	case "windows":
-		paths = []string{
-			filepath.Join(defaultBinDirectoryPath, "launcher.exe"),
-		}
-	}
-	return paths
-}
-
-// getFilepaths returns a list of file paths matching the pattern
-func getFilepaths(elem ...string) []string {
-	fileGlob := filepath.Join(elem...)
-	filepaths, err := filepath.Glob(fileGlob)
-
-	if err == nil && len(filepaths) > 0 {
-		return filepaths
-	}
-
-	return nil
-}
-
 // windowsAddExe appends ".exe" to the input string when running on Windows
 func windowsAddExe(in string) string {
 	if runtime.GOOS == "windows" {

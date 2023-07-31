@@ -1,6 +1,8 @@
 package packagekit
 
 import (
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,5 +48,20 @@ func TestGenerateMicrosoftProductCode(t *testing.T) {
 		require.Equal(t, len("XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"), len(guid))
 		require.Equal(t, tt.out, guid)
 	}
+}
 
+func Test_getSigntoolPath(t *testing.T) {
+	t.Parallel()
+
+	signtoolPath, err := getSigntoolPath()
+
+	switch runtime.GOOS {
+	case "windows":
+		// We should expect to find signtool somewhere.
+		require.NoError(t, err, "did not expect error finding signtool")
+		require.True(t, strings.HasSuffix(signtoolPath, "signtool.exe"))
+	case "darwin", "linux":
+		// Tests the case where signtool.exe won't be found.
+		require.Error(t, err, "expected to error when signtool is not present")
+	}
 }
