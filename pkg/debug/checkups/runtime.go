@@ -82,7 +82,9 @@ func gatherStack(z *zip.Writer) error {
 
 	buf := make([]byte, 1<<32)
 	stacklen := runtime.Stack(buf, true)
-	out.Write(buf[0:stacklen])
+	if _, err := out.Write(buf[0:stacklen]); err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
 
 	return nil
 }
@@ -108,7 +110,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	}
 
 	if err := pprof.StartCPUProfile(out); err != nil {
-		return fmt.Errorf("startint CPU profile: %w", err)
+		return fmt.Errorf("starting CPU profile: %w", err)
 	}
 	defer pprof.StopCPUProfile()
 

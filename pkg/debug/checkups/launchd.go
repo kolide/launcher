@@ -51,11 +51,16 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	zippedPlist, err := extraZip.Create(filepath.Base(launchdPlistPath))
 	if err != nil {
 		c.status = Erroring
-		c.summary = fmt.Sprintf("unable to write extra information: %s", err)
+		c.summary = fmt.Sprintf("unable to create extra information: %s", err)
 		return nil
 	}
 
-	io.Copy(zippedPlist, launchdPlist)
+	if _, err := io.Copy(zippedPlist, launchdPlist); err != nil {
+		c.status = Erroring
+		c.summary = fmt.Sprintf("unable to write extra information: %s", err)
+		return nil
+
+	}
 
 	// run launchctl to check status
 	var printOut bytes.Buffer
@@ -72,10 +77,15 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	zippedOut, err := extraZip.Create("launchctl-print.txt")
 	if err != nil {
 		c.status = Erroring
-		c.summary = fmt.Sprintf("unable to write launchctl-print.txt: %s", err)
+		c.summary = fmt.Sprintf("unable to create launchctl-print.txt: %s", err)
 		return nil
 	}
-	zippedOut.Write(printOut.Bytes())
+	if _, err := zippedOut.Write(printOut.Bytes()); err != nil {
+		c.status = Erroring
+		c.summary = fmt.Sprintf("unable to write launchctl-print.txt: %s", err)
+		return nil
+
+	}
 
 	if !strings.Contains(printOut.String(), "state = running") {
 		c.status = Failing
