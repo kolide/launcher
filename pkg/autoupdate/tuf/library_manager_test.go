@@ -43,6 +43,25 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
 }
 
+func TestClose(t *testing.T) {
+	t.Parallel()
+
+	testBaseDir := filepath.Join(t.TempDir(), "updates")
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	require.NoError(t, err, "unexpected error creating new update library manager")
+
+	stagedDownloadDir, err := os.Stat(testLibraryManager.stagingDir)
+	require.NoError(t, err, "could not stat staged osqueryd download dir")
+	require.True(t, stagedDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
+
+	// Close the library
+	require.NoError(t, testLibraryManager.Close(), "expected no error on closing library")
+
+	// Confirm staged download directory is gone
+	_, err = os.Stat(testLibraryManager.stagingDir)
+	require.True(t, os.IsNotExist(err), "expected staged download dir to be removed on Close")
+}
+
 func Test_pathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 

@@ -52,6 +52,7 @@ type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
+	Close() error
 }
 
 type querier interface {
@@ -195,6 +196,9 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
+	if err := ta.libraryManager.Close(); err != nil {
+		level.Debug(ta.logger).Log("msg", "could not close library on interrupt", "err", err)
+	}
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
