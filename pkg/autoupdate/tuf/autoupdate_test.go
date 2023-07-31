@@ -122,7 +122,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
-	// Check log lines to confirm that we see the log `received interrupt, stopping`, indicating that
+	// Check log lines to confirm that we see the log `received interrupt to restart launcher after update, stopping`, indicating that
 	// the autoupdater shut down at the end
 	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
@@ -130,7 +130,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	require.GreaterOrEqual(t, len(logLines), 1)
 
 	// Check that we shut down
-	require.Contains(t, logLines[len(logLines)-1], "launcher updated -- exiting to load new version")
+	require.Contains(t, logLines[len(logLines)-1], "received interrupt to restart launcher after update, stopping")
 }
 
 func TestExecute_osquerydUpdate(t *testing.T) {
@@ -206,7 +206,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	// Check that we restarted osquery
 	require.True(t, osquerydRestarted, "did not call restart function for osqueryd")
 
-	// Check log lines to confirm that we see the log `received interrupt, stopping`, indicating that
+	// Check log lines to confirm that we see the log `received external interrupt, stopping`, indicating that
 	// the autoupdater shut down at the end
 	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
@@ -214,7 +214,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	require.GreaterOrEqual(t, len(logLines), 1)
 
 	// Check that we shut down
-	require.Contains(t, logLines[len(logLines)-1], "received interrupt, stopping")
+	require.Contains(t, logLines[len(logLines)-1], "received external interrupt, stopping")
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
