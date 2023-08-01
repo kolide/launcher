@@ -114,6 +114,7 @@ func Test_updaterCmd_execute(t *testing.T) {
 			u := &updaterCmd{
 				updater:                 tt.fields.updater,
 				ctx:                     ctx,
+				cancel:                  cancelCtx,
 				stopChan:                tt.fields.stopChan,
 				config:                  tt.fields.config,
 				runUpdaterRetryInterval: tt.fields.runUpdaterRetryInterval,
@@ -194,9 +195,13 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			ctx, cancel := context.WithCancel(context.Background())
+
 			u := &updaterCmd{
 				stopChan: tt.fields.stopChan,
 				config:   tt.fields.config,
+				ctx:      ctx,
+				cancel:   cancel,
 			}
 
 			// using this wait group to ensure that something gets received on u.StopChan
