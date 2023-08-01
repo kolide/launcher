@@ -221,12 +221,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 
 // Interrupt stops creating launcher desktop processes and kills any existing ones.
 // It also signals the execute loop to exit, so new desktop processes cease to spawn.
-func (r *DesktopUsersProcessesRunner) Interrupt(interruptError error) {
-	level.Debug(r.logger).Log(
-		"msg", "sending interrupt to desktop users processes runner",
-		"err", interruptError,
-	)
-
+func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	// Tell the execute loop to stop checking, and exit
 	r.interrupt <- struct{}{}
 

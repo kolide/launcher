@@ -140,9 +140,9 @@ func (u *updaterCmd) execute() error {
 	return nil
 }
 
-func (u *updaterCmd) interrupt(err error) {
+func (u *updaterCmd) interrupt(_ error) {
 
-	level.Info(u.config.Logger).Log("msg", "updater interrupted", "err", err)
+	level.Info(u.config.Logger).Log("msg", "updater interrupted")
 
 	// non-blocking channel send
 	select {
