@@ -27,24 +27,24 @@ func New(overrider controlRequestIntervalOverrider) *AccelerateControlConsumer {
 	}
 }
 
-func (c *AccelerateControlConsumer) Update(data io.Reader) error {
+func (c *AccelerateControlConsumer) DoAction(data io.Reader) error {
 	if c.overrider == nil {
 		return errors.New("control request interval overrider is nil")
 	}
 
-	accelerate_data := struct {
+	accelerateData := struct {
 		// expected to come in from contorl server in seconds
 		Interval int `json:"interval"`
 		Duration int `json:"duration"`
 	}{}
 
-	if err := json.NewDecoder(data).Decode(&accelerate_data); err != nil {
+	if err := json.NewDecoder(data).Decode(&accelerateData); err != nil {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
 	c.overrider.SetControlRequestIntervalOverride(
-		time.Duration(accelerate_data.Interval)*time.Second,
-		time.Duration(accelerate_data.Duration)*time.Second,
+		time.Duration(accelerateData.Interval)*time.Second,
+		time.Duration(accelerateData.Duration)*time.Second,
 	)
 
 	return nil

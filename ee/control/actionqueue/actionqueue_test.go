@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	testUpdaterType    = "test-updater-type"
-	anotherUpdaterType = "another-updater-type"
+	testActionerType        = "test-actioner-type"
+	anotherTestActionerType = "another-actioner-type"
 )
 
-func TestUpdate_HandlesDuplicates(t *testing.T) {
+func TestDoAction_HandlesDuplicates(t *testing.T) {
 	t.Parallel()
 
 	// Queue up two duplicate actions
@@ -33,47 +33,47 @@ func TestUpdate_HandlesDuplicates(t *testing.T) {
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testUpdaterType,
+			Type:       testActionerType,
 		},
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testUpdaterType,
+			Type:       testActionerType,
 		},
 	}
-	testNotificationsRaw, err := json.Marshal(testActions)
+	testActionsRaw, err := json.Marshal(testActions)
 	require.NoError(t, err)
 
-	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the notifier is called only once, to send the first notification
-	mockUpdater := mocks.NewUpdater(t)
-	mockUpdater.On("Update", mock.Anything).Return(nil).Once()
+	// Expect that the actioner is called only once, to send the first action
+	mockActioner := mocks.NewActioner(t)
+	mockActioner.On("DoAction", mock.Anything).Return(nil).Once()
 
 	actionqueue := New()
-	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	actionqueue.RegisterActioner(testActionerType, mockActioner)
 
-	require.NoError(t, actionqueue.Update(testNotificationsData))
+	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
-func TestUpdate_HandlesMultipleTypes(t *testing.T) {
+func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 	t.Parallel()
 
 	testActions := []action{
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       testUpdaterType,
+			Type:       testActionerType,
 		},
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       anotherUpdaterType,
+			Type:       anotherTestActionerType,
 		},
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       anotherUpdaterType,
+			Type:       anotherTestActionerType,
 		},
 		{
 			// missing type
@@ -83,7 +83,7 @@ func TestUpdate_HandlesMultipleTypes(t *testing.T) {
 		{
 			// missing valid until
 			ID:   ulid.New(),
-			Type: anotherUpdaterType,
+			Type: anotherTestActionerType,
 		},
 		{
 			// non existent type
@@ -92,129 +92,129 @@ func TestUpdate_HandlesMultipleTypes(t *testing.T) {
 			ValidUntil: getValidUntil(),
 		},
 	}
-	testNotificationsRaw, err := json.Marshal(testActions)
+	testActionsRaw, err := json.Marshal(testActions)
 	require.NoError(t, err)
 
-	testNotificationsData := bytes.NewReader(testNotificationsRaw)
+	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the notifier is called only once, to send the first notification
-	mockUpdater := mocks.NewUpdater(t)
-	mockUpdater.On("Update", mock.Anything).Return(nil).Once()
+	// Expect that the actioner is called only once, to send the first action
+	mockActioner := mocks.NewActioner(t)
+	mockActioner.On("DoAction", mock.Anything).Return(nil).Once()
 
-	anotherMockUpdater := mocks.NewUpdater(t)
-	anotherMockUpdater.On("Update", mock.Anything).Return(nil).Twice()
+	anothermockActioner := mocks.NewActioner(t)
+	anothermockActioner.On("DoAction", mock.Anything).Return(nil).Twice()
 
 	actionqueue := New()
 
-	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
-	actionqueue.RegisterUpdater(anotherUpdaterType, anotherMockUpdater)
+	actionqueue.RegisterActioner(testActionerType, mockActioner)
+	actionqueue.RegisterActioner(anotherTestActionerType, anothermockActioner)
 
-	require.NoError(t, actionqueue.Update(testNotificationsData))
+	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
-func TestUpdate_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
+func TestDoAction_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
 	t.Parallel()
 
-	// Queue up two duplicate notifications
+	// Queue up two duplicate actions
 	testId := ulid.New()
 	actions := []action{
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testUpdaterType,
+			Type:       testActionerType,
 		},
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testUpdaterType,
+			Type:       testActionerType,
 		},
 	}
 	testActionsRaw, err := json.Marshal(actions)
 	require.NoError(t, err)
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the notifier is called twice: once to unsuccessfully send the first notification, and again to send the duplicate successfully
-	mockUpdater := mocks.NewUpdater(t)
-	errorCall := mockUpdater.On("Update", mock.Anything).Return(errors.New("test error")).Once()
-	mockUpdater.On("Update", mock.Anything).Return(nil).NotBefore(errorCall).Once()
+	// Expect that the actioner is called twice: once to unsuccessfully send the first action, and again to send the duplicate successfully
+	mockActioner := mocks.NewActioner(t)
+	errorCall := mockActioner.On("DoAction", mock.Anything).Return(errors.New("test error")).Once()
+	mockActioner.On("DoAction", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
-	// Call update and assert our expectations about sent notifications
+	// Call DoAction and assert our expectations about completed actions
 	actionqueue := New()
-	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	actionqueue.RegisterActioner(testActionerType, mockActioner)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
 func TestCleanup(t *testing.T) {
 	t.Parallel()
 
-	mockUpdater := mocks.NewUpdater(t)
+	mockActioner := mocks.NewActioner(t)
 	store := setupStorage(t)
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	logger := log.NewLogfmtLogger(&logBytes)
-	amw := New(
+	actionQueue := New(
 		WithStore(store),
 		WithLogger(logger),
 		WithCleanupInterval(100*time.Millisecond),
 		WithContext(context.Background()),
 	)
-	amw.RegisterUpdater(testUpdaterType, mockUpdater)
+	actionQueue.RegisterActioner(testActionerType, mockActioner)
 
 	// Save two entries in the db -- one sent a year ago, and one sent now.
-	notificationIdToDelete := "should_be_deleted"
-	amw.storeActionRecord(action{
-		ID:          notificationIdToDelete,
+	actionsToDelete := "should_be_deleted"
+	actionQueue.storeActionRecord(action{
+		ID:          actionsToDelete,
 		ProcessedAt: time.Now().Add(-365 * 24 * time.Hour),
-		Type:        testUpdaterType,
+		Type:        testActionerType,
 	})
-	notificationIdToRetain := "should_be_retained"
-	amw.storeActionRecord(action{
-		ID:          notificationIdToRetain,
+	actionsToReturn := "should_be_retained"
+	actionQueue.storeActionRecord(action{
+		ID:          actionsToReturn,
 		ProcessedAt: time.Now(),
-		Type:        testUpdaterType,
+		Type:        testActionerType,
 	})
 
 	// Confirm we have both entries in the db.
-	oldNotificationRecord, err := store.Get([]byte(notificationIdToDelete))
-	require.NotNil(t, oldNotificationRecord, "old notification was not seeded in db")
+	oldActionRecord, err := store.Get([]byte(actionsToDelete))
+	require.NotNil(t, oldActionRecord, "old action was not seeded in db")
 	require.NoError(t, err)
 
-	newNotificationRecord, err := store.Get([]byte(notificationIdToRetain))
-	require.NotNil(t, newNotificationRecord, "new notification was not seeded in db")
+	newActionRecord, err := store.Get([]byte(actionsToReturn))
+	require.NotNil(t, newActionRecord, "new action was not seeded in db")
 	require.NoError(t, err)
 
 	// start clean up
 	go func() {
-		amw.StartCleanup()
+		actionQueue.StartCleanup()
 	}()
 
 	// give it a chance to run
 	time.Sleep(500 * time.Millisecond)
 
-	// Confirm that the old notification record was deleted, and the new one was not.
-	oldNotificationRecord, err = store.Get([]byte(notificationIdToDelete))
-	require.Nil(t, oldNotificationRecord, "old notification was not cleaned up but should have been")
+	// Confirm that the old action record was deleted, and the new one was not.
+	oldActionRecord, err = store.Get([]byte(actionsToDelete))
+	require.Nil(t, oldActionRecord, "old action was not cleaned up but should have been")
 	require.NoError(t, err)
 
-	newNotificationRecord, err = store.Get([]byte(notificationIdToRetain))
-	require.NotNil(t, newNotificationRecord, "new notification was cleaned up but should not have been")
+	newActionRecord, err = store.Get([]byte(actionsToReturn))
+	require.NotNil(t, newActionRecord, "new action was cleaned up but should not have been")
 	require.NoError(t, err)
 
 	// stop
-	amw.StopCleanup(nil)
+	actionQueue.StopCleanup(nil)
 	// give log a chance to log
 	time.Sleep(500 * time.Millisecond)
 	require.Contains(t, logBytes.String(), "cleanup")
 }
 
-func TestUpdate_HandlesMalformedActions(t *testing.T) {
+func TestDoAction_HandlesMalformedActions(t *testing.T) {
 	t.Parallel()
 
-	// Queue up two notifications -- one malformed, one correctly formed
+	// Queue up two actions -- one malformed, one correctly formed
 	testId := ulid.New()
 	goodAction := action{
 		ID:         testId,
 		ValidUntil: getValidUntil(),
-		Type:       testUpdaterType,
+		Type:       testActionerType,
 	}
 	goodActionRaw, err := json.Marshal(goodAction)
 	require.NoError(t, err)
@@ -235,17 +235,17 @@ func TestUpdate_HandlesMalformedActions(t *testing.T) {
 
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	mockUpdater := mocks.NewUpdater(t)
+	mockActioner := mocks.NewActioner(t)
 
-	// Expect that the updater is still called once, to send the good notification
-	mockUpdater.On("Update", bytes.NewReader(goodActionRaw)).Return(nil)
+	// Expect that the DoActionr is still called once, to send do the good action
+	mockActioner.On("DoAction", bytes.NewReader(goodActionRaw)).Return(nil)
 	actionqueue := New()
-	actionqueue.RegisterUpdater(testUpdaterType, mockUpdater)
+	actionqueue.RegisterActioner(testActionerType, mockActioner)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.SentNotificationsStore.String())
+	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ControlServerActionsStore.String())
 	require.NoError(t, err)
 	return s
 }

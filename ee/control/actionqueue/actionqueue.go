@@ -23,8 +23,8 @@ const (
 	actionRetentionPeriod = time.Hour * 24 * 30 * 6
 )
 
-type updater interface {
-	Update(data io.Reader) error
+type actioner interface {
+	DoAction(data io.Reader) error
 }
 
 type action struct {
@@ -36,7 +36,7 @@ type action struct {
 
 type actionqueue struct {
 	ctx                   context.Context
-	updaters              map[string]updater
+	actioners             map[string]actioner
 	store                 types.KVStore
 	logger                log.Logger
 	actionCleanupInterval time.Duration
@@ -72,7 +72,7 @@ func WithContext(ctx context.Context) actionqueueOption {
 func New(opts ...actionqueueOption) *actionqueue {
 	aq := &actionqueue{
 		ctx:                   context.Background(),
-		updaters:              make(map[string]updater, 0),
+		actioners:             make(map[string]actioner, 0),
 		actionCleanupInterval: defaultCleanupInterval,
 		logger:                log.NewNopLogger(),
 	}
@@ -107,18 +107,18 @@ func (aq *actionqueue) Update(data io.Reader) error {
 			continue
 		}
 
-		updater, err := aq.updaterForAction(action)
+		actioner, err := aq.actionerForAction(action)
 		if err != nil {
-			level.Info(aq.logger).Log("msg", "getting updater for action", "error", err)
+			level.Info(aq.logger).Log("msg", "getting actioner for action", "error", err)
 			continue
 		}
 
-		if err := updater.Update(bytes.NewReader(rawAction)); err != nil {
-			level.Info(aq.logger).Log("msg", "failed to update with action, not marking action complete", "err", err)
+		if err := actioner.DoAction(bytes.NewReader(rawAction)); err != nil {
+			level.Info(aq.logger).Log("msg", "failed to do action with action, not marking action complete", "err", err)
 			continue
 		}
 
-		// only mark processed when updater was successful
+		// only mark processed when actioner was successful
 		action.ProcessedAt = time.Now().UTC()
 		aq.storeActionRecord(action)
 	}
@@ -126,8 +126,8 @@ func (aq *actionqueue) Update(data io.Reader) error {
 	return nil
 }
 
-func (aq *actionqueue) RegisterUpdater(updaterType string, updater updater) {
-	aq.updaters[updaterType] = updater
+func (aq *actionqueue) RegisterActioner(actionerType string, actionToRegister actioner) {
+	aq.actioners[actionerType] = actionToRegister
 }
 
 func (aq *actionqueue) StartCleanup() error {
@@ -157,25 +157,26 @@ func (aq *actionqueue) StopCleanup(err error) {
 	aq.cancel()
 }
 
-func (aq *actionqueue) storeActionRecord(action action) {
-	rawAction, err := json.Marshal(action)
+func (aq *actionqueue) storeActionRecord(actionToStore action) {
+	rawAction, err := json.Marshal(actionToStore)
 	if err != nil {
 		level.Error(aq.logger).Log("msg", "could not marshal complete action", "err", err)
 		return
 	}
 
-	if err := aq.store.Set([]byte(action.ID), rawAction); err != nil {
-		level.Debug(aq.logger).Log("msg", "could not mark notification sent", "err", err)
+	if err := aq.store.Set([]byte(actionToStore.ID), rawAction); err != nil {
+		level.Debug(aq.logger).Log("msg", "could not mark action complete", "err", err)
 	}
 }
 
 func (aq *actionqueue) isActionNew(id string) bool {
-	sentNotificationRaw, err := aq.store.Get([]byte(id))
+	completedActionRaw, err := aq.store.Get([]byte(id))
 	if err != nil {
 		level.Error(aq.logger).Log("msg", "could not read action from bucket", "err", err)
+		return false
 	}
 
-	if sentNotificationRaw == nil {
+	if completedActionRaw == nil {
 		// No previous record -- action has not been processed before, it's new
 		return true
 	}
@@ -197,22 +198,22 @@ func (aq *actionqueue) isActionValid(a action) bool {
 	return a.ValidUntil > time.Now().Unix()
 }
 
-func (aq *actionqueue) updaterForAction(a action) (updater, error) {
-	if len(aq.updaters) == 0 {
-		return nil, errors.New("no updaters registered")
+func (aq *actionqueue) actionerForAction(a action) (actioner, error) {
+	if len(aq.actioners) == 0 {
+		return nil, errors.New("no actioners registered")
 	}
 
-	// more than one updater
+	// more than one actioner
 	if a.Type == "" {
-		return nil, errors.New("have more than 1 updater and action type is empty, cannot determine updater")
+		return nil, errors.New("have more than 1 actioner and action type is empty, cannot determine actioner")
 	}
 
-	updater, ok := aq.updaters[a.Type]
+	actioner, ok := aq.actioners[a.Type]
 	if !ok {
-		return nil, fmt.Errorf("updater type %s not found", a.Type)
+		return nil, fmt.Errorf("actioner type %s not found", a.Type)
 	}
 
-	return updater, nil
+	return actioner, nil
 }
 
 func (aq *actionqueue) cleanupActions() {
@@ -236,6 +237,6 @@ func (aq *actionqueue) cleanupActions() {
 
 	// Delete all old keys
 	if err := aq.store.Delete(keysToDelete...); err != nil {
-		level.Debug(aq.logger).Log("msg", "could not delete old notifications from bucket", "err", err)
+		level.Debug(aq.logger).Log("msg", "could not delete old actions from bucket", "err", err)
 	}
 }

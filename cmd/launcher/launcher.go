@@ -316,7 +316,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
 
 		// register accelerate control consumer
-		actionsQueue.RegisterUpdater(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
+		actionsQueue.RegisterActioner(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
@@ -329,7 +329,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		// register notifications consumer
-		actionsQueue.RegisterUpdater(notificationconsumer.NotificationSubsystem, notificationConsumer)
+		actionsQueue.RegisterActioner(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())

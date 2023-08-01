@@ -54,7 +54,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
-	err = testNc.Update(testNotificationsData)
+	err = testNc.DoAction(testNotificationsData)
 	require.NoError(t, err)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
 }
@@ -86,7 +86,7 @@ func TestUpdate_HappyPath_NoAction(t *testing.T) {
 	mockNotifier.On("SendNotification", mock.Anything).Return(nil)
 
 	// Call update and assert our expectations about sent notifications
-	err = testNc.Update(testNotificationsData)
+	err = testNc.DoAction(testNotificationsData)
 	require.NoError(t, err)
 	mockNotifier.AssertNumberOfCalls(t, "SendNotification", 1)
 }
@@ -132,7 +132,7 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 			testNotificationsData := bytes.NewReader(testNotificationsRaw)
 
 			// Call update and assert our expectations about sent notifications
-			err = testNc.Update(testNotificationsData)
+			err = testNc.DoAction(testNotificationsData)
 			require.NoError(t, err)
 			mockNotifier.AssertNumberOfCalls(t, "SendNotification", 0)
 		})
