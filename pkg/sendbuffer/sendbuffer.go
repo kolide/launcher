@@ -141,7 +141,7 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		case <-ticker.C:
 			continue
 		case <-ctx.Done():
-			break
+			return nil
 		}
 	}
 }
