@@ -99,7 +99,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 		checkInterval:          k.AutoupdateInterval(),
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
-		osquerierRetryInterval: 1 * time.Minute,
+		osquerierRetryInterval: 30 * time.Second,
 		logger:                 log.NewNopLogger(),
 		restartFuncs:           make(map[autoupdatableBinary]func() error),
 	}
@@ -200,10 +200,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 }
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
-	ta.interrupt <- struct{}{}
 	if err := ta.libraryManager.Close(); err != nil {
 		level.Debug(ta.logger).Log("msg", "could not close library on interrupt", "err", err)
 	}
+	ta.interrupt <- struct{}{}
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
@@ -339,16 +339,16 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
+	if ta.libraryManager.Available(binary, release) {
+		return "", nil
+	}
+
 	// Get the current running version if available -- don't error out if we can't
 	// get it, since the worst case is that we download an update whose version matches
 	// our install version.
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
 	if currentVersion == versionFromTarget(binary, release) {
-		return "", nil
-	}
-
-	if ta.libraryManager.Available(binary, release) {
 		return "", nil
 	}
 
