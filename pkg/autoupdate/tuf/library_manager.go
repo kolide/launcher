@@ -69,6 +69,12 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 
 // Close cleans up the temporary staging directory
 func (ulm *updateLibraryManager) Close() error {
+	// Acquire lock to ensure we aren't interrupting an ongoing operation
+	for _, binary := range binaries {
+		ulm.lock.Lock(binary)
+		defer ulm.lock.Unlock(binary)
+	}
+
 	if err := os.RemoveAll(ulm.stagingDir); err != nil {
 		return fmt.Errorf("could not remove staging dir %s: %w", ulm.stagingDir, err)
 	}
