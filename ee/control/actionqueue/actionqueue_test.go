@@ -24,7 +24,7 @@ const (
 	anotherTestActorType = "another-actor-type"
 )
 
-func TestDoAction_HandlesDuplicates(t *testing.T) {
+func TestActionQueue_HandlesDuplicates(t *testing.T) {
 	t.Parallel()
 
 	// Queue up two duplicate actions
@@ -48,7 +48,7 @@ func TestDoAction_HandlesDuplicates(t *testing.T) {
 
 	// Expect that the actor is called only once, to send the first action
 	mockActor := mocks.NewActor(t)
-	mockActor.On("DoAction", mock.Anything).Return(nil).Once()
+	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
 	actionqueue := New()
 	actionqueue.RegisterActor(testActorType, mockActor)
@@ -56,7 +56,7 @@ func TestDoAction_HandlesDuplicates(t *testing.T) {
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
-func TestDoAction_HandlesMultipleTypes(t *testing.T) {
+func TestActionQueue_HandlesMultipleActorTypes(t *testing.T) {
 	t.Parallel()
 
 	testActions := []action{
@@ -99,10 +99,10 @@ func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 
 	// Expect that the actor is called only once, to send the first action
 	mockActor := mocks.NewActor(t)
-	mockActor.On("DoAction", mock.Anything).Return(nil).Once()
+	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
 	anotherMockActor := mocks.NewActor(t)
-	anotherMockActor.On("DoAction", mock.Anything).Return(nil).Twice()
+	anotherMockActor.On("Do", mock.Anything).Return(nil).Twice()
 
 	actionqueue := New()
 
@@ -112,7 +112,7 @@ func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
-func TestDoAction_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
+func TestActionQueue_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
 	t.Parallel()
 
 	// Queue up two duplicate actions
@@ -135,10 +135,10 @@ func TestDoAction_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
 
 	// Expect that the actor is called twice: once to unsuccessfully send the first action, and again to send the duplicate successfully
 	mockActor := mocks.NewActor(t)
-	errorCall := mockActor.On("DoAction", mock.Anything).Return(errors.New("test error")).Once()
-	mockActor.On("DoAction", mock.Anything).Return(nil).NotBefore(errorCall).Once()
+	errorCall := mockActor.On("Do", mock.Anything).Return(errors.New("test error")).Once()
+	mockActor.On("Do", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
-	// Call DoAction and assert our expectations about completed actions
+	// Call Do and assert our expectations about completed actions
 	actionqueue := New()
 	actionqueue.RegisterActor(testActorType, mockActor)
 	require.NoError(t, actionqueue.Update(testActionsData))
@@ -206,7 +206,7 @@ func TestCleanup(t *testing.T) {
 	require.Contains(t, logBytes.String(), "cleanup")
 }
 
-func TestDoAction_HandlesMalformedActions(t *testing.T) {
+func TestActionQueue_HandlesMalformedActions(t *testing.T) {
 	t.Parallel()
 
 	// Queue up two actions -- one malformed, one correctly formed
@@ -237,8 +237,8 @@ func TestDoAction_HandlesMalformedActions(t *testing.T) {
 
 	mockActioner := mocks.NewActor(t)
 
-	// Expect that the DoActionr is still called once, to send do the good action
-	mockActioner.On("DoAction", bytes.NewReader(goodActionRaw)).Return(nil)
+	// Expect that the Do is still called once, to send do the good action
+	mockActioner.On("Do", bytes.NewReader(goodActionRaw)).Return(nil)
 	actionqueue := New()
 	actionqueue.RegisterActor(testActorType, mockActioner)
 	require.NoError(t, actionqueue.Update(testActionsData))
