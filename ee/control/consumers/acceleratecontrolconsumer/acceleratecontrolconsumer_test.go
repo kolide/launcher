@@ -53,7 +53,7 @@ func TestAccelerateControlConsumer(t *testing.T) {
 			}
 
 			c := New(mockSack)
-			err := c.DoAction(strings.NewReader(tt.data))
+			err := c.Do(strings.NewReader(tt.data))
 
 			if tt.wantErr {
 				require.Error(t, err)

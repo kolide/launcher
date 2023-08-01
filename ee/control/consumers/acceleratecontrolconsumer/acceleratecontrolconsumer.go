@@ -27,7 +27,7 @@ func New(overrider controlRequestIntervalOverrider) *AccelerateControlConsumer {
 	}
 }
 
-func (c *AccelerateControlConsumer) DoAction(data io.Reader) error {
+func (c *AccelerateControlConsumer) Do(data io.Reader) error {
 	if c.overrider == nil {
 		return errors.New("control request interval overrider is nil")
 	}

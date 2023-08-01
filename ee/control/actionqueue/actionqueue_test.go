@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	testActionerType        = "test-actioner-type"
-	anotherTestActionerType = "another-actioner-type"
+	testActorType        = "test-actor-type"
+	anotherTestActorType = "another-actor-type"
 )
 
 func TestDoAction_HandlesDuplicates(t *testing.T) {
@@ -33,12 +33,12 @@ func TestDoAction_HandlesDuplicates(t *testing.T) {
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testActionerType,
+			Type:       testActorType,
 		},
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testActionerType,
+			Type:       testActorType,
 		},
 	}
 	testActionsRaw, err := json.Marshal(testActions)
@@ -46,12 +46,12 @@ func TestDoAction_HandlesDuplicates(t *testing.T) {
 
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the actioner is called only once, to send the first action
-	mockActioner := mocks.NewActioner(t)
-	mockActioner.On("DoAction", mock.Anything).Return(nil).Once()
+	// Expect that the actor is called only once, to send the first action
+	mockActor := mocks.NewActor(t)
+	mockActor.On("DoAction", mock.Anything).Return(nil).Once()
 
 	actionqueue := New()
-	actionqueue.RegisterActioner(testActionerType, mockActioner)
+	actionqueue.RegisterActor(testActorType, mockActor)
 
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
@@ -63,17 +63,17 @@ func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       testActionerType,
+			Type:       testActorType,
 		},
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       anotherTestActionerType,
+			Type:       anotherTestActorType,
 		},
 		{
 			ID:         ulid.New(),
 			ValidUntil: getValidUntil(),
-			Type:       anotherTestActionerType,
+			Type:       anotherTestActorType,
 		},
 		{
 			// missing type
@@ -83,7 +83,7 @@ func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 		{
 			// missing valid until
 			ID:   ulid.New(),
-			Type: anotherTestActionerType,
+			Type: anotherTestActorType,
 		},
 		{
 			// non existent type
@@ -97,17 +97,17 @@ func TestDoAction_HandlesMultipleTypes(t *testing.T) {
 
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the actioner is called only once, to send the first action
-	mockActioner := mocks.NewActioner(t)
-	mockActioner.On("DoAction", mock.Anything).Return(nil).Once()
+	// Expect that the actor is called only once, to send the first action
+	mockActor := mocks.NewActor(t)
+	mockActor.On("DoAction", mock.Anything).Return(nil).Once()
 
-	anothermockActioner := mocks.NewActioner(t)
-	anothermockActioner.On("DoAction", mock.Anything).Return(nil).Twice()
+	anotherMockActor := mocks.NewActor(t)
+	anotherMockActor.On("DoAction", mock.Anything).Return(nil).Twice()
 
 	actionqueue := New()
 
-	actionqueue.RegisterActioner(testActionerType, mockActioner)
-	actionqueue.RegisterActioner(anotherTestActionerType, anothermockActioner)
+	actionqueue.RegisterActor(testActorType, mockActor)
+	actionqueue.RegisterActor(anotherTestActorType, anotherMockActor)
 
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
@@ -121,33 +121,33 @@ func TestDoAction_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T) {
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testActionerType,
+			Type:       testActorType,
 		},
 		{
 			ID:         testId,
 			ValidUntil: getValidUntil(),
-			Type:       testActionerType,
+			Type:       testActorType,
 		},
 	}
 	testActionsRaw, err := json.Marshal(actions)
 	require.NoError(t, err)
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	// Expect that the actioner is called twice: once to unsuccessfully send the first action, and again to send the duplicate successfully
-	mockActioner := mocks.NewActioner(t)
-	errorCall := mockActioner.On("DoAction", mock.Anything).Return(errors.New("test error")).Once()
-	mockActioner.On("DoAction", mock.Anything).Return(nil).NotBefore(errorCall).Once()
+	// Expect that the actor is called twice: once to unsuccessfully send the first action, and again to send the duplicate successfully
+	mockActor := mocks.NewActor(t)
+	errorCall := mockActor.On("DoAction", mock.Anything).Return(errors.New("test error")).Once()
+	mockActor.On("DoAction", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
 	// Call DoAction and assert our expectations about completed actions
 	actionqueue := New()
-	actionqueue.RegisterActioner(testActionerType, mockActioner)
+	actionqueue.RegisterActor(testActorType, mockActor)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
 func TestCleanup(t *testing.T) {
 	t.Parallel()
 
-	mockActioner := mocks.NewActioner(t)
+	mockActor := mocks.NewActor(t)
 	store := setupStorage(t)
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	logger := log.NewLogfmtLogger(&logBytes)
@@ -157,20 +157,20 @@ func TestCleanup(t *testing.T) {
 		WithCleanupInterval(100*time.Millisecond),
 		WithContext(context.Background()),
 	)
-	actionQueue.RegisterActioner(testActionerType, mockActioner)
+	actionQueue.RegisterActor(testActorType, mockActor)
 
 	// Save two entries in the db -- one sent a year ago, and one sent now.
 	actionsToDelete := "should_be_deleted"
 	actionQueue.storeActionRecord(action{
 		ID:          actionsToDelete,
 		ProcessedAt: time.Now().Add(-365 * 24 * time.Hour),
-		Type:        testActionerType,
+		Type:        testActorType,
 	})
 	actionsToReturn := "should_be_retained"
 	actionQueue.storeActionRecord(action{
 		ID:          actionsToReturn,
 		ProcessedAt: time.Now(),
-		Type:        testActionerType,
+		Type:        testActorType,
 	})
 
 	// Confirm we have both entries in the db.
@@ -214,7 +214,7 @@ func TestDoAction_HandlesMalformedActions(t *testing.T) {
 	goodAction := action{
 		ID:         testId,
 		ValidUntil: getValidUntil(),
-		Type:       testActionerType,
+		Type:       testActorType,
 	}
 	goodActionRaw, err := json.Marshal(goodAction)
 	require.NoError(t, err)
@@ -235,12 +235,12 @@ func TestDoAction_HandlesMalformedActions(t *testing.T) {
 
 	testActionsData := bytes.NewReader(testActionsRaw)
 
-	mockActioner := mocks.NewActioner(t)
+	mockActioner := mocks.NewActor(t)
 
 	// Expect that the DoActionr is still called once, to send do the good action
 	mockActioner.On("DoAction", bytes.NewReader(goodActionRaw)).Return(nil)
 	actionqueue := New()
-	actionqueue.RegisterActioner(testActionerType, mockActioner)
+	actionqueue.RegisterActor(testActorType, mockActioner)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 

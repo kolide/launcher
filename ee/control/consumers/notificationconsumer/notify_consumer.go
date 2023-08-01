@@ -52,7 +52,7 @@ func NewNotifyConsumer(runner *desktopRunner.DesktopUsersProcessesRunner, ctx co
 	return nc, nil
 }
 
-func (nc *NotificationConsumer) DoAction(data io.Reader) error {
+func (nc *NotificationConsumer) Do(data io.Reader) error {
 	if nc == nil {
 		return errors.New("NotificationConsumer is nil")
 	}

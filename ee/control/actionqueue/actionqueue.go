@@ -23,8 +23,8 @@ const (
 	actionRetentionPeriod = time.Hour * 24 * 30 * 6
 )
 
-type actioner interface {
-	DoAction(data io.Reader) error
+type actor interface {
+	Do(data io.Reader) error
 }
 
 type action struct {
@@ -36,7 +36,7 @@ type action struct {
 
 type actionqueue struct {
 	ctx                   context.Context
-	actioners             map[string]actioner
+	actors                map[string]actor
 	store                 types.KVStore
 	logger                log.Logger
 	actionCleanupInterval time.Duration
@@ -72,7 +72,7 @@ func WithContext(ctx context.Context) actionqueueOption {
 func New(opts ...actionqueueOption) *actionqueue {
 	aq := &actionqueue{
 		ctx:                   context.Background(),
-		actioners:             make(map[string]actioner, 0),
+		actors:                make(map[string]actor, 0),
 		actionCleanupInterval: defaultCleanupInterval,
 		logger:                log.NewNopLogger(),
 	}
@@ -107,18 +107,18 @@ func (aq *actionqueue) Update(data io.Reader) error {
 			continue
 		}
 
-		actioner, err := aq.actionerForAction(action)
+		actor, err := aq.actorForAction(action)
 		if err != nil {
-			level.Info(aq.logger).Log("msg", "getting actioner for action", "error", err)
+			level.Info(aq.logger).Log("msg", "getting actor for action", "err", err)
 			continue
 		}
 
-		if err := actioner.DoAction(bytes.NewReader(rawAction)); err != nil {
+		if err := actor.Do(bytes.NewReader(rawAction)); err != nil {
 			level.Info(aq.logger).Log("msg", "failed to do action with action, not marking action complete", "err", err)
 			continue
 		}
 
-		// only mark processed when actioner was successful
+		// only mark processed when actor was successful
 		action.ProcessedAt = time.Now().UTC()
 		aq.storeActionRecord(action)
 	}
@@ -126,8 +126,8 @@ func (aq *actionqueue) Update(data io.Reader) error {
 	return nil
 }
 
-func (aq *actionqueue) RegisterActioner(actionerType string, actionToRegister actioner) {
-	aq.actioners[actionerType] = actionToRegister
+func (aq *actionqueue) RegisterActor(actorType string, actorToRegister actor) {
+	aq.actors[actorType] = actorToRegister
 }
 
 func (aq *actionqueue) StartCleanup() error {
@@ -198,22 +198,21 @@ func (aq *actionqueue) isActionValid(a action) bool {
 	return a.ValidUntil > time.Now().Unix()
 }
 
-func (aq *actionqueue) actionerForAction(a action) (actioner, error) {
-	if len(aq.actioners) == 0 {
-		return nil, errors.New("no actioners registered")
+func (aq *actionqueue) actorForAction(a action) (actor, error) {
+	if len(aq.actors) == 0 {
+		return nil, errors.New("no actor registered")
 	}
 
-	// more than one actioner
 	if a.Type == "" {
-		return nil, errors.New("have more than 1 actioner and action type is empty, cannot determine actioner")
+		return nil, errors.New("action does not have type, cannot determine actor")
 	}
 
-	actioner, ok := aq.actioners[a.Type]
+	actor, ok := aq.actors[a.Type]
 	if !ok {
-		return nil, fmt.Errorf("actioner type %s not found", a.Type)
+		return nil, fmt.Errorf("actor type %s not found", a.Type)
 	}
 
-	return actioner, nil
+	return actor, nil
 }
 
 func (aq *actionqueue) cleanupActions() {
