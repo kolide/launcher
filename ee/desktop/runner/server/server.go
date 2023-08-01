@@ -123,9 +123,8 @@ func (ms *RunnerServer) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// only lock mutex to access map
 		ms.mutex.Lock()
-		defer ms.mutex.Unlock()
-
 		key := ""
 		for k, v := range ms.desktopProcAuthTokens {
 			if v == authHeader[1] {
@@ -133,6 +132,11 @@ func (ms *RunnerServer) authMiddleware(next http.Handler) http.Handler {
 				break
 			}
 		}
+
+		// not using defer here because this function
+		// calls the next function rather than returing,
+		// this blocks mutex for too long
+		ms.mutex.Unlock()
 
 		if key == "" {
 			level.Debug(ms.logger).Log("msg", "no key found for desktop auth token")
