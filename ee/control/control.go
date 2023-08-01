@@ -105,8 +105,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	}
 }
 
-func (cs *ControlService) Interrupt(err error) {
-	level.Info(cs.logger).Log("msg", "control service interrupted", "err", err)
+func (cs *ControlService) Interrupt(_ error) {
 	cs.Stop()
 }
 

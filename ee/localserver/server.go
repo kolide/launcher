@@ -280,8 +280,8 @@ func (ls *localServer) Stop() error {
 	return nil
 }
 
-func (ls *localServer) Interrupt(err error) {
-	level.Debug(ls.logger).Log("message", "Stopping due to interrupt", "reason", err)
+func (ls *localServer) Interrupt(_ error) {
+	level.Debug(ls.logger).Log("message", "Stopping due to interrupt")
 	if err := ls.Stop(); err != nil {
 		level.Info(ls.logger).Log("message", "got error interrupting", "error", err)
 	}
