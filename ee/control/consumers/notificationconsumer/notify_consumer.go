@@ -183,7 +183,7 @@ func (nc *NotificationConsumer) Execute() error {
 }
 
 // Stops cleanup job
-func (nc *NotificationConsumer) Interrupt(err error) {
+func (nc *NotificationConsumer) Interrupt(_ error) {
 	nc.cancel()
 }
 
