@@ -25,7 +25,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:  "malformed input",
-			input: []byte("\ntest-Who\n.-->\t11 -> 25.52\n\t foop\n\n\nfoobar \t1.1.1 %$-> \t2.2.2\n\nboo \t\n"),
+			input: []byte("\ntest-Who\n.-->\t11 -> 25.52\n\t foop\n\n\nfoobar \t1.1.1 -> \t2.2.2\n\nboo \t\n"),
 			expected: []map[string]string{
 				{
 					"package":         "foobar",

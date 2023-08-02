@@ -31,13 +31,14 @@ func rpmParse(reader io.Reader) (any, error) {
 		// `Name: pm-utils`
 		// `Version: 1.4.1`
 		// `Release: 27.el7`...
-		// We split each line to get a key -> value pair, then store
-		// it into our row until we log the row and start a new one.
+		// We split each line by ":" to get a key/value pair.
 		kv := strings.SplitN(line, ":", 2)
 		var key = strings.ToLower(strings.TrimSpace(kv[0]))
 		if slices.Contains(allowedKeys, key) {
-			// rpm doesn't provide a clean break. I'm collecting everything until
-			// description, then storing each line for description until the next key.
+			// rpm doesn't provide a clean break. Description seems
+			// to come last, so once that is found we set a flag to
+			// say we are reading it, then I'm appending each line
+			// until the next key i.e. name is found to break out.
 			if key == "description" {
 				readingDesc = true
 			} else if readingDesc {
@@ -48,6 +49,7 @@ func rpmParse(reader io.Reader) (any, error) {
 
 			row[key] = strings.TrimSpace(kv[1])
 		} else if readingDesc {
+			// This is where the multiline description will fall to.
 			row["description"] = strings.TrimSpace(row["description"] + " " + strings.TrimSpace(line))
 		}
 	}
