@@ -80,10 +80,10 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: ${{ runner.os }}-${{ github.run_id }}
 
   exec_testing:
-    name: launcher exec tests
+    name: Smoke Test and Upload
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -98,7 +98,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: ${{ runner.os }}-${{ github.run_id }}
 
 
     # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
