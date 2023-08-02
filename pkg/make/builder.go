@@ -462,12 +462,14 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		return fmt.Errorf("create an instance of the TUF repository: %w", err)
 	}
 
-	backoff.WaitFor(func() error {
+	if err := backoff.WaitFor(func() error {
 		if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
 			return fmt.Errorf("getting all target metadata: %w", err)
 		}
 		return nil
-	}, 5*time.Minute, 30*time.Second)
+	}, 5*time.Minute, 30*time.Second); err != nil {
+		return err
+	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
 	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
