@@ -76,6 +76,31 @@ jobs:
     - name: Test
       run: make test
 
+    - name: Cache build
+      uses: actions/cache@v3
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  exec_testing:
+    name: launcher exec tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Consider changing this sometime
+      matrix:
+        os:
+          - ubuntu-20.04
+          - macos-12
+          - windows-latest
+    needs: build_and_test
+    steps:
+    - name: cache restore
+      uses: actions/cache/restore@v3
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+
     # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
     # check to ensure that launcher can update to this build.
     - name: Test build - macOS and ubuntu
@@ -195,3 +220,4 @@ jobs:
     needs:
       - build_and_test
       - package_builder_test
+      - exec_testing
