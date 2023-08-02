@@ -76,7 +76,7 @@ jobs:
     - name: Test
       run: make test
 
-    - name: Cache build
+    - name: Cache build output
       uses: actions/cache@v3
       with:
         path: ./build
@@ -89,12 +89,17 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
+          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-software
           - ubuntu-20.04
+          - ubuntu-22.04
+          - macos-11
           - macos-12
-          - windows-latest
+          - macos-13
+          - windows-2019
+          - windows-2022
     needs: build_and_test
     steps:
-    - name: cache restore
+    - name: cache restore build output
       uses: actions/cache/restore@v3
       with:
         path: ./build
