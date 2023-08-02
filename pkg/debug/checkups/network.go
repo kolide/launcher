@@ -68,11 +68,6 @@ func (n *networkCheckup) Data() any {
 // gatherNetworkConfiguration runs ifconfig on linux/macos and ipconfig on windows,
 // writing the ouptut to the given zip writer
 func gatherNetworkConfiguration(ctx context.Context, z *zip.Writer) error {
-	out, err := z.Create("networkconfig")
-	if err != nil {
-		return fmt.Errorf("creating networkconfig: %w", err)
-	}
-
 	var configCommand string
 	var configArgs []string
 	switch runtime.GOOS {
@@ -86,10 +81,20 @@ func gatherNetworkConfiguration(ctx context.Context, z *zip.Writer) error {
 		return fmt.Errorf("not supported for %s", runtime.GOOS)
 	}
 
+	if _, err := exec.LookPath(configCommand); err != nil {
+		// Not installed, nothing we can do here
+		return nil
+	}
+
 	cmd := exec.CommandContext(ctx, configCommand, configArgs...)
 	cmdOutput, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("running command %s %v: %w", configCommand, configArgs, err)
+	}
+
+	out, err := z.Create("networkconfig")
+	if err != nil {
+		return fmt.Errorf("creating networkconfig: %w", err)
 	}
 
 	if _, err := out.Write(cmdOutput); err != nil {
