@@ -30,6 +30,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 
 	"github.com/theupdateframework/notary/client"
@@ -461,8 +462,13 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		return fmt.Errorf("create an instance of the TUF repository: %w", err)
 	}
 
-	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-		return fmt.Errorf("getting all target metadata: %w", err)
+	if err := backoff.WaitFor(func() error {
+		if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
+			return fmt.Errorf("getting all target metadata: %w", err)
+		}
+		return nil
+	}, 5*time.Minute, 30*time.Second); err != nil {
+		return err
 	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
