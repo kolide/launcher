@@ -56,6 +56,7 @@ type TraceExporter struct {
 	disableIngestTLS          bool
 	enabled                   bool
 	traceSamplingRate         float64
+	interrupt                 chan struct{}
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -86,6 +87,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		disableIngestTLS:          k.DisableTraceIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
+		interrupt:                 make(chan struct{}),
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
@@ -248,8 +250,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 // Execute is a no-op -- the exporter is already running in the background. The TraceExporter
 // otherwise only responds to control server events.
 func (t *TraceExporter) Execute() error {
-	// Does nothing, just waiting for launcher to exit
-	<-context.Background().Done()
+	<-t.interrupt
 	return nil
 }
 
@@ -257,6 +258,8 @@ func (t *TraceExporter) Interrupt(_ error) {
 	if t.provider != nil {
 		t.provider.Shutdown(context.Background())
 	}
+
+	t.interrupt <- struct{}{}
 }
 
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,

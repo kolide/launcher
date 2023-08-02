@@ -62,9 +62,12 @@ func NewUpdater(
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	updateCmd := &updaterCmd{
 		updater:                 updater,
 		ctx:                     ctx,
+		cancel:                  cancel,
 		stopChan:                make(chan bool),
 		config:                  config,
 		runUpdaterRetryInterval: 30 * time.Minute,
@@ -84,6 +87,7 @@ type updater interface {
 type updaterCmd struct {
 	updater                 updater
 	ctx                     context.Context
+	cancel                  context.CancelFunc
 	stopChan                chan bool
 	stopExecution           func()
 	config                  *UpdaterConfig
@@ -140,9 +144,9 @@ func (u *updaterCmd) execute() error {
 	return nil
 }
 
-func (u *updaterCmd) interrupt(err error) {
+func (u *updaterCmd) interrupt(_ error) {
 
-	level.Info(u.config.Logger).Log("msg", "updater interrupted", "err", err)
+	level.Info(u.config.Logger).Log("msg", "updater interrupted")
 
 	// non-blocking channel send
 	select {
@@ -155,4 +159,6 @@ func (u *updaterCmd) interrupt(err error) {
 	if u.stopExecution != nil {
 		u.stopExecution()
 	}
+
+	u.cancel()
 }
