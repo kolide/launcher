@@ -83,7 +83,7 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
 
   exec_testing:
-    name: Smoke Test and Upload
+    name: Exec and Upload
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -111,25 +111,31 @@ jobs:
     - name: Launcher Doctor
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} doctor
 
-    - name: Upload Build - Windows
-      if: ${{ contains(matrix.os, 'windows') }}
+
+  # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
+  # be able to do this entirely on ubuntu, so let's try!
+  store_artifacts:
+    name: Store Artifacts
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu
+          - macos
+          - windows
+    needs: exec_testing
+    steps:
+    - name: cache restore build output
+      uses: actions/cache/restore@v3
+      with:
+        path: ./build
+        key: ${{ matrix.os }}-${{ github.run_id }}
+
+    - name: Upload Build
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.os }}-build
-        path: build/
-
-    - name: Upload Build - macOS
-      if: ${{ contains(matrix.os, 'macos') }}
-      uses: actions/upload-artifact@v2
-      with:
-        name: macos-latest-build
-        path: build/
-
-    - name: Upload Build - Ubuntu
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      uses: actions/upload-artifact@v2
-      with:
-        name: ubuntu-latest-build
         path: build/
 
     - name: Upload coverage
