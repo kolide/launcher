@@ -26,7 +26,8 @@ func runDownloadOsquery(args []string) error {
 		return err
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Minute*2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
 
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
