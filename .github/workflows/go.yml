@@ -65,7 +65,7 @@ jobs:
     - name: Build
       run: make -j2 github-build
       env:
-        MACOSX_DEPLOYMENT_TARGET: 13 # FIXME
+        MACOSX_DEPLOYMENT_TARGET: 11
 
     - name: Check macOS minumum Version
       if: contains(matrix.os, 'macos')
