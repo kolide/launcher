@@ -83,7 +83,7 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
 
   exec_testing:
-    name: Exec and Upload
+    name: Exec Test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -107,6 +107,9 @@ jobs:
 
     - name: Launcher Version
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} --version
+
+    - name: Download Osquery
+      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} download-osquery
 
     - name: Launcher Doctor
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} doctor
