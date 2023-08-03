@@ -55,9 +55,8 @@ jobs:
     - name: Get dependencies
       run: make deps
 
-    # The `|| true` is here because govulncheck is very touchy. I'm not sure what we should be doing with it.
     - name: Run govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./... || true
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
 
     - name: Set up zig
       if: ${{ contains(matrix.os, 'ubuntu') }}
@@ -143,7 +142,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: ./build
-        key: ${{ matrix.os }}-${{ github.run_id }}
+        key: ${{ matrix.os == 'ubuntu' && 'Linux' || matrix.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
     - name: Upload Build
