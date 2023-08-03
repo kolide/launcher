@@ -97,19 +97,22 @@ jobs:
           - macos-13
           - windows-2019
           - windows-2022
-    needs: build_and_test
+    ###needs: build_and_test
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v3
       with:
         path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
+        #######key: ${{ runner.os }}-${{ github.run_id }}
+        key: ${{ runner.os }}-5745946236
 
     - name: Launcher Version
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} --version
 
     - name: Download Osquery
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} download-osquery
+    - name: Osquery Version
+      run: osqueryd --version
 
     - name: Launcher Doctor
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} doctor
