@@ -86,7 +86,7 @@ jobs:
     name: Exec Test
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Consider changing this sometime
+      fail-fast: false
       matrix:
         os:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-software
@@ -97,14 +97,13 @@ jobs:
           - macos-13
           - windows-2019
           - windows-2022
-    ###needs: build_and_test
+    needs: build_and_test
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v3
       with:
         path: ./build
-        #######key: ${{ runner.os }}-${{ github.run_id }}
-        key: ${{ runner.os }}-5745946236
+        key: ${{ runner.os }}-${{ github.run_id }}
 
     - name: Launcher Version
       working-directory: build
