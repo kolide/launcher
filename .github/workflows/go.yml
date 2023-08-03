@@ -54,9 +54,10 @@ jobs:
 
     - name: Get dependencies
       run: make deps
-    # FIXME
-   # - name: Run govulncheck
-   #   run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
+
+    # The `|| true` is here because govulncheck is very touchy. I'm not sure what we should be doing with it.
+    - name: Run govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./... || true
 
     - name: Set up zig
       if: ${{ contains(matrix.os, 'ubuntu') }}
@@ -81,6 +82,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
 
   exec_testing:
     name: Exec Test
@@ -104,6 +106,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
 
     - name: Launcher Version
       working-directory: build
@@ -141,6 +144,7 @@ jobs:
       with:
         path: ./build
         key: ${{ matrix.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
 
     - name: Upload Build
       uses: actions/upload-artifact@v2
