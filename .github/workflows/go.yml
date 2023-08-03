@@ -147,13 +147,14 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Upload Build
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.os }}-build
         path: build/
+        if-no-files-found: error
 
     - name: Upload coverage
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.os }}-coverage.out
         path: coverage.out
