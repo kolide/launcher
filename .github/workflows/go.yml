@@ -64,13 +64,11 @@ jobs:
 
     - name: Build
       run: make -j2 github-build
-      env:
-        MACOSX_DEPLOYMENT_TARGET: 11
 
-    - name: Check macOS minumum Version
+    - name: Check macOS build target
       if: contains(matrix.os, 'macos')
       # this uses grep's exit code
-      run: otool -l build/launcher | grep "minos 11"
+      run: otool -l build/launcher | grep -A1 "minos 11"
 
     - name: Lipo
       run: make github-lipo
