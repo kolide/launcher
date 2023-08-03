@@ -132,8 +132,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu
+        artifactos:
+          # artifactos needs to match the runner.os set by the builds. (Which is not quite the same as matrix.os)
+          - linux
           - macos
           - windows
     needs: exec_testing
@@ -142,20 +143,20 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: ./build
-        key: ${{ matrix.os == 'ubuntu' && 'Linux' || matrix.os }}-${{ github.run_id }}
+        key: ${{ matrix.artifactos }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
     - name: Upload Build
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.os }}-build
+        name: ${{ matrix.artifactos }}-build
         path: build/
         if-no-files-found: error
 
     - name: Upload coverage
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.os }}-coverage.out
+        name: ${{ matrix.artifactos }}-coverage.out
         path: coverage.out
 
 
