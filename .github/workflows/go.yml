@@ -107,20 +107,20 @@ jobs:
         key: ${{ runner.os }}-5745946236
 
     - name: Launcher Version
-      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} --version
+      working-directory: build
+      run: ./launcher --version
 
     - name: Download Osquery
-      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} download-osquery --directory build
+      working-directory: build
+      run: ./launcher download-osquery --directory .
+
     - name: Osquery Version
       working-directory: build
       run: ./osqueryd --version
-    - name: ls
-      working-directory: build
-      run: ls
-
 
     - name: Launcher Doctor
-      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} doctor
+      working-directory: build
+      run: ./launcher doctor
 
 
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
