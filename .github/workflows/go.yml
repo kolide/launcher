@@ -110,8 +110,9 @@ jobs:
       run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} --version
 
     - name: Download Osquery
-      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} download-osquery
+      run: ${{ contains(matrix.os, 'windows')  && '.\build\launcher.exe' || './build/launcher' }} download-osquery --directory build
     - name: Osquery Version
+      working-directory: build
       run: osqueryd --version
 
     - name: Launcher Doctor
