@@ -65,6 +65,11 @@ jobs:
     - name: Build
       run: make -j2 github-build
 
+    - name: Check macOS build target
+      if: contains(matrix.os, 'macos')
+      # this uses grep's exit code
+      run: otool -l build/launcher | grep -A1 "minos 11"
+
     - name: Lipo
       run: make github-lipo
       if: ${{ contains(matrix.os, 'macos') }}
@@ -82,6 +87,13 @@ jobs:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
+
+    # upload coverage here, because we don't cache it with the build
+    - name: Upload coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ runner.os }}-coverage.out
+        path: coverage.out
 
   exec_testing:
     name: Exec Test
@@ -152,12 +164,6 @@ jobs:
         name: ${{ matrix.artifactos }}-build
         path: build/
         if-no-files-found: error
-
-    - name: Upload coverage
-      uses: actions/upload-artifact@v3
-      with:
-        name: ${{ matrix.artifactos }}-coverage.out
-        path: coverage.out
 
 
   package_builder_test:
