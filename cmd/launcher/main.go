@@ -137,6 +137,8 @@ func runSubcommands() error {
 		run = runInteractive
 	case "desktop":
 		run = runDesktop
+	case "download-osquery":
+		run = runDownloadOsquery
 	case "uninstall":
 		run = runUninstall
 	default:
