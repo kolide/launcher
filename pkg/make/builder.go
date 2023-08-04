@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -568,7 +569,12 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		cmd := b.execCC(ctx, b.goPath, args...)
 		cmd.Env = append(cmd.Env, b.cmdEnv...)
 		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+
+		// Some build commands, especially relating to link errors on macOS, are emitted to STDERR and do not change
+		// exit code. To compensate, we can capture stderr, and if present, declare the run a failure. This was prompted
+		// by https://github.com/kolide/launcher/issues/1276
+		var stderr bytes.Buffer
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
 
 		level.Debug(ctxlog.FromContext(ctx)).Log(
 			"mgs", "building binary",
@@ -580,6 +586,10 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if err := cmd.Run(); err != nil {
 			return err
+		}
+
+		if stderr.Len() > 0 {
+			return errors.New("stderr not empty")
 		}
 
 		// Tell github where we're at
