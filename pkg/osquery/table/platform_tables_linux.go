@@ -10,7 +10,12 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptsetup"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/apt"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dnf"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dpkg"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/group"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/info"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/upgradeable"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/rpm"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/simple_array"
 	"github.com/kolide/launcher/pkg/osquery/tables/fscrypt_info"
 	"github.com/kolide/launcher/pkg/osquery/tables/gsettings"
@@ -42,6 +47,11 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), []string{"/opt/CrowdStrike/falconctl", "-g", "--systags"}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, []string{"/usr/bin/apt", "list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dnf_upgradeable", dnf.Parser, []string{"/usr/bin/dnf", "check-update"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_dpkg_version_info", dpkg.Parser, []string{"/usr/bin/dpkg", "-p"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_group", pacman_group.Parser, []string{"/usr/bin/pacman", "-Qg"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_version_info", pacman_info.Parser, []string{"/usr/bin/pacman", "-Qi"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, []string{"/usr/bin/pacman", "-Qu"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, []string{"/usr/bin/rpm", "-qai"}, dataflattentable.WithIncludeStderr()),
 	}
 }
