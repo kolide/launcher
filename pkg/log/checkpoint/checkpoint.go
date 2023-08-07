@@ -109,6 +109,7 @@ func (c *checkPointer) logCheckPoint() {
 	}
 	c.logServerProvidedData()
 	c.logDesktopProcs()
+	c.logger.Log("disable_osquery_healthchecks", c.knapsack.DisableOsqueryHealthchecks())
 }
 
 func (c *checkPointer) logDesktopProcs() {
