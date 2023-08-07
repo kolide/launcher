@@ -9,7 +9,7 @@ var allowedCommands = map[string]allowedCommand{
 		args:     []string{"hello"},
 	},
 	"cb_repcli": {
-		binPaths: []string"/opt/carbonblack/psc/bin/repcli"},
+		binPaths: []string{"/opt/carbonblack/psc/bin/repcli"},
 		args:     []string{"status"},
 	},
 }
