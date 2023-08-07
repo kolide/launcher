@@ -5,6 +5,11 @@ all: build
 GOPATH ?= $(HOME)/go
 PATH := $(GOPATH)/bin:$(PATH)
 
+
+# Set the target version of macOS. This is an ENV that is consumed by go build (and downstream c pieces)
+# It's set here, and not in the GitHub Actions tooling, so that we notice build warnings.
+export MACOSX_DEPLOYMENT_TARGET = 11
+
 export GO111MODULE=on
 
 # If not windows, set the shell to bash explicitly
