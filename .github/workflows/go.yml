@@ -65,6 +65,11 @@ jobs:
     - name: Build
       run: make -j2 github-build
 
+    - name: Check macOS build target
+      if: contains(matrix.os, 'macos')
+      # this uses grep's exit code
+      run: otool -l build/launcher | grep -A1 "minos 11"
+
     - name: Lipo
       run: make github-lipo
       if: ${{ contains(matrix.os, 'macos') }}
@@ -76,53 +81,89 @@ jobs:
     - name: Test
       run: make test
 
-    # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
-    # check to ensure that launcher can update to this build.
-    - name: Test build - macOS and ubuntu
-      if: ${{ contains(matrix.os, 'macos') || contains(matrix.os, 'ubuntu') }}
-      run: |
-        if ! ./build/launcher --version; then
-          echo "launcher.exe --version failed"
-          exit 1
-        fi
-
-    # Launcher should always successfully run and exit cleanly when called with `version` -- this is a quick
-    # check to ensure that launcher can update to this build.
-    - name: Test build - Windows
-      if: ${{ contains(matrix.os, 'windows') }}
-      shell: powershell
-      run: |
-        .\build\launcher.exe --version
-        if( !$? ) {
-          throw "launcher.exe --version failed"
-        }
-
-    - name: Upload Build - Windows
-      if: ${{ contains(matrix.os, 'windows') }}
-      uses: actions/upload-artifact@v2
+    - name: Cache build output
+      uses: actions/cache@v3
       with:
-        name: ${{ matrix.os }}-build
-        path: build/
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
 
-    - name: Upload Build - macOS
-      if: ${{ contains(matrix.os, 'macos') }}
-      uses: actions/upload-artifact@v2
-      with:
-        name: macos-latest-build
-        path: build/
-
-    - name: Upload Build - Ubuntu
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      uses: actions/upload-artifact@v2
-      with:
-        name: ubuntu-latest-build
-        path: build/
-
+    # upload coverage here, because we don't cache it with the build
     - name: Upload coverage
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.os }}-coverage.out
+        name: ${{ runner.os }}-coverage.out
         path: coverage.out
+
+  exec_testing:
+    name: Exec Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-software
+          - ubuntu-20.04
+          - ubuntu-22.04
+          - macos-11
+          - macos-12
+          - macos-13
+          - windows-2019
+          - windows-2022
+    needs: build_and_test
+    steps:
+    - name: cache restore build output
+      uses: actions/cache/restore@v3
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - name: Launcher Version
+      working-directory: build
+      run: ./launcher --version
+
+    - name: Download Osquery
+      working-directory: build
+      run: ./launcher download-osquery --directory .
+
+    - name: Osquery Version
+      working-directory: build
+      run: ./osqueryd --version
+
+    - name: Launcher Doctor
+      working-directory: build
+      run: ./launcher doctor
+
+
+  # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
+  # be able to do this entirely on ubuntu, so let's try!
+  store_artifacts:
+    name: Store Artifacts
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        artifactos:
+          # artifactos needs to match the runner.os set by the builds. (Which is not quite the same as matrix.os)
+          - linux
+          - macos
+          - windows
+    needs: exec_testing
+    steps:
+    - name: cache restore build output
+      uses: actions/cache/restore@v3
+      with:
+        path: ./build
+        key: ${{ matrix.artifactos }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - name: Upload Build
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifactos }}-build
+        path: build/
+        if-no-files-found: error
 
 
   package_builder_test:
@@ -195,3 +236,4 @@ jobs:
     needs:
       - build_and_test
       - package_builder_test
+      - exec_testing

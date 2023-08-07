@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -30,6 +31,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 
 	"github.com/theupdateframework/notary/client"
@@ -461,8 +463,13 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		return fmt.Errorf("create an instance of the TUF repository: %w", err)
 	}
 
-	if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-		return fmt.Errorf("getting all target metadata: %w", err)
+	if err := backoff.WaitFor(func() error {
+		if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
+			return fmt.Errorf("getting all target metadata: %w", err)
+		}
+		return nil
+	}, 5*time.Minute, 30*time.Second); err != nil {
+		return err
 	}
 
 	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
@@ -562,7 +569,12 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		cmd := b.execCC(ctx, b.goPath, args...)
 		cmd.Env = append(cmd.Env, b.cmdEnv...)
 		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+
+		// Some build commands, especially relating to link errors on macOS, are emitted to STDERR and do not change
+		// exit code. To compensate, we can capture stderr, and if present, declare the run a failure. This was prompted
+		// by https://github.com/kolide/launcher/issues/1276
+		var stderr bytes.Buffer
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
 
 		level.Debug(ctxlog.FromContext(ctx)).Log(
 			"mgs", "building binary",
@@ -574,6 +586,10 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if err := cmd.Run(); err != nil {
 			return err
+		}
+
+		if stderr.Len() > 0 {
+			return errors.New("stderr not empty")
 		}
 
 		// Tell github where we're at
