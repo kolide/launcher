@@ -309,6 +309,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			actionqueue.WithContext(ctx),
 			actionqueue.WithLogger(logger),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
+			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
 		)
 		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
 		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)

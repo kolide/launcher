@@ -38,6 +38,7 @@ type actionqueue struct {
 	ctx                   context.Context
 	actors                map[string]actor
 	store                 types.KVStore
+	oldNotificationsStore types.KVStore
 	logger                log.Logger
 	actionCleanupInterval time.Duration
 	cancel                context.CancelFunc
@@ -54,6 +55,12 @@ func WithLogger(logger log.Logger) actionqueueOption {
 func WithStore(store types.KVStore) actionqueueOption {
 	return func(aq *actionqueue) {
 		aq.store = store
+	}
+}
+
+func WithOldNotificationsStore(store types.KVStore) actionqueueOption {
+	return func(aq *actionqueue) {
+		aq.oldNotificationsStore = store
 	}
 }
 
@@ -84,6 +91,8 @@ func New(opts ...actionqueueOption) *actionqueue {
 	if aq.store == nil {
 		aq.store = inmemory.NewStore(aq.logger)
 	}
+
+	aq.logger = log.With(aq.logger, "component", "actionqueue")
 
 	return aq
 }
@@ -176,12 +185,33 @@ func (aq *actionqueue) isActionNew(id string) bool {
 		return false
 	}
 
-	if completedActionRaw == nil {
-		// No previous record -- action has not been processed before, it's new
+	// found previous record, action not new
+	if completedActionRaw != nil {
+		return false
+	}
+
+	// the first "actions" were actually notifications
+	// so lets make sure we are not actually getting an
+	// old notification
+
+	// 6 months or so after 2023_09_07 we should be able to remove
+	// the logic around the "oldNotificationsStore"
+	// since we will be sure everything has been removed from k2
+	// ~ James Pickett
+
+	// no where else to look, action is new
+	if aq.oldNotificationsStore == nil {
 		return true
 	}
 
-	return false
+	completedActionRaw, err = aq.oldNotificationsStore.Get([]byte(id))
+	if err != nil {
+		level.Error(aq.logger).Log("msg", "could not read action from old notifications store", "err", err)
+		return false
+	}
+
+	// if nil, it's new so return true
+	return completedActionRaw == nil
 }
 
 func (aq *actionqueue) isActionValid(a action) bool {

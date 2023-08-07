@@ -56,6 +56,45 @@ func TestActionQueue_HandlesDuplicates(t *testing.T) {
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
 
+func TestActionQueue_ChecksOldNotificationStore(t *testing.T) {
+	t.Parallel()
+
+	oldNotification := action{
+		ID:         ulid.New(),
+		ValidUntil: getValidUntil(),
+		Type:       testActorType,
+	}
+
+	newAction := action{
+		ID:         ulid.New(),
+		ValidUntil: getValidUntil(),
+		Type:       testActorType,
+	}
+
+	testActions := []action{
+		oldNotification,
+		newAction,
+	}
+
+	testActionsRaw, err := json.Marshal(testActions)
+	require.NoError(t, err)
+
+	testActionsData := bytes.NewReader(testActionsRaw)
+
+	oldNotificationStore := setupStorage(t)
+	oldNotificationStore.Set([]byte(oldNotification.ID), mustJsonMarshal(t, oldNotification))
+
+	// Expect that the actor is only called once, to send the new action
+	mockActor := mocks.NewActor(t)
+	mockActor.On("Do", mock.Anything).Return(nil).Once()
+
+	actionqueue := New(WithOldNotificationsStore(oldNotificationStore))
+
+	actionqueue.RegisterActor(testActorType, mockActor)
+
+	require.NoError(t, actionqueue.Update(testActionsData))
+}
+
 func TestActionQueue_HandlesMultipleActorTypes(t *testing.T) {
 	t.Parallel()
 
@@ -252,4 +291,10 @@ func setupStorage(t *testing.T) types.KVStore {
 
 func getValidUntil() int64 {
 	return time.Now().Add(1 * time.Hour).Unix()
+}
+
+func mustJsonMarshal(t *testing.T, v interface{}) []byte {
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return b
 }
