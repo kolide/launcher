@@ -188,4 +188,8 @@ type Flags interface {
 	// DisableTraceIngestTLS disables TLS for observability ingest server communication
 	SetDisableTraceIngestTLS(enabled bool) error
 	DisableTraceIngestTLS() bool
+
+	// DisableOsqueryHealthchecks disables healthchecks for the osquery extension
+	SetDisableOsqueryHealthchecks(enabled bool) error
+	DisableOsqueryHealthchecks() bool
 }

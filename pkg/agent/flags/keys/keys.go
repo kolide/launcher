@@ -47,6 +47,7 @@ const (
 	LogIngestServerURL         FlagKey = "log_ingest_url"
 	TraceIngestServerURL       FlagKey = "trace_ingest_url"
 	DisableTraceIngestTLS      FlagKey = "disable_trace_ingest_tls"
+	DisableOsqueryHealthchecks FlagKey = "disable_osquery_healthchecks"
 )
 
 func (key FlagKey) String() string {

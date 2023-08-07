@@ -491,3 +491,12 @@ func (fc *FlagController) DisableTraceIngestTLS() bool {
 		WithDefaultBool(fc.cmdLineOpts.DisableTraceIngestTLS),
 	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
 }
+
+func (fc *FlagController) SetDisableOsqueryHealthchecks(enabled bool) error {
+	return fc.setControlServerValue(keys.DisableOsqueryHealthchecks, boolToBytes(enabled))
+}
+func (fc *FlagController) DisableOsqueryHealthchecks() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.DisableOsqueryHealthchecks))
+}

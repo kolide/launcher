@@ -382,3 +382,10 @@ func (k *knapsack) SetLogIngestServerURL(url string) error {
 func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
 }
+
+func (k *knapsack) SetDisableOsqueryHealthchecks(enabled bool) error {
+	return k.flags.SetDisableOsqueryHealthchecks(enabled)
+}
+func (k *knapsack) DisableOsqueryHealthchecks() bool {
+	return k.flags.DisableOsqueryHealthchecks()
+}
