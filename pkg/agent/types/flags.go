@@ -189,7 +189,7 @@ type Flags interface {
 	SetDisableTraceIngestTLS(enabled bool) error
 	DisableTraceIngestTLS() bool
 
-	// DisableOsqueryHealthchecks disables healthchecks for the osquery extension
-	SetDisableOsqueryHealthchecks(enabled bool) error
-	DisableOsqueryHealthchecks() bool
+	// InModernStandby indicates whether a Windows machine is awake or in modern standby
+	SetInModernStandby(enabled bool) error
+	InModernStandby() bool
 }

@@ -383,9 +383,9 @@ func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
 }
 
-func (k *knapsack) SetDisableOsqueryHealthchecks(enabled bool) error {
-	return k.flags.SetDisableOsqueryHealthchecks(enabled)
+func (k *knapsack) SetInModernStandby(enabled bool) error {
+	return k.flags.SetInModernStandby(enabled)
 }
-func (k *knapsack) DisableOsqueryHealthchecks() bool {
-	return k.flags.DisableOsqueryHealthchecks()
+func (k *knapsack) InModernStandby() bool {
+	return k.flags.InModernStandby()
 }

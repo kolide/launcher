@@ -164,12 +164,12 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	switch e.System.EventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		level.Debug(p.logger).Log("msg", "system is sleeping", "event_id", e.System.EventID)
-		if err := p.knapsack.SetDisableOsqueryHealthchecks(true); err != nil {
+		if err := p.knapsack.SetInModernStandby(true); err != nil {
 			level.Debug(p.logger).Log("msg", "could not disable osquery healthchecks on system sleep", "err", err)
 		}
 	case eventIdExitingModernStandby:
 		level.Debug(p.logger).Log("msg", "system is waking", "event_id", e.System.EventID)
-		if err := p.knapsack.SetDisableOsqueryHealthchecks(false); err != nil {
+		if err := p.knapsack.SetInModernStandby(false); err != nil {
 			level.Debug(p.logger).Log("msg", "could not enable osquery healthchecks on system wake", "err", err)
 		}
 	default:

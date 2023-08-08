@@ -109,7 +109,9 @@ func (c *checkPointer) logCheckPoint() {
 	}
 	c.logServerProvidedData()
 	c.logDesktopProcs()
-	c.logger.Log("disable_osquery_healthchecks", c.knapsack.DisableOsqueryHealthchecks())
+	if runtime.GOOS == "windows" {
+		c.logger.Log("in_modern_standby", c.knapsack.InModernStandby())
+	}
 }
 
 func (c *checkPointer) logDesktopProcs() {

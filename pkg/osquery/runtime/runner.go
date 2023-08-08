@@ -447,7 +447,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-ticker.C:
 				// If device is sleeping, we do not want to perform unnecessary healthchecks that
 				// may force an unnecessary restart.
-				if o.knapsack.DisableOsqueryHealthchecks() {
+				if o.knapsack.InModernStandby() {
 					break
 				}
 

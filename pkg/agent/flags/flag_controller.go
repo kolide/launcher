@@ -492,11 +492,11 @@ func (fc *FlagController) DisableTraceIngestTLS() bool {
 	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
 }
 
-func (fc *FlagController) SetDisableOsqueryHealthchecks(enabled bool) error {
-	return fc.setControlServerValue(keys.DisableOsqueryHealthchecks, boolToBytes(enabled))
+func (fc *FlagController) SetInModernStandby(enabled bool) error {
+	return fc.setControlServerValue(keys.InModernStandby, boolToBytes(enabled))
 }
-func (fc *FlagController) DisableOsqueryHealthchecks() bool {
+func (fc *FlagController) InModernStandby() bool {
 	return NewBoolFlagValue(
 		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.DisableOsqueryHealthchecks))
+	).get(fc.getControlServerValue(keys.InModernStandby))
 }
