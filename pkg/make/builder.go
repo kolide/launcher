@@ -455,7 +455,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 		notaryConfigDir,
 		data.GUN(gun),
 		remoteServerURL,
-		&http.Transport{Proxy: http.ProxyFromEnvironment},
+		http.DefaultTransport,
 		passwordRetrieverFn,
 		trustpinning.TrustPinConfig{},
 	)
