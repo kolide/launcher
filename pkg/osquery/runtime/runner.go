@@ -445,6 +445,12 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
 			case <-ticker.C:
+				// If device is sleeping, we do not want to perform unnecessary healthchecks that
+				// may force an unnecessary restart.
+				if o.knapsack.InModernStandby() {
+					break
+				}
+
 				// Health check! Allow a couple
 				// failures before we tear everything
 				// down. This is pretty simple, it
