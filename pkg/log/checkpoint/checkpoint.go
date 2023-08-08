@@ -109,6 +109,9 @@ func (c *checkPointer) logCheckPoint() {
 	}
 	c.logServerProvidedData()
 	c.logDesktopProcs()
+	if runtime.GOOS == "windows" {
+		c.logger.Log("in_modern_standby", c.knapsack.InModernStandby())
+	}
 }
 
 func (c *checkPointer) logDesktopProcs() {

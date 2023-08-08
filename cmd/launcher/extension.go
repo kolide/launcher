@@ -210,6 +210,7 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 	)
 
 	return []runtime.OsqueryInstanceOption{
+		runtime.WithKnapsack(k),
 		runtime.WithOsquerydBinary(k.OsquerydPath()),
 		runtime.WithRootDirectory(k.RootDirectory()),
 		runtime.WithOsqueryExtensionPlugins(ktable.LauncherTables(k)...),

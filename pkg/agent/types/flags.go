@@ -188,4 +188,8 @@ type Flags interface {
 	// DisableTraceIngestTLS disables TLS for observability ingest server communication
 	SetDisableTraceIngestTLS(enabled bool) error
 	DisableTraceIngestTLS() bool
+
+	// InModernStandby indicates whether a Windows machine is awake or in modern standby
+	SetInModernStandby(enabled bool) error
+	InModernStandby() bool
 }
