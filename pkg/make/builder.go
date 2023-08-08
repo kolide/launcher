@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -451,11 +452,20 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 	}
 
 	// Safely fetch and validate all TUF metadata from remote Notary server.
+	dialCtx := (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
 	repo, err := client.NewFileCachedRepository(
 		notaryConfigDir,
 		data.GUN(gun),
 		remoteServerURL,
-		http.DefaultTransport,
+		&http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           dialCtx,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+		},
 		passwordRetrieverFn,
 		trustpinning.TrustPinConfig{},
 	)
