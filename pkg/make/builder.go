@@ -409,7 +409,7 @@ func (b *Builder) GenerateTUF(ctx context.Context) error {
 			return fmt.Errorf("make autoupdate dir %s: %w", localRepo, err)
 		}
 
-		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun); err != nil {
+		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun, 30*time.Second, 5*time.Minute); err != nil {
 			return fmt.Errorf("bootstrap notary GUN %s: %w", gun, err)
 		}
 	}
@@ -442,7 +442,7 @@ func (b *Builder) execBindata(ctx context.Context, dir string) error {
 	return nil
 }
 
-func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string) error {
+func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string, retryTimeout time.Duration, bootstrapTimeout time.Duration) error {
 	passwordRetrieverFn := func(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
 		pass = os.Getenv(key)
 		if pass == "" {
@@ -464,7 +464,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 			Proxy:                 http.ProxyFromEnvironment,
 			DialContext:           dialCtx,
 			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 30 * time.Second,
+			ResponseHeaderTimeout: retryTimeout,
 		},
 		passwordRetrieverFn,
 		trustpinning.TrustPinConfig{},
@@ -478,7 +478,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 			return fmt.Errorf("getting all target metadata: %w", err)
 		}
 		return nil
-	}, 5*time.Minute, 30*time.Second); err != nil {
+	}, bootstrapTimeout, retryTimeout); err != nil {
 		return err
 	}
 
