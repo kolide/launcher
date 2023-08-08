@@ -453,7 +453,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 
 	// Safely fetch and validate all TUF metadata from remote Notary server.
 	dialCtx := (&net.Dialer{
-		Timeout:   30 * time.Second,
+		Timeout:   retryTimeout,
 		KeepAlive: 30 * time.Second,
 	}).DialContext
 	repo, err := client.NewFileCachedRepository(
