@@ -105,6 +105,7 @@ func parseSecret(extraFH io.Writer, secretPath string) (Status, string) {
 		fmt.Fprintf(extraFH, "unknown error: %s\n", err)
 		return Erroring, fmt.Sprintf("unknown error: %s", err)
 	}
+	defer secretFH.Close()
 
 	// If we can read the secret, let's try to extract the munemo
 	tokenRaw, err := io.ReadAll(secretFH)
