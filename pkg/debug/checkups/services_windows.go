@@ -230,6 +230,11 @@ func gatherServices(z *zip.Writer, serviceManager *mgr.Mgr) error {
 }
 
 func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
+	eventLogOut, err := z.Create("eventlog.txt")
+	if err != nil {
+		return fmt.Errorf("creating eventlog.txt: %w", err)
+	}
+
 	cmdletArgs := []string{
 		"Get-EventLog",
 		"-Newest", "50",
@@ -242,18 +247,9 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 
 	getEventLogCmd := exec.CommandContext(ctx, "powershell.exe", cmdletArgs...)
 	getEventLogCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // prevents spawning window
-	out, err := getEventLogCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("running Get-EventLog: error %w, output %s", err, string(out))
-	}
-
-	eventLogOut, err := z.Create("eventlog.txt")
-	if err != nil {
-		return fmt.Errorf("creating eventlog.txt: %w", err)
-	}
-
-	if _, err := eventLogOut.Write(out); err != nil {
-		return fmt.Errorf("writing event logs: %w", err)
+	getEventLogCmd.Stdout = eventLogOut                                 // write directly to zip
+	if err := getEventLogCmd.Run(); err != nil {
+		return fmt.Errorf("running Get-EventLog: error %w", err)
 	}
 
 	return nil
