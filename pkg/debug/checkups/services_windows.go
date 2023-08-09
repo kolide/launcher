@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
+	"syscall"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -90,23 +92,13 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
 
-	// Write names of all other services to extra writer too
-	services, err := serviceManager.ListServices()
-	if err != nil {
-		return fmt.Errorf("listing services: %w", err)
+	if err := gatherServices(extraZip, serviceManager); err != nil {
+		return fmt.Errorf("gathering service list: %w", err)
 	}
 
-	servicesOut, err := extraZip.Create("services.json")
-	if err != nil {
-		return fmt.Errorf("creating etc hosts: %w", err)
+	if err := gatherServiceManagerEventLogs(ctx, extraZip); err != nil {
+		return fmt.Errorf("gathering service manager event logs: %w", err)
 	}
-
-	servicesRaw, err := json.Marshal(services)
-	if err != nil {
-		return fmt.Errorf("marshalling services: %w", err)
-	}
-
-	servicesOut.Write(servicesRaw)
 
 	return nil
 }
@@ -209,6 +201,59 @@ func sidTypeHumanReadable(sidType uint32) string {
 	default:
 		return fmt.Sprintf("unknown: %d", sidType)
 	}
+}
+
+func gatherServices(z *zip.Writer, serviceManager *mgr.Mgr) error {
+	services, err := serviceManager.ListServices()
+	if err != nil {
+		return fmt.Errorf("listing services: %w", err)
+	}
+
+	servicesOut, err := z.Create("services.json")
+	if err != nil {
+		return fmt.Errorf("creating services.json: %w", err)
+	}
+
+	servicesRaw, err := json.Marshal(services)
+	if err != nil {
+		return fmt.Errorf("marshalling services: %w", err)
+	}
+
+	if _, err := servicesOut.Write(servicesRaw); err != nil {
+		return fmt.Errorf("writing services: %w", err)
+	}
+
+	return nil
+}
+
+func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
+	cmdletArgs := []string{
+		"Get-EventLog",
+		"-Newest", "50",
+		"-LogName", "System",
+		"-Source", "\"Service Control Manager\"",
+		"-Message", fmt.Sprintf("*%s*", kolideSvcName),
+		"|",
+		"Format-Table", "-Wrap", "-AutoSize", // ensure output doesn't get truncated
+	}
+
+	getEventLogCmd := exec.CommandContext(ctx, "powershell.exe", cmdletArgs...)
+	getEventLogCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // prevents spawning window
+	out, err := getEventLogCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("running Get-EventLog: error %w, output %s", err, string(out))
+	}
+
+	eventLogOut, err := z.Create("eventlog.txt")
+	if err != nil {
+		return fmt.Errorf("creating eventlog.txt: %w", err)
+	}
+
+	if _, err := eventLogOut.Write(out); err != nil {
+		return fmt.Errorf("writing event logs: %w", err)
+	}
+
+	return nil
 }
 
 func (s *servicesCheckup) ExtraFileName() string {
