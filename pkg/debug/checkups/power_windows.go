@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package checkups
 
 import (
@@ -6,7 +9,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"syscall"
 
 	"github.com/kolide/launcher/pkg/agent"
@@ -15,17 +17,10 @@ import (
 type powerCheckup struct{}
 
 func (p *powerCheckup) Name() string {
-	if runtime.GOOS != "windows" {
-		return ""
-	}
 	return "Power Report"
 }
 
 func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-
 	// Create a temporary file for powercfg to write its output to
 	tmpFilePath := agent.TempPath("launcher-checkup-spr.html")
 	defer func() {
