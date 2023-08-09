@@ -23,9 +23,7 @@ func (p *powerCheckup) Name() string {
 func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	// Create a temporary file for powercfg to write its output to
 	tmpFilePath := agent.TempPath("launcher-checkup-spr.html")
-	defer func() {
-		os.Remove(tmpFilePath)
-	}()
+	defer os.Remove(tmpFilePath)
 
 	// See: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options#option_systempowerreport
 	powerCfgCmd := exec.CommandContext(ctx, "powercfg.exe", "/systempowerreport", "/output", tmpFilePath)
