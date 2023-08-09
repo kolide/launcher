@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package checkups
 
 import (
@@ -5,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"runtime"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -22,11 +24,7 @@ func (s *servicesCheckup) Name() string {
 	return "Service Report"
 }
 
-func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-
+func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error { 
 	serviceManager, err := mgr.Connect()
 	if err != nil {
 		return fmt.Errorf("connecting to service manager: %w", err)
