@@ -13,7 +13,7 @@ type installCheckup struct {
 }
 
 func (i *installCheckup) Name() string {
-	return "Installation"
+	return "Package Install Logs"
 }
 
 func (i *installCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
@@ -21,7 +21,7 @@ func (i *installCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	defer extraZip.Close()
 
 	if err := gatherInstallationLogs(extraZip); err != nil {
-		return fmt.Errorf("gathering installation logss: %w", err)
+		return fmt.Errorf("gathering installation logs: %w", err)
 	}
 
 	return nil
@@ -49,9 +49,9 @@ func gatherInstallationLogs(z *zip.Writer) error {
 		return nil
 	}
 
-	out, err := z.Create("install.log")
+	out, err := z.Create("macos-var-log-install.log")
 	if err != nil {
-		return fmt.Errorf("creating install.log in zip: %w", err)
+		return fmt.Errorf("creating macos-var-log-install.log in zip: %w", err)
 	}
 
 	installLog, err := os.Open("/var/log/install.log")
@@ -60,12 +60,7 @@ func gatherInstallationLogs(z *zip.Writer) error {
 	}
 	defer installLog.Close()
 
-	installLogRaw, err := io.ReadAll(installLog)
-	if err != nil {
-		return fmt.Errorf("reading /var/log/install.log: %w", err)
-	}
-
-	if _, err := out.Write(installLogRaw); err != nil {
+	if _, err := io.Copy(out, installLog); err != nil {
 		return fmt.Errorf("writing /var/log/install.log contents to zip: %w", err)
 	}
 
