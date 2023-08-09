@@ -16,15 +16,17 @@ import (
 const kolideSvcName = "LauncherKolideK2Svc"
 
 type servicesCheckup struct {
-	data         map[string]any
-	serviceState svc.State
+	data                      map[string]any
+	serviceState              svc.State
+	serviceStateHumanReadable string
+	queryServiceStateErr      error
 }
 
 func (s *servicesCheckup) Name() string {
 	return "Service Report"
 }
 
-func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error { 
+func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	serviceManager, err := mgr.Connect()
 	if err != nil {
 		return fmt.Errorf("connecting to service manager: %w", err)
@@ -43,12 +45,14 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 
 	// Get status
 	if status, err := serviceHandle.Query(); err != nil {
+		s.queryServiceStateErr = err
 		s.data["state"] = fmt.Sprintf("error: %v", err)
 	} else {
 		// Map state (uint32) to human-readable statuses
 		s.serviceState = status.State
+		s.serviceStateHumanReadable = stateHumanReadable(status.State)
 		s.data["state_raw"] = status.State
-		s.data["state"] = stateHumanReadable(status.State)
+		s.data["state"] = s.serviceStateHumanReadable
 	}
 
 	// Get config
@@ -209,12 +213,11 @@ func (s *servicesCheckup) Summary() string {
 		return "did not find Kolide service"
 	}
 
-	// If we got a readable string for state, include that in the summary
-	if state, ok := s.data["state"]; ok {
-		return fmt.Sprintf("found Kolide service in state %d (%s)", s.serviceState, state)
+	if s.queryServiceStateErr != nil {
+		return fmt.Sprintf("found Kolide service but could not query state: %s", s.queryServiceStateErr.Error())
 	}
 
-	return fmt.Sprintf("found Kolide service in state %d", s.serviceState)
+	return fmt.Sprintf("found Kolide service in state %d (%s)", s.serviceState, s.serviceStateHumanReadable)
 }
 
 func (s *servicesCheckup) Data() any {
