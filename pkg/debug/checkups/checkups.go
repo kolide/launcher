@@ -103,6 +103,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&enrollSecretCheckup{}, doctorSupported | flareSupported},
 		{&bboltdbCheckup{k: k}, flareSupported},
 		{&networkCheckup{}, doctorSupported | flareSupported},
+		{&installCheckup{}, flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
