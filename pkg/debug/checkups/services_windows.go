@@ -4,6 +4,7 @@
 package checkups
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -86,12 +87,26 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 		return nil
 	}
 
+	extraZip := zip.NewWriter(extraWriter)
+	defer extraZip.Close()
+
 	// Write names of all other services to extra writer too
 	services, err := serviceManager.ListServices()
 	if err != nil {
 		return fmt.Errorf("listing services: %w", err)
 	}
-	_ = json.NewEncoder(extraWriter).Encode(services)
+
+	servicesOut, err := extraZip.Create("services.json")
+	if err != nil {
+		return fmt.Errorf("creating etc hosts: %w", err)
+	}
+
+	servicesRaw, err := json.Marshal(services)
+	if err != nil {
+		return fmt.Errorf("marshalling services: %w", err)
+	}
+
+	servicesOut.Write(servicesRaw)
 
 	return nil
 }
@@ -197,7 +212,7 @@ func sidTypeHumanReadable(sidType uint32) string {
 }
 
 func (s *servicesCheckup) ExtraFileName() string {
-	return "services.json"
+	return "servicemgr.zip"
 }
 
 func (s *servicesCheckup) Status() Status {
