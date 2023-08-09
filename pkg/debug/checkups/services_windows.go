@@ -24,6 +24,7 @@ type servicesCheckup struct {
 	serviceState              svc.State
 	serviceStateHumanReadable string
 	queryServiceStateErr      error
+	queryServiceConfigErr     error
 }
 
 func (s *servicesCheckup) Name() string {
@@ -61,6 +62,7 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 
 	// Get config
 	if cfg, err := serviceHandle.Config(); err != nil {
+		s.queryServiceConfigErr = err
 		s.data["config"] = fmt.Sprintf("error: %v", err)
 	} else {
 		s.data["binary_path_name"] = cfg.BinaryPathName
@@ -274,8 +276,16 @@ func (s *servicesCheckup) Summary() string {
 		return "did not find Kolide service"
 	}
 
+	if s.queryServiceStateErr != nil && s.queryServiceConfigErr != nil {
+		return fmt.Sprintf("found Kolide service but could not query state (%s) or config (%s)", s.queryServiceStateErr.Error(), s.queryServiceConfigErr.Error())
+	}
+
 	if s.queryServiceStateErr != nil {
 		return fmt.Sprintf("found Kolide service but could not query state: %s", s.queryServiceStateErr.Error())
+	}
+
+	if s.queryServiceConfigErr != nil {
+		return fmt.Sprintf("found Kolide service in state %d (%s) but could not query config: %s", s.serviceState, s.serviceStateHumanReadable, s.queryServiceConfigErr.Error())
 	}
 
 	return fmt.Sprintf("found Kolide service in state %d (%s)", s.serviceState, s.serviceStateHumanReadable)
