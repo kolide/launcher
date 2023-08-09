@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -106,19 +107,19 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 func stateHumanReadable(state svc.State) string {
 	// For mapping, see https://pkg.go.dev/golang.org/x/sys/windows/svc#pkg-constants
 	switch state {
-	case svc.Running:
+	case windows.SERVICE_RUNNING:
 		return "SERVICE_RUNNING"
-	case svc.Stopped:
+	case windows.SERVICE_STOPPED:
 		return "SERVICE_STOPPED"
-	case svc.StartPending:
+	case windows.SERVICE_START_PENDING:
 		return "SERVICE_START_PENDING"
-	case svc.StopPending:
+	case windows.SERVICE_STOP_PENDING:
 		return "SERVICE_STOP_PENDING"
-	case svc.ContinuePending:
+	case windows.SERVICE_CONTINUE_PENDING:
 		return "SERVICE_CONTINUE_PENDING"
-	case svc.PausePending:
+	case windows.SERVICE_PAUSE_PENDING:
 		return "SERVICE_PAUSE_PENDING"
-	case svc.Paused:
+	case windows.SERVICE_PAUSED:
 		return "SERVICE_PAUSED"
 	default:
 		return fmt.Sprintf("unknown: %d", state)
@@ -128,25 +129,25 @@ func stateHumanReadable(state svc.State) string {
 func serviceTypeHumanReadable(serviceType uint32) string {
 	// For mapping, see https://pkg.go.dev/golang.org/x/sys@v0.11.0/windows#SERVICE_KERNEL_DRIVER
 	switch serviceType {
-	case 1:
+	case windows.SERVICE_KERNEL_DRIVER:
 		return "SERVICE_KERNEL_DRIVER"
-	case 2:
+	case windows.SERVICE_FILE_SYSTEM_DRIVER:
 		return "SERVICE_FILE_SYSTEM_DRIVER"
-	case 4:
+	case windows.SERVICE_ADAPTER:
 		return "SERVICE_ADAPTER"
-	case 8:
+	case windows.SERVICE_RECOGNIZER_DRIVER:
 		return "SERVICE_RECOGNIZER_DRIVER"
-	case 16:
+	case windows.SERVICE_WIN32_OWN_PROCESS:
 		return "SERVICE_WIN32_OWN_PROCESS"
-	case 32:
+	case windows.SERVICE_WIN32_SHARE_PROCESS:
 		return "SERVICE_WIN32_SHARE_PROCESS"
-	case 16 | 32:
+	case windows.SERVICE_WIN32:
 		return "SERVICE_WIN32"
-	case 256:
+	case windows.SERVICE_INTERACTIVE_PROCESS:
 		return "SERVICE_INTERACTIVE_PROCESS"
-	case 1 | 2 | 8:
+	case windows.SERVICE_DRIVER:
 		return "SERVICE_DRIVER"
-	case 1 | 2 | 4 | 8 | 16 | 32 | 256:
+	case windows.SERVICE_TYPE_ALL:
 		return "SERVICE_TYPE_ALL"
 	default:
 		return fmt.Sprintf("unknown: %d", serviceType)
@@ -157,15 +158,15 @@ func startTypeHumanReadable(startType uint32) string {
 	// For mapping, see https://pkg.go.dev/golang.org/x/sys/windows/svc/mgr#pkg-constants
 	// and https://pkg.go.dev/golang.org/x/sys@v0.11.0/windows#SERVICE_BOOT_START
 	switch startType {
-	case 0:
+	case windows.SERVICE_BOOT_START:
 		return "SERVICE_BOOT_START"
-	case 1:
+	case windows.SERVICE_SYSTEM_START:
 		return "SERVICE_SYSTEM_START"
-	case mgr.StartAutomatic:
+	case windows.SERVICE_AUTO_START:
 		return "SERVICE_AUTO_START"
-	case mgr.StartManual:
+	case windows.SERVICE_DEMAND_START:
 		return "SERVICE_DEMAND_START"
-	case mgr.StartDisabled:
+	case windows.SERVICE_DISABLED:
 		return "SERVICE_DISABLED"
 	default:
 		return fmt.Sprintf("unknown: %d", startType)
@@ -175,13 +176,13 @@ func startTypeHumanReadable(startType uint32) string {
 func errorControlHumanReadable(errorControl uint32) string {
 	// For mapping, see https://pkg.go.dev/golang.org/x/sys/windows/svc/mgr#pkg-constants
 	switch errorControl {
-	case mgr.ErrorIgnore:
+	case windows.SERVICE_ERROR_IGNORE:
 		return "SERVICE_ERROR_IGNORE"
-	case mgr.ErrorNormal:
+	case windows.SERVICE_ERROR_NORMAL:
 		return "SERVICE_ERROR_NORMAL"
-	case mgr.ErrorSevere:
+	case windows.SERVICE_ERROR_SEVERE:
 		return "SERVICE_ERROR_SEVERE"
-	case mgr.ErrorCritical:
+	case windows.SERVICE_ERROR_CRITICAL:
 		return "SERVICE_ERROR_CRITICAL"
 	default:
 		return fmt.Sprintf("unknown: %d", errorControl)
@@ -192,11 +193,11 @@ func sidTypeHumanReadable(sidType uint32) string {
 	// For mapping, see https://pkg.go.dev/golang.org/x/sys@v0.11.0/windows#SERVICE_SID_TYPE_NONE
 	// See also: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_sid_info
 	switch sidType {
-	case 0:
+	case windows.SERVICE_SID_TYPE_NONE:
 		return "SERVICE_SID_TYPE_NONE"
-	case 1:
+	case windows.SERVICE_SID_TYPE_UNRESTRICTED:
 		return "SERVICE_SID_TYPE_UNRESTRICTED"
-	case 3:
+	case windows.SERVICE_SID_TYPE_RESTRICTED:
 		return "SERVICE_SID_TYPE_RESTRICTED"
 	default:
 		return fmt.Sprintf("unknown: %d", sidType)
