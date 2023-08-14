@@ -23,7 +23,107 @@ const (
 	dnscacheService     = `Dnscache`
 
 	notFoundInRegistryError = "The system cannot find the file specified."
+
+	customUrlKey = "ktest"
 )
+
+func registerCustomUrl(logger log.Logger) {
+	// If this isn't a Kolide installation, do not register custom URL
+	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
+		return
+	}
+
+	// Get custom URL key
+	customUrlEntry, openedExisting, err := registry.CreateKey(registry.LOCAL_MACHINE, customUrlKey, registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not create registry key", "key_name", customUrlKey, "err", err)
+		return
+	}
+	// Close it once we're done
+	defer func() {
+		if err := customUrlEntry.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", customUrlKey, "err", err)
+		}
+	}()
+
+	// Key already exists so we don't need to create configuration here
+	if openedExisting {
+		level.Error(logger).Log("msg", "key already exists, nothing to do", "key_name", customUrlKey)
+		return
+	}
+
+	// Setup mirrors https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/aa767914(v=vs.85)
+
+	if err := customUrlEntry.SetStringValue("(Default)", fmt.Sprintf("URL:%s Protocol", customUrlKey)); err != nil {
+		level.Error(logger).Log("msg", "cannot set (Default)", "err", err)
+		return
+	}
+
+	if err := customUrlEntry.SetStringValue("URL Protocol", ""); err != nil {
+		level.Error(logger).Log("msg", "cannot set URL Protocol key", "err", err)
+		return
+	}
+
+	// Create DefaultIcon key under customUrlKey
+	defaultIconEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, filepath.Join(customUrlKey, "DefaultIcon"), registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not create registry key", "key_name", filepath.Join(customUrlKey, "DefaultIcon"), "err", err)
+		return
+	}
+	// Close it once we're done
+	defer func() {
+		if err := defaultIconEntry.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", "DefaultIcon", "err", err)
+		}
+	}()
+
+	if err := defaultIconEntry.SetStringValue("(Default)", `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe,1`); err != nil {
+		level.Error(logger).Log("msg", "cannot set URL Protocol key", "err", err)
+		return
+	}
+
+	// Create keys customUrlKey => shell => open => command
+	shellPath := filepath.Join(customUrlKey, "shell")
+	shellEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, shellPath, registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not create registry key", "key_name", shellPath, "err", err)
+		return
+	}
+	defer func() {
+		if err := shellEntry.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", shellPath, "err", err)
+		}
+	}()
+
+	openPath := filepath.Join(shellPath, "open")
+	openEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, openPath, registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not create registry key", "key_name", openPath, "err", err)
+		return
+	}
+	defer func() {
+		if err := openEntry.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", openPath, "err", err)
+		}
+	}()
+
+	commandPath := filepath.Join(openPath, "command")
+	commandEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, commandPath, registry.ALL_ACCESS)
+	if err != nil {
+		level.Error(logger).Log("msg", "could not create registry key", "key_name", commandPath, "err", err)
+		return
+	}
+	defer func() {
+		if err := commandEntry.Close(); err != nil {
+			level.Error(logger).Log("msg", "could not close registry key", "key_name", commandPath, "err", err)
+		}
+	}()
+
+	if err := commandEntry.SetStringsValue("(Default)", []string{`C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`, `%1`}); err != nil {
+		level.Error(logger).Log("msg", "cannot set Default key", "err", err)
+		return
+	}
+}
 
 func checkServiceConfiguration(logger log.Logger, opts *launcher.Options) {
 	// If this isn't a Kolide installation, do not update the configuration

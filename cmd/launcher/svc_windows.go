@@ -80,6 +80,7 @@ func runWindowsSvc(args []string) error {
 
 	// Confirm that service configuration is up-to-date
 	checkServiceConfiguration(logger, opts)
+	registerCustomUrl(logger)
 
 	level.Info(logger).Log(
 		"msg", "launching service",
