@@ -4,6 +4,9 @@
 package main
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -27,14 +30,14 @@ const (
 	customUrlKey = "ktest"
 )
 
-func registerCustomUrl(logger log.Logger) {
+func registerCustomUrl(logger log.Logger, opts *launcher.Options) {
 	// If this isn't a Kolide installation, do not register custom URL
 	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
 		return
 	}
 
 	// Get custom URL key
-	customUrlEntry, openedExisting, err := registry.CreateKey(registry.LOCAL_MACHINE, customUrlKey, registry.ALL_ACCESS)
+	customUrlEntry, openedExisting, err := registry.CreateKey(registry.CLASSES_ROOT, customUrlKey, registry.ALL_ACCESS)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not create registry key", "key_name", customUrlKey, "err", err)
 		return
@@ -54,7 +57,7 @@ func registerCustomUrl(logger log.Logger) {
 
 	// Setup mirrors https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/aa767914(v=vs.85)
 
-	if err := customUrlEntry.SetStringValue("(Default)", fmt.Sprintf("URL:%s Protocol", customUrlKey)); err != nil {
+	if err := customUrlEntry.SetStringValue("", fmt.Sprintf("URL:%s Protocol", customUrlKey)); err != nil {
 		level.Error(logger).Log("msg", "cannot set (Default)", "err", err)
 		return
 	}
@@ -65,7 +68,7 @@ func registerCustomUrl(logger log.Logger) {
 	}
 
 	// Create DefaultIcon key under customUrlKey
-	defaultIconEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, filepath.Join(customUrlKey, "DefaultIcon"), registry.ALL_ACCESS)
+	defaultIconEntry, _, err := registry.CreateKey(registry.CLASSES_ROOT, filepath.Join(customUrlKey, "DefaultIcon"), registry.ALL_ACCESS)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not create registry key", "key_name", filepath.Join(customUrlKey, "DefaultIcon"), "err", err)
 		return
@@ -77,14 +80,14 @@ func registerCustomUrl(logger log.Logger) {
 		}
 	}()
 
-	if err := defaultIconEntry.SetStringValue("(Default)", `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe,1`); err != nil {
+	if err := defaultIconEntry.SetStringValue("", `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe,1`); err != nil {
 		level.Error(logger).Log("msg", "cannot set URL Protocol key", "err", err)
 		return
 	}
 
 	// Create keys customUrlKey => shell => open => command
 	shellPath := filepath.Join(customUrlKey, "shell")
-	shellEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, shellPath, registry.ALL_ACCESS)
+	shellEntry, _, err := registry.CreateKey(registry.CLASSES_ROOT, shellPath, registry.ALL_ACCESS)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not create registry key", "key_name", shellPath, "err", err)
 		return
@@ -96,7 +99,7 @@ func registerCustomUrl(logger log.Logger) {
 	}()
 
 	openPath := filepath.Join(shellPath, "open")
-	openEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, openPath, registry.ALL_ACCESS)
+	openEntry, _, err := registry.CreateKey(registry.CLASSES_ROOT, openPath, registry.ALL_ACCESS)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not create registry key", "key_name", openPath, "err", err)
 		return
@@ -108,7 +111,7 @@ func registerCustomUrl(logger log.Logger) {
 	}()
 
 	commandPath := filepath.Join(openPath, "command")
-	commandEntry, _, err := registry.CreateKey(registry.LOCAL_MACHINE, commandPath, registry.ALL_ACCESS)
+	commandEntry, _, err := registry.CreateKey(registry.CLASSES_ROOT, commandPath, registry.ALL_ACCESS)
 	if err != nil {
 		level.Error(logger).Log("msg", "could not create registry key", "key_name", commandPath, "err", err)
 		return
@@ -119,7 +122,7 @@ func registerCustomUrl(logger log.Logger) {
 		}
 	}()
 
-	if err := commandEntry.SetStringsValue("(Default)", []string{`C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`, `%1`}); err != nil {
+	if err := commandEntry.SetStringValue("", `"C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe" "%1"`); err != nil {
 		level.Error(logger).Log("msg", "cannot set Default key", "err", err)
 		return
 	}
