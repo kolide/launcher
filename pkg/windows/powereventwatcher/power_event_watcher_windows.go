@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -26,6 +27,7 @@ type (
 
 	powerEventWatcher struct {
 		logger                  log.Logger
+		knapsack                types.Knapsack
 		subscriptionHandle      uintptr
 		subscribeProcedure      *syscall.LazyProc
 		unsubscribeProcedure    *syscall.LazyProc
@@ -43,11 +45,12 @@ const (
 )
 
 // New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func New(logger log.Logger) (*powerEventWatcher, error) {
+func New(k types.Knapsack, logger log.Logger) (*powerEventWatcher, error) {
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")
 
 	p := &powerEventWatcher{
 		logger:                  logger,
+		knapsack:                k,
 		subscribeProcedure:      evtApi.NewProc("EvtSubscribe"),
 		unsubscribeProcedure:    evtApi.NewProc("EvtClose"),
 		renderEventLogProcedure: evtApi.NewProc("EvtRender"),
@@ -161,8 +164,14 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	switch e.System.EventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		level.Debug(p.logger).Log("msg", "system is sleeping", "event_id", e.System.EventID)
+		if err := p.knapsack.SetInModernStandby(true); err != nil {
+			level.Debug(p.logger).Log("msg", "could not disable osquery healthchecks on system sleep", "err", err)
+		}
 	case eventIdExitingModernStandby:
 		level.Debug(p.logger).Log("msg", "system is waking", "event_id", e.System.EventID)
+		if err := p.knapsack.SetInModernStandby(false); err != nil {
+			level.Debug(p.logger).Log("msg", "could not enable osquery healthchecks on system wake", "err", err)
+		}
 	default:
 		level.Debug(p.logger).Log("msg", "received unexpected event ID in log", "event_id", e.System.EventID, "raw_event", string(utf8bytes))
 	}

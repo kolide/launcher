@@ -224,7 +224,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		close(sigChannel)
 	})
 
-	powerEventWatcher, err := powereventwatcher.New(log.With(logger, "component", "power_event_watcher"))
+	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
 		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
 	} else {

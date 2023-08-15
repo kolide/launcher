@@ -386,3 +386,10 @@ func (k *knapsack) SetLogIngestServerURL(url string) error {
 func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
 }
+
+func (k *knapsack) SetInModernStandby(enabled bool) error {
+	return k.flags.SetInModernStandby(enabled)
+}
+func (k *knapsack) InModernStandby() bool {
+	return k.flags.InModernStandby()
+}
