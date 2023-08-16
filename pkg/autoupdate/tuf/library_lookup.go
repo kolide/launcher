@@ -52,7 +52,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 // getAutoupdateConfig reads launcher's config file to determine the configuration values
 // needed to work with the autoupdate library.
 func getAutoupdateConfig() (*autoupdateConfig, error) {
-	configFilePath := getConfigFilePath()
+	configFilePath := getConfigFilePath(os.Args[1:])
 	if configFilePath == "" {
 		return nil, errors.New("could not get config file path")
 	}
@@ -89,10 +89,17 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 // getConfigFilePath returns the path to launcher's launcher.flags file. If the path
 // is available in the command-line args, it will return that path; otherwise, it
 // will fall back to a well-known location.
-func getConfigFilePath() string {
-	for i, arg := range os.Args[1:] {
+func getConfigFilePath(args []string) string {
+	for i, arg := range args {
 		if arg == "--config" || arg == "-config" {
-			return strings.Trim(os.Args[i+1], `"'`)
+			return strings.Trim(args[i+1], `"'`)
+		}
+
+		if strings.Contains(arg, "config=") {
+			parts := strings.Split(arg, "=")
+			if len(parts) == 2 {
+				return parts[1]
+			}
 		}
 	}
 
