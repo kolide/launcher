@@ -150,14 +150,8 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockQuerier := newMockQuerier(t)
 
-	// Set up finalize function for osquery
-	osquerydRestarted := false
-
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error {
-		osquerydRestarted = true
-		return nil
-	}))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -190,31 +184,29 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
-	mockLibraryManager.On("Close").Return(nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
 	time.Sleep(5 * time.Second)
 
-	// The autoupdater won't stop after an osqueryd download, so interrupt it and wait for the interrupt to complete
-	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(1 * time.Second)
-
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
-	// Check that we restarted osquery
-	require.True(t, osquerydRestarted, "did not call restart function for osqueryd")
-
-	// Check log lines to confirm that we see the log `received external interrupt, stopping`, indicating that
-	// the autoupdater shut down at the end
+	// Check log lines to confirm that we see the log `restarted binary after update`, indicating that
+	// we restarted osqueryd
 	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
-	// We expect at least 1 log for the shutdown line.
+	// We expect at least 1 log for the restart line.
 	require.GreaterOrEqual(t, len(logLines), 1)
 
-	// Check that we shut down
-	require.Contains(t, logLines[len(logLines)-1], "received external interrupt, stopping")
+	// Check that we restarted osqueryd
+	require.Contains(t, logLines[len(logLines)-1], "restarted binary after update")
+
+	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
+	mockLibraryManager.On("Close").Return(nil)
+	autoupdater.Interrupt(errors.New("test error"))
+	time.Sleep(1 * time.Second)
+	mockLibraryManager.AssertExpectations(t)
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
