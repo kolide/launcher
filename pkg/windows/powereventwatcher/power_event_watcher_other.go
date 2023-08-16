@@ -5,13 +5,14 @@ package powereventwatcher
 
 import (
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 type noOpPowerEventWatcher struct {
 	interrupt chan struct{}
 }
 
-func New(_ log.Logger) (*noOpPowerEventWatcher, error) {
+func New(_ types.Knapsack, _ log.Logger) (*noOpPowerEventWatcher, error) {
 	return &noOpPowerEventWatcher{
 		interrupt: make(chan struct{}),
 	}, nil

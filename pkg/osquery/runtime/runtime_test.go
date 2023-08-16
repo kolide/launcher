@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
+	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -213,6 +214,7 @@ func TestBadBinaryPath(t *testing.T) {
 	defer rmRootDirectory()
 
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
 	)
@@ -227,6 +229,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	defer rmRootDirectory()
 
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
@@ -252,6 +255,7 @@ func TestSimplePath(t *testing.T) {
 	defer rmRootDirectory()
 
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
@@ -300,6 +304,7 @@ func TestOsqueryDies(t *testing.T) {
 	defer rmRootDirectory()
 
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
@@ -328,7 +333,7 @@ func TestNotStarted(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	runner := newRunner(WithRootDirectory(rootDirectory))
+	runner := newRunner(WithKnapsack(typesMocks.NewKnapsack(t)), WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	assert.Error(t, runner.Healthy())
@@ -381,6 +386,7 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -411,6 +417,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	runner, err := LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithLogger(log.NewLogfmtLogger(&logBytes)),
@@ -449,6 +456,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	require.NoError(t, err)
 
 	runner, err = LaunchInstance(
+		WithKnapsack(typesMocks.NewKnapsack(t)),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)

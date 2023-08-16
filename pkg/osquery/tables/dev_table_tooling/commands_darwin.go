@@ -8,4 +8,8 @@ var allowedCommands = map[string]allowedCommand{
 		binPaths: []string{"echo"},
 		args:     []string{"hello"},
 	},
+	"cb_repcli": {
+		binPaths: []string{"/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli"},
+		args:     []string{"status"},
+	},
 }

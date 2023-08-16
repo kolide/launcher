@@ -17,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -221,6 +222,12 @@ func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
 	}
 }
 
+func WithKnapsack(k types.Knapsack) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.knapsack = k
+	}
+}
+
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
@@ -239,6 +246,7 @@ type OsqueryInstance struct {
 	usingTempDir            bool
 	stats                   *history.Instance
 	startFunc               func(cmd *exec.Cmd) error
+	knapsack                types.Knapsack
 }
 
 // Healthy will check to determine whether or not the osquery process that is

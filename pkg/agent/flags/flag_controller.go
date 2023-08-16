@@ -491,3 +491,12 @@ func (fc *FlagController) DisableTraceIngestTLS() bool {
 		WithDefaultBool(fc.cmdLineOpts.DisableTraceIngestTLS),
 	).get(fc.getControlServerValue(keys.DisableTraceIngestTLS))
 }
+
+func (fc *FlagController) SetInModernStandby(enabled bool) error {
+	return fc.setControlServerValue(keys.InModernStandby, boolToBytes(enabled))
+}
+func (fc *FlagController) InModernStandby() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.InModernStandby))
+}
