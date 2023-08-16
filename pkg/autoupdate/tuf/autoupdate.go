@@ -198,12 +198,14 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	defer cleanupTicker.Stop()
 
 	for {
+		if err := ta.checkForUpdate(); err != nil {
+			ta.storeError(err)
+			level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
+		}
+
 		select {
 		case <-checkTicker.C:
-			if err := ta.checkForUpdate(); err != nil {
-				ta.storeError(err)
-				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
-			}
+			continue
 		case <-cleanupTicker.C:
 			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
