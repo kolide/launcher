@@ -34,6 +34,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
@@ -70,6 +71,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
@@ -144,6 +146,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
@@ -207,6 +210,65 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	autoupdater.Interrupt(errors.New("test error"))
 	time.Sleep(1 * time.Second)
 	mockLibraryManager.AssertExpectations(t)
+}
+
+func TestExecute_withInitialDelay(t *testing.T) {
+	t.Parallel()
+
+	initialDelay := 5 * time.Second
+
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.2.3"
+	tufServerUrl, _ := tufci.InitRemoteTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
+		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	autoupdater.logger = log.NewJSONLogger(&logBytes)
+
+	// Expect that we interrupt
+	mockLibraryManager := NewMocklibrarian(t)
+	mockLibraryManager.On("Close").Return(nil)
+	autoupdater.libraryManager = mockLibraryManager
+
+	// Let the autoupdater run for less than the initial delay
+	go autoupdater.Execute()
+	time.Sleep(3 * time.Second)
+
+	// Shut down the autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
+	time.Sleep(1 * time.Second)
+
+	// Assert expectation that we closed the library
+	mockLibraryManager.AssertExpectations(t)
+
+	// Check log lines to confirm that we see the log `received external interrupt during initial delay, stopping`,
+	// indicating that we halted during the initial delay
+	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
+
+	// We expect at least 1 log for the shutdown line.
+	require.GreaterOrEqual(t, len(logLines), 1)
+
+	// Check that we shut down
+	require.Contains(t, logLines[len(logLines)-1], "received external interrupt during initial delay, stopping")
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
@@ -275,6 +337,7 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(setupStorage(t))
 	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")

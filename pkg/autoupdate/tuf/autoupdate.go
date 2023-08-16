@@ -65,6 +65,7 @@ type TufAutoupdater struct {
 	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
 	channel                string
+	initialDelay           time.Duration
 	checkInterval          time.Duration
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
@@ -97,6 +98,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
 		checkInterval:          k.AutoupdateInterval(),
+		initialDelay:           k.AutoupdateInitialDelay(),
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -171,6 +173,15 @@ func defaultLibraryDirectory(rootDirectory string) string {
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
+	// Delay startup, if initial delay is set
+	select {
+	case <-ta.interrupt:
+		level.Debug(ta.logger).Log("msg", "received external interrupt during initial delay, stopping")
+		return nil
+	case <-time.After(ta.initialDelay):
+		break
+	}
+
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
 	ta.tidyLibrary()
