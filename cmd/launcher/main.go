@@ -148,22 +148,25 @@ func runSubcommands() error {
 func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	newerBinary, err := latestLauncherPath(ctx, logger)
 	if err != nil {
-		logutil.Fatal(logger, err, "checking for updated version")
+		logutil.Fatal(logger, "msg", "checking for updated version", "err", err)
 	}
 
-	if newerBinary != "" {
-		level.Debug(logger).Log(
-			"msg", "preparing to exec new binary",
-			"oldVersion", version.Version().Version,
-			"newBinary", newerBinary,
-		)
-		if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
-			logutil.Fatal(logger, err, "exec")
-		}
-		panic("how")
-	} else {
-		level.Debug(logger).Log("msg", "Nothing newer")
+	if newerBinary == "" {
+		level.Debug(logger).Log("msg", "nothing newer")
+		return
 	}
+
+	level.Debug(logger).Log(
+		"msg", "preparing to exec new binary",
+		"old_version", version.Version().Version,
+		"new_binary", newerBinary,
+	)
+
+	if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
+		logutil.Fatal(logger, "msg", "error execing newer version of launcher", "new_binary", newerBinary, "err", err)
+	}
+
+	logutil.Fatal(logger, "msg", "execing newer version of launcher exited unexpectedly without error", "new_binary", newerBinary)
 }
 
 // latestLauncherPath looks for the latest version of launcher in the new autoupdate library,
@@ -187,12 +190,12 @@ func latestLauncherPath(ctx context.Context, logger log.Logger) (string, error) 
 
 	currentPath, _ := os.Executable()
 	if newerBinary.Version != version.Version().Version && newerBinary.Path != currentPath {
-		level.Error(logger).Log(
+		level.Debug(logger).Log(
 			"msg", "got new version of launcher to run",
 			"old_version", version.Version().Version,
 			"new_binary_version", newerBinary.Version,
 			"new_binary_path", newerBinary.Path,
-		) // TODO RM
+		)
 		return newerBinary.Path, nil
 	}
 
