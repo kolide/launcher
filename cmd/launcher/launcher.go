@@ -366,6 +366,26 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if k.Autoupdate() {
+		// Create a new TUF autoupdater
+		metadataClient := http.DefaultClient
+		metadataClient.Timeout = 1 * time.Minute
+		mirrorClient := http.DefaultClient
+		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
+		tufAutoupdater, err := tuf.NewTufAutoupdater(
+			k,
+			metadataClient,
+			mirrorClient,
+			extension,
+			tuf.WithLogger(logger),
+			tuf.WithOsqueryRestart(runnerRestart),
+		)
+		if err != nil {
+			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
+			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
+		} else {
+			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+		}
+
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
@@ -420,26 +440,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("create launcher updater: %w", err)
 		}
 		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
-
-		// Create a new TUF autoupdater
-		metadataClient := http.DefaultClient
-		metadataClient.Timeout = 1 * time.Minute
-		mirrorClient := http.DefaultClient
-		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
-		tufAutoupdater, err := tuf.NewTufAutoupdater(
-			k,
-			metadataClient,
-			mirrorClient,
-			extension,
-			tuf.WithLogger(logger),
-			tuf.WithOsqueryRestart(runnerRestart),
-		)
-		if err != nil {
-			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
-			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
-		} else {
-			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
-		}
 	}
 
 	if err := runGroup.Run(); err != nil {
