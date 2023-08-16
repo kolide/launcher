@@ -138,6 +138,12 @@ func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *h
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
 	}
 
+	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
+	// have permissions in excess of -rwxr-x---.
+	if err := os.Chmod(localTufDirectory, 0750); err != nil {
+		return nil, fmt.Errorf("chmodding local TUF directory %s: %w", localTufDirectory, err)
+	}
+
 	// Set up our local store i.e. point to the directory in our filesystem
 	localStore, err := filejsonstore.NewFileJSONStore(localTufDirectory)
 	if err != nil {
