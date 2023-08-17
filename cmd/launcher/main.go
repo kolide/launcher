@@ -146,6 +146,16 @@ func runSubcommands() error {
 // runNewerLauncherIfAvailable checks the autoupdate library for a newer version
 // of launcher than the currently-running one. If found, it will exec that version.
 func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
+	// If the legacy autoupdate path variable isn't already set, set it to help
+	// the legacy autoupdater find its update directory even when the newer binary
+	// runs out of a different directory.
+	if _, ok := os.LookupEnv(autoupdate.LegacyAutoupdatePathEnvVar); !ok {
+		currentPath, err := os.Executable()
+		if err == nil {
+			os.Setenv(autoupdate.LegacyAutoupdatePathEnvVar, currentPath)
+		}
+	}
+
 	newerBinary, err := latestLauncherPath(ctx, logger)
 	if err != nil {
 		logutil.Fatal(logger, "msg", "checking for updated version", "err", err)
