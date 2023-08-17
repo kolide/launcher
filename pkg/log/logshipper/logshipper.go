@@ -64,24 +64,30 @@ func (ls *LogShipper) Ping() {
 	ls.sender.authtoken = string(token)
 
 	shouldEnable := ls.knapsack.LogIngestServerURL() != ""
-	parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
-	if err != nil || parsedUrl.String() == "" {
-		// If we have a bad endpoint, just disable for now.
-		// It will get renabled when control server sends a
-		// valid endpoint.
-		shouldEnable = false
-		level.Debug(ls.baseLogger).Log(
-			"msg", "error parsing log ingest server url, shipping disabled",
-			"err", err,
-			"log_ingest_url", ls.knapsack.LogIngestServerURL(),
-		)
+
+	// Only attempt to parse a URL if we have one
+	if shouldEnable {
+		parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
+		if err != nil {
+			// If we have a bad endpoint, just disable for now.
+			// It will get renabled when control server sends a
+			// valid endpoint.
+			shouldEnable = false
+			level.Debug(ls.baseLogger).Log(
+				"msg", "error parsing log ingest server url, shipping disabled",
+				"err", err,
+				"log_ingest_url", ls.knapsack.LogIngestServerURL(),
+			)
+		} else if parsedUrl != nil {
+			ls.sender.endpoint = parsedUrl.String()
+		}
 	}
 
-	ls.sender.endpoint = parsedUrl.String()
 	ls.isShippingEnabled = shouldEnable
 	ls.addDeviceIdentifyingAttributesToLogger()
 
 	if !ls.isShippingEnabled {
+		ls.sender.endpoint = "" // clear out URL when shipping is disabled
 		ls.sendBuffer.DeleteAllData()
 	}
 }
