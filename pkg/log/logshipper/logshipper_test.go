@@ -36,7 +36,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
 			endpoint := "https://someurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 			knapsack.On("Debug").Return(true)
 
@@ -50,7 +50,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
 			endpoint = "http://someotherurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
@@ -66,7 +66,7 @@ func TestLogShipper(t *testing.T) {
 			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to empty endpoint")
 
 			endpoint = "http://somenewvalidurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
@@ -74,7 +74,7 @@ func TestLogShipper(t *testing.T) {
 			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
 
 			endpoint = "not_a_url%$%"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(3)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
 			ls.Ping()
 
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
