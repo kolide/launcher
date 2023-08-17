@@ -20,7 +20,13 @@ func (e LauncherReloadNeeded) Error() string {
 	return e.msg
 }
 
+func (e LauncherReloadNeeded) Is(target error) bool {
+	if _, ok := target.(LauncherReloadNeeded); ok {
+		return true
+	}
+	return false
+}
+
 func IsLauncherReloadNeededErr(err error) bool {
-	_, ok := errors.Cause(err).(LauncherReloadNeeded)
-	return ok
+	return errors.Is(err, LauncherReloadNeeded{})
 }
