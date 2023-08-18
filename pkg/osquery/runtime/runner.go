@@ -438,6 +438,10 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
+		level.Debug(o.logger).Log("msg", "entering delay before starting osquery healthchecks")
+		time.Sleep(o.knapsack.OsqueryHealthcheckStartupDelay())
+		level.Debug(o.logger).Log("msg", "exiting delay before starting osquery healthchecks")
+
 		ticker := time.NewTicker(healthCheckInterval)
 		defer ticker.Stop()
 		for {
