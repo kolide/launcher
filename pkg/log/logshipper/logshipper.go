@@ -49,7 +49,7 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 		sender:         sender,
 		sendBuffer:     sendBuffer,
 		shippingLogger: shippingLogger,
-		baseLogger:     baseLogger,
+		baseLogger:     log.With(baseLogger, "component", "logshipper"),
 		knapsack:       k,
 	}
 
@@ -63,22 +63,22 @@ func (ls *LogShipper) Ping() {
 	token, _ := ls.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	ls.sender.authtoken = string(token)
 
-	shouldEnable := ls.knapsack.LogIngestServerURL() != ""
 	parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
-	if err != nil || parsedUrl.String() == "" {
+	if err != nil {
 		// If we have a bad endpoint, just disable for now.
 		// It will get renabled when control server sends a
 		// valid endpoint.
-		shouldEnable = false
+		ls.sender.endpoint = ""
 		level.Debug(ls.baseLogger).Log(
 			"msg", "error parsing log ingest server url, shipping disabled",
 			"err", err,
 			"log_ingest_url", ls.knapsack.LogIngestServerURL(),
 		)
+	} else if parsedUrl != nil {
+		ls.sender.endpoint = parsedUrl.String()
 	}
 
-	ls.sender.endpoint = parsedUrl.String()
-	ls.isShippingEnabled = shouldEnable
+	ls.isShippingEnabled = ls.sender.endpoint != ""
 	ls.addDeviceIdentifyingAttributesToLogger()
 
 	if !ls.isShippingEnabled {
