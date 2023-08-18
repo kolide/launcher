@@ -36,7 +36,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
 			endpoint := "https://someurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 			knapsack.On("Debug").Return(true)
 
@@ -50,7 +50,7 @@ func TestLogShipper(t *testing.T) {
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
 			endpoint = "http://someotherurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
@@ -58,12 +58,28 @@ func TestLogShipper(t *testing.T) {
 			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
 
 			endpoint = ""
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(3)
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 			ls.Ping()
 
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
 			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
-			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to bad endpoint")
+			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to empty endpoint")
+
+			endpoint = "http://somenewvalidurl"
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+
+			ls.Ping()
+			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
+			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
+
+			endpoint = "not_a_url%$%"
+			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
+			ls.Ping()
+
+			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
+			require.Equal(t, "", ls.sender.endpoint, "log shipper should update endpoint to empty string when invalid")
+			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to invalid endpoint")
 		})
 	}
 }
