@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"syscall"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -246,8 +245,8 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 	}
 
 	getEventLogCmd := exec.CommandContext(ctx, "powershell.exe", cmdletArgs...)
-	getEventLogCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // prevents spawning window
-	getEventLogCmd.Stdout = eventLogOut                                 // write directly to zip
+	hideWindow(getEventLogCmd)
+	getEventLogCmd.Stdout = eventLogOut // write directly to zip
 	if err := getEventLogCmd.Run(); err != nil {
 		return fmt.Errorf("running Get-EventLog: error %w", err)
 	}

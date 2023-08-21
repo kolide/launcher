@@ -52,6 +52,7 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	defer cmdCancel()
 
 	cmd := exec.CommandContext(cmdCtx, osquery, "--version")
+	hideWindow(cmd)
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
 	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
@@ -75,6 +76,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	defer cmdCancel()
 
 	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive")
+	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader("select * from osquery_info;")
 
 	startTime := time.Now().UnixMilli()

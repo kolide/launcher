@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"syscall"
 
 	"github.com/kolide/launcher/pkg/agent"
 )
@@ -27,7 +26,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	// See: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options#option_systempowerreport
 	powerCfgCmd := exec.CommandContext(ctx, "powercfg.exe", "/systempowerreport", "/output", tmpFilePath)
-	powerCfgCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // prevents spawning window
+	hideWindow(powerCfgCmd)
 	if out, err := powerCfgCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("running powercfg.exe: error %w, output %s", err, string(out))
 	}
