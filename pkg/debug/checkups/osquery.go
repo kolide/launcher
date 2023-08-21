@@ -8,9 +8,13 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate"
 )
 
 type osqueryCheckup struct {
+	k              types.Knapsack
 	status         Status
 	executionTimes map[string]string // maps command to how long it took to run, in ms
 	summary        string
@@ -40,24 +44,18 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 }
 
 func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
-	var osquery string
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		osquery = "/usr/local/kolide-k2/bin/osqueryd"
-	case "windows":
-		osquery = `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe`
-	}
+	osquerydPath := autoupdate.FindNewest(ctx, o.k.OsquerydPath())
 
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cmdCancel()
 
-	cmd := exec.CommandContext(cmdCtx, osquery, "--version")
+	cmd := exec.CommandContext(cmdCtx, osquerydPath, "--version")
 	hideWindow(cmd)
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
 	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
-		return "", fmt.Errorf("running %s version: err %w, output %s", osquery, err, string(out))
+		return "", fmt.Errorf("running %s version: err %w, output %s", osquerydPath, err, string(out))
 	}
 
 	return strings.TrimSpace(string(out)), nil
@@ -72,12 +70,12 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 		launcherPath = `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`
 	}
 
-	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
+	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
 	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive")
 	hideWindow(cmd)
-	cmd.Stdin = strings.NewReader("select * from osquery_info;")
+	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
