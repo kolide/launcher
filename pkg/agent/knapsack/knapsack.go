@@ -389,3 +389,10 @@ func (k *knapsack) SetInModernStandby(enabled bool) error {
 func (k *knapsack) InModernStandby() bool {
 	return k.flags.InModernStandby()
 }
+
+func (k *knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
+	return k.flags.SetOsqueryHealthcheckStartupDelay(delay)
+}
+func (k *knapsack) OsqueryHealthcheckStartupDelay() time.Duration {
+	return k.flags.OsqueryHealthcheckStartupDelay()
+}

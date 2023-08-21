@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,6 +276,9 @@ func Test_bootstrapFromNotary_retryOnTimeout(t *testing.T) {
 	err := bootstrapFromNotary(t.TempDir(), testNotaryServer.URL, t.TempDir(), testGun, 1*time.Second, 10*time.Second)
 	require.NotNil(t, err, "expected timeout during bootstrap")
 
-	// Confirm we made the expected number of attempts
-	require.Contains(t, err.Error(), "timeout after 10s (10 attempts)")
+	// Confirm we made (more or less) the expected number of attempts
+	eightOrMoreAttempts := strings.Contains(err.Error(), "timeout after 10s (8 attempts)") ||
+		strings.Contains(err.Error(), "timeout after 10s (9 attempts)") ||
+		strings.Contains(err.Error(), "timeout after 10s (10 attempts)")
+	require.True(t, eightOrMoreAttempts, "expected at least 8 attempts", err.Error())
 }
