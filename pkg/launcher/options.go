@@ -25,6 +25,8 @@ type Options struct {
 	RootDirectory string
 	// OsquerydPath is the path to the osqueryd binary.
 	OsquerydPath string
+	// OsqueryHealthcheckStartupDelay is the time to wait before beginning osquery healthchecks
+	OsqueryHealthcheckStartupDelay time.Duration
 	// CertPins are optional hashes of subject public key info to use for
 	// certificate pinning.
 	CertPins [][]byte
