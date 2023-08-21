@@ -88,7 +88,7 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 	}
 
 	// If we're running doctor and not flare, no need to write extra data
-	if extraWriter == nil {
+	if extraWriter == io.Discard {
 		return nil
 	}
 
