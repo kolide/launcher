@@ -1,7 +1,6 @@
 package checkups
 
 import (
-	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -26,7 +25,6 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	o.executionTimes = make(map[string]string)
 	if osqueryVersion, err := o.version(ctx); err != nil {
 		o.status = Failing
-		o.summary = err.Error()
 		return fmt.Errorf("running osqueryd version: %w", err)
 	} else {
 		o.status = Passing
@@ -38,23 +36,17 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("running launcher interactive: %w", err)
 	}
 
-	// If we're running doctor and not flare, that's all we need
-	if extraWriter == io.Discard {
-		return nil
-	}
-
-	zipWriter := zip.NewWriter(extraWriter)
-	defer zipWriter.Close()
-
-	if err := o.foreground(ctx, zipWriter); err != nil {
-		return fmt.Errorf("running osqueryd in foreground: %w", err)
-	}
-
 	return nil
 }
 
 func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
-	osquery := osquerydPath()
+	var osquery string
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		osquery = "/usr/local/kolide-k2/bin/osqueryd"
+	case "windows":
+		osquery = `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe`
+	}
 
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cmdCancel()
@@ -62,7 +54,7 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	cmd := exec.CommandContext(cmdCtx, osquery, "--version")
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
-	o.executionTimes[strings.Join(cmd.Args, " ")] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
+	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
 		return "", fmt.Errorf("running %s version: err %w, output %s", osquery, err, string(out))
 	}
@@ -87,7 +79,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
-	o.executionTimes[strings.Join(cmd.Args, " ")] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
+	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
 		return fmt.Errorf("running %s interactive: err %w, output %s", launcherPath, err, string(out))
 	}
@@ -95,43 +87,8 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	return nil
 }
 
-func (o *osqueryCheckup) foreground(ctx context.Context, zipWriter *zip.Writer) error {
-	osquery := osquerydPath()
-
-	runInForegroundDuration := 10 * time.Second
-
-	cmdCtx, cmdCancel := context.WithTimeout(ctx, runInForegroundDuration)
-	defer cmdCancel()
-
-	out, err := zipWriter.Create("osqueryd-foreground.log")
-	if err != nil {
-		return fmt.Errorf("creating zip file for stderr: %w", err)
-	}
-	cmd := exec.CommandContext(cmdCtx, osquery, "--ephemeral", "--disable_database", "--disable_logging", "--verbose")
-	cmd.Stderr = out
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("starting osqueryd in foreground: err %w", err)
-	}
-
-	time.Sleep(runInForegroundDuration)
-
-	return nil
-}
-
-func osquerydPath() string {
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		return "/usr/local/kolide-k2/bin/osqueryd"
-	case "windows":
-		return `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe`
-	}
-
-	return ""
-}
-
 func (o *osqueryCheckup) ExtraFileName() string {
-	return "osqueryd-output.zip"
+	return ""
 }
 
 func (o *osqueryCheckup) Status() Status {
