@@ -192,4 +192,8 @@ type Flags interface {
 	// InModernStandby indicates whether a Windows machine is awake or in modern standby
 	SetInModernStandby(enabled bool) error
 	InModernStandby() bool
+
+	// OsqueryHealthcheckStartupDelay is the time to wait before beginning osquery healthchecks
+	SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
+	OsqueryHealthcheckStartupDelay() time.Duration
 }

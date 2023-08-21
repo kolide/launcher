@@ -41,6 +41,7 @@ type Runner struct {
 	instance     *OsqueryInstance
 	instanceLock sync.Mutex
 	shutdown     chan struct{}
+	opts         []OsqueryInstanceOption
 }
 
 // LaunchInstance will launch an instance of osqueryd via a very configurable
@@ -111,6 +112,9 @@ func (r *Runner) Start() error {
 			opts := r.instance.opts
 			r.instance = newInstance()
 			r.instance.opts = opts
+			for _, opt := range r.opts {
+				opt(r.instance)
+			}
 			if err := r.launchOsqueryInstance(); err != nil {
 				level.Info(r.instance.logger).Log(
 					"msg", "fatal error restarting instance",
@@ -438,6 +442,12 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
+		if o.knapsack != nil && o.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
+			level.Debug(o.logger).Log("msg", "entering delay before starting osquery healthchecks")
+			time.Sleep(o.knapsack.OsqueryHealthcheckStartupDelay())
+			level.Debug(o.logger).Log("msg", "exiting delay before starting osquery healthchecks")
+		}
+
 		ticker := time.NewTicker(healthCheckInterval)
 		defer ticker.Stop()
 		for {
@@ -447,7 +457,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			case <-ticker.C:
 				// If device is sleeping, we do not want to perform unnecessary healthchecks that
 				// may force an unnecessary restart.
-				if o.knapsack.InModernStandby() {
+				if o.knapsack != nil && o.knapsack.InModernStandby() {
 					break
 				}
 
@@ -505,5 +515,6 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 	return &Runner{
 		instance: i,
 		shutdown: make(chan struct{}),
+		opts:     opts,
 	}
 }
