@@ -213,8 +213,10 @@ func TestBadBinaryPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
 	)
@@ -228,8 +230,10 @@ func TestWithOsqueryFlags(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
@@ -254,8 +258,10 @@ func TestSimplePath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
@@ -303,8 +309,10 @@ func TestOsqueryDies(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
@@ -333,7 +341,9 @@ func TestNotStarted(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
-	runner := newRunner(WithKnapsack(typesMocks.NewKnapsack(t)), WithRootDirectory(rootDirectory))
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	runner := newRunner(WithKnapsack(k), WithRootDirectory(rootDirectory))
 	require.NoError(t, err)
 
 	assert.Error(t, runner.Healthy())
@@ -384,9 +394,11 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -416,8 +428,10 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err := LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithLogger(log.NewLogfmtLogger(&logBytes)),
@@ -455,8 +469,10 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
 	require.NoError(t, err)
 
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	runner, err = LaunchInstance(
-		WithKnapsack(typesMocks.NewKnapsack(t)),
+		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)

@@ -500,3 +500,14 @@ func (fc *FlagController) InModernStandby() bool {
 		WithDefaultBool(false),
 	).get(fc.getControlServerValue(keys.InModernStandby))
 }
+
+func (fc *FlagController) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
+	return fc.setControlServerValue(keys.OsqueryHealthcheckStartupDelay, durationToBytes(delay))
+}
+func (fc *FlagController) OsqueryHealthcheckStartupDelay() time.Duration {
+	return NewDurationFlagValue(fc.logger, keys.OsqueryHealthcheckStartupDelay,
+		WithDefault(fc.cmdLineOpts.OsqueryHealthcheckStartupDelay),
+		WithMin(0*time.Second),
+		WithMax(1*time.Hour),
+	).get(fc.getControlServerValue(keys.OsqueryHealthcheckStartupDelay))
+}
