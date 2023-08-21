@@ -117,6 +117,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true
         enableCrossOsArchive: true
 
     - name: Launcher Version
@@ -156,6 +157,7 @@ jobs:
       with:
         path: ./build
         key: ${{ matrix.artifactos }}-${{ github.run_id }}
+        fail-on-cache-miss: true
         enableCrossOsArchive: true
 
     - name: Upload Build
