@@ -213,8 +213,7 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	}
 
 	// Consumer and subscriber(s) notified now
-	err = cs.update(subsystem, data)
-	if err != nil {
+	if err := cs.update(subsystem, data); err != nil {
 		// Although we failed to update, the payload may be bad and there's no
 		// sense in repeatedly attempting to apply a bad update.
 		// A new update will have a new hash, so continue and remember this hash.
@@ -224,12 +223,14 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	// Remember the hash of the last fetched version of this subsystem's data
 	cs.lastFetched[subsystem] = hash
 
-	if cs.store != nil {
-		// Store the hash so we can persist the last fetched data across launcher restarts
-		err = cs.store.Set([]byte(subsystem), []byte(hash))
-		if err != nil {
-			level.Error(logger).Log("msg", "failed to store last fetched control data", "err", err)
-		}
+	// can't store hash if we dont have store
+	if cs.store == nil {
+		return nil
+	}
+
+	// Store the hash so we can persist the last fetched data across launcher restarts
+	if err := cs.store.Set([]byte(subsystem), []byte(hash)); err != nil {
+		level.Error(logger).Log("msg", "failed to store last fetched control data", "err", err)
 	}
 
 	return nil
