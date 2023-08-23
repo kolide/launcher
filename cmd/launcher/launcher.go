@@ -24,6 +24,8 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	"github.com/kolide/launcher/ee/control/actionqueue"
+	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -285,11 +287,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataConsumer handles server data table updates
-		serverDataConsumer := keyvalueconsumer.New(k.ServerProvidedDataStore())
-		controlService.RegisterConsumer(serverDataSubsystemName, serverDataConsumer)
+		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
-		agentFlagsConsumer := keyvalueconsumer.New(flagController)
-		controlService.RegisterConsumer(agentFlagsSubsystemName, agentFlagsConsumer)
+		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
 
 		runner, err = desktopRunner.New(
 			k,
@@ -303,9 +303,22 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		runGroup.Add(runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
-		// Run the notification service
+
+		// create an action queue for all other action style commands
+		actionsQueue := actionqueue.New(
+			actionqueue.WithContext(ctx),
+			actionqueue.WithLogger(logger),
+			actionqueue.WithStore(k.ControlServerActionsStore()),
+			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
+		)
+		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
+		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
+
+		// register accelerate control consumer
+		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
+
+		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			k.SentNotificationsStore(),
 			runner,
 			ctx,
 			notificationconsumer.WithLogger(logger),
@@ -313,12 +326,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
 		}
-		// Runs the cleanup routine for old notification records
-		runGroup.Add(notificationConsumer.Execute, notificationConsumer.Interrupt)
 
-		if err := controlService.RegisterConsumer(notificationconsumer.NotificationSubsystem, notificationConsumer); err != nil {
-			return fmt.Errorf("failed to register notify consumer: %w", err)
-		}
+		// register notifications consumer
+		actionsQueue.RegisterActor(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
