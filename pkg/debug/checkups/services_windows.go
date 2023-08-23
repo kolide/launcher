@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"syscall"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -88,7 +87,7 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 	}
 
 	// If we're running doctor and not flare, no need to write extra data
-	if extraWriter == nil {
+	if extraWriter == io.Discard {
 		return nil
 	}
 
@@ -246,8 +245,8 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 	}
 
 	getEventLogCmd := exec.CommandContext(ctx, "powershell.exe", cmdletArgs...)
-	getEventLogCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // prevents spawning window
-	getEventLogCmd.Stdout = eventLogOut                                 // write directly to zip
+	hideWindow(getEventLogCmd)
+	getEventLogCmd.Stdout = eventLogOut // write directly to zip
 	if err := getEventLogCmd.Run(); err != nil {
 		return fmt.Errorf("running Get-EventLog: error %w", err)
 	}
