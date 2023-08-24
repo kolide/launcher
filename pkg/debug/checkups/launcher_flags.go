@@ -81,5 +81,5 @@ func (lf *launcherFlags) flagsFilePath() string {
 	}
 
 	// windows flags file path
-	return filepath.Join(lf.k.RootDirectory(), "conf", "launcher.flags")
+	return filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 }
