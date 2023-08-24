@@ -107,6 +107,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&servicesCheckup{}, doctorSupported | flareSupported},
 		{&powerCheckup{}, flareSupported},
 		{&osqueryCheckup{k: k}, doctorSupported | flareSupported},
+		{&launcherFlags{k: k}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
