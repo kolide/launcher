@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
@@ -22,7 +23,7 @@ func runInteractive(args []string) error {
 			"",
 			"The path to the oqueryd binary",
 		)
-		flOsqueryFlags arrayFlags
+		flOsqueryFlags launcher.ArrayFlags
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -34,7 +35,7 @@ func runInteractive(args []string) error {
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
-		osquerydPath = findOsquery()
+		osquerydPath = launcher.FindOsquery()
 		if osquerydPath == "" {
 			return errors.New("Could not find osqueryd binary")
 		}

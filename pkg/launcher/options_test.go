@@ -1,4 +1,4 @@
-package main
+package launcher
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/kolide/kit/stringutil"
-	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +27,7 @@ func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 		}
 	}
 
-	opts, err := parseOptions("", testFlags)
+	opts, err := ParseOptions("", testFlags)
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -50,7 +49,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
 		require.NoError(t, os.Setenv(name, val))
 	}
-	opts, err := parseOptions("", []string{})
+	opts, err := ParseOptions("", []string{})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -82,7 +81,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := parseOptions("", []string{"-config", flagFile.Name()})
+	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -161,7 +160,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 		tt := tt
 		os.Clearenv()
 		t.Run(tt.testName, func(t *testing.T) {
-			opts, err := parseOptions("", tt.testFlags)
+			opts, err := ParseOptions("", tt.testFlags)
 			require.NoError(t, err, "could not parse options")
 			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
 			require.Equal(t, tt.expectedInsecureControlTLS, opts.InsecureControlTLS, "incorrect insecure TLS")
@@ -170,7 +169,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func getArgsAndResponse() (map[string]string, *launcher.Options) {
+func getArgsAndResponse() (map[string]string, *Options) {
 	randomHostname := fmt.Sprintf("%s.example.com", stringutil.RandomString(8))
 	randomInt := rand.Intn(1024)
 
@@ -184,7 +183,7 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 		"-autoloaded_extension": "some-extension.ext",
 	}
 
-	opts := &launcher.Options{
+	opts := &Options{
 		AutoupdateInitialDelay:         1 * time.Hour,
 		AutoupdateInterval:             48 * time.Hour,
 		CompactDbMaxTx:                 int64(65536),
@@ -210,4 +209,13 @@ func getArgsAndResponse() (map[string]string, *launcher.Options) {
 	}
 
 	return args, opts
+}
+
+// windowsAddExe appends ".exe" to the input string when running on Windows
+func windowsAddExe(in string) string {
+	if runtime.GOOS == "windows" {
+		return in + ".exe"
+	}
+
+	return in
 }

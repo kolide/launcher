@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 )
@@ -81,7 +82,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	opts, err := parseOptions("", os.Args[1:])
+	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		os.Exit(1)

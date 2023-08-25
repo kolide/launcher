@@ -9,15 +9,16 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/debug/checkups"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 func runDoctor(args []string) error {
 	// Doctor assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
-	defaultAutoupdate = true
+	launcher.DefaultAutoupdate = true
 	setDefaultPaths()
 
-	opts, err := parseOptions("doctor", os.Args[2:])
+	opts, err := launcher.ParseOptions("doctor", os.Args[2:])
 	if err != nil {
 		return err
 	}

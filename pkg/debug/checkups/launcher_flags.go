@@ -9,7 +9,7 @@ import (
 	"runtime"
 
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/peterbourgon/ff/v3"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type launcherFlags struct {
@@ -42,14 +42,14 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 		return nil
 	}
 
-	fmt.Fprint(extraFh, "Parsed Flags (boolean flags appear as {KEY} TRUE):\n\n")
+	fmt.Fprint(extraFh, "\nlauncher.flags contents:\n\n")
 
-	if err := ff.PlainParser(file, func(name, value string) error {
-		// print each flag and value to file handler
-		fmt.Fprint(extraFh, fmt.Sprintf("%s %s\n", name, value))
+	if _, err := io.Copy(extraFh, file); err != nil {
+		lf.summary = fmt.Sprintf("failed to copy flags file to file handler: %s", err)
 		return nil
-	}); err != nil {
-		fmt.Fprint(extraFh, fmt.Sprintf("encountered error: %s", err))
+	}
+
+	if _, err := launcher.ParseOptions("", []string{fmt.Sprintf("--config=%s", configFilePath)}); err != nil {
 		lf.summary = fmt.Sprintf("failed to parse flags: %s", err)
 		return nil
 	}
