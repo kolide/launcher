@@ -11,5 +11,5 @@ For additional documentation on the topic:
 package tools
 
 import (
-	_ "github.com/go-bindata/go-bindata/go-bindata"
+	_ "github.com/go-bindata/go-bindata/go-bindata/"
 )
