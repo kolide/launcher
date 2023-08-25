@@ -29,8 +29,9 @@ const (
 )
 
 type v2CmdRequestType struct {
-	Path string
-	Body []byte
+	Path        string
+	Body        []byte
+	PostbackUrl string
 }
 
 type kryptoEcMiddleware struct {
@@ -46,6 +47,53 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 		counterParty:   counterParty,
 		logger:         log.With(logger, "keytype", "ec"),
 	}
+}
+
+// Because postback errors are effectively a shared API with K2, let's define them as a constant and not just
+// random strings
+type postbackErrors string
+
+const (
+	timeOutOfRangeErr  postbackErrors = "time-out-of-range"
+	responseFailureErr postbackErrors = "response-failure"
+)
+
+type postbackDataStruct struct {
+	Time      int64
+	Error     postbackErrors
+	Response  any
+	UserAgent string
+}
+
+// postback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
+// the signed data, and the response is encrypted, this is reasonable secure.
+//
+// Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
+// around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
+func (e *kryptoEcMiddleware) postback(url string, data *postbackDataStruct) {
+	if url == "" || data == nil {
+		return
+	}
+
+	b, err := json.Marshal(data)
+	if err != nil {
+		level.Debug(e.logger).Log("msg", "unable to marshal postback data", "err", err)
+	}
+
+	// TODO: This feels like it would be cleaner if we passed in an http client at initialzation time
+	// TODO: Timeouts?
+	go func() {
+		resp, err := http.Post(url, "application/json", bytes.NewReader(b))
+		if err != nil {
+			level.Debug(e.logger).Log("msg", "got error in postback", "url", url, "err", err)
+		}
+
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+
+		level.Debug(e.logger).Log("msg", "Suggessful postback", "url", url)
+	}()
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
@@ -72,6 +120,25 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		// Unmarshal the response _before_ checking the timestamp. This lets us grab the signed postback url to communicate
+		// timestamp issues.
+		var cmdReq v2CmdRequestType
+		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
+			traces.SetError(span, err)
+			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Setup callback/postback URLs and data.
+		postbackData := &postbackDataStruct{
+			Time:      time.Now().Unix(),
+			UserAgent: r.Header.Get("User-Agent"),
+		}
+		if cmdReq.PostbackUrl != "" {
+			defer e.postback(cmdReq.PostbackUrl, postbackData)
+		}
+
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
@@ -81,14 +148,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 			level.Debug(e.logger).Log("msg", "timestamp is out of range", "delta", timestampDelta)
 			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		var cmdReq v2CmdRequestType
-		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
-			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
+			postbackData.Error = timeOutOfRangeErr
 			return
 		}
 
@@ -128,8 +188,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
+			postbackData.Error = responseFailureErr
 			return
 		}
+
+		// becasue the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
+		// it to a string, which has an implicit copy
+		postbackData.Response = string(response)
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
