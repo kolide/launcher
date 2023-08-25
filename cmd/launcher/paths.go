@@ -28,12 +28,3 @@ func setDefaultPaths() {
 		launcher.DefaultConfigFilePath = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 	}
 }
-
-// windowsAddExe appends ".exe" to the input string when running on Windows
-func windowsAddExe(in string) string {
-	if runtime.GOOS == "windows" {
-		return in + ".exe"
-	}
-
-	return in
-}
