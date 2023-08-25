@@ -76,10 +76,10 @@ func (lf *launcherFlags) Data() any {
 }
 
 func (lf *launcherFlags) flagsFilePath() string {
-	if runtime.GOOS != "windows" {
-		return "/private/etc/kolide-k2/launcher.flags"
+	if runtime.GOOS == "windows" {
+		return filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 	}
 
-	// windows flags file path
-	return filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
+	// non-windows
+	return "/private/etc/kolide-k2/launcher.flags"
 }
