@@ -47,12 +47,10 @@ func (cmdReq v2CmdRequestType) PostbackReq() (*http.Request, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	if cmdReq.PostbackHeaders != nil {
-		// Iterate and deep copy
-		for h, vals := range cmdReq.PostbackHeaders {
-			for _, v := range vals {
-				req.Header.Add(h, v)
-			}
+	// Iterate and deep copy
+	for h, vals := range cmdReq.PostbackHeaders {
+		for _, v := range vals {
+			req.Header.Add(h, v)
 		}
 	}
 
@@ -91,15 +89,16 @@ type postbackDataStruct struct {
 }
 
 // postback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
-// the signed data, and the response is encrypted, this is reasonable secure.
+// the signed data, and the response is encrypted, this is reasonably secure.
 //
 // Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
+//
+// Note that this should be a goroutine.
 func (e *kryptoEcMiddleware) postback(req *http.Request, data *postbackDataStruct) {
 	if req == nil {
 		return
 	}
-
 	b, err := json.Marshal(data)
 	if err != nil {
 		level.Debug(e.logger).Log("msg", "unable to marshal postback data", "err", err)
@@ -112,19 +111,17 @@ func (e *kryptoEcMiddleware) postback(req *http.Request, data *postbackDataStruc
 		Timeout: 5 * time.Second,
 	}
 
-	go func() {
-		resp, err := client.Do(req)
-		if err != nil {
-			level.Debug(e.logger).Log("msg", "got error in postback", "err", err)
-			return
-		}
+	resp, err := client.Do(req)
+	if err != nil {
+		level.Debug(e.logger).Log("msg", "got error in postback", "err", err)
+		return
+	}
 
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 
-		level.Debug(e.logger).Log("msg", "Finished postback", "response-status", resp.Status)
-	}()
+	level.Debug(e.logger).Log("msg", "Finished postback", "response-status", resp.Status)
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
@@ -169,7 +166,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		if postbackReq, err := cmdReq.PostbackReq(); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to create postback req", "err", err)
 		} else {
-			defer e.postback(postbackReq, postbackData)
+			defer func() { go e.postback(postbackReq, postbackData) }()
 		}
 
 		// Check the timestamp, this prevents people from saving a challenge and then
