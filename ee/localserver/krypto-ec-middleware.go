@@ -29,9 +29,34 @@ const (
 )
 
 type v2CmdRequestType struct {
-	Path        string
-	Body        []byte
-	PostbackUrl string
+	Path            string
+	Body            []byte
+	PostbackUrl     string
+	PostbackHeaders map[string][]string
+}
+
+func (cmdReq v2CmdRequestType) PostbackReq() (*http.Request, error) {
+	if cmdReq.PostbackUrl == "" {
+		return nil, nil
+	}
+
+	req, err := http.NewRequest(http.MethodPost, cmdReq.PostbackUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("making http request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	if cmdReq.PostbackHeaders != nil {
+		// Iterate and deep copy
+		for h, vals := range cmdReq.PostbackHeaders {
+			for _, v := range vals {
+				req.Header.Add(h, v)
+			}
+		}
+	}
+
+	return req, nil
 }
 
 type kryptoEcMiddleware struct {
@@ -61,7 +86,7 @@ const (
 type postbackDataStruct struct {
 	Time      int64
 	Error     postbackErrors
-	Response  any
+	Response  string // expected base64 encoded krypto box
 	UserAgent string
 }
 
@@ -70,8 +95,8 @@ type postbackDataStruct struct {
 //
 // Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
-func (e *kryptoEcMiddleware) postback(url string, data *postbackDataStruct) {
-	if url == "" || data == nil {
+func (e *kryptoEcMiddleware) postback(req *http.Request, data *postbackDataStruct) {
+	if req == nil {
 		return
 	}
 
@@ -80,19 +105,25 @@ func (e *kryptoEcMiddleware) postback(url string, data *postbackDataStruct) {
 		level.Debug(e.logger).Log("msg", "unable to marshal postback data", "err", err)
 	}
 
+	req.Body = io.NopCloser(bytes.NewReader(b))
+
 	// TODO: This feels like it would be cleaner if we passed in an http client at initialzation time
-	// TODO: Timeouts?
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
 	go func() {
-		resp, err := http.Post(url, "application/json", bytes.NewReader(b))
+		resp, err := client.Do(req)
 		if err != nil {
-			level.Debug(e.logger).Log("msg", "got error in postback", "url", url, "err", err)
+			level.Debug(e.logger).Log("msg", "got error in postback", "err", err)
+			return
 		}
 
 		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
 		}
 
-		level.Debug(e.logger).Log("msg", "Suggessful postback", "url", url)
+		level.Debug(e.logger).Log("msg", "Finished postback", "response-status", resp.Status)
 	}()
 }
 
@@ -135,8 +166,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			Time:      time.Now().Unix(),
 			UserAgent: r.Header.Get("User-Agent"),
 		}
-		if cmdReq.PostbackUrl != "" {
-			defer e.postback(cmdReq.PostbackUrl, postbackData)
+		if postbackReq, err := cmdReq.PostbackReq(); err != nil {
+			level.Debug(e.logger).Log("msg", "unable to create postback req", "err", err)
+		} else {
+			defer e.postback(postbackReq, postbackData)
 		}
 
 		// Check the timestamp, this prevents people from saving a challenge and then
@@ -194,7 +227,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// because the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
 		// it to a string, which has an implicit copy
-		postbackData.Response = string(response)
+		postbackData.Response = base64.StdEncoding.EncodeToString(response)
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
