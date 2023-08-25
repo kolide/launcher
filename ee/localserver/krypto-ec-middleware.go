@@ -192,7 +192,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		// becasue the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
+		// because the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
 		// it to a string, which has an implicit copy
 		postbackData.Response = string(response)
 
