@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 )
 
 type osqueryCheckup struct {
@@ -44,7 +46,7 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 }
 
 func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
-	osquerydPath := autoupdate.FindNewest(ctx, o.k.OsquerydPath())
+	osquerydPath := o.osquerydPath(ctx)
 
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cmdCancel()
@@ -59,6 +61,21 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	}
 
 	return strings.TrimSpace(string(out)), nil
+}
+
+func (o *osqueryCheckup) osquerydPath(ctx context.Context) string {
+	var currentOsquerydBinaryPath string
+	currentOsquerydBinary, err := tuf.CheckOutLatest("osqueryd", o.k.RootDirectory(), o.k.UpdateDirectory(), o.k.UpdateChannel(), log.NewNopLogger())
+	if err != nil {
+		currentOsquerydBinaryPath = autoupdate.FindNewest(
+			ctx,
+			o.k.OsquerydPath(),
+		)
+	} else {
+		currentOsquerydBinaryPath = currentOsquerydBinary.Path
+	}
+
+	return currentOsquerydBinaryPath
 }
 
 func (o *osqueryCheckup) interactive(ctx context.Context) error {
