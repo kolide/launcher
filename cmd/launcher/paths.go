@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"runtime"
+
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 // setDefaultPaths populates the default file/dir paths
@@ -10,28 +12,19 @@ import (
 func setDefaultPaths() {
 	switch runtime.GOOS {
 	case "darwin":
-		defaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
-		defaultEtcDirectoryPath = "/etc/kolide-k2/"
-		defaultBinDirectoryPath = "/usr/local/kolide-k2/"
-		defaultConfigFilePath = filepath.Join(defaultEtcDirectoryPath, "launcher.flags")
+		launcher.DefaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		launcher.DefaultEtcDirectoryPath = "/etc/kolide-k2/"
+		launcher.DefaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		launcher.DefaultConfigFilePath = filepath.Join(launcher.DefaultEtcDirectoryPath, "launcher.flags")
 	case "linux":
-		defaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
-		defaultEtcDirectoryPath = "/etc/kolide-k2/"
-		defaultBinDirectoryPath = "/usr/local/kolide-k2/"
-		defaultConfigFilePath = filepath.Join(defaultEtcDirectoryPath, "launcher.flags")
+		launcher.DefaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		launcher.DefaultEtcDirectoryPath = "/etc/kolide-k2/"
+		launcher.DefaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		launcher.DefaultConfigFilePath = filepath.Join(launcher.DefaultEtcDirectoryPath, "launcher.flags")
 	case "windows":
-		defaultRootDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
-		defaultEtcDirectoryPath = ""
-		defaultBinDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
-		defaultConfigFilePath = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
+		launcher.DefaultRootDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
+		launcher.DefaultEtcDirectoryPath = ""
+		launcher.DefaultBinDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
+		launcher.DefaultConfigFilePath = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
 	}
-}
-
-// windowsAddExe appends ".exe" to the input string when running on Windows
-func windowsAddExe(in string) string {
-	if runtime.GOOS == "windows" {
-		return in + ".exe"
-	}
-
-	return in
 }

@@ -30,7 +30,6 @@ var rootJson []byte
 
 // Configuration defaults
 const (
-	DefaultTufServer = "https://tuf.kolide.com"
 	tufDirectoryName = "tuf"
 )
 
