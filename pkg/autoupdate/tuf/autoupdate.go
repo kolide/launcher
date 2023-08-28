@@ -339,11 +339,12 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 					"binary", binary,
 					"new_binary_version", newBinaryVersion,
 					"err", err)
-			} else {
-				level.Debug(ta.logger).Log("msg", "restarted binary after update",
-					"binary", binary,
-					"new_binary_version", newBinaryVersion)
+				continue
 			}
+
+			level.Debug(ta.logger).Log("msg", "restarted binary after update",
+				"binary", binary,
+				"new_binary_version", newBinaryVersion)
 		}
 	}
 
