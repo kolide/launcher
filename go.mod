@@ -57,7 +57,7 @@ require (
 	github.com/apache/thrift v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/kolide/systray v1.10.4
-	github.com/kolide/toast v1.0.1
+	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
