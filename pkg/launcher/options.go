@@ -1,6 +1,8 @@
 package launcher
 
 import (
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/kolide/launcher/pkg/autoupdate"
@@ -121,4 +123,32 @@ type Options struct {
 
 	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
 	LocalDevelopmentPath string
+}
+
+// ConfigFilePath returns the path to launcher's launcher.flags file. If the path
+// is available in the command-line args, it will return that path; otherwise, it
+// will fall back to a well-known location.
+func ConfigFilePath(args []string) string {
+	for i, arg := range args {
+		if arg == "--config" || arg == "-config" {
+			return strings.Trim(args[i+1], `"'`)
+		}
+
+		if strings.Contains(arg, "config=") {
+			parts := strings.Split(arg, "=")
+			if len(parts) == 2 {
+				return parts[1]
+			}
+		}
+	}
+
+	// Not found in command-line arguments -- return well-known location instead
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		return "/etc/kolide-k2/launcher.flags"
+	case "windows":
+		return `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`
+	default:
+		return ""
+	}
 }

@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -52,7 +51,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 // getAutoupdateConfig reads launcher's config file to determine the configuration values
 // needed to work with the autoupdate library.
 func getAutoupdateConfig() (*autoupdateConfig, error) {
-	configFilePath := getConfigFilePath(os.Args[1:])
+	configFilePath := launcher.ConfigFilePath(os.Args[1:])
 	if configFilePath == "" {
 		return nil, errors.New("could not get config file path")
 	}
@@ -84,34 +83,6 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 	}
 
 	return cfg, nil
-}
-
-// getConfigFilePath returns the path to launcher's launcher.flags file. If the path
-// is available in the command-line args, it will return that path; otherwise, it
-// will fall back to a well-known location.
-func getConfigFilePath(args []string) string {
-	for i, arg := range args {
-		if arg == "--config" || arg == "-config" {
-			return strings.Trim(args[i+1], `"'`)
-		}
-
-		if strings.Contains(arg, "config=") {
-			parts := strings.Split(arg, "=")
-			if len(parts) == 2 {
-				return parts[1]
-			}
-		}
-	}
-
-	// Not found in command-line arguments -- return well-known location instead
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		return "/etc/kolide-k2/launcher.flags"
-	case "windows":
-		return `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`
-	default:
-		return ""
-	}
 }
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
