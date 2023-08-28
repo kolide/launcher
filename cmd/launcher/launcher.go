@@ -169,6 +169,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if k.ControlServerURL() != "" {
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
+		logger = log.With(logger, "caller", log.Caller(5))
 	}
 
 	// construct the appropriate http client based on security settings
