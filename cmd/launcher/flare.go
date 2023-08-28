@@ -12,17 +12,18 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/debug/checkups"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	// TODO this stuff needs some deeper thinking
-	defaultAutoupdate = true
+	launcher.DefaultAutoupdate = true
 	setDefaultPaths()
-	_ = defaultBinDirectoryPath
+	_ = launcher.DefaultBinDirectoryPath
 
-	opts, err := parseOptions("flare", args)
+	opts, err := launcher.ParseOptions("flare", args)
 	if err != nil {
 		return err
 	}

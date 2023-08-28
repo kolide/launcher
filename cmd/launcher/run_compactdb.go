@@ -7,10 +7,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 func runCompactDb(args []string) error {
-	opts, err := parseOptions("compactdb", args)
+	opts, err := launcher.ParseOptions("compactdb", args)
 	if err != nil {
 		return err
 	}
