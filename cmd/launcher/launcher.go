@@ -480,7 +480,7 @@ func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath
 		return
 	}
 
-	versionCtx, versionCancel := context.WithTimeout(ctx, 10*time.Second)
+	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer versionCancel()
 
 	versionCmd := exec.CommandContext(versionCtx, osquerydPath, "--version")
