@@ -262,9 +262,7 @@ func getUpdateDir(fullBinaryPath string) string {
 
 	// These are cases that shouldn't really happen. But, this is
 	// a bare string function. So return "" when they do.
-	if strings.HasSuffix(fullBinaryPath, "/") {
-		fullBinaryPath = strings.TrimSuffix(fullBinaryPath, "/")
-	}
+	fullBinaryPath = strings.TrimSuffix(fullBinaryPath, "/")
 
 	if fullBinaryPath == "" {
 		return ""
