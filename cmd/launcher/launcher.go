@@ -9,8 +9,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +71,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+
+	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -465,4 +469,31 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
+}
+
+// runOsqueryVersionCheck execs the osqueryd binary in the background when we're running
+// on darwin. Operating on our theory that some startup delay issues for osquery might
+// be due to the notarization check taking too long, we execute the binary here ahead
+// of time in the hopes of getting the check out of the way.
+func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	versionCtx, versionCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer versionCancel()
+
+	versionCmd := exec.CommandContext(versionCtx, osquerydPath, "--version")
+
+	startTime := time.Now().UnixMilli()
+	out, err := versionCmd.CombinedOutput()
+	executionTimeMs := time.Now().UnixMilli() - startTime
+	outTrimmed := strings.TrimSpace(string(out))
+
+	if err != nil {
+		level.Error(logger).Log("msg", "could not check osqueryd version", "output", outTrimmed, "err", err, "execution_time_ms", executionTimeMs)
+		return
+	}
+
+	level.Debug(logger).Log("msg", "checked osqueryd version", "version", outTrimmed, "execution_time_ms", executionTimeMs)
 }
