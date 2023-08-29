@@ -86,7 +86,45 @@ func TestGetUpdateDir(t *testing.T) {
 	for _, tt := range tests {
 		require.Equal(t, tt.out, getUpdateDir(tt.in), "input: %s", tt.in)
 	}
+}
 
+func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
+	// Since we're setting an environment variable, we don't want to run this test at the
+	// same time as other tests.
+
+	var tests = []struct {
+		installPath string
+		currentPath string
+		out         string
+	}{
+		{
+			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/binary",
+			installPath: filepath.Clean("/a/bin/binary"),
+			out:         filepath.Clean("/a/bin/binary-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/binary",
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/binary"),
+			out:         filepath.Clean("/a/bin/binary-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/Test.app/Contents/MacOS/binary",
+			installPath: filepath.Clean("/a/bin/binary"),
+			out:         filepath.Clean("/a/bin/binary-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/Test.app/Contents/MacOS/binary",
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/binary"),
+			out:         filepath.Clean("/a/bin/binary-updates"),
+		},
+	}
+
+	for _, tt := range tests {
+		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
+		require.Equal(t, tt.out, getUpdateDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
+	}
+
+	os.Setenv(LegacyAutoupdatePathEnvVar, "")
 }
 
 func TestFindBaseDir(t *testing.T) {
@@ -109,7 +147,45 @@ func TestFindBaseDir(t *testing.T) {
 	for _, tt := range tests {
 		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", tt.in)
 	}
+}
 
+func TestFindBaseDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
+	// Since we're setting an environment variable, we don't want to run this test at the
+	// same time as other tests.
+
+	var tests = []struct {
+		installPath string
+		currentPath string
+		out         string
+	}{
+		{
+			installPath: "/a/path/bin/launcher",
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/launcher",
+			out:         filepath.Clean("/a/path/bin"),
+		},
+		{
+			installPath: "/a/path/bin/launcher",
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/Test.app/Contents/MacOS/launcher",
+			out:         filepath.Clean("/a/path/bin"),
+		},
+		{
+			installPath: "/a/path/Test.app/Contents/MacOS/launcher",
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/launcher",
+			out:         filepath.Clean("/a/path/bin"),
+		},
+		{
+			installPath: "/a/path/Test.app/Contents/MacOS/launcher",
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/Test.app/Contents/MacOS/launcher",
+			out:         filepath.Clean("/a/path/bin"),
+		},
+	}
+
+	for _, tt := range tests {
+		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
+		require.Equal(t, tt.out, FindBaseDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
+	}
+
+	os.Setenv(LegacyAutoupdatePathEnvVar, "")
 }
 
 func TestFindNewestEmpty(t *testing.T) {

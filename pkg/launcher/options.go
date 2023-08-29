@@ -1,9 +1,6 @@
 package launcher
 
 import (
-	"text/tabwriter"
-	"time"
-
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -13,11 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/kolide/launcher/pkg/autoupdate"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -133,11 +131,43 @@ type Options struct {
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string
+
+	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
+	LocalDevelopmentPath string
+}
+
+// ConfigFilePath returns the path to launcher's launcher.flags file. If the path
+// is available in the command-line args, it will return that path; otherwise, it
+// will fall back to a well-known location.
+func ConfigFilePath(args []string) string {
+	for i, arg := range args {
+		if arg == "--config" || arg == "-config" {
+			return strings.Trim(args[i+1], `"'`)
+		}
+
+		if strings.Contains(arg, "config=") {
+			parts := strings.Split(arg, "=")
+			if len(parts) == 2 {
+				return parts[1]
+			}
+		}
+	}
+
+	// Not found in command-line arguments -- return well-known location instead
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		return "/etc/kolide-k2/launcher.flags"
+	case "windows":
+		return `C:\Program Files\Kolide\Launcher-kolide-k2\conf\launcher.flags`
+	default:
+		return ""
+	}
 }
 
 const (
 	defaultRootDirectory = "launcher-root"
 	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
+	DefaultTufServer     = "https://tuf.kolide.com"
 )
 
 var (
@@ -215,7 +245,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
-		flTufServerURL           = flagset.String("tuf_url", tuf.DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
+		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
 		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
 		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
 		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
@@ -231,6 +261,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
+		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -367,6 +398,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
 		LogIngestServerURL:                 *flLogIngestServerURL,
+		LocalDevelopmentPath:               *flLocalDevelopmentPath,
 		TraceIngestServerURL:               *flTraceIngestServerURL,
 		DisableTraceIngestTLS:              *flDisableIngestTLS,
 		AutoloadedExtensions:               flAutoloadedExtensions,

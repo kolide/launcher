@@ -8,9 +8,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
@@ -35,11 +37,17 @@ func runInteractive(args []string) error {
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
-		osquerydPath = launcher.FindOsquery()
-		if osquerydPath == "" {
-			return errors.New("Could not find osqueryd binary")
+		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", log.NewNopLogger())
+		if err != nil {
+			osquerydPath = launcher.FindOsquery()
+			if osquerydPath == "" {
+				return errors.New("could not find osqueryd binary")
+			}
+			// Fall back to old autoupdate library
+			osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
+		} else {
+			osquerydPath = latestOsquerydBinary.Path
 		}
-		osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
 	}
 
 	// have to keep tempdir name short so we don't exceed socket length

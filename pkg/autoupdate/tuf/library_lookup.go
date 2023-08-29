@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/peterbourgon/ff/v3"
 )
 
 type BinaryUpdateInfo struct {
@@ -16,9 +19,80 @@ type BinaryUpdateInfo struct {
 	Version string
 }
 
+type autoupdateConfig struct {
+	rootDirectory        string
+	updateDirectory      string
+	channel              string
+	localDevelopmentPath string
+}
+
+var channelsUsingLegacyAutoupdate = map[string]bool{
+	"stable": true,
+	"beta":   true,
+}
+
+// CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
+// searching for launcher configuration values in its config file.
+// For now, it is only available when launcher is on the nightly update channel.
+func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
+	cfg, err := getAutoupdateConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
+	}
+
+	// Short-circuit lookup for local launcher test builds
+	if binary == binaryLauncher && cfg.localDevelopmentPath != "" {
+		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
+	}
+
+	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+}
+
+// getAutoupdateConfig reads launcher's config file to determine the configuration values
+// needed to work with the autoupdate library.
+func getAutoupdateConfig() (*autoupdateConfig, error) {
+	configFilePath := launcher.ConfigFilePath(os.Args[1:])
+	if configFilePath == "" {
+		return nil, errors.New("could not get config file path")
+	}
+	if _, err := os.Stat(configFilePath); err != nil && os.IsNotExist(err) {
+		return nil, fmt.Errorf("could not read config file because it does not exist at %s: %w", configFilePath, err)
+	}
+
+	cfgFileHandle, err := os.Open(configFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file %s for reading: %w", configFilePath, err)
+	}
+	defer cfgFileHandle.Close()
+
+	cfg := &autoupdateConfig{}
+	if err := ff.PlainParser(cfgFileHandle, func(name, value string) error {
+		switch name {
+		case "root_directory":
+			cfg.rootDirectory = value
+		case "update_directory":
+			cfg.updateDirectory = value
+		case "update_channel":
+			cfg.channel = value
+		case "localdev_path":
+			cfg.localDevelopmentPath = value
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("could not parse config file %s: %w", configFilePath, err)
+	}
+
+	return cfg, nil
+}
+
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
 func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
+	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
+	if _, ok := channelsUsingLegacyAutoupdate[channel]; ok {
+		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
+	}
+
 	if updateDirectory == "" {
 		updateDirectory = defaultLibraryDirectory(rootDirectory)
 	}
@@ -57,7 +131,7 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
 	if autoupdate.CheckExecutable(context.TODO(), targetPath, "--version") != nil {
-		return nil, fmt.Errorf("version %s from target %s either not yet downloaded or corrupted: %w", targetVersion, targetName, err)
+		return nil, fmt.Errorf("version %s from target %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, err)
 	}
 
 	return &BinaryUpdateInfo{
@@ -77,7 +151,7 @@ func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (
 
 	// No valid versions in the library
 	if len(validVersionsInLibrary) < 1 {
-		return nil, errors.New("no versions in library")
+		return nil, fmt.Errorf("no versions of %s in library at %s", binary, baseUpdateDirectory)
 	}
 
 	// Versions are sorted in ascending order -- return the last one

@@ -30,7 +30,6 @@ var rootJson []byte
 
 // Configuration defaults
 const (
-	DefaultTufServer = "https://tuf.kolide.com"
 	tufDirectoryName = "tuf"
 )
 
@@ -65,10 +64,13 @@ type TufAutoupdater struct {
 	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
 	channel                string
+	initialDelay           time.Duration
 	checkInterval          time.Duration
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
+	signalRestart          chan error
 	logger                 log.Logger
+	restartFuncs           map[autoupdatableBinary]func() error
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -79,16 +81,28 @@ func WithLogger(logger log.Logger) TufAutoupdaterOption {
 	}
 }
 
+func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		if ta.restartFuncs == nil {
+			ta.restartFuncs = make(map[autoupdatableBinary]func() error)
+		}
+		ta.restartFuncs[binaryOsqueryd] = restart
+	}
+}
+
 func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		channel:                k.UpdateChannel(),
-		interrupt:              make(chan struct{}),
+		interrupt:              make(chan struct{}, 1),
+		signalRestart:          make(chan error, 1),
 		checkInterval:          k.AutoupdateInterval(),
+		initialDelay:           k.AutoupdateInitialDelay(),
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
 		logger:                 log.NewNopLogger(),
+		restartFuncs:           make(map[autoupdatableBinary]func() error),
 	}
 
 	for _, opt := range opts {
@@ -121,6 +135,12 @@ func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *h
 	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
 		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
+	}
+
+	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
+	// have permissions in excess of -rwxr-x---.
+	if err := os.Chmod(localTufDirectory, 0750); err != nil {
+		return nil, fmt.Errorf("chmodding local TUF directory %s: %w", localTufDirectory, err)
 	}
 
 	// Set up our local store i.e. point to the directory in our filesystem
@@ -158,6 +178,15 @@ func defaultLibraryDirectory(rootDirectory string) string {
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
+	// Delay startup, if initial delay is set
+	select {
+	case <-ta.interrupt:
+		level.Debug(ta.logger).Log("msg", "received external interrupt during initial delay, stopping")
+		return nil
+	case <-time.After(ta.initialDelay):
+		break
+	}
+
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
 	ta.tidyLibrary()
@@ -168,17 +197,22 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	defer cleanupTicker.Stop()
 
 	for {
+		if err := ta.checkForUpdate(); err != nil {
+			ta.storeError(err)
+			level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
+		}
+
 		select {
 		case <-checkTicker.C:
-			if err := ta.checkForUpdate(); err != nil {
-				ta.storeError(err)
-				level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
-			}
+			continue
 		case <-cleanupTicker.C:
 			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
-			level.Debug(ta.logger).Log("msg", "received interrupt, stopping")
+			level.Debug(ta.logger).Log("msg", "received external interrupt, stopping")
 			return nil
+		case signalRestartErr := <-ta.signalRestart:
+			level.Debug(ta.logger).Log("msg", "received interrupt to restart launcher after update, stopping")
+			return signalRestartErr
 		}
 	}
 }
@@ -265,9 +299,9 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	}
 
 	// Check for and download any new releases that are available
-	updatesDownloaded := make([]bool, len(binaries))
+	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
-	for i, binary := range binaries {
+	for _, binary := range binaries {
 		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
@@ -275,9 +309,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 		if downloadedUpdateVersion != "" {
 			level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
-			updatesDownloaded[i] = true
-		} else {
-			updatesDownloaded[i] = false
+			updatesDownloaded[binary] = versionFromTarget(binary, downloadedUpdateVersion)
 		}
 
 	}
@@ -287,11 +319,31 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not download updates: %+v", updateErrors)
 	}
 
-	for _, updateDownloaded := range updatesDownloaded {
-		if updateDownloaded {
-			// In the future, we would restart or re-launch the binary with the new version
-			level.Debug(ta.logger).Log("msg", "at least one update downloaded")
-			break
+	// If launcher was updated, we want to exit and reload
+	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
+		level.Debug(ta.logger).Log("msg", "launcher updated -- exiting to load new version", "new_binary_version", updatedVersion)
+		ta.signalRestart <- NewLauncherReloadNeededErr(updatedVersion)
+		return nil
+	}
+
+	// For non-launcher binaries (i.e. osqueryd), call any reload functions we have saved
+	for binary, newBinaryVersion := range updatesDownloaded {
+		if binary == binaryLauncher {
+			continue
+		}
+
+		if restart, ok := ta.restartFuncs[binary]; ok {
+			if err := restart(); err != nil {
+				level.Debug(ta.logger).Log("msg", "failed to restart binary after update",
+					"binary", binary,
+					"new_binary_version", newBinaryVersion,
+					"err", err)
+				continue
+			}
+
+			level.Debug(ta.logger).Log("msg", "restarted binary after update",
+				"binary", binary,
+				"new_binary_version", newBinaryVersion)
 		}
 	}
 

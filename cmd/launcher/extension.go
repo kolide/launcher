@@ -221,6 +221,8 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 		runtime.WithOsqueryFlags(k.OsqueryFlags()),
 		runtime.WithAugeasLensFunction(augeas.InstallLenses),
 		runtime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
+		runtime.WithUpdateDirectory(k.UpdateDirectory()),
+		runtime.WithUpdateChannel(k.UpdateChannel()),
 	}
 }
 

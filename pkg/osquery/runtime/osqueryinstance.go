@@ -64,6 +64,18 @@ func WithRootDirectory(path string) OsqueryInstanceOption {
 	}
 }
 
+func WithUpdateDirectory(path string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.updateDirectory = path
+	}
+}
+
+func WithUpdateChannel(channel string) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.updateChannel = channel
+	}
+}
+
 // WithExtensionSocketPath is a functional option which allows the user to
 // define the path of the extension socket path that osqueryd will open to
 // communicate with other processes.
@@ -320,6 +332,8 @@ type osqueryOptions struct {
 	tlsHostname           string
 	tlsLoggerEndpoint     string
 	tlsServerCerts        string
+	updateChannel         string
+	updateDirectory       string
 	verbose               bool
 }
 

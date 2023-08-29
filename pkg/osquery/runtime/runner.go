@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -272,17 +273,27 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	// before we start osqueryd, check with the update system to
-	// see if we have the newest version. Do this everytime. If
+	// see if we have the newest version. Do this every time. If
 	// this proves undesirable, we can expose a function to set
 	// o.opts.binaryPath in the finalizer to call.
 	//
 	// FindNewest uses context as a way to get a logger, so we need to
 	// create and pass a ctxlog in.
-	currentOsquerydBinaryPath := autoupdate.FindNewest(
-		ctxlog.NewContext(context.TODO(), o.logger),
-		o.opts.binaryPath,
-		autoupdate.DeleteOldUpdates(),
-	)
+	var currentOsquerydBinaryPath string
+	currentOsquerydBinary, err := tuf.CheckOutLatest("osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
+	if err != nil {
+		level.Debug(o.logger).Log(
+			"msg", "could not get latest version of osqueryd from new autoupdate library, falling back",
+			"err", err,
+		)
+		currentOsquerydBinaryPath = autoupdate.FindNewest(
+			ctxlog.NewContext(context.TODO(), o.logger),
+			o.opts.binaryPath,
+			autoupdate.DeleteOldUpdates(),
+		)
+	} else {
+		currentOsquerydBinaryPath = currentOsquerydBinary.Path
+	}
 
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start

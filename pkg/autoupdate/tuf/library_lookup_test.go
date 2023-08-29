@@ -44,7 +44,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(binary, rootDir, "", "stable", log.NewNopLogger())
+			latest, err := CheckOutLatest(binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -72,11 +72,30 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(binary, rootDir, "", "stable", log.NewNopLogger())
+			latest, err := CheckOutLatest(binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
 		})
+	}
+}
+
+func TestCheckOutLatest_NotAvailableOnNonNightlyChannels(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		for _, channel := range []string{"beta", "stable"} {
+			channel := channel
+			t.Run(fmt.Sprintf("%s-%s", binary, channel), func(t *testing.T) {
+				t.Parallel()
+
+				rootDir := t.TempDir()
+
+				_, err := CheckOutLatest(binary, rootDir, "", channel, log.NewNopLogger())
+				require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
+			})
+		}
 	}
 }
 
