@@ -56,22 +56,10 @@ func Test_Parse(t *testing.T) {
 			output: "This Menu Was Last Updated 15 Minutes Ago.",
 		},
 		{
-			name:   "relativeTime 111 seconds ago",
-			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-111 * time.Second).Unix()},
-			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
-			output: "This Menu Was Last Updated 111 Seconds Ago.",
-		},
-		{
 			name:   "relativeTime one minute ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-1 * time.Minute).Unix()},
 			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
 			output: "This Menu Was Last Updated One Minute Ago.",
-		},
-		{
-			name:   "relativeTime 7 seconds ago",
-			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-7 * time.Second).Unix()},
-			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
-			output: "This Menu Was Last Updated 7 Seconds Ago.",
 		},
 		{
 			name:   "relativeTime one second",
@@ -190,6 +178,54 @@ func Test_Parse(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.output, o)
+		})
+	}
+}
+
+func Test_Parse_Seconds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		td           *TemplateData
+		text         string
+		outputFormat string
+		seconds      int
+	}{
+		{
+			name:         "relativeTime 111 seconds ago",
+			td:           &TemplateData{LastMenuUpdateTime: time.Now().Add(-111 * time.Second).Unix()},
+			text:         "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
+			outputFormat: "This Menu Was Last Updated %d Seconds Ago.",
+			seconds:      111,
+		},
+		{
+			name:         "relativeTime 7 seconds ago",
+			td:           &TemplateData{LastMenuUpdateTime: time.Now().Add(-7 * time.Second).Unix()},
+			text:         "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
+			outputFormat: "This Menu Was Last Updated %d Seconds Ago.",
+			seconds:      7,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tp := NewTemplateParser(tt.td)
+			o, err := tp.Parse(tt.text)
+			require.NoError(t, err)
+
+			// Sometimes we're off by a second and that's fine.
+			expectedOutput := fmt.Sprintf(tt.outputFormat, tt.seconds)
+			expectedOutputPlusOneSecond := fmt.Sprintf(tt.outputFormat, tt.seconds+1)
+			expectedOutputMinusOneSecond := fmt.Sprintf(tt.outputFormat, tt.seconds-1)
+			require.True(t,
+				o == expectedOutput ||
+					o == expectedOutputPlusOneSecond ||
+					o == expectedOutputMinusOneSecond,
+				fmt.Sprintf("expected output %s to be within one second of %d but was not", o, tt.seconds),
+			)
 		})
 	}
 }
