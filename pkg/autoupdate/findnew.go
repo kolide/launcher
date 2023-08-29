@@ -251,8 +251,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 //
 // It makes some string assumptions about how things are named.
 func getUpdateDir(fullBinaryPath string) string {
-	installedPath := os.Getenv(LegacyAutoupdatePathEnvVar)
-	if installedPath != "" {
+	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
 		fullBinaryPath = installedPath
 	}
 
