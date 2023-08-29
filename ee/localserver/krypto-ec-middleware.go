@@ -165,7 +165,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 		if postbackReq, err := cmdReq.PostbackReq(); err != nil {
 			level.Debug(e.logger).Log("msg", "unable to create postback req", "err", err)
-		} else {
+		} else if postbackReq != nil {
 			defer func() { go e.postback(postbackReq, postbackData) }()
 		}
 
