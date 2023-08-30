@@ -54,6 +54,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_version_info", pacman_info.Parser, []string{"/usr/bin/pacman", "-Qi"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, []string{"/usr/bin/pacman", "-Qu"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, []string{"/usr/bin/rpm", "-qai"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/opt/carbonblack/psc/bin/repcli", "status"}, dataflattentable.WithIncludeStderr())
+		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/opt/carbonblack/psc/bin/repcli", "status"}, dataflattentable.WithIncludeStderr()),
 	}
 }
