@@ -86,7 +86,7 @@ func main() {
 		if r := recover(); r != nil {
 			level.Info(logger).Log(
 				"msg", "panic occurred",
-				"err", err,
+				"err", r,
 			)
 			time.Sleep(time.Second)
 		}
