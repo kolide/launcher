@@ -30,36 +30,13 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	require.NoError(t, err, "could not stat base dir")
 	require.True(t, baseDir.IsDir(), "base dir is not a directory")
 
-	stagedDownloadDir, err := os.Stat(testLibraryManager.stagingDir)
-	require.NoError(t, err, "could not stat staged osqueryd download dir")
-	require.True(t, stagedDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
-
-	osquerydDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "osqueryd"))
+	osquerydDownloadDir, err := os.Stat(updatesDirectory("osqueryd", testLibraryManager.baseDir))
 	require.NoError(t, err, "could not stat osqueryd download dir")
 	require.True(t, osquerydDownloadDir.IsDir(), "osqueryd download dir is not a directory")
 
-	launcherDownloadDir, err := os.Stat(filepath.Join(testBaseDir, "launcher"))
+	launcherDownloadDir, err := os.Stat(updatesDirectory("launcher", testLibraryManager.baseDir))
 	require.NoError(t, err, "could not stat launcher download dir")
 	require.True(t, launcherDownloadDir.IsDir(), "launcher download dir is not a directory")
-}
-
-func TestClose(t *testing.T) {
-	t.Parallel()
-
-	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
-	require.NoError(t, err, "unexpected error creating new update library manager")
-
-	stagedDownloadDir, err := os.Stat(testLibraryManager.stagingDir)
-	require.NoError(t, err, "could not stat staged osqueryd download dir")
-	require.True(t, stagedDownloadDir.IsDir(), "staged osqueryd download dir is not a directory")
-
-	// Close the library
-	require.NoError(t, testLibraryManager.Close(), "expected no error on closing library")
-
-	// Confirm staged download directory is gone
-	_, err = os.Stat(testLibraryManager.stagingDir)
-	require.True(t, os.IsNotExist(err), "expected staged download dir to be removed on Close")
 }
 
 func Test_pathToTargetVersionExecutable(t *testing.T) {
@@ -171,11 +148,6 @@ func TestAddToLibrary(t *testing.T) {
 			executableInfo, err := os.Stat(executableLocation(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion), tt.binary))
 			require.NoError(t, err, "checking that downloaded update includes executable")
 			require.False(t, executableInfo.IsDir())
-
-			// Confirm the staging directory is empty
-			matches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-			require.NoError(t, err, "checking that staging dir was cleaned")
-			require.Equal(t, 0, len(matches), "unexpected files found in staged updates directory: %+v", matches)
 		})
 	}
 }
@@ -198,7 +170,6 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 				mirrorClient: http.DefaultClient,
 				logger:       log.NewNopLogger(),
 				baseDir:      testBaseDir,
-				stagingDir:   t.TempDir(),
 				lock:         newLibraryLock(),
 			}
 
@@ -238,7 +209,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 				mirrorClient: http.DefaultClient,
 				logger:       log.NewNopLogger(),
 				baseDir:      testBaseDir,
-				stagingDir:   t.TempDir(),
 				lock:         newLibraryLock(),
 			}
 
@@ -327,11 +297,6 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 
 			// Request download
 			require.Error(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected error when library manager downloads invalid file")
-
-			// Confirm the update was removed after download
-			downloadMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-			require.NoError(t, err, "checking that staging dir did not have any downloads")
-			require.Equal(t, 0, len(downloadMatches), "unexpected files found in staged updates directory: %+v", downloadMatches)
 
 			// Confirm the update was not added to the library
 			updateMatches, err := filepath.Glob(filepath.Join(updatesDirectory(tt.binary, testBaseDir), "*"))
@@ -498,21 +463,10 @@ func TestTidyLibrary(t *testing.T) {
 				// Set up test library manager
 				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					logger:     log.NewNopLogger(),
-					baseDir:    testBaseDir,
-					stagingDir: t.TempDir(),
-					lock:       newLibraryLock(),
+					logger:  log.NewNopLogger(),
+					baseDir: testBaseDir,
+					lock:    newLibraryLock(),
 				}
-
-				// Make a file in the staged updates directory
-				f1, err := os.Create(filepath.Join(testLibraryManager.stagingDir, fmt.Sprintf("%s-1.2.3.tar.gz", binary)))
-				require.NoError(t, err, "creating fake download file")
-				f1.Close()
-
-				// Confirm we made the staging files
-				stagingMatches, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-				require.NoError(t, err, "could not glob for files in staged download dir")
-				require.Equal(t, 1, len(stagingMatches))
 
 				// Set up existing versions for test
 				for existingVersion, isExecutable := range tt.existingVersions {
@@ -537,13 +491,6 @@ func TestTidyLibrary(t *testing.T) {
 
 				// Tidy the library
 				testLibraryManager.TidyLibrary(binary, tt.currentlyRunningVersion)
-
-				// Confirm the staging directory was tidied up
-				_, err = os.Stat(testLibraryManager.stagingDir)
-				require.NoError(t, err, "could not stat staged download dir")
-				matchesAfter, err := filepath.Glob(filepath.Join(testLibraryManager.stagingDir, "*"))
-				require.NoError(t, err, "could not glob for files in staged download dir")
-				require.Equal(t, 0, len(matchesAfter))
 
 				// Confirm that the versions we expect are still there
 				for _, expectedPreservedVersion := range tt.expectedPreservedVersions {

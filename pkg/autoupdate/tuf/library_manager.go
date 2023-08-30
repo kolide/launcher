@@ -31,7 +31,6 @@ type updateLibraryManager struct {
 	mirrorUrl    string // dl.kolide.co
 	mirrorClient *http.Client
 	baseDir      string
-	stagingDir   string
 	lock         *libraryLock
 	logger       log.Logger
 }
@@ -50,13 +49,6 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 		return nil, fmt.Errorf("could not make base directory for updates library: %w", err)
 	}
 
-	// Create the directory for staging updates
-	stagingDir, err := agent.MkdirTemp("staged-updates")
-	if err != nil {
-		return nil, fmt.Errorf("could not make staged updates directory: %w", err)
-	}
-	ulm.stagingDir = stagingDir
-
 	// Create the update library
 	for _, binary := range binaries {
 		if err := os.MkdirAll(updatesDirectory(binary, baseDir), 0755); err != nil {
@@ -65,20 +57,6 @@ func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDi
 	}
 
 	return &ulm, nil
-}
-
-// Close cleans up the temporary staging directory
-func (ulm *updateLibraryManager) Close() error {
-	// Acquire lock to ensure we aren't interrupting an ongoing operation
-	for _, binary := range binaries {
-		ulm.lock.Lock(binary)
-		defer ulm.lock.Unlock(binary)
-	}
-
-	if err := os.RemoveAll(ulm.stagingDir); err != nil {
-		return fmt.Errorf("could not remove staging dir %s: %w", ulm.stagingDir, err)
-	}
-	return nil
 }
 
 // updatesDirectory returns the update library location for the given binary.
@@ -115,13 +93,18 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 		return nil
 	}
 
-	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
-	defer ulm.tidyStagedUpdates(binary)
-
 	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(binary, targetFilename, targetMetadata)
 	if err != nil {
 		return fmt.Errorf("could not stage update: %w", err)
 	}
+
+	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
+	defer func() {
+		dirToRemove := filepath.Dir(stagedUpdatePath)
+		if err := os.RemoveAll(dirToRemove); err != nil {
+			level.Debug(ulm.logger).Log("msg", "could not remove temp staging directory", "err", err, "directory", dirToRemove)
+		}
+	}()
 
 	if err := ulm.moveVerifiedUpdate(binary, targetFilename, stagedUpdatePath); err != nil {
 		return fmt.Errorf("could not move verified update: %w", err)
@@ -133,7 +116,11 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
-	stagedUpdatePath := filepath.Join(ulm.stagingDir, targetFilename)
+	stagingDir, err := agent.MkdirTemp(fmt.Sprintf("staged-updates-%s", versionFromTarget(binary, targetFilename)))
+	if err != nil {
+		return "", fmt.Errorf("could not create temporary directory for downloading target: %w", err)
+	}
+	stagedUpdatePath := filepath.Join(stagingDir, targetFilename)
 
 	// Request download from mirror
 	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
@@ -178,9 +165,9 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 // Finally, it moves the update to its correct versioned location in the update library for the given binary.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
 	targetVersion := versionFromTarget(binary, targetFilename)
-	stagedVersionedDirectory := filepath.Join(ulm.stagingDir, targetVersion)
-	if err := os.MkdirAll(stagedVersionedDirectory, 0755); err != nil {
-		return fmt.Errorf("could not create directory %s for untarring and validating new update: %w", stagedVersionedDirectory, err)
+	stagedVersionedDirectory, err := agent.MkdirTemp(targetVersion)
+	if err != nil {
+		return fmt.Errorf("could not create temporary directory for untarring and validating new update: %w", err)
 	}
 	defer func() {
 		// In case of error, clean up the staged version
@@ -224,39 +211,16 @@ func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binary
 	}
 }
 
-// TidyLibrary removes unneeded files from the staged updates and updates directories.
+// TidyLibrary reviews all updates in the library for the binary and removes any old versions
+// that are no longer needed. It will always preserve the current running binary, and then the
+// two most recent valid versions. It will remove versions it cannot validate.
 func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, currentVersion string) {
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
 
-	// First, remove old staged archives
-	ulm.tidyStagedUpdates(binary)
-
 	// Remove any updates we no longer need
-	ulm.tidyUpdateLibrary(binary, currentVersion)
-}
-
-// tidyStagedUpdates removes all old archives from the staged updates directory.
-func (ulm *updateLibraryManager) tidyStagedUpdates(binary autoupdatableBinary) {
-	matches, err := filepath.Glob(filepath.Join(ulm.stagingDir, "*"))
-	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "could not glob for staged updates to tidy updates library", "err", err)
-		return
-	}
-
-	for _, match := range matches {
-		if err := os.RemoveAll(match); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not remove staged update when tidying update library", "file", match, "err", err)
-		}
-	}
-}
-
-// tidyUpdateLibrary reviews all updates in the library for the binary and removes any old versions
-// that are no longer needed. It will always preserve the current running binary, and then the
-// two most recent valid versions. It will remove versions it cannot validate.
-func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, currentRunningVersion string) {
-	if currentRunningVersion == "" {
+	if currentVersion == "" {
 		level.Debug(ulm.logger).Log("msg", "cannot tidy update library without knowing current running version")
 		return
 	}
@@ -282,7 +246,7 @@ func (ulm *updateLibraryManager) tidyUpdateLibrary(binary autoupdatableBinary, c
 	nonCurrentlyRunningVersionsKept := 0
 	for i := len(versionsInLibrary) - 1; i >= 0; i -= 1 {
 		// Always keep the current running executable
-		if versionsInLibrary[i] == currentRunningVersion {
+		if versionsInLibrary[i] == currentVersion {
 			continue
 		}
 

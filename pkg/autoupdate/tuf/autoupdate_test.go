@@ -206,10 +206,8 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	require.Contains(t, logLines[len(logLines)-1], "restarted binary after update")
 
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
-	mockLibraryManager.On("Close").Return(nil)
 	autoupdater.Interrupt(errors.New("test error"))
 	time.Sleep(1 * time.Second)
-	mockLibraryManager.AssertExpectations(t)
 }
 
 func TestExecute_withInitialDelay(t *testing.T) {
@@ -246,7 +244,6 @@ func TestExecute_withInitialDelay(t *testing.T) {
 
 	// Expect that we interrupt
 	mockLibraryManager := NewMocklibrarian(t)
-	mockLibraryManager.On("Close").Return(nil)
 	autoupdater.libraryManager = mockLibraryManager
 
 	// Let the autoupdater run for less than the initial delay
@@ -357,7 +354,6 @@ func Test_storeError(t *testing.T) {
 	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
 	// for launcher in tests.
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
-	mockLibraryManager.On("Close").Return(nil)
 
 	// Set the check interval to something short so we can accumulate some errors
 	autoupdater.checkInterval = 1 * time.Second
