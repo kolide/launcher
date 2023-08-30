@@ -331,8 +331,7 @@ func FindBaseDir(path string) string {
 		return ""
 	}
 
-	installedPath := os.Getenv(LegacyAutoupdatePathEnvVar)
-	if installedPath != "" {
+	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
 		path = installedPath
 	}
 
