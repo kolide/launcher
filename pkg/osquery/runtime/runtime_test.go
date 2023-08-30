@@ -437,6 +437,9 @@ func TestOsquerySlowStart(t *testing.T) {
 		WithLogger(log.NewLogfmtLogger(&logBytes)),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
+			if err != nil {
+				return fmt.Errorf("unexpected error starting command: %w", err)
+			}
 			// suspend the process right away
 			cmd.Process.Signal(syscall.SIGTSTP)
 			go func() {
@@ -444,7 +447,7 @@ func TestOsquerySlowStart(t *testing.T) {
 				time.Sleep(3 * time.Second)
 				cmd.Process.Signal(syscall.SIGCONT)
 			}()
-			return err
+			return nil
 		}),
 	)
 	require.NoError(t, err)
