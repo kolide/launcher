@@ -145,6 +145,9 @@ func TestAddToLibrary(t *testing.T) {
 			dirInfo, err := os.Stat(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion))
 			require.NoError(t, err, "checking that update was downloaded")
 			require.True(t, dirInfo.IsDir())
+			if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+				require.Equal(t, "drwxr-xr-x", dirInfo.Mode().String())
+			}
 			executableInfo, err := os.Stat(executableLocation(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion), tt.binary))
 			require.NoError(t, err, "checking that downloaded update includes executable")
 			require.False(t, executableInfo.IsDir())
