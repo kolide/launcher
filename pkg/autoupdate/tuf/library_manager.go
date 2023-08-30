@@ -197,6 +197,10 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
 		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
+	// Need rwxr-xr-x so that the desktop (running as user) can execute the downloaded binary too
+	if err := os.Chmod(newUpdateDirectory, 0755); err != nil {
+		return fmt.Errorf("could not chmod %s: %w", newUpdateDirectory, err)
+	}
 
 	return nil
 }
