@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/remotectl"
+	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/repcli"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/softwareupdate"
 	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
 	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
@@ -118,5 +119,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli", "status"}, dataflattentable.WithIncludeStderr()),
 	}
 }
