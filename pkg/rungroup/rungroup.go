@@ -1,5 +1,10 @@
 package rungroup
 
+// rungroup expands on oklog/run, adding logs to indicate which actor caused
+// the interrupt and which actor, if any, is preventing shutdown. In the
+// future, we would like to add the ability to force shutdown before a given
+// timeout. See: https://github.com/kolide/launcher/issues/1205
+
 import (
 	"fmt"
 
