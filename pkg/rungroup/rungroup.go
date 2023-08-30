@@ -68,7 +68,7 @@ func (g *Group) Run() error {
 	// Wait for all actors to stop.
 	for i := 1; i < cap(errors); i++ {
 		e := <-errors
-		level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName)
+		level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName, "index", i)
 	}
 
 	// Return the original error.
