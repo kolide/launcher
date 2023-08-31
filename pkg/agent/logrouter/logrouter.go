@@ -77,6 +77,10 @@ func New(systemLogger log.Logger) (*logRouter, error) {
 	}, nil
 }
 
+func (lr *logRouter) AddLogger(logger log.Logger) {
+	lr.loggerTee.Add(logger)
+}
+
 func (lr *logRouter) ReplaceSystemLogger(newSystemLogger log.Logger) {
 	newSystemTee := teelogger.New(newSystemLogger, lr.loggerTee)
 	lr.systemTee = newSystemTee

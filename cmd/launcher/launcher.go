@@ -35,17 +35,16 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/pkg/agent/logrouter"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/log/logshipper"
-	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
@@ -70,7 +69,8 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+	logrouter := logrouter.FromContext(ctx)
+	logger := log.With(logrouter.Logger(), "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
 
@@ -172,8 +172,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	var logShipper *logshipper.LogShipper
 	if k.ControlServerURL() != "" {
 		logShipper = logshipper.New(k, logger)
-		logger = teelogger.New(logger, logShipper)
-		logger = log.With(logger, "caller", log.Caller(5))
+		logrouter.AddLogger(logShipper)
 	}
 
 	// construct the appropriate http client based on security settings

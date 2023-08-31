@@ -20,8 +20,6 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/locallogger"
-	"github.com/kolide/launcher/pkg/log/teelogger"
 )
 
 func main() {
@@ -62,7 +60,7 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		runNewerLauncherIfAvailable(ctx, logger)
+		runNewerLauncherIfAvailable(ctx, logrouter)
 	}
 
 	// if the launcher is being ran with a positional argument,
@@ -94,11 +92,11 @@ func main() {
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
-			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
-			runNewerLauncherIfAvailable(ctx, logger)
+			level.Debug(logrouter).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
+			runNewerLauncherIfAvailable(ctx, logrouter)
 		} else {
-			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
-			logutil.Fatal(logger, err, "run launcher")
+			level.Debug(logrouter).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
+			logutil.Fatal(logrouter, err, "run launcher")
 		}
 	}
 }
