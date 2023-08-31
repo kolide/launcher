@@ -12,7 +12,7 @@
 //	                                  +-----> filter ---> persisted ring
 //	                                         by level
 //
-// While several destinations are passed in, these fufill different purposes:
+// While several destinations are passed in, these fulfill different purposes:
 //  1. System Logs: This is meant for logs to be read be the end user. While end users can read the full debug.json,
 //     system logs are meant to be more meaningful. (Note that the filter is applied upstream, and passed
 //     a on initialization. This allows the command line flags to work)
@@ -57,7 +57,7 @@ type logRouter struct {
 }
 
 func New(systemLogger log.Logger) (*logRouter, error) {
-	// We always have exactly one in memory ring logger. This recieves _all_ the logs. It's used to replay into new
+	// We always have exactly one in memory ring logger. This receives _all_ the logs. It's used to replay into new
 	// desinatations, and is expected to be a query target for recent logs
 	logRing, err := ringlogger.New(persistentring.NewInMemory(1000))
 	if err != nil {
