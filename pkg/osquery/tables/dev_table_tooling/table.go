@@ -27,6 +27,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 		table.TextColumn("name"),
 		table.TextColumn("args"),
 		table.TextColumn("output"),
+		table.TextColumn("error"),
 	}
 
 	tableName := "kolide_dev_table_tooling"
@@ -54,17 +55,21 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args, false)
-		if err != nil {
-			level.Info(t.logger).Log("msg", "execution failed", "name", name, "err", err)
-			continue
-		}
-
-		results = append(results, map[string]string{
+		result := map[string]string{
 			"name":   name,
 			"args":   strings.Join(cmd.args, " "),
-			"output": base64.StdEncoding.EncodeToString(output),
-		})
+			"output": "",
+			"error":  "",
+		}
+
+		if output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args, false); err != nil {
+			level.Info(t.logger).Log("msg", "execution failed", "name", name, "err", err)
+			result["error"] = err.Error()
+		} else {
+			result["output"] = base64.StdEncoding.EncodeToString(output)
+		}
+
+		results = append(results, result)
 	}
 
 	return results, nil
