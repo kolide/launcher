@@ -113,7 +113,7 @@ func (lr *logRouter) GetRecentDebugLogs() ([]map[string]any, error) {
 // Replay will replay the logs from the memory ring to a new logger. Because we're serliazing everything down to a
 // string, handling the leveling is cumbersome.
 //
-// TODO: This should probably move to the underlying ringlogger
+// TODO: This should probably move to the underlying ringlogger, but we should also add an iterator for that.
 func (lr *logRouter) Replay(logger log.Logger) error {
 	logs, err := lr.logRing.GetAll()
 	if err != nil {
