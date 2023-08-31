@@ -122,7 +122,7 @@ func (lr *logRouter) Replay(logger log.Logger) error {
 	for _, l := range logs {
 		var levelFn func(logger log.Logger) log.Logger
 
-		pairs := make([]any, 2+len(l))
+		pairs := make([]any, 0)
 		pairs = append(pairs, "replayed", true)
 		for k, v := range l {
 			if k == level.Key() {
