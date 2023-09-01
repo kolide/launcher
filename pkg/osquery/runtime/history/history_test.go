@@ -175,6 +175,49 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
+func TestLatestInstanceUptimeMinutes(t *testing.T) { // nolint:paralleltest
+	tests := []struct {
+		name             string
+		initialInstances []*Instance
+		want             int64
+		expectedErr      bool
+	}{
+		{
+			name: "success",
+			initialInstances: []*Instance{
+				{
+					StartTime: time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
+				},
+				{
+					StartTime: time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
+				},
+			},
+			want:        10,
+			expectedErr: false,
+		},
+		{
+			name:        "no_instances_error",
+			want:        0,
+			expectedErr: true,
+		},
+	}
+	for _, tt := range tests { // nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(func() { currentHistory = &History{} })
+
+			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
+
+			got, err := LatestInstanceUptimeMinutes()
+
+			if tt.expectedErr {
+				require.Error(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // setupStorage creates storage and seeds it with the given instances.
 func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
 	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
