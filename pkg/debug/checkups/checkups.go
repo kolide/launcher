@@ -108,6 +108,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&powerCheckup{}, flareSupported},
 		{&osqueryCheckup{k: k}, doctorSupported | flareSupported},
 		{&launcherFlags{}, doctorSupported | flareSupported},
+		{&gnomeExtensions{}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
@@ -116,7 +117,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 			continue
 		}
 
-		// Use the absence of a name as a shorthand for not supported. This lets is avoid  platform
+		// Use the absence of a name as a shorthand for not supported. This lets is avoid platform
 		// flavors of this method
 		if p.c.Name() == "" {
 			continue
