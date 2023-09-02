@@ -58,16 +58,16 @@ func (c *gnomeExtensions) Run(ctx context.Context, extraWriter io.Writer) error 
 		}
 
 		if c.summary == "" {
-			c.summary = fmt.Sprintf("%s: %s", dir.Name(), summary)
+			c.summary = fmt.Sprintf("uid:%s: %s", dir.Name(), summary)
 		} else {
-			c.summary = fmt.Sprintf("%s; %s: %s", c.summary, dir.Name(), summary)
+			c.summary = fmt.Sprintf("%s; uid:%s: %s", c.summary, dir.Name(), summary)
 		}
 
 	}
 
 	// If we got here, without setting c.status, it must be passing. It feels not great assuming that,
 	// but it's a low risk place, and the code is cleaner.
-	if c.status == Unknown {
+	if c.status == "" || c.status == Unknown {
 		c.status = Passing
 	}
 
@@ -128,7 +128,7 @@ func checkRundir(ctx context.Context, extraWriter io.Writer, rundir string) (Sta
 
 		output, err := execGnomeExtension(ctx, extraWriter, rundir, "show", ext)
 		if err != nil {
-			// Errors running this command are proably fatal, may as well bail
+			// Errors running this command are probably fatal, may as well bail
 			return Erroring, fmt.Sprintf("error running gnome-extensions: %s", err)
 		}
 
@@ -140,7 +140,7 @@ func checkRundir(ctx context.Context, extraWriter io.Writer, rundir string) (Sta
 
 	if len(missing) > 0 {
 		status = Failing
-		summary = fmt.Sprintf("missing extensions: %s", strings.Join(missing, ", "))
+		summary = fmt.Sprintf("missing (or screenlocked) extensions: %s", strings.Join(missing, ", "))
 	} else {
 		status = Passing
 		summary = fmt.Sprintf("enabled extensions: %s", strings.Join(expectedExtensions, ", "))
