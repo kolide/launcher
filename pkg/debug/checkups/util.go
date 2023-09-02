@@ -51,7 +51,7 @@ func addFileToZip(z *zip.Writer, location string) error {
 	// Not totally clear if we should use Lstat or Stat here.
 	fi, err := os.Stat(location)
 	if os.IsNotExist(err) || os.IsPermission(err) {
-		fmt.Fprintf(metaout, `{ "error stating file": "%s" }\n`, err)
+		fmt.Fprintf(metaout, `{ "error stating file": "%s" }`, err)
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func addFileToZip(z *zip.Writer, location string) error {
 
 	fh, err := os.Open(location)
 	if err != nil {
-		fmt.Fprintf(metaout, `{ "error opening file": "%s" }\n`, err)
+		fmt.Fprintf(metaout, `{ "error opening file": "%s" }`, err)
 		return nil
 	}
 	defer fh.Close()
