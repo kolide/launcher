@@ -8,7 +8,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -42,6 +44,7 @@ type fileInfo struct {
 	IsDir   bool      // abbreviation for Mode().IsDir()
 }
 
+// addFileToZip takes a file path, and a zip writer, and adds the file and some metadata.
 func addFileToZip(z *zip.Writer, location string) error {
 	metaout, err := z.Create(filepath.Join(".", location+".flaremeta"))
 	if err != nil {
@@ -95,6 +98,58 @@ func addFileToZip(z *zip.Writer, location string) error {
 	if _, err := io.Copy(dataout, fh); err != nil {
 		return fmt.Errorf("copy data into zip file %s: %w", location, err)
 	}
-	return nil
 
+	return nil
+}
+
+var ignoredEnvPrefixes = []string{
+	"LESS",
+	"LS_COLORS",
+	"SECURITYSESSIONID",
+	"SSH",
+	"TERM_SESSION_ID",
+}
+
+// runCmdMarkdownLogged is a wrapper over cmd.Run that does some output formatting. Callers are expected to have
+// created the cmd with appropriate environment and io writers.
+func runCmdMarkdownLogged(cmd *exec.Cmd, extraWriter io.Writer) error {
+	if extraWriter != io.Discard {
+		fmt.Fprintf(extraWriter, "```shell\n")
+		fmt.Fprintf(extraWriter, "# ENV:\n")
+		for _, e := range cmd.Environ() {
+			skip := false
+			for _, prefix := range ignoredEnvPrefixes {
+				if strings.HasPrefix(e, prefix) {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			fmt.Fprintf(extraWriter, "export %s\n", e)
+		}
+		fmt.Fprintf(extraWriter, "\n$ %s\n", cmd.String())
+
+		defer fmt.Fprintf(extraWriter, "```\n\n")
+
+		if cmd.Stderr == nil {
+			cmd.Stderr = extraWriter
+		} else {
+			io.MultiWriter(extraWriter, cmd.Stderr)
+		}
+
+		if cmd.Stdout == nil {
+			cmd.Stdout = extraWriter
+		} else {
+			cmd.Stdout = io.MultiWriter(extraWriter, cmd.Stdout)
+		}
+	}
+
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(extraWriter, "\n\n# Got Error: %s\n", err)
+		return err
+	}
+
+	return nil
 }
