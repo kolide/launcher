@@ -234,7 +234,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	if len(warningCheckups) > 0 {
 		fmt.Fprintf(w, "\nCheckups with warnings:\n")
 		for _, n := range warningCheckups {
-			fmt.Fprintf(w, "\t* %s", n)
+			fmt.Fprintf(w, "\t* %s\n", n)
 		}
 		fmt.Fprintf(w, "\n")
 	}
@@ -242,7 +242,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	if len(failingCheckups) > 0 {
 		fmt.Fprintf(w, "\nCheckups with failures:\n")
 		for _, n := range failingCheckups {
-			fmt.Fprintf(w, "\t* %s", n)
+			fmt.Fprintf(w, "\t* %s\n", n)
 		}
 		fmt.Fprintf(w, "\n")
 	}
