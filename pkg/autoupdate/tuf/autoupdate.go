@@ -315,6 +315,12 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		return fmt.Errorf("could not download updates: %+v", updateErrors)
 	}
 
+	// Only perform restarts if we're configured to use this new autoupdate library,
+	// to prevent performing unnecessary restarts.
+	if !usingNewAutoupdater(ta.channel) {
+		return nil
+	}
+
 	// If launcher was updated, we want to exit and reload
 	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
 		level.Debug(ta.logger).Log("msg", "launcher updated -- exiting to load new version", "new_binary_version", updatedVersion)
