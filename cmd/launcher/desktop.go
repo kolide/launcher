@@ -21,8 +21,8 @@ import (
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/systray"
-	"github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -105,20 +105,20 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	var runGroup run.Group
+	runGroup := rungroup.NewRunGroup(logger)
 
 	// listen for signals
-	runGroup.Add(func() error {
+	runGroup.Add("desktopSignalListener", func() error {
 		listenSignals(logger)
 		return nil
 	}, func(error) {})
 
 	// Set up notification sending and listening
 	notifier := notify.NewDesktopNotifier(logger, *flIconPath)
-	runGroup.Add(notifier.Listen, notifier.Interrupt)
+	runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
 
 	// monitor parent
-	runGroup.Add(func() error {
+	runGroup.Add("desktopMonitorParentProcess", func() error {
 		monitorParentProcess(logger, *flRunnerServerUrl, *flRunnerServerAuthToken, 2*time.Second)
 		return nil
 	}, func(error) {})
@@ -136,7 +136,7 @@ func runDesktop(args []string) error {
 	server.RegisterRefreshListener(refreshMenu)
 
 	// start user server
-	runGroup.Add(server.Serve, func(err error) {
+	runGroup.Add("desktopServer", server.Serve, func(err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
@@ -148,7 +148,7 @@ func runDesktop(args []string) error {
 	})
 
 	// listen on shutdown channel
-	runGroup.Add(func() error {
+	runGroup.Add("desktopServerShutdownListener", func() error {
 		<-shutdownChan
 		return nil
 	}, func(err error) {
@@ -156,7 +156,7 @@ func runDesktop(args []string) error {
 	})
 
 	// notify runner server when menu opened
-	runGroup.Add(func() error {
+	runGroup.Add("desktopMenuOpenedListener", func() error {
 		notifyRunnerServerMenuOpened(logger, *flRunnerServerUrl, *flRunnerServerAuthToken)
 		return nil
 	}, func(err error) {})

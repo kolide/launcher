@@ -29,7 +29,7 @@ type UpdaterConfig struct {
 	SigChannel         chan os.Signal
 }
 
-// NewUpdater returns an Actor suitable for an oklog/run group. It
+// NewUpdater returns an Actor suitable for a pkg/rungroup group. It
 // is a light wrapper around autoupdate.NewUpdater to simplify having
 // multiple ones in launcher.
 func NewUpdater(
