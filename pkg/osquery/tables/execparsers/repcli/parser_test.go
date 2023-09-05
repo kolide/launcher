@@ -28,11 +28,17 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:  "unexpected format input",
-			input: []byte("\n\nEmpty Top Level:\n\n\nTest: topLevelValue\nNested:\n\tSub: Section\nSkipped line without colons\n\n"),
+			input: []byte("\n\nEmpty Top Level:\n\n\nTest: topLevelValue\nNested:\n\tSub: Section\n\t\tDouble Sub:\n\t\t\tsecond Level: value\n\t\t\ttriple:\n\t\t\t\tdeepest:value\ndSkipped line without colons\n\n"),
 			expected: map[string]interface{}{
 				"empty_top_level": map[string]interface{}{},
 				"nested": map[string]interface{}{
 					"sub": "Section",
+					"double_sub": map[string]interface{}{
+						"second_level": "value",
+						"triple": map[string]interface{}{
+							"deepest": "value",
+						},
+					},
 				},
 				"test": "topLevelValue",
 			},
