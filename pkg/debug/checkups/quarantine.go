@@ -26,7 +26,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.quarantineCounts = make(map[string]int)
 
 	var (
-		quarantineRootDepth = map[string]int{
+		quarantinePathDepths = map[string]int{
 			`C:\Windows\System32\Drivers`: 3,
 			`C:\ProgramData`:              3,
 
@@ -49,7 +49,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.logMeddlesomeProccesses(ctx, extraFh, meddlesomeProcessPatterns)
 	fmt.Fprintf(extraFh, "\nsearching for quarantined files:\n")
 
-	for path, maxDepth := range quarantineRootDepth {
+	for path, maxDepth := range quarantinePathDepths {
 		fileInfo, err := os.Stat(path)
 		if err != nil {
 			fmt.Fprintf(extraFh, "%s does not exist\n", path)
@@ -61,7 +61,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 			continue
 		}
 
-		q.walkDirLimited(extraFh, 0, maxDepth, path, "quarantine")
+		q.checkDirs(extraFh, 0, maxDepth, path, "quarantine")
 	}
 
 	fmt.Fprintf(extraFh, "total directories checked: %d\n", q.dirsChecked)
@@ -93,7 +93,9 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	return nil
 }
 
-func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, directoryKeyword string) {
+// Recursively scans dir to given max depth. Creates entry for each dir whose path contains the directoryKeyword.
+// Increments quarantine.quarantineCounts for each file found in folder and descendant folders.
+func (q *quarantine) checkDirs(extraFh io.Writer, currentDepth, maxDepth int, dirPath, directoryKeyword string) {
 	if currentDepth > maxDepth {
 		return
 	}
@@ -121,7 +123,7 @@ func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth in
 
 	for _, dirEntry := range dirEntries {
 		if dirEntry.IsDir() {
-			q.walkDirLimited(extraFh, currentDepth+1, maxDepth, filepath.Join(dirPath, dirEntry.Name()), directoryKeyword)
+			q.checkDirs(extraFh, currentDepth+1, maxDepth, filepath.Join(dirPath, dirEntry.Name()), directoryKeyword)
 			continue
 		}
 
