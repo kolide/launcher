@@ -92,6 +92,10 @@ func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	// Since we're setting an environment variable, we don't want to run this test at the
 	// same time as other tests.
 
+	t.Cleanup(func() {
+		os.Setenv(LegacyAutoupdatePathEnvVar, "")
+	})
+
 	var tests = []struct {
 		installPath string
 		currentPath string
@@ -123,8 +127,6 @@ func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
 		require.Equal(t, tt.out, getUpdateDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
 	}
-
-	os.Setenv(LegacyAutoupdatePathEnvVar, "")
 }
 
 func TestFindBaseDir(t *testing.T) {
@@ -152,6 +154,10 @@ func TestFindBaseDir(t *testing.T) {
 func TestFindBaseDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	// Since we're setting an environment variable, we don't want to run this test at the
 	// same time as other tests.
+
+	t.Cleanup(func() {
+		os.Setenv(LegacyAutoupdatePathEnvVar, "")
+	})
 
 	var tests = []struct {
 		installPath string
@@ -184,8 +190,6 @@ func TestFindBaseDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
 		require.Equal(t, tt.out, FindBaseDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
 	}
-
-	os.Setenv(LegacyAutoupdatePathEnvVar, "")
 }
 
 func TestFindNewestEmpty(t *testing.T) {

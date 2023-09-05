@@ -455,8 +455,12 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.errgroup.Go(func() error {
 		if o.knapsack != nil && o.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			level.Debug(o.logger).Log("msg", "entering delay before starting osquery healthchecks")
-			time.Sleep(o.knapsack.OsqueryHealthcheckStartupDelay())
-			level.Debug(o.logger).Log("msg", "exiting delay before starting osquery healthchecks")
+			select {
+			case <-time.After(o.knapsack.OsqueryHealthcheckStartupDelay()):
+				level.Debug(o.logger).Log("msg", "exiting delay before starting osquery healthchecks")
+			case <-o.doneCtx.Done():
+				return o.doneCtx.Err()
+			}
 		}
 
 		ticker := time.NewTicker(healthCheckInterval)

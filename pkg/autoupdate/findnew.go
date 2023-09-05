@@ -251,8 +251,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 //
 // It makes some string assumptions about how things are named.
 func getUpdateDir(fullBinaryPath string) string {
-	installedPath := os.Getenv(LegacyAutoupdatePathEnvVar)
-	if installedPath != "" {
+	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
 		fullBinaryPath = installedPath
 	}
 
@@ -263,9 +262,7 @@ func getUpdateDir(fullBinaryPath string) string {
 
 	// These are cases that shouldn't really happen. But, this is
 	// a bare string function. So return "" when they do.
-	if strings.HasSuffix(fullBinaryPath, "/") {
-		fullBinaryPath = strings.TrimSuffix(fullBinaryPath, "/")
-	}
+	fullBinaryPath = strings.TrimSuffix(fullBinaryPath, "/")
 
 	if fullBinaryPath == "" {
 		return ""
@@ -334,8 +331,7 @@ func FindBaseDir(path string) string {
 		return ""
 	}
 
-	installedPath := os.Getenv(LegacyAutoupdatePathEnvVar)
-	if installedPath != "" {
+	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
 		path = installedPath
 	}
 

@@ -19,11 +19,11 @@ func checkExecutablePermissions(potentialBinary string) error {
 	stat, err := os.Stat(potentialBinary)
 	switch {
 	case os.IsNotExist(err):
-		return errors.New("No such file")
-	case stat.IsDir():
-		return errors.New("is a directory")
+		return errors.New("no such file")
 	case err != nil:
 		return fmt.Errorf("statting file: %w", err)
+	case stat.IsDir():
+		return errors.New("is a directory")
 	case stat.Mode()&0111 == 0:
 		return errors.New("not executable")
 	}

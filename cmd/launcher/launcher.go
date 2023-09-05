@@ -9,8 +9,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -46,10 +48,10 @@ import (
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces/exporter"
 	"github.com/kolide/launcher/pkg/windows/powereventwatcher"
-	"github.com/oklog/run"
 
 	"go.etcd.io/bbolt"
 )
@@ -69,6 +71,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+
+	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -206,14 +210,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	var runGroup run.Group
+	runGroup := rungroup.NewRunGroup(logger)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
 
 	// Add a rungroup to catch things on the sigChannel
 	// Attach a notifier for os.Interrupt
-	runGroup.Add(func() error {
+	runGroup.Add("sigChannel", func() error {
 		signal.Notify(sigChannel, os.Interrupt)
 		select {
 		case <-sigChannel:
@@ -229,7 +233,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err != nil {
 		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
 	} else {
-		runGroup.Add(powerEventWatcher.Execute, powerEventWatcher.Interrupt)
+		runGroup.Add("powerEventWatcher", powerEventWatcher.Execute, powerEventWatcher.Interrupt)
 	}
 
 	var client service.KolideService
@@ -261,7 +265,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
-	runGroup.Add(extension.Execute, extension.Interrupt)
+	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
 	level.Info(logger).Log(
@@ -285,7 +289,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
-		runGroup.Add(controlService.ExecuteWithContext(ctx), controlService.Interrupt)
+		runGroup.Add("controlService", controlService.ExecuteWithContext(ctx), controlService.Interrupt)
 
 		// serverDataConsumer handles server data table updates
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
@@ -302,7 +306,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
 
-		runGroup.Add(runner.Execute, runner.Interrupt)
+		runGroup.Add("desktopRunner", runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
 		// create an action queue for all other action style commands
@@ -312,7 +316,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			actionqueue.WithStore(k.ControlServerActionsStore()),
 			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
 		)
-		runGroup.Add(actionsQueue.StartCleanup, actionsQueue.StopCleanup)
+		runGroup.Add("actionsQueue", actionsQueue.StartCleanup, actionsQueue.StopCleanup)
 		controlService.RegisterConsumer(actionqueue.ActionsSubsystem, actionsQueue)
 
 		// register accelerate control consumer
@@ -343,14 +347,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 				"err", err,
 			)
 		} else {
-			runGroup.Add(exp.Execute, exp.Interrupt)
+			runGroup.Add("traceExporter", exp.Execute, exp.Interrupt)
 			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
 		}
 
 		// begin log shipping and subsribe to token updates
 		// nil check incase it failed to create for some reason
 		if logShipper != nil {
-			runGroup.Add(logShipper.Run, logShipper.Stop)
+			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
@@ -372,14 +376,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		}
 
 		ls.SetQuerier(extension)
-		runGroup.Add(ls.Start, ls.Interrupt)
+		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
 	// If the autoupdater is enabled, enable it for both osquery and launcher
 	if k.Autoupdate() {
 		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
-		metadataClient.Timeout = 1 * time.Minute
+		metadataClient.Timeout = 30 * time.Second
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
@@ -394,7 +398,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
 			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
 		} else {
-			runGroup.Add(tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+			runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 		}
 
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
@@ -415,7 +419,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("create osquery updater: %w", err)
 		}
-		runGroup.Add(osqueryLegacyUpdater.Execute, osqueryLegacyUpdater.Interrupt)
+		runGroup.Add("osqueryLegacyAutoupdater", osqueryLegacyUpdater.Execute, osqueryLegacyUpdater.Interrupt)
 
 		launcherUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
@@ -450,7 +454,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		if err != nil {
 			return fmt.Errorf("create launcher updater: %w", err)
 		}
-		runGroup.Add(launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
+		runGroup.Add("launcherLegacyAutoupdater", launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 	}
 
 	if err := runGroup.Run(); err != nil {
@@ -465,4 +469,31 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
+}
+
+// runOsqueryVersionCheck execs the osqueryd binary in the background when we're running
+// on darwin. Operating on our theory that some startup delay issues for osquery might
+// be due to the notarization check taking too long, we execute the binary here ahead
+// of time in the hopes of getting the check out of the way.
+func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer versionCancel()
+
+	versionCmd := exec.CommandContext(versionCtx, osquerydPath, "--version")
+
+	startTime := time.Now().UnixMilli()
+	out, err := versionCmd.CombinedOutput()
+	executionTimeMs := time.Now().UnixMilli() - startTime
+	outTrimmed := strings.TrimSpace(string(out))
+
+	if err != nil {
+		level.Error(logger).Log("msg", "could not check osqueryd version", "output", outTrimmed, "err", err, "execution_time_ms", executionTimeMs)
+		return
+	}
+
+	level.Debug(logger).Log("msg", "checked osqueryd version", "version", outTrimmed, "execution_time_ms", executionTimeMs)
 }
