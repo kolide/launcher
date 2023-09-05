@@ -89,7 +89,6 @@ func addFileToZip(z *zip.Writer, location string) error {
 	}
 	defer fh.Close()
 
-	//var errToLog
 	dataout, err := z.Create(filepath.Join(".", location))
 	if err != nil {
 		return fmt.Errorf("creating %s in zip: %w", location, err)
