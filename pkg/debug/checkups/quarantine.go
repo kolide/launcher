@@ -12,8 +12,10 @@ import (
 )
 
 type quarantine struct {
-	status  Status
-	summary string
+	status           Status
+	summary          string
+	quarantineCounts map[string]int
+	dirsChecked      int
 }
 
 func (q *quarantine) Name() string {
@@ -21,17 +23,14 @@ func (q *quarantine) Name() string {
 }
 
 func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
+	q.quarantineCounts = map[string]int{}
 
 	var (
-		rootsToScanForQuarantineDirs = []string{
-			`C:\Windows\System32\Drivers`,
-			`C:\ProgramData`,
+		quarantineRootDepth = map[string]int{
+			`C:\Windows\System32\Drivers`: 3,
+			`C:\ProgramData`:              3,
 
-			`/Library/Application Support`,
-		}
-
-		fileNamesToMatch = []string{
-			`osquery`,
+			`/Library/Application Support`: 4,
 		}
 
 		meddlesomeProcessPatterns = []string{
@@ -50,115 +49,83 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.logMeddlesomeProccesses(ctx, extraFh, meddlesomeProcessPatterns)
 	fmt.Fprintf(extraFh, "\nsearching for quarantined files:\n")
 
-	var quarantineDirs []string
-
-	// find all the folders that contain the word quarantine
-	for _, root := range rootsToScanForQuarantineDirs {
-		fileInfo, err := os.Stat(root)
+	for path, maxDepth := range quarantineRootDepth {
+		fileInfo, err := os.Stat(path)
 		if err != nil {
-			fmt.Fprintf(extraFh, "%s does not exist\n", root)
+			fmt.Fprintf(extraFh, "%s does not exist\n", path)
 			continue
 		}
 
 		if !fileInfo.IsDir() {
-			fmt.Fprintf(extraFh, "expected %s to be a directory, but was not\n", root)
+			fmt.Fprintf(extraFh, "expected %s to be a directory, but was not\n", path)
 			continue
 		}
 
-		dirs := q.findDirsThatContain(extraFh, root, "quarantine")
-		quarantineDirs = append(quarantineDirs, dirs...)
-	}
-
-	if len(quarantineDirs) == 0 {
-		q.status = Passing
-		status := "No quarantine directories found"
-		fmt.Fprint(extraFh, status)
-		q.summary = status
-		return nil
-	}
-
-	// scan quarantine dirs for files that might relate to us
-	for _, dir := range quarantineDirs {
-		if pass, result := q.checkDirForQuarantinedFiles(extraFh, dir, fileNamesToMatch); !pass {
+		if err := q.walkDirLimited(extraFh, 0, maxDepth, path, "quarantine"); err != nil {
+			q.summary = fmt.Sprintf("failed to walk %s: %s", path, err)
 			q.status = Failing
-			q.summary = result
 			return nil
 		}
 	}
 
-	q.status = Passing
-	q.summary = "No notable files found in quarantine directories"
+	fmt.Fprintf(extraFh, "%d of %d directories may contain quarantined files\n", len(q.quarantineCounts), q.dirsChecked)
+
+	if len(q.quarantineCounts) == 0 {
+		q.status = Passing
+		q.summary = "no files found in quarantine"
+		return nil
+	}
+
+	fmt.Fprintf(extraFh, "\nquarantined file counts:\n")
+	quarantinedFiles := 0
+
+	for path, count := range q.quarantineCounts {
+		quarantinedFiles += count
+		fmt.Fprintf(extraFh, "%s: %d\n", path, count)
+	}
+
+	q.status = Failing
+	q.summary = fmt.Sprintf("found %d quarantined files", quarantinedFiles)
 	return nil
 }
 
-func (q *quarantine) checkDirForQuarantinedFiles(extraFh io.Writer, path string, quarantineFileNamesToSearchFor []string) (bool, string) {
-	dirEntries, err := os.ReadDir(path)
-	if err != nil {
-		// if we can't read the directory, we can't do much else, error
-		result := fmt.Sprintf("failed to read directory %s: %s", path, err)
-		fmt.Fprint(extraFh, result)
-		return false, result
+func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, folderKeyword string) error {
+	if currentDepth > maxDepth {
+		return nil
 	}
 
-	fmt.Fprintf(extraFh, "found %d files in %s\n", len(dirEntries), path)
+	q.dirsChecked++
 
-	if len(dirEntries) == 0 {
-		return true, ""
+	dirEntries, err := os.ReadDir(dirPath)
+	if err != nil {
+		// some dirs, such as /Library/Application Support/com.apple.TCC can't be read even with sudo
+		// have to give terminal FDA?
+		// so just move on instead of failing
+		fmt.Fprintf(extraFh, "failed to read %s: %s\n", dirPath, err)
+		return nil
 	}
 
 	for _, dirEntry := range dirEntries {
 		if dirEntry.IsDir() {
-			if pass, result := q.checkDirForQuarantinedFiles(extraFh, filepath.Join(path, dirEntry.Name()), quarantineFileNamesToSearchFor); !pass {
-				return pass, result
-			}
-
+			q.walkDirLimited(extraFh, currentDepth+1, maxDepth, filepath.Join(dirPath, dirEntry.Name()), folderKeyword)
 			continue
 		}
 
-		for _, pattern := range quarantineFileNamesToSearchFor {
-			fileName := strings.ToLower(dirEntry.Name())
-			pattern := strings.ToLower(pattern)
-
-			if strings.Contains(fileName, pattern) {
-				result := fmt.Sprintf("found file %s in folder %s that contained the string %s", dirEntry.Name(), path, pattern)
-				fmt.Fprint(extraFh, result)
-				return false, result
-			}
+		if !strings.Contains(strings.ToLower(dirPath), folderKeyword) {
+			// not in quarantine folder
+			continue
 		}
 
-		fmt.Fprintf(extraFh, "no notable files found in %s", dirEntry.Name())
+		// create map entry if not exists
+		if _, ok := q.quarantineCounts[dirPath]; !ok {
+			q.quarantineCounts[dirPath] = 1
+			continue
+		}
+
+		q.quarantineCounts[dirPath]++
 	}
 
-	return true, ""
-}
-
-func (q *quarantine) findDirsThatContain(extraFh io.Writer, rootDir, substr string) []string {
-	var matchingPaths []string
-	dirCount := 0
-
-	if err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
-		dirCount++
-
-		if err != nil {
-			fmt.Fprintf(extraFh, "error walking directory: %v\n", err)
-			return nil
-		}
-
-		if !d.IsDir() {
-			return nil
-		}
-
-		if strings.Contains(strings.ToLower(d.Name()), strings.ToLower(substr)) {
-			matchingPaths = append(matchingPaths, path)
-		}
-
-		return nil
-	}); err != nil {
-		return matchingPaths
-	}
-
-	fmt.Fprintf(extraFh, "%d out of %d scanned directories starting at root %s contained %s\n", len(matchingPaths), dirCount, rootDir, substr)
-	return matchingPaths
+	return nil
 }
 
 func (q *quarantine) logMeddlesomeProccesses(ctx context.Context, extraFh io.Writer, containsSubStrings []string) error {
