@@ -79,7 +79,7 @@ func TestParse(t *testing.T) {
 			input: repcli_mac_status,
 			expected: map[string]interface{}{
 				"cloud_status": map[string]interface{}{
-					"mdm_device_id":      "9FCF04E4-4C8C-45A0-B3EA-053672776382",
+					"mdm_device_id":      "99999999-4C8C-45A0-B3EA-053672776382",
 					"next_check-in":      "Now",
 					"next_cloud_upgrade": "None",
 					"platform_type":      "CLIENT_ARM64",

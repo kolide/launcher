@@ -32,7 +32,7 @@ Cloud Status:
     Next Check-In: Now
     Private Logging: Disabled
     Next Cloud Upgrade: None
-    MDM Device ID: 9FCF04E4-4C8C-45A0-B3EA-053672776382
+    MDM Device ID: 99999999-4C8C-45A0-B3EA-053672776382
     Platform Type: CLIENT_ARM64
 Proxy Settings: 
     Proxy Configured: No
