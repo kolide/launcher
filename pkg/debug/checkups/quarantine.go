@@ -23,7 +23,7 @@ func (q *quarantine) Name() string {
 }
 
 func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
-	q.quarantineCounts = map[string]int{}
+	q.quarantineCounts = make(map[string]int)
 
 	var (
 		quarantineRootDepth = map[string]int{
@@ -64,33 +64,51 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 		q.walkDirLimited(extraFh, 0, maxDepth, path, "quarantine")
 	}
 
-	fmt.Fprintf(extraFh, "%d of %d directories may contain quarantined files\n", len(q.quarantineCounts), q.dirsChecked)
+	fmt.Fprintf(extraFh, "total directories checked: %d\n", q.dirsChecked)
 
 	if len(q.quarantineCounts) == 0 {
 		q.status = Passing
-		q.summary = "no files found in quarantine"
+		q.summary = "no quarantine directories found"
+		fmt.Fprint(extraFh, "no quarantine directories found\n")
 		return nil
 	}
 
-	fmt.Fprintf(extraFh, "\nquarantined file counts:\n")
-	quarantinedFiles := 0
+	fmt.Fprintf(extraFh, "quarantine directory paths and file counts:\n")
+
+	totalQuarantinedFiles := 0
 
 	for path, count := range q.quarantineCounts {
-		quarantinedFiles += count
 		fmt.Fprintf(extraFh, "%s: %d\n", path, count)
+		totalQuarantinedFiles += count
+	}
+
+	if totalQuarantinedFiles == 0 {
+		q.status = Passing
+		q.summary = "no files found in quarantine directories"
+		return nil
 	}
 
 	q.status = Failing
-	q.summary = fmt.Sprintf("found %d quarantined files", quarantinedFiles)
+	q.summary = fmt.Sprintf("found %d quarantined files", totalQuarantinedFiles)
 	return nil
 }
 
-func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, folderKeyword string) {
+func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, directoryKeyword string) {
 	if currentDepth > maxDepth {
 		return
 	}
 
 	q.dirsChecked++
+
+	dirNameContainsKeyword := strings.Contains(strings.ToLower(dirPath), directoryKeyword)
+
+	// add entry for each dir that contains the keyword
+	if dirNameContainsKeyword {
+		// create map entry if not exists
+		if _, ok := q.quarantineCounts[dirPath]; !ok {
+			q.quarantineCounts[dirPath] = 0
+		}
+	}
 
 	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -103,25 +121,17 @@ func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth in
 
 	for _, dirEntry := range dirEntries {
 		if dirEntry.IsDir() {
-			q.walkDirLimited(extraFh, currentDepth+1, maxDepth, filepath.Join(dirPath, dirEntry.Name()), folderKeyword)
+			q.walkDirLimited(extraFh, currentDepth+1, maxDepth, filepath.Join(dirPath, dirEntry.Name()), directoryKeyword)
 			continue
 		}
 
-		if !strings.Contains(strings.ToLower(dirPath), folderKeyword) {
-			// not in quarantine folder
-			continue
-		}
-
-		// create map entry if not exists
-		if _, ok := q.quarantineCounts[dirPath]; !ok {
-			q.quarantineCounts[dirPath] = 1
+		if !dirNameContainsKeyword {
+			// not in quarantine dir
 			continue
 		}
 
 		q.quarantineCounts[dirPath]++
 	}
-
-	return
 }
 
 func (q *quarantine) logMeddlesomeProccesses(ctx context.Context, extraFh io.Writer, containsSubStrings []string) error {
