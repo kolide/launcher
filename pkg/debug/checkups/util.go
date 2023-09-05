@@ -1,10 +1,17 @@
 package checkups
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -27,4 +34,121 @@ func recursiveDirectoryContents(extraFH io.Writer, basedir string) (int, error) 
 
 	return len(maps.Keys(files)), filewalkErr
 
+}
+
+type fileInfo struct {
+	Name    string    // base name of the file
+	Size    int64     // length in bytes for regular files; system-dependent for others
+	Mode    string    // file mode bits
+	ModTime time.Time // modification time
+	IsDir   bool      // abbreviation for Mode().IsDir()
+}
+
+// addFileToZip takes a file path, and a zip writer, and adds the file and some metadata.
+func addFileToZip(z *zip.Writer, location string) error {
+	metaout, err := z.Create(filepath.Join(".", location+".flaremeta"))
+	if err != nil {
+		return fmt.Errorf("creating %s in zip: %w", location+".flaremeta", err)
+	}
+
+	// Not totally clear if we should use Lstat or Stat here.
+	fi, err := os.Stat(location)
+	if os.IsNotExist(err) || os.IsPermission(err) {
+		fmt.Fprintf(metaout, `{ "error stating file": "%s" }`, err)
+		return nil
+	}
+
+	b, err := json.Marshal(fileInfo{
+		Name:    fi.Name(),
+		Size:    fi.Size(),
+		Mode:    fi.Mode().String(),
+		ModTime: fi.ModTime(),
+		IsDir:   fi.IsDir(),
+	})
+	if err != nil {
+		// Structural error. Abort
+		return fmt.Errorf("marshalling json: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, b, "", "  "); err != nil {
+		// Structural error. Abort
+		return fmt.Errorf("indenting json: %w", err)
+
+	}
+	metaout.Write(buf.Bytes())
+
+	//
+	// Done with metadata, and we know the file exists, and that we have permission to it.
+	//
+
+	fh, err := os.Open(location)
+	if err != nil {
+		fmt.Fprintf(metaout, `{ "error opening file": "%s" }`, err)
+		return nil
+	}
+	defer fh.Close()
+
+	dataout, err := z.Create(filepath.Join(".", location))
+	if err != nil {
+		return fmt.Errorf("creating %s in zip: %w", location, err)
+	}
+
+	if _, err := io.Copy(dataout, fh); err != nil {
+		return fmt.Errorf("copy data into zip file %s: %w", location, err)
+	}
+
+	return nil
+}
+
+var ignoredEnvPrefixes = []string{
+	"LESS",
+	"LS_COLORS",
+	"SECURITYSESSIONID",
+	"SSH",
+	"TERM_SESSION_ID",
+}
+
+// runCmdMarkdownLogged is a wrapper over cmd.Run that does some output formatting. Callers are expected to have
+// created the cmd with appropriate environment and io writers.
+func runCmdMarkdownLogged(cmd *exec.Cmd, extraWriter io.Writer) error {
+	if extraWriter != io.Discard {
+		fmt.Fprintf(extraWriter, "```shell\n")
+		fmt.Fprintf(extraWriter, "# ENV:\n")
+		for _, e := range cmd.Environ() {
+			skip := false
+			for _, prefix := range ignoredEnvPrefixes {
+				if strings.HasPrefix(e, prefix) {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			fmt.Fprintf(extraWriter, "export %s\n", e)
+		}
+		fmt.Fprintf(extraWriter, "\n$ %s\n", cmd.String())
+
+		defer fmt.Fprintf(extraWriter, "```\n\n")
+
+		if cmd.Stderr == nil {
+			cmd.Stderr = extraWriter
+		} else {
+			io.MultiWriter(extraWriter, cmd.Stderr)
+		}
+
+		if cmd.Stdout == nil {
+			cmd.Stdout = extraWriter
+		} else {
+			cmd.Stdout = io.MultiWriter(extraWriter, cmd.Stdout)
+		}
+	}
+
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(extraWriter, "\n\n# Got Error: %s\n", err)
+		return err
+	}
+
+	return nil
 }
