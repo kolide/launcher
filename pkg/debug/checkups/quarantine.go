@@ -61,11 +61,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 			continue
 		}
 
-		if err := q.walkDirLimited(extraFh, 0, maxDepth, path, "quarantine"); err != nil {
-			q.summary = fmt.Sprintf("failed to walk %s: %s", path, err)
-			q.status = Failing
-			return nil
-		}
+		q.walkDirLimited(extraFh, 0, maxDepth, path, "quarantine")
 	}
 
 	fmt.Fprintf(extraFh, "%d of %d directories may contain quarantined files\n", len(q.quarantineCounts), q.dirsChecked)
@@ -89,9 +85,9 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	return nil
 }
 
-func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, folderKeyword string) error {
+func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth int, dirPath, folderKeyword string) {
 	if currentDepth > maxDepth {
-		return nil
+		return
 	}
 
 	q.dirsChecked++
@@ -102,7 +98,7 @@ func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth in
 		// have to give terminal FDA?
 		// so just move on instead of failing
 		fmt.Fprintf(extraFh, "failed to read %s: %s\n", dirPath, err)
-		return nil
+		return
 	}
 
 	for _, dirEntry := range dirEntries {
@@ -125,7 +121,7 @@ func (q *quarantine) walkDirLimited(extraFh io.Writer, currentDepth, maxDepth in
 		q.quarantineCounts[dirPath]++
 	}
 
-	return nil
+	return
 }
 
 func (q *quarantine) logMeddlesomeProccesses(ctx context.Context, extraFh io.Writer, containsSubStrings []string) error {

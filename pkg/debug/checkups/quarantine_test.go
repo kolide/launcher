@@ -73,7 +73,7 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 				quarantineCounts: make(map[string]int),
 			}
 			rootPath, expected := tt.pathsFunc(t)
-			require.NoError(t, q.walkDirLimited(io.Discard, 0, tt.maxDepth, rootPath, folderKeyword))
+			q.walkDirLimited(io.Discard, 0, tt.maxDepth, rootPath, folderKeyword)
 			require.EqualValues(t, expected, q.quarantineCounts)
 			require.Equal(t, tt.expectedDirsChecked, q.dirsChecked)
 		})
