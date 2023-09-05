@@ -180,3 +180,33 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 		})
 	}
 }
+
+func Test_usingNewAutoupdater(t *testing.T) {
+	t.Parallel()
+
+	channelsForTest := []struct {
+		channelName        string
+		usesNewAutoupdater bool
+	}{
+		{
+			channelName:        "nightly",
+			usesNewAutoupdater: true,
+		},
+		{
+			channelName:        "alpha",
+			usesNewAutoupdater: true,
+		},
+		{
+			channelName:        "stable",
+			usesNewAutoupdater: false,
+		},
+		{
+			channelName:        "beta",
+			usesNewAutoupdater: false,
+		},
+	}
+
+	for _, channel := range channelsForTest {
+		require.Equal(t, channel.usesNewAutoupdater, usingNewAutoupdater(channel.channelName))
+	}
+}

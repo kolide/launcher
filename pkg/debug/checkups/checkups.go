@@ -108,6 +108,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&powerCheckup{}, flareSupported},
 		{&osqueryCheckup{k: k}, doctorSupported | flareSupported},
 		{&launcherFlags{}, doctorSupported | flareSupported},
+		{&gnomeExtensions{}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
@@ -116,7 +117,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 			continue
 		}
 
-		// Use the absence of a name as a shorthand for not supported. This lets is avoid  platform
+		// Use the absence of a name as a shorthand for not supported. This lets is avoid platform
 		// flavors of this method
 		if p.c.Name() == "" {
 			continue
@@ -233,7 +234,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	if len(warningCheckups) > 0 {
 		fmt.Fprintf(w, "\nCheckups with warnings:\n")
 		for _, n := range warningCheckups {
-			fmt.Fprintf(w, "\t* %s", n)
+			fmt.Fprintf(w, "\t* %s\n", n)
 		}
 		fmt.Fprintf(w, "\n")
 	}
@@ -241,7 +242,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	if len(failingCheckups) > 0 {
 		fmt.Fprintf(w, "\nCheckups with failures:\n")
 		for _, n := range failingCheckups {
-			fmt.Fprintf(w, "\t* %s", n)
+			fmt.Fprintf(w, "\t* %s\n", n)
 		}
 		fmt.Fprintf(w, "\n")
 	}
