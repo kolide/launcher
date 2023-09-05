@@ -720,6 +720,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("PPID=%d", os.Getpid()),
 		fmt.Sprintf("RUNNER_SERVER_URL=%s", r.runnerServer.Url()),
 		fmt.Sprintf("RUNNER_SERVER_AUTH_TOKEN=%s", r.runnerServer.RegisterClient(uid)),
+		fmt.Sprintf("DEBUG=%v", r.knapsack.Debug()),
 	}
 
 	stdErr, err := cmd.StderrPipe()
@@ -737,7 +738,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		scanner := bufio.NewScanner(combined)
 
 		for scanner.Scan() {
-			level.Info(r.logger).Log(
+			level.Debug(r.logger).Log(
 				"uid", uid,
 				"subprocess", "desktop",
 				"msg", scanner.Text(),
