@@ -41,6 +41,13 @@ func parseLine(scanner *bufio.Scanner) (string, string, int) {
 	return formatKey(kv[0]), strings.TrimSpace(kv[1]), nestedDepth
 }
 
+// parseSection works recursively to handle nested sections. There is slight duplication
+// between the outer scanner.Scan() call here and in the main repcliParse function to ensure
+// this would still function as expected with arbitrary levels of nesting while supporting
+// standard sections at the top level.
+// This returns the given results for the section, along with a boolean flag indicating
+// that the previous line should be re-read when the parsing determines we've moved
+// back outside the target depth.
 func parseSection(scanner *bufio.Scanner, currentDepth int) (map[string]any, bool) {
 	results := make(map[string]any)
 	skipScan := false
@@ -84,6 +91,17 @@ func parseSection(scanner *bufio.Scanner, currentDepth int) (map[string]any, boo
 	return results, false
 }
 
+// repcliParse will take a reader containing stdout data from a cli invocation of repcli.
+// We are expecting to parse something like the following into an arbitrarily-nested map[string]any:
+//
+// General Info:
+//
+//	Sensor Version: 2.14.0.1234321
+//	DeviceHash: test6b7v9Xo5bX50okW5KABCD+wHxb/YZeSzrZACKo0=
+//
+// Sensor Status:
+//
+//	State: Enabled
 func repcliParse(reader io.Reader) (any, error) {
 	scanner := bufio.NewScanner(reader)
 	results := make(map[string]any)
