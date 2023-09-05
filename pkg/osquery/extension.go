@@ -53,9 +53,6 @@ type Extension struct {
 
 	osqueryClient Querier
 	initialRunner *initialRunner
-
-	osqueryVerbose      bool
-	osqueryVerboseMutex sync.Mutex
 }
 
 // SetQuerier sets an osquery client on the extension, allowing
@@ -187,15 +184,13 @@ func NewExtension(client service.KolideService, k types.Knapsack, opts Extension
 	}
 
 	return &Extension{
-		logger:              log.With(opts.Logger, "component", "osquery_extension"),
-		serviceClient:       client,
-		knapsack:            k,
-		NodeKey:             nodekey,
-		Opts:                opts,
-		done:                make(chan struct{}),
-		initialRunner:       initialRunner,
-		osqueryVerbose:      false,
-		osqueryVerboseMutex: sync.Mutex{},
+		logger:        log.With(opts.Logger, "component", "osquery_extension"),
+		serviceClient: client,
+		knapsack:      k,
+		NodeKey:       nodekey,
+		Opts:          opts,
+		done:          make(chan struct{}),
+		initialRunner: initialRunner,
 	}, nil
 }
 
@@ -521,26 +516,13 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	// Adjust osqueryVerbose value if needed
-	e.osqueryVerboseMutex.Lock()
-	defer e.osqueryVerboseMutex.Unlock()
-	verboseChanged := false
-	if !reenroll && !e.osqueryVerbose {
-		// On first-time startup, ensure osquery provides verbose logs for troubleshooting purposes.
-		level.Debug(e.logger).Log("msg", "setting osquery logging to verbose for first-time enrollment")
-		e.osqueryVerbose = true
-		verboseChanged = true
-	} else if e.osqueryVerbose {
-		// If osquery has been running successfully, then turn off verbose logs.
-		if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 20 {
-			level.Debug(e.logger).Log("msg", "osquery has been up for more than 20 minutes, turning off verbose logging", "uptime_mins", uptimeMins)
-			e.osqueryVerbose = false
-			verboseChanged = true
-		}
+	// If osquery has been running successfully for 20 minutes, then turn off verbose logs.
+	osqueryVerbose := true
+	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 20 {
+		level.Debug(e.logger).Log("msg", "osquery has been up for more than 20 minutes, turning off verbose logging", "uptime_mins", uptimeMins)
+		osqueryVerbose = false
 	}
-	if verboseChanged {
-		config = e.setVerbose(config)
-	}
+	config = e.setVerbose(config, osqueryVerbose)
 
 	if err := e.initialRunner.Execute(config, e.writeLogsWithReenroll); err != nil {
 		return "", fmt.Errorf("initial run results: %w", err)
@@ -550,7 +532,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 }
 
 // setVerbose modifies the given config to add the `verbose` option.
-func (e *Extension) setVerbose(config string) string {
+func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 	var cfg map[string]any
 
 	if config != "" {
@@ -567,7 +549,7 @@ func (e *Extension) setVerbose(config string) string {
 		opts = make(map[string]any)
 	}
 
-	opts["verbose"] = e.osqueryVerbose
+	opts["verbose"] = osqueryVerbose
 	cfg["options"] = opts
 
 	cfgBytes, err := json.Marshal(cfg)

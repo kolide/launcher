@@ -284,7 +284,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 
 func TestExtensionGenerateConfigsCaching(t *testing.T) {
 
-	configVal := `{"foo": "bar"}`
+	configVal := `{"foo":"bar","options":{"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -345,7 +345,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 
 func TestExtensionGenerateConfigs(t *testing.T) {
 
-	configVal := `{"foo": "bar"}`
+	configVal := `{"foo":"bar","options":{"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -1257,14 +1257,13 @@ func Test_setVerbose(t *testing.T) {
 			t.Parallel()
 
 			e := &Extension{
-				osqueryVerbose: tt.osqueryVerbose,
-				logger:         log.NewNopLogger(),
+				logger: log.NewNopLogger(),
 			}
 
 			cfgBytes, err := json.Marshal(tt.initialConfig)
 			require.NoError(t, err)
 
-			modifiedCfgStr := e.setVerbose(string(cfgBytes))
+			modifiedCfgStr := e.setVerbose(string(cfgBytes), tt.osqueryVerbose)
 
 			var modifiedCfg map[string]any
 			require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
