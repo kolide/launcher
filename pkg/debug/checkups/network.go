@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"os/exec"
 	"runtime"
+	"time"
 )
 
 type networkCheckup struct {
@@ -33,17 +33,34 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		n.summary = "launcher can listen on local network"
 	}
 
+	if extraWriter == io.Discard {
+		return nil
+	}
+
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
 
-	// Gather results of ipconfig/ifconfig for extra writer
-	if err := gatherNetworkConfiguration(ctx, extraZip); err != nil {
-		return fmt.Errorf("gathering networkconfig: %w", err)
+	// This will put all the command stdout into a single commands.md. It's not yet clear if we want to split them up
+	// or combine them
+	commandOutput, err := extraZip.Create("commands.md")
+	if err != nil {
+		return fmt.Errorf("creating zip file: %w", err)
 	}
 
-	// Gather /etc/hosts for posix systems for extra writer
-	if err := gatherEtcHosts(extraZip); err != nil {
-		return fmt.Errorf("gathering /etc/hosts: %w", err)
+	for _, commandArr := range listCommands() {
+		if len(commandArr) < 1 {
+			// how did this happen
+			continue
+		}
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, commandArr[0], commandArr[1:]...)
+		_ = runCmdMarkdownLogged(cmd, commandOutput)
+	}
+
+	for _, fileLocation := range listFiles() {
+		_ = addFileToZip(extraZip, fileLocation)
 	}
 
 	return nil
@@ -65,70 +82,44 @@ func (n *networkCheckup) Data() any {
 	return nil
 }
 
-// gatherNetworkConfiguration runs ifconfig on linux/macos and ipconfig on windows,
-// writing the ouptut to the given zip writer
-func gatherNetworkConfiguration(ctx context.Context, z *zip.Writer) error {
-	var configCommand string
-	var configArgs []string
+func listCommands() [][]string {
 	switch runtime.GOOS {
-	case "darwin", "linux":
-		configCommand = "ifconfig"
-		configArgs = []string{"-a"}
+	case "darwin":
+		return [][]string{
+			{"ifconfig", "-a"},
+			{"netstat", "-nr"},
+		}
+	case "linux":
+		return [][]string{
+			{"ifconfig", "-a"},
+			{"ip", "-N", "-d", "-h", "-a", "address"},
+			{"ip", "-N", "-d", "-h", "-a", "route"},
+		}
 	case "windows":
-		configCommand = "ipconfig"
-		configArgs = []string{"/all"}
+		return [][]string{
+			{"ipconfig", "/all"},
+		}
 	default:
-		return fmt.Errorf("not supported for %s", runtime.GOOS)
-	}
-
-	if _, err := exec.LookPath(configCommand); err != nil {
-		// Not installed, nothing we can do here
 		return nil
 	}
-
-	cmd := exec.CommandContext(ctx, configCommand, configArgs...)
-	cmdOutput, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("running command %s %v: %w", configCommand, configArgs, err)
-	}
-
-	out, err := z.Create("networkconfig")
-	if err != nil {
-		return fmt.Errorf("creating networkconfig: %w", err)
-	}
-
-	if _, err := out.Write(cmdOutput); err != nil {
-		return fmt.Errorf("writing network config: %w", err)
-	}
-
-	return nil
 }
 
-// gatherEtcHosts returns the contents of the /etc/hosts file on posix systems
-func gatherEtcHosts(z *zip.Writer) error {
-	if runtime.GOOS == "windows" {
+func listFiles() []string {
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{
+			"/etc/hosts",
+			"/etc/resolv.conf",
+		}
+	case "linux":
+		return []string{
+			"/etc/nsswitch.conf",
+			"/etc/hosts",
+			"/etc/resolv.conf",
+		}
+	case "windows":
+		return []string{}
+	default:
 		return nil
 	}
-
-	out, err := z.Create("etchosts")
-	if err != nil {
-		return fmt.Errorf("creating etc hosts: %w", err)
-	}
-
-	etcHostsFile, err := os.Open("/etc/hosts")
-	if err != nil {
-		return fmt.Errorf("opening /etc/hosts: %w", err)
-	}
-	defer etcHostsFile.Close()
-
-	etcHostsRaw, err := io.ReadAll(etcHostsFile)
-	if err != nil {
-		return fmt.Errorf("reading /etc/hosts: %w", err)
-	}
-
-	if _, err := out.Write(etcHostsRaw); err != nil {
-		return fmt.Errorf("writing /etc/hosts contents to zip: %w", err)
-	}
-
-	return nil
 }

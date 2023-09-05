@@ -89,7 +89,7 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 // as its version.
 func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
-	if _, ok := channelsUsingLegacyAutoupdate[channel]; ok {
+	if !usingNewAutoupdater(channel) {
 		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
 	}
 
@@ -107,6 +107,11 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
 	return mostRecentVersion(binary, updateDirectory)
+}
+
+func usingNewAutoupdater(channel string) bool {
+	_, ok := channelsUsingLegacyAutoupdate[channel]
+	return !ok
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our

@@ -121,6 +121,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
 
+			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
+				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
+				// to be starting a process.
+				mockKnapsack.On("Debug").Return(true)
+			}
+
 			r, err := New(
 				mockKnapsack,
 				WithLogger(log.NewLogfmtLogger(&logBytes)),
