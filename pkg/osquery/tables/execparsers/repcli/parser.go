@@ -12,64 +12,6 @@ import (
 	"unicode"
 )
 
-func NewStatusTemplate() map[string]map[string]any {
-	return map[string]map[string]interface{}{
-		"general_info": {
-			"devicehash":         "",
-			"deviceid":           "",
-			"quarantine":         "",
-			"sensor_version":     "",
-			"sensor_restarts":    "",
-			"kernel_type":        "",
-			"system_extension":   "",
-			"kernel_file_filter": "",
-			"background_scan":    "",
-			"last_reset":         "",
-			"fips_mode":          "",
-		},
-		"full_disk_access_configurations": {
-			"repmgr":           "",
-			"system_extension": "",
-			"osquery":          "",
-			"uninstall_helper": "",
-			"uninstall_ui":     "",
-		},
-		"sensor_status": {
-			"status":                      "",
-			"details":                     make(map[string][]string, 0),
-			"svcstable":                   "",
-			"boot_count":                  "",
-			"first_boot_after_os_upgrade": "",
-			"service_uptime":              "",
-			"service_waketime":            "",
-		},
-		"cloud_status": {
-			"registered":         "",
-			"server_address":     "",
-			"next_check-in":      "",
-			"private_logging":    "",
-			"next_cloud_upgrade": "",
-			"mdm_device_id":      "",
-			"platform_type":      "",
-			"proxy":              "",
-		},
-		"proxy_settings": {
-			"proxy_configured": "",
-		},
-		"enforcement_status": {
-			"execution_blocks":     "",
-			"network_restrictions": "",
-		},
-		"rules_status": {
-			"policy_name":               "",
-			"policy_timestamp":          "",
-			"endpoint_standard_product": "",
-			"enterprise_edr_product":    "",
-			"active_policies":           make(map[string]string, 0),
-		},
-	}
-}
-
 // formatKey prepares raw (potentially multi-word) key values by:
 // - stripping all surrounding whitespace
 // - coercing the entire string to lowercase
@@ -77,94 +19,92 @@ func NewStatusTemplate() map[string]map[string]any {
 func formatKey(key string) string {
 	processed := strings.TrimSpace(strings.ToLower(key))
 	words := strings.Fields(processed)
-	// State and Status are used interchangeably in section headers
-	// across device types, so we coerce all to status here
-	for idx, word := range words {
-		if word == "state" {
-			words[idx] = "status"
-		}
-	}
-
 	return strings.Join(words, "_")
 }
 
-func repcliParse(reader io.Reader) (any, error) {
-	results := NewStatusTemplate()
-	var sectionHeaders []string
-	nestedLevel := 0
+// parseLine reads the next line from a scanner and attempts to
+// pull out the key, value, and key depth (level of nesting).
+// an empty key-value pair is returned if the line is malformed
+func parseLine(scanner *bufio.Scanner) (string, string, int) {
+	line := scanner.Text()
+	if len(line) == 0 {
+		return "", "", 0 // blank lines are not expected or meaningful
+	}
 
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		rawLine := scanner.Text()
-		if len(rawLine) == 0 {
-			continue // blank lines are not expected or meaningful
+	kv := strings.SplitN(line, ":", 2)
+	if len(kv) < 2 {
+		return "", "", 0 // lines without a colon are not expected or meaningful
+	}
+
+	nestedDepth := len(kv[0]) - len(strings.TrimLeftFunc(kv[0], unicode.IsSpace))
+
+	return formatKey(kv[0]), strings.TrimSpace(kv[1]), nestedDepth
+}
+
+func parseSection(scanner *bufio.Scanner, currentDepth int) (map[string]any, bool) {
+	results := make(map[string]any)
+	skipScan := false
+	for skipScan || scanner.Scan() {
+		skipScan = false // always reset here because we'll have completed the skip
+		key, value, nextDepth := parseLine(scanner)
+
+		if key == "" {
+			continue
 		}
 
-		kv := strings.SplitN(rawLine, ":", 2)
-		if len(kv) < 2 {
-			continue // lines without a colon are not expected or meaningful
-		}
-
-		formattedKey := formatKey(kv[0])
-		formattedValue := strings.TrimSpace(kv[1])
-		isSectionHeader := len(formattedValue) == 0
-		// a nested section header has left padding and no associated value
-		currentNestedLevel := len(kv[0]) - len(strings.TrimLeftFunc(kv[0], unicode.IsSpace))
-		if isSectionHeader && currentNestedLevel <= 0 {
-			// reset key paths for any new, top-level header
-			sectionHeaders = []string{}
+		isSectionHeader := len(value) == 0
+		if nextDepth <= currentDepth {
+			// we must pass skipScan here because we'll need to re-read this line on the next pass
+			return results, true
 		}
 
 		if isSectionHeader {
-			nestedLevel = currentNestedLevel
-			sectionHeaders = append(sectionHeaders, formattedKey)
+			results[key], skipScan = parseSection(scanner, nextDepth)
 			continue
 		}
-		// from this point forward we expect that we're working with a
-		// line containing a full key-value pair. the following logic
-		// supports up to 2 levels of nesting
-		if len(sectionHeaders) > 2 || len(sectionHeaders) < 1 {
-			continue // log?
-		}
 
-		// if this is the case then we're leaving a nested section (and should
-		// re-enter the parent section instead)
-		if currentNestedLevel < nestedLevel && len(sectionHeaders) > 1 {
-			sectionHeaders = sectionHeaders[0 : len(sectionHeaders)-1]
-		}
-
-		if _, ok := results[sectionHeaders[0]]; !ok {
-			continue // we don't handle this section
-		}
-
-		if len(sectionHeaders) == 1 {
-			if _, ok := results[sectionHeaders[0]][formattedKey]; !ok {
-				continue // we don't handle this key
+		// handle any cases where there is already a value set for key
+		if existingValue, ok := results[key]; ok {
+			switch existingValue.(type) {
+			case []string:
+				results[key] = append(results[key].([]string), value)
+			case string:
+				results[key] = []string{results[key].(string), value}
+			default:
+				// if additional nested types are supported they should be added to the switch here
+				continue
 			}
 
-			results[sectionHeaders[0]][formattedKey] = formattedValue
 			continue
 		}
 
-		if _, ok := results[sectionHeaders[0]][sectionHeaders[1]]; !ok {
+		results[key] = value
+	}
+
+	return results, false
+}
+
+func repcliParse(reader io.Reader) (any, error) {
+	scanner := bufio.NewScanner(reader)
+	results := make(map[string]any)
+	skipScan := false
+	var section map[string]any
+	for skipScan || scanner.Scan() {
+		skipScan = false
+		key, value, nextDepth := parseLine(scanner)
+
+		if key == "" {
 			continue
 		}
 
-		switch results[sectionHeaders[0]][sectionHeaders[1]].(type) {
-		case map[string][]string:
-			if coerced, ok := results[sectionHeaders[0]][sectionHeaders[1]].(map[string][]string); ok {
-				coerced[formattedKey] = append(coerced[formattedKey], formattedValue)
-			}
-		case map[string]string:
-			if coerced, ok := results[sectionHeaders[0]][sectionHeaders[1]].(map[string]string); ok {
-				coerced[formattedKey] = formattedValue
-			}
-		default:
-			// if additional nested types are supported they should be added to the switch here
+		// we don't currently expect but would support any top-level key-value pairs
+		if value != "" {
+			results[key] = value
 			continue
 		}
 
-		nestedLevel = currentNestedLevel
+		section, skipScan = parseSection(scanner, nextDepth)
+		results[key] = section
 	}
 
 	return results, nil

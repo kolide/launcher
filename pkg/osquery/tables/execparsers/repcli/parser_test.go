@@ -20,150 +20,149 @@ func TestParse(t *testing.T) {
 	var tests = []struct {
 		name     string
 		input    []byte
-		expected map[string]map[string]any
+		expected map[string]any
 	}{
 		{
 			name:     "empty input",
-			expected: NewStatusTemplate(),
+			expected: map[string]interface{}{},
 		},
 		{
-			name:     "malformed input",
-			input:    []byte("\n\nGeneral Info:\n\nGarbage: values\nmissing colons\ndouble colon values:: oh my\n\n"),
-			expected: NewStatusTemplate(),
+			name:  "unexpected format input",
+			input: []byte("\n\nEmpty Top Level:\n\n\nTest: topLevelValue\nNested:\n\tSub: Section\nSkipped line without colons\n\n"),
+			expected: map[string]interface{}{
+				"empty_top_level": map[string]interface{}{},
+				"nested": map[string]interface{}{
+					"sub": "Section",
+				},
+				"test": "topLevelValue",
+			},
 		},
 		{
 			name:  "repcli linux status",
 			input: repcli_linux_status,
-			expected: map[string]map[string]interface{}{
-				"general_info": {
-					"devicehash":         "test6b7v9Xo5bX50okW5KABCD+wHxb/YZeSzrZACKo0=",
-					"deviceid":           "123453928",
-					"quarantine":         "No",
-					"sensor_version":     "2.14.0.1234321",
-					"sensor_restarts":    "",
-					"kernel_type":        "",
-					"system_extension":   "",
-					"kernel_file_filter": "",
-					"background_scan":    "",
-					"last_reset":         "",
-					"fips_mode":          "",
+			expected: map[string]interface{}{
+				"cloud_status": map[string]interface{}{
+					"proxy":          "No",
+					"registered":     "Yes",
+					"server_address": "https://dev-prod06.example.com",
 				},
-				"full_disk_access_configurations": {
-					"repmgr":           "",
-					"system_extension": "",
-					"osquery":          "",
-					"uninstall_helper": "",
-					"uninstall_ui":     "",
+				"general_info": map[string]interface{}{
+					"devicehash":     "test6b7v9Xo5bX50okW5KABCD+wHxb/YZeSzrZACKo0=",
+					"deviceid":       "123453928",
+					"quarantine":     "No",
+					"sensor_version": "2.14.0.1234321",
 				},
-				"sensor_status": {
-					"status": "Enabled",
-					"details": map[string][]string{
-						"liveresponse": {
+				"rules_status": map[string]interface{}{
+					"policy_name":      "LinuxDefaultPolicy",
+					"policy_timestamp": "02/20/2023",
+				},
+				"sensor_status": map[string]interface{}{
+					"details": map[string]interface{}{
+						"liveresponse": []string{
 							"NoSession",
 							"Enabled",
 							"NoKillSwitch",
 						},
 					},
-					"svcstable":                   "",
-					"boot_count":                  "",
-					"first_boot_after_os_upgrade": "",
-					"service_uptime":              "",
-					"service_waketime":            "",
-				},
-				"cloud_status": {
-					"registered":         "Yes",
-					"server_address":     "https://dev-prod06.example.com",
-					"next_check-in":      "",
-					"private_logging":    "",
-					"next_cloud_upgrade": "",
-					"mdm_device_id":      "",
-					"platform_type":      "",
-					"proxy":              "No",
-				},
-				"proxy_settings": {
-					"proxy_configured": "",
-				},
-				"enforcement_status": {
-					"execution_blocks":     "",
-					"network_restrictions": "",
-				},
-				"rules_status": {
-					"policy_name":               "LinuxDefaultPolicy",
-					"policy_timestamp":          "02/20/2023",
-					"endpoint_standard_product": "",
-					"enterprise_edr_product":    "",
-					"active_policies":           make(map[string]string, 0),
+					"state": "Enabled",
 				},
 			},
 		},
 		{
 			name:  "repcli mac status",
 			input: repcli_mac_status,
-			expected: map[string]map[string]interface{}{
-				"general_info": {
-					"devicehash":         "",
-					"deviceid":           "",
-					"quarantine":         "",
-					"sensor_version":     "3.7.2.81",
-					"sensor_restarts":    "1911",
-					"kernel_type":        "System Extension",
-					"system_extension":   "Running",
-					"kernel_file_filter": "Connected",
-					"background_scan":    "Complete",
-					"last_reset":         "not set",
-					"fips_mode":          "Disabled",
+			expected: map[string]interface{}{
+				"cloud_status": map[string]interface{}{
+					"mdm_device_id":      "9FCF04E4-4C8C-45A0-B3EA-053672776382",
+					"next_check-in":      "Now",
+					"next_cloud_upgrade": "None",
+					"platform_type":      "CLIENT_ARM64",
+					"private_logging":    "Disabled",
+					"registered":         "Yes",
+					"server_address":     "https://dev-prod05.example.com",
 				},
-				"full_disk_access_configurations": {
+				"enforcement_status": map[string]interface{}{
+					"execution_blocks":     "0",
+					"network_restrictions": "0",
+				},
+				"full_disk_access_configurations": map[string]interface{}{
+					"osquery":          "Unknown",
 					"repmgr":           "Not Configured",
 					"system_extension": "Unknown",
-					"osquery":          "Unknown",
 					"uninstall_helper": "Unknown",
 					"uninstall_ui":     "Unknown",
 				},
-				"sensor_status": {
-					"status": "Enabled",
-					"details": map[string][]string{
-						"liveresponse": {
+				"general_info": map[string]interface{}{
+					"background_scan":    "Complete",
+					"fips_mode":          "Disabled",
+					"kernel_file_filter": "Connected",
+					"kernel_type":        "System Extension",
+					"last_reset":         "not set",
+					"sensor_restarts":    "1911",
+					"sensor_version":     "3.7.2.81",
+					"system_extension":   "Running",
+				},
+				"proxy_settings": map[string]interface{}{
+					"proxy_configured": "No",
+				},
+				"queues": map[string]interface{}{
+					"livequeries": map[string]interface{}{
+						"completed":   "0",
+						"outstanding": "0",
+						"peak":        "2",
+					},
+					"pscevents_batch_upload": map[string]interface{}{
+						"failed":               "0",
+						"mean_data_rate_(b/s)": "7583",
+						"pending":              "0",
+						"uploaded":             "1727",
+					},
+					"reputation_expedited": map[string]interface{}{
+						"last_completed_id": "50",
+						"last_queue_id":     "50",
+						"max_outstanding":   "2",
+						"outstanding":       "0",
+						"total_queued":      "50",
+					},
+					"reputation_resubmit": map[string]interface{}{
+						"max_outstanding": "0",
+						"outstanding":     "0",
+						"total_queued":    "0",
+					},
+					"reputation_slow": map[string]interface{}{
+						"demand":   "0",
+						"ready":    "128",
+						"resubmit": "0",
+						"stale":    "715",
+					},
+				},
+				"rules_status": map[string]interface{}{
+					"active_policies": map[string]interface{}{
+						"dc_allow_external_devices_revision[1]":         "Enabled(Manifest)",
+						"device_control_reporting_policy_revision[5]":   "Enabled(Manifest)",
+						"eedr_reporting_revision[18]":                   "Enabled(Manifest)",
+						"sensor_telemetry_reporting_policy_revision[3]": "Enabled(Built-in)",
+					},
+					"endpoint_standard_product": "Enabled",
+					"enterprise_edr_product":    "Enabled",
+					"policy_name":               "Workstations",
+					"policy_timestamp":          "08/22/2023 15:19:53",
+				},
+				"sensor_state": map[string]interface{}{
+					"boot_count": "103",
+					"details": map[string]interface{}{
+						"fulldiskaccess": "NotEnabled",
+						"liveresponse": []string{
 							"NoSession",
 							"NoKillSwitch",
 							"Enabled",
 						},
-						"fulldiskaccess": {"NotEnabled"},
 					},
-					"svcstable":                   "Yes",
-					"boot_count":                  "103",
 					"first_boot_after_os_upgrade": "No",
 					"service_uptime":              "155110500 ms",
 					"service_waketime":            "37860000 ms",
-				},
-				"cloud_status": {
-					"registered":         "Yes",
-					"server_address":     "https://dev-prod05.example.com",
-					"next_check-in":      "Now",
-					"private_logging":    "Disabled",
-					"next_cloud_upgrade": "None",
-					"mdm_device_id":      "9FCF04E4-4C8C-45A0-B3EA-053672776382",
-					"platform_type":      "CLIENT_ARM64",
-					"proxy":              "",
-				},
-				"proxy_settings": {
-					"proxy_configured": "No",
-				},
-				"enforcement_status": {
-					"execution_blocks":     "0",
-					"network_restrictions": "0",
-				},
-				"rules_status": {
-					"policy_name":               "Workstations",
-					"policy_timestamp":          "08/22/2023 15:19:53",
-					"endpoint_standard_product": "Enabled",
-					"enterprise_edr_product":    "Enabled",
-					"active_policies": map[string]string{
-						"sensor_telemetry_reporting_policy_revision[3]": "Enabled(Built-in)",
-						"eedr_reporting_revision[18]":                   "Enabled(Manifest)",
-						"device_control_reporting_policy_revision[5]":   "Enabled(Manifest)",
-						"dc_allow_external_devices_revision[1]":         "Enabled(Manifest)",
-					},
+					"state":                       "Enabled",
+					"svcstable":                   "Yes",
 				},
 			},
 		},
