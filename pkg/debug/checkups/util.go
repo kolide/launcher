@@ -67,7 +67,7 @@ func addFileToZip(z *zip.Writer, location string) error {
 	})
 	if err != nil {
 		// Structural error. Abort
-		return fmt.Errorf("marhsaling json: %w", err)
+		return fmt.Errorf("marshalling json: %w", err)
 	}
 
 	var buf bytes.Buffer
