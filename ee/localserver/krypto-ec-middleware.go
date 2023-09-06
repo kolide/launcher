@@ -29,8 +29,32 @@ const (
 )
 
 type v2CmdRequestType struct {
-	Path string
-	Body []byte
+	Path            string
+	Body            []byte
+	CallbackUrl     string
+	CallbackHeaders map[string][]string
+}
+
+func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
+	if cmdReq.CallbackUrl == "" {
+		return nil, nil
+	}
+
+	req, err := http.NewRequest(http.MethodPost, cmdReq.CallbackUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("making http request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Iterate and deep copy
+	for h, vals := range cmdReq.CallbackHeaders {
+		for _, v := range vals {
+			req.Header.Add(h, v)
+		}
+	}
+
+	return req, nil
 }
 
 type kryptoEcMiddleware struct {
@@ -46,6 +70,58 @@ func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner cryp
 		counterParty:   counterParty,
 		logger:         log.With(logger, "keytype", "ec"),
 	}
+}
+
+// Because callback errors are effectively a shared API with K2, let's define them as a constant and not just
+// random strings
+type callbackErrors string
+
+const (
+	timeOutOfRangeErr  callbackErrors = "time-out-of-range"
+	responseFailureErr callbackErrors = "response-failure"
+)
+
+type callbackDataStruct struct {
+	Time      int64
+	Error     callbackErrors
+	Response  string // expected base64 encoded krypto box
+	UserAgent string
+}
+
+// sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
+// the signed data, and the response is encrypted, this is reasonably secure.
+//
+// Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
+// around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
+//
+// Note that this should be a goroutine.
+func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataStruct) {
+	if req == nil {
+		return
+	}
+	b, err := json.Marshal(data)
+	if err != nil {
+		level.Debug(e.logger).Log("msg", "unable to marshal callback data", "err", err)
+	}
+
+	req.Body = io.NopCloser(bytes.NewReader(b))
+
+	// TODO: This feels like it would be cleaner if we passed in an http client at initialzation time
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		level.Debug(e.logger).Log("msg", "got error in callback", "err", err)
+		return
+	}
+
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
+
+	level.Debug(e.logger).Log("msg", "Finished callback", "response-status", resp.Status)
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
@@ -72,6 +148,27 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		// Unmarshal the response _before_ checking the timestamp. This lets us grab the signed callback url to communicate
+		// timestamp issues.
+		var cmdReq v2CmdRequestType
+		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
+			traces.SetError(span, err)
+			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Setup callback URLs and data. This is a pointer, so it can be adjusted before the defer triggers
+		callbackData := &callbackDataStruct{
+			Time:      time.Now().Unix(),
+			UserAgent: r.Header.Get("User-Agent"),
+		}
+		if callbackReq, err := cmdReq.CallbackReq(); err != nil {
+			level.Debug(e.logger).Log("msg", "unable to create callback req", "err", err)
+		} else if callbackReq != nil {
+			defer func() { go e.sendCallback(callbackReq, callbackData) }()
+		}
+
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
@@ -81,14 +178,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 			level.Debug(e.logger).Log("msg", "timestamp is out of range", "delta", timestampDelta)
 			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		var cmdReq v2CmdRequestType
-		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
-			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
-			w.WriteHeader(http.StatusUnauthorized)
+			callbackData.Error = timeOutOfRangeErr
 			return
 		}
 
@@ -128,8 +218,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			traces.SetError(span, err)
 			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
+			callbackData.Error = responseFailureErr
 			return
 		}
+
+		// because the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
+		// it to a string, which has an implicit copy
+		callbackData.Response = base64.StdEncoding.EncodeToString(response)
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
