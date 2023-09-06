@@ -94,17 +94,19 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 	}
 
 	stagedUpdatePath, err := ulm.stageAndVerifyUpdate(binary, targetFilename, targetMetadata)
-	if err != nil {
-		return fmt.Errorf("could not stage update: %w", err)
-	}
-
 	// Remove downloaded archives after update, regardless of success -- this will run before the unlock
 	defer func() {
+		if stagedUpdatePath == "" {
+			return
+		}
 		dirToRemove := filepath.Dir(stagedUpdatePath)
 		if err := os.RemoveAll(dirToRemove); err != nil {
 			level.Debug(ulm.logger).Log("msg", "could not remove temp staging directory", "err", err, "directory", dirToRemove)
 		}
 	}()
+	if err != nil {
+		return fmt.Errorf("could not stage update: %w", err)
+	}
 
 	if err := ulm.moveVerifiedUpdate(binary, targetFilename, stagedUpdatePath); err != nil {
 		return fmt.Errorf("could not move verified update: %w", err)
