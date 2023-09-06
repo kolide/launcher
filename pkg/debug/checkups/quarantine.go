@@ -6,10 +6,23 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/shirou/gopsutil/v3/process"
 )
+
+// quarantine:
+// Recursively scans common installation directories to to a given depth.
+// Reports and directories that have the word "quarantine" in their path and the number of files they contain.
+// Fails if any files are found in the above directories.
+// Reports possible "meddlesome" processes for information purposes (does not fail due to proccesses running)
+
+// It's difficult to keep track of every possible Anti-Virus or EDRs quarantine directory, but they all seem
+// to have "quarantine" in their name. So we just look for that some where in the dir path. The suspicion
+// is that some programs will quarantine osquery. Unfortunalty, we typically can't see the names of the files
+// that were quarantined. So if we do find quarantined files, we'll fail and would ask the user to check and
+// see if osquery was quarantined.
 
 type quarantine struct {
 	status           Status
@@ -22,17 +35,35 @@ func (q *quarantine) Name() string {
 	return "Quarantine"
 }
 
+func (q *quarantine) searchPathDepths() map[string]int {
+	switch runtime.GOOS {
+	case "windows":
+		return map[string]int{
+			// Crowdstrike: C:\Windows\System32\Drivers\CrowdStrike\Quarantine
+			`C:\Windows\System32\Drivers`: 3,
+			// Malwarebytes: C:\ProgramData\Malwarebytes\MBAMService\Quarantine
+			// Windows Defender: C:\ProgramData\Microsoft\Windows Defender\Quarantine
+			`C:\ProgramData`: 3,
+		}
+	case "darwin":
+		return map[string]int{
+			// Crowdstrike: /Library/Application Support/CrowdStrike/Falcon/Quarantine
+			`/Library/Application Support`: 4,
+		}
+	case "linux":
+		return map[string]int{
+			// Malwarebytes: /var/lib/mblinux/quarantine
+			`/var/lib`: 3,
+		}
+	default:
+		return make(map[string]int)
+	}
+}
+
 func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.quarantineCounts = make(map[string]int)
 
 	var (
-		quarantinePathDepths = map[string]int{
-			`C:\Windows\System32\Drivers`: 3,
-			`C:\ProgramData`:              3,
-
-			`/Library/Application Support`: 4,
-		}
-
 		meddlesomeProcessPatterns = []string{
 			`crowdstrike`,
 			`opswat`,
@@ -49,7 +80,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.logMeddlesomeProccesses(ctx, extraFh, meddlesomeProcessPatterns)
 	fmt.Fprintf(extraFh, "\nsearching for quarantined files:\n")
 
-	for path, maxDepth := range quarantinePathDepths {
+	for path, maxDepth := range q.searchPathDepths() {
 		fileInfo, err := os.Stat(path)
 		if err != nil {
 			fmt.Fprintf(extraFh, "%s does not exist\n", path)
@@ -132,12 +163,14 @@ func (q *quarantine) checkDirs(extraFh io.Writer, currentDepth, maxDepth int, di
 			continue
 		}
 
+		// typically AVs will rename the file to a guid and store meta data some where
+		// so just log the file count
 		q.quarantineCounts[dirPath]++
 	}
 }
 
 func (q *quarantine) logMeddlesomeProccesses(ctx context.Context, extraFh io.Writer, containsSubStrings []string) error {
-	fmt.Fprint(extraFh, "\npossilby meddlesome proccesses:\n")
+	fmt.Fprint(extraFh, "\npossilby meddlesome processes:\n")
 	foundMeddlesomeProcesses := false
 
 	ps, err := process.ProcessesWithContext(ctx)
