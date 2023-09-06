@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
+func Test_quarantine_checkDirs(t *testing.T) {
 	t.Parallel()
 
 	const folderKeyword = "quarantine_checkup_test"
