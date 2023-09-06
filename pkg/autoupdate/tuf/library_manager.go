@@ -12,12 +12,12 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
@@ -116,7 +116,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
 func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
-	stagingDir, err := agent.MkdirTemp(fmt.Sprintf("staged-updates-%s", versionFromTarget(binary, targetFilename)))
+	stagingDir, err := ulm.tempDir(binary, fmt.Sprintf("staged-updates-%s", versionFromTarget(binary, targetFilename)))
 	if err != nil {
 		return "", fmt.Errorf("could not create temporary directory for downloading target: %w", err)
 	}
@@ -161,11 +161,22 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	return stagedUpdatePath, nil
 }
 
+// tempDir creates a directory inside of the updates directory. It is the caller's responsibility to remove
+// the directory when it is no longer needed.
+func (ulm *updateLibraryManager) tempDir(binary autoupdatableBinary, pattern string) (string, error) {
+	directory := filepath.Join(updatesDirectory(binary, ulm.baseDir), fmt.Sprintf("%s-%d", pattern, time.Now().UnixMicro()))
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return "", fmt.Errorf("making dir %s: %w", directory, err)
+	}
+
+	return directory, nil
+}
+
 // moveVerifiedUpdate untars the update and performs final checks to make sure that it's a valid, working update.
 // Finally, it moves the update to its correct versioned location in the update library for the given binary.
 func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, targetFilename string, stagedUpdate string) error {
 	targetVersion := versionFromTarget(binary, targetFilename)
-	stagedVersionedDirectory, err := agent.MkdirTemp(targetVersion)
+	stagedVersionedDirectory, err := ulm.tempDir(binary, targetVersion)
 	if err != nil {
 		return fmt.Errorf("could not create temporary directory for untarring and validating new update: %w", err)
 	}
