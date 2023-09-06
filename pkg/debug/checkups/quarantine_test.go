@@ -17,13 +17,13 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 	tests := []struct {
 		name                string
 		shouldPass          bool
-		pathsFunc           func(t *testing.T) (string, map[string]int)
+		pathsFunc           func(t *testing.T) (string, map[string][]string)
 		maxDepth            int
 		expectedDirsChecked int
 	}{
 		{
 			name: "found quarantined files",
-			pathsFunc: func(t *testing.T) (string, map[string]int) {
+			pathsFunc: func(t *testing.T) (string, map[string][]string) {
 				dir := t.TempDir()
 
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "1", folderKeyword, "2", "3", "4"), 0755))
@@ -31,11 +31,11 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", folderKeyword, "anotherFile"), nil, 0755))
 
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", folderKeyword, "2", "3", "yetAnotherFile"), nil, 0755))
-				return dir, map[string]int{
-					filepath.Join(dir, "1", folderKeyword):                2,
-					filepath.Join(dir, "1", folderKeyword, "2"):           0,
-					filepath.Join(dir, "1", folderKeyword, "2", "3"):      1,
-					filepath.Join(dir, "1", folderKeyword, "2", "3", "4"): 0,
+				return dir, map[string][]string{
+					filepath.Join(dir, "1", folderKeyword):                {"someFile", "anotherFile"},
+					filepath.Join(dir, "1", folderKeyword, "2"):           {},
+					filepath.Join(dir, "1", folderKeyword, "2", "3"):      {"yetAnotherFile"},
+					filepath.Join(dir, "1", folderKeyword, "2", "3", "4"): {},
 				}
 			},
 			maxDepth:            10,
@@ -43,24 +43,24 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 		},
 		{
 			name: "doesnt exceed max depth",
-			pathsFunc: func(t *testing.T) (string, map[string]int) {
+			pathsFunc: func(t *testing.T) (string, map[string][]string) {
 				dir := t.TempDir()
 
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "1", "2", folderKeyword), 0755))
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "not in special folder"), nil, 0755))
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "2", folderKeyword, "somefile"), nil, 0755))
-				return dir, map[string]int{}
+				return dir, map[string][]string{}
 			},
 			maxDepth:            2,
 			expectedDirsChecked: 3,
 		},
 		{
 			name: "no notable files",
-			pathsFunc: func(t *testing.T) (string, map[string]int) {
+			pathsFunc: func(t *testing.T) (string, map[string][]string) {
 				dir := t.TempDir()
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "1", "2", "3"), 0755))
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "2", "dont care"), nil, 0755))
-				return dir, map[string]int{}
+				return dir, map[string][]string{}
 			},
 			maxDepth:            10,
 			expectedDirsChecked: 4,
@@ -72,12 +72,16 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			q := quarantine{
-				quarantineCounts: make(map[string]int),
+				quarantineDirPathFilenames: make(map[string][]string),
 			}
 			rootPath, expected := tt.pathsFunc(t)
 			q.checkDirs(io.Discard, 0, tt.maxDepth, rootPath, folderKeyword)
-			require.EqualValues(t, expected, q.quarantineCounts)
-			require.Equal(t, tt.expectedDirsChecked, q.dirsChecked)
+
+			for path, files := range expected {
+				val, ok := q.quarantineDirPathFilenames[path]
+				require.True(t, ok, "path should be present in quarantine")
+				require.ElementsMatch(t, files, val)
+			}
 		})
 	}
 }

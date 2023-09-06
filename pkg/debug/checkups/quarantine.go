@@ -14,7 +14,7 @@ import (
 
 // quarantine:
 // Recursively scans common installation directories to to a given depth.
-// Reports and directories that have the word "quarantine" in their path and the number of files they contain.
+// Reports and directories that have the word "quarantine" in their path and the number of files and their names they contain.
 // Fails if any files are found in the above directories.
 // Reports possible "meddlesome" processes for information purposes (does not fail due to proccesses running)
 
@@ -25,10 +25,10 @@ import (
 // see if osquery was quarantined.
 
 type quarantine struct {
-	status           Status
-	summary          string
-	quarantineCounts map[string]int
-	dirsChecked      int
+	status                     Status
+	summary                    string
+	quarantineDirPathFilenames map[string][]string
+	dirsChecked                int
 }
 
 func (q *quarantine) Name() string {
@@ -61,7 +61,7 @@ func (q *quarantine) searchPathDepths() map[string]int {
 }
 
 func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
-	q.quarantineCounts = make(map[string]int)
+	q.quarantineDirPathFilenames = make(map[string][]string)
 
 	var (
 		meddlesomeProcessPatterns = []string{
@@ -97,20 +97,24 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 
 	fmt.Fprintf(extraFh, "total directories checked: %d\n", q.dirsChecked)
 
-	if len(q.quarantineCounts) == 0 {
+	if len(q.quarantineDirPathFilenames) == 0 {
 		q.status = Passing
 		q.summary = "no quarantine directories found"
 		fmt.Fprint(extraFh, "no quarantine directories found\n")
 		return nil
 	}
 
-	fmt.Fprintf(extraFh, "quarantine directory paths and file counts:\n")
+	fmt.Fprintf(extraFh, "quarantine directory paths and files:\n")
 
 	totalQuarantinedFiles := 0
 
-	for path, count := range q.quarantineCounts {
-		fmt.Fprintf(extraFh, "%s: %d\n", path, count)
-		totalQuarantinedFiles += count
+	for path, fileNames := range q.quarantineDirPathFilenames {
+		fmt.Fprintf(extraFh, "%s: %d files\n", path, len(fileNames))
+		totalQuarantinedFiles += len(fileNames)
+
+		for _, fileName := range fileNames {
+			fmt.Fprintf(extraFh, "  %s\n", fileName)
+		}
 	}
 
 	if totalQuarantinedFiles == 0 {
@@ -138,8 +142,8 @@ func (q *quarantine) checkDirs(extraFh io.Writer, currentDepth, maxDepth int, di
 	// add entry for each dir that contains the keyword
 	if dirNameContainsKeyword {
 		// create map entry if not exists
-		if _, ok := q.quarantineCounts[dirPath]; !ok {
-			q.quarantineCounts[dirPath] = 0
+		if _, ok := q.quarantineDirPathFilenames[dirPath]; !ok {
+			q.quarantineDirPathFilenames[dirPath] = make([]string, 0)
 		}
 	}
 
@@ -165,7 +169,7 @@ func (q *quarantine) checkDirs(extraFh io.Writer, currentDepth, maxDepth int, di
 
 		// typically AVs will rename the file to a guid and store meta data some where
 		// so just log the file count
-		q.quarantineCounts[dirPath]++
+		q.quarantineDirPathFilenames[dirPath] = append(q.quarantineDirPathFilenames[dirPath], dirEntry.Name())
 	}
 }
 
