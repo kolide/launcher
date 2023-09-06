@@ -410,7 +410,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
+			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2 + 5*time.Minute,
 			SigChannel:         sigChannel,
 		}
 
@@ -430,7 +430,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay(),
+			InitialDelay:       k.AutoupdateInitialDelay() + 5*time.Minute,
 			SigChannel:         sigChannel,
 		}
 
