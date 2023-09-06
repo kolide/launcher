@@ -32,8 +32,10 @@ func Test_quarantine_checkDirForQuarantinedFiles(t *testing.T) {
 
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "1", folderKeyword, "2", "3", "yetAnotherFile"), nil, 0755))
 				return dir, map[string]int{
-					filepath.Join(dir, "1", folderKeyword):           2,
-					filepath.Join(dir, "1", folderKeyword, "2", "3"): 1,
+					filepath.Join(dir, "1", folderKeyword):                2,
+					filepath.Join(dir, "1", folderKeyword, "2"):           0,
+					filepath.Join(dir, "1", folderKeyword, "2", "3"):      1,
+					filepath.Join(dir, "1", folderKeyword, "2", "3", "4"): 0,
 				}
 			},
 			maxDepth:            10,
