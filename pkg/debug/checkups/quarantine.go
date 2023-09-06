@@ -15,7 +15,7 @@ import (
 // quarantine:
 // Recursively scans common installation directories to to a given depth.
 // Reports and directories that have the word "quarantine" in their path and the number of files and their names they contain.
-// Fails if any files are found in the above directories.
+// Warns if any files are found in the above directories.
 // Reports possible "meddlesome" processes for information purposes (does not fail due to proccesses running)
 
 // It's difficult to keep track of every possible Anti-Virus or EDRs quarantine directory, but they all seem
@@ -73,6 +73,14 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 			`virus`,
 			`quarantine`,
 			`snitch`,
+			// carbon black possible processes
+			`cbagent`,
+			`carbonblack`,
+			`repmgr`,
+			`repwsc`,
+			`cb.exe`,
+			`cbdaemon`,
+			`cbOsxSensorService`,
 		}
 	)
 
@@ -123,7 +131,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 		return nil
 	}
 
-	q.status = Failing
+	q.status = Warning
 	q.summary = fmt.Sprintf("found %d quarantined files", totalQuarantinedFiles)
 	return nil
 }
