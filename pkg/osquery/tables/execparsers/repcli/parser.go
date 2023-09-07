@@ -39,7 +39,7 @@ func formatKey(key string) string {
 	return strings.Join(words, "_")
 }
 
-// parseLine reads the next line from a scanner and attempts to pull out the
+// parseLine reads a line of text and attempts to pull out the
 // key, value, and key depth (level of nesting) into a repcliLine struct.
 // an empty key-value pair is returned if the line is malformed
 func parseLine(line string) *repcliLine {
