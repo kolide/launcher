@@ -4,6 +4,11 @@ package repcli
 // repcli sensor status utility. Some of the output format has
 // changed from the published documentation, as noted here:
 // https://community.carbonblack.com/t5/Knowledge-Base/Endpoint-Standard-How-to-Verify-Sensor-Status-With-RepCLI/ta-p/62524
+//
+// As a general note, there are a few nuances to this output format that make a fully
+// recursive solution difficult to accomplish cleanly.
+// - a key-value line may be nested 3+ times, but be immediately followed by a top level key
+// - some keys may be duplicated within a given section. these values should be represented as an []string
 
 import (
 	"bufio"
@@ -58,6 +63,9 @@ func parseLine(line string) *repcliLine {
 	}
 }
 
+// updatedKeyPaths takes a running array of lines traversed to get to the latest line (newSection).
+// it does so by iterating over currentPaths to determine the correct placement of newSection based on the
+// indent level for each existing section
 func updatedKeyPaths(currentPaths []*repcliLine, newSection *repcliLine) []*repcliLine {
 	updatedPaths := make([]*repcliLine, 0)
 
@@ -85,10 +93,10 @@ func updatedKeyPaths(currentPaths []*repcliLine, newSection *repcliLine) []*repc
 }
 
 // setNestedValue works to recursively dive into the resultMap while traversing the
-// lines provided to set the final (deepest) value
-func setNestedValue(results resultMap, lines []*repcliLine) error {
+// lines provided to set the final (deepest) value.
+func setNestedValue(results resultMap, lines []*repcliLine) resultMap {
 	if len(lines) == 0 {
-		return fmt.Errorf("at least one line is required to set the value")
+		return results
 	}
 
 	key, value := lines[0].key, lines[0].value
@@ -103,10 +111,10 @@ func setNestedValue(results resultMap, lines []*repcliLine) error {
 			results[key] = value
 		default:
 			// if additional nested types are required they should be added above
-			return fmt.Errorf("unknown type %T requested for nested set", knownValue)
+			results[key] = fmt.Sprintf("unknown type %T requested on value %v", knownValue, value)
 		}
 
-		return nil
+		return results
 	}
 
 	_, ok := results[key]
@@ -114,10 +122,17 @@ func setNestedValue(results resultMap, lines []*repcliLine) error {
 		results[key] = make(resultMap, 0)
 	}
 
-	return setNestedValue(results[key].(resultMap), lines[1:])
+	results[key] = setNestedValue(results[key].(resultMap), lines[1:])
+
+	return results
 }
 
 // repcliParse will take a reader containing stdout data from a cli invocation of repcli.
+// The general approach here is as follows:
+// - read in each line of output, breaking it down into key, optional value, and indentation length
+// - update the paths taken to get to this line (see updatedKeyPaths)
+// - if there is a value to set, set it in results using the currentKeyPaths accumulated (see setNestedValue)
+//
 // We are expecting to parse something like the following into an arbitrarily-nested map[string]any:
 // General Info:
 //
@@ -143,9 +158,7 @@ func repcliParse(reader io.Reader) (any, error) {
 			continue
 		}
 
-		if err := setNestedValue(results, currentKeyPaths); err != nil {
-			return nil, err
-		}
+		results = setNestedValue(results, currentKeyPaths)
 	}
 
 	return results, nil
