@@ -143,7 +143,9 @@ func repcliParse(reader io.Reader) (any, error) {
 			continue
 		}
 
-		setNestedValue(results, currentKeyPaths)
+		if err := setNestedValue(results, currentKeyPaths); err != nil {
+			return nil, err
+		}
 	}
 
 	return results, nil
