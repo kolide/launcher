@@ -60,8 +60,9 @@ type checkPointer struct {
 
 func New(logger logger, k types.Knapsack) *checkPointer {
 	return &checkPointer{
-		logger:   log.With(logger, "component", "log checkpoint"),
-		knapsack: k,
+		logger:    log.With(logger, "component", "log checkpoint"),
+		knapsack:  k,
+		interrupt: make(chan struct{}, 1),
 
 		lock:        sync.RWMutex{},
 		queriedInfo: make(map[string]any),
