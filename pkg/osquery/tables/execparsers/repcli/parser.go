@@ -117,8 +117,7 @@ func setNestedValue(results resultMap, lines []*repcliLine) resultMap {
 		return results
 	}
 
-	_, ok := results[key]
-	if !ok {
+	if _, ok := results[key]; !ok {
 		results[key] = make(resultMap, 0)
 	}
 
