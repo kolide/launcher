@@ -11,7 +11,7 @@ import (
 )
 
 // For notifications to work, we must run in the user context with launchctl asuser.
-func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+func SetCmdToExecAsUser(_ context.Context, uid string, cmd *exec.Cmd) error {
 	// Ensure that we handle a non-root current user appropriately
 	currentUser, err := user.Current()
 	if err != nil {
@@ -43,10 +43,6 @@ func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 		// if the user is running for another user, we have an error because we can't set credentials
 		return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
 	}
-
-	// the remaining code in this function is not covered by unit test since it requires root privileges
-	// We may be able to run passwordless sudo in GitHub actions, could possibly exec the tests as sudo.
-	// But we may not have a console user?
 
 	return nil
 }
