@@ -20,7 +20,7 @@ func (st *systemTime) Name() string {
 func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 	var (
 		urls = []string{
-			"https://app.kolide.com/version",
+			"https://k2control.kolide.com/version",
 			"https://developers.google.com/time/",
 			"http://sha256timestamp.ws.symantec.com/",
 		}
