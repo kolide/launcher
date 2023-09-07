@@ -458,6 +458,12 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
+	if runtime.GOOS == "linux" && !IsAppindicatorEnabled(context.Background()) {
+		level.Info(r.logger).Log("msg", "no appindicator not enabled, no running desktop")
+		r.killDesktopProcesses()
+		return nil
+	}
+
 	executablePath, err := r.determineExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining executable path: %w", err)
@@ -791,4 +797,30 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 		// not dir, has prefix
 		return os.Remove(path)
 	})
+}
+
+func IsAppindicatorEnabled(ctx context.Context) bool {
+	var extensions = []string{
+		"ubuntu-appindicators@ubuntu.com",
+		"appindicatorsupport@rgcjonas.gmail.com",
+	}
+
+	for _, extension := range extensions {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "show", extension)
+
+		// gnome seems to do things through this env
+		cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=%s", "/run/user"))
+
+		if out, err := cmd.CombinedOutput(); err != nil || !bytes.Contains(out, []byte("State: ENABLED")) {
+			continue
+		}
+
+		// enabled
+		return true
+	}
+
+	return false
 }
