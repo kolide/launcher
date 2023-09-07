@@ -33,6 +33,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/runas"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -497,7 +498,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := r.runAsUser(ctx, uid, cmd); err != nil {
+		if err := runas.RunAsUser(ctx, uid, cmd); err != nil {
 			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
@@ -802,6 +803,7 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 func IsAppindicatorEnabled(ctx context.Context) bool {
 	var extensions = []string{
 		"ubuntu-appindicators@ubuntu.com",
+		// appindicator that ships with NixOS
 		"appindicatorsupport@rgcjonas.gmail.com",
 	}
 
