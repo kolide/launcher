@@ -110,6 +110,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&launcherFlags{}, doctorSupported | flareSupported},
 		{&gnomeExtensions{}, doctorSupported | flareSupported},
 		{&quarantine{}, doctorSupported | flareSupported},
+		{&systemTime{}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
