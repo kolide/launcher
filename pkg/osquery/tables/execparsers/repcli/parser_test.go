@@ -24,19 +24,30 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			name:     "empty input",
-			expected: map[string]interface{}{},
+			expected: resultMap{},
 		},
 		{
-			name:  "unexpected format input",
-			input: []byte("\n\nEmpty Top Level:\n\n\nTest: topLevelValue\nNested:\n\tSub: Section\n\t\tDouble Sub:\n\t\t\tsecond Level: value\n\t\t\ttriple:\n\t\t\t\tdeepest:value\ndSkipped line without colons\n\n"),
-			expected: map[string]interface{}{
-				"empty_top_level": map[string]interface{}{},
-				"nested": map[string]interface{}{
+			name: "unexpected format input",
+			input: []byte(`
+Test: topLevelValue
+Nested:
+	Sub: Section
+	Double Sub:
+		second Level: value
+		Triple Nested Flag Test:
+			Deepest Flag: deepflag1
+			Deepest Flag: deepflag2
+			Deepest Lone Value: lone Value
+You Should Not See this erroneous L1n3
+			`),
+			expected: resultMap{
+				"nested": resultMap{
 					"sub": "Section",
-					"double_sub": map[string]interface{}{
+					"double_sub": resultMap{
 						"second_level": "value",
-						"triple": map[string]interface{}{
-							"deepest": "value",
+						"triple_nested_flag_test": resultMap{
+							"deepest_flag":       []string{"deepflag1", "deepflag2"},
+							"deepest_lone_value": "lone Value",
 						},
 					},
 				},
@@ -46,24 +57,24 @@ func TestParse(t *testing.T) {
 		{
 			name:  "repcli linux status",
 			input: repcli_linux_status,
-			expected: map[string]interface{}{
-				"cloud_status": map[string]interface{}{
+			expected: resultMap{
+				"cloud_status": resultMap{
 					"proxy":          "No",
 					"registered":     "Yes",
 					"server_address": "https://dev-prod06.example.com",
 				},
-				"general_info": map[string]interface{}{
+				"general_info": resultMap{
 					"devicehash":     "test6b7v9Xo5bX50okW5KABCD+wHxb/YZeSzrZACKo0=",
 					"deviceid":       "123453928",
 					"quarantine":     "No",
 					"sensor_version": "2.14.0.1234321",
 				},
-				"rules_status": map[string]interface{}{
+				"rules_status": resultMap{
 					"policy_name":      "LinuxDefaultPolicy",
 					"policy_timestamp": "02/20/2023",
 				},
-				"sensor_status": map[string]interface{}{
-					"details": map[string]interface{}{
+				"sensor_status": resultMap{
+					"details": resultMap{
 						"liveresponse": []string{
 							"NoSession",
 							"Enabled",
@@ -77,8 +88,8 @@ func TestParse(t *testing.T) {
 		{
 			name:  "repcli mac status",
 			input: repcli_mac_status,
-			expected: map[string]interface{}{
-				"cloud_status": map[string]interface{}{
+			expected: resultMap{
+				"cloud_status": resultMap{
 					"mdm_device_id":      "99999999-4C8C-45A0-B3EA-053672776382",
 					"next_check-in":      "Now",
 					"next_cloud_upgrade": "None",
@@ -87,18 +98,18 @@ func TestParse(t *testing.T) {
 					"registered":         "Yes",
 					"server_address":     "https://dev-prod05.example.com",
 				},
-				"enforcement_status": map[string]interface{}{
+				"enforcement_status": resultMap{
 					"execution_blocks":     "0",
 					"network_restrictions": "0",
 				},
-				"full_disk_access_configurations": map[string]interface{}{
+				"full_disk_access_configurations": resultMap{
 					"osquery":          "Unknown",
 					"repmgr":           "Not Configured",
 					"system_extension": "Unknown",
 					"uninstall_helper": "Unknown",
 					"uninstall_ui":     "Unknown",
 				},
-				"general_info": map[string]interface{}{
+				"general_info": resultMap{
 					"background_scan":    "Complete",
 					"fips_mode":          "Disabled",
 					"kernel_file_filter": "Connected",
@@ -108,42 +119,42 @@ func TestParse(t *testing.T) {
 					"sensor_version":     "3.7.2.81",
 					"system_extension":   "Running",
 				},
-				"proxy_settings": map[string]interface{}{
+				"proxy_settings": resultMap{
 					"proxy_configured": "No",
 				},
-				"queues": map[string]interface{}{
-					"livequeries": map[string]interface{}{
+				"queues": resultMap{
+					"livequeries": resultMap{
 						"completed":   "0",
 						"outstanding": "0",
 						"peak":        "2",
 					},
-					"pscevents_batch_upload": map[string]interface{}{
+					"pscevents_batch_upload": resultMap{
 						"failed":               "0",
 						"mean_data_rate_(b/s)": "7583",
 						"pending":              "0",
 						"uploaded":             "1727",
 					},
-					"reputation_expedited": map[string]interface{}{
+					"reputation_expedited": resultMap{
 						"last_completed_id": "50",
 						"last_queue_id":     "50",
 						"max_outstanding":   "2",
 						"outstanding":       "0",
 						"total_queued":      "50",
 					},
-					"reputation_resubmit": map[string]interface{}{
+					"reputation_resubmit": resultMap{
 						"max_outstanding": "0",
 						"outstanding":     "0",
 						"total_queued":    "0",
 					},
-					"reputation_slow": map[string]interface{}{
+					"reputation_slow": resultMap{
 						"demand":   "0",
 						"ready":    "128",
 						"resubmit": "0",
 						"stale":    "715",
 					},
 				},
-				"rules_status": map[string]interface{}{
-					"active_policies": map[string]interface{}{
+				"rules_status": resultMap{
+					"active_policies": resultMap{
 						"dc_allow_external_devices_revision[1]":         "Enabled(Manifest)",
 						"device_control_reporting_policy_revision[5]":   "Enabled(Manifest)",
 						"eedr_reporting_revision[18]":                   "Enabled(Manifest)",
@@ -154,9 +165,9 @@ func TestParse(t *testing.T) {
 					"policy_name":               "Workstations",
 					"policy_timestamp":          "08/22/2023 15:19:53",
 				},
-				"sensor_state": map[string]interface{}{
+				"sensor_state": resultMap{
 					"boot_count": "103",
-					"details": map[string]interface{}{
+					"details": resultMap{
 						"fulldiskaccess": "NotEnabled",
 						"liveresponse": []string{
 							"NoSession",

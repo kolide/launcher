@@ -7,9 +7,21 @@ package repcli
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strings"
 	"unicode"
+)
+
+type (
+	resultMap map[string]any
+
+	repcliLine struct {
+		isSectionHeader bool
+		indentLevel     int
+		key             string
+		value           string
+	}
 )
 
 // formatKey prepares raw (potentially multi-word) key values by:
@@ -22,78 +34,91 @@ func formatKey(key string) string {
 	return strings.Join(words, "_")
 }
 
-// parseLine reads the next line from a scanner and attempts to
-// pull out the key, value, and key depth (level of nesting).
+// parseLine reads the next line from a scanner and attempts to pull out the
+// key, value, and key depth (level of nesting) into a repcliLine struct.
 // an empty key-value pair is returned if the line is malformed
-func parseLine(scanner *bufio.Scanner) (string, string, int) {
-	line := scanner.Text()
+func parseLine(line string) *repcliLine {
 	if len(line) == 0 {
-		return "", "", 0 // blank lines are not expected or meaningful
+		return nil // blank lines are not expected or meaningful
 	}
 
 	kv := strings.SplitN(line, ":", 2)
 	if len(kv) < 2 {
-		return "", "", 0 // lines without a colon are not expected or meaningful
+		return nil // lines without a colon are not expected or meaningful
 	}
 
-	nestedDepth := len(kv[0]) - len(strings.TrimLeftFunc(kv[0], unicode.IsSpace))
+	indentLen := len(kv[0]) - len(strings.TrimLeftFunc(kv[0], unicode.IsSpace))
+	formattedValue := strings.TrimSpace(kv[1])
 
-	return formatKey(kv[0]), strings.TrimSpace(kv[1]), nestedDepth
+	return &repcliLine{
+		isSectionHeader: (len(formattedValue) == 0),
+		indentLevel:     indentLen,
+		key:             formatKey(kv[0]),
+		value:           formattedValue,
+	}
 }
 
-// parseSection works recursively to handle nested sections. There is slight duplication
-// between the outer scanner.Scan() call here and in the main repcliParse function to ensure
-// this would still function as expected with arbitrary levels of nesting while supporting
-// standard sections at the top level.
-// This returns the given results for the section, along with a boolean flag indicating
-// that the previous line should be re-read when the parsing determines we've moved
-// back outside the target depth.
-func parseSection(scanner *bufio.Scanner, currentDepth int) (map[string]any, bool) {
-	results := make(map[string]any)
-	skipScan := false
-	for skipScan || scanner.Scan() {
-		skipScan = false // always reset here because we'll have completed the skip
-		key, value, nextDepth := parseLine(scanner)
+func updatedKeyPaths(currentPaths []*repcliLine, newSection *repcliLine) []*repcliLine {
+	updatedPaths := make([]*repcliLine, 0)
 
-		if key == "" {
-			continue
-		}
-
-		isSectionHeader := len(value) == 0
-		if nextDepth <= currentDepth {
-			// we must pass skipScan here because we'll need to re-read this line on the next pass
-			return results, true
-		}
-
-		if isSectionHeader {
-			results[key], skipScan = parseSection(scanner, nextDepth)
-			continue
-		}
-
-		// handle any cases where there is already a value set for key
-		if existingValue, ok := results[key]; ok {
-			switch existingValue.(type) {
-			case []string:
-				results[key] = append(results[key].([]string), value)
-			case string:
-				results[key] = []string{results[key].(string), value}
-			default:
-				// if additional nested types are supported they should be added to the switch here
-				continue
-			}
-
-			continue
-		}
-
-		results[key] = value
+	if len(currentPaths) == 0 {
+		return append(updatedPaths, newSection)
 	}
 
-	return results, false
+	for idx, sectionLine := range currentPaths {
+		// we only let this fall through if we should add in the new section at the very end
+		if newSection.indentLevel > sectionLine.indentLevel {
+			updatedPaths = append(updatedPaths, sectionLine)
+			continue
+		}
+
+		// we've gone too far and need to replace the previous key
+		if newSection.indentLevel < sectionLine.indentLevel {
+			return append(currentPaths[:idx-1], newSection)
+		}
+
+		// this key is at the same level as our new section, replace that in the currentPaths
+		return append(currentPaths[:idx], newSection)
+	}
+
+	return append(updatedPaths, newSection)
+}
+
+// setNestedValue works to recursively dive into the resultMap while traversing the
+// lines provided to set the final (deepest) value
+func setNestedValue(results resultMap, lines []*repcliLine) error {
+	if len(lines) == 0 {
+		return fmt.Errorf("at least one line is required to set the value")
+	}
+
+	key, value := lines[0].key, lines[0].value
+	if len(lines) == 1 {
+		// handle any cases where there is already a value set for key
+		switch knownValue := results[key].(type) {
+		case []string:
+			results[key] = append(knownValue, value)
+		case string:
+			results[key] = []string{knownValue, value}
+		case resultMap, interface{}, nil:
+			results[key] = value
+		default:
+			// if additional nested types are required they should be added above
+			return fmt.Errorf("unknown type %T requested for nested set", knownValue)
+		}
+
+		return nil
+	}
+
+	_, ok := results[key]
+	if !ok {
+		results[key] = make(resultMap, 0)
+	}
+
+	return setNestedValue(results[key].(resultMap), lines[1:])
 }
 
 // repcliParse will take a reader containing stdout data from a cli invocation of repcli.
 // We are expecting to parse something like the following into an arbitrarily-nested map[string]any:
-//
 // General Info:
 //
 //	Sensor Version: 2.14.0.1234321
@@ -105,24 +130,20 @@ func parseSection(scanner *bufio.Scanner, currentDepth int) (map[string]any, boo
 func repcliParse(reader io.Reader) (any, error) {
 	scanner := bufio.NewScanner(reader)
 	results := make(map[string]any)
-	skipScan := false
-	var section map[string]any
-	for skipScan || scanner.Scan() {
-		skipScan = false
-		key, value, nextDepth := parseLine(scanner)
-
-		if key == "" {
+	currentKeyPaths := make([]*repcliLine, 0)
+	for scanner.Scan() {
+		line := parseLine(scanner.Text())
+		if line == nil {
 			continue
 		}
 
-		// we don't currently expect but would support any top-level key-value pairs
-		if value != "" {
-			results[key] = value
+		currentKeyPaths = updatedKeyPaths(currentKeyPaths, line)
+
+		if line.isSectionHeader {
 			continue
 		}
 
-		section, skipScan = parseSection(scanner, nextDepth)
-		results[key] = section
+		setNestedValue(results, currentKeyPaths)
 	}
 
 	return results, nil
