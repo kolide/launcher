@@ -107,6 +107,7 @@ type DesktopUsersProcessesRunner struct {
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
+	interrupted         bool
 	// uidProcs is a map of uid to desktop process
 	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
@@ -222,6 +223,13 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 // Interrupt stops creating launcher desktop processes and kills any existing ones.
 // It also signals the execute loop to exit, so new desktop processes cease to spawn.
 func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if r.interrupted {
+		return
+	}
+
+	r.interrupted = true
+
 	// Tell the execute loop to stop checking, and exit
 	r.interrupt <- struct{}{}
 
