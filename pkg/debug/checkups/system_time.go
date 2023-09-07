@@ -20,13 +20,14 @@ func (st *systemTime) Name() string {
 func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 	var (
 		urls = []string{
+			"https://app.kolide.com/version",
 			"https://developers.google.com/time/",
 			"http://sha256timestamp.ws.symantec.com/",
 		}
 	)
 
 	for _, url := range urls {
-		serverTime, err := getTimeFromURL(url)
+		serverTime, err := getTimeFromDateHeader(url)
 		if err != nil {
 			fmt.Fprintf(extraFh, "error from url %s: %v\n", url, err)
 			continue
@@ -34,7 +35,7 @@ func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 
 		serverTime = serverTime.UTC()
 
-		fmt.Fprintf(extraFh, "got time from %s: %v\n", url, serverTime)
+		fmt.Fprintf(extraFh, "pulled date header from %s: %v\n", url, serverTime)
 
 		systemTime := time.Now().UTC()
 
@@ -47,23 +48,24 @@ func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 
 		maxDiff := 5 * time.Minute
 		if diff > maxDiff {
-			st.summary = fmt.Sprintf("system time off by more than %f minutes, delta = %f minutes", maxDiff.Minutes(), diff.Minutes())
-			st.status = Failing
+			st.summary = fmt.Sprintf("system time off by more than %f minutes when compared to server date header, delta = %f minutes", maxDiff.Minutes(), diff.Minutes())
+			st.status = Warning
 			return nil
 		}
 
-		st.summary = fmt.Sprintf("system time is within %f minutes, delta = %f minutes", maxDiff.Minutes(), diff.Minutes())
+		// all urls errored
+		st.summary = fmt.Sprintf("system time is within %f minutes of server date header, delta = %f minutes", maxDiff.Minutes(), diff.Minutes())
 		st.status = Passing
 		return nil
 	}
 
 	// if we made it here, we never got valid server time
 	st.summary = "could not get valid server time"
-	st.status = Failing
+	st.status = Erroring
 	return nil
 }
 
-func getTimeFromURL(url string) (time.Time, error) {
+func getTimeFromDateHeader(url string) (time.Time, error) {
 	// Make an HTTP GET request to the specified URL.
 	resp, err := http.Get(url)
 	if err != nil {
