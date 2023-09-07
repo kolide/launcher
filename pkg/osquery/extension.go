@@ -516,10 +516,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		return e.generateConfigsWithReenroll(ctx, false)
 	}
 
-	// If osquery has been running successfully for 20 minutes, then turn off verbose logs.
+	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
 	osqueryVerbose := true
-	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 20 {
-		level.Debug(e.logger).Log("msg", "osquery has been up for more than 20 minutes, turning off verbose logging", "uptime_mins", uptimeMins)
+	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
+		level.Debug(e.logger).Log("msg", "osquery has been up for more than 10 minutes, turning off verbose logging", "uptime_mins", uptimeMins)
 		osqueryVerbose = false
 	}
 	config = e.setVerbose(config, osqueryVerbose)
