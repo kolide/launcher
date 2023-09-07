@@ -145,7 +145,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				assert.NoError(t, r.Execute())
 			}()
 
-			// let is run a few interval
+			// let it run a few intervals
 			time.Sleep(r.updateInterval * 3)
 			r.Interrupt(nil)
 
@@ -185,6 +185,33 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 					p.Process.Wait()
 				}
 			})
+
+			// Confirm we can call Interrupt multiple times without blocking
+			interruptComplete := make(chan struct{})
+			expectedInterrupts := 3
+			for i := 0; i < expectedInterrupts; i += 1 {
+				go func() {
+					r.Interrupt(nil)
+					interruptComplete <- struct{}{}
+				}()
+			}
+
+			receivedInterrupts := 0
+			for {
+				if receivedInterrupts >= expectedInterrupts {
+					break
+				}
+
+				select {
+				case <-interruptComplete:
+					receivedInterrupts += 1
+					continue
+				case <-time.After(5 * time.Second):
+					t.Error("could not call interrupt multiple times and return within 5 seconds")
+				}
+			}
+
+			require.Equal(t, expectedInterrupts, receivedInterrupts)
 		})
 	}
 }

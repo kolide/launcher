@@ -108,7 +108,8 @@ type DesktopUsersProcessesRunner struct {
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
 	// uidProcs is a map of uid to desktop process
-	uidProcs map[string]processRecord
+	uidProcs      map[string]processRecord
+	uidProcsMutex sync.Mutex
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
 	// interruptTimeout how long to wait for desktop proccesses to finish on interrupt
@@ -150,8 +151,9 @@ type processRecord struct {
 func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		logger:                 log.NewNopLogger(),
-		interrupt:              make(chan struct{}),
+		interrupt:              make(chan struct{}, 1),
 		uidProcs:               make(map[string]processRecord),
+		uidProcsMutex:          sync.Mutex{},
 		updateInterval:         k.DesktopUpdateInterval(),
 		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
 		procsWg:                &sync.WaitGroup{},
@@ -222,8 +224,15 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 // Interrupt stops creating launcher desktop processes and kills any existing ones.
 // It also signals the execute loop to exit, so new desktop processes cease to spawn.
 func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
-	// Tell the execute loop to stop checking, and exit
-	r.interrupt <- struct{}{}
+	// Non-blocking send to interrupt channel
+	select {
+	case r.interrupt <- struct{}{}:
+		// First time we've received an interrupt, so we've notified r.Execute.
+	default:
+		// Execute loop is no longer running, so there's nothing to interrupt
+	}
+
+	time.Sleep(3 * time.Second)
 
 	// Kill any desktop processes that may exist
 	r.killDesktopProcesses()
@@ -241,6 +250,9 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 
 // killDesktopProcesses kills any existing desktop processes
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
+	r.uidProcsMutex.Lock()
+	defer r.uidProcsMutex.Unlock()
+
 	wgDone := make(chan struct{})
 	go func() {
 		defer close(wgDone)
@@ -297,6 +309,9 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
+	r.uidProcsMutex.Lock()
+	defer r.uidProcsMutex.Unlock()
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -380,6 +395,8 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
+	r.uidProcsMutex.Lock()
+	defer r.uidProcsMutex.Unlock()
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
@@ -531,6 +548,9 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 
 // addProcessTrackingRecordForUser adds process information to the internal tracking state
 func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string, socketPath string, osProcess *os.Process) error {
+	r.uidProcsMutex.Lock()
+	defer r.uidProcsMutex.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
@@ -592,6 +612,9 @@ func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) 
 }
 
 func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
+	r.uidProcsMutex.Lock()
+	defer r.uidProcsMutex.Unlock()
+
 	// have no record of process
 	proc, ok := r.uidProcs[uid]
 	if !ok {
