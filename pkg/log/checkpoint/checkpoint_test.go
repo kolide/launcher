@@ -2,11 +2,101 @@ package checkpoint
 
 import (
 	"net/url"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
+
+func TestInterrupt(t *testing.T) {
+	t.Parallel()
+
+	// Set up temp db
+	file, err := os.CreateTemp("", "kolide_launcher_test")
+	if err != nil {
+		t.Fatalf("creating temp file: %s", err.Error())
+	}
+
+	db, err := bbolt.Open(file.Name(), 0600, nil)
+	if err != nil {
+		t.Fatalf("opening bolt DB: %s", err.Error())
+	}
+
+	defer func() {
+		db.Close()
+		os.Remove(file.Name())
+	}()
+
+	// Set up knapsack
+	k := mocks.NewKnapsack(t)
+	k.On("BboltDB").Return(db)
+	k.On("KolideHosted").Return(true)
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("KolideServerURL").Return("")
+	k.On("InsecureTransportTLS").Return(false)
+	k.On("Autoupdate").Return(true)
+	k.On("MirrorServerURL").Return("")
+	k.On("NotaryServerURL").Return("")
+	k.On("TufServerURL").Return("")
+	k.On("ControlServerURL").Return("")
+
+	// Start the checkpointer, let it run, interrupt it, and confirm it can return from the interrupt
+	testCheckpointer := New(log.NewNopLogger(), k)
+
+	runInterruptReceived := make(chan struct{}, 1)
+
+	go func() {
+		require.Nil(t, testCheckpointer.Run())
+		runInterruptReceived <- struct{}{}
+	}()
+
+	// Give it a couple seconds to run before calling interrupt
+	time.Sleep(3 * time.Second)
+
+	testCheckpointer.Interrupt(nil)
+
+	select {
+	case <-runInterruptReceived:
+		break
+	case <-time.After(5 * time.Second):
+		t.Error("could not interrupt checkpointer within 5 seconds")
+		t.FailNow()
+	}
+
+	// Now call interrupt a couple more times
+	expectedAdditionalInterrupts := 3
+	additionalInterruptsReceived := make(chan struct{}, expectedAdditionalInterrupts)
+
+	for i := 0; i < expectedAdditionalInterrupts; i += 1 {
+		go func() {
+			testCheckpointer.Interrupt(nil)
+			additionalInterruptsReceived <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedAdditionalInterrupts {
+			break
+		}
+
+		select {
+		case <-additionalInterruptsReceived:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedAdditionalInterrupts, receivedInterrupts)
+}
 
 func Test_urlsToTest(t *testing.T) {
 	t.Parallel()

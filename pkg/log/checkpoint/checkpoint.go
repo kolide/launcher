@@ -97,7 +97,12 @@ func (c *checkPointer) Run() error {
 }
 
 func (c *checkPointer) Interrupt(_ error) {
-	c.interrupt <- struct{}{}
+	// Non-blocking channel send
+	select {
+	case c.interrupt <- struct{}{}:
+	default:
+		level.Debug(c.logger).Log("msg", "received additional call to interrupt")
+	}
 }
 
 func (c *checkPointer) Once() {
