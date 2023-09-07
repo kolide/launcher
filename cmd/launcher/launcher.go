@@ -193,10 +193,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// pickup
 	internal.RecordLauncherVersion(rootDirectory)
 
-	// Try to ensure useful info in the logs
-	checkpointer := checkpoint.New(logger, k)
-	checkpointer.Run()
-
 	// create the certificate pool
 	var rootPool *x509.CertPool
 	if k.RootPEM() != "" {
@@ -211,6 +207,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	runGroup := rungroup.NewRunGroup(logger)
+
+	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
+	checkpointer := checkpoint.New(logger, k)
+	checkpointer.Once()
+	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
