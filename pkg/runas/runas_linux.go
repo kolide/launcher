@@ -1,5 +1,5 @@
-//go:build darwin
-// +build darwin
+//go:build linux
+// +build linux
 
 package runas
 
@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"os/exec"
 	"os/user"
+	"strconv"
+	"syscall"
 )
 
-// For notifications to work, we must run in the user context with launchctl asuser.
 func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	// Ensure that we handle a non-root current user appropriately
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -22,16 +22,6 @@ func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	if err != nil {
 		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
-
-	// Update command so that we're prepending `launchctl asuser $UID sudo --preserve-env -u $runningUser` to the launcher desktop command.
-	// We need to run with `launchctl asuser` in order to get the user context, which is required to be able to send notifications.
-	// We need `sudo -u $runningUser` to set the UID on the command correctly -- necessary for, among other things, correctly observing
-	// light vs dark mode.
-	// We need --preserve-env for sudo in order to avoid clearing SOCKET_PATH, AUTHTOKEN, etc that are necessary for the desktop
-	// process to run.
-	cmd.Path = "/bin/launchctl"
-	updatedCmdArgs := append([]string{"/bin/launchctl", "asuser", uid, "sudo", "--preserve-env", "-u", runningUser.Username}, cmd.Args...)
-	cmd.Args = updatedCmdArgs
 
 	// current user not root
 	if currentUser.Uid != "0" {
@@ -47,6 +37,23 @@ func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	// the remaining code in this function is not covered by unit test since it requires root privileges
 	// We may be able to run passwordless sudo in GitHub actions, could possibly exec the tests as sudo.
 	// But we may not have a console user?
+
+	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
+	}
+
+	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(runningUserUid),
+			Gid: uint32(runningUserGid),
+		},
+	}
 
 	return nil
 }

@@ -460,7 +460,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	}
 
 	if runtime.GOOS == "linux" && !IsAppindicatorEnabled(context.Background()) {
-		level.Info(r.logger).Log("msg", "no appindicator not enabled, no running desktop")
+		level.Info(r.logger).Log("msg", "no appindicator enabled, not running desktop")
 		r.killDesktopProcesses()
 		return nil
 	}
@@ -498,8 +498,12 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := runas.RunAsUser(ctx, uid, cmd); err != nil {
-			return fmt.Errorf("running desktop command as user: %w", err)
+		if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
+			return fmt.Errorf("setting desktop command to exec as user: %w", err)
+		}
+
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("starting process: %w", err)
 		}
 
 		r.waitOnProcessAsync(uid, cmd.Process)
@@ -753,6 +757,14 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		}
 	}()
 
+	if runtime.GOOS == "linux" {
+		// Set any necessary environment variables on the command (like DISPLAY)
+		envVars := r.userEnvVars(context.Background(), uid)
+		for k, v := range envVars {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+
 	return cmd, nil
 }
 
@@ -800,7 +812,14 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 	})
 }
 
+// IsAppindicatorEnabled iterates over known appindicator gnome-extensions for each user
+// and returns true the first time it finds one enabled, false if none found enabled
 func IsAppindicatorEnabled(ctx context.Context) bool {
+	uids, err := consoleuser.CurrentUids(ctx)
+	if err != nil {
+		return false
+	}
+
 	var extensions = []string{
 		"ubuntu-appindicators@ubuntu.com",
 		// appindicator that ships with NixOS
@@ -808,20 +827,25 @@ func IsAppindicatorEnabled(ctx context.Context) bool {
 	}
 
 	for _, extension := range extensions {
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
+		for _, uid := range uids {
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
 
-		cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "show", extension)
+			cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "show", extension)
 
-		// gnome seems to do things through this env
-		cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=%s", "/run/user"))
+			// gnome seems to do things through this env
+			cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=%s", fmt.Sprintf("/run/user/%s", uid)))
 
-		if out, err := cmd.CombinedOutput(); err != nil || !bytes.Contains(out, []byte("State: ENABLED")) {
-			continue
+			if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
+				continue
+			}
+
+			if out, err := cmd.CombinedOutput(); err != nil || !bytes.Contains(out, []byte("State: ENABLED")) {
+				continue
+			}
+
+			return true
 		}
-
-		// enabled
-		return true
 	}
 
 	return false
