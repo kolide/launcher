@@ -207,7 +207,8 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 					receivedInterrupts += 1
 					continue
 				case <-time.After(5 * time.Second):
-					t.Error("could not call interrupt multiple times and return within 5 seconds")
+					t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+					t.FailNow()
 				}
 			}
 
