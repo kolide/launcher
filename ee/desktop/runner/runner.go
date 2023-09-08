@@ -834,27 +834,28 @@ func IsAppindicatorEnabled(ctx context.Context) bool {
 		"appindicatorsupport@rgcjonas.gmail.com",
 	}
 
-	for _, extension := range extensions {
-		for _, uid := range uids {
-			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
+	for _, uid := range uids {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
 
-			cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "show", extension)
+		cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "list", "--enabled")
 
-			// gnome seems to do things through this env
-			cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=%s", fmt.Sprintf("/run/user/%s", uid)))
+		if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
+			continue
+		}
 
-			if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
-				continue
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			continue
+		}
+
+		for _, extension := range extensions {
+			if bytes.Contains(out, []byte(extension)) {
+				return true
 			}
-
-			if out, err := cmd.CombinedOutput(); err != nil || !bytes.Contains(out, []byte("State: ENABLED")) {
-				continue
-			}
-
-			return true
 		}
 	}
 
+	// did not find extension for any console user
 	return false
 }
