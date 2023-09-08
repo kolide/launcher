@@ -5,15 +5,70 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
+	"os/user"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 const defaultDisplay = ":0"
+
+func runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("getting current user: %w", err)
+	}
+
+	runningUser, err := user.LookupId(uid)
+	if err != nil {
+		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
+	}
+
+	// current user not root
+	if currentUser.Uid != "0" {
+		// if the user is running for itself, just run without setting credentials
+		if currentUser.Uid == runningUser.Uid {
+			return cmd.Start()
+		}
+
+		// if the user is running for another user, we have an error because we can't set credentials
+		return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
+	}
+
+	// the remaining code in this function is not covered by unit test since it requires root privileges
+	// We may be able to run passwordless sudo in GitHub actions, could possibly exec the tests as sudo.
+	// But we may not have a console user?
+
+	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
+	}
+
+	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(runningUserUid),
+			Gid: uint32(runningUserGid),
+		},
+	}
+
+	// Set any necessary environment variables on the command (like DISPLAY)
+	envVars := r.userEnvVars(ctx, uid)
+	for k, v := range envVars {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return cmd.Start()
+}
 
 func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid string) map[string]string {
 	envVars := make(map[string]string)

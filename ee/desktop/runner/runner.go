@@ -33,7 +33,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/runas"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -506,12 +505,8 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 			return fmt.Errorf("creating desktop command: %w", err)
 		}
 
-		if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
+		if err := runAsUser(ctx, uid, cmd); err != nil {
 			return fmt.Errorf("setting desktop command to exec as user: %w", err)
-		}
-
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("starting process: %w", err)
 		}
 
 		r.waitOnProcessAsync(uid, cmd.Process)
@@ -835,22 +830,25 @@ func IsAppindicatorEnabled(ctx context.Context) bool {
 	}
 
 	for _, uid := range uids {
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "list", "--enabled")
 
-		if err := runas.SetCmdToExecAsUser(ctx, uid, cmd); err != nil {
-			continue
+		var combinedBuffer bytes.Buffer
+		cmd.Stdout = &combinedBuffer
+		cmd.Stderr = &combinedBuffer
+
+		if err := runAsUser(ctx, uid, cmd); err != nil {
+			return false
 		}
 
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			continue
+		if err := cmd.Wait(); err != nil {
+			return false
 		}
 
 		for _, extension := range extensions {
-			if bytes.Contains(out, []byte(extension)) {
+			if bytes.Contains(combinedBuffer.Bytes(), []byte(extension)) {
 				return true
 			}
 		}
