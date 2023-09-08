@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package runner
+package runas
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/consoleuser"
 )
 
-func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+func SetCmdToExecAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)
@@ -30,7 +30,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 		Token: accessToken,
 	}
 
-	return cmd.Start()
+	return nil
 }
 
 /*

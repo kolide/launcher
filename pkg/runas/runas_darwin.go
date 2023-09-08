@@ -10,7 +10,6 @@ import (
 	"os/user"
 )
 
-// For notifications to work, we must run in the user context with launchctl asuser.
 func SetCmdToExecAsUser(_ context.Context, uid string, cmd *exec.Cmd) error {
 	// Ensure that we handle a non-root current user appropriately
 	currentUser, err := user.Current()
@@ -23,12 +22,11 @@ func SetCmdToExecAsUser(_ context.Context, uid string, cmd *exec.Cmd) error {
 		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
 
-	// Update command so that we're prepending `launchctl asuser $UID sudo --preserve-env -u $runningUser` to the launcher desktop command.
-	// We need to run with `launchctl asuser` in order to get the user context, which is required to be able to send notifications.
+	// Update command so that we're prepending `launchctl asuser $UID sudo --preserve-env -u $runningUser` to the command.
+	// We need to run with `launchctl asuser` in order to get the user context, which is required to be able to do things like send notifications.
 	// We need `sudo -u $runningUser` to set the UID on the command correctly -- necessary for, among other things, correctly observing
 	// light vs dark mode.
-	// We need --preserve-env for sudo in order to avoid clearing SOCKET_PATH, AUTHTOKEN, etc that are necessary for the desktop
-	// process to run.
+	// We need --preserve-env for sudo in order to avoid clearing env vars
 	cmd.Path = "/bin/launchctl"
 	updatedCmdArgs := append([]string{"/bin/launchctl", "asuser", uid, "sudo", "--preserve-env", "-u", runningUser.Username}, cmd.Args...)
 	cmd.Args = updatedCmdArgs
