@@ -61,12 +61,6 @@ func runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 		},
 	}
 
-	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := r.userEnvVars(ctx, uid)
-	for k, v := range envVars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-	}
-
 	return cmd.Start()
 }
 
