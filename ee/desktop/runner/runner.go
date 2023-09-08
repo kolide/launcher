@@ -506,7 +506,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 
 		if err := runAsUser(ctx, uid, cmd); err != nil {
-			return fmt.Errorf("setting desktop command to exec as user: %w", err)
+			return fmt.Errorf("running desktop command as user: %w", err)
 		}
 
 		r.waitOnProcessAsync(uid, cmd.Process)
