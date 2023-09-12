@@ -15,9 +15,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
+	"golang.org/x/sys/unix"
 )
 
 func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
@@ -41,7 +43,7 @@ type osUpdateTable struct {
 
 func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	if table.macOSBuildVersionPrefix == 0 {
-		buildPrefix, err := macOSBuildVersionPrefix(table.client)
+		buildPrefix, err := macOSBuildVersionPrefix()
 		if err != nil {
 			return nil, fmt.Errorf("determine macOS build prefix for software update table: %w", err)
 		}
@@ -82,15 +84,21 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	return resp, nil
 }
 
-func macOSBuildVersionPrefix(client *osquery.ExtensionManagerClient) (int, error) {
-	query := `SELECT CAST(SUBSTR(build,0,3) AS int) AS build_prefix FROM os_version`
-	row, err := client.QueryRow(query)
+func macOSBuildVersionPrefix() (int, error) {
+	version, err := unix.Sysctl("kern.osrelease")
 	if err != nil {
-		return 0, fmt.Errorf("querying for macOS version: %w", err)
+		return 0, err
 	}
-	buildPrefix, err := strconv.Atoi(row["build_prefix"])
+
+	parts := strings.Split(version, ".")
+	if len(parts) < 1 {
+		return 0, fmt.Errorf("failed to parse build train prefix from sysctl call for kern.osrelease")
+	}
+
+	buildPrefix, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return 0, fmt.Errorf("converting build prefix from string to int: %w", err)
 	}
+
 	return buildPrefix, nil
 }
