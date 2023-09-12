@@ -93,7 +93,7 @@ func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	// same time as other tests.
 
 	t.Cleanup(func() {
-		os.Setenv(LegacyAutoupdatePathEnvVar, "")
+		os.Setenv(LegacyLauncherAutoupdatePathEnvVar, "")
 	})
 
 	var tests = []struct {
@@ -103,28 +103,48 @@ func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	}{
 		{
 			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/binary",
-			installPath: filepath.Clean("/a/bin/binary"),
+			installPath: filepath.Clean("/a/bin/launcher"),
 			out:         filepath.Clean("/a/bin/binary-updates"),
 		},
 		{
 			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/binary",
-			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/binary"),
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/launcher"),
 			out:         filepath.Clean("/a/bin/binary-updates"),
 		},
 		{
 			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/Test.app/Contents/MacOS/binary",
-			installPath: filepath.Clean("/a/bin/binary"),
+			installPath: filepath.Clean("/a/bin/launcher"),
 			out:         filepath.Clean("/a/bin/binary-updates"),
 		},
 		{
 			currentPath: "/a/path/var/id/hostname/updates/binary/1.2.3/Test.app/Contents/MacOS/binary",
-			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/binary"),
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/launcher"),
 			out:         filepath.Clean("/a/bin/binary-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/launcher",
+			installPath: filepath.Clean("/a/bin/launcher"),
+			out:         filepath.Clean("/a/bin/launcher-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/launcher",
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/launcher"),
+			out:         filepath.Clean("/a/bin/launcher-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/Test.app/Contents/MacOS/launcher",
+			installPath: filepath.Clean("/a/bin/launcher"),
+			out:         filepath.Clean("/a/bin/launcher-updates"),
+		},
+		{
+			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/Test.app/Contents/MacOS/launcher",
+			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/launcher"),
+			out:         filepath.Clean("/a/bin/launcher-updates"),
 		},
 	}
 
 	for _, tt := range tests {
-		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
+		os.Setenv(LegacyLauncherAutoupdatePathEnvVar, tt.installPath)
 		require.Equal(t, tt.out, getUpdateDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
 	}
 }
@@ -156,7 +176,7 @@ func TestFindBaseDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	// same time as other tests.
 
 	t.Cleanup(func() {
-		os.Setenv(LegacyAutoupdatePathEnvVar, "")
+		os.Setenv(LegacyLauncherAutoupdatePathEnvVar, "")
 	})
 
 	var tests = []struct {
@@ -187,7 +207,7 @@ func TestFindBaseDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests {
-		os.Setenv(LegacyAutoupdatePathEnvVar, tt.installPath)
+		os.Setenv(LegacyLauncherAutoupdatePathEnvVar, tt.installPath)
 		require.Equal(t, tt.out, FindBaseDir(tt.currentPath), "input: install path %s, current path %s", tt.installPath, tt.currentPath)
 	}
 }

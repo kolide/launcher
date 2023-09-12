@@ -150,10 +150,10 @@ func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	// If the legacy autoupdate path variable isn't already set, set it to help
 	// the legacy autoupdater find its update directory even when the newer binary
 	// runs out of a different directory.
-	if _, ok := os.LookupEnv(autoupdate.LegacyAutoupdatePathEnvVar); !ok {
+	if _, ok := os.LookupEnv(autoupdate.LegacyLauncherAutoupdatePathEnvVar); !ok {
 		currentPath, err := os.Executable()
 		if err == nil {
-			os.Setenv(autoupdate.LegacyAutoupdatePathEnvVar, currentPath)
+			os.Setenv(autoupdate.LegacyLauncherAutoupdatePathEnvVar, currentPath)
 		}
 	}
 

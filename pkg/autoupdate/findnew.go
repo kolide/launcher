@@ -29,7 +29,7 @@ const defaultBuildTimestamp = "0"
 const updateDirSuffix = "-updates"
 
 const (
-	LegacyAutoupdatePathEnvVar = "LAUNCHER_LEGACY_AUTOUPDATE_PATH"
+	LegacyLauncherAutoupdatePathEnvVar = "LAUNCHER_LEGACY_AUTOUPDATE_PATH"
 )
 
 type newestSettings struct {
@@ -251,8 +251,9 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 //
 // It makes some string assumptions about how things are named.
 func getUpdateDir(fullBinaryPath string) string {
-	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
-		fullBinaryPath = installedPath
+	if installedPath := os.Getenv(LegacyLauncherAutoupdatePathEnvVar); installedPath != "" {
+		binaryName := filepath.Base(fullBinaryPath)
+		fullBinaryPath = filepath.Join(filepath.Dir(installedPath), binaryName)
 	}
 
 	if strings.Contains(fullBinaryPath, ".app") {
@@ -331,8 +332,9 @@ func FindBaseDir(path string) string {
 		return ""
 	}
 
-	if installedPath := os.Getenv(LegacyAutoupdatePathEnvVar); installedPath != "" {
-		path = installedPath
+	if installedPath := os.Getenv(LegacyLauncherAutoupdatePathEnvVar); installedPath != "" {
+		binaryName := filepath.Base(path)
+		path = filepath.Join(filepath.Dir(installedPath), binaryName)
 	}
 
 	// If this is an app bundle installation, we need to adjust the directory -- otherwise we end up with a library
