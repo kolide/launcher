@@ -76,7 +76,6 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 	return []osquery.OsqueryPlugin{
 		keychainAclsTable,
 		keychainItemsTable,
-		Airdrop(client),
 		appicons.AppIcons(),
 		ChromeLoginKeychainInfo(client, logger),
 		firmwarepasswd.TablePlugin(client, logger),
