@@ -17,12 +17,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/sys/unix"
 )
 
-func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
+func MacOSUpdate() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("autoupdate_managed"),
 		table.IntegerColumn("autoupdate_enabled"),
@@ -32,12 +31,11 @@ func MacOSUpdate(client *osquery.ExtensionManagerClient) *table.Plugin {
 		table.IntegerColumn("critical_updates"),
 		table.IntegerColumn("last_successful_check_timestamp"),
 	}
-	tableGen := &osUpdateTable{client: client}
+	tableGen := &osUpdateTable{}
 	return table.NewPlugin("kolide_macos_software_update", columns, tableGen.generateMacUpdate)
 }
 
 type osUpdateTable struct {
-	client                  *osquery.ExtensionManagerClient
 	macOSBuildVersionPrefix int
 }
 

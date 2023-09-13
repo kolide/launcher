@@ -23,7 +23,6 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -31,20 +30,18 @@ const pwpolicyPath = "/usr/bin/pwpolicy"
 const pwpolicyCmd = "getaccountpolicies"
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	tableName string
 	execCC    func(context.Context, string, ...string) *exec.Cmd
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("username"),
 	)
 
 	t := &Table{
-		client:    client,
 		logger:    logger,
 		tableName: "kolide_pwpolicy",
 		execCC:    exec.CommandContext,

@@ -16,30 +16,28 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 	parser *OutputParser
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("option_roms_allowed"),
 		table.IntegerColumn("password_enabled"),
 		table.TextColumn("mode"),
 	}
 
-	t := New(client, logger)
+	t := New(logger)
 
 	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
 
 }
 
-func New(client *osquery.ExtensionManagerClient, logger log.Logger) *Table {
+func New(logger log.Logger) *Table {
 	parser := NewParser(logger,
 		[]Matcher{
 			{
@@ -60,7 +58,6 @@ func New(client *osquery.ExtensionManagerClient, logger log.Logger) *Table {
 		})
 
 	return &Table{
-		client: client,
 		logger: level.NewFilter(logger, level.AllowInfo()),
 		parser: parser,
 	}

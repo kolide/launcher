@@ -11,12 +11,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-
 	"github.com/kolide/kit/fsutil"
-	"github.com/osquery/osquery-go"
-	"github.com/osquery/osquery-go/plugin/table"
-
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/osquery/osquery-go/plugin/table"
 )
 
 var profileDirs = map[string][]string{
@@ -25,9 +22,8 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeLoginDataEmails(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func ChromeLoginDataEmails(logger log.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
-		client: client,
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
@@ -39,7 +35,6 @@ func ChromeLoginDataEmails(client *osquery.ExtensionManagerClient, logger log.Lo
 }
 
 type ChromeLoginDataEmailsTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

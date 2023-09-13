@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -32,7 +31,6 @@ const (
 )
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	osqueryd  string
 	query     string
@@ -40,14 +38,12 @@ type Table struct {
 }
 
 func TablePlugin(
-	client *osquery.ExtensionManagerClient, logger log.Logger,
-	tablename string, osqueryd string, osqueryQuery string, columns []table.ColumnDefinition,
+	logger log.Logger, tablename string, osqueryd string,
+	osqueryQuery string, columns []table.ColumnDefinition,
 ) *table.Plugin {
-
 	columns = append(columns, table.TextColumn("user"))
 
 	t := &Table{
-		client:    client,
 		logger:    logger,
 		osqueryd:  osqueryd,
 		query:     osqueryQuery,
@@ -55,7 +51,6 @@ func TablePlugin(
 	}
 
 	return table.NewPlugin(t.tablename, columns, t.generate)
-
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -32,7 +31,7 @@ type Table struct {
 
 const tableName = "kolide_airport_util"
 
-func TablePlugin(_ *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("option"),
 	)
