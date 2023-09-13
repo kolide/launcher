@@ -163,11 +163,15 @@ func compress(t *testing.T, outFileName string, outFileDir string, targetDir str
 	defer tw.Close()
 
 	srcFilePath := binary
-	if binary == "launcher" && runtime.GOOS == "darwin" {
-		srcFilePath = filepath.Join("Kolide.app", "Contents", "MacOS", binary)
+	if runtime.GOOS == "darwin" {
+		appBundleName := "Kolide.app"
+		if binary == "osqueryd" {
+			appBundleName = "osquery.app"
+		}
+		srcFilePath = filepath.Join(appBundleName, "Contents", "MacOS", binary)
 
 		// Create directory structure for app bundle
-		for _, path := range []string{"Kolide.app", "Kolide.app/Contents", "Kolide.app/Contents/MacOS"} {
+		for _, path := range []string{appBundleName, fmt.Sprintf("%s/Contents", appBundleName), fmt.Sprintf("%s/Contents/MacOS", appBundleName)} {
 			pInfo, err := os.Stat(filepath.Join(targetDir, path))
 			require.NoError(t, err, "stat for app bundle path %s", path)
 
@@ -205,7 +209,7 @@ func executableLocation(updateDirectory string, binary string) string {
 		case "launcher":
 			return filepath.Join(updateDirectory, "Kolide.app", "Contents", "MacOS", binary)
 		case "osqueryd":
-			return filepath.Join(updateDirectory, binary)
+			return filepath.Join(updateDirectory, "osquery.app", "Contents", "MacOS", binary)
 		default:
 			return ""
 		}

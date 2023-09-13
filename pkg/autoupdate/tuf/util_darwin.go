@@ -14,7 +14,7 @@ func executableLocation(updateDirectory string, binary autoupdatableBinary) stri
 	case "launcher":
 		return filepath.Join(updateDirectory, "Kolide.app", "Contents", "MacOS", string(binary))
 	case "osqueryd":
-		return filepath.Join(updateDirectory, string(binary))
+		return filepath.Join(updateDirectory, "osquery.app", "Contents", "MacOS", string(binary))
 	default:
 		return ""
 	}

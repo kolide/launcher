@@ -17,7 +17,7 @@ func Test_executableLocation(t *testing.T) {
 	var expectedLauncherLocation string
 	switch runtime.GOOS {
 	case "darwin":
-		expectedOsquerydLocation = filepath.Join(updateDir, "osqueryd")
+		expectedOsquerydLocation = filepath.Join(updateDir, "osquery.app", "Contents", "MacOS", "osqueryd")
 		expectedLauncherLocation = filepath.Join(updateDir, "Kolide.app", "Contents", "MacOS", "launcher")
 	case "windows":
 		expectedOsquerydLocation = filepath.Join(updateDir, "osqueryd.exe")
