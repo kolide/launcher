@@ -26,7 +26,7 @@ func (a *appindicator) ExtraFileName() string {
 }
 
 func (a *appindicator) Run(ctx context.Context, extraWriter io.Writer) error {
-	if !runner.IsAppindicatorEnabled(ctx) {
+	if !runner.IsMeetingGnomeAppindicatorRequirements(ctx) {
 		a.status = Failing
 		a.summary = "No appindicator is enabled, cannot display desktop"
 		return nil
