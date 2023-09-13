@@ -50,7 +50,6 @@ import (
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -81,13 +80,11 @@ type Result struct {
 }
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	tableName string
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("parentdatatype"),
 		table.TextColumn("datatype"),
@@ -95,7 +92,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	)
 
 	t := &Table{
-		client:    client,
 		logger:    level.NewFilter(logger, level.AllowInfo()),
 		tableName: "kolide_system_profiler",
 	}

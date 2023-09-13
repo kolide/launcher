@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -54,18 +53,16 @@ var headerRegex = regexp.MustCompile(`^=== CPF_GetInstalledProfiles === \(<Devic
 var lengthBytesRegex = regexp.MustCompile(`{length = (\d+,) bytes = (0[xX][0-9a-fA-F\.\s]+)}`)
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	tableName string
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("command"),
 	)
 
 	t := &Table{
-		client:    client,
 		logger:    logger,
 		tableName: "kolide_mdmclient",
 	}

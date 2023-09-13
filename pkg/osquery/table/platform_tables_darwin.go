@@ -35,14 +35,14 @@ const (
 	screenlockQuery    = "select enabled, grace_period from screenlock"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	munki := munki.New()
 
 	// This table uses undocumented APIs, There is some discussion at the
 	// PR adding the table. See
 	// https://github.com/osquery/osquery/pull/6243
 	screenlockTable := osquery_user_exec_table.TablePlugin(
-		client, logger, "kolide_screenlock",
+		logger, "kolide_screenlock",
 		currentOsquerydBinaryPath, screenlockQuery,
 		[]table.ColumnDefinition{
 			table.IntegerColumn("enabled"),
@@ -50,7 +50,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		})
 
 	keychainAclsTable := osquery_user_exec_table.TablePlugin(
-		client, logger, "kolide_keychain_acls",
+		logger, "kolide_keychain_acls",
 		currentOsquerydBinaryPath, keychainItemsQuery,
 		[]table.ColumnDefinition{
 			table.TextColumn("keychain_path"),
@@ -61,7 +61,7 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 		})
 
 	keychainItemsTable := osquery_user_exec_table.TablePlugin(
-		client, logger, "kolide_keychain_items",
+		logger, "kolide_keychain_items",
 		currentOsquerydBinaryPath, keychainAclsQuery,
 		[]table.ColumnDefinition{
 			table.TextColumn("label"),
@@ -76,46 +76,45 @@ func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, c
 	return []osquery.OsqueryPlugin{
 		keychainAclsTable,
 		keychainItemsTable,
-		Airdrop(client),
 		appicons.AppIcons(),
-		ChromeLoginKeychainInfo(client, logger),
-		firmwarepasswd.TablePlugin(client, logger),
-		GDriveSyncConfig(client, logger),
-		GDriveSyncHistoryInfo(client, logger),
+		ChromeLoginKeychainInfo(logger),
+		firmwarepasswd.TablePlugin(logger),
+		GDriveSyncConfig(logger),
+		GDriveSyncHistoryInfo(logger),
 		MDMInfo(logger),
-		macos_software_update.MacOSUpdate(client),
+		macos_software_update.MacOSUpdate(),
 		macos_software_update.RecommendedUpdates(logger),
 		macos_software_update.AvailableProducts(logger),
 		MachoInfo(),
 		Spotlight(),
-		TouchIDUserConfig(client, logger),
-		TouchIDSystemConfig(client, logger),
+		TouchIDUserConfig(logger),
+		TouchIDSystemConfig(logger),
 		UserAvatar(logger),
-		ioreg.TablePlugin(client, logger),
-		profiles.TablePlugin(client, logger),
-		airport.TablePlugin(client, logger),
+		ioreg.TablePlugin(logger),
+		profiles.TablePlugin(logger),
+		airport.TablePlugin(logger),
 		kextpolicy.TablePlugin(),
-		filevault.TablePlugin(client, logger),
-		mdmclient.TablePlugin(client, logger),
+		filevault.TablePlugin(logger),
+		mdmclient.TablePlugin(logger),
 		apple_silicon_security_policy.TablePlugin(logger),
 		legacyexec.TablePlugin(),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_diskutil_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "list", "-plist"}),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_falconctl_stats", dataflattentable.PlistType, []string{"/Applications/Falcon.app/Contents/Resources/falconctl", "stats", "-p"}),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_apfs_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "list", "-plist"}),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, []string{"/usr/bin/tmutil", "destinationinfo", "-X"}),
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_powermetrics", dataflattentable.PlistType, []string{"/usr/bin/powermetrics", "-n", "1", "-f", "plist"}),
 		screenlockTable,
-		pwpolicy.TablePlugin(client, logger),
-		systemprofiler.TablePlugin(client, logger),
-		munki.ManagedInstalls(client, logger),
-		munki.MunkiReport(client, logger),
+		pwpolicy.TablePlugin(logger),
+		systemprofiler.TablePlugin(logger),
+		munki.ManagedInstalls(logger),
+		munki.MunkiReport(logger),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`}, dataflattentable.WithIncludeStderr()),

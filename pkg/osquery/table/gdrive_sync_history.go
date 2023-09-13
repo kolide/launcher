@@ -12,13 +12,11 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncHistoryInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func GDriveSyncHistoryInfo(logger log.Logger) *table.Plugin {
 	g := &GDriveSyncHistory{
-		client: client,
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
@@ -31,7 +29,6 @@ func GDriveSyncHistoryInfo(client *osquery.ExtensionManagerClient, logger log.Lo
 }
 
 type GDriveSyncHistory struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -23,9 +22,8 @@ var chromeLocalStateDirs = map[string][]string{
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var chromeLocalStateDirDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeUserProfiles(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func ChromeUserProfiles(logger log.Logger) *table.Plugin {
 	c := &chromeUserProfilesTable{
-		client: client,
 		logger: logger,
 	}
 
@@ -40,7 +38,6 @@ func ChromeUserProfiles(client *osquery.ExtensionManagerClient, logger log.Logge
 }
 
 type chromeUserProfilesTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

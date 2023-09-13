@@ -22,7 +22,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -33,14 +32,13 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 type gsettingsExecer func(ctx context.Context, username string, buf *bytes.Buffer) error
 
 type GsettingsValues struct {
-	client   *osquery.ExtensionManagerClient
 	logger   log.Logger
 	getBytes gsettingsExecer
 }
 
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
-func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func Settings(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
@@ -49,7 +47,6 @@ func Settings(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 	}
 
 	t := &GsettingsValues{
-		client:   client,
 		logger:   logger,
 		getBytes: execGsettings,
 	}

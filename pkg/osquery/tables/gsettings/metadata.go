@@ -18,20 +18,17 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type GsettingsMetadata struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	cmdRunner func(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error
 }
 
 // Metadata returns a table plugin for querying metadata about specific keys in
 // specific schemas
-func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-
+func Metadata(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
 		table.TextColumn("schema"),
@@ -41,7 +38,6 @@ func Metadata(client *osquery.ExtensionManagerClient, logger log.Logger) *table.
 	}
 
 	t := &GsettingsMetadata{
-		client:    client,
 		logger:    logger,
 		cmdRunner: execGsettingsCommand,
 	}
