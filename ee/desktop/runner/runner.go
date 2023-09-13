@@ -834,6 +834,7 @@ func IsAppindicatorEnabled(ctx context.Context) bool {
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", "list", "--enabled")
+		cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%s", uid))
 
 		var combinedBuffer bytes.Buffer
 		cmd.Stdout = &combinedBuffer
