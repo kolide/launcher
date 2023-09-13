@@ -22,7 +22,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -34,12 +33,11 @@ const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST
 type execer func(ctx context.Context, display, username string, buf *bytes.Buffer) error
 
 type XRDBSettings struct {
-	client   *osquery.ExtensionManagerClient
 	logger   log.Logger
 	getBytes execer
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
@@ -48,7 +46,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	}
 
 	t := &XRDBSettings{
-		client:   client,
 		logger:   logger,
 		getBytes: execXRDB,
 	}

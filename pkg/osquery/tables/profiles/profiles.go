@@ -24,7 +24,6 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -39,13 +38,11 @@ var (
 )
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	tableName string
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-
+func TablePlugin(logger log.Logger) *table.Plugin {
 	// profiles options. See `man profiles`. These may not be needed,
 	// we use `show -all` as the default, and it probably covers
 	// everything.
@@ -56,7 +53,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	)
 
 	t := &Table{
-		client:    client,
 		logger:    logger,
 		tableName: "kolide_profiles",
 	}

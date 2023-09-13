@@ -12,7 +12,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -20,17 +19,15 @@ import (
 const fdesetupPath = "/usr/bin/fdesetup"
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("status"),
 	}
 
 	t := &Table{
-		client: client,
 		logger: logger,
 	}
 

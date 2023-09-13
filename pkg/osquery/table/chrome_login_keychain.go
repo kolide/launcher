@@ -12,14 +12,12 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // DEPRECATED use kolide_chrome_login_data_emails
-func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func ChromeLoginKeychainInfo(logger log.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
-		client: client,
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
@@ -31,7 +29,6 @@ func ChromeLoginKeychainInfo(client *osquery.ExtensionManagerClient, logger log.
 }
 
 type ChromeLoginKeychain struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

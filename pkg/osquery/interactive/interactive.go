@@ -117,7 +117,7 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
-	extensionManagerServer.RegisterPlugin(table.PlatformTables(client, log.NewNopLogger(), osquerydPath)...)
+	extensionManagerServer.RegisterPlugin(table.PlatformTables(log.NewNopLogger(), osquerydPath)...)
 
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)

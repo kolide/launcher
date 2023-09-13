@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -30,7 +29,7 @@ var slackConfigDirs = map[string][]string{
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var slackConfigDirDefault = []string{".config/Slack"}
 
-func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func SlackConfig(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("team_id"),
 		table.TextColumn("team_name"),
@@ -41,7 +40,6 @@ func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	}
 
 	t := &SlackConfigTable{
-		client: client,
 		logger: logger,
 	}
 
@@ -49,7 +47,6 @@ func SlackConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 }
 
 type SlackConfigTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

@@ -11,7 +11,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -24,7 +23,6 @@ const (
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.@/"
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 	cmd    string
 }
@@ -38,9 +36,8 @@ func columns() []table.ColumnDefinition {
 	}
 }
 
-func ZfsPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
-		client: client,
 		logger: logger,
 		cmd:    zfsPath,
 	}
@@ -48,9 +45,8 @@ func ZfsPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Logg
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
 }
 
-func ZpoolPropertiesPlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func ZpoolPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
-		client: client,
 		logger: logger,
 		cmd:    zpoolPath,
 	}

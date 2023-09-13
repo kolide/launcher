@@ -14,13 +14,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDUserConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TouchIDUserConfig(logger log.Logger) *table.Plugin {
 	t := &touchIDUserConfigTable{
-		client: client,
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
@@ -36,7 +34,6 @@ func TouchIDUserConfig(client *osquery.ExtensionManagerClient, logger log.Logger
 }
 
 type touchIDUserConfigTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
