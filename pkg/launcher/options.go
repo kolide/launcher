@@ -607,3 +607,25 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 }
+
+// SetDefaultPaths populates the default file/dir paths
+// call this before calling parseOptions if you want to assume these paths exist
+func SetDefaultPaths() {
+	switch runtime.GOOS {
+	case "darwin":
+		DefaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		DefaultEtcDirectoryPath = "/etc/kolide-k2/"
+		DefaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		DefaultConfigFilePath = filepath.Join(DefaultEtcDirectoryPath, "launcher.flags")
+	case "linux":
+		DefaultRootDirectoryPath = "/var/kolide-k2/k2device.kolide.com/"
+		DefaultEtcDirectoryPath = "/etc/kolide-k2/"
+		DefaultBinDirectoryPath = "/usr/local/kolide-k2/"
+		DefaultConfigFilePath = filepath.Join(DefaultEtcDirectoryPath, "launcher.flags")
+	case "windows":
+		DefaultRootDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
+		DefaultEtcDirectoryPath = ""
+		DefaultBinDirectoryPath = "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
+		DefaultConfigFilePath = filepath.Join("C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf", "launcher.flags")
+	}
+}
