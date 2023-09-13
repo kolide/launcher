@@ -466,7 +466,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
-	if runtime.GOOS == "linux" && !IsAppindicatorEnabled(context.Background()) {
+	if runtime.GOOS == "linux" && !IsMeetingGnomeAppindicatorRequirements(context.Background()) {
 		level.Info(r.logger).Log("msg", "no appindicator enabled, not running desktop")
 		r.killDesktopProcesses()
 		return nil
@@ -815,9 +815,10 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 	})
 }
 
-// IsAppindicatorEnabled iterates over known appindicator gnome-extensions for each user
-// and returns true the first time it finds one enabled, false if none found enabled
-func IsAppindicatorEnabled(ctx context.Context) bool {
+// IsMeetingGnomeAppindicatorRequirements iterates over known appindicator gnome-extensions for each user
+// and returns true the first time it finds one enabled, false if none found enabled.
+// Returns true if exec of gnome-extensions fails, assumes user not using gnome.
+func IsMeetingGnomeAppindicatorRequirements(ctx context.Context) bool {
 	uids, err := consoleuser.CurrentUids(ctx)
 	if err != nil {
 		return false
@@ -845,7 +846,8 @@ func IsAppindicatorEnabled(ctx context.Context) bool {
 		}
 
 		if err := cmd.Wait(); err != nil {
-			return false
+			// if we go an error here we are just assuming that the machine is not using gnome
+			return true
 		}
 
 		for _, extension := range extensions {
