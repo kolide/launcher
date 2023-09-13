@@ -32,34 +32,39 @@ func RunFlareShip(logger log.Logger, k types.Knapsack, flarer flarer, requestUrl
 	// make sure we have a url to upload to
 	uploadUrl, err := requestUploadUrl(k, requestUrl)
 	if err != nil {
-		return err
+		return fmt.Errorf("requesting upload url: %w", err)
 	}
 
-	b := bytes.NewBuffer([]byte{})
+	flareBuf := bytes.NewBuffer([]byte{})
 
 	// run flare
 	ctx := context.Background()
-	if err := flarer.RunFlare(ctx, k, b, checkups.InSituEnvironment); err != nil {
-		return err
+	if err := flarer.RunFlare(ctx, k, flareBuf, checkups.InSituEnvironment); err != nil {
+		return fmt.Errorf("running flare: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, uploadUrl, b)
+	flareUploadRequest, err := http.NewRequest(http.MethodPost, uploadUrl, flareBuf)
 	if err != nil {
-		return nil
+		return fmt.Errorf("creating request: %w", err)
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	flareUploadResponse, err := http.DefaultClient.Do(flareUploadRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("sending request: %w", err)
 	}
-	defer response.Body.Close()
+	defer flareUploadResponse.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(response.Body)
-		if err != nil {
-			return fmt.Errorf("got %s status in response, error reading body: %w", response.Status, err)
-		}
-		return fmt.Errorf("got %s status in response: %s", response.Status, string(body))
+	flareUploadResponseBody, err := io.ReadAll(flareUploadResponse.Body)
+	if err != nil {
+		return fmt.Errorf("reading response: %w", err)
+	}
+
+	if len(flareUploadResponseBody) > 0 {
+		logger.Log("flare upload response", string(flareUploadResponseBody))
+	}
+
+	if flareUploadResponse.StatusCode != http.StatusOK {
+		return fmt.Errorf("got %s status in response: %s", flareUploadResponse.Status, string(flareUploadResponseBody))
 	}
 
 	return nil
@@ -73,25 +78,32 @@ func requestUploadUrl(k types.Knapsack, requestUrl string) (string, error) {
 
 	request, err := uploadUrlRequest(k, requestUrl, data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating request: %w", err)
 	}
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("sending request: %w", err)
 	}
 	defer response.Body.Close()
 
-	uploadUrl, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("reading response: %w", err)
 	}
 
-	return string(uploadUrl), nil
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("got %s status in response: %s", response.Status, string(body))
+	}
+
+	return string(body), nil
 }
 
 func uploadUrlRequest(k types.Knapsack, url string, body []byte) (*http.Request, error) {
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
 
 	// try to get access to launcher keys so we can sign request, but if we fail at any point
 	// just return the request without the signature and let server side deal with it

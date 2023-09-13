@@ -47,9 +47,7 @@ func runFlare(args []string) error {
 
 	var requestUrl = env.String("KOLIDE_AGENT_FLARE_REQUEST_URL", "")
 	if requestUrl != "" {
-		if err := flareshipping.RunFlareShip(logger, k, runFlareInt{}, requestUrl); err != nil {
-			fmt.Println(err)
-		}
+		return flareshipping.RunFlareShip(logger, k, runFlareInt{}, requestUrl)
 	}
 
 	// not shipping, write to file
