@@ -42,6 +42,7 @@ type Runner struct {
 	instance     *OsqueryInstance
 	instanceLock sync.Mutex
 	shutdown     chan struct{}
+	interrupted  bool
 	opts         []OsqueryInstanceOption
 }
 
@@ -140,6 +141,12 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
 func (r *Runner) Shutdown() error {
+	if r.interrupted {
+		// Already shut down, nothing else to do
+		return nil
+	}
+
+	r.interrupted = true
 	close(r.shutdown)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()

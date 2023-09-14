@@ -568,6 +568,43 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	require.Equal(t, newerValidVersion, validVersions[3], "not sorted")
 }
 
+func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
+	t.Parallel()
+
+	// Create update directories
+	testBaseDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "launcher"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(testBaseDir, "osqueryd"), 0755))
+
+	// Create a few valid updates in the library
+	olderVersion := "1.0.16-8-g1594781"
+	middleVersion := "1.0.16-9-g613d85c"
+	newerVersion := "1.0.16-30-ge34c9a0"
+	for _, v := range []string{olderVersion, middleVersion, newerVersion} {
+		versionDir := filepath.Join(testBaseDir, "launcher", v)
+		executablePath := executableLocation(versionDir, binaryLauncher)
+		require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+		tufci.CopyBinary(t, executablePath)
+		require.NoError(t, os.Chmod(executablePath, 0755))
+		_, err := os.Stat(executablePath)
+		require.NoError(t, err, "did not create binary for test")
+		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+	}
+
+	// Get sorted versions
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(binaryLauncher, testBaseDir)
+	require.NoError(t, err, "expected no error on sorting versions in library")
+
+	// Confirm we don't have any invalid versions
+	require.Equal(t, 0, len(invalidVersions))
+
+	// Confirm valid versions are the ones we expect and that they're sorted in ascending order
+	require.Equal(t, 3, len(validVersions))
+	require.Equal(t, olderVersion, validVersions[0], "not sorted")
+	require.Equal(t, middleVersion, validVersions[1], "not sorted")
+	require.Equal(t, newerVersion, validVersions[2], "not sorted")
+}
+
 func Test_versionFromTarget(t *testing.T) {
 	t.Parallel()
 
