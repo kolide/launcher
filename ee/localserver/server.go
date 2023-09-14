@@ -20,7 +20,6 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
@@ -215,35 +214,27 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 
 func (ls *localServer) Start() error {
 	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can, but because the underlying launcher
-	// run group isn't ordered, this is likely to happen before querier is ready. So we retry at a frequent interval for a couple of minutes, then we drop
-	// back to a slower poll interval. Note that this polling is merely a check against time, we don't repopulate this data nearly so often. (But we poll
+	// run group isn't ordered, this is likely to happen before querier is ready. So we wait for <pollInterval> and allow attempting at this more frequent
+	// interval until the first run is successful, then adhere to a much longer recalculation interval.
+	// Note that this polling is merely a check against time, we don't repopulate this data nearly so often. (But we poll
 	// frequently to account for the difference between wall clock time, and sleep time)
 	const (
-		initialPollInterval = 10 * time.Second
-		initialPollTimeout  = 2 * time.Minute
-		pollInterval        = 15 * time.Minute
+		pollInterval        = 10 * time.Minute
 		recalculateInterval = 24 * time.Hour
 	)
-	go func() {
-		// Initial load, run pretty often, at least for the first chunk of time.
-		var lastRun time.Time
-		if err := backoff.WaitFor(func() error {
-			lastRun = ls.runAsyncdWorkers()
-			if (lastRun == time.Time{}) {
-				return errors.New("async tasks not success on initial boot (no surprise)")
-			}
-			return nil
-		},
-			initialPollTimeout,
-			initialPollInterval,
-		); err != nil {
-			level.Info(ls.logger).Log("message", "Initial async runs unsuccessful. Will retry in the future.", "err", err)
-		}
 
-		// Now that we're done with the initial population, fall back to a periodic polling
+	go func() {
+		var lastRun time.Time
+
 		for range time.Tick(pollInterval) {
-			if time.Since(lastRun) > (recalculateInterval) {
+			// every pollInterval, run if:
+			//  - we've never run successfully, or the last run was unsuccessful
+			//  - we haven't run successfully in over <recalculateInterval>
+			if lastRun.IsZero() || time.Since(lastRun) > recalculateInterval {
 				lastRun = ls.runAsyncdWorkers()
+				if lastRun.IsZero() {
+					level.Info(ls.logger).Log("message", "runAsyncdWorkers unsuccessful, will retry in the future.")
+				}
 			}
 		}
 	}()
