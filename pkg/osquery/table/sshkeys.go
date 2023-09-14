@@ -13,7 +13,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/launcher/pkg/keyidentifier"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,13 +23,12 @@ var sshDirs = map[string][]string{
 var sshDirsDefault = []string{".ssh/*"}
 
 type SshKeysTable struct {
-	client     *osquery.ExtensionManagerClient
 	logger     log.Logger
 	kIdentifer *keyidentifier.KeyIdentifier
 }
 
 // New returns a new table extension
-func SshKeys(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func SshKeys(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("user"),
 		table.TextColumn("path"),
@@ -52,7 +50,6 @@ func SshKeys(client *osquery.ExtensionManagerClient, logger log.Logger) *table.P
 	}
 
 	t := &SshKeysTable{
-		client:     client,
 		logger:     logger,
 		kIdentifer: kIdentifer,
 	}

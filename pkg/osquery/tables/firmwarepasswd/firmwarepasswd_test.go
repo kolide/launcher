@@ -47,7 +47,7 @@ func TestParser(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		parser := New(nil, log.NewNopLogger()).parser
+		parser := New(log.NewNopLogger()).parser
 
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()

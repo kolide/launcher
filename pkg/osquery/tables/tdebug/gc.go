@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -26,7 +25,7 @@ type gcTable struct {
 	stats  debug.GCStats
 }
 
-func LauncherGcInfo(_client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func LauncherGcInfo(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &gcTable{

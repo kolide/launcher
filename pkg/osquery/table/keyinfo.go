@@ -8,17 +8,15 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/keyidentifier"
-	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type KeyInfoTable struct {
-	client     *osquery.ExtensionManagerClient
 	logger     log.Logger
 	kIdentifer *keyidentifier.KeyIdentifier
 }
 
-func KeyInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func KeyInfo(logger log.Logger) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
@@ -40,7 +38,6 @@ func KeyInfo(client *osquery.ExtensionManagerClient, logger log.Logger) *table.P
 	}
 
 	t := &KeyInfoTable{
-		client:     client,
 		logger:     logger,
 		kIdentifer: kIdentifer,
 	}

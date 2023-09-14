@@ -57,9 +57,7 @@ func main() {
 	}
 
 	var plugins []osquery.OsqueryPlugin
-	for _, tablePlugin := range table.PlatformTables(client, logger, "osqueryd") {
-		plugins = append(plugins, tablePlugin)
-	}
+	plugins = append(plugins, table.PlatformTables(logger, "osqueryd")...)
 	server.RegisterPlugin(plugins...)
 
 	if err := server.Run(); err != nil {

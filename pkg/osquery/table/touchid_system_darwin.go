@@ -10,14 +10,11 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDSystemConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TouchIDSystemConfig(logger log.Logger) *table.Plugin {
 	t := &touchIDSystemConfigTable{
-		client: client,
 		logger: logger,
 	}
 	columns := []table.ColumnDefinition{
@@ -31,7 +28,6 @@ func TouchIDSystemConfig(client *osquery.ExtensionManagerClient, logger log.Logg
 }
 
 type touchIDSystemConfigTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 
 	"golang.org/x/text/encoding/unicode"
@@ -31,18 +30,15 @@ import (
 const seceditCmd = "secedit"
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
-
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
 	)
 
 	t := &Table{
-		client: client,
 		logger: logger,
 	}
 

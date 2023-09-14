@@ -17,18 +17,16 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
 
 type Table struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("namespace"),
@@ -38,7 +36,6 @@ func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *tab
 	)
 
 	t := &Table{
-		client: client,
 		logger: level.NewFilter(logger),
 	}
 
