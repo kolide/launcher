@@ -44,6 +44,7 @@ build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
 build_%: GOBUILD = $(if $(CROSSGOPATH), $(CROSSGOPATH), go)
 build_%: .pre-build
+	$(GOBUILD) clean -cache
 	$(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
 
 fake_%: TARGET =  $(word 2, $(subst _, ,$@))
@@ -240,6 +241,7 @@ proto:
 	@echo "Generated code from proto definitions."
 
 test: generate
+	go clean -testcache
 	go test -cover -coverprofile=coverage.out -race $(shell go list ./... | grep -v /vendor/)
 
 ##
