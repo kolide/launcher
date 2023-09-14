@@ -318,9 +318,15 @@ func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory str
 	// Sort the versions (ascending order)
 	sort.Sort(semver.Collection(versionsInLibrary))
 
-	// Transform versions back into strings now that we've finished sorting them
+	// Transform versions back into strings now that we've finished sorting them; swap the prerelease value back.
 	versionsInLibraryStr := make([]string, len(versionsInLibrary))
 	for i, v := range versionsInLibrary {
+		if v.Prerelease() != "" {
+			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.Replace(v.Prerelease(), ".", "-", -1))
+			if err == nil {
+				v = &versionWithUpdatedPrerelease
+			}
+		}
 		versionsInLibraryStr[i] = v.Original()
 	}
 
