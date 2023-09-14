@@ -18,7 +18,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func getEnrollDetails(osquerydPath string) (service.EnrollmentDetails, error) {
+func getEnrollDetails(ctx context.Context, osquerydPath string) (service.EnrollmentDetails, error) {
 	var details service.EnrollmentDetails
 
 	// To facilitate manual testing around missing enrollment details,
@@ -32,6 +32,8 @@ func getEnrollDetails(osquerydPath string) (service.EnrollmentDetails, error) {
 		return details, fmt.Errorf("no binary at %s", osquerydPath)
 	} else if info.IsDir() {
 		return details, fmt.Errorf("%s is a directory", osquerydPath)
+	} else if err != nil {
+		return details, fmt.Errorf("statting %s: %w", osquerydPath, err)
 	}
 
 	query := `
@@ -65,7 +67,7 @@ func getEnrollDetails(osquerydPath string) (service.EnrollmentDetails, error) {
 		return details, fmt.Errorf("create osquery for enrollment details: %w", err)
 	}
 
-	osqCtx, osqCancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer osqCancel()
 
 	if err := osq.Execute(osqCtx); osqCtx.Err() != nil {

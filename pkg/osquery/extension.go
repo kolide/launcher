@@ -408,12 +408,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		level.Info(logger).Log("msg", "Cannot get additional enrollment details without an osqueryd path. This is probably CI")
 	} else {
 		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(e.knapsack.OsquerydPath())
+			enrollDetails, err = getEnrollDetails(ctx, e.knapsack.OsquerydPath())
 			if err != nil {
 				level.Debug(logger).Log("msg", "getEnrollDetails failed in backoff", "err", err)
 			}
 			return err
-		}, 5*time.Second, 5*time.Second); err != nil {
+		}, 30*time.Second, 5*time.Second); err != nil {
 			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
 				return "", true, fmt.Errorf("query enrollment details: %w", err)
 			}

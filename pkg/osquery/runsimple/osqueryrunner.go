@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"runtime"
 )
 
 // osqueryRunner is a very simple osquery runtime manager. It's designed to start and stop osquery. It has
@@ -83,12 +84,9 @@ func NewOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osquery
 }
 
 func (p *osqueryProcess) Execute(ctx context.Context) error {
-	// TODO: Not totally sure on ctx here. I think that osquery should probably have it's own context, but also
-	// that it's a better method signature.
-
-	// cmd.Start does not block
-	// Need to call cmd.Wait after it
-	// So how do we manage the start, health, wait in the rest of the control flow?
+	// if this grows to replacing the larger osquery runtime, there are a lot of questions about how it will work.
+	//  - cmd.Start does not block, Need to call cmd.Wait after it, So how do we manage the start, health, wait in the rest of the control flow?
+	//  - Should osquery get it's own context? It makes some of the process management easier. But maybe not.
 
 	args := []string{}
 
@@ -98,10 +96,13 @@ func (p *osqueryProcess) Execute(ctx context.Context) error {
 			"--config_path", "/dev/null",
 			"--disable_events",
 			"--disable_database",
-			"--disable_audit",
 			"--ephemeral",
 			"--json",
 		}...)
+
+		if runtime.GOOS != "windows" {
+			args = append(args, "--disable_audit")
+		}
 
 		p.stdin = bytes.NewReader(p.sql)
 	} else {
