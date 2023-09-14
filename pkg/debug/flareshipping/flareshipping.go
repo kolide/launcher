@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -158,9 +157,7 @@ func enrollSecret(k types.Knapsack) string {
 		return k.EnrollSecret()
 	}
 
-	launcher.SetDefaultPaths()
-
-	b, err := os.ReadFile(filepath.Join(launcher.DefaultEtcDirectoryPath, "secret"))
+	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
 	if err != nil {
 		return ""
 	}
@@ -174,9 +171,9 @@ func launcherKey(k types.Knapsack) crypto.Signer {
 	}
 
 	if err := agent.SetupKeys(log.NewNopLogger(), k.ConfigStore()); err != nil {
-		return agent.LocalDbKeys()
+		return nil
 	}
 
 	// should we let flare create db and add keys?
-	return nil
+	return agent.LocalDbKeys()
 }
