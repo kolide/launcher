@@ -303,6 +303,15 @@ func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory str
 			continue
 		}
 
+		// We have to swap the hyphen in the prerelease for a period (30-abcdabcd to 30.abcdabcd) so that the
+		// semver library can correctly compare prerelease values.
+		if v.Prerelease() != "" {
+			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.Replace(v.Prerelease(), "-", ".", -1))
+			if err == nil {
+				v = &versionWithUpdatedPrerelease
+			}
+		}
+
 		versionsInLibrary = append(versionsInLibrary, v)
 	}
 
