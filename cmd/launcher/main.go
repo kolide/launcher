@@ -163,11 +163,11 @@ func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	}
 
 	if newerBinary == "" {
-		level.Debug(logger).Log("msg", "nothing newer")
+		level.Info(logger).Log("msg", "nothing newer")
 		return
 	}
 
-	level.Debug(logger).Log(
+	level.Info(logger).Log(
 		"msg", "preparing to exec new binary",
 		"old_version", version.Version().Version,
 		"new_binary", newerBinary,
@@ -201,7 +201,7 @@ func latestLauncherPath(ctx context.Context, logger log.Logger) (string, error) 
 
 	currentPath, _ := os.Executable()
 	if newerBinary.Version != version.Version().Version && newerBinary.Path != currentPath {
-		level.Debug(logger).Log(
+		level.Info(logger).Log(
 			"msg", "got new version of launcher to run",
 			"old_version", version.Version().Version,
 			"new_binary_version", newerBinary.Version,
