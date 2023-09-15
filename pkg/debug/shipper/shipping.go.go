@@ -111,10 +111,7 @@ func launcherData(k types.Knapsack) (io.Reader, error) {
 		return nil, fmt.Errorf("getting username: %w", err)
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("getting hostname: %w", err)
-	}
+	hostname, _ := os.Hostname() //nolint:errorcheck want to continue any ways if we don't have host name
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
