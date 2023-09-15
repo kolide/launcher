@@ -562,6 +562,7 @@ func FindOsquery() string {
 	// seem important.
 	likelyDirectories = append(
 		likelyDirectories,
+		"/usr/local/kolide-k2/osquery.app/Contents/MacOS",
 		"/usr/local/kolide/bin",
 		"/usr/local/kolide-k2/bin",
 		"/usr/local/bin",
