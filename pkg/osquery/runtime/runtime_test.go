@@ -275,6 +275,28 @@ func TestSimplePath(t *testing.T) {
 	require.NoError(t, runner.Shutdown())
 }
 
+func TestMultipleShutdowns(t *testing.T) {
+	t.Parallel()
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	runner, err := LaunchInstance(
+		WithKnapsack(k),
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+	)
+	require.NoError(t, err)
+
+	waitHealthy(t, runner)
+
+	for i := 0; i < 3; i += 1 {
+		require.NoError(t, runner.Shutdown(), "expected no error on calling shutdown but received error on attempt: ", i)
+	}
+}
+
 func TestRestart(t *testing.T) {
 	t.Parallel()
 	runner, teardown := setupOsqueryInstanceForTests(t)
