@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/debug/checkups"
-	shipping "github.com/kolide/launcher/pkg/debug/shipper"
+	"github.com/kolide/launcher/pkg/debug/shipping"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
