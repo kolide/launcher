@@ -1,6 +1,7 @@
-package flareshipping
+package shipping
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,12 +11,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
-	"github.com/kolide/launcher/pkg/agent/types"
-	agentTypesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/debug/flareshipping/mocks"
+	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,25 +23,30 @@ func TestRunFlareShip(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		mockKnapsack           func(t *testing.T) types.Knapsack
+		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
 		expectSignatureHeaders bool
 		expectSecret           bool
 		assertion              assert.ErrorAssertionFunc
 	}{
 		{
-			name:         "happy path no signing keys",
-			mockKnapsack: func(t *testing.T) types.Knapsack { return nil },
-			assertion:    assert.NoError,
+			name: "happy path no signing keys",
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				k.On("EnrollSecret").Return("")
+				return k
+			},
+			assertion: assert.NoError,
 			// if the secret exists at the default path, is should error when
 			// we try to read it unless we run tests as root
 			expectSecret: false,
 		},
 		{
 			name: "happy path with signing keys",
-			mockKnapsack: func(t *testing.T) types.Knapsack {
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				configStore := inmemory.NewStore(log.NewNopLogger())
-				k := agentTypesMocks.NewKnapsack(t)
-				k.On("ConfigStore").Return(configStore)
+				agent.SetupKeys(log.NewNopLogger(), configStore)
+
+				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				return k
 			},
@@ -51,14 +55,9 @@ func TestRunFlareShip(t *testing.T) {
 			assertion:              assert.NoError,
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			flarer := mocks.NewFlarer(t)
-			flarer.On("RunFlare", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
 			testServer := httptest.NewServer(nil)
 
 			mux := http.NewServeMux()
@@ -87,7 +86,10 @@ func TestRunFlareShip(t *testing.T) {
 
 			testServer.Config.Handler = mux
 
-			tt.assertion(t, RunFlareShip(log.NewNopLogger(), tt.mockKnapsack(t), flarer, fmt.Sprintf("%s/signedurl", testServer.URL)))
+			knapsack := tt.mockKnapsack(t)
+			knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
+
+			tt.assertion(t, Ship(log.NewNopLogger(), knapsack, bytes.NewBuffer([]byte("ahhhhh"))))
 		})
 	}
 }
@@ -114,12 +116,6 @@ func TestRunFlareShipErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			flarer := mocks.NewFlarer(t)
-
-			if !tt.failGetSignedURLRequest {
-				flarer.On("RunFlare", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			}
-
 			testServer := httptest.NewServer(nil)
 
 			mux := http.NewServeMux()
@@ -141,7 +137,11 @@ func TestRunFlareShipErrors(t *testing.T) {
 
 			testServer.Config.Handler = mux
 
-			require.Error(t, RunFlareShip(log.NewNopLogger(), nil, flarer, fmt.Sprintf("%s/signedurl", testServer.URL)))
+			k := typesMocks.NewKnapsack(t)
+			k.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
+			k.On("EnrollSecret").Return("")
+
+			require.Error(t, Ship(log.NewNopLogger(), k, bytes.NewBuffer([]byte("ahhhhh"))))
 		})
 	}
 }

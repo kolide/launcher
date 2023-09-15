@@ -49,6 +49,7 @@ const (
 	TraceIngestServerURL           FlagKey = "trace_ingest_url"
 	DisableTraceIngestTLS          FlagKey = "disable_trace_ingest_tls"
 	InModernStandby                FlagKey = "in_modern_standby"
+	DebugUploadRequestURL          FlagKey = "debug_upload_request_url"
 )
 
 func (key FlagKey) String() string {

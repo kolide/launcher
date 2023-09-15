@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -12,18 +12,11 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/debug/checkups"
-	"github.com/kolide/launcher/pkg/debug/flareshipping"
+	shipping "github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
-
-// runFlareInt is an empty struct that implements the RunFlare method so we can pass to flare shipper
-type runFlareInt struct{}
-
-func (_ runFlareInt) RunFlare(ctx context.Context, k types.Knapsack, flare io.Writer, environment checkups.RuntimeEnvironmentType) error {
-	return checkups.RunFlare(ctx, k, flare, environment)
-}
 
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
@@ -40,14 +33,19 @@ func runFlare(args []string) error {
 
 	logger := log.NewLogfmtLogger(os.Stdout)
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, nil, fcOpts...)
+	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
 	k := knapsack.New(nil, flagController, nil)
 
 	ctx := context.Background()
 
-	var requestUrl = env.String("KOLIDE_AGENT_FLARE_REQUEST_URL", "")
-	if requestUrl != "" {
-		return flareshipping.RunFlareShip(logger, k, runFlareInt{}, requestUrl)
+	k.SetDebugUploadRequestURL(env.String("KOLIDE_AGENT_FLARE_REQUEST_URL", ""))
+	if k.DebugUploadRequestURL() != "" {
+		flareWriter := &bytes.Buffer{}
+		if err := checkups.RunFlare(ctx, k, flareWriter, checkups.StandaloneEnviroment); err != nil {
+			return err
+		}
+
+		return shipping.Ship(logger, k, flareWriter)
 	}
 
 	// not shipping, write to file
