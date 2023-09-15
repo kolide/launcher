@@ -213,24 +213,22 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 }
 
 func (ls *localServer) Start() error {
-	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can, but because the underlying launcher
-	// run group isn't ordered, this is likely to happen before querier is ready. So we wait for <pollInterval> and allow attempting at this more frequent
-	// interval until the first run is successful, then adhere to a much longer recalculation interval.
+	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can,
+	// this is likely to happen before querier is ready. So we wait for <pollInterval> and before starting and then only
+	// rerun if the previous run was unsuccessful, or has been greater than <recalculateInterval>.
 	// Note that this polling is merely a check against time, we don't repopulate this data nearly so often. (But we poll
 	// frequently to account for the difference between wall clock time, and sleep time)
 	const (
-		pollInterval        = 10 * time.Minute
+		pollInterval        = 15 * time.Minute
 		recalculateInterval = 24 * time.Hour
 	)
 
 	go func() {
 		var lastRun time.Time
 
+		// note that this will trigger the check for the first time after pollInterval (not immediately)
 		for range time.Tick(pollInterval) {
-			// every pollInterval, run if:
-			//  - we've never run successfully, or the last run was unsuccessful
-			//  - we haven't run successfully in over <recalculateInterval>
-			if lastRun.IsZero() || time.Since(lastRun) > recalculateInterval {
+			if time.Since(lastRun) > recalculateInterval {
 				lastRun = ls.runAsyncdWorkers()
 				if lastRun.IsZero() {
 					level.Info(ls.logger).Log("message", "runAsyncdWorkers unsuccessful, will retry in the future.")
