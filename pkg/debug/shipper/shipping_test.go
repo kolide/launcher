@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunFlareShip(t *testing.T) {
+func TestShip(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -94,7 +94,7 @@ func TestRunFlareShip(t *testing.T) {
 	}
 }
 
-func TestRunFlareShipErrors(t *testing.T) {
+func TestShipErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
