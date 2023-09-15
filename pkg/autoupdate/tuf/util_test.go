@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -11,7 +12,7 @@ import (
 func Test_executableLocation(t *testing.T) {
 	t.Parallel()
 
-	updateDir := filepath.Join("some", "path", "to", "the", "updates", "directory")
+	updateDir := t.TempDir()
 
 	var expectedOsquerydLocation string
 	var expectedLauncherLocation string
@@ -27,9 +28,32 @@ func Test_executableLocation(t *testing.T) {
 		expectedLauncherLocation = filepath.Join(updateDir, "launcher")
 	}
 
+	require.NoError(t, os.MkdirAll(filepath.Dir(expectedOsquerydLocation), 0755))
+	f, err := os.Create(expectedOsquerydLocation)
+	require.NoError(t, err)
+	f.Close()
+
 	osquerydLocation := executableLocation(updateDir, "osqueryd")
 	require.Equal(t, expectedOsquerydLocation, osquerydLocation)
 
 	launcherLocation := executableLocation(updateDir, "launcher")
 	require.Equal(t, expectedLauncherLocation, launcherLocation)
+}
+
+func Test_executableLocation_nonAppBundle(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS != "darwin" {
+		t.SkipNow()
+	}
+
+	updateDir := t.TempDir()
+	expectedOsquerydLocation := filepath.Join(updateDir, "osqueryd")
+
+	f, err := os.Create(expectedOsquerydLocation)
+	require.NoError(t, err)
+	f.Close()
+
+	osquerydLocation := executableLocation(updateDir, "osqueryd")
+	require.Equal(t, expectedOsquerydLocation, osquerydLocation)
 }
