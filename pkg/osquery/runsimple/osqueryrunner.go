@@ -3,7 +3,6 @@ package runsimple
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os/exec"
 	"runtime"
@@ -17,9 +16,6 @@ type osqueryProcess struct {
 	stdout        io.Writer
 	stderr        io.Writer
 	stdin         io.Reader
-	sql           []byte
-
-	cmd *exec.Cmd
 }
 
 type osqueryProcessOpt func(*osqueryProcess)
@@ -58,15 +54,6 @@ func WithStdin(r io.Reader) osqueryProcessOpt {
 	}
 }
 
-// RunSql will run a given blob by passing it in as stdin. Note that osquery is perticular. It needs the
-// trailing semicolon, but it's real weird about line breaks, an may return as multiline json output. It
-// is the responsibility of the caller to get the details right.
-func RunSql(sql []byte) osqueryProcessOpt {
-	return func(p *osqueryProcess) {
-		p.sql = sql
-	}
-}
-
 func NewOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osqueryProcess, error) {
 	p := &osqueryProcess{
 		osquerydPath: osquerydPath,
@@ -76,50 +63,62 @@ func NewOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osquery
 		opt(p)
 	}
 
-	if p.stdin != nil && p.sql != nil {
-		return nil, errors.New("Cannot specify both stdin and sql")
-	}
-
 	return p, nil
 }
+
+// RunSql will run a given blob by passing it in as stdin. Note that osquery is perticular. It needs the
+// trailing semicolon, but it's real weird about line breaks, an may return as multiline json output. It
+// is the responsibility of the caller to get the details right.
+func (p osqueryProcess) RunSql(ctx context.Context, sql []byte) error {
+	args := []string{
+		"-S",
+		"--config_path", "/dev/null",
+		"--disable_events",
+		"--disable_database",
+		"--ephemeral",
+		"--json",
+	}
+
+	if runtime.GOOS != "windows" {
+		args = append(args, "--disable_audit")
+	}
+
+	p.stdin = bytes.NewReader(sql)
+
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+
+	// It's okay for these to be nil, so we can just set them without checking.
+	cmd.Stdin = p.stdin
+	cmd.Stdout = p.stdout
+	cmd.Stderr = p.stderr
+
+	return cmd.Run()
+}
+
+func (p osqueryProcess) RunVersion(ctx context.Context) error {
+	args := []string{
+		"--version",
+	}
+
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+
+	// It's okay for these to be nil, so we can just set them without checking.
+	cmd.Stdin = p.stdin
+	cmd.Stdout = p.stdout
+	cmd.Stderr = p.stderr
+
+	return cmd.Run()
+}
+
+/*
 
 func (p *osqueryProcess) Execute(ctx context.Context) error {
 	// if this grows to replacing the larger osquery runtime, there are a lot of questions about how it will work.
 	//  - cmd.Start does not block, Need to call cmd.Wait after it, So how do we manage the start, health, wait in the rest of the control flow?
 	//  - Should osquery get it's own context? It makes some of the process management easier. But maybe not.
 
-	args := []string{}
-
-	if p.sql != nil {
-		args = append(args, []string{
-			"-S",
-			"--config_path", "/dev/null",
-			"--disable_events",
-			"--disable_database",
-			"--ephemeral",
-			"--json",
-		}...)
-
-		if runtime.GOOS != "windows" {
-			args = append(args, "--disable_audit")
-		}
-
-		p.stdin = bytes.NewReader(p.sql)
-	} else {
-		panic("Not supported without specified sql")
-	}
-
-	p.cmd = exec.CommandContext(ctx, p.osquerydPath, args...)
-
-	// It's okay for these to be nil, so we can just set them without checking.
-	p.cmd.Stdin = p.stdin
-	p.cmd.Stdout = p.stdout
-	p.cmd.Stderr = p.stderr
-
-	return p.cmd.Run()
 }
 
-/*
 
 func (p *osqueryProcess) Stop() error {
 	proc := p.cmd.Process

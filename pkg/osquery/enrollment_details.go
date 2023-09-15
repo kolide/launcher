@@ -60,7 +60,6 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 
 	osq, err := runsimple.NewOsqueryProcess(
 		osquerydPath,
-		runsimple.RunSql([]byte(query)),
 		runsimple.WithStdout(&respBytes),
 	)
 	if err != nil {
@@ -70,7 +69,7 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer osqCancel()
 
-	if err := osq.Execute(osqCtx); osqCtx.Err() != nil {
+	if err := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
 		return details, fmt.Errorf("query enrollment details context error: %w", osqCtx.Err())
 	} else if err != nil {
 		return details, fmt.Errorf("query enrollment details: %w", err)
