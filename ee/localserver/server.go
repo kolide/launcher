@@ -213,11 +213,11 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 }
 
 func (ls *localServer) Start() error {
-	// Spawn background workers. This loop is a bit weird on startup. We want to populate this data as soon as we can,
-	// this is likely to happen before querier is ready. So we wait for <pollInterval> and before starting and then only
-	// rerun if the previous run was unsuccessful, or has been greater than <recalculateInterval>.
-	// Note that this polling is merely a check against time, we don't repopulate this data nearly so often. (But we poll
-	// frequently to account for the difference between wall clock time, and sleep time)
+	// Spawn background workers. The information gathered here is not critical for DT flow- so to reduce early osquery contention
+	// we wait for <pollInterval> and before starting and then only rerun if the previous run was unsuccessful,
+	// or has been greater than <recalculateInterval>. Note that this polling is merely a check against time,
+	// we don't repopulate this data nearly so often. (But we poll frequently to account for the difference between
+	// wall clock time, and sleep time)
 	const (
 		pollInterval        = 15 * time.Minute
 		recalculateInterval = 24 * time.Hour
@@ -231,7 +231,7 @@ func (ls *localServer) Start() error {
 			if time.Since(lastRun) > recalculateInterval {
 				lastRun = ls.runAsyncdWorkers()
 				if lastRun.IsZero() {
-					level.Info(ls.logger).Log("message", "runAsyncdWorkers unsuccessful, will retry in the future.")
+					level.Debug(ls.logger).Log("message", "runAsyncdWorkers unsuccessful, will retry in the future.")
 				}
 			}
 		}
