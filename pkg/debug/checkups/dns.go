@@ -2,8 +2,11 @@ package checkups
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/kolide/launcher/pkg/agent/types"
 )
@@ -15,88 +18,70 @@ type dnsCheck struct {
 	data    map[string]string
 }
 
-func (dc *dnsCheck) Name() string {
-	return "Check DNS Resolution Health"
-}
-
-func (dc *dnsCheck) Run(ctx context.Context, extraFH io.Writer) error {
-	//if !c.k.KolideHosted() {
-	//	c.status = Unknown
-	//	c.summary = "not kolide hosted"
-	//	return nil
-	//}
-
-	httpClient := &http.Client{Timeout: requestTimeout}
-
-	hosts := map[string]string{
-		"device":  c.k.KolideServerURL(),
-		"control": c.k.ControlServerURL(),
-		"trace":   c.k.TraceIngestServerURL(),
-		"log":     c.k.LogIngestServerURL(),
-	}
-
-	c.data = make(map[string]string, len(hosts))
-
-	failingHosts := make([]string, 0)
-	for n, v := range hosts {
-		fmt.Fprintf(extraFH, "Response from %s / %s:\n", n, v)
-		if v == "" {
-			fmt.Fprintf(extraFH, "%s\n", "not in knapsack")
-			c.data[n] = "not in knapsack"
-			continue
-		}
-
-		body, err := checkKolideServer(c.k, httpClient, extraFH, v)
-		if err != nil {
-			fmt.Fprintf(extraFH, "error: %s\n", err)
-			c.data[n] = err.Error()
-			failingHosts = append(failingHosts, fmt.Sprintf("%s(%s)", n, v))
-			continue
-		}
-
-		fmt.Fprintf(extraFH, "%s\n", string(body))
-		c.data[n] = string(body)
-	}
-
-	if len(failingHosts) > 0 {
-		c.status = Failing
-		c.summary = fmt.Sprintf("Trouble connecting to: %s", strings.Join(failingHosts, ", "))
-		return nil
-	}
-	c.status = Passing
-	c.summary = "successfully connected to device and control server"
-	return nil
-}
-
 // ipLookeruper is an interface to allow mocking of ip look ups
 type ipLookuper interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
-func lookupHostsIpv4s(ipLookuper ipLookuper, urls ...*url.URL) map[string]interface{} {
-	results := make(map[string]interface{})
+func (dc *dnsCheck) Name() string          { return "Verify DNS Resolution" }
+func (dc *dnsCheck) Data() any             { return dc.data }
+func (dc *dnsCheck) ExtraFileName() string { return "resolutions.txt" }
+func (dc *dnsCheck) Status() Status        { return dc.status }
+func (dc *dnsCheck) Summary() string       { return dc.summary }
 
-	for _, url := range urls {
-		ips, err := lookupIpv4(ipLookuper, url)
-
-		if err != nil {
-			results[url.Hostname()] = err.Error()
-		} else {
-			results[url.Hostname()] = ips
-		}
+func (dc *dnsCheck) Run(ctx context.Context, extraFH io.Writer) error {
+	hosts := []string{
+		dc.k.KolideServerURL(),
+		dc.k.ControlServerURL(),
+		dc.k.TraceIngestServerURL(),
+		dc.k.LogIngestServerURL(),
 	}
 
-	return results
+	dc.data = make(map[string]string)
+
+	successCount := 0
+	ipLookerUpperer := &net.Resolver{}
+	fmt.Printf("HOSTS %v", hosts)
+
+	for _, host := range hosts {
+		parsedUrl, err := url.Parse(host)
+		if err != nil {
+			dc.data[host] = fmt.Sprintf("unable to parse url from host: %w", err)
+			continue
+		}
+
+		ips, err := lookupIpv4(ipLookerUpperer, parsedUrl)
+
+		if err != nil {
+			dc.data[parsedUrl.Hostname()] = err.Error()
+			continue
+		}
+
+		dc.data[parsedUrl.Hostname()] = ips
+		successCount++
+	}
+
+	if successCount == len(hosts) {
+		dc.status = Passing
+	} else if successCount > 0 {
+		dc.status = Warning
+	} else {
+		dc.status = Failing
+	}
+
+	dc.summary = fmt.Sprintf("successfully resolved %d/%d hosts", successCount, len(hosts))
+
+	return nil
 }
 
-func lookupIpv4(ipLookuper ipLookuper, url *url.URL) ([]string, error) {
+func lookupIpv4(ipLookuper ipLookuper, url *url.URL) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	ips, err := ipLookuper.LookupIP(ctx, "ip", url.Hostname())
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	ipv4s := []string{}
@@ -106,5 +91,5 @@ func lookupIpv4(ipLookuper ipLookuper, url *url.URL) ([]string, error) {
 		}
 	}
 
-	return ipv4s, nil
+	return strings.Join(ipv4s, ","), nil
 }
