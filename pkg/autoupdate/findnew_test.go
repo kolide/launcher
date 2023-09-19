@@ -81,6 +81,7 @@ func TestGetUpdateDir(t *testing.T) {
 		{in: "/a/bin/Test.app/Contents/MacOS/launcher-updates/1569339163/Test.app/Contents/MacOS/launcher", out: filepath.Clean("/a/bin/launcher-updates")},
 		{in: "", out: ""},
 		{in: "/", out: ""},
+		{in: `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe`, out: `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe-updates`},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +141,11 @@ func TestGetUpdateDir_WithEnvVar(t *testing.T) { //nolint:paralleltest
 			currentPath: "/a/path/var/id/hostname/updates/launcher/1.2.3/Test.app/Contents/MacOS/launcher",
 			installPath: filepath.Clean("/a/Test.app/Contents/MacOS/launcher"),
 			out:         filepath.Clean("/a/bin/launcher-updates"),
+		},
+		{
+			currentPath: `C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe`,
+			installPath: filepath.Clean(`C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`),
+			out:         filepath.Clean(`C:\Program Files\Kolide\Launcher-kolide-k2\bin\osqueryd.exe-updates`),
 		},
 	}
 
