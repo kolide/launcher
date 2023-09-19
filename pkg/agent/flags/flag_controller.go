@@ -479,7 +479,7 @@ func (fc *FlagController) SetDebugUploadRequestURL(url string) error {
 }
 func (fc *FlagController) DebugUploadRequestURL() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.DebugUploadRequestUrl),
+		WithDefaultString(fc.cmdLineOpts.DebugUploadRequestURL),
 	).get(fc.getControlServerValue(keys.DebugUploadRequestURL))
 }
 
