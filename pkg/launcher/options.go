@@ -129,7 +129,7 @@ type Options struct {
 	// DisableTraceIngestTLS allows for disabling TLS when connecting to the observability ingest server
 	DisableTraceIngestTLS bool
 	// DebugUploadRequestURL is the url to request a signed url to upload debug artifacts
-	DebugUploadRequestUrl string
+	DebugUploadRequestURL string
 
 	// ConfigFilePath is the config file options were parsed from, if provided
 	ConfigFilePath string
