@@ -21,13 +21,13 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
-func Ship(logger log.Logger, k types.Knapsack, dataToShip io.Reader) error {
+func Ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader) error {
 	// first get a signed url
 	if k.DebugUploadRequestURL() == "" {
 		return errors.New("debug upload request url is empty")
 	}
 
-	launcherData, err := launcherData(k)
+	launcherData, err := launcherData(k, note)
 	if err != nil {
 		return fmt.Errorf("creating launcher data: %w", err)
 	}
@@ -105,7 +105,7 @@ func signHttpRequest(k types.Knapsack, req *http.Request) error {
 	return nil
 }
 
-func launcherData(k types.Knapsack) (io.Reader, error) {
+func launcherData(k types.Knapsack, note string) (io.Reader, error) {
 	user, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("getting username: %w", err)
@@ -120,6 +120,7 @@ func launcherData(k types.Knapsack) (io.Reader, error) {
 		"enroll_secret": enrollSecret(k),
 		"username":      user.Username,
 		"hostname":      hostname,
+		"note":          note,
 	})
 
 	if err != nil {

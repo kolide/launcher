@@ -10,6 +10,6 @@ import (
 
 type Shipper struct{}
 
-func (s *Shipper) Ship(loggger log.Logger, k types.Knapsack, flareStream io.Reader) error {
-	return shipping.Ship(loggger, k, flareStream)
+func (s *Shipper) Ship(loggger log.Logger, k types.Knapsack, note string, flareStream io.Reader) error {
+	return shipping.Ship(loggger, k, note, flareStream)
 }

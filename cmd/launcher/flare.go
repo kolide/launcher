@@ -45,7 +45,7 @@ func runFlare(args []string) error {
 			return err
 		}
 
-		return shipping.Ship(logger, k, flareWriter)
+		return shipping.Ship(logger, k, "TODO: add cmd line opt for note", flareWriter)
 	}
 
 	// not shipping, write to file
