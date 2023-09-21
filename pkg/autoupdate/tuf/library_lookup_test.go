@@ -17,9 +17,9 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint: paralleltest
 		channelsUsingLegacyAutoupdate["nightly"] = true
 	}()
 
-	for _, binary := range binaries {
+	for _, binary := range binaries { //nolint: paralleltest
 		binary := binary
-		t.Run(string(binary), func(t *testing.T) { //nolint: paralleltest
+		t.Run(string(binary), func(t *testing.T) {
 			// Set up an update library
 			rootDir := t.TempDir()
 			updateDir := defaultLibraryDirectory(rootDir)
@@ -59,9 +59,9 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) { // nolint:parallelt
 		channelsUsingLegacyAutoupdate["nightly"] = true
 	}()
 
-	for _, binary := range binaries {
+	for _, binary := range binaries { //nolint: paralleltest
 		binary := binary
-		t.Run(string(binary), func(t *testing.T) { // nolint:paralleltest
+		t.Run(string(binary), func(t *testing.T) {
 			// Set up an update library, but no TUF repo
 			rootDir := t.TempDir()
 			updateDir := defaultLibraryDirectory(rootDir)
