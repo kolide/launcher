@@ -89,7 +89,7 @@ func TestShip(t *testing.T) {
 			knapsack := tt.mockKnapsack(t)
 			knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 
-			tt.assertion(t, Ship(log.NewNopLogger(), knapsack, bytes.NewBuffer([]byte("ahhhhh"))))
+			tt.assertion(t, Ship(log.NewNopLogger(), knapsack, "some note", bytes.NewBuffer([]byte("ahhhhh"))))
 		})
 	}
 }
@@ -141,7 +141,7 @@ func TestShipErrors(t *testing.T) {
 			k.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 			k.On("EnrollSecret").Return("")
 
-			require.Error(t, Ship(log.NewNopLogger(), k, bytes.NewBuffer([]byte("ahhhhh"))))
+			require.Error(t, Ship(log.NewNopLogger(), k, "some note", bytes.NewBuffer([]byte("ahhhhh"))))
 		})
 	}
 }
