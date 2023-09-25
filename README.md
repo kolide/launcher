@@ -33,7 +33,8 @@ model where the client is the software to be updated and the server is
 the update server. For our implementation, we use [Docker
 Notary](https://github.com/docker/notary) as our TUF server and a Go
 client library that [we built
-in-house](https://github.com/kolide/updater).
+in-house](https://github.com/kolide/updater). We are replacing our
+Notary implementation with one that uses [go-tuf](https://github.com/theupdateframework/go-tuf) instead.
 
 Because we understand the security implications of an osquery
 autoupdater, NCC Group was contracted to perform a security audit of
