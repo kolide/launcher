@@ -27,8 +27,10 @@ type autoupdateConfig struct {
 }
 
 var channelsUsingLegacyAutoupdate = map[string]bool{
-	"stable": true,
-	"beta":   true,
+	"stable":  true,
+	"beta":    true,
+	"alpha":   true,
+	"nightly": true,
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
@@ -47,6 +49,15 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 	}
 
 	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+}
+
+func UsingNewAutoupdater() bool {
+	cfg, err := getAutoupdateConfig()
+	if err != nil {
+		return false
+	}
+
+	return usingNewAutoupdater(cfg.channel)
 }
 
 // getAutoupdateConfig reads launcher's config file to determine the configuration values
