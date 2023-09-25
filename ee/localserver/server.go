@@ -308,6 +308,10 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
+		// Some modern chrome and derivatives use Access-Control-Allow-Private-Network
+		// https://developer.chrome.com/blog/private-network-access-preflight/
+		w.Header().Set("Access-Control-Allow-Private-Network", "true")
+
 		// Stop here if its Preflighted OPTIONS request
 		if r.Method == "OPTIONS" {
 			return
