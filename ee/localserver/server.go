@@ -310,6 +310,7 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 
 		// Some modern chrome and derivatives use Access-Control-Allow-Private-Network
 		// https://developer.chrome.com/blog/private-network-access-preflight/
+		// Though it's unclear if this is still needed, see https://developer.chrome.com/blog/private-network-access-update/
 		w.Header().Set("Access-Control-Allow-Private-Network", "true")
 
 		// Stop here if its Preflighted OPTIONS request
