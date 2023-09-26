@@ -12,9 +12,9 @@ import (
 )
 
 func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint: paralleltest
-	delete(channelsUsingLegacyAutoupdate, "nightly")
+	channelsUsingNewAutoupdater["nightly"] = true
 	defer func() {
-		channelsUsingLegacyAutoupdate["nightly"] = true
+		delete(channelsUsingNewAutoupdater, "nightly")
 	}()
 
 	for _, binary := range binaries { //nolint: paralleltest
@@ -54,9 +54,9 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint: paralleltest
 }
 
 func TestCheckOutLatest_withoutTufRepository(t *testing.T) { // nolint:paralleltest
-	delete(channelsUsingLegacyAutoupdate, "nightly")
+	channelsUsingNewAutoupdater["nightly"] = true
 	defer func() {
-		channelsUsingLegacyAutoupdate["nightly"] = true
+		delete(channelsUsingNewAutoupdater, "nightly")
 	}()
 
 	for _, binary := range binaries { //nolint: paralleltest
@@ -219,6 +219,10 @@ func Test_usingNewAutoupdater(t *testing.T) {
 		},
 		{
 			channelName:        "beta",
+			usesNewAutoupdater: false,
+		},
+		{
+			channelName:        "",
 			usesNewAutoupdater: false,
 		},
 	}
