@@ -22,13 +22,9 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	// Stop and disable launcher service
 	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", "--now", serviceName}...)
-	if out, err := cmd.Output(); err != nil {
-		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", out, err)
-		return err
-	}
-
-	if err := cmd.Run(); err != nil {
-		return err
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Don't exit. Log and move on to the next uninstall command
+		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", string(out), err)
 	}
 
 	fileExists := func(f string) bool {
@@ -42,13 +38,13 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	switch {
 	case fileExists("/usr/bin/dpkg"):
 		cmd = exec.CommandContext(ctx, "/usr/bin/dpkg", []string{"--purge", packageName}...)
-		if err := cmd.Run(); err != nil {
-			return err
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Printf("error occurred while running dpkg --purge, output %s: err: %s\n", string(out), err)
 		}
 	case fileExists("/bin/rpm"):
 		cmd = exec.CommandContext(ctx, "/bin/rpm", []string{"-e", packageName}...)
-		if err := cmd.Run(); err != nil {
-			return err
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Printf("error occurred while running rpm -e, output %s: err: %s\n", string(out), err)
 		}
 	default:
 		return fmt.Errorf("unsupported package manager")
