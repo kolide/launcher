@@ -1,42 +1,17 @@
 package checkpoint
 
 import (
-	"crypto/x509"
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"net/url"
-	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
-)
-
-// defines time out for all http, dns, connectivity requests
-const requestTimeout = time.Second * 5
-
-var (
-	// if we find any files in these directories, log them to check point
-	notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
-
-	runtimeInfo = map[string]string{
-		"GOARCH": runtime.GOARCH,
-		"GOOS":   runtime.GOOS,
-	}
-
-	launcherInfo = map[string]string{
-		"revision": version.Version().Revision,
-		"version":  version.Version().Version,
-	}
 )
 
 // logger is an interface that allows mocking of logger
@@ -104,85 +79,7 @@ func (c *checkPointer) Once() {
 	// populate and log the queried static info
 	c.queryStaticInfo()
 	c.logQueriedInfo()
-
-	c.logger.Log("runtime", runtimeInfo)
-	c.logger.Log("launcher", launcherInfo)
-	c.logger.Log("hostname", hostName())
-	c.logger.Log("notableFiles", filesInDirs(notableFileDirs...))
-	c.logger.Log("keyinfo", agentKeyInfo())
 	c.logOsqueryInfo()
-	c.logDbSize()
-	c.logKolideServerVersion()
-	c.logger.Log("connections", c.Connections())
-	c.logger.Log("ip look ups", c.IpLookups())
-	notaryVersions, err := c.NotaryVersions()
-	if err != nil {
-		c.logger.Log("notary versions", err)
-	} else {
-		c.logger.Log("notary versions", notaryVersions)
-	}
-	c.logServerProvidedData()
-	c.logDesktopProcs()
-	if runtime.GOOS == "windows" {
-		c.logger.Log("in_modern_standby", c.knapsack.InModernStandby())
-	}
-}
-
-func (c *checkPointer) logDesktopProcs() {
-	c.logger.Log("user_desktop_processes", runner.InstanceDesktopProcessRecords())
-}
-
-func (c *checkPointer) logDbSize() {
-	db := c.knapsack.BboltDB()
-	if db == nil {
-		return
-	}
-
-	boltStats, err := agent.GetStats(db)
-	if err != nil {
-		c.logger.Log("bbolt db size", err.Error())
-	} else {
-		c.logger.Log("bbolt db size", boltStats.DB.Size)
-	}
-}
-
-func (c *checkPointer) logKolideServerVersion() {
-	if !c.knapsack.KolideHosted() {
-		return
-	}
-
-	httpClient := &http.Client{Timeout: requestTimeout}
-
-	kolideServerUrl, err := parseUrl(fmt.Sprintf("%s/version", c.knapsack.KolideServerURL()), c.knapsack)
-	if err != nil {
-		c.logger.Log("kolide server version fetch", err)
-	} else {
-		c.logger.Log("kolide server version fetch", fetchFromUrls(httpClient, kolideServerUrl))
-	}
-}
-
-func (c *checkPointer) NotaryVersions() (map[string]string, error) {
-	if !c.knapsack.KolideHosted() || !c.knapsack.Autoupdate() {
-		return nil, nil
-	}
-
-	httpClient := &http.Client{Timeout: requestTimeout}
-	notaryUrl, err := parseUrl(fmt.Sprintf("%s/v2/kolide/launcher/_trust/tuf/targets/releases.json", c.knapsack.NotaryServerURL()), c.knapsack)
-	if err != nil {
-		return nil, err
-	} else {
-		return fetchNotaryVersions(httpClient, notaryUrl), nil
-	}
-}
-
-func (c *checkPointer) Connections() map[string]string {
-	dialer := &net.Dialer{Timeout: requestTimeout}
-	return testConnections(dialer, urlsToTest(c.knapsack)...)
-}
-
-func (c *checkPointer) IpLookups() map[string]interface{} {
-	ipLookuper := &net.Resolver{}
-	return lookupHostsIpv4s(ipLookuper, urlsToTest(c.knapsack)...)
 }
 
 func urlsToTest(flags types.Flags) []*url.URL {
@@ -238,41 +135,96 @@ func parseUrl(addr string, flags types.Flags) (*url.URL, error) {
 	return u, nil
 }
 
-func hostName() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = fmt.Sprintf("ERROR: %s", err)
+const osSqlQuery = `
+SELECT
+	os_version.build as os_build,
+	os_version.name as os_name,
+	os_version.platform as os_platform,
+	os_version.platform_like as os_platform_like,
+	os_version.version as os_version
+FROM
+	os_version
+`
+
+const systemSqlQuery = `
+SELECT
+	system_info.hardware_model,
+	system_info.hardware_serial,
+	system_info.hardware_vendor,
+	system_info.hostname,
+	system_info.uuid as hardware_uuid
+FROM
+	system_info
+`
+
+const osquerySqlQuery = `
+SELECT
+	osquery_info.version as osquery_version,
+	osquery_info.instance_id as osquery_instance_id
+FROM
+    osquery_info
+`
+
+func (c *checkPointer) logOsqueryInfo() {
+	if c.querier == nil {
+		return
 	}
 
-	return hostname
+	info, err := c.query(osquerySqlQuery)
+	if err != nil {
+		c.logger.Log("msg", "error querying osquery info", "err", err)
+		return
+	}
+
+	c.logger.Log("osquery_info", info)
 }
 
-func agentKeyInfo() map[string]string {
-	keyinfo := make(map[string]string, 3)
+func (c *checkPointer) logQueriedInfo() {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
-	pub := agent.LocalDbKeys().Public()
-	if pub == nil {
-		keyinfo["local_key"] = "nil. Likely startup delay"
-		return keyinfo
+	for k, v := range c.queriedInfo {
+		c.logger.Log(k, fmt.Sprintf("%+v", v))
+	}
+}
+
+// queryStaticInfo usually the querier to add additional static info.
+func (c *checkPointer) queryStaticInfo() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.querier == nil {
+		return
 	}
 
-	if localKeyDer, err := x509.MarshalPKIXPublicKey(pub); err == nil {
-		// der is a binary format, so convert to b64
-		keyinfo["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
+	if info, err := c.query(osSqlQuery); err != nil {
+		c.logger.Log("msg", "failed to query os info", "err", err)
+		return
 	} else {
-		keyinfo["local_key"] = fmt.Sprintf("error marshalling local key (startup is sometimes weird): %s", err)
+		c.queriedInfo["os_info"] = info
 	}
 
-	// We don't always have hardware keys. Move on if we don't
-	if agent.HardwareKeys().Public() == nil {
-		return keyinfo
+	if info, err := c.query(systemSqlQuery); err != nil {
+		c.logger.Log("msg", "failed to query os info", "err", err)
+		return
+	} else {
+		c.queriedInfo["system_info"] = info
+	}
+}
+
+func (c *checkPointer) query(sql string) (map[string]string, error) {
+	if c.querier == nil {
+		return nil, errors.New("no querier")
 	}
 
-	if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
-		// der is a binary format, so convert to b64
-		keyinfo["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
-		keyinfo["hardware_key_source"] = agent.HardwareKeys().Type()
+	resp, err := c.querier.Query(sql)
+	if err != nil {
+		return nil, fmt.Errorf("error querying for static: %s", err)
 	}
 
-	return keyinfo
+	if len(resp) < 1 {
+		return nil, errors.New("expected at least one row for static details")
+	}
+
+	return resp[0], nil
 }

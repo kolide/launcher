@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -114,30 +112,4 @@ func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, serv
 	}
 
 	return bytes, nil
-}
-
-func parseUrl(k types.Knapsack, addr string) (*url.URL, error) {
-	if !strings.HasPrefix(addr, "http") {
-		scheme := "https"
-		if k.InsecureTransportTLS() {
-			scheme = "http"
-		}
-		addr = fmt.Sprintf("%s://%s", scheme, addr)
-	}
-
-	u, err := url.Parse(addr)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if u.Port() == "" {
-		port := "443"
-		if k.InsecureTransportTLS() {
-			port = "80"
-		}
-		u.Host = net.JoinHostPort(u.Host, port)
-	}
-
-	return u, nil
 }
