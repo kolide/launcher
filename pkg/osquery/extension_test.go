@@ -7,7 +7,6 @@ package osquery
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -284,7 +283,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 
 func TestExtensionGenerateConfigsCaching(t *testing.T) {
 
-	configVal := `{"foo":"bar","options":{"verbose":true}}`
+	configVal := `{"foo": "bar"}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -345,7 +344,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 
 func TestExtensionGenerateConfigs(t *testing.T) {
 
-	configVal := `{"foo":"bar","options":{"verbose":true}}`
+	configVal := `{"foo": "bar"}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -1122,153 +1121,4 @@ func TestLauncherRsaKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, &key.PublicKey, pubkey)
-}
-
-func Test_setVerbose(t *testing.T) {
-	t.Parallel()
-
-	type testCase struct {
-		name           string
-		initialConfig  map[string]any
-		osqueryVerbose bool
-		expectedConfig map[string]any
-	}
-
-	testCases := make([]testCase, 0)
-	for _, osqVerbose := range []bool{true, false} {
-		testCases = append(testCases,
-			testCase{
-				name:           fmt.Sprintf("empty config, osquery verbose %v", osqVerbose),
-				initialConfig:  make(map[string]any),
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-				},
-			},
-			testCase{
-				name: fmt.Sprintf("config with verbose already set, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": !osqVerbose,
-					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-				},
-			},
-			testCase{
-				name: fmt.Sprintf("config with other options, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"options": map[string]any{
-						"audit_allow_config": false,
-					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"audit_allow_config": false,
-						"verbose":            osqVerbose,
-					},
-				},
-			},
-			testCase{
-				name: fmt.Sprintf("config with decorators, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"decorators": map[string]any{
-						"load": []any{
-							"SELECT version FROM osquery_info;",
-							"SELECT uuid AS host_uuid FROM system_info;",
-						},
-						"always": []any{
-							"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
-						},
-						"interval": map[string]any{
-							"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
-						},
-					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-					"decorators": map[string]any{
-						"load": []any{
-							"SELECT version FROM osquery_info;",
-							"SELECT uuid AS host_uuid FROM system_info;",
-						},
-						"always": []any{
-							"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
-						},
-						"interval": map[string]any{
-							"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
-						},
-					},
-				},
-			},
-			testCase{
-				name: fmt.Sprintf("config with auto table construction, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"auto_table_construction": map[string]any{
-						"tcc_system_entries": map[string]any{
-							"query": "SELECT service, client, auth_value, last_modified FROM access;",
-							"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
-							"columns": []any{
-								"service",
-								"client",
-								"auth_value",
-								"last_modified",
-							},
-							"platform": "darwin",
-						},
-					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-					"auto_table_construction": map[string]any{
-						"tcc_system_entries": map[string]any{
-							"query": "SELECT service, client, auth_value, last_modified FROM access;",
-							"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
-							"columns": []any{
-								"service",
-								"client",
-								"auth_value",
-								"last_modified",
-							},
-							"platform": "darwin",
-						},
-					},
-				},
-			},
-		)
-	}
-
-	for _, tt := range testCases {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			e := &Extension{
-				logger: log.NewNopLogger(),
-			}
-
-			cfgBytes, err := json.Marshal(tt.initialConfig)
-			require.NoError(t, err)
-
-			modifiedCfgStr := e.setVerbose(string(cfgBytes), tt.osqueryVerbose)
-
-			var modifiedCfg map[string]any
-			require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
-
-			require.Equal(t, tt.expectedConfig, modifiedCfg)
-		})
-	}
 }

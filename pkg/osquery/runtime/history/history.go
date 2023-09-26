@@ -68,25 +68,6 @@ func LatestInstance() (Instance, error) {
 	return *currentHistory.instances[len(currentHistory.instances)-1], nil
 }
 
-func LatestInstanceUptimeMinutes() (int64, error) {
-	lastInstance, err := LatestInstance()
-	if err != nil {
-		return 0, fmt.Errorf("getting latest instance: %w", err)
-	}
-
-	if lastInstance.ExitTime != "" {
-		return 0, nil
-	}
-
-	startTime, err := time.Parse(time.RFC3339, lastInstance.StartTime)
-	if err != nil {
-		return 0, fmt.Errorf("parsing start time %s: %w", lastInstance.StartTime, err)
-	}
-
-	uptimeSeconds := time.Now().UTC().Unix() - startTime.Unix()
-	return uptimeSeconds / 60, nil
-}
-
 // NewInstance adds a new instance to the osquery instance history and returns it
 func NewInstance() (*Instance, error) {
 	currentHistory.Lock()
