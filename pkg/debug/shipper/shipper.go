@@ -38,7 +38,7 @@ func New(logger log.Logger, knapsack types.Knapsack, note string) *shipper {
 }
 
 func (s *shipper) Close() error {
-	return ship(s.logger, s.knapsack, s.note, s)
+	return ship(s.logger, s.knapsack, s.note, &s.Buffer)
 }
 
 func ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader) error {

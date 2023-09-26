@@ -17,13 +17,42 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
+// sudo /usr/local/kolide-k2/bin/launcher flareupload "note" --debug_upload_request_url="https://example.com"
+func runFlareUpload(args []string) error {
+	// Flare assumes a launcher installation (at least partially) exists
+	// Overriding some of the default values allows options to be parsed making this assumption
+	// TODO this stuff needs some deeper thinking
+	launcher.DefaultAutoupdate = true
+	launcher.SetDefaultPaths()
+
+	note := ""
+	if len(args) > 0 {
+		note = args[0]
+		args = args[1:]
+	}
+
+	opts, err := launcher.ParseOptions("flareupload", args)
+	if err != nil {
+		return err
+	}
+
+	logger := log.NewLogfmtLogger(os.Stdout)
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
+	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
+	k := knapsack.New(nil, flagController, nil)
+
+	ctx := context.Background()
+	shipper := shipper.New(logger, k, note)
+	return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
+}
+
+// sudo /usr/local/kolide-k2/bin/launcher flare
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	// TODO this stuff needs some deeper thinking
 	launcher.DefaultAutoupdate = true
 	launcher.SetDefaultPaths()
-	_ = launcher.DefaultBinDirectoryPath
 
 	opts, err := launcher.ParseOptions("flare", args)
 	if err != nil {
@@ -37,13 +66,6 @@ func runFlare(args []string) error {
 
 	ctx := context.Background()
 
-	k.SetDebugUploadRequestURL(env.String("KOLIDE_AGENT_FLARE_REQUEST_URL", ""))
-	if k.DebugUploadRequestURL() != "" {
-		shipper := shipper.New(logger, k, "TODO: add cmd line opt for note")
-		return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
-	}
-
-	// not shipping, write to file
 	var (
 		dirPath = env.String("KOLIDE_AGENT_FLARE_ZIP_DIR_PATH", "")
 	)
@@ -56,11 +78,6 @@ func runFlare(args []string) error {
 	if err != nil {
 		return fmt.Errorf("creating flare file (%s): %w", reportPath, err)
 	}
-	defer func() {
-		_ = flare.Close()
-	}()
 
-	checkups.RunFlare(ctx, k, flare, checkups.StandaloneEnviroment)
-
-	return nil
+	return checkups.RunFlare(ctx, k, flare, checkups.StandaloneEnviroment)
 }

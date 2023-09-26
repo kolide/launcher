@@ -246,14 +246,15 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flUpdateDirectory        = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
 
 		// Development & Debugging options
-		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
-		flOsqueryVerbose       = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
-		flDeveloperUsage       = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options (default: false)")
-		flInsecureTransport    = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
-		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
-		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
-		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
-		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
+		flDebug                 = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flOsqueryVerbose        = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
+		flDeveloperUsage        = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options (default: false)")
+		flInsecureTransport     = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
+		flInsecureTLS           = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+		flIAmBreakingEELicense  = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
+		flDelayStart            = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
+		flLocalDevelopmentPath  = flagset.String("localdev_path", "", "Path to local launcher build")
+		flDebugUploadRequestURL = flagset.String("debug_upload_request_url", "", "URL to request a signed url to upload debug artifacts")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -382,6 +383,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		ControlServerURL:                   controlServerURL,
 		ControlRequestInterval:             *flControlRequestInterval,
 		Debug:                              *flDebug,
+		DebugUploadRequestURL:              *flDebugUploadRequestURL,
 		DelayStart:                         *flDelayStart,
 		DisableControlTLS:                  disableControlTLS,
 		InsecureControlTLS:                 insecureControlTLS,
