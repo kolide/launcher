@@ -26,12 +26,7 @@ type autoupdateConfig struct {
 	localDevelopmentPath string
 }
 
-var channelsUsingLegacyAutoupdate = map[string]bool{
-	"stable":  true,
-	"beta":    true,
-	"alpha":   true,
-	"nightly": true,
-}
+var channelsUsingNewAutoupdater = map[string]bool{}
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
@@ -123,8 +118,8 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 }
 
 func usingNewAutoupdater(channel string) bool {
-	_, ok := channelsUsingLegacyAutoupdate[channel]
-	return !ok
+	_, ok := channelsUsingNewAutoupdater[channel]
+	return ok
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
