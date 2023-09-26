@@ -25,7 +25,6 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		// Don't exit. Log and move on to the next uninstall command
 		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", string(out), err)
-		return err
 	}
 
 	fileExists := func(f string) bool {
