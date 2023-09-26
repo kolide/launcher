@@ -1,4 +1,4 @@
-package shipping
+package shipper
 
 import (
 	"bytes"
@@ -21,7 +21,27 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
-func Ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader) error {
+type shipper struct {
+	bytes.Buffer
+	logger   log.Logger
+	knapsack types.Knapsack
+	// note is intended to help humans identify the object being shipped
+	note string
+}
+
+func New(logger log.Logger, knapsack types.Knapsack, note string) *shipper {
+	return &shipper{
+		logger:   logger,
+		knapsack: knapsack,
+		note:     note,
+	}
+}
+
+func (s *shipper) Close() error {
+	return ship(s.logger, s.knapsack, s.note, s)
+}
+
+func ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader) error {
 	// first get a signed url
 	if k.DebugUploadRequestURL() == "" {
 		return errors.New("debug upload request url is empty")

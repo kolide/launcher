@@ -1,7 +1,6 @@
 package flareconsumer
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/debug/checkups"
+	"github.com/kolide/launcher/pkg/debug/shipper"
 )
 
 const (
@@ -20,33 +20,28 @@ const (
 
 type FlareConsumer struct {
 	flarer   flarer
-	shipper  shipper
 	knapsack types.Knapsack
+	// newFlareStream is assigned to a field so it can be mocked in tests
+	newFlareStream func(note string) io.WriteCloser
 }
 
 type flarer interface {
-	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runtimeEnvironment checkups.RuntimeEnvironmentType) error
+	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, environment checkups.RuntimeEnvironmentType) error
 }
 
-type shipper interface {
-	Ship(log log.Logger, k types.Knapsack, note string, flareStream io.Reader) error
-}
-
-func New(knapsack types.Knapsack, flarer flarer, shipper shipper) *FlareConsumer {
+func New(knapsack types.Knapsack, flarer flarer) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   flarer,
 		knapsack: knapsack,
-		shipper:  shipper,
+		newFlareStream: func(note string) io.WriteCloser {
+			return shipper.New(log.NewNopLogger(), knapsack, note)
+		},
 	}
 }
 
 func (fc *FlareConsumer) Do(data io.Reader) error {
 	if fc.flarer == nil {
 		return errors.New("flarer is nil")
-	}
-
-	if fc.shipper == nil {
-		return errors.New("shipper is nil")
 	}
 
 	flareData := struct {
@@ -57,11 +52,5 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
-	buf := &bytes.Buffer{}
-
-	if err := fc.flarer.RunFlare(context.Background(), fc.knapsack, buf, checkups.InSituEnvironment); err != nil {
-		return err
-	}
-
-	return fc.shipper.Ship(log.NewNopLogger(), fc.knapsack, flareData.Note, buf)
+	return fc.flarer.RunFlare(context.Background(), fc.knapsack, fc.newFlareStream(flareData.Note), checkups.InSituEnvironment)
 }

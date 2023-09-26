@@ -10,6 +10,6 @@ import (
 
 type FlareRunner struct{}
 
-func (f *FlareRunner) RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runtimeEnvironment checkups.RuntimeEnvironmentType) error {
+func (f *FlareRunner) RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment checkups.RuntimeEnvironmentType) error {
 	return checkups.RunFlare(ctx, k, flareStream, runtimeEnvironment)
 }

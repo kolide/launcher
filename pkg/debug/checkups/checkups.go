@@ -257,7 +257,7 @@ const (
 	InSituEnvironment    RuntimeEnvironmentType = "in situ"
 )
 
-func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runtimeEnvironment RuntimeEnvironmentType) error {
+func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment RuntimeEnvironmentType) error {
 	flare := zip.NewWriter(flareStream)
 	defer func() {
 		_ = flare.Close()
@@ -286,7 +286,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runt
 		}
 	}
 
-	return nil
+	return flareStream.Close()
 }
 
 func writeFlareEnv(z *zip.Writer, runtimeEnvironment RuntimeEnvironmentType) error {

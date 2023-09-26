@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -14,7 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/debug/checkups"
-	"github.com/kolide/launcher/pkg/debug/shipping"
+	"github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -40,12 +39,8 @@ func runFlare(args []string) error {
 
 	k.SetDebugUploadRequestURL(env.String("KOLIDE_AGENT_FLARE_REQUEST_URL", ""))
 	if k.DebugUploadRequestURL() != "" {
-		flareWriter := &bytes.Buffer{}
-		if err := checkups.RunFlare(ctx, k, flareWriter, checkups.StandaloneEnviroment); err != nil {
-			return err
-		}
-
-		return shipping.Ship(logger, k, "TODO: add cmd line opt for note", flareWriter)
+		shipper := shipper.New(logger, k, "TODO: add cmd line opt for note")
+		return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
 	}
 
 	// not shipping, write to file

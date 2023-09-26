@@ -2,6 +2,7 @@ package flareconsumer
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer/mocks"
@@ -16,7 +17,6 @@ func TestFlareConsumer(t *testing.T) {
 	tests := []struct {
 		name         string
 		flarer       func(t *testing.T) flarer
-		shipper      func(t *testing.T) shipper
 		errAssertion require.ErrorAssertionFunc
 	}{
 		{
@@ -25,11 +25,6 @@ func TestFlareConsumer(t *testing.T) {
 				flarer := mocks.NewFlarer(t)
 				flarer.On("RunFlare", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				return flarer
-			},
-			shipper: func(t *testing.T) shipper {
-				shipper := mocks.NewShipper(t)
-				shipper.On("Ship", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				return shipper
 			},
 			errAssertion: require.NoError,
 		},
@@ -40,8 +35,10 @@ func TestFlareConsumer(t *testing.T) {
 			t.Parallel()
 
 			mockSack := knapsackMock.NewKnapsack(t)
-
-			f := New(mockSack, tt.flarer(t), tt.shipper(t))
+			f := New(mockSack, tt.flarer(t))
+			f.newFlareStream = func(note string) io.WriteCloser {
+				return &io.PipeWriter{}
+			}
 
 			tt.errAssertion(t, f.Do(bytes.NewBuffer([]byte(`{"note":"the_note"}`))))
 		})
