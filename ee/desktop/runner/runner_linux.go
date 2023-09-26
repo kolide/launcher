@@ -6,8 +6,10 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -62,7 +64,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	}
 
 	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := r.userEnvVars(ctx, uid)
+	envVars := r.userEnvVars(ctx, uid, runningUser.Username)
 	for k, v := range envVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -70,7 +72,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	return cmd.Start()
 }
 
-func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid string) map[string]string {
+func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid string, username string) map[string]string {
 	envVars := make(map[string]string)
 
 	uidInt, err := strconv.ParseInt(uid, 10, 32)
@@ -132,6 +134,11 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
 	envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+
+	// We need xauthority set in order to launch the browser on Ubuntu 23.04
+	if xauthorityLocation := r.getXauthority(ctx, uid, username); xauthorityLocation != "" {
+		envVars["XAUTHORITY"] = xauthorityLocation
+	}
 
 	return envVars
 }
@@ -213,4 +220,40 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	}
 
 	return defaultDisplay
+}
+
+func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid string, username string) string {
+	xdgRuntimeDir := filepath.Join("run", "user", uid)
+
+	// Glob for Wayland matches first
+	waylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, ".mutter-Xwaylandauth.*")
+	if matches, err := filepath.Glob(waylandXAuthorityLocationPattern); err == nil && len(matches) > 0 {
+		return matches[0]
+	}
+
+	// Next, check default X11 location
+	x11XauthorityLocation := filepath.Join(xdgRuntimeDir, "gdm", "Xauthority")
+	if _, err := os.Stat(x11XauthorityLocation); err == nil {
+		return x11XauthorityLocation
+	}
+
+	// Default location is $HOME/.Xauthority -- try that before giving up
+	homeCmd := exec.CommandContext(ctx, "sudo", "-u", username, "sh", "-c", "'echo $HOME'")
+	out, err := homeCmd.CombinedOutput()
+	if err != nil {
+		level.Debug(r.logger).Log("msg", "could not get $HOME", "err", err, "output", string(out))
+		return ""
+	}
+
+	homeLocation := filepath.Join(strings.TrimSpace(string(out)), ".Xauthority")
+	if _, err := os.Stat(homeLocation); err == nil {
+		return homeLocation
+	}
+
+	level.Debug(r.logger).Log("msg", "could not find xauthority in any known location",
+		"wayland", waylandXAuthorityLocationPattern,
+		"x11", x11XauthorityLocation,
+		"default", homeLocation)
+
+	return ""
 }
