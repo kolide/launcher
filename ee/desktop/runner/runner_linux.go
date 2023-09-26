@@ -239,14 +239,7 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 	}
 
 	// Default location is $HOME/.Xauthority -- try that before giving up
-	homeCmd := exec.CommandContext(ctx, "sudo", "-u", username, "sh", "-c", "'echo $HOME'")
-	out, err := homeCmd.CombinedOutput()
-	if err != nil {
-		level.Debug(r.logger).Log("msg", "could not get $HOME", "err", err, "output", string(out))
-		return ""
-	}
-
-	homeLocation := filepath.Join(strings.TrimSpace(string(out)), ".Xauthority")
+	homeLocation := filepath.Join("/home", username, ".Xauthority")
 	if _, err := os.Stat(homeLocation); err == nil {
 		return homeLocation
 	}
