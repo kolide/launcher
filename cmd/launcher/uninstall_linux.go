@@ -38,13 +38,13 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	switch {
 	case fileExists("/usr/bin/dpkg"):
 		cmd = exec.CommandContext(ctx, "/usr/bin/dpkg", []string{"--purge", packageName}...)
-		if err := cmd.Run(); err != nil {
-			return err
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Printf("error occurred while running dpkg --purge, output %s: err: %s\n", string(out), err)
 		}
 	case fileExists("/bin/rpm"):
 		cmd = exec.CommandContext(ctx, "/bin/rpm", []string{"-e", packageName}...)
-		if err := cmd.Run(); err != nil {
-			return err
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Printf("error occurred while running rpm -e, output %s: err: %s\n", string(out), err)
 		}
 	default:
 		return fmt.Errorf("unsupported package manager")
