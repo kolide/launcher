@@ -29,9 +29,9 @@ type flarer interface {
 	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, environment checkups.RuntimeEnvironmentType) error
 }
 
-func New(knapsack types.Knapsack, flarer flarer) *FlareConsumer {
+func New(knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
-		flarer:   flarer,
+		flarer:   &FlareRunner{},
 		knapsack: knapsack,
 		newFlareStream: func(note string) io.WriteCloser {
 			return shipper.New(log.NewNopLogger(), knapsack, note)

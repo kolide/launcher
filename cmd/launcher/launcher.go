@@ -325,7 +325,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		// register flare consumer
-		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k, &flareconsumer.FlareRunner{}))
+		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(

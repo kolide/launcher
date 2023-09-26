@@ -35,7 +35,8 @@ func TestFlareConsumer(t *testing.T) {
 			t.Parallel()
 
 			mockSack := knapsackMock.NewKnapsack(t)
-			f := New(mockSack, tt.flarer(t))
+			f := New(mockSack)
+			f.flarer = tt.flarer(t)
 			f.newFlareStream = func(note string) io.WriteCloser {
 				return &io.PipeWriter{}
 			}
