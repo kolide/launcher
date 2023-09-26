@@ -21,63 +21,51 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
+type shipperOption func(*shipper)
+
+// WithUploadURL causes the shipper to upload to the given url instead of requesting a url to upload to
+func WithUploadURL(url string) shipperOption {
+	return func(s *shipper) {
+		s.uploadURL = url
+	}
+}
+
 type shipper struct {
 	bytes.Buffer
 	logger   log.Logger
 	knapsack types.Knapsack
 	// note is intended to help humans identify the object being shipped
 	note string
+	// upload url can be set to skip the request for one
+	uploadURL string
 }
 
-func New(logger log.Logger, knapsack types.Knapsack, note string) *shipper {
-	return &shipper{
+func New(logger log.Logger, knapsack types.Knapsack, note string, opts ...shipperOption) *shipper {
+	s := &shipper{
 		logger:   logger,
 		knapsack: knapsack,
 		note:     note,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (s *shipper) Close() error {
-	return ship(s.logger, s.knapsack, s.note, &s.Buffer)
+	return s.ship()
 }
 
-func ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader) error {
-	// first get a signed url
-	if k.DebugUploadRequestURL() == "" {
-		return errors.New("debug upload request url is empty")
-	}
-
-	launcherData, err := launcherData(k, note)
+func (s *shipper) ship() error {
+	signedUrl, err := s.signedUrl()
 	if err != nil {
-		return fmt.Errorf("creating launcher data: %w", err)
-	}
-
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, k.DebugUploadRequestURL(), launcherData)
-	if err != nil {
-		return fmt.Errorf("creating signed url request: %w", err)
-	}
-
-	if err := signHttpRequest(k, signedUrlRequest); err != nil {
-		return fmt.Errorf("signing signed url request: %w", err)
-	}
-
-	signedUrlResponse, err := http.DefaultClient.Do(signedUrlRequest)
-	if err != nil {
-		return fmt.Errorf("sending signed url request: %w", err)
-	}
-	defer signedUrlResponse.Body.Close()
-
-	signedUrlResponseBody, err := io.ReadAll(signedUrlResponse.Body)
-	if err != nil {
-		return fmt.Errorf("reading signed url response: %w", err)
-	}
-
-	if signedUrlResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("got %s status in signed url response: %s", signedUrlResponse.Status, string(signedUrlResponseBody))
+		return fmt.Errorf("getting signed url: %w", err)
 	}
 
 	// now upload to the signed url
-	uploadResponse, err := http.Post(string(signedUrlResponseBody), "application/octet-stream", dataToShip)
+	uploadResponse, err := http.Post(signedUrl, "application/octet-stream", &s.Buffer)
 	if err != nil {
 		return fmt.Errorf("uploading data: %w", err)
 	}
@@ -93,6 +81,48 @@ func ship(logger log.Logger, k types.Knapsack, note string, dataToShip io.Reader
 	}
 
 	return nil
+}
+
+func (s *shipper) signedUrl() (string, error) {
+	if s.uploadURL != "" {
+		return s.uploadURL, nil
+	}
+
+	// first get a signed url
+	if s.knapsack.DebugUploadRequestURL() == "" {
+		return "", errors.New("debug upload request url is empty")
+	}
+
+	launcherData, err := launcherData(s.knapsack, s.note)
+	if err != nil {
+		return "", fmt.Errorf("creating launcher data: %w", err)
+	}
+
+	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.knapsack.DebugUploadRequestURL(), launcherData)
+	if err != nil {
+		return "", fmt.Errorf("creating signed url request: %w", err)
+	}
+
+	if err := signHttpRequest(s.knapsack, signedUrlRequest); err != nil {
+		return "", fmt.Errorf("signing signed url request: %w", err)
+	}
+
+	signedUrlResponse, err := http.DefaultClient.Do(signedUrlRequest)
+	if err != nil {
+		return "", fmt.Errorf("sending signed url request: %w", err)
+	}
+	defer signedUrlResponse.Body.Close()
+
+	signedUrlResponseBody, err := io.ReadAll(signedUrlResponse.Body)
+	if err != nil {
+		return "", fmt.Errorf("reading signed url response: %w", err)
+	}
+
+	if signedUrlResponse.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("got %s status in signed url response: %s", signedUrlResponse.Status, string(signedUrlResponseBody))
+	}
+
+	return string(signedUrlResponseBody), nil
 }
 
 func signHttpRequest(k types.Knapsack, req *http.Request) error {

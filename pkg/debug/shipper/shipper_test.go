@@ -1,7 +1,6 @@
 package shipper
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,18 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShip(t *testing.T) {
-	t.Parallel()
-
+func TestShip(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		name                   string
 		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
 		expectSignatureHeaders bool
 		expectSecret           bool
 		assertion              assert.ErrorAssertionFunc
+		opts                   []shipperOption
 	}{
 		{
-			name: "happy path no signing keys",
+			name: "happy path no enroll secret",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
@@ -41,7 +39,7 @@ func TestShip(t *testing.T) {
 			expectSecret: false,
 		},
 		{
-			name: "happy path with signing keys",
+			name: "happy path with signing keys and enroll secret",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				configStore := inmemory.NewStore(log.NewNopLogger())
 				agent.SetupKeys(log.NewNopLogger(), configStore)
@@ -53,6 +51,19 @@ func TestShip(t *testing.T) {
 			expectSignatureHeaders: true,
 			expectSecret:           true,
 			assertion:              assert.NoError,
+		},
+		{
+			name: "happy path with provided upload url",
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				return k
+			},
+			expectSignatureHeaders: true,
+			expectSecret:           true,
+			assertion:              assert.NoError,
+			opts: []shipperOption{func(s *shipper) {
+				s.uploadURL = "https://example.com"
+			}},
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
@@ -87,16 +98,19 @@ func TestShip(t *testing.T) {
 			testServer.Config.Handler = mux
 
 			knapsack := tt.mockKnapsack(t)
-			knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 
-			tt.assertion(t, ship(log.NewNopLogger(), knapsack, "some note", bytes.NewBuffer([]byte("ahhhhh"))))
+			shipper := New(log.NewNopLogger(), knapsack, "some note", tt.opts...)
+
+			if shipper.uploadURL == "" {
+				knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
+			}
+
+			tt.assertion(t, shipper.ship())
 		})
 	}
 }
 
-func TestShipErrors(t *testing.T) {
-	t.Parallel()
-
+func TestShipErrors(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		name                    string
 		failGetSignedURLRequest bool
@@ -111,7 +125,7 @@ func TestShipErrors(t *testing.T) {
 			failUploadRequest: true,
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -141,7 +155,8 @@ func TestShipErrors(t *testing.T) {
 			k.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 			k.On("EnrollSecret").Return("")
 
-			require.Error(t, ship(log.NewNopLogger(), k, "some note", bytes.NewBuffer([]byte("ahhhhh"))))
+			shipper := New(log.NewNopLogger(), k, "some note")
+			require.Error(t, shipper.ship())
 		})
 	}
 }
