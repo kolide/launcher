@@ -222,6 +222,7 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	return defaultDisplay
 }
 
+// getXauthority checks known locations for the xauthority file
 func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid string, username string) string {
 	xdgRuntimeDir := filepath.Join("run", "user", uid)
 
