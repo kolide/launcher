@@ -11,13 +11,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncConfig(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func GDriveSyncConfig(logger log.Logger) *table.Plugin {
 	g := &gdrive{
-		client: client,
 		logger: logger,
 	}
 
@@ -29,7 +27,6 @@ func GDriveSyncConfig(client *osquery.ExtensionManagerClient, logger log.Logger)
 }
 
 type gdrive struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 

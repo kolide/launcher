@@ -16,9 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
-
 	"github.com/scjalliance/comshim"
 )
 
@@ -30,13 +28,12 @@ const (
 )
 
 type Table struct {
-	client    *osquery.ExtensionManagerClient
 	logger    log.Logger
 	queryFunc queryFuncType
 	name      string
 }
 
-func TablePlugin(mode tableMode, client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(mode tableMode, logger log.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
@@ -44,7 +41,6 @@ func TablePlugin(mode tableMode, client *osquery.ExtensionManagerClient, logger 
 	)
 
 	t := &Table{
-		client: client,
 		logger: logger,
 	}
 

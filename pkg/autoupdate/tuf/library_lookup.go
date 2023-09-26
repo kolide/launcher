@@ -26,15 +26,13 @@ type autoupdateConfig struct {
 	localDevelopmentPath string
 }
 
-var channelsUsingLegacyAutoupdate = map[string]bool{
-	"stable": true,
-	"beta":   true,
-}
+var channelsUsingNewAutoupdater = map[string]bool{}
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
 // For now, it is only available when launcher is on the nightly update channel.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
+	logger = log.With(logger, "component", "tuf_library_lookup")
 	cfg, err := getAutoupdateConfig()
 	if err != nil {
 		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
@@ -46,6 +44,15 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 	}
 
 	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+}
+
+func UsingNewAutoupdater() bool {
+	cfg, err := getAutoupdateConfig()
+	if err != nil {
+		return false
+	}
+
+	return usingNewAutoupdater(cfg.channel)
 }
 
 // getAutoupdateConfig reads launcher's config file to determine the configuration values
@@ -99,10 +106,11 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 
 	update, err := findExecutableFromRelease(binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
 	if err == nil {
+		level.Info(logger).Log("msg", "found executable matching current release", "path", update.Path, "version", update.Version)
 		return update, nil
 	}
 
-	level.Debug(logger).Log("msg", "could not find executable from release", "err", err)
+	level.Info(logger).Log("msg", "could not find executable matching current release", "err", err)
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
@@ -110,8 +118,8 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 }
 
 func usingNewAutoupdater(channel string) bool {
-	_, ok := channelsUsingLegacyAutoupdate[channel]
-	return !ok
+	_, ok := channelsUsingNewAutoupdater[channel]
+	return ok
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our

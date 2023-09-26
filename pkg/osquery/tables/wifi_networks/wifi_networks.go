@@ -18,7 +18,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -38,16 +37,14 @@ var pwshScript []byte
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
 type Table struct {
-	client   *osquery.ExtensionManagerClient
 	logger   log.Logger
 	getBytes execer
 }
 
-func TablePlugin(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
-		client:   client,
 		logger:   logger,
 		getBytes: execPwsh(logger),
 	}

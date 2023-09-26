@@ -735,6 +735,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("RUNNER_SERVER_URL=%s", r.runnerServer.Url()),
 		fmt.Sprintf("RUNNER_SERVER_AUTH_TOKEN=%s", r.runnerServer.RegisterClient(uid)),
 		fmt.Sprintf("DEBUG=%v", r.knapsack.Debug()),
+		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}
 
 	stdErr, err := cmd.StderrPipe()

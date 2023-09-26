@@ -42,6 +42,7 @@ type Runner struct {
 	instance     *OsqueryInstance
 	instanceLock sync.Mutex
 	shutdown     chan struct{}
+	interrupted  bool
 	opts         []OsqueryInstanceOption
 }
 
@@ -140,6 +141,12 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
 func (r *Runner) Shutdown() error {
+	if r.interrupted {
+		// Already shut down, nothing else to do
+		return nil
+	}
+
+	r.interrupted = true
 	close(r.shutdown)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
@@ -438,7 +445,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// TODO: Consider chunking, if we find we can only have so
 	// many tables per extension manager
 	o.errgroup.Go(func() error {
-		plugins := table.PlatformTables(o.extensionManagerClient, o.logger, currentOsquerydBinaryPath)
+		plugins := table.PlatformTables(o.logger, currentOsquerydBinaryPath)
 
 		if len(plugins) == 0 {
 			return nil

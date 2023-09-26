@@ -26,23 +26,23 @@ import (
 	osquery "github.com/osquery/osquery-go"
 )
 
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		cryptsetup.TablePlugin(client, logger),
-		gsettings.Settings(client, logger),
-		gsettings.Metadata(client, logger),
-		secureboot.TablePlugin(client, logger),
-		xrdb.TablePlugin(client, logger),
+		cryptsetup.TablePlugin(logger),
+		gsettings.Settings(logger),
+		gsettings.Metadata(logger),
+		secureboot.TablePlugin(logger),
+		xrdb.TablePlugin(logger),
 		fscrypt_info.TablePlugin(logger),
 		falcon_kernel_check.TablePlugin(logger),
 		falconctl.NewFalconctlOptionTable(logger),
 		xfconf.TablePlugin(logger),
 
-		dataflattentable.TablePluginExec(client, logger,
+		dataflattentable.TablePluginExec(logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
 			[]string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
 			dataflattentable.WithKVSeparator(":")),
-		dataflattentable.TablePluginExec(client, logger, "kolide_lsblk", dataflattentable.JsonType,
+		dataflattentable.TablePluginExec(logger, "kolide_lsblk", dataflattentable.JsonType,
 			[]string{"lsblk", "-J"},
 			dataflattentable.WithBinDirs("/usr/bin", "/bin"),
 		),

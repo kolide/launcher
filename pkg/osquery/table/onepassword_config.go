@@ -11,10 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -27,7 +25,7 @@ var onepasswordDataFiles = map[string][]string{
 	},
 }
 
-func OnePasswordAccounts(client *osquery.ExtensionManagerClient, logger log.Logger) *table.Plugin {
+func OnePasswordAccounts(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
@@ -39,7 +37,6 @@ func OnePasswordAccounts(client *osquery.ExtensionManagerClient, logger log.Logg
 	}
 
 	o := &onePasswordAccountsTable{
-		client: client,
 		logger: logger,
 	}
 
@@ -47,7 +44,6 @@ func OnePasswordAccounts(client *osquery.ExtensionManagerClient, logger log.Logg
 }
 
 type onePasswordAccountsTable struct {
-	client *osquery.ExtensionManagerClient
 	logger log.Logger
 }
 
