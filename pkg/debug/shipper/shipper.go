@@ -2,6 +2,7 @@ package shipper
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
@@ -10,11 +11,11 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -93,17 +94,17 @@ func (s *shipper) signedUrl() (string, error) {
 		return "", errors.New("debug upload request url is empty")
 	}
 
-	launcherData, err := launcherData(s.knapsack, s.note)
+	body, err := launcherData(s.knapsack, s.note)
 	if err != nil {
 		return "", fmt.Errorf("creating launcher data: %w", err)
 	}
 
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.knapsack.DebugUploadRequestURL(), launcherData)
+	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.knapsack.DebugUploadRequestURL(), bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
 
-	if err := signHttpRequest(s.knapsack, signedUrlRequest); err != nil {
+	if err := signHttpRequest(s.knapsack, signedUrlRequest, body); err != nil {
 		return "", fmt.Errorf("signing signed url request: %w", err)
 	}
 
@@ -125,7 +126,7 @@ func (s *shipper) signedUrl() (string, error) {
 	return string(signedUrlResponseBody), nil
 }
 
-func signHttpRequest(k types.Knapsack, req *http.Request) error {
+func signHttpRequest(k types.Knapsack, req *http.Request, body []byte) error {
 	if agent.LocalDbKeys().Public() == nil {
 		return nil
 	}
@@ -135,17 +136,7 @@ func signHttpRequest(k types.Knapsack, req *http.Request) error {
 		return nil
 	}
 
-	bodyBytes, err := io.ReadAll(req.Body)
-	if err != nil {
-		return fmt.Errorf("reading body to create signature: %w", err)
-	}
-
-	req.Body.Close()
-
-	// put the body back
-	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	sig, err := echelper.SignWithTimeout(agent.LocalDbKeys(), bodyBytes, 1*time.Second, 250*time.Millisecond)
+	sig, err := echelper.SignWithTimeout(agent.LocalDbKeys(), body, 1*time.Second, 250*time.Millisecond)
 	if err != nil {
 		return nil
 	}
@@ -155,10 +146,20 @@ func signHttpRequest(k types.Knapsack, req *http.Request) error {
 	return nil
 }
 
-func launcherData(k types.Knapsack, note string) (io.Reader, error) {
-	user, err := user.Current()
-	if err != nil {
-		return nil, fmt.Errorf("getting username: %w", err)
+func launcherData(k types.Knapsack, note string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	username := "unknown"
+	consoleUsers, err := consoleuser.CurrentUsers(ctx)
+
+	switch {
+	case err != nil:
+		username = fmt.Sprintf("error getting current users: %s", err)
+	case len(consoleUsers) > 0:
+		username = consoleUsers[0].Username
+	default: // no console users
+		username = "no console users"
 	}
 
 	hostname, err := os.Hostname()
@@ -168,7 +169,7 @@ func launcherData(k types.Knapsack, note string) (io.Reader, error) {
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
-		"username":      user.Username,
+		"username":      username,
 		"hostname":      hostname,
 		"note":          note,
 	})
@@ -177,7 +178,7 @@ func launcherData(k types.Knapsack, note string) (io.Reader, error) {
 		return nil, fmt.Errorf("marshaling data: %w", err)
 	}
 
-	return bytes.NewBuffer(b), nil
+	return b, nil
 }
 
 func enrollSecret(k types.Knapsack) string {
