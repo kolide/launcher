@@ -170,7 +170,7 @@ func runSubcommands() error {
 func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	newerBinary, err := latestLauncherPath(ctx, logger)
 	if err != nil {
-		logutil.Fatal(logger, "msg", "checking for updated version", "err", err)
+		level.Info(logger).Log("msg", "could not get updated version", "err", err)
 	}
 
 	if newerBinary == "" {
