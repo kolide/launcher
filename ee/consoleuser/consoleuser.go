@@ -12,13 +12,13 @@ func CurrentUsers(ctx context.Context) ([]*user.User, error) {
 	}
 
 	users := make([]*user.User, len(currentUids))
-	for _, uid := range currentUids {
+	for i, uid := range currentUids {
 		u, err := user.LookupId(uid)
 		if err != nil {
 			return nil, err
 		}
 
-		users = append(users, u)
+		users[i] = u
 	}
 
 	return users, nil
