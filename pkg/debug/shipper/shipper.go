@@ -3,6 +3,7 @@ package shipper
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
@@ -117,7 +118,7 @@ func (s *shipper) signedUrl() (string, error) {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
 
-	signHttpRequest(s.knapsack, signedUrlRequest, body)
+	signHttpRequest(signedUrlRequest, body)
 
 	signedUrlResponse, err := http.DefaultClient.Do(signedUrlRequest)
 	if err != nil {
@@ -137,28 +138,24 @@ func (s *shipper) signedUrl() (string, error) {
 	return string(signedUrlResponseBody), nil
 }
 
-func signHttpRequest(k types.Knapsack, req *http.Request, body []byte) {
-	if agent.LocalDbKeys().Public() != nil {
-		pub, err := echelper.PublicEcdsaToB64Der(agent.LocalDbKeys().Public().(*ecdsa.PublicKey))
+func signHttpRequest(req *http.Request, body []byte) {
+	sign := func(signer crypto.Signer, headerKey, signatureKey string, request *http.Request) {
+		if signer == nil || signer.Public() == nil {
+			return
+		}
+
+		pub, err := echelper.PublicEcdsaToB64Der(signer.Public().(*ecdsa.PublicKey))
 		if err == nil {
-			sig, err := echelper.SignWithTimeout(agent.LocalDbKeys(), body, 1*time.Second, 250*time.Millisecond)
+			sig, err := echelper.SignWithTimeout(signer, body, 1*time.Second, 250*time.Millisecond)
 			if err == nil {
-				req.Header.Set(control.HeaderKey, string(pub))
-				req.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
+				request.Header.Set(control.HeaderKey, string(pub))
+				request.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
 			}
 		}
 	}
 
-	if agent.HardwareKeys().Public() != nil {
-		pub, err := echelper.PublicEcdsaToB64Der(agent.HardwareKeys().Public().(*ecdsa.PublicKey))
-		if err == nil {
-			sig, err := echelper.SignWithTimeout(agent.HardwareKeys(), body, 1*time.Second, 250*time.Millisecond)
-			if err == nil {
-				req.Header.Set(control.HeaderKey2, string(pub))
-				req.Header.Set(control.HeaderSignature2, base64.StdEncoding.EncodeToString(sig))
-			}
-		}
-	}
+	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)
+	sign(agent.HardwareKeys(), control.HeaderKey2, control.HeaderSignature2, req)
 }
 
 func launcherData(k types.Knapsack, note string) ([]byte, error) {
