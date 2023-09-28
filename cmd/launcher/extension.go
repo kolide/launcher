@@ -210,7 +210,7 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 	)
 
 	// Only enable watchdog internally for now
-	enableWatchdog := k.UpdateChannel() == "beta" || k.UpdateChannel() == "nightly"
+	enableWatchdog := k.UpdateChannel() == "nightly"
 
 	return []runtime.OsqueryInstanceOption{
 		runtime.WithKnapsack(k),
