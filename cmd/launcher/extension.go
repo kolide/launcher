@@ -209,6 +209,9 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 		kolidelog.WithKeyValue("osqlevel", "stdout"),
 	)
 
+	// Only enable watchdog internally for now
+	enableWatchdog := k.UpdateChannel() == "beta" || k.UpdateChannel() == "nightly"
+
 	return []runtime.OsqueryInstanceOption{
 		runtime.WithKnapsack(k),
 		runtime.WithOsquerydBinary(k.OsquerydPath()),
@@ -223,6 +226,7 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 		runtime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
 		runtime.WithUpdateDirectory(k.UpdateDirectory()),
 		runtime.WithUpdateChannel(k.UpdateChannel()),
+		runtime.WithEnableWatchdog(enableWatchdog),
 	}
 }
 
