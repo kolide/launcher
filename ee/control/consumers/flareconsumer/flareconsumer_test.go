@@ -37,9 +37,9 @@ func TestFlareConsumer(t *testing.T) {
 			mockSack := knapsackMock.NewKnapsack(t)
 			f := New(mockSack)
 			f.flarer = tt.flarer(t)
-			f.newFlareStream = func(note, uploadURL string) io.WriteCloser {
+			f.newFlareStream = func(note, uploadURL string) (io.WriteCloser, error) {
 				// whatever, it implements write closer
-				return &io.PipeWriter{}
+				return &io.PipeWriter{}, nil
 			}
 
 			tt.errAssertion(t, f.Do(bytes.NewBuffer([]byte(`{"note":"the_note"}`))))

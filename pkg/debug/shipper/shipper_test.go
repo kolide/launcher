@@ -23,8 +23,8 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
 		expectSignatureHeaders bool
 		expectSecret           bool
+		withUploadUrl          bool
 		assertion              assert.ErrorAssertionFunc
-		opts                   []shipperOption
 	}{
 		{
 			name: "happy path no enroll secret",
@@ -61,9 +61,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			expectSignatureHeaders: true,
 			expectSecret:           true,
 			assertion:              assert.NoError,
-			opts: []shipperOption{func(s *shipper) {
-				s.uploadURL = "https://example.com"
-			}},
+			withUploadUrl:          true,
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
@@ -93,19 +91,31 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				w.Write([]byte(fmt.Sprintf("%s/upload", testServer.URL)))
 			}))
 
-			mux.Handle("/upload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+			uploadBody := []byte("some_data")
+
+			mux.Handle("/upload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				require.Equal(t, uploadBody, body)
+			}))
 
 			testServer.Config.Handler = mux
 
 			knapsack := tt.mockKnapsack(t)
 
-			shipper := New(log.NewNopLogger(), knapsack, "some note", tt.opts...)
-
-			if shipper.uploadURL == "" {
+			var shipper *shipper
+			var err error
+			if tt.withUploadUrl {
+				shipper, err = New(log.NewNopLogger(), knapsack, WithUploadURL(fmt.Sprintf("%s/upload", testServer.URL)))
+			} else {
 				knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
+				shipper, err = New(log.NewNopLogger(), knapsack)
 			}
+			require.NoError(t, err)
 
-			tt.assertion(t, shipper.ship())
+			_, err = shipper.Write(uploadBody)
+			require.NoError(t, err)
+			require.NoError(t, shipper.Close())
 		})
 	}
 }
@@ -119,10 +129,6 @@ func TestShipErrors(t *testing.T) { //nolint:paralleltest
 		{
 			name:                    "fail get signed url request",
 			failGetSignedURLRequest: true,
-		},
-		{
-			name:              "fail upload request",
-			failUploadRequest: true,
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
@@ -155,8 +161,8 @@ func TestShipErrors(t *testing.T) { //nolint:paralleltest
 			k.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 			k.On("EnrollSecret").Return("")
 
-			shipper := New(log.NewNopLogger(), k, "some note")
-			require.Error(t, shipper.ship())
+			_, err := New(log.NewNopLogger(), k)
+			require.Error(t, err)
 		})
 	}
 }

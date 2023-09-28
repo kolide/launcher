@@ -5,8 +5,6 @@ package mocks
 import (
 	context "context"
 
-	checkups "github.com/kolide/launcher/pkg/debug/checkups"
-
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
@@ -19,13 +17,13 @@ type Flarer struct {
 	mock.Mock
 }
 
-// RunFlare provides a mock function with given fields: ctx, k, flareStream, environment
-func (_m *Flarer) RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, environment checkups.RuntimeEnvironmentType) error {
-	ret := _m.Called(ctx, k, flareStream, environment)
+// RunFlare provides a mock function with given fields: ctx, k, flareStream
+func (_m *Flarer) RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error {
+	ret := _m.Called(ctx, k, flareStream)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.Knapsack, io.WriteCloser, checkups.RuntimeEnvironmentType) error); ok {
-		r0 = rf(ctx, k, flareStream, environment)
+	if rf, ok := ret.Get(0).(func(context.Context, types.Knapsack, io.WriteCloser) error); ok {
+		r0 = rf(ctx, k, flareStream)
 	} else {
 		r0 = ret.Error(0)
 	}

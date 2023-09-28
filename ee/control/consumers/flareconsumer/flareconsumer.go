@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 )
 
@@ -22,19 +21,19 @@ type FlareConsumer struct {
 	flarer   flarer
 	knapsack types.Knapsack
 	// newFlareStream is assigned to a field so it can be mocked in tests
-	newFlareStream func(note, uploadURL string) io.WriteCloser
+	newFlareStream func(note, uploadURL string) (io.WriteCloser, error)
 }
 
 type flarer interface {
-	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, environment checkups.RuntimeEnvironmentType) error
+	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error
 }
 
 func New(knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
-		newFlareStream: func(note, uploadURL string) io.WriteCloser {
-			return shipper.New(log.NewNopLogger(), knapsack, note, shipper.WithUploadURL(uploadURL))
+		newFlareStream: func(note, uploadURL string) (io.WriteCloser, error) {
+			return shipper.New(log.NewNopLogger(), knapsack, shipper.WithNote(note), shipper.WithUploadURL(uploadURL))
 		},
 	}
 }
@@ -53,5 +52,9 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
-	return fc.flarer.RunFlare(context.Background(), fc.knapsack, fc.newFlareStream(flareData.Note, flareData.UploadURL), checkups.InSituEnvironment)
+	flareStream, err := fc.newFlareStream(flareData.Note, flareData.UploadURL)
+	if err != nil {
+		return fmt.Errorf("failed to create flare stream: %w", err)
+	}
+	return fc.flarer.RunFlare(context.Background(), fc.knapsack, flareStream)
 }

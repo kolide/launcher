@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
@@ -31,8 +32,15 @@ func WithUploadURL(url string) shipperOption {
 	}
 }
 
+// WithNote causes the signed url request to include a human defined note
+func WithNote(note string) shipperOption {
+	return func(s *shipper) {
+		s.note = note
+	}
+}
+
 type shipper struct {
-	bytes.Buffer
+	writer   *io.PipeWriter
 	logger   log.Logger
 	knapsack types.Knapsack
 	// note is intended to help humans identify the object being shipped
@@ -41,47 +49,53 @@ type shipper struct {
 	uploadURL string
 }
 
-func New(logger log.Logger, knapsack types.Knapsack, note string, opts ...shipperOption) *shipper {
+func New(logger log.Logger, knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s := &shipper{
 		logger:   logger,
 		knapsack: knapsack,
-		note:     note,
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
-	return s
+	if s.uploadURL == "" {
+		uploadURL, err := s.signedUrl()
+		if err != nil {
+			return nil, fmt.Errorf("getting signed url: %w", err)
+		}
+		s.uploadURL = uploadURL
+	}
+
+	reader, writer := io.Pipe()
+
+	go func() {
+		uploadResponse, err := http.Post(s.uploadURL, "application/octet-stream", reader)
+		if err != nil {
+			level.Error(s.logger).Log("msg", "uploading data", "err", err)
+		}
+		defer uploadResponse.Body.Close()
+
+		uploadRepsonseBody, err := io.ReadAll(uploadResponse.Body)
+		if err != nil {
+			level.Error(s.logger).Log("msg", "reading upload response", "err", err)
+		}
+
+		if uploadResponse.StatusCode != http.StatusOK {
+			level.Error(s.logger).Log("msg", "got non 200 status in upload response", "status", uploadResponse.Status, "body", string(uploadRepsonseBody))
+		}
+	}()
+
+	s.writer = writer
+	return s, nil
+}
+
+func (s *shipper) Write(p []byte) (n int, err error) {
+	return s.writer.Write(p)
 }
 
 func (s *shipper) Close() error {
-	return s.ship()
-}
-
-func (s *shipper) ship() error {
-	signedUrl, err := s.signedUrl()
-	if err != nil {
-		return fmt.Errorf("getting signed url: %w", err)
-	}
-
-	// now upload to the signed url
-	uploadResponse, err := http.Post(signedUrl, "application/octet-stream", &s.Buffer)
-	if err != nil {
-		return fmt.Errorf("uploading data: %w", err)
-	}
-	defer uploadResponse.Body.Close()
-
-	uploadRepsonseBody, err := io.ReadAll(uploadResponse.Body)
-	if err != nil {
-		return fmt.Errorf("reading upload response: %w", err)
-	}
-
-	if uploadResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("got %s status in upload response: %s", uploadResponse.Status, string(uploadRepsonseBody))
-	}
-
-	return nil
+	return s.writer.Close()
 }
 
 func (s *shipper) signedUrl() (string, error) {
@@ -89,7 +103,6 @@ func (s *shipper) signedUrl() (string, error) {
 		return s.uploadURL, nil
 	}
 
-	// first get a signed url
 	if s.knapsack.DebugUploadRequestURL() == "" {
 		return "", errors.New("debug upload request url is empty")
 	}

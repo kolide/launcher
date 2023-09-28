@@ -42,7 +42,10 @@ func runFlareUpload(args []string) error {
 	k := knapsack.New(nil, flagController, nil)
 
 	ctx := context.Background()
-	shipper := shipper.New(logger, k, note)
+	shipper, err := shipper.New(logger, k, shipper.WithNote(note))
+	if err != nil {
+		return err
+	}
 	return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
 }
 
@@ -78,6 +81,7 @@ func runFlare(args []string) error {
 	if err != nil {
 		return fmt.Errorf("creating flare file (%s): %w", reportPath, err)
 	}
+	defer flare.Close()
 
 	return checkups.RunFlare(ctx, k, flare, checkups.StandaloneEnviroment)
 }
