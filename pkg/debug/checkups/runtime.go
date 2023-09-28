@@ -80,7 +80,7 @@ func gatherStack(z *zip.Writer) error {
 		return fmt.Errorf("creating stack: %w", err)
 	}
 
-	buf := make([]byte, 1<<32)
+	buf := make([]byte, 1<<16)
 	stacklen := runtime.Stack(buf, true)
 	if _, err := out.Write(buf[0:stacklen]); err != nil {
 		return fmt.Errorf("writing file: %w", err)
