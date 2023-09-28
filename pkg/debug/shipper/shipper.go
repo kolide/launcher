@@ -117,9 +117,7 @@ func (s *shipper) signedUrl() (string, error) {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
 
-	if err := signHttpRequest(s.knapsack, signedUrlRequest, body); err != nil {
-		return "", fmt.Errorf("signing signed url request: %w", err)
-	}
+	signHttpRequest(s.knapsack, signedUrlRequest, body)
 
 	signedUrlResponse, err := http.DefaultClient.Do(signedUrlRequest)
 	if err != nil {
@@ -139,24 +137,28 @@ func (s *shipper) signedUrl() (string, error) {
 	return string(signedUrlResponseBody), nil
 }
 
-func signHttpRequest(k types.Knapsack, req *http.Request, body []byte) error {
-	if agent.LocalDbKeys().Public() == nil {
-		return nil
+func signHttpRequest(k types.Knapsack, req *http.Request, body []byte) {
+	if agent.LocalDbKeys().Public() != nil {
+		pub, err := echelper.PublicEcdsaToB64Der(agent.LocalDbKeys().Public().(*ecdsa.PublicKey))
+		if err == nil {
+			sig, err := echelper.SignWithTimeout(agent.LocalDbKeys(), body, 1*time.Second, 250*time.Millisecond)
+			if err == nil {
+				req.Header.Set(control.HeaderKey, string(pub))
+				req.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
+			}
+		}
 	}
 
-	pub, err := echelper.PublicEcdsaToB64Der(agent.LocalDbKeys().Public().(*ecdsa.PublicKey))
-	if err != nil {
-		return nil
+	if agent.HardwareKeys().Public() != nil {
+		pub, err := echelper.PublicEcdsaToB64Der(agent.HardwareKeys().Public().(*ecdsa.PublicKey))
+		if err == nil {
+			sig, err := echelper.SignWithTimeout(agent.HardwareKeys(), body, 1*time.Second, 250*time.Millisecond)
+			if err == nil {
+				req.Header.Set(control.HeaderKey2, string(pub))
+				req.Header.Set(control.HeaderSignature2, base64.StdEncoding.EncodeToString(sig))
+			}
+		}
 	}
-
-	sig, err := echelper.SignWithTimeout(agent.LocalDbKeys(), body, 1*time.Second, 250*time.Millisecond)
-	if err != nil {
-		return nil
-	}
-
-	req.Header.Set(control.HeaderKey, string(pub))
-	req.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
-	return nil
 }
 
 func launcherData(k types.Knapsack, note string) ([]byte, error) {
