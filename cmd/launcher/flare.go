@@ -28,11 +28,11 @@ func runFlare(args []string) error {
 	launcher.SetDefaultPaths()
 
 	var (
-		flagset    = flag.NewFlagSet("flare", flag.ExitOnError)
-		flNoUpload = flagset.Bool(
-			"no_upload",
-			false,
-			"save flare on disk instead of uploading",
+		flagset = flag.NewFlagSet("flare", flag.ExitOnError)
+		flSave  = flagset.String(
+			"save",
+			"local",
+			"local | upload",
 		)
 		flNote = flagset.String(
 			"note",
@@ -48,6 +48,10 @@ func runFlare(args []string) error {
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
+	}
+
+	if *flSave != "local" && *flSave != "upload" {
+		return fmt.Errorf("invalid save option: %s, expected local or upload", *flSave)
 	}
 
 	opts, err := launcher.ParseOptions("flareupload", make([]string, 0))
@@ -66,7 +70,7 @@ func runFlare(args []string) error {
 	k := knapsack.New(nil, flagController, nil)
 	ctx := context.Background()
 
-	if !*flNoUpload {
+	if *flSave == "upload" {
 		shipper, err := shipper.New(k, shipper.WithNote(*flNote))
 		if err != nil {
 			return err
