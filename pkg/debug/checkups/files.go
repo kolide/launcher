@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/agent/types"
 )
-
-var notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
 
 type filesCheckup struct {
 	k       types.Knapsack
@@ -29,6 +28,13 @@ func (fc *filesCheckup) Summary() string       { return fc.summary }
 func (fc *filesCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	fc.data = make(map[string]string)
 	dirExists, dirNotEmpty, dirHasError := false, false, false
+	var notableFileDirs []string
+	switch runtime.GOOS {
+	case "windows":
+		notableFileDirs = []string{`C:\Program Files\osquery`}
+	default:
+		notableFileDirs = []string{"/var/osquery", "/etc/osquery"}
+	}
 
 	for _, dirname := range notableFileDirs {
 		files, err := os.ReadDir(dirname)
@@ -54,14 +60,17 @@ func (fc *filesCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 		}
 	}
 
-	fc.status = Informational
 	if dirNotEmpty {
+		fc.status = Failing
 		fc.summary = "At least one notable directory is present and non-empty"
 	} else if dirHasError {
+		fc.status = Erroring
 		fc.summary = "At least one notable directory is present and could not be read"
 	} else if dirExists {
+		fc.status = Warning
 		fc.summary = "At least one notable directory is present, but empty"
 	} else {
+		fc.status = Passing
 		fc.summary = "No notable directories were detected"
 	}
 

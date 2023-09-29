@@ -36,6 +36,8 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 	sdc.data = make(map[string]string, len(serverProvidedDataKeys))
 
 	if db == nil {
+		sdc.status = Warning
+		sdc.summary = "no bbolt DB connection in knapsack"
 		return nil
 	}
 
@@ -44,6 +46,8 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 	if err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(storage.ServerProvidedDataStore))
 		if b == nil {
+			sdc.status = Warning
+			sdc.summary = fmt.Sprintf("unable to access bbolt bucket (%s)", storage.ServerProvidedDataStore)
 			return nil
 		}
 
@@ -60,17 +64,25 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 
 		return nil
 	}); err != nil {
-		return err
+		sdc.status = Failing
+		sdc.summary = fmt.Sprintf("encountered error accessing bucket (%s): %w", storage.ServerProvidedDataStore, err)
+		return nil
 	}
 
-	sdc.status = Informational
 	if !accessedBucket {
+		sdc.status = Failing
 		sdc.summary = fmt.Sprintf("unable to view bucket: %s", storage.ServerProvidedDataStore)
-	} else if missingValues {
-		sdc.summary = fmt.Sprintf("successfully connected to %s bucket, but some values are missing", storage.ServerProvidedDataStore)
-	} else {
-		sdc.summary = fmt.Sprintf("successfully gathered all data values from %s bucket", storage.ServerProvidedDataStore)
+		return nil
 	}
+
+	if missingValues {
+		sdc.status = Warning
+		sdc.summary = fmt.Sprintf("successfully connected to %s bucket, but some values are missing", storage.ServerProvidedDataStore)
+		return nil
+	}
+
+	sdc.status = Passing
+	sdc.summary = fmt.Sprintf("successfully gathered all data values from %s bucket", storage.ServerProvidedDataStore)
 
 	return nil
 }

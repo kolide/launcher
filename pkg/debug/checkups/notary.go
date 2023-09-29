@@ -35,7 +35,7 @@ func (nc *notaryCheckup) Summary() string       { return nc.summary }
 
 func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	nc.data = make(map[string]string)
-	if !nc.k.KolideHosted() || !nc.k.Autoupdate() {
+	if !nc.k.Autoupdate() {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	} else {
 		nc.data[notaryUrl.String()] = response
 		nc.status = Passing
-		nc.summary = "Successfully gathered notary version response"
+		nc.summary = fmt.Sprintf("Successfully gathered notary version %s from %s", response, notaryUrl.String())
 	}
 
 	return nil

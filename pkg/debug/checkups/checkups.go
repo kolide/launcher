@@ -112,6 +112,12 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
 		{&dnsCheckup{k: k}, doctorSupported | flareSupported},
+		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported},
+		{&notaryCheckup{k: k}, doctorSupported | flareSupported},
+		{&tuffCheckup{k: k}, doctorSupported | flareSupported},
+		{&filesCheckup{k: k}, doctorSupported | flareSupported},
+		{&serverDataCheckup{k: k}, doctorSupported | flareSupported},
+		{&serverVersionCheckup{k: k}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
