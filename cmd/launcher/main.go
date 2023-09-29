@@ -137,8 +137,6 @@ func runSubcommands() error {
 		run = runDoctor
 	case "flare":
 		run = runFlare
-	case "flareupload":
-		run = runFlareUpload
 	case "svc":
 		run = runWindowsSvc
 	case "svc-fg":

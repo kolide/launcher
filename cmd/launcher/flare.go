@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,41 +16,10 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/peterbourgon/ff/v3"
 )
 
 // sudo /usr/local/kolide-k2/bin/launcher flareupload "note" --debug_upload_request_url="https://example.com"
-func runFlareUpload(args []string) error {
-	// Flare assumes a launcher installation (at least partially) exists
-	// Overriding some of the default values allows options to be parsed making this assumption
-	// TODO this stuff needs some deeper thinking
-	launcher.DefaultAutoupdate = true
-	launcher.SetDefaultPaths()
-
-	note := ""
-	if len(args) > 0 {
-		note = args[0]
-		args = args[1:]
-	}
-
-	opts, err := launcher.ParseOptions("flareupload", args)
-	if err != nil {
-		return err
-	}
-
-	logger := log.NewLogfmtLogger(os.Stdout)
-	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
-	k := knapsack.New(nil, flagController, nil)
-
-	ctx := context.Background()
-	shipper, err := shipper.New(logger, k, shipper.WithNote(note))
-	if err != nil {
-		return err
-	}
-	return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
-}
-
-// sudo /usr/local/kolide-k2/bin/launcher flare
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
@@ -57,7 +27,30 @@ func runFlare(args []string) error {
 	launcher.DefaultAutoupdate = true
 	launcher.SetDefaultPaths()
 
-	opts, err := launcher.ParseOptions("flare", args)
+	var (
+		flagset    = flag.NewFlagSet("flare", flag.ExitOnError)
+		flNoUpload = flagset.Bool(
+			"no_upload",
+			false,
+			"save flare on disk instead of uploading",
+		)
+		flNote = flagset.String(
+			"note",
+			"",
+			"note used in URL upload request",
+		)
+		flUploadRequestURL = flagset.String(
+			"upload_request_url",
+			"",
+			"URL to request a signed upload URL",
+		)
+	)
+
+	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
+		return fmt.Errorf("parsing flags: %w", err)
+	}
+
+	opts, err := launcher.ParseOptions("flareupload", make([]string, 0))
 	if err != nil {
 		return err
 	}
@@ -65,23 +58,35 @@ func runFlare(args []string) error {
 	logger := log.NewLogfmtLogger(os.Stdout)
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
-	k := knapsack.New(nil, flagController, nil)
 
+	if *flUploadRequestURL != "" {
+		flagController.SetDebugUploadRequestURL(*flUploadRequestURL)
+	}
+
+	k := knapsack.New(nil, flagController, nil)
 	ctx := context.Background()
 
+	if !*flNoUpload {
+		shipper, err := shipper.New(logger, k, shipper.WithNote(*flNote))
+		if err != nil {
+			return err
+		}
+		return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
+	}
+
+	// saving flare locally
 	var (
 		dirPath = env.String("KOLIDE_AGENT_FLARE_ZIP_DIR_PATH", "")
 	)
 
-	id := ulid.New()
-	reportName := fmt.Sprintf("kolide_agent_flare_report_%s", id)
+	reportName := fmt.Sprintf("kolide_agent_flare_report_%s", ulid.New())
 	reportPath := fmt.Sprintf("%s.zip", filepath.Join(dirPath, reportName))
 
-	flare, err := os.Create(reportPath)
+	flareFile, err := os.Create(reportPath)
 	if err != nil {
 		return fmt.Errorf("creating flare file (%s): %w", reportPath, err)
 	}
-	defer flare.Close()
+	defer flareFile.Close()
 
-	return checkups.RunFlare(ctx, k, flare, checkups.StandaloneEnviroment)
+	return checkups.RunFlare(ctx, k, flareFile, checkups.StandaloneEnviroment)
 }
