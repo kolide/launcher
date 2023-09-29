@@ -222,8 +222,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("sigChannel", func() error {
 		signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 		select {
-		case <-sigChannel:
-			level.Info(logger).Log("msg", "beginning shutdown via signal")
+		case sig := <-sigChannel:
+			level.Info(logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
 			return nil
 		}
 	}, func(_ error) {
