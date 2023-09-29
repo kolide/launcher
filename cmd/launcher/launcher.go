@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -219,10 +220,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// Add a rungroup to catch things on the sigChannel
 	// Attach a notifier for os.Interrupt
 	runGroup.Add("sigChannel", func() error {
-		signal.Notify(sigChannel, os.Interrupt)
+		signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 		select {
-		case <-sigChannel:
-			level.Info(logger).Log("msg", "beginning shutdown via signal")
+		case sig := <-sigChannel:
+			level.Info(logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
 			return nil
 		}
 	}, func(_ error) {
