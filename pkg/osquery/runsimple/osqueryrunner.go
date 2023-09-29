@@ -11,7 +11,7 @@ import (
 	"runtime"
 )
 
-// osqueryRunner is a very simple osquery runtime manager. It's designed to start and stop osquery. It has
+// osqueryProcess is a very simple osquery runtime manager. It's designed to start and stop osquery. It has
 // no interactions with the osquery socket, it is purely a process manager.
 type osqueryProcess struct {
 	osquerydPath  string
