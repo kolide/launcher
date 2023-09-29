@@ -20,10 +20,10 @@ func Test_OsquerySingleSqlNoIO(t *testing.T) {
 		t.Skip("No osquery. Not implemented")
 	}
 
-	osq, err := NewOsqueryProcess(osquerydPath, RunSql([]byte("select 1")))
+	osq, err := NewOsqueryProcess(osquerydPath)
 	require.NoError(t, err)
 
-	require.NoError(t, osq.Execute(context.TODO()))
+	require.NoError(t, osq.RunSql(context.TODO(), []byte("select 1")))
 }
 
 func Test_OsquerySingleSqlErr(t *testing.T) {
@@ -78,19 +78,18 @@ func Test_OsquerySingleSqlErr(t *testing.T) {
 
 			osq, err := NewOsqueryProcess(
 				osquerydPath,
-				RunSql([]byte(tt.sql)),
 				WithStdout(&stdout),
 				WithStderr(&stderr),
 			)
 			require.NoError(t, err)
 
 			if tt.expectErr {
-				require.Error(t, osq.Execute(context.TODO()))
+				require.Error(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
 				require.Contains(t, stderr.String(), "Error")
 				return
 			}
 
-			require.NoError(t, osq.Execute(context.TODO()))
+			require.NoError(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
 
 			if tt.jsonMulti {
 				// This is discouraged, and hard to test. So let's bail for now
