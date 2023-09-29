@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 )
 
 type (
@@ -70,7 +71,7 @@ func (tc *tuffCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 
 	tc.status = Passing
 	tc.data[tuffUrl.String()] = response
-	tc.summary = fmt.Sprintf("Successfully gathered tuff version %s from %s", response, tuffUrl.String())
+	tc.summary = fmt.Sprintf("Successfully gathered release version %s from %s", response, tuffUrl.String())
 
 	return nil
 }
@@ -92,12 +93,7 @@ func (tc *tuffCheckup) fetchTuffVersion(client *http.Client, url *url.URL) (stri
 		return "", err
 	}
 
-	upgradePathKey := fmt.Sprintf("launcher/%s/%s/%s/release.json", runtime.GOOS, runtime.GOARCH, tc.k.UpdateChannel())
-	// try universal if there is no specific match for GOARCH
-	if _, ok := releaseTargets.Signed.Targets[upgradePathKey]; !ok {
-		upgradePathKey = fmt.Sprintf("launcher/%s/universal/%s/release.json", runtime.GOOS, tc.k.UpdateChannel())
-	}
-
+	upgradePathKey := fmt.Sprintf("launcher/%s/%s/%s/release.json", runtime.GOOS, tuf.PlatformArch(), tc.k.UpdateChannel())
 	hostTargets, ok := releaseTargets.Signed.Targets[upgradePathKey]
 
 	if !ok {

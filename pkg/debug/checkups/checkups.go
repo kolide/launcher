@@ -91,9 +91,10 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		c       checkupInt
 		targets targetBits
 	}{
-		{&Processes{}, doctorSupported | flareSupported},
+		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported},
 		{&Platform{}, doctorSupported | flareSupported},
 		{&Version{k: k}, doctorSupported | flareSupported},
+		{&Processes{}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
@@ -112,7 +113,6 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
 		{&dnsCheckup{k: k}, doctorSupported | flareSupported},
-		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported},
 		{&notaryCheckup{k: k}, doctorSupported | flareSupported},
 		{&tuffCheckup{k: k}, doctorSupported | flareSupported},
 		{&filesCheckup{k: k}, doctorSupported | flareSupported},

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -24,8 +23,6 @@ const osSqlQuery = `
 SELECT
 	os_version.build as os_build,
 	os_version.name as os_name,
-	os_version.platform as os_platform,
-	os_version.platform_like as os_platform_like,
 	os_version.version as os_version
 FROM
 	os_version;
@@ -36,18 +33,9 @@ SELECT
 	system_info.hardware_model,
 	system_info.hardware_serial,
 	system_info.hardware_vendor,
-	system_info.hostname,
 	system_info.uuid as hardware_uuid
 FROM
 	system_info;
-`
-
-const osquerySqlQuery = `
-SELECT
-	osquery_info.version as osquery_version,
-	osquery_info.instance_id as osquery_instance_id
-FROM
-    osquery_info;
 `
 
 type (
@@ -70,46 +58,37 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hc.data = make(map[string]any)
 	hc.data["hostname"] = hostName()
 	hc.data["keyinfo"] = agentKeyInfo()
-	hc.data["runtime"] = map[string]string{
-		"GOARCH": runtime.GOARCH,
-		"GOOS":   runtime.GOOS,
-	}
-
-	hc.data["launcher"] = map[string]string{
-		"revision": version.Version().Revision,
-		"version":  version.Version().Version,
-	}
-
 	hc.data["bbolt_db_size"] = hc.bboltDbSize()
-
 	hc.data["user_desktop_processes"] = runner.InstanceDesktopProcessRecords()
 
 	if runtime.GOOS == "windows" {
 		hc.data["in_modern_standby"] = hc.k.InModernStandby()
 	}
 
+	hc.status = Informational
+	hc.summary = fmt.Sprintf("\n\t\thostname: %s", hc.data["hostname"])
+
 	if result, err := hc.osqueryInteractive(ctx, osSqlQuery); err != nil {
 		hc.data["os_version"] = err.Error()
 	} else {
 		hc.data["os_version"] = result
+		hc.appendResultsToSummary(result)
 	}
 
 	if result, err := hc.osqueryInteractive(ctx, systemSqlQuery); err != nil {
 		hc.data["system_info"] = err.Error()
 	} else {
 		hc.data["system_info"] = result
+		hc.appendResultsToSummary(result)
 	}
-
-	if result, err := hc.osqueryInteractive(ctx, osquerySqlQuery); err != nil {
-		hc.data["osquery_info"] = err.Error()
-	} else {
-		hc.data["osquery_info"] = result
-	}
-
-	hc.status = Informational
-	hc.summary = fmt.Sprintf("collected all available host data for %s", hc.data["hostname"])
 
 	return nil
+}
+
+func (hc *hostInfoCheckup) appendResultsToSummary(results map[string]string) {
+	for k, v := range results {
+		hc.summary = fmt.Sprintf("%s\n\t\t%s: %s", hc.summary, k, v)
+	}
 }
 
 func (hc *hostInfoCheckup) osqueryInteractive(ctx context.Context, query string) (map[string]string, error) {

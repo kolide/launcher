@@ -46,7 +46,7 @@ func (svc *serverVersionCheckup) Run(ctx context.Context, extraFH io.Writer) err
 	} else {
 		svc.data[serverUrl.String()] = response
 		svc.status = Passing
-		svc.summary = "Successfully gathered server version response"
+		svc.summary = fmt.Sprintf("%s returned version response: %s", serverUrl.String(), response)
 	}
 
 	return nil
