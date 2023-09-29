@@ -67,7 +67,7 @@ func runFlare(args []string) error {
 	ctx := context.Background()
 
 	if !*flNoUpload {
-		shipper, err := shipper.New(logger, k, shipper.WithNote(*flNote))
+		shipper, err := shipper.New(k, shipper.WithNote(*flNote))
 		if err != nil {
 			return err
 		}
