@@ -404,11 +404,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// We used to see the enrollment details fail, but now that we're running as an exec,
 	// it seems less likely. Try a couple times, but backoff fast.
 	var enrollDetails service.EnrollmentDetails
-	if e.knapsack.OsquerydPath() == "" {
+	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
 		level.Info(logger).Log("msg", "Cannot get additional enrollment details without an osqueryd path. This is probably CI")
 	} else {
 		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(ctx, e.knapsack.OsquerydPath())
+			enrollDetails, err = getEnrollDetails(ctx, osqPath)
 			if err != nil {
 				level.Debug(logger).Log("msg", "getEnrollDetails failed in backoff", "err", err)
 			}
