@@ -145,13 +145,17 @@ func signHttpRequest(req *http.Request, body []byte) {
 		}
 
 		pub, err := echelper.PublicEcdsaToB64Der(signer.Public().(*ecdsa.PublicKey))
-		if err == nil {
-			sig, err := echelper.SignWithTimeout(signer, body, 1*time.Second, 250*time.Millisecond)
-			if err == nil {
-				request.Header.Set(control.HeaderKey, string(pub))
-				request.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
-			}
+		if err != nil {
+			return
 		}
+
+		sig, err := echelper.SignWithTimeout(signer, body, 1*time.Second, 250*time.Millisecond)
+		if err != nil {
+			return
+		}
+
+		request.Header.Set(control.HeaderKey, string(pub))
+		request.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
 	}
 
 	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)
