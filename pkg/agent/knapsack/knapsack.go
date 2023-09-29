@@ -1,11 +1,15 @@
 package knapsack
 
 import (
+	"context"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"go.etcd.io/bbolt"
 )
 
@@ -138,6 +142,15 @@ func (k *knapsack) RootDirectory() string {
 
 func (k *knapsack) OsquerydPath() string {
 	return k.flags.OsquerydPath()
+}
+
+func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
+	latestBin, err := tuf.CheckOutLatest("osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
+	if err != nil {
+		return autoupdate.FindNewest(ctx, k.OsquerydPath())
+	}
+
+	return latestBin.Path
 }
 
 func (k *knapsack) CertPins() [][]byte {
