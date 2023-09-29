@@ -261,7 +261,6 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	flare := zip.NewWriter(flareStream)
 	defer func() {
 		_ = flare.Close()
-		_ = flareStream.Close()
 	}()
 
 	// zip can only handle one file being written at a time. So defer writing the summary till the end
@@ -283,11 +282,15 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
-			return fmt.Errorf("writing flare file: %w", err)
+			if closeErr := flareStream.Close(); closeErr != nil {
+				return fmt.Errorf("writing to flare stream: %w, closing flare stream: %w", err, closeErr)
+			}
+			return fmt.Errorf("writing to flare stream: %w", err)
 		}
 	}
 
-	return nil
+	// we could defer this close, but we want to return any errors
+	return flareStream.Close()
 }
 
 func writeFlareEnv(z *zip.Writer, runtimeEnvironment RuntimeEnvironmentType) error {

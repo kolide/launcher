@@ -12,10 +12,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
@@ -41,19 +40,25 @@ func WithNote(note string) shipperOption {
 }
 
 type shipper struct {
-	writer   *io.PipeWriter
-	logger   log.Logger
+	writer   io.WriteCloser
 	knapsack types.Knapsack
+
+	uploadRequest        *http.Request
+	uploadRequestStarted bool
+	uploadRequestErr     error
+	uploadResponse       *http.Response
+	uploadRequestWg      *sync.WaitGroup
+
 	// note is intended to help humans identify the object being shipped
 	note string
 	// upload url can be set to skip the request for one
 	uploadURL string
 }
 
-func New(logger log.Logger, knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
+func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s := &shipper{
-		logger:   logger,
-		knapsack: knapsack,
+		knapsack:        knapsack,
+		uploadRequestWg: &sync.WaitGroup{},
 	}
 
 	for _, opt := range opts {
@@ -69,34 +74,65 @@ func New(logger log.Logger, knapsack types.Knapsack, opts ...shipperOption) (*sh
 	}
 
 	reader, writer := io.Pipe()
-
-	go func() {
-		uploadResponse, err := http.Post(s.uploadURL, "application/octet-stream", reader)
-		if err != nil {
-			level.Error(s.logger).Log("msg", "uploading data", "err", err)
-		}
-		defer uploadResponse.Body.Close()
-
-		uploadRepsonseBody, err := io.ReadAll(uploadResponse.Body)
-		if err != nil {
-			level.Error(s.logger).Log("msg", "reading upload response", "err", err)
-		}
-
-		if uploadResponse.StatusCode != http.StatusOK {
-			level.Error(s.logger).Log("msg", "got non 200 status in upload response", "status", uploadResponse.Status, "body", string(uploadRepsonseBody))
-		}
-	}()
-
 	s.writer = writer
+
+	req, err := http.NewRequest(http.MethodPut, s.uploadURL, reader)
+	if err != nil {
+		return nil, fmt.Errorf("creating upload request: %w", err)
+	}
+	s.uploadRequest = req
+
 	return s, nil
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
+	if s.uploadRequestStarted {
+		return s.writer.Write(p)
+	}
+
+	// start request
+	// We could start the request in New(), but then we would hold the connection open longer than needed,
+	// OTHO, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
+	s.uploadRequestStarted = true
+	s.uploadRequestWg.Add(1)
+	go func() {
+		defer s.uploadRequestWg.Done()
+		// will close the body in the close function
+		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
+	}()
+
 	return s.writer.Write(p)
 }
 
 func (s *shipper) Close() error {
-	return s.writer.Close()
+	if err := s.writer.Close(); err != nil {
+		return err
+	}
+
+	// this will happen if the write function is never called
+	// then nothing sent, no error
+	if !s.uploadRequestStarted {
+		return nil
+	}
+
+	// wait for upload request to finish
+	s.uploadRequestWg.Wait()
+
+	if s.uploadRequestErr != nil {
+		return fmt.Errorf("upload request error: %w", s.uploadRequestErr)
+	}
+	defer s.uploadResponse.Body.Close()
+
+	uploadRepsonseBody, err := io.ReadAll(s.uploadResponse.Body)
+	if err != nil {
+		return fmt.Errorf("reading upload response: %w", err)
+	}
+
+	if s.uploadResponse.StatusCode != http.StatusOK {
+		return fmt.Errorf("got non 200 status in upload response: %s %s", s.uploadResponse.Status, string(uploadRepsonseBody))
+	}
+
+	return nil
 }
 
 func (s *shipper) signedUrl() (string, error) {

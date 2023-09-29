@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 )
@@ -33,7 +32,7 @@ func New(knapsack types.Knapsack) *FlareConsumer {
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
 		newFlareStream: func(note, uploadURL string) (io.WriteCloser, error) {
-			return shipper.New(log.NewNopLogger(), knapsack, shipper.WithNote(note), shipper.WithUploadURL(uploadURL))
+			return shipper.New(knapsack, shipper.WithNote(note), shipper.WithUploadURL(uploadURL))
 		},
 	}
 }

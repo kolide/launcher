@@ -106,10 +106,10 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			var shipper *shipper
 			var err error
 			if tt.withUploadUrl {
-				shipper, err = New(log.NewNopLogger(), knapsack, WithUploadURL(fmt.Sprintf("%s/upload", testServer.URL)))
+				shipper, err = New(knapsack, WithUploadURL(fmt.Sprintf("%s/upload", testServer.URL)))
 			} else {
 				knapsack.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
-				shipper, err = New(log.NewNopLogger(), knapsack)
+				shipper, err = New(knapsack)
 			}
 			require.NoError(t, err)
 
@@ -121,14 +121,24 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 }
 
 func TestShipErrors(t *testing.T) { //nolint:paralleltest
+	type errorType int
+
+	const (
+		failedToGetSignedURL errorType = iota
+		failedToUPload
+	)
+
 	tests := []struct {
-		name                    string
-		failGetSignedURLRequest bool
-		failUploadRequest       bool
+		name      string
+		errorType errorType
 	}{
 		{
-			name:                    "fail get signed url request",
-			failGetSignedURLRequest: true,
+			name:      "fail get signed url request",
+			errorType: failedToGetSignedURL,
+		},
+		{
+			name:      "bad upload url",
+			errorType: failedToUPload,
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
@@ -141,8 +151,7 @@ func TestShipErrors(t *testing.T) { //nolint:paralleltest
 			mux := http.NewServeMux()
 			mux.Handle("/signedurl", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer r.Body.Close()
-
-				if tt.failGetSignedURLRequest {
+				if tt.errorType == failedToGetSignedURL {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
 
@@ -150,7 +159,8 @@ func TestShipErrors(t *testing.T) { //nolint:paralleltest
 			}))
 
 			mux.Handle("/upload", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tt.failUploadRequest {
+				defer r.Body.Close()
+				if tt.errorType == failedToUPload {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
 			}))
@@ -161,8 +171,18 @@ func TestShipErrors(t *testing.T) { //nolint:paralleltest
 			k.On("DebugUploadRequestURL").Return(fmt.Sprintf("%s/signedurl", testServer.URL))
 			k.On("EnrollSecret").Return("")
 
-			_, err := New(log.NewNopLogger(), k)
-			require.Error(t, err)
+			shipper, err := New(k)
+			if tt.errorType == failedToGetSignedURL {
+				require.Error(t, err)
+				return
+			}
+
+			_, err = shipper.Write([]byte("some_data"))
+			require.NoError(t, err)
+
+			if tt.errorType == failedToUPload {
+				require.Error(t, shipper.Close())
+			}
 		})
 	}
 }
