@@ -69,10 +69,10 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer osqCancel()
 
-	if err := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
+	if sqlErr := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
 		return details, fmt.Errorf("query enrollment details context error: %w", osqCtx.Err())
-	} else if err != nil {
-		return details, fmt.Errorf("query enrollment details: %w", err)
+	} else if sqlErr != nil {
+		return details, fmt.Errorf("query enrollment details: %w", sqlErr)
 	}
 
 	var resp []map[string]string
