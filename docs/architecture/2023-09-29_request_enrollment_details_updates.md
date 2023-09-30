@@ -1,5 +1,7 @@
 # Revisiting enrollment details
 
+This continues the work started in [Initial Host Details](2018-06-15_request_enrollment_details.md)
+
 ## Authors
 
 - seph ([@directionless](https://github.com/directionless))
