@@ -54,6 +54,7 @@ func runFlare(args []string) error {
 		return fmt.Errorf("invalid save option: %s, expected local or upload", *flSave)
 	}
 
+	// were passing an empty array here just to get the default options
 	opts, err := launcher.ParseOptions("flareupload", make([]string, 0))
 	if err != nil {
 		return err
