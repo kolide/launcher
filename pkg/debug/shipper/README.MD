@@ -1,9 +1,20 @@
+shipping initiated by user (cmd line):
 ```mermaid
 sequenceDiagram
-    Launcher->>+K2: signed url request
-    K2->>+GCP: create pre-signed url
-    GCP-->>+K2: pre-signed url
-    K2-->>+Launcher: pre-signed url
-    Launcher->>+Launcher: generate artiface
-    Launcher->>+GCP: post artifact to pre-signed url
+    launcher->>+server: signed url request
+    server->>+gcp: create signed url
+    gcp-->>+server: signed url
+    server-->>+launcher: signed url
+    launcher->>+launcher: generate artifact
+    launcher->>+gcp: post artifact to signed url
+```
+
+shipping initated by server:
+```mermaid
+sequenceDiagram
+    server->>+gcp: create signed url
+    gcp-->>+server: signed url
+    server->>+launcher: do something and upload to (signed url)
+    launcher->>+launcher: generate artifact
+    launcher->>+gcp: post artifact to signed url
 ```
