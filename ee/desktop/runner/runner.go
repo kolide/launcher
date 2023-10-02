@@ -226,23 +226,8 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 			r.refreshMenu()
 			continue
 		case <-osUpdateCheckTicker.C:
-			// on darwin, sometimes the desktop disappears after an OS update
-			// eventhough the process is still there, so lets restart desktop
-			// via killing the process and letting the runner restart it
-			if runtime.GOOS != "darwin" {
-				continue
-			}
-
-			osVersion, err := osversion()
-			if err != nil {
-				level.Error(r.logger).Log("msg", "getting os version", "err", err)
-				continue
-			}
-
-			if osVersion != r.osVersion {
-				r.osVersion = osVersion
-				r.killDesktopProcesses()
-			}
+			r.checkOsUpdate()
+			continue
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
 			return nil
@@ -830,4 +815,29 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 		// not dir, has prefix
 		return os.Remove(path)
 	})
+}
+
+func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
+	// on darwin, sometimes the desktop disappears after an OS update
+	// eventhough the process is still there, so lets restart desktop
+	// via killing the process and letting the runner restart it
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	osVersion, err := osversion()
+	if err != nil {
+		level.Error(r.logger).Log("msg", "getting os version", "err", err)
+		return
+	}
+
+	if osVersion != r.osVersion {
+		level.Debug(r.logger).Log(
+			"msg", "os version changed, restarting desktop",
+			"old", r.osVersion,
+			"new", osVersion,
+		)
+		r.osVersion = osVersion
+		r.killDesktopProcesses()
+	}
 }
