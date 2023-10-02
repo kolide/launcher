@@ -210,7 +210,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	defer updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()
-	osUpdateCheckTicker := time.NewTicker(5 * time.Second)
+	osUpdateCheckTicker := time.NewTicker(1 * time.Minute)
 	defer osUpdateCheckTicker.Stop()
 
 	for {
