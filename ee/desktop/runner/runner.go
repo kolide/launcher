@@ -133,6 +133,8 @@ type DesktopUsersProcessesRunner struct {
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
 	runnerServer *runnerserver.RunnerServer
+	// osVersion is the version of the OS cached in new
+	osVersion string
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -189,6 +191,14 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		}
 	}()
 
+	if runtime.GOOS == "darwin" {
+		osversion, err := osversion()
+		if err != nil {
+			level.Error(runner.logger).Log("msg", "getting os version", "err", err)
+		}
+		runner.osVersion = osversion
+	}
+
 	setInstance(runner)
 	return runner, nil
 }
@@ -200,6 +210,8 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	defer updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()
+	osUpdateCheckTicker := time.NewTicker(5 * time.Second)
+	defer osUpdateCheckTicker.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
@@ -213,6 +225,24 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		case <-menuRefreshTicker.C:
 			r.refreshMenu()
 			continue
+		case <-osUpdateCheckTicker.C:
+			// on darwin, sometimes the desktop disappears after an OS update
+			// eventhough the process is still there, so lets restart desktop
+			// via killing the process and letting the runner restart it
+			if runtime.GOOS != "darwin" {
+				continue
+			}
+
+			osVersion, err := osversion()
+			if err != nil {
+				level.Error(r.logger).Log("msg", "getting os version", "err", err)
+				continue
+			}
+
+			if osVersion != r.osVersion {
+				r.osVersion = osVersion
+				r.killDesktopProcesses()
+			}
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
 			return nil
