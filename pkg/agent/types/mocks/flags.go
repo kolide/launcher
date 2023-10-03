@@ -160,20 +160,6 @@ func (_m *Flags) DebugServerData() bool {
 	return r0
 }
 
-// DebugUploadRequestURL provides a mock function with given fields:
-func (_m *Flags) DebugUploadRequestURL() string {
-	ret := _m.Called()
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // DesktopEnabled provides a mock function with given fields:
 func (_m *Flags) DesktopEnabled() bool {
 	ret := _m.Called()
@@ -760,20 +746,6 @@ func (_m *Flags) SetDebugServerData(debug bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(debug)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetDebugUploadRequestURL provides a mock function with given fields: url
-func (_m *Flags) SetDebugUploadRequestURL(url string) error {
-	ret := _m.Called(url)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(url)
 	} else {
 		r0 = ret.Error(0)
 	}

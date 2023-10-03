@@ -64,10 +64,6 @@ func runFlare(args []string) error {
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
 
-	if *flUploadRequestURL != "" {
-		flagController.SetDebugUploadRequestURL(*flUploadRequestURL)
-	}
-
 	k := knapsack.New(nil, flagController, nil)
 	ctx := context.Background()
 

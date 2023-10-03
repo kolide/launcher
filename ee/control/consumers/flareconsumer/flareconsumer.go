@@ -20,7 +20,7 @@ type FlareConsumer struct {
 	flarer   flarer
 	knapsack types.Knapsack
 	// newFlareStream is assigned to a field so it can be mocked in tests
-	newFlareStream func(note, uploadURL string) (io.WriteCloser, error)
+	newFlareStream func(uploadURL string) (io.WriteCloser, error)
 }
 
 type flarer interface {
@@ -31,8 +31,8 @@ func New(knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
-		newFlareStream: func(note, uploadURL string) (io.WriteCloser, error) {
-			return shipper.New(knapsack, shipper.WithNote(note), shipper.WithUploadURL(uploadURL))
+		newFlareStream: func(uploadURL string) (io.WriteCloser, error) {
+			return shipper.New(knapsack, shipper.WithUploadURL(uploadURL))
 		},
 	}
 }
@@ -43,7 +43,6 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	}
 
 	flareData := struct {
-		Note      string `json:"note"`
 		UploadURL string `json:"upload_url"`
 	}{}
 
@@ -51,7 +50,7 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
-	flareStream, err := fc.newFlareStream(flareData.Note, flareData.UploadURL)
+	flareStream, err := fc.newFlareStream(flareData.UploadURL)
 	if err != nil {
 		return fmt.Errorf("failed to create flare stream: %w", err)
 	}

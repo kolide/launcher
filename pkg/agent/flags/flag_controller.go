@@ -474,15 +474,6 @@ func (fc *FlagController) LogIngestServerURL() string {
 	).get(fc.getControlServerValue(keys.LogIngestServerURL))
 }
 
-func (fc *FlagController) SetDebugUploadRequestURL(url string) error {
-	return fc.setControlServerValue(keys.DebugUploadRequestURL, []byte(url))
-}
-func (fc *FlagController) DebugUploadRequestURL() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.DebugUploadRequestURL),
-	).get(fc.getControlServerValue(keys.DebugUploadRequestURL))
-}
-
 func (fc *FlagController) SetTraceIngestServerURL(url string) error {
 	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
 }

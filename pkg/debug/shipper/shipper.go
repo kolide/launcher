@@ -7,7 +7,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,10 +24,17 @@ import (
 
 type shipperOption func(*shipper)
 
-// WithUploadURL causes the shipper to upload to the given url instead of requesting a url to upload to
+// WithUploadURL causes the shipper to upload to the given url, instead of requesting a url to upload to
 func WithUploadURL(url string) shipperOption {
 	return func(s *shipper) {
 		s.uploadURL = url
+	}
+}
+
+// WithUploadRequestURL causes the shipper to request a url to upload to
+func WithUploadRequestURL(url string) shipperOption {
+	return func(s *shipper) {
+		s.uploadRequestURL = url
 	}
 }
 
@@ -43,6 +49,7 @@ type shipper struct {
 	writer   io.WriteCloser
 	knapsack types.Knapsack
 
+	uploadRequestURL     string
 	uploadRequest        *http.Request
 	uploadRequestStarted bool
 	uploadRequestErr     error
@@ -65,6 +72,10 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 		opt(s)
 	}
 
+	if s.uploadRequestURL == "" && s.uploadURL == "" {
+		return nil, fmt.Errorf("must provide either upload request url or upload url")
+	}
+
 	if s.uploadURL == "" {
 		uploadURL, err := s.signedUrl()
 		if err != nil {
@@ -78,7 +89,7 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 
 	req, err := http.NewRequest(http.MethodPut, s.uploadURL, reader)
 	if err != nil {
-		return nil, fmt.Errorf("creating upload request: %w", err)
+		return nil, fmt.Errorf("creating request for http upload: %w", err)
 	}
 	s.uploadRequest = req
 
@@ -92,7 +103,7 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 
 	// start request
 	// We could start the request in New(), but then we would hold the connection open longer than needed,
-	// OTHO, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
+	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
 	s.uploadRequestStarted = true
 	s.uploadRequestWg.Add(1)
 	go func() {
@@ -136,20 +147,12 @@ func (s *shipper) Close() error {
 }
 
 func (s *shipper) signedUrl() (string, error) {
-	if s.uploadURL != "" {
-		return s.uploadURL, nil
-	}
-
-	if s.knapsack.DebugUploadRequestURL() == "" {
-		return "", errors.New("debug upload request url is empty")
-	}
-
 	body, err := launcherData(s.knapsack, s.note)
 	if err != nil {
 		return "", fmt.Errorf("creating launcher data: %w", err)
 	}
 
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.knapsack.DebugUploadRequestURL(), bytes.NewBuffer(body))
+	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}

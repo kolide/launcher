@@ -189,10 +189,6 @@ type Flags interface {
 	SetDisableTraceIngestTLS(enabled bool) error
 	DisableTraceIngestTLS() bool
 
-	// DebugUploadRequestURL is the URL to request a signed url to upload debug artifacts to
-	SetDebugUploadRequestURL(url string) error
-	DebugUploadRequestURL() string
-
 	// InModernStandby indicates whether a Windows machine is awake or in modern standby
 	SetInModernStandby(enabled bool) error
 	InModernStandby() bool
