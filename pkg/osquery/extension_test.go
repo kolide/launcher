@@ -1281,3 +1281,24 @@ func Test_setVerbose(t *testing.T) {
 		})
 	}
 }
+
+func Test_setVerbose_EmptyConfig(t *testing.T) {
+	t.Parallel()
+
+	e := &Extension{
+		logger: log.NewNopLogger(),
+	}
+
+	expectedCfg := map[string]any{
+		"options": map[string]any{
+			"verbose": true,
+		},
+	}
+
+	modifiedCfgStr := e.setVerbose("", true)
+
+	var modifiedCfg map[string]any
+	require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
+
+	require.Equal(t, expectedCfg, modifiedCfg)
+}
