@@ -1302,3 +1302,23 @@ func Test_setVerbose_EmptyConfig(t *testing.T) {
 
 	require.Equal(t, expectedCfg, modifiedCfg)
 }
+
+func Test_setVerbose_MalformedConfig(t *testing.T) {
+	t.Parallel()
+
+	e := &Extension{
+		logger: log.NewNopLogger(),
+	}
+
+	malformedCfg := map[string]any{
+		"options": "options should not be a string, yet it is, oops",
+	}
+	cfgBytes, err := json.Marshal(malformedCfg)
+	require.NoError(t, err)
+	modifiedCfgStr := e.setVerbose(string(cfgBytes), true)
+
+	var modifiedCfg map[string]any
+	require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
+
+	require.Equal(t, malformedCfg, modifiedCfg)
+}

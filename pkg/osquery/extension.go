@@ -550,7 +550,11 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 
 	var opts map[string]any
 	if cfgOpts, ok := cfg["options"]; ok {
-		opts = cfgOpts.(map[string]any)
+		opts, ok = cfgOpts.(map[string]any)
+		if !ok {
+			level.Debug(e.logger).Log("msg", "config options are malformed, cannot set verbose")
+			return config
+		}
 	} else {
 		opts = make(map[string]any)
 	}
