@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 )
 
@@ -25,6 +26,12 @@ type FlareConsumer struct {
 
 type flarer interface {
 	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error
+}
+
+type FlareRunner struct{}
+
+func (f *FlareRunner) RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error {
+	return checkups.RunFlare(ctx, k, flareStream, checkups.InSituEnvironment)
 }
 
 func New(knapsack types.Knapsack) *FlareConsumer {
