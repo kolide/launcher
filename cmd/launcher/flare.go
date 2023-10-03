@@ -68,7 +68,7 @@ func runFlare(args []string) error {
 	ctx := context.Background()
 
 	if *flSave == "upload" {
-		shipper, err := shipper.New(k, shipper.WithNote(*flNote))
+		shipper, err := shipper.New(k, shipper.WithNote(*flNote), shipper.WithUploadRequestURL(*flUploadRequestURL))
 		if err != nil {
 			return err
 		}
