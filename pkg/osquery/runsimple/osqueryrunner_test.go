@@ -6,65 +6,89 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_OsquerySingleSqlNoIO(t *testing.T) {
-	osquerydPath := os.Getenv("OSQUERYD_PATH")
+var testOsqueryBinary string
 
-	if osquerydPath == "" {
-		t.Skip("No osquery. Not implemented")
+// TestMain overrides the default test main function. This allows us to share setup/teardown.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "osquery-runsimple")
+	if err != nil {
+		fmt.Println("Failed to make temp dir for test binaries")
+		os.Exit(1)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := downloadOsqueryInBinDir(dir); err != nil {
+		fmt.Printf("Failed to download osquery: %v\n", err)
+		os.Exit(1)
 	}
 
-	osq, err := NewOsqueryProcess(osquerydPath)
+	testOsqueryBinary = filepath.Join(dir, "osqueryd")
+	if runtime.GOOS == "windows" {
+		testOsqueryBinary += ".exe"
+	}
+
+	// Run the tests!
+	retCode := m.Run()
+	os.Exit(retCode)
+}
+
+func Test_OsqueryRunSqlNoIO(t *testing.T) {
+	osq, err := NewOsqueryProcess(testOsqueryBinary)
 	require.NoError(t, err)
 
 	require.NoError(t, osq.RunSql(context.TODO(), []byte("select 1")))
 }
 
-func Test_OsquerySingleSqlErr(t *testing.T) {
-	osquerydPath := os.Getenv("OSQUERYD_PATH")
-
-	if osquerydPath == "" {
-		t.Skip("No osquery. Not implemented")
-	}
-
+func Test_OsqueryRunSql(t *testing.T) {
 	tests := []struct {
 		name      string
 		sql       string
 		expectErr bool
-		jsonMulti bool
+		contains  []string
 	}{
 		{
 			name:      "Bad SQL",
 			sql:       "this is not sql;",
 			expectErr: true,
 		},
+		// osquery behavior is quite inconsistent around this stuff. So several tests
+		// are commented out.
+		// https://github.com/osquery/osquery/issues/8148
+		// {
+		// 	name:      "Bad SQL, no semicolon,
+		// 	sql:       "this is not sql, no semicolon",
+		// 	expectErr: true,
+		// },
+		//
+		// {
+		// 	name: "select 1",
+		// 	sql:  "select 1",
+		// },
 		{
-			name:      "Bad SQL, no semicolon",
-			sql:       "this is not sql, no semicolon",
-			expectErr: true,
+			name:     "select 1;",
+			sql:      "select 1;",
+			contains: []string{"1"},
 		},
 		{
-			name: "select 1",
-			sql:  "select 1",
+			name:     "multiselect",
+			sql:      "select 1; select 2;",
+			contains: []string{"1", "2"},
 		},
 		{
-			name: "select 1;",
-			sql:  "select 1",
-		},
-		{
-			name: "multiselect",
-			sql:  "select 1; select 2",
-		},
-		{
-			name:      "comments",
-			sql:       "select 1; select 2; \n--this is a comment\nselect 3",
-			jsonMulti: true,
+			name:     "comments",
+			sql:      "select 1; select 2; \n--this is a comment\nselect 3;",
+			contains: []string{"1", "2", "3"},
 		},
 	}
 
@@ -77,7 +101,7 @@ func Test_OsquerySingleSqlErr(t *testing.T) {
 			var stderr bytes.Buffer
 
 			osq, err := NewOsqueryProcess(
-				osquerydPath,
+				testOsqueryBinary,
 				WithStdout(&stdout),
 				WithStderr(&stderr),
 			)
@@ -91,18 +115,62 @@ func Test_OsquerySingleSqlErr(t *testing.T) {
 
 			require.NoError(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
 
-			if tt.jsonMulti {
-				// This is discouraged, and hard to test. So let's bail for now
-				return
+			for _, s := range tt.contains {
+				require.Contains(t, stdout.String(), s, "Output should contain %s", s)
 			}
-
-			var result []map[string]string
-			require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
-
-			fmt.Println(stderr.String())
-			spew.Dump(result)
-
+			{
+				_, err := decodeJsonL(&stdout)
+				require.NoError(t, err)
+			}
 		})
 	}
 
+}
+
+func decodeJsonL(data io.Reader) ([]any, error) {
+	var result []any
+	decoder := json.NewDecoder(data)
+
+	count := 0
+	for {
+		var object any
+
+		switch err := decoder.Decode(&object); err {
+		case nil:
+			result = append(result, object)
+		case io.EOF:
+			return result, nil
+		default:
+			return nil, fmt.Errorf("unmarshalling jsonl: %w", err)
+		}
+
+		count += 1
+
+		if count > 50 {
+			return nil, fmt.Errorf("stuck in a loop. Count exceeds 50")
+		}
+	}
+}
+
+// downloadOsqueryInBinDir downloads osqueryd. This allows the test
+// suite to run on hosts lacking osqueryd.
+func downloadOsqueryInBinDir(binDirectory string) error {
+	target := packaging.Target{}
+	if err := target.PlatformFromString(runtime.GOOS); err != nil {
+		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
+	}
+
+	outputFile := filepath.Join(binDirectory, "osqueryd") //, target.PlatformBinaryName("osqueryd"))
+	cacheDir := "/tmp"
+
+	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
+	if err != nil {
+		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
+	}
+
+	if err := fsutil.CopyFile(path, outputFile); err != nil {
+		return fmt.Errorf("Couldn't copy file to %s: %w", outputFile, err)
+	}
+
+	return nil
 }
