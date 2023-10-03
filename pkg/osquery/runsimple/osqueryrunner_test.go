@@ -160,8 +160,8 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
 	}
 
-	outputFile := filepath.Join(binDirectory, "osqueryd") //, target.PlatformBinaryName("osqueryd"))
-	cacheDir := "/tmp"
+	outputFile := filepath.Join(binDirectory, target.PlatformBinaryName("osqueryd"))
+	cacheDir := binDirectory
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
