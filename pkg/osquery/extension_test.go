@@ -29,6 +29,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
@@ -52,6 +53,8 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 
 func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m := mocks.NewKnapsack(t)
+	m.On("OsquerydPath").Maybe().Return("")
+	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	return m
@@ -94,9 +97,9 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 }
 
 func TestGetHostIdentifier(t *testing.T) {
-
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
+
 	k := makeKnapsack(t, db)
 	e, err := NewExtension(&mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -152,9 +155,11 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
+
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
+
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
 	e.SetQuerier(mockClient{})
@@ -606,6 +611,8 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -979,6 +986,8 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
