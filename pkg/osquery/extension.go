@@ -544,11 +544,17 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 			level.Debug(e.logger).Log("msg", "could not unmarshal config, cannot set verbose", "err", err)
 			return config
 		}
+	} else {
+		cfg = make(map[string]any)
 	}
 
 	var opts map[string]any
 	if cfgOpts, ok := cfg["options"]; ok {
-		opts = cfgOpts.(map[string]any)
+		opts, ok = cfgOpts.(map[string]any)
+		if !ok {
+			level.Debug(e.logger).Log("msg", "config options are malformed, cannot set verbose")
+			return config
+		}
 	} else {
 		opts = make(map[string]any)
 	}
