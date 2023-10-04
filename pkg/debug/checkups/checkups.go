@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -259,38 +260,41 @@ const (
 
 func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment RuntimeEnvironmentType) error {
 	flare := zip.NewWriter(flareStream)
-	defer func() {
-		_ = flare.Close()
-	}()
-
-	// zip can only handle one file being written at a time. So defer writing the summary till the end
 	combinedSummary := bytes.Buffer{}
-	defer func() {
-		zipSummary, err := flare.Create("doctor.log")
-		if err != nil {
-			// Oh well
-			return
+
+	close := func() error {
+		closeFlares := func() error {
+			return errors.Join(flare.Close(), flareStream.Close())
 		}
 
-		zipSummary.Write(combinedSummary.Bytes())
-	}()
+		// zip can only handle one file being written at a time. So defer writing the summary till the end
+		zipSummary, err := flare.Create("doctor.log")
+		if err != nil {
+			return errors.Join(fmt.Errorf("creating doctor.log: %w", err), closeFlares())
+		}
+
+		if _, err := zipSummary.Write(combinedSummary.Bytes()); err != nil {
+			return errors.Join(fmt.Errorf("writing doctor.log: %w", err), closeFlares())
+		}
+
+		return closeFlares()
+	}
 
 	// Note our runtime context.
 	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
-	writeFlareEnv(flare, runtimeEnvironment)
+	if err := writeFlareEnv(flare, runtimeEnvironment); err != nil {
+		return errors.Join(fmt.Errorf("writing flare environment: %w", err), close())
+	}
 
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
-			if closeErr := flareStream.Close(); closeErr != nil {
-				return fmt.Errorf("writing to flare stream: %w, closing flare stream: %w", err, closeErr)
-			}
-			return fmt.Errorf("writing to flare stream: %w", err)
+			return errors.Join(fmt.Errorf("writing flare zip: %w", err), close())
 		}
 	}
 
 	// we could defer this close, but we want to return any errors
-	return flareStream.Close()
+	return close()
 }
 
 func writeFlareEnv(z *zip.Writer, runtimeEnvironment RuntimeEnvironmentType) error {
