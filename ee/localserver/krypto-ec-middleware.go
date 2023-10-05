@@ -136,7 +136,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
 			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err)
+			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err, "path", r.URL.Path, "query_params", r.URL.RawQuery)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

@@ -5,6 +5,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -250,4 +251,8 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 		"default", homeLocation)
 
 	return ""
+}
+
+func osversion() (string, error) {
+	return "", errors.New("not implemented")
 }

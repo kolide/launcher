@@ -5,6 +5,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"syscall"
@@ -54,4 +55,8 @@ func processAccessToken(pid int32) (syscall.Token, error) {
 	}
 
 	return token, err
+}
+
+func osversion() (string, error) {
+	return "", errors.New("not implemented")
 }

@@ -51,17 +51,19 @@ func runWindowsSvc(args []string) error {
 		os.Exit(1)
 	}
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
-	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
-	}
-
-	// Now that we've parsed the options, let's set a filter on our logger
+	// Now that we've parsed the options, let's set a filter on our eventLog logger.
+	// We don't want to set this on the teelogger below because we want debug logs to always
+	// go to debug.json.
 	if opts.Debug {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	// Create a local logger. This logs to a known path, and aims to help diagnostics
+	if opts.RootDirectory != "" {
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	// Use the FindNewest mechanism to delete old
