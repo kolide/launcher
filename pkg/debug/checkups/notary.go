@@ -17,7 +17,7 @@ type (
 		k       types.Knapsack
 		status  Status
 		summary string
-		data    map[string]string
+		data    map[string]any
 	}
 
 	notaryRelease struct {
@@ -27,15 +27,15 @@ type (
 	}
 )
 
-func (nc *notaryCheckup) Data() any             { return nc.data }
+func (nc *notaryCheckup) Data() map[string]any             { return nc.data }
 func (nc *notaryCheckup) ExtraFileName() string { return "" }
 func (nc *notaryCheckup) Name() string          { return "Notary Version" }
 func (nc *notaryCheckup) Status() Status        { return nc.status }
 func (nc *notaryCheckup) Summary() string       { return nc.summary }
 
 func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	nc.data = make(map[string]string)
-	if !nc.k.Autoupdate() {
+	nc.data = make(map[string]any)
+	if !nc.k.KolideHosted() || !nc.k.Autoupdate() {
 		return nil
 	}
 
@@ -50,7 +50,7 @@ func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	if err != nil {
 		nc.data[notaryUrl.String()] = err.Error()
 		nc.status = Failing
-		nc.summary = "Unable to gather notary version response"
+		nc.summary = fmt.Sprintf("Unable to gather notary version response from %s", notaryUrl.String())
 	} else {
 		nc.data[notaryUrl.String()] = response
 		nc.status = Passing

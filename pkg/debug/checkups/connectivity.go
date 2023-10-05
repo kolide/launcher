@@ -18,7 +18,7 @@ type Connectivity struct {
 	k       types.Knapsack
 	status  Status
 	summary string
-	data    map[string]string
+	data    map[string]any
 }
 
 func (c *Connectivity) Name() string {
@@ -41,7 +41,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 		"log":     c.k.LogIngestServerURL(),
 	}
 
-	c.data = make(map[string]string, len(hosts))
+	c.data = make(map[string]any)
 
 	failingHosts := make([]string, 0)
 	for n, v := range hosts {
@@ -86,7 +86,7 @@ func (c *Connectivity) Summary() string {
 	return c.summary
 }
 
-func (c *Connectivity) Data() any {
+func (c *Connectivity) Data() map[string]any {
 	return c.data
 }
 

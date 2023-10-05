@@ -14,34 +14,34 @@ import (
 )
 
 type (
-	tuffCheckup struct {
+	tufCheckup struct {
 		k       types.Knapsack
 		status  Status
 		summary string
-		data    map[string]string
+		data    map[string]any
 	}
 
-	customTuffRelease struct {
+	customTufRelease struct {
 		Custom struct {
 			Target string `json:"target"`
 		} `json:"custom"`
 	}
 
-	tuffRelease struct {
+	tufRelease struct {
 		Signed struct {
-			Targets map[string]customTuffRelease `json:"targets"`
+			Targets map[string]customTufRelease `json:"targets"`
 		} `json:"signed"`
 	}
 )
 
-func (tc *tuffCheckup) Data() any             { return tc.data }
-func (tc *tuffCheckup) ExtraFileName() string { return "" }
-func (tc *tuffCheckup) Name() string          { return "Tuff Version" }
-func (tc *tuffCheckup) Status() Status        { return tc.status }
-func (tc *tuffCheckup) Summary() string       { return tc.summary }
+func (tc *tufCheckup) Data() map[string]any  { return tc.data }
+func (tc *tufCheckup) ExtraFileName() string { return "" }
+func (tc *tufCheckup) Name() string          { return "Tuff Version" }
+func (tc *tufCheckup) Status() Status        { return tc.status }
+func (tc *tufCheckup) Summary() string       { return tc.summary }
 
-func (tc *tuffCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	tc.data = make(map[string]string)
+func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
+	tc.data = make(map[string]any)
 	if !tc.k.Autoupdate() {
 		return nil
 	}
@@ -58,14 +58,14 @@ func (tc *tuffCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	if err != nil {
 		tc.status = Erroring
 		tc.data[tuffUrl.String()] = err.Error()
-		tc.summary = "Unable to gather tuff version response"
+		tc.summary = "Unable to gather tuf version response"
 		return nil
 	}
 
 	if response == "" {
 		tc.status = Failing
-		tc.data[tuffUrl.String()] = "missing from tuff response"
-		tc.summary = "missing version from tuff targets response"
+		tc.data[tuffUrl.String()] = "missing from tuf response"
+		tc.summary = "missing version from tuf targets response"
 		return nil
 	}
 
@@ -76,19 +76,19 @@ func (tc *tuffCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-// fetchTuffVersion retrieves the latest targets.json from the tuff URL provided.
+// fetchTufVersion retrieves the latest targets.json from the tuff URL provided.
 // We're attempting to key into the current target for the current platform here,
 // which should look like:
 // https://[TUFF_HOST]/repository/targets.json -> full targets blob
 // ---> signed -> targets -> launcher/<GOOS>/<GOARCH|universal>/<RELEASE_CHANNEL>/release.json -> custom -> target
-func (tc *tuffCheckup) fetchTuffVersion(client *http.Client, url *url.URL) (string, error) {
+func (tc *tufCheckup) fetchTuffVersion(client *http.Client, url *url.URL) (string, error) {
 	response, err := client.Get(url.String())
 	if err != nil {
 		return "", err
 	}
 	defer response.Body.Close()
 
-	var releaseTargets tuffRelease
+	var releaseTargets tufRelease
 	if err := json.NewDecoder(response.Body).Decode(&releaseTargets); err != nil {
 		return "", err
 	}

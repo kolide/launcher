@@ -16,17 +16,17 @@ type filesCheckup struct {
 	k       types.Knapsack
 	status  Status
 	summary string
-	data    map[string]string
+	data    map[string]any
 }
 
-func (fc *filesCheckup) Data() any             { return fc.data }
+func (fc *filesCheckup) Data() map[string]any  { return fc.data }
 func (fc *filesCheckup) ExtraFileName() string { return "" }
 func (fc *filesCheckup) Name() string          { return "Notable Files" }
 func (fc *filesCheckup) Status() Status        { return fc.status }
 func (fc *filesCheckup) Summary() string       { return fc.summary }
 
 func (fc *filesCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	fc.data = make(map[string]string)
+	fc.data = make(map[string]any)
 	dirExists, dirNotEmpty, dirHasError := false, false, false
 	var notableFileDirs []string
 	switch runtime.GOOS {

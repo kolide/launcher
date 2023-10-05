@@ -15,58 +15,62 @@ type dnsCheckup struct {
 	k       types.Knapsack
 	status  Status
 	summary string
-	data    map[string]string
+	data    map[string]any
 }
 
-func (nc *dnsCheckup) Data() any             { return nc.data }
+func (nc *dnsCheckup) Data() map[string]any  { return nc.data }
 func (nc *dnsCheckup) ExtraFileName() string { return "" }
 func (nc *dnsCheckup) Name() string          { return "DNS Resolution" }
 func (nc *dnsCheckup) Status() Status        { return nc.status }
 func (nc *dnsCheckup) Summary() string       { return nc.summary }
 
-func (nc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	hosts := onlyValidHosts( // remove any empty/missing hosts from lists
-		[]string{
-			nc.k.KolideServerURL(),
-			nc.k.ControlServerURL(),
-			nc.k.TraceIngestServerURL(),
-			nc.k.LogIngestServerURL(),
-			"google.com",
-			"apple.com",
-		},
-	)
+func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
+	hosts := []string{
+		dc.k.KolideServerURL(),
+		dc.k.ControlServerURL(),
+		dc.k.LogIngestServerURL(),
+		dc.k.TufServerURL(),
+		"https://google.com",
+		"https://apple.com",
+	}
 
-	nc.data = make(map[string]string)
-	successCount := 0
+	dc.data = make(map[string]any)
+	attemptedCount, successCount := 0, 0
 	resolver := &net.Resolver{}
 
 	for _, host := range hosts {
-		_, err := url.Parse(host)
-		if err != nil {
-			nc.data[host] = fmt.Sprintf("unable to parse url from host: %w", err)
+		if len(strings.TrimSpace(host)) == 0 {
 			continue
 		}
 
-		ips, err := resolveHost(resolver, host)
-
+		parsedUrl, err := url.Parse(host)
 		if err != nil {
-			nc.data[host] = err.Error()
+			dc.data[host] = fmt.Sprintf("unable to parse url from host: %s", err.Error())
 			continue
 		}
 
-		nc.data[host] = ips
+		ips, err := resolveHost(resolver, parsedUrl.Host)
+		// keep attemptedCount as a separate variable to avoid indicating failures where we didn't even try
+		attemptedCount++
+
+		if err != nil {
+			dc.data[parsedUrl.Host] = fmt.Sprintf("ERROR: %s", err.Error())
+			continue
+		}
+
+		dc.data[parsedUrl.Host] = ips
 		successCount++
 	}
 
 	if successCount == len(hosts) {
-		nc.status = Passing
+		dc.status = Passing
 	} else if successCount > 0 {
-		nc.status = Warning
+		dc.status = Warning
 	} else {
-		nc.status = Failing
+		dc.status = Failing
 	}
 
-	nc.summary = fmt.Sprintf("successfully resolved %d/%d hosts", successCount, len(hosts))
+	dc.summary = fmt.Sprintf("successfully resolved %d/%d hosts", successCount, attemptedCount)
 
 	return nil
 }
@@ -81,18 +85,9 @@ func resolveHost(resolver *net.Resolver, host string) (string, error) {
 		return "", err
 	}
 
-	return strings.Join(ips, ", "), nil
-}
-
-func onlyValidHosts(hosts []string) []string {
-	filtered := make([]string, 0)
-	for _, host := range hosts {
-		if len(strings.TrimSpace(host)) == 0 {
-			continue
-		}
-
-		filtered = append(filtered, host)
+	if len(ips) == 0 {
+		return "", fmt.Errorf("host was valid but did not resolve")
 	}
 
-	return filtered
+	return strings.Join(ips, ", "), nil
 }

@@ -15,18 +15,18 @@ type (
 		k       types.Knapsack
 		status  Status
 		summary string
-		data    map[string]string
+		data    map[string]any
 	}
 )
 
-func (svc *serverVersionCheckup) Data() any             { return svc.data }
+func (svc *serverVersionCheckup) Data() map[string]any  { return svc.data }
 func (svc *serverVersionCheckup) ExtraFileName() string { return "" }
 func (svc *serverVersionCheckup) Name() string          { return "Server Version" }
 func (svc *serverVersionCheckup) Status() Status        { return svc.status }
 func (svc *serverVersionCheckup) Summary() string       { return svc.summary }
 
 func (svc *serverVersionCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	svc.data = make(map[string]string)
+	svc.data = make(map[string]any)
 	if !svc.k.KolideHosted() {
 		return nil
 	}

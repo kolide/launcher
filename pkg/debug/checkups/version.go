@@ -30,13 +30,13 @@ func (c *Version) Status() Status {
 }
 
 func (c *Version) Summary() string {
-	return fmt.Sprintf("version %s", version.Version().Version)
+	return fmt.Sprintf("launcher_version %s", version.Version().Version)
 }
 
-func (c *Version) Data() any {
-	return map[string]string{
-		"channel":   c.k.UpdateChannel(),
-		"tufServer": c.k.TufServerURL(),
-		"version":   version.Version().Version,
+func (c *Version) Data() map[string]any {
+	return map[string]any{
+		"update_channel":   c.k.UpdateChannel(),
+		"tufServer":        c.k.TufServerURL(),
+		"launcher_version": version.Version().Version,
 	}
 }

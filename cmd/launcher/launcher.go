@@ -43,6 +43,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
+	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/teelogger"
@@ -208,6 +209,11 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	}
 	// create a rungroup for all the actors we create to allow for easy start/stop
 	runGroup := rungroup.NewRunGroup(logger)
+
+	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
+	checkpointer := checkups.NewCheckupLogger(logger, k)
+	checkpointer.Once(ctx)
+	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
