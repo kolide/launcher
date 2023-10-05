@@ -153,6 +153,8 @@ func (s *shipper) signedUrl() (string, error) {
 	}
 
 	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
+	signedUrlRequest.Header.Set(control.HeaderApiVersion, control.ApiVersion)
+
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
@@ -165,16 +167,19 @@ func (s *shipper) signedUrl() (string, error) {
 	}
 	defer signedUrlResponse.Body.Close()
 
-	signedUrlResponseBody, err := io.ReadAll(signedUrlResponse.Body)
-	if err != nil {
-		return "", fmt.Errorf("reading signed url response: %w", err)
+	responseData := struct {
+		URL string `json:"URL"`
+	}{}
+
+	if err := json.NewDecoder(signedUrlResponse.Body).Decode(&responseData); err != nil {
+		return "", fmt.Errorf("decoding signed url response: %w", err)
 	}
 
 	if signedUrlResponse.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("got %s status in signed url response: %s", signedUrlResponse.Status, string(signedUrlResponseBody))
+		return "", fmt.Errorf("got %s status in signed url response", signedUrlResponse.Status)
 	}
 
-	return string(signedUrlResponseBody), nil
+	return responseData.URL, nil
 }
 
 func signHttpRequest(req *http.Request, body []byte) {
