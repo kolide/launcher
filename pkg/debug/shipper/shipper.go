@@ -146,11 +146,11 @@ func (s *shipper) signedUrl() (string, error) {
 	}
 
 	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
-	signedUrlRequest.Header.Set(control.HeaderApiVersion, control.ApiVersion)
-
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
+
+	signedUrlRequest.Header.Set(control.HeaderApiVersion, control.ApiVersion)
 
 	signHttpRequest(signedUrlRequest, body)
 
