@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"regexp"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -17,8 +16,6 @@ type dnsCheckup struct {
 	summary string
 	data    map[string]any
 }
-
-var hostProtoRegexp = regexp.MustCompile(`^\w+://`)
 
 func (nc *dnsCheckup) Data() map[string]any  { return nc.data }
 func (nc *dnsCheckup) ExtraFileName() string { return "" }
@@ -44,18 +41,22 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
-		host = hostProtoRegexp.ReplaceAllString(host, "")
+		hostUrl, err := parseUrl(dc.k, host)
+		if err != nil {
+			dc.data[host] = fmt.Sprintf("PARSE ERROR: %s", err.Error())
+			continue
+		}
 
-		ips, err := resolveHost(resolver, host)
+		ips, err := resolveHost(resolver, hostUrl.Hostname())
 		// keep attemptedCount as a separate variable to avoid indicating failures where we didn't even try
 		attemptedCount++
 
 		if err != nil {
-			dc.data[host] = fmt.Sprintf("ERROR: %s", err.Error())
+			dc.data[hostUrl.Hostname()] = fmt.Sprintf("RESOLVE ERROR: %s", err.Error())
 			continue
 		}
 
-		dc.data[host] = ips
+		dc.data[hostUrl.Hostname()] = ips
 		successCount++
 	}
 

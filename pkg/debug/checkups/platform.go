@@ -16,7 +16,8 @@ var potentialFiles = []string{
 	"/etc/lsb-release",
 }
 
-type Platform struct{}
+type Platform struct {
+}
 
 func (c *Platform) Name() string {
 	return "Platform"
