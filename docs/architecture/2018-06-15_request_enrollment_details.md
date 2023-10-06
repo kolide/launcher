@@ -6,7 +6,8 @@
 
 ## Status
 
-Accepted (June 15, 2018)
+Accepted, June 15, 2018
+Updated, 2023-09, [Revisiting enrollment details](2023-09-29_request_enrollment_details_updates.md)
 
 ## Context
 
