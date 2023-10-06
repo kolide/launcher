@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -18,6 +18,8 @@ type dnsCheckup struct {
 	data    map[string]any
 }
 
+var hostProtoRegexp = regexp.MustCompile(`^\w+://`)
+
 func (nc *dnsCheckup) Data() map[string]any  { return nc.data }
 func (nc *dnsCheckup) ExtraFileName() string { return "" }
 func (nc *dnsCheckup) Name() string          { return "DNS Resolution" }
@@ -28,10 +30,9 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hosts := []string{
 		dc.k.KolideServerURL(),
 		dc.k.ControlServerURL(),
-		dc.k.LogIngestServerURL(),
 		dc.k.TufServerURL(),
-		"https://google.com",
-		"https://apple.com",
+		"google.com",
+		"apple.com",
 	}
 
 	dc.data = make(map[string]any)
@@ -43,32 +44,31 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
-		parsedUrl, err := url.Parse(host)
-		if err != nil {
-			dc.data[host] = fmt.Sprintf("unable to parse url from host: %s", err.Error())
-			continue
-		}
+		host = hostProtoRegexp.ReplaceAllString(host, "")
 
-		ips, err := resolveHost(resolver, parsedUrl.Host)
+		ips, err := resolveHost(resolver, host)
 		// keep attemptedCount as a separate variable to avoid indicating failures where we didn't even try
 		attemptedCount++
 
 		if err != nil {
-			dc.data[parsedUrl.Host] = fmt.Sprintf("ERROR: %s", err.Error())
+			dc.data[host] = fmt.Sprintf("ERROR: %s", err.Error())
 			continue
 		}
 
-		dc.data[parsedUrl.Host] = ips
+		dc.data[host] = ips
 		successCount++
 	}
 
-	if successCount == len(hosts) {
+	if successCount == attemptedCount {
 		dc.status = Passing
 	} else if successCount > 0 {
 		dc.status = Warning
 	} else {
 		dc.status = Failing
 	}
+
+	dc.data["lookup_attempts"] = attemptedCount
+	dc.data["lookup_successes"] = successCount
 
 	dc.summary = fmt.Sprintf("successfully resolved %d/%d hosts", successCount, attemptedCount)
 
@@ -89,5 +89,5 @@ func resolveHost(resolver *net.Resolver, host string) (string, error) {
 		return "", fmt.Errorf("host was valid but did not resolve")
 	}
 
-	return strings.Join(ips, ", "), nil
+	return strings.Join(ips, ","), nil
 }

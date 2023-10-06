@@ -26,7 +26,7 @@ FROM
 `
 
 type (
-	osqResp         []map[string]string
+	osqResp          []map[string]string
 	osqDataCollector struct {
 		k       types.Knapsack
 		status  Status
@@ -37,19 +37,31 @@ type (
 
 func (odc *osqDataCollector) Data() map[string]any  { return odc.data }
 func (odc *osqDataCollector) ExtraFileName() string { return "" }
-func (odc *osqDataCollector) Name() string          { return "Host Info" }
+func (odc *osqDataCollector) Name() string          { return "Osquery Data" }
 func (odc *osqDataCollector) Status() Status        { return odc.status }
 func (odc *osqDataCollector) Summary() string       { return odc.summary }
 
 func (odc *osqDataCollector) Run(ctx context.Context, extraFH io.Writer) error {
-	if result, err := odc.osqueryInteractive(ctx, osSqlQuery); err != nil {
-		odc.data["osq_data"] = err.Error()
-	} else {
-		odc.data["osq_data"] = result
-		if uuid, ok := result["hardware_uuid"]; ok { // append the uuid to summary line if we have it
-			odc.summary = fmt.Sprintf("%s, uuid: %s", odc.summary, uuid)
+	odc.data = make(map[string]any)
+
+	result, err := odc.osqueryInteractive(ctx, osSqlQuery)
+	if err != nil {
+		odc.status = Erroring
+		odc.data["error"] = err.Error()
+		odc.summary = fmt.Sprintf("ERROR using osq interactive: %s", err.Error())
+		return nil
+	}
+
+	data := make([]string, 0)
+	for k, v := range result {
+		if k != "" {
+			data = append(data, fmt.Sprintf("%s: %s", k, v))
+			odc.data[k] = v
 		}
 	}
+
+	odc.status = Passing
+	odc.summary = strings.Join(data, ", ")
 
 	return nil
 }

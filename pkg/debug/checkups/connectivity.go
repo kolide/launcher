@@ -14,23 +14,23 @@ import (
 
 const requestTimeout = time.Second * 5
 
-type Connectivity struct {
+type connectivity struct {
 	k       types.Knapsack
 	status  Status
 	summary string
 	data    map[string]any
 }
 
-func (c *Connectivity) Name() string {
+func (c *connectivity) Name() string {
 	return "Check communication with Kolide"
 }
 
-func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
-	//if !c.k.KolideHosted() {
-	//	c.status = Unknown
-	//	c.summary = "not kolide hosted"
-	//	return nil
-	//}
+func (c *connectivity) Run(ctx context.Context, extraFH io.Writer) error {
+	if !c.k.KolideHosted() {
+		c.status = Unknown
+		c.summary = "not kolide hosted"
+		return nil
+	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
@@ -74,19 +74,19 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (c *Connectivity) ExtraFileName() string {
+func (c *connectivity) ExtraFileName() string {
 	return "responses.txt"
 }
 
-func (c *Connectivity) Status() Status {
+func (c *connectivity) Status() Status {
 	return c.status
 }
 
-func (c *Connectivity) Summary() string {
+func (c *connectivity) Summary() string {
 	return c.summary
 }
 
-func (c *Connectivity) Data() map[string]any {
+func (c *connectivity) Data() map[string]any {
 	return c.data
 }
 

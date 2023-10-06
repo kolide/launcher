@@ -27,7 +27,7 @@ type (
 	}
 )
 
-func (nc *notaryCheckup) Data() map[string]any             { return nc.data }
+func (nc *notaryCheckup) Data() map[string]any  { return nc.data }
 func (nc *notaryCheckup) ExtraFileName() string { return "" }
 func (nc *notaryCheckup) Name() string          { return "Notary Version" }
 func (nc *notaryCheckup) Status() Status        { return nc.status }
