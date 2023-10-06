@@ -23,18 +23,31 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
 		expectSignatureHeaders bool
 		expectSecret           bool
-		withUploadUrl          bool
 		withUploadRequestURL   bool
 		assertion              assert.ErrorAssertionFunc
 	}{
 		{
-			name: "happy path no enroll secret",
+			name: "no enroll secret, upload request url opt",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				return k
 			},
-			assertion: assert.NoError,
+			assertion:            assert.NoError,
+			withUploadRequestURL: true,
+			// if the secret exists at the default path, is should error when
+			// we try to read it unless we run tests as root
+			expectSecret: false,
+		},
+		{
+			name: "no enroll secret, singed url req from knapsack",
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				k.On("EnrollSecret").Return("")
+				return k
+			},
+			assertion:            assert.NoError,
+			withUploadRequestURL: false,
 			// if the secret exists at the default path, is should error when
 			// we try to read it unless we run tests as root
 			expectSecret: false,
@@ -51,18 +64,8 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			},
 			expectSignatureHeaders: true,
 			expectSecret:           true,
+			withUploadRequestURL:   true,
 			assertion:              assert.NoError,
-		},
-		{
-			name: "happy path with provided upload url",
-			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
-				k := typesMocks.NewKnapsack(t)
-				return k
-			},
-			expectSignatureHeaders: true,
-			expectSecret:           true,
-			assertion:              assert.NoError,
-			withUploadUrl:          true,
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
@@ -71,7 +74,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			testServer := httptest.NewServer(nil)
 
 			mux := http.NewServeMux()
-			mux.Handle("/signedurl", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mux.Handle("/api/agent/flare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer r.Body.Close()
 
 				for _, header := range []string{control.HeaderKey, control.HeaderSignature} {
@@ -88,8 +91,17 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				require.Equal(t, tt.expectSecret, len(data["enroll_secret"]) > 0)
 				require.NotEmpty(t, data["hostname"])
 				require.NotEmpty(t, data["username"])
+				require.NotEmpty(t, data["note"])
+				urlData := struct {
+					URL string
+				}{
+					URL: fmt.Sprintf("%s/upload", testServer.URL),
+				}
 
-				w.Write([]byte(fmt.Sprintf("%s/upload", testServer.URL)))
+				urlDataJson, err := json.Marshal(urlData)
+				require.NoError(t, err)
+
+				w.Write(urlDataJson)
 			}))
 
 			uploadBody := []byte("some_data")
@@ -106,89 +118,18 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 			var shipper *shipper
 			var err error
-			if tt.withUploadUrl {
-				shipper, err = New(knapsack, WithUploadURL(fmt.Sprintf("%s/upload", testServer.URL)))
-				require.NoError(t, err)
+			if tt.withUploadRequestURL {
+				shipper, err = New(knapsack, WithNote("woo"), WithUploadRequestURL(fmt.Sprintf("%s/api/agent/flare", testServer.URL)))
 			} else {
-				shipper, err = New(knapsack, WithUploadRequestURL(fmt.Sprintf("%s/signedurl", testServer.URL)))
+				knapsack.On("KolideServerURL").Return(testServer.URL)
+				shipper, err = New(knapsack, WithNote("woo"))
 			}
+
 			require.NoError(t, err)
 
 			_, err = shipper.Write(uploadBody)
 			require.NoError(t, err)
 			require.NoError(t, shipper.Close())
-		})
-	}
-}
-
-func TestShipErrors(t *testing.T) { //nolint:paralleltest
-	type errorType int
-
-	const (
-		failedToGetSignedURL errorType = iota
-		failedToUpload
-		noUploadOrUploadReqeustURL
-	)
-
-	tests := []struct {
-		name      string
-		errorType errorType
-	}{
-		{
-			name:      "fail get signed url request",
-			errorType: failedToGetSignedURL,
-		},
-		{
-			name:      "bad upload url",
-			errorType: failedToUpload,
-		},
-		{
-			name:      "no upload or upload reqeust URL option",
-			errorType: noUploadOrUploadReqeustURL,
-		},
-	}
-	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			testServer := httptest.NewServer(nil)
-
-			mux := http.NewServeMux()
-			mux.Handle("/signedurl", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer r.Body.Close()
-				w.WriteHeader(http.StatusInternalServerError)
-			}))
-
-			testServer.Config.Handler = mux
-
-			k := typesMocks.NewKnapsack(t)
-			var shipper *shipper
-			var err error
-
-			switch tt.errorType {
-			case failedToGetSignedURL:
-				// should error on New() since /signedurl will return 500
-				k.On("EnrollSecret").Return("")
-				shipper, err = New(k, WithUploadRequestURL(fmt.Sprintf("%s/signedurl", testServer.URL)))
-				require.Error(t, err)
-
-			case failedToUpload:
-				// should error on Close() since /bad_endpoint doesnt exist
-				shipper, err = New(k, WithUploadURL(fmt.Sprintf("%s/bad_endpoint", testServer.URL)))
-				require.NoError(t, err)
-				_, err = shipper.Write([]byte("some_data"))
-				require.NoError(t, err)
-				require.Error(t, shipper.Close())
-
-			case noUploadOrUploadReqeustURL:
-				// should error on New() since no upload or upload request url
-				shipper, err = New(k)
-				require.Error(t, err)
-
-			default:
-				t.Fail()
-			}
 		})
 	}
 }

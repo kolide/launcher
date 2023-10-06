@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -23,13 +24,6 @@ import (
 )
 
 type shipperOption func(*shipper)
-
-// WithUploadURL causes the shipper to upload to the given url, instead of requesting a url to upload to
-func WithUploadURL(url string) shipperOption {
-	return func(s *shipper) {
-		s.uploadURL = url
-	}
-}
 
 // WithUploadRequestURL causes the shipper to request a url to upload to
 func WithUploadRequestURL(url string) shipperOption {
@@ -58,8 +52,6 @@ type shipper struct {
 
 	// note is intended to help humans identify the object being shipped
 	note string
-	// upload url can be set to skip the request for one
-	uploadURL string
 }
 
 func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
@@ -72,22 +64,23 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 		opt(s)
 	}
 
-	if s.uploadRequestURL == "" && s.uploadURL == "" {
-		return nil, fmt.Errorf("must provide either upload request url or upload url")
+	if s.uploadRequestURL == "" {
+		uploadRequestURL, err := url.JoinPath(knapsack.KolideServerURL(), "api/agent/flare")
+		if err != nil {
+			return nil, fmt.Errorf("joining url: %w", err)
+		}
+		s.uploadRequestURL = uploadRequestURL
 	}
 
-	if s.uploadURL == "" {
-		uploadURL, err := s.signedUrl()
-		if err != nil {
-			return nil, fmt.Errorf("getting signed url: %w", err)
-		}
-		s.uploadURL = uploadURL
+	uploadURL, err := s.signedUrl()
+	if err != nil {
+		return nil, fmt.Errorf("getting signed url: %w", err)
 	}
 
 	reader, writer := io.Pipe()
 	s.writer = writer
 
-	req, err := http.NewRequest(http.MethodPut, s.uploadURL, reader)
+	req, err := http.NewRequest(http.MethodPut, uploadURL, reader)
 	if err != nil {
 		return nil, fmt.Errorf("creating request for http upload: %w", err)
 	}
