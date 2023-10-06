@@ -14,18 +14,18 @@ import (
 
 const requestTimeout = time.Second * 5
 
-type connectivity struct {
+type Connectivity struct {
 	k       types.Knapsack
 	status  Status
 	summary string
 	data    map[string]any
 }
 
-func (c *connectivity) Name() string {
+func (c *Connectivity) Name() string {
 	return "Check communication with Kolide"
 }
 
-func (c *connectivity) Run(ctx context.Context, extraFH io.Writer) error {
+func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 	if !c.k.KolideHosted() {
 		c.status = Unknown
 		c.summary = "not kolide hosted"
@@ -74,19 +74,19 @@ func (c *connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (c *connectivity) ExtraFileName() string {
+func (c *Connectivity) ExtraFileName() string {
 	return "responses.txt"
 }
 
-func (c *connectivity) Status() Status {
+func (c *Connectivity) Status() Status {
 	return c.status
 }
 
-func (c *connectivity) Summary() string {
+func (c *Connectivity) Summary() string {
 	return c.summary
 }
 
-func (c *connectivity) Data() map[string]any {
+func (c *Connectivity) Data() map[string]any {
 	return c.data
 }
 

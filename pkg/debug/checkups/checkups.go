@@ -64,9 +64,8 @@ func writeSummary(w io.Writer, s Status, name, msg string) {
 	fmt.Fprintf(w, "%s\t%s: %s\n", s.Emoji(), name, msg)
 }
 
-// CheckupInt is the generalized checkup interface.
-// It is used within doctor/flare, as well as by the log checkpoints
-type CheckupInt interface {
+// checkupInt is the generalized checkup interface. It is not meant to be exported.
+type checkupInt interface {
 	Name() string                                         // Checkup name
 	Run(ctx context.Context, extraWriter io.Writer) error // Run the checkup. Errors here are protocol level
 	ExtraFileName() string                                // If this checkup will have extra data, what name should it use in flare
@@ -85,19 +84,19 @@ const (
 
 //const checkupFor iota
 
-func checkupsFor(k types.Knapsack, target targetBits) []CheckupInt {
+func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 	// This encodes what checkups run in which contexts. This could be pushed down into the checkups directly,
 	// but it seems nice to have it here. TBD
 	var potentialCheckups = []struct {
-		c       CheckupInt
+		c       checkupInt
 		targets targetBits
 	}{
-		{&platform{}, doctorSupported | flareSupported | logSupported},
+		{&Platform{}, doctorSupported | flareSupported | logSupported},
 		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Processes{}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
-		{&connectivity{k: k}, doctorSupported | flareSupported | logSupported},
+		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
 		{&BinaryDirectory{}, doctorSupported | flareSupported},
 		{&launchdCheckup{}, doctorSupported | flareSupported},
@@ -122,7 +121,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []CheckupInt {
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
 	}
 
-	checkupsToRun := make([]CheckupInt, 0)
+	checkupsToRun := make([]checkupInt, 0)
 	for _, p := range potentialCheckups {
 		if p.targets&target == 0 {
 			continue
@@ -141,7 +140,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []CheckupInt {
 }
 
 // doctorCheckup runs a checkup for the doctor command line. Its a small bit of sugar over the io channels
-func doctorCheckup(ctx context.Context, c CheckupInt, w io.Writer) {
+func doctorCheckup(ctx context.Context, c checkupInt, w io.Writer) {
 	if err := c.Run(ctx, io.Discard); err != nil {
 		writeSummary(w, Erroring, c.Name(), fmt.Sprintf("failed to run: %s", err))
 		return
@@ -154,7 +153,7 @@ type zipFile interface {
 	Create(name string) (io.Writer, error)
 }
 
-func flareCheckup(ctx context.Context, c CheckupInt, combinedSummary io.Writer, flare zipFile) {
+func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, flare zipFile) {
 	// zip can only have a single open file. So defer writing the summary.
 	summary := bytes.Buffer{}
 	defer func() {
@@ -202,7 +201,7 @@ func flareCheckup(ctx context.Context, c CheckupInt, combinedSummary io.Writer, 
 	}
 }
 
-func logCheckup(ctx context.Context, c CheckupInt, logger log.Logger) { // nolint:unused
+func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolint:unused
 	if err := c.Run(ctx, io.Discard); err != nil {
 		level.Debug(logger).Log(
 			"name", c.Name(),

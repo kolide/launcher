@@ -16,13 +16,13 @@ var potentialFiles = []string{
 	"/etc/lsb-release",
 }
 
-type platform struct{}
+type Platform struct{}
 
-func (c *platform) Name() string {
+func (c *Platform) Name() string {
 	return "Platform"
 }
 
-func (c *platform) Run(_ context.Context, extraWriter io.Writer) error {
+func (c *Platform) Run(_ context.Context, extraWriter io.Writer) error {
 	if extraWriter == io.Discard {
 		return nil
 	}
@@ -39,19 +39,19 @@ func (c *platform) Run(_ context.Context, extraWriter io.Writer) error {
 	return nil
 }
 
-func (c *platform) ExtraFileName() string {
+func (c *Platform) ExtraFileName() string {
 	return "files.zip"
 }
 
-func (c *platform) Status() Status {
+func (c *Platform) Status() Status {
 	return Informational
 }
 
-func (c *platform) Summary() string {
+func (c *Platform) Summary() string {
 	return fmt.Sprintf("platform: %s, architecture: %s", runtime.GOOS, runtime.GOARCH)
 }
 
-func (c *platform) Data() map[string]any {
+func (c *Platform) Data() map[string]any {
 	return map[string]any{
 		"platform":     runtime.GOOS,
 		"architecture": runtime.GOARCH,
