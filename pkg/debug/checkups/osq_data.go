@@ -1,15 +1,16 @@
 package checkups
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 )
 
 const osSqlQuery = `
@@ -70,25 +71,31 @@ func (odc *osqDataCollector) Run(ctx context.Context, extraFH io.Writer) error {
 // it was done this way to avoid bringing Querier into knapsack for a task that will only be run
 // during flare or doctor
 func (odc *osqDataCollector) osqueryInteractive(ctx context.Context, query string) (map[string]string, error) {
-	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
+	osqPath := odc.k.LatestOsquerydPath(ctx)
+	var resultBuffer bytes.Buffer
+	osqCtx, cmdCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cmdCancel()
 
-	osqPath := odc.k.LatestOsquerydPath(ctx)
-	cmd := exec.CommandContext(cmdCtx, osqPath, "-S", "--json")
-	hideWindow(cmd)
-	cmd.Stdin = strings.NewReader(query)
-	out, err := cmd.Output()
+	osq, err := runsimple.NewOsqueryProcess(osqPath, runsimple.WithStdout(&resultBuffer))
 	if err != nil {
-		return nil, fmt.Errorf("running %s interactive: err %w, output %s", osqPath, err, string(out))
+		return nil, fmt.Errorf("unable to create osq process %w", err)
 	}
 
+	if sqlErr := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
+		return nil, fmt.Errorf("osq data query invocation context error: %w", osqCtx.Err())
+	} else if sqlErr != nil {
+		return nil, fmt.Errorf("osq data SQL error: %w", sqlErr)
+	}
+
+	queryResponse := resultBuffer.Bytes()
+
 	results := make(osqResp, 0)
-	if err := json.Unmarshal(out, &results); err != nil {
-		return nil, fmt.Errorf("parsing %s interactive: err %w, output %s", osqPath, err, string(out))
+	if err := json.Unmarshal(queryResponse, &results); err != nil {
+		return nil, fmt.Errorf("unable to parse osq data query results from output %s. error: %w", string(queryResponse), err)
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("got empty response from %s interactive: output %s", osqPath, string(out))
+		return nil, fmt.Errorf("got empty result set from osq_data query: output %s", string(queryResponse))
 	}
 
 	return results[0], nil
