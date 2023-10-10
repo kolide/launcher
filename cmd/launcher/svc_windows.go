@@ -92,8 +92,8 @@ func runWindowsSvc(args []string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			level.Info(logger).Log(
-				"msg", "panic occurred",
-				"err", err,
+				"msg", "panic occurred in windows service",
+				"err", r,
 			)
 			time.Sleep(time.Second)
 		}
@@ -186,7 +186,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				level.Info(w.logger).Log("msg", "shutdown request received")
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
