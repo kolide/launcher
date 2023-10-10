@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -90,7 +91,11 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 				require.Equal(t, tt.expectSecret, len(data["enroll_secret"]) > 0)
 				require.NotEmpty(t, data["hostname"])
-				require.NotEmpty(t, data["usernames"])
+
+				if runtime.GOOS != "linux" {
+					// linux doesn't get console users in CI
+					require.NotEmpty(t, data["usernames"])
+				}
 				require.NotEmpty(t, data["note"])
 				urlData := struct {
 					URL string
