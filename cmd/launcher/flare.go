@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
@@ -16,10 +16,9 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/peterbourgon/ff/v3"
 )
 
-// sudo /usr/local/kolide-k2/bin/launcher flareupload "note" --debug_upload_request_url="https://example.com"
+// runFlare is a command that runs the flare checkup and saves the results locally or uploads them to a server.
 func runFlare(args []string) error {
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
@@ -34,10 +33,10 @@ func runFlare(args []string) error {
 			"local",
 			"local | upload",
 		)
-		flNote = flagset.String(
-			"note",
-			"",
-			"note used in URL upload request",
+		flOutputDir = flagset.String(
+			"output_dir",
+			".",
+			"path to directory to save flare output",
 		)
 		flUploadRequestURL = flagset.String(
 			"upload_request_url",
@@ -46,7 +45,7 @@ func runFlare(args []string) error {
 		)
 	)
 
-	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
+	if err := flagset.Parse(args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
@@ -68,7 +67,7 @@ func runFlare(args []string) error {
 	ctx := context.Background()
 
 	if *flSave == "upload" {
-		shipper, err := shipper.New(k, shipper.WithNote(*flNote), shipper.WithUploadRequestURL(*flUploadRequestURL))
+		shipper, err := shipper.New(k, shipper.WithNote(strings.Join(flagset.Args(), " ")), shipper.WithUploadRequestURL(*flUploadRequestURL))
 		if err != nil {
 			return err
 		}
@@ -76,12 +75,8 @@ func runFlare(args []string) error {
 	}
 
 	// saving flare locally
-	var (
-		dirPath = env.String("KOLIDE_AGENT_FLARE_ZIP_DIR_PATH", "")
-	)
-
 	reportName := fmt.Sprintf("kolide_agent_flare_report_%s", ulid.New())
-	reportPath := fmt.Sprintf("%s.zip", filepath.Join(dirPath, reportName))
+	reportPath := fmt.Sprintf("%s.zip", filepath.Join(*flOutputDir, reportName))
 
 	flareFile, err := os.Create(reportPath)
 	if err != nil {

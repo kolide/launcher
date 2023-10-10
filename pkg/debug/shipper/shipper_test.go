@@ -90,7 +90,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 				require.Equal(t, tt.expectSecret, len(data["enroll_secret"]) > 0)
 				require.NotEmpty(t, data["hostname"])
-				require.NotEmpty(t, data["username"])
+				require.NotEmpty(t, data["usernames"])
 				require.NotEmpty(t, data["note"])
 				urlData := struct {
 					URL string

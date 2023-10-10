@@ -8,6 +8,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/go-kit/kit/log"
+
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
@@ -15,13 +18,15 @@ import (
 
 const (
 	// Identifier for this consumer.
-	FlareSubsystem = "flare"
+	FlareSubsystem   = "flare"
+	minFlareInterval = 5 * time.Minute
 )
 
 type FlareConsumer struct {
 	lastFlareTime time.Time
 	flarer        flarer
 	knapsack      types.Knapsack
+	logger        log.Logger
 	// newFlareStream is assigned to a field so it can be mocked in tests
 	newFlareStream func(note, uploadRequestURL string) (io.WriteCloser, error)
 }
@@ -36,7 +41,7 @@ func (f *FlareRunner) RunFlare(ctx context.Context, k types.Knapsack, flareStrea
 	return checkups.RunFlare(ctx, k, flareStream, checkups.InSituEnvironment)
 }
 
-func New(knapsack types.Knapsack) *FlareConsumer {
+func New(logger log.Logger, knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
@@ -47,10 +52,20 @@ func New(knapsack types.Knapsack) *FlareConsumer {
 }
 
 func (fc *FlareConsumer) Do(data io.Reader) error {
-	if time.Since(fc.lastFlareTime) < 5*time.Minute {
+	timeSinceLastFlare := time.Since(fc.lastFlareTime)
+
+	if timeSinceLastFlare < minFlareInterval {
+		level.Info(fc.logger).Log(
+			"msg", "skipping flare, run too recently",
+			"min_flare_interval", minFlareInterval,
+			"time_since_last_flare", timeSinceLastFlare,
+		)
 		return nil
 	}
-	fc.lastFlareTime = time.Now()
+
+	defer func() {
+		fc.lastFlareTime = time.Now()
+	}()
 
 	if fc.flarer == nil {
 		return errors.New("flarer is nil")

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -203,16 +204,16 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	currentUser := "unknown"
-	consoleUsers, err := consoleuser.CurrentUsers(ctx)
-
-	switch {
-	case err != nil:
-		currentUser = fmt.Sprintf("error getting current users: %s", err)
-	case len(consoleUsers) > 0:
-		currentUser = consoleUsers[0].Username
-	default: // no console users
-		currentUser = "no console users"
+	usernames := "unknown"
+	foundConsoleUsers, err := consoleuser.CurrentUsers(ctx)
+	if err != nil {
+		usernames = fmt.Sprintf("error getting current users: %s", err)
+	} else {
+		currentUserNames := make([]string, len(foundConsoleUsers))
+		for i, u := range foundConsoleUsers {
+			currentUserNames[i] = u.Username
+		}
+		usernames = strings.Join(currentUserNames, ", ")
 	}
 
 	hostname, err := os.Hostname()
@@ -222,7 +223,7 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
-		"username":      currentUser,
+		"usernames":     usernames,
 		"hostname":      hostname,
 		"note":          note,
 	})
