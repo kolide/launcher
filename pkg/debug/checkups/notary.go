@@ -51,12 +51,12 @@ func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 		nc.data[notaryUrl.String()] = err.Error()
 		nc.status = Failing
 		nc.summary = fmt.Sprintf("Unable to gather notary version response from %s", notaryUrl.String())
-	} else {
-		nc.data[notaryUrl.String()] = response
-		nc.status = Passing
-		nc.summary = fmt.Sprintf("Successfully gathered notary version %s from %s", response, notaryUrl.String())
+		return nil
 	}
-
+	
+        nc.data[notaryUrl.String()] = response
+        nc.status = Passing
+        nc.summary = fmt.Sprintf("Successfully gathered notary version %s from %s", response, notaryUrl.String())
 	return nil
 }
 
