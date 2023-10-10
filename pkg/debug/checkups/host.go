@@ -84,7 +84,7 @@ func agentKeyInfo() map[string]string {
 		// der is a binary format, so convert to b64
 		keyinfo["local_key"] = base64.StdEncoding.EncodeToString(localKeyDer)
 	} else {
-		keyinfo["local_key"] = fmt.Sprintf("error marshalling local key (startup is sometimes weird): %s", err)
+		keyinfo["local_key"] = fmt.Sprintf("error marshalling local key (startup is sometimes weird): %s", err.Error())
 	}
 
 	// We don't always have hardware keys. Move on if we don't
@@ -96,6 +96,8 @@ func agentKeyInfo() map[string]string {
 		// der is a binary format, so convert to b64
 		keyinfo["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
 		keyinfo["hardware_key_source"] = agent.HardwareKeys().Type()
+	} else {
+		keyinfo["hardware_key"] = fmt.Sprintf("error marshalling hardware key: %s", err.Error())
 	}
 
 	return keyinfo

@@ -36,7 +36,7 @@ type (
 
 func (tc *tufCheckup) Data() map[string]any  { return tc.data }
 func (tc *tufCheckup) ExtraFileName() string { return "" }
-func (tc *tufCheckup) Name() string          { return "Tuff Version" }
+func (tc *tufCheckup) Name() string          { return "Tuf Version" }
 func (tc *tufCheckup) Status() Status        { return tc.status }
 func (tc *tufCheckup) Summary() string       { return tc.summary }
 
@@ -48,40 +48,40 @@ func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
-	tuffEndpoint := fmt.Sprintf("%s/repository/targets.json", tc.k.TufServerURL())
-	tuffUrl, err := parseUrl(tc.k, tuffEndpoint)
+	tufEndpoint := fmt.Sprintf("%s/repository/targets.json", tc.k.TufServerURL())
+	tufUrl, err := parseUrl(tc.k, tufEndpoint)
 	if err != nil {
 		return err
 	}
 
-	response, err := tc.fetchTuffVersion(httpClient, tuffUrl)
+	response, err := tc.fetchTufVersion(httpClient, tufUrl)
 	if err != nil {
 		tc.status = Erroring
-		tc.data[tuffUrl.String()] = err.Error()
+		tc.data[tufUrl.String()] = err.Error()
 		tc.summary = "Unable to gather tuf version response"
 		return nil
 	}
 
 	if response == "" {
 		tc.status = Failing
-		tc.data[tuffUrl.String()] = "missing from tuf response"
+		tc.data[tufUrl.String()] = "missing from tuf response"
 		tc.summary = "missing version from tuf targets response"
 		return nil
 	}
 
 	tc.status = Passing
-	tc.data[tuffUrl.String()] = response
-	tc.summary = fmt.Sprintf("Successfully gathered release version %s from %s", response, tuffUrl.String())
+	tc.data[tufUrl.String()] = response
+	tc.summary = fmt.Sprintf("Successfully gathered release version %s from %s", response, tufUrl.String())
 
 	return nil
 }
 
-// fetchTufVersion retrieves the latest targets.json from the tuff URL provided.
+// fetchTufVersion retrieves the latest targets.json from the tuf URL provided.
 // We're attempting to key into the current target for the current platform here,
 // which should look like:
-// https://[TUFF_HOST]/repository/targets.json -> full targets blob
+// https://[TUF_HOST]/repository/targets.json -> full targets blob
 // ---> signed -> targets -> launcher/<GOOS>/<GOARCH|universal>/<RELEASE_CHANNEL>/release.json -> custom -> target
-func (tc *tufCheckup) fetchTuffVersion(client *http.Client, url *url.URL) (string, error) {
+func (tc *tufCheckup) fetchTufVersion(client *http.Client, url *url.URL) (string, error) {
 	response, err := client.Get(url.String())
 	if err != nil {
 		return "", err
