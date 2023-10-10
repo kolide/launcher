@@ -204,16 +204,16 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	consoleUserNames := "unknown"
+	usernames := ""
 	foundConsoleUsers, err := consoleuser.CurrentUsers(ctx)
 	if err != nil {
-		consoleUserNames = fmt.Sprintf("error getting current users: %s", err)
+		usernames = fmt.Sprintf("error getting current users: %s", err)
 	} else {
 		currentUserNames := make([]string, len(foundConsoleUsers))
 		for i, u := range foundConsoleUsers {
 			currentUserNames[i] = u.Username
 		}
-		consoleUserNames = strings.Join(currentUserNames, ", ")
+		usernames = strings.Join(currentUserNames, ", ")
 	}
 
 	hostname, err := os.Hostname()
@@ -223,7 +223,7 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
-		"usernames":     consoleUserNames,
+		"usernames":     usernames,
 		"hostname":      hostname,
 		"note":          note,
 	})
