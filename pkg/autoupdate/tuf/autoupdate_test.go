@@ -343,6 +343,85 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	require.Contains(t, logLines[len(logLines)-1], "received external interrupt during initial delay, stopping")
 }
 
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	// We don't need a real metadata server for this one
+	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testMetadataServer.Close()
+	})
+
+	testRootDir := t.TempDir()
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
+		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	autoupdater.logger = log.NewJSONLogger(&logBytes)
+
+	// Set up normal library and querier interactions
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+	// mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true)
+	// mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil)
+
+	// Let the autoupdater run for a bit
+	go autoupdater.Execute()
+	time.Sleep(3 * time.Second)
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			autoupdater.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
+}
+
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
 	t.Parallel()
 
