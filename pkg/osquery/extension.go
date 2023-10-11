@@ -48,14 +48,12 @@ type Extension struct {
 	wg            sync.WaitGroup
 	logger        log.Logger
 
-	osqueryClient Querier
 	initialRunner *initialRunner
 }
 
 // SetQuerier sets an osquery client on the extension, allowing
 // the extension to query the running osqueryd instance.
 func (e *Extension) SetQuerier(client Querier) {
-	e.osqueryClient = client
 	if e.initialRunner != nil {
 		e.initialRunner.client = client
 	}
@@ -371,7 +369,7 @@ func isNodeInvalidErr(err error) bool {
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	logger := log.With(e.logger, "method", "enroll")
 
-	level.Debug(logger).Log("msg", "starting enrollment")
+	level.Debug(logger).Log("msg", "checking enrollment")
 
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
@@ -381,7 +379,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
-		level.Debug(logger).Log("msg", "node key exists, skipping")
+		level.Debug(logger).Log("msg", "node key exists, skipping enrollment")
 		return e.NodeKey, false, nil
 	}
 
@@ -392,9 +390,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	if key != "" {
+		level.Debug(logger).Log("msg", "found stored node key, skipping enrollment")
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
+
+	level.Debug(logger).Log("msg", "starting enrollment")
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
@@ -443,6 +444,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	e.NodeKey = keyString
+
+	level.Debug(logger).Log("msg", "completed enrollment")
+
 	return e.NodeKey, false, nil
 }
 
