@@ -57,8 +57,8 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	if timeSinceLastFlare < minFlareInterval {
 		level.Info(fc.logger).Log(
 			"msg", "skipping flare, run too recently",
-			"min_flare_interval", minFlareInterval,
-			"time_since_last_flare", timeSinceLastFlare,
+			"min_flare_interval", fmt.Sprintf("%v minutes", minFlareInterval.Minutes()),
+			"time_since_last_flare", fmt.Sprintf("%v minutes", timeSinceLastFlare.Minutes()),
 		)
 		return nil
 	}

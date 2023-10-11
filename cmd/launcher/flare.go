@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/peterbourgon/ff/v3"
 )
 
 // runFlare is a command that runs the flare checkup and saves the results locally or uploads them to a server.
@@ -45,7 +46,7 @@ func runFlare(args []string) error {
 		)
 	)
 
-	if err := flagset.Parse(args); err != nil {
+	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 

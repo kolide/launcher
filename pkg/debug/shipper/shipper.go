@@ -206,9 +206,13 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 
 	usernames := ""
 	foundConsoleUsers, err := consoleuser.CurrentUsers(ctx)
-	if err != nil {
+
+	switch {
+	case err != nil:
 		usernames = fmt.Sprintf("error getting current users: %s", err)
-	} else {
+	case len(foundConsoleUsers) == 0:
+		usernames = "no console users found"
+	default:
 		currentUserNames := make([]string, len(foundConsoleUsers))
 		for i, u := range foundConsoleUsers {
 			currentUserNames[i] = u.Username
