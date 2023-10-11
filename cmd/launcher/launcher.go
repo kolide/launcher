@@ -382,7 +382,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
-	// If the autoupdater is enabled, enable it for both osquery and launcher
+	// If autoupdating is enabled, run the new autoupdater
 	if k.Autoupdate() {
 		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
@@ -398,12 +398,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			tuf.WithOsqueryRestart(runnerRestart),
 		)
 		if err != nil {
-			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
-			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
-		} else {
-			runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+			return fmt.Errorf("creating TUF autoupdater updater: %w", err)
 		}
 
+		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+	}
+
+	// Run the legacy autoupdater only if autoupdating is enabled and the given channel hasn't moved
+	// to the new autoupdater yet.
+	if k.Autoupdate() && !tuf.ChannelUsesNewAutoupdater(k.UpdateChannel()) {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
@@ -413,7 +416,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2 + 5*time.Minute,
+			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
 			SigChannel:         sigChannel,
 		}
 
@@ -433,7 +436,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + 5*time.Minute,
+			InitialDelay:       k.AutoupdateInitialDelay(),
 			SigChannel:         sigChannel,
 		}
 

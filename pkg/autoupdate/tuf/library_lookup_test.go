@@ -180,7 +180,7 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 	}
 }
 
-func Test_usingNewAutoupdater(t *testing.T) {
+func TestChannelUsesNewAutoupdater(t *testing.T) {
 	t.Parallel()
 
 	channelsForTest := []struct {
@@ -210,6 +210,6 @@ func Test_usingNewAutoupdater(t *testing.T) {
 	}
 
 	for _, channel := range channelsForTest {
-		require.Equal(t, channel.usesNewAutoupdater, usingNewAutoupdater(channel.channelName))
+		require.Equal(t, channel.usesNewAutoupdater, ChannelUsesNewAutoupdater(channel.channelName))
 	}
 }
