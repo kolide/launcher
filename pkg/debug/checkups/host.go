@@ -9,10 +9,12 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/shirou/gopsutil/v3/host"
 )
 
 type (
@@ -38,12 +40,21 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	desktopProcesses := runner.InstanceDesktopProcessRecords()
 	hc.data["user_desktop_processes"] = desktopProcesses
 
+	uptimeRaw, err := host.Uptime()
+	if err != nil {
+		hc.data["uptime_friendly"] = fmt.Sprintf("ERROR: %s", err.Error())
+	} else {
+		hc.data["uptime_friendly"] = formatUptime(uptimeRaw)
+	}
+
+	hc.data["uptime"] = uptimeRaw
+
 	if runtime.GOOS == "windows" {
 		hc.data["in_modern_standby"] = hc.k.InModernStandby()
 	}
 
 	hc.status = Informational
-	hc.summary = fmt.Sprintf("hostname: %s", hc.data["hostname"])
+	hc.summary = fmt.Sprintf("hostname: %s, uptime: %s", hc.data["hostname"], hc.data["uptime_friendly"])
 
 	return nil
 }
@@ -69,6 +80,34 @@ func hostName() string {
 	}
 
 	return hostname
+}
+
+// formatUptime takes a raw uptime value in seconds
+// and returns a human friendly relative time string
+func formatUptime(uptime uint64) string {
+	if uptime == 0 {
+		return "0 seconds" // don't overcomplicate the rest for this
+	}
+
+	formattedUptime := make([]string, 0)
+	// unitDivisors is a map of time units => seconds per unit
+	unitDivisors := map[string]uint64{"days": 86400, "hours": 3600, "minutes": 60, "seconds": 1}
+	// iterate over an ordered list of the keys above
+	for _, unit := range []string{"days", "hours", "minutes", "seconds"} {
+		divisor := unitDivisors[unit]
+		if uptime >= divisor {
+			if uptime == divisor { // cut plural ending if the quantity will be singular
+				unit = strings.TrimRight(unit, "s")
+			}
+
+			formattedUptime = append(formattedUptime,
+				fmt.Sprintf("%d %s", uptime/divisor, unit))
+
+			uptime %= divisor
+		}
+	}
+
+	return strings.Join(formattedUptime, ", ")
 }
 
 func agentKeyInfo() map[string]string {
