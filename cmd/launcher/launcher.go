@@ -43,8 +43,8 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
+	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/checkpoint"
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -211,8 +211,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup := rungroup.NewRunGroup(logger)
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
-	checkpointer := checkpoint.New(logger, k)
-	checkpointer.Once()
+	checkpointer := checkups.NewCheckupLogger(logger, k)
+	checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
 	// Create a channel for signals
@@ -276,12 +276,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
-
-	go func() {
-		// Sleep to give osquery time to startup before the checkpointer starts using it.
-		time.Sleep(30 * time.Second)
-		checkpointer.SetQuerier(extension)
-	}()
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner

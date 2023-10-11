@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -20,7 +18,7 @@ type Connectivity struct {
 	k       types.Knapsack
 	status  Status
 	summary string
-	data    map[string]string
+	data    map[string]any
 }
 
 func (c *Connectivity) Name() string {
@@ -28,11 +26,11 @@ func (c *Connectivity) Name() string {
 }
 
 func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
-	//if !c.k.KolideHosted() {
-	//	c.status = Unknown
-	//	c.summary = "not kolide hosted"
-	//	return nil
-	//}
+	if !c.k.KolideHosted() {
+		c.status = Unknown
+		c.summary = "not kolide hosted"
+		return nil
+	}
 
 	httpClient := &http.Client{Timeout: requestTimeout}
 
@@ -43,7 +41,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 		"log":     c.k.LogIngestServerURL(),
 	}
 
-	c.data = make(map[string]string, len(hosts))
+	c.data = make(map[string]any)
 
 	failingHosts := make([]string, 0)
 	for n, v := range hosts {
@@ -88,7 +86,7 @@ func (c *Connectivity) Summary() string {
 	return c.summary
 }
 
-func (c *Connectivity) Data() any {
+func (c *Connectivity) Data() map[string]any {
 	return c.data
 }
 
@@ -114,30 +112,4 @@ func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, serv
 	}
 
 	return bytes, nil
-}
-
-func parseUrl(k types.Knapsack, addr string) (*url.URL, error) {
-	if !strings.HasPrefix(addr, "http") {
-		scheme := "https"
-		if k.InsecureTransportTLS() {
-			scheme = "http"
-		}
-		addr = fmt.Sprintf("%s://%s", scheme, addr)
-	}
-
-	u, err := url.Parse(addr)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if u.Port() == "" {
-		port := "443"
-		if k.InsecureTransportTLS() {
-			port = "80"
-		}
-		u.Host = net.JoinHostPort(u.Host, port)
-	}
-
-	return u, nil
 }

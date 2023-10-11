@@ -71,7 +71,7 @@ type checkupInt interface {
 	ExtraFileName() string                                // If this checkup will have extra data, what name should it use in flare
 	Summary() string                                      // Short summary string about the status
 	Status() Status                                       // State of this checkup
-	Data() any                                            // What data objects exist, if any
+	Data() map[string]any                                 // What data objects exist, if any
 }
 
 type targetBits uint8
@@ -91,11 +91,12 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		c       checkupInt
 		targets targetBits
 	}{
+		{&Platform{}, doctorSupported | flareSupported | logSupported},
+		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
+		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Processes{}, doctorSupported | flareSupported},
-		{&Platform{}, doctorSupported | flareSupported},
-		{&Version{k: k}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
-		{&Connectivity{k: k}, doctorSupported | flareSupported},
+		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
 		{&BinaryDirectory{}, doctorSupported | flareSupported},
 		{&launchdCheckup{}, doctorSupported | flareSupported},
@@ -111,6 +112,12 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&gnomeExtensions{}, doctorSupported | flareSupported},
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
+		{&dnsCheckup{k: k}, doctorSupported | flareSupported | logSupported},
+		{&notaryCheckup{k: k}, doctorSupported | flareSupported},
+		{&tufCheckup{k: k}, doctorSupported | flareSupported},
+		{&osqConfigConflictCheckup{k: k}, doctorSupported | flareSupported},
+		{&serverDataCheckup{k: k}, doctorSupported | flareSupported | logSupported},
+		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
@@ -129,7 +136,6 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 	}
 
 	return checkupsToRun
-
 }
 
 // doctorCheckup runs a checkup for the doctor command line. Its a small bit of sugar over the io channels

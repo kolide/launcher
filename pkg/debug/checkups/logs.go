@@ -77,6 +77,6 @@ func (c *Logs) ExtraFileName() string {
 	return "logs.zip"
 }
 
-func (c *Logs) Data() any {
+func (c *Logs) Data() map[string]any {
 	return nil
 }
