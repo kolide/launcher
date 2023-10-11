@@ -40,7 +40,7 @@ func (i *installCheckup) Summary() string {
 	return "N/A"
 }
 
-func (i *installCheckup) Data() any {
+func (i *installCheckup) Data() map[string]any {
 	return nil
 }
 

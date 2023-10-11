@@ -110,6 +110,6 @@ func (c *launchdCheckup) Summary() string {
 	return c.summary
 }
 
-func (c *launchdCheckup) Data() any {
+func (c *launchdCheckup) Data() map[string]any {
 	return nil
 }

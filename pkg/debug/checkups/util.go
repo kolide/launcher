@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/pkg/agent/types"
 	"golang.org/x/exp/maps"
 )
 
@@ -151,4 +154,30 @@ func runCmdMarkdownLogged(cmd *exec.Cmd, extraWriter io.Writer) error {
 	}
 
 	return nil
+}
+
+func parseUrl(k types.Knapsack, addr string) (*url.URL, error) {
+	if !strings.HasPrefix(addr, "http") {
+		scheme := "https"
+		if k.InsecureTransportTLS() {
+			scheme = "http"
+		}
+		addr = fmt.Sprintf("%s://%s", scheme, addr)
+	}
+
+	u, err := url.Parse(addr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Port() == "" {
+		port := "443"
+		if k.InsecureTransportTLS() {
+			port = "80"
+		}
+		u.Host = net.JoinHostPort(u.Host, port)
+	}
+
+	return u, nil
 }

@@ -57,7 +57,7 @@ func (c *BinaryDirectory) Summary() string {
 	return c.summary
 }
 
-func (c *BinaryDirectory) Data() any {
+func (c *BinaryDirectory) Data() map[string]any {
 	return nil
 }
 

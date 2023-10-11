@@ -13,7 +13,7 @@ import (
 
 type Processes struct {
 	kolideCount int
-	data        []map[string]any
+	data        map[string]any
 }
 
 func (c *Processes) Name() string {
@@ -25,7 +25,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		return errors.New("missing io.Writer")
 	}
 
-	c.data = []map[string]any{}
+	c.data = make(map[string]any)
 
 	ps, err := process.ProcessesWithContext(ctx)
 	if err != nil {
@@ -54,7 +54,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		exe, _ := p.Exe()
 		if strings.Contains(strings.ToLower(exe), "kolide") {
 			c.kolideCount += 1
-			c.data = append(c.data, pMap)
+			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
 		}
 	}
 
@@ -77,7 +77,7 @@ func (c *Processes) Summary() string {
 	return fmt.Sprintf("found %d kolide processes", c.kolideCount)
 }
 
-func (c *Processes) Data() any {
+func (c *Processes) Data() map[string]any {
 	return c.data
 }
 
