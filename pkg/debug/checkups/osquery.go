@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -60,11 +61,18 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 }
 
 func (o *osqueryCheckup) interactive(ctx context.Context) error {
+	var launcherPath string
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		launcherPath = "/usr/local/kolide-k2/bin/launcher"
+	case "windows":
+		launcherPath = `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`
+	}
+
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	osqPath := o.k.LatestOsquerydPath(ctx)
-	cmd := exec.CommandContext(cmdCtx, osqPath, "-S")
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive")
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
@@ -72,7 +80,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	out, err := cmd.CombinedOutput()
 	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
-		return fmt.Errorf("running %s osq interactive: err %w, output %s", osqPath, err, string(out))
+		return fmt.Errorf("running %s interactive: err %w, output %s", launcherPath, err, string(out))
 	}
 
 	return nil
