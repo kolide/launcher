@@ -57,6 +57,7 @@ type TraceExporter struct {
 	enabled                   bool
 	traceSamplingRate         float64
 	interrupt                 chan struct{}
+	interrupted               bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -255,6 +256,13 @@ func (t *TraceExporter) Execute() error {
 }
 
 func (t *TraceExporter) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if t.interrupted {
+		return
+	}
+
+	t.interrupted = true
+
 	if t.provider != nil {
 		t.provider.Shutdown(context.Background())
 	}

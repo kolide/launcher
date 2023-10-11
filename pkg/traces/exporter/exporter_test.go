@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"testing"
@@ -108,6 +109,56 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	}
 
 	mockKnapsack.AssertExpectations(t)
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	tokenStore := testTokenStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
+	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
+	mockKnapsack.On("ExportTraces").Return(false)
+	mockKnapsack.On("TraceSamplingRate").Return(0.0)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
+	require.NoError(t, err)
+	mockKnapsack.AssertExpectations(t)
+
+	go traceExporter.Execute()
+	time.Sleep(3 * time.Second)
+	traceExporter.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			traceExporter.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
 func Test_addDeviceIdentifyingAttributes(t *testing.T) {
