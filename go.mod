@@ -5,7 +5,6 @@ require (
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/clbanning/mxj v1.8.4
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.9.0
 	github.com/go-ole/go-ole v1.2.6
@@ -38,13 +37,13 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.4.0
+	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/image v0.10.0
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.8.0
-	golang.org/x/text v0.11.0
+	golang.org/x/sys v0.13.0
+	golang.org/x/text v0.13.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.55.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
