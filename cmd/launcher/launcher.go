@@ -10,12 +10,10 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -219,18 +217,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	sigChannel := make(chan os.Signal, 1)
 
 	// Add a rungroup to catch things on the sigChannel
-	// Attach a notifier for os.Interrupt
-	runGroup.Add("sigChannel", func() error {
-		signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
-		select {
-		case sig := <-sigChannel:
-			level.Info(logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
-			return nil
-		}
-	}, func(_ error) {
-		cancel()
-		close(sigChannel)
-	})
+	signalListener := newSignalListener(sigChannel, cancel, logger)
+	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
