@@ -96,7 +96,7 @@ func formatUptime(uptime uint64) string {
 	for _, unit := range []string{"days", "hours", "minutes", "seconds"} {
 		divisor := unitDivisors[unit]
 		if uptime >= divisor {
-			if uptime == divisor { // cut plural ending if the quantity will be singular
+			if uptime/divisor < 2 { // cut plural ending if the quantity will be singular
 				unit = strings.TrimRight(unit, "s")
 			}
 
