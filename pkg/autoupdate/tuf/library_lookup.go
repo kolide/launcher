@@ -26,7 +26,9 @@ type autoupdateConfig struct {
 	localDevelopmentPath string
 }
 
-var channelsUsingNewAutoupdater = map[string]bool{}
+var channelsUsingNewAutoupdater = map[string]bool{
+	"nightly": true,
+}
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.

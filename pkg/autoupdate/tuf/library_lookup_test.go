@@ -11,15 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint: paralleltest
-	channelsUsingNewAutoupdater["nightly"] = true
-	defer func() {
-		delete(channelsUsingNewAutoupdater, "nightly")
-	}()
+func TestCheckOutLatest_withTufRepository(t *testing.T) {
+	t.Parallel()
 
-	for _, binary := range binaries { //nolint: paralleltest
+	for _, binary := range binaries {
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
 			// Set up an update library
 			rootDir := t.TempDir()
 			updateDir := defaultLibraryDirectory(rootDir)
@@ -53,15 +52,13 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint: paralleltest
 	}
 }
 
-func TestCheckOutLatest_withoutTufRepository(t *testing.T) { // nolint:paralleltest
-	channelsUsingNewAutoupdater["nightly"] = true
-	defer func() {
-		delete(channelsUsingNewAutoupdater, "nightly")
-	}()
-
-	for _, binary := range binaries { //nolint: paralleltest
+func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
+	t.Parallel()
+	for _, binary := range binaries {
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
 			// Set up an update library, but no TUF repo
 			rootDir := t.TempDir()
 			updateDir := defaultLibraryDirectory(rootDir)
@@ -96,21 +93,6 @@ func TestCheckOutLatest_NotAvailableOnNonNightlyChannels(t *testing.T) {
 
 				_, err := CheckOutLatest(binary, rootDir, "", channel, log.NewNopLogger())
 				require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
-			})
-		}
-	}
-}
-
-func TestUsingNewAutoupdater(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		for _, channel := range []string{"beta", "stable", "nightly", "alpha"} {
-			channel := channel
-			t.Run(fmt.Sprintf("%s-%s", binary, channel), func(t *testing.T) {
-				t.Parallel()
-				require.False(t, UsingNewAutoupdater())
 			})
 		}
 	}
@@ -207,7 +189,7 @@ func Test_usingNewAutoupdater(t *testing.T) {
 	}{
 		{
 			channelName:        "nightly",
-			usesNewAutoupdater: false,
+			usesNewAutoupdater: true,
 		},
 		{
 			channelName:        "alpha",
