@@ -133,6 +133,8 @@ type DesktopUsersProcessesRunner struct {
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
 	runnerServer *runnerserver.RunnerServer
+	// osVersion is the version of the OS cached in new
+	osVersion string
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -189,6 +191,14 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		}
 	}()
 
+	if runtime.GOOS == "darwin" {
+		osversion, err := osversion()
+		if err != nil {
+			level.Error(runner.logger).Log("msg", "getting os version", "err", err)
+		}
+		runner.osVersion = osversion
+	}
+
 	setInstance(runner)
 	return runner, nil
 }
@@ -200,6 +210,8 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	defer updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()
+	osUpdateCheckTicker := time.NewTicker(1 * time.Minute)
+	defer osUpdateCheckTicker.Stop()
 
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
@@ -212,6 +224,9 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 			continue
 		case <-menuRefreshTicker.C:
 			r.refreshMenu()
+			continue
+		case <-osUpdateCheckTicker.C:
+			r.checkOsUpdate()
 			continue
 		case <-r.interrupt:
 			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
@@ -800,4 +815,29 @@ func removeFilesWithPrefix(folderPath, prefix string) error {
 		// not dir, has prefix
 		return os.Remove(path)
 	})
+}
+
+func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
+	// on darwin, sometimes the desktop disappears after an OS update
+	// eventhough the process is still there, so lets restart desktop
+	// via killing the process and letting the runner restart it
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	osVersion, err := osversion()
+	if err != nil {
+		level.Error(r.logger).Log("msg", "getting os version", "err", err)
+		return
+	}
+
+	if osVersion != r.osVersion {
+		level.Debug(r.logger).Log(
+			"msg", "os version changed, restarting desktop",
+			"old", r.osVersion,
+			"new", osVersion,
+		)
+		r.osVersion = osVersion
+		r.killDesktopProcesses()
+	}
 }

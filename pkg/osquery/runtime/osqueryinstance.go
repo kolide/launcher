@@ -76,6 +76,12 @@ func WithUpdateChannel(channel string) OsqueryInstanceOption {
 	}
 }
 
+func WithEnableWatchdog(enableWatchdog bool) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.opts.enableWatchdog = enableWatchdog
+	}
+}
+
 // WithExtensionSocketPath is a functional option which allows the user to
 // define the path of the extension socket path that osqueryd will open to
 // communicate with other processes.
@@ -318,6 +324,7 @@ type osqueryOptions struct {
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
 	autoloadedExtensions  []string
+	enableWatchdog        bool
 	extensionSocketPath   string
 	enrollSecretPath      string
 	loggerPluginFlag      string
@@ -460,8 +467,7 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 // which will launch a properly configured osqueryd process.
 func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
-	cmd := exec.Command(
-		osquerydBinary,
+	args := []string{
 		fmt.Sprintf("--logger_plugin=%s", opts.loggerPluginFlag),
 		fmt.Sprintf("--distributed_plugin=%s", opts.distributedPluginFlag),
 		"--disable_distributed=false",
@@ -469,8 +475,14 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--pack_delimiter=:",
 		"--host_identifier=uuid",
 		"--force=true",
-		"--disable_watchdog",
 		"--utc",
+	}
+	if !opts.enableWatchdog {
+		args = append(args, "--disable_watchdog")
+	}
+	cmd := exec.Command(
+		osquerydBinary,
+		args...,
 	)
 
 	if opts.verbose {

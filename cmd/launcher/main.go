@@ -55,7 +55,28 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		runNewerLauncherIfAvailable(ctx, logger)
+		if tuf.UsingNewAutoupdater() {
+			runNewerLauncherIfAvailable(ctx, logger)
+		} else {
+			newerBinary, err := autoupdate.FindNewestSelf(ctx)
+			if err != nil {
+				logutil.Fatal(logger, err, "checking for updated version")
+			}
+
+			if newerBinary != "" {
+				level.Debug(logger).Log(
+					"msg", "preparing to exec new binary",
+					"oldVersion", version.Version().Version,
+					"newBinary", newerBinary,
+				)
+				if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
+					logutil.Fatal(logger, err, "exec")
+				}
+				panic("how")
+			} else {
+				level.Debug(logger).Log("msg", "Nothing new")
+			}
+		}
 	}
 
 	// if the launcher is being ran with a positional argument,
@@ -147,19 +168,9 @@ func runSubcommands() error {
 // runNewerLauncherIfAvailable checks the autoupdate library for a newer version
 // of launcher than the currently-running one. If found, it will exec that version.
 func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
-	// If the legacy autoupdate path variable isn't already set, set it to help
-	// the legacy autoupdater find its update directory even when the newer binary
-	// runs out of a different directory.
-	if _, ok := os.LookupEnv(autoupdate.LegacyLauncherAutoupdatePathEnvVar); !ok {
-		currentPath, err := os.Executable()
-		if err == nil {
-			os.Setenv(autoupdate.LegacyLauncherAutoupdatePathEnvVar, currentPath)
-		}
-	}
-
 	newerBinary, err := latestLauncherPath(ctx, logger)
 	if err != nil {
-		logutil.Fatal(logger, "msg", "checking for updated version", "err", err)
+		level.Info(logger).Log("msg", "could not get updated version", "err", err)
 	}
 
 	if newerBinary == "" {
@@ -185,18 +196,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 func latestLauncherPath(ctx context.Context, logger log.Logger) (string, error) {
 	newerBinary, err := tuf.CheckOutLatestWithoutConfig("launcher", logger)
 	if err != nil {
-		level.Error(logger).Log(
-			"msg", "could not check out latest launcher, will fall back to old autoupdate library",
-			"err", err,
-		)
-
-		// Fall back to legacy autoupdate library
-		newerBinaryPath, err := autoupdate.FindNewestSelf(ctx)
-		if err != nil {
-			return "", fmt.Errorf("finding newest self: %w", err)
-		}
-
-		return newerBinaryPath, nil
+		return "", fmt.Errorf("checking out latest launcher: %w", err)
 	}
 
 	currentPath, _ := os.Executable()

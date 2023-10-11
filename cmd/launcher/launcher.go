@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -9,12 +10,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -47,6 +48,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
@@ -219,10 +221,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// Add a rungroup to catch things on the sigChannel
 	// Attach a notifier for os.Interrupt
 	runGroup.Add("sigChannel", func() error {
-		signal.Notify(sigChannel, os.Interrupt)
+		signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 		select {
-		case <-sigChannel:
-			level.Info(logger).Log("msg", "beginning shutdown via signal")
+		case sig := <-sigChannel:
+			level.Info(logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
 			return nil
 		}
 	}, func(_ error) {
@@ -475,23 +477,34 @@ func writePidFile(path string) error {
 // runOsqueryVersionCheck execs the osqueryd binary in the background when we're running
 // on darwin. Operating on our theory that some startup delay issues for osquery might
 // be due to the notarization check taking too long, we execute the binary here ahead
-// of time in the hopes of getting the check out of the way.
+// of time in the hopes of getting the check out of the way. This is expected to be called
+// from a goroutine, and thus does not return an error.
 func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath string) {
 	if runtime.GOOS != "darwin" {
 		return
 	}
 
+	logger = log.With(logger, "component", "osquery-version-check")
+
+	var output bytes.Buffer
+
+	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
+	if err != nil {
+		level.Error(logger).Log("msg", "unable to create process", "err", err)
+		return
+	}
+
+	// This has a somewhat long timeout, in case there's a notarization fetch
 	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer versionCancel()
 
-	versionCmd := exec.CommandContext(versionCtx, osquerydPath, "--version")
-
 	startTime := time.Now().UnixMilli()
-	out, err := versionCmd.CombinedOutput()
-	executionTimeMs := time.Now().UnixMilli() - startTime
-	outTrimmed := strings.TrimSpace(string(out))
 
-	if err != nil {
+	osqErr := osq.RunVersion(versionCtx)
+	executionTimeMs := time.Now().UnixMilli() - startTime
+	outTrimmed := strings.TrimSpace(output.String())
+
+	if osqErr != nil {
 		level.Error(logger).Log("msg", "could not check osqueryd version", "output", outTrimmed, "err", err, "execution_time_ms", executionTimeMs)
 		return
 	}

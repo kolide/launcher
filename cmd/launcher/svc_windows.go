@@ -51,17 +51,19 @@ func runWindowsSvc(args []string) error {
 		os.Exit(1)
 	}
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
-	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
-	}
-
-	// Now that we've parsed the options, let's set a filter on our logger
+	// Now that we've parsed the options, let's set a filter on our eventLog logger.
+	// We don't want to set this on the teelogger below because we want debug logs to always
+	// go to debug.json.
 	if opts.Debug {
 		logger = level.NewFilter(logger, level.AllowDebug())
 	} else {
 		logger = level.NewFilter(logger, level.AllowInfo())
+	}
+
+	// Create a local logger. This logs to a known path, and aims to help diagnostics
+	if opts.RootDirectory != "" {
+		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	// Use the FindNewest mechanism to delete old
@@ -90,8 +92,8 @@ func runWindowsSvc(args []string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			level.Info(logger).Log(
-				"msg", "panic occurred",
-				"err", err,
+				"msg", "panic occurred in windows service",
+				"err", r,
 			)
 			time.Sleep(time.Second)
 		}
@@ -184,7 +186,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				level.Info(w.logger).Log("msg", "shutdown request received")
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:

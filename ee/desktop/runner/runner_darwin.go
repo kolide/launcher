@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os/exec"
 	"os/user"
+
+	"golang.org/x/sys/unix"
 )
 
 // For notifications to work, we must run in the user context with launchctl asuser.
@@ -49,4 +51,8 @@ func (r *DesktopUsersProcessesRunner) runAsUser(_ context.Context, uid string, c
 	// But we may not have a console user?
 
 	return cmd.Start()
+}
+
+func osversion() (string, error) {
+	return unix.Sysctl("kern.osrelease")
 }

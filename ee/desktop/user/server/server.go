@@ -56,6 +56,10 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 		Handler: userServer.authMiddleware(authedMux),
 	}
 
+	// there is possible conention here since we're doing http over a socket
+	// so were turning of keep alive in an attmept to prevent that
+	userServer.server.SetKeepAlivesEnabled(false)
+
 	// remove existing socket
 	if err := userServer.removeSocket(); err != nil {
 		return nil, err
