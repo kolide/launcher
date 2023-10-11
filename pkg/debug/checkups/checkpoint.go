@@ -19,9 +19,10 @@ type (
 	}
 
 	checkPointer struct {
-		logger    logger
-		knapsack  types.Knapsack
-		interrupt chan struct{}
+		logger      logger
+		knapsack    types.Knapsack
+		interrupt   chan struct{}
+		interrupted bool
 	}
 )
 
@@ -53,6 +54,13 @@ func (c *checkPointer) Run() error {
 }
 
 func (c *checkPointer) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if c.interrupted {
+		return
+	}
+
+	c.interrupted = true
+
 	c.interrupt <- struct{}{}
 }
 
