@@ -82,7 +82,7 @@ func (c *gnomeExtensions) Summary() string {
 	return c.summary
 }
 
-func (c *gnomeExtensions) Data() any {
+func (c *gnomeExtensions) Data() map[string]any {
 	return nil
 }
 

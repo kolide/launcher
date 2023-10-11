@@ -149,6 +149,15 @@ type processRecord struct {
 	socketPath                 string
 }
 
+func (pr processRecord) String() string {
+	return fmt.Sprintf("%s [socket: %s, started: %s, last_health_check: %s])",
+		pr.path,
+		pr.socketPath,
+		pr.StartTime.String(),
+		pr.LastHealthCheck.String(),
+	)
+}
+
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
 func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{

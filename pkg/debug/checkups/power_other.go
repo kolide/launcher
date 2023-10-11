@@ -30,6 +30,6 @@ func (p *powerCheckup) Summary() string {
 	return ""
 }
 
-func (p *powerCheckup) Data() any {
+func (p *powerCheckup) Data() map[string]any {
 	return nil
 }

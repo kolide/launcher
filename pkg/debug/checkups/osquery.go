@@ -15,7 +15,7 @@ import (
 type osqueryCheckup struct {
 	k              types.Knapsack
 	status         Status
-	executionTimes map[string]string // maps command to how long it took to run, in ms
+	executionTimes map[string]any // maps command to how long it took to run, in ms
 	summary        string
 }
 
@@ -25,7 +25,7 @@ func (o *osqueryCheckup) Name() string {
 
 func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	// Determine passing status by running osqueryd --version
-	o.executionTimes = make(map[string]string)
+	o.executionTimes = make(map[string]any)
 	if osqueryVersion, err := o.version(ctx); err != nil {
 		o.status = Failing
 		return fmt.Errorf("running osqueryd version: %w", err)
@@ -98,6 +98,6 @@ func (o *osqueryCheckup) Summary() string {
 	return o.summary
 }
 
-func (o *osqueryCheckup) Data() any {
+func (o *osqueryCheckup) Data() map[string]any {
 	return o.executionTimes
 }

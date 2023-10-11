@@ -286,6 +286,6 @@ func (s *servicesCheckup) Summary() string {
 	return fmt.Sprintf("found Kolide service in state %d (%s)", s.serviceState, s.serviceStateHumanReadable)
 }
 
-func (s *servicesCheckup) Data() any {
+func (s *servicesCheckup) Data() map[string]any {
 	return s.data
 }

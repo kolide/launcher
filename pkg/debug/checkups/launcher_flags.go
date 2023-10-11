@@ -69,7 +69,7 @@ func (lf *launcherFlags) ExtraFileName() string {
 	return "launcherFlags.log"
 }
 
-func (lf *launcherFlags) Data() any {
+func (lf *launcherFlags) Data() map[string]any {
 	return nil
 }
 
