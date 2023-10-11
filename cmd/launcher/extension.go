@@ -122,6 +122,14 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 			Actor: actor.Actor{
 				// and the methods for starting and stopping the extension
 				Execute: func() error {
+					// Attempt to enroll before starting up osquery. If we can't enroll now, don't error out --
+					// we'll attempt again the first time osquery calls launcher plugins.
+					_, invalid, err := ext.Enroll(ctx)
+					if err != nil {
+						level.Debug(logger).Log("msg", "error performing enrollment", "err", err)
+					} else if invalid {
+						level.Debug(logger).Log("msg", "invalid enroll secret", "err", err)
+					}
 
 					// Start the osqueryd instance
 					if err := runner.Start(); err != nil {
@@ -139,30 +147,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					}
 
 					// The runner allows querying the osqueryd instance from the extension.
-					// Used by the Enroll method below to get initial enrollment details.
 					ext.SetQuerier(runner)
-
-					// It's not clear to me _why_ the extension
-					// ever called Enroll here. From what
-					// I can tell, this would cause the
-					// launcher extension to do a bunch of
-					// initial setup (create node key,
-					// etc). But, this is also done by
-					// osquery. And having them both
-					// attempt it is a bit racey.  I'm not
-					// so confident to outright remove it,
-					// so it's gated behind this debugging
-					// environment.
-					if os.Getenv("LAUNCHER_DEBUG_ENROLL_FIRST") == "true" {
-						// enroll this launcher with the server
-						_, invalid, err := ext.Enroll(ctx)
-						if err != nil {
-							return fmt.Errorf("enrolling host: %w", err)
-						}
-						if invalid {
-							return fmt.Errorf("invalid enroll secret: %w", err)
-						}
-					}
 
 					// start the extension
 					ext.Start()
