@@ -53,6 +53,6 @@ func (c *RootDirectory) Summary() string {
 	return c.summary
 }
 
-func (c *RootDirectory) Data() any {
+func (c *RootDirectory) Data() map[string]any {
 	return nil
 }

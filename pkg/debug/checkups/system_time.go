@@ -100,6 +100,6 @@ func (st *systemTime) Summary() string {
 	return st.summary
 }
 
-func (st *systemTime) Data() any {
+func (st *systemTime) Data() map[string]any {
 	return nil
 }

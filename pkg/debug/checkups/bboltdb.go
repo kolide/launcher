@@ -12,7 +12,7 @@ import (
 
 type bboltdbCheckup struct {
 	k    types.Knapsack
-	data any
+	data map[string]any
 }
 
 func (c *bboltdbCheckup) Name() string {
@@ -30,7 +30,11 @@ func (c *bboltdbCheckup) Run(_ context.Context, _ io.Writer) error {
 		return fmt.Errorf("getting db stats: %w", err)
 	}
 
-	c.data = stats
+	c.data = make(map[string]any)
+	for k, v := range stats.Buckets {
+		c.data[k] = v
+	}
+
 	return nil
 }
 
@@ -46,6 +50,6 @@ func (c *bboltdbCheckup) Summary() string {
 	return "N/A"
 }
 
-func (c *bboltdbCheckup) Data() any {
+func (c *bboltdbCheckup) Data() map[string]any {
 	return c.data
 }

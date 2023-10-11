@@ -70,7 +70,7 @@ func (c *enrollSecretCheckup) Summary() string {
 	return c.summary
 }
 
-func (c *enrollSecretCheckup) Data() any {
+func (c *enrollSecretCheckup) Data() map[string]any {
 	return nil
 }
 
