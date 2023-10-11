@@ -31,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/pkg/agent"
@@ -324,6 +325,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// register accelerate control consumer
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
+		// register uninstall consumer
+		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(logger, k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
