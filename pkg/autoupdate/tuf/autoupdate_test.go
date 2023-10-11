@@ -392,6 +392,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
 	time.Sleep(3 * time.Second)
+	autoupdater.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
 	interruptComplete := make(chan struct{})
