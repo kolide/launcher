@@ -83,7 +83,7 @@ func (c *checkPointer) summarizeData(data any) any {
 	switch knownValue := data.(type) {
 	case []string:
 		return strings.Join(knownValue, ",")
-	case string, uint, int, int32, int64:
+	case string, uint, uint64, int, int32, int64:
 		return knownValue
 	default:
 		return fmt.Sprintf("%v", data)
