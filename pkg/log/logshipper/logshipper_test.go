@@ -1,7 +1,9 @@
 package logshipper
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
@@ -82,6 +84,56 @@ func TestLogShipper(t *testing.T) {
 			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to invalid endpoint")
 		})
 	}
+}
+
+func TestStop_Multiple(t *testing.T) {
+	t.Parallel()
+
+	knapsack := mocks.NewKnapsack(t)
+	tokenStore := testTokenStore(t)
+	authToken := ulid.New()
+
+	knapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
+
+	endpoint := "https://someurl"
+	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
+	knapsack.On("Debug").Return(true)
+
+	ls := New(knapsack, log.NewNopLogger())
+
+	go ls.Run()
+	time.Sleep(3 * time.Second)
+	ls.Stop(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			ls.Stop(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
 func testTokenStore(t *testing.T) types.KVStore {

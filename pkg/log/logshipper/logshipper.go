@@ -28,6 +28,7 @@ type LogShipper struct {
 	//baseLogger is for logShipper interal logging
 	baseLogger        log.Logger
 	knapsack          types.Knapsack
+	ctx               context.Context
 	stopFunc          context.CancelFunc
 	isShippingEnabled bool
 }
@@ -45,12 +46,16 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	// setting a ulid as session_ulid allows us to follow a single run of launcher
 	shippingLogger := log.With(log.NewJSONLogger(sendBuffer), "caller", log.Caller(6), "session_ulid", ulid.New())
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ls := &LogShipper{
 		sender:         sender,
 		sendBuffer:     sendBuffer,
 		shippingLogger: shippingLogger,
 		baseLogger:     log.With(baseLogger, "component", "logshipper"),
 		knapsack:       k,
+		ctx:            ctx,
+		stopFunc:       cancel,
 	}
 
 	ls.Ping()
@@ -87,9 +92,7 @@ func (ls *LogShipper) Ping() {
 }
 
 func (ls *LogShipper) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	ls.stopFunc = cancel
-	return ls.sendBuffer.Run(ctx)
+	return ls.sendBuffer.Run(ls.ctx)
 }
 
 func (ls *LogShipper) Stop(_ error) {
