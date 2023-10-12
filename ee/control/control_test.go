@@ -1,6 +1,8 @@
 package control
 
 import (
+	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -301,4 +303,50 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
 		})
 	}
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("ControlRequestInterval").Return(24 * time.Hour)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	data := &TestClient{}
+	control := New(log.NewNopLogger(), k, data)
+
+	go control.ExecuteWithContext(ctx)
+
+	time.Sleep(3 * time.Second)
+	control.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			control.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
