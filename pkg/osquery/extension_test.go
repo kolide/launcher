@@ -891,6 +891,34 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	testutil.FatalAfterFunc(t, 3*time.Second, func() {
 		e.Shutdown()
 	})
+
+	// Confirm we can call Shutdown multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			e.Shutdown()
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
 func TestExtensionPurgeBufferedLogs(t *testing.T) {
