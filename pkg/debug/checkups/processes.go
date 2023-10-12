@@ -48,6 +48,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 			"cpu_times":   naIfError(p.TimesWithContext(ctx)),
 			"status":      naIfError(p.StatusWithContext(ctx)),
 			"uids":        naIfError(p.UidsWithContext(ctx)),
+			"username":    naIfError(p.UsernameWithContext(ctx)),
 		}
 		_ = jsonWriter.Encode(pMap)
 
