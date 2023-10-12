@@ -324,7 +324,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// Only perform restarts if we're configured to use this new autoupdate library,
 	// to prevent performing unnecessary restarts.
-	if !usingNewAutoupdater(ta.channel) {
+	if !ChannelUsesNewAutoupdater(ta.channel) {
 		return nil
 	}
 

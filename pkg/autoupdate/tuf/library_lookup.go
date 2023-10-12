@@ -26,7 +26,9 @@ type autoupdateConfig struct {
 	localDevelopmentPath string
 }
 
-var channelsUsingNewAutoupdater = map[string]bool{}
+var channelsUsingNewAutoupdater = map[string]bool{
+	"nightly": true,
+}
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
@@ -52,7 +54,7 @@ func UsingNewAutoupdater() bool {
 		return false
 	}
 
-	return usingNewAutoupdater(cfg.channel)
+	return ChannelUsesNewAutoupdater(cfg.channel)
 }
 
 // getAutoupdateConfig reads launcher's config file to determine the configuration values
@@ -96,7 +98,7 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 // as its version.
 func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
 	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
-	if !usingNewAutoupdater(channel) {
+	if !ChannelUsesNewAutoupdater(channel) {
 		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
 	}
 
@@ -117,7 +119,7 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 	return mostRecentVersion(binary, updateDirectory)
 }
 
-func usingNewAutoupdater(channel string) bool {
+func ChannelUsesNewAutoupdater(channel string) bool {
 	_, ok := channelsUsingNewAutoupdater[channel]
 	return ok
 }
@@ -143,7 +145,7 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if autoupdate.CheckExecutable(context.TODO(), targetPath, "--version") != nil {
+	if err := autoupdate.CheckExecutable(context.TODO(), targetPath, "--version"); err != nil {
 		return nil, fmt.Errorf("version %s from target %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, err)
 	}
 

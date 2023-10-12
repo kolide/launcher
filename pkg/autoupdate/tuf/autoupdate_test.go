@@ -124,18 +124,15 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
-	// In the future, we expect that we'd restart launcher. For now, we don't want unnecessary restarts.
-	/*
-		// Check log lines to confirm that we see the log `received interrupt to restart launcher after update, stopping`, indicating that
-		// the autoupdater shut down at the end
-		logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
+	// Check log lines to confirm that we see the log `received interrupt to restart launcher after update, stopping`, indicating that
+	// the autoupdater shut down at the end
+	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
 
-		// We expect at least 1 log for the shutdown line.
-		require.GreaterOrEqual(t, len(logLines), 1)
+	// We expect at least 1 log for the shutdown line.
+	require.GreaterOrEqual(t, len(logLines), 1)
 
-		// Check that we shut down
-		require.Contains(t, logLines[len(logLines)-1], "received interrupt to restart launcher after update, stopping")
-	*/
+	// Check that we shut down
+	require.Contains(t, logLines[len(logLines)-1], "received interrupt to restart launcher after update, stopping")
 }
 
 func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) {
@@ -280,11 +277,8 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	// We expect at least 1 log for the restart line.
 	require.GreaterOrEqual(t, len(logLines), 1)
 
-	// 	// In the future, we expect that we'd restart osquery. For now, we don't want unnecessary restarts.
-	/*
-		// Check that we restarted osqueryd
-		require.Contains(t, logLines[len(logLines)-1], "restarted binary after update")
-	*/
+	// Check that we restarted osqueryd
+	require.Contains(t, logLines[len(logLines)-1], "restarted binary after update")
 
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
 	autoupdater.Interrupt(errors.New("test error"))
