@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"time"
@@ -176,7 +177,13 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 	// The osqueryd client may not have initialized yet, so retry for up to three minutes on error.
 	var resp []map[string]string
 	var err error
+	retryTimeout := time.Now().Add(3 * time.Minute)
 	for {
+		if time.Now().After(retryTimeout) {
+			err = errors.New("could not get osquery details before timeout")
+			break
+		}
+
 		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
 		if err == nil && len(resp) > 0 {
 			break
