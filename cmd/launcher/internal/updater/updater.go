@@ -90,6 +90,7 @@ type updaterCmd struct {
 	cancel                  context.CancelFunc
 	stopChan                chan bool
 	stopExecution           func()
+	stopped                 bool
 	config                  *UpdaterConfig
 	runUpdaterRetryInterval time.Duration
 }
@@ -145,6 +146,11 @@ func (u *updaterCmd) execute() error {
 }
 
 func (u *updaterCmd) interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if u.stopped {
+		return
+	}
+	u.stopped = true
 
 	level.Info(u.config.Logger).Log("msg", "updater interrupted")
 
