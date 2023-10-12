@@ -12,8 +12,9 @@ import (
 )
 
 type Processes struct {
-	kolideCount int
-	data        map[string]any
+	kolideCount         int
+	kolideRunningAsRoot bool
+	data                map[string]any
 }
 
 func (c *Processes) Name() string {
@@ -36,7 +37,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 
 	for _, p := range ps {
 		// This doesn't feel great yet. I'm not sure what data we need, and some of the gopsutil stuff has
-		// weird extraneous exec routines. So this is a starting point
+		// weird extraneous exec routines. So this is a starting point.
 		pMap := map[string]any{
 			"pid":         p.Pid,
 			"exe":         naIfError(p.ExeWithContext(ctx)),
@@ -48,6 +49,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 			"cpu_times":   naIfError(p.TimesWithContext(ctx)),
 			"status":      naIfError(p.StatusWithContext(ctx)),
 			"uids":        naIfError(p.UidsWithContext(ctx)),
+			"username":    naIfError(p.UsernameWithContext(ctx)),
 		}
 		_ = jsonWriter.Encode(pMap)
 
@@ -55,6 +57,13 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		if strings.Contains(strings.ToLower(exe), "kolide") {
 			c.kolideCount += 1
 			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
+
+			if !c.kolideRunningAsRoot {
+				username := pMap["username"].(string)
+				if username == "root" || username == "NT AUTHORITY\\SYSTEM" {
+					c.kolideRunningAsRoot = true
+				}
+			}
 		}
 	}
 
@@ -66,7 +75,7 @@ func (c *Processes) ExtraFileName() string {
 }
 
 func (c *Processes) Status() Status {
-	if c.kolideCount >= 2 {
+	if c.kolideCount >= 2 && c.kolideRunningAsRoot {
 		return Passing
 	}
 
@@ -74,7 +83,11 @@ func (c *Processes) Status() Status {
 }
 
 func (c *Processes) Summary() string {
-	return fmt.Sprintf("found %d kolide processes", c.kolideCount)
+	if c.kolideRunningAsRoot {
+		return fmt.Sprintf("found %d kolide processes, at least one running as root or system", c.kolideCount)
+	}
+
+	return fmt.Sprintf("found %d kolide processes, none running as root or system", c.kolideCount)
 }
 
 func (c *Processes) Data() map[string]any {
