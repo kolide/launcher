@@ -258,7 +258,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	osquerygotraces.SetTracerProvider(newProvider)
 
 	if t.provider != nil {
-		t.provider.Shutdown(context.Background())
+		t.provider.Shutdown(t.ctx)
 	}
 
 	t.provider = newProvider
@@ -280,7 +280,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 	t.interrupted = true
 
 	if t.provider != nil {
-		t.provider.Shutdown(context.Background())
+		t.provider.Shutdown(t.ctx)
 	}
 
 	t.cancel()
@@ -319,7 +319,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
 			if t.provider != nil {
-				t.provider.Shutdown(context.Background())
+				t.provider.Shutdown(t.ctx)
 			}
 			t.enabled = false
 			level.Debug(t.logger).Log("msg", "disabling trace export")
