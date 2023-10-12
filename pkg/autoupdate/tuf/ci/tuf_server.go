@@ -168,6 +168,7 @@ func compress(t *testing.T, outFileName string, outFileDir string, targetDir str
 		if binary == "osqueryd" {
 			appBundleName = "osquery.app"
 		}
+
 		srcFilePath = filepath.Join(appBundleName, "Contents", "MacOS", binary)
 
 		// Create directory structure for app bundle
