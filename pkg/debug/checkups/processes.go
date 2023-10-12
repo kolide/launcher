@@ -58,13 +58,11 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 			c.kolideCount += 1
 			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
 
-			if c.kolideRunningAsRoot {
-				continue
-			}
-
-			username := pMap["username"].(string)
-			if username == "root" || username == "NT AUTHORITY\\SYSTEM" {
-				c.kolideRunningAsRoot = true
+			if !c.kolideRunningAsRoot {
+				username := pMap["username"].(string)
+				if username == "root" || username == "NT AUTHORITY\\SYSTEM" {
+					c.kolideRunningAsRoot = true
+				}
 			}
 		}
 	}
