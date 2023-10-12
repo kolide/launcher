@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -256,46 +257,53 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	}
 }
 
-type runtimeEnvironmentTyp string
+type RuntimeEnvironmentType string
 
 const (
-	StandaloneEnviroment runtimeEnvironmentTyp = "standalone"
-	InSituEnvironment    runtimeEnvironmentTyp = "in situ"
+	StandaloneEnviroment RuntimeEnvironmentType = "standalone"
+	InSituEnvironment    RuntimeEnvironmentType = "in situ"
 )
 
-func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.Writer, runtimeEnvironment runtimeEnvironmentTyp) error {
+func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment RuntimeEnvironmentType) error {
 	flare := zip.NewWriter(flareStream)
-	defer func() {
-		_ = flare.Close()
-	}()
-
-	// zip can only handle one file being written at a time. So defer writing the summary till the end
 	combinedSummary := bytes.Buffer{}
-	defer func() {
-		zipSummary, err := flare.Create("doctor.log")
-		if err != nil {
-			// Oh well
-			return
+
+	close := func() error {
+		closeFlares := func() error {
+			return errors.Join(flare.Close(), flareStream.Close())
 		}
 
-		zipSummary.Write(combinedSummary.Bytes())
-	}()
+		// zip can only handle one file being written at a time. So defer writing the summary till the end
+		zipSummary, err := flare.Create("doctor.log")
+		if err != nil {
+			return errors.Join(fmt.Errorf("creating doctor.log: %w", err), closeFlares())
+		}
+
+		if _, err := zipSummary.Write(combinedSummary.Bytes()); err != nil {
+			return errors.Join(fmt.Errorf("writing doctor.log: %w", err), closeFlares())
+		}
+
+		return closeFlares()
+	}
 
 	// Note our runtime context.
 	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
-	writeFlareEnv(flare, runtimeEnvironment)
+	if err := writeFlareEnv(flare, runtimeEnvironment); err != nil {
+		return errors.Join(fmt.Errorf("writing flare environment: %w", err), close())
+	}
 
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
-			return fmt.Errorf("writing flare file: %w", err)
+			return errors.Join(fmt.Errorf("writing flare zip: %w", err), close())
 		}
 	}
 
-	return nil
+	// we could defer this close, but we want to return any errors
+	return close()
 }
 
-func writeFlareEnv(z *zip.Writer, runtimeEnvironment runtimeEnvironmentTyp) error {
+func writeFlareEnv(z *zip.Writer, runtimeEnvironment RuntimeEnvironmentType) error {
 	if _, err := z.Create(fmt.Sprintf("FLARE_RUNNING_%s", strings.ReplaceAll(strings.ToUpper(string(runtimeEnvironment)), " ", "_"))); err != nil {
 		return fmt.Errorf("making env note file: %s", err)
 	}

@@ -16,7 +16,7 @@ func runDoctor(args []string) error {
 	// Doctor assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	launcher.DefaultAutoupdate = true
-	setDefaultPaths()
+	launcher.SetDefaultPaths()
 
 	opts, err := launcher.ParseOptions("doctor", os.Args[2:])
 	if err != nil {
