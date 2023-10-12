@@ -170,7 +170,16 @@ func runSubcommands() error {
 func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	newerBinary, err := latestLauncherPath(ctx, logger)
 	if err != nil {
-		level.Info(logger).Log("msg", "could not get updated version", "err", err)
+		level.Error(logger).Log(
+			"msg", "could not check out latest launcher, will fall back to old autoupdate library",
+			"err", err,
+		)
+
+		// Fall back to legacy autoupdate library
+		newerBinary, err = autoupdate.FindNewestSelf(ctx)
+		if err != nil {
+			return
+		}
 	}
 
 	if newerBinary == "" {

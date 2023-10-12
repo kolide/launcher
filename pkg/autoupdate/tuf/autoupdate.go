@@ -67,6 +67,7 @@ type TufAutoupdater struct {
 	checkInterval          time.Duration
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
+	interrupted            bool
 	signalRestart          chan error
 	logger                 log.Logger
 	restartFuncs           map[autoupdatableBinary]func() error
@@ -217,6 +218,12 @@ func (ta *TufAutoupdater) Execute() (err error) {
 }
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if ta.interrupted {
+		return
+	}
+	ta.interrupted = true
+
 	ta.interrupt <- struct{}{}
 }
 
@@ -317,7 +324,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// Only perform restarts if we're configured to use this new autoupdate library,
 	// to prevent performing unnecessary restarts.
-	if !usingNewAutoupdater(ta.channel) {
+	if !ChannelUsesNewAutoupdater(ta.channel) {
 		return nil
 	}
 
