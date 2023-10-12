@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-
 	"github.com/go-kit/kit/log/level"
+
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/debug/shipper"
@@ -45,6 +45,7 @@ func New(logger log.Logger, knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
+		logger:   logger,
 		newFlareStream: func(note, uploadRequestURL string) (io.WriteCloser, error) {
 			return shipper.New(knapsack, shipper.WithNote(note), shipper.WithUploadRequestURL(uploadRequestURL))
 		},
