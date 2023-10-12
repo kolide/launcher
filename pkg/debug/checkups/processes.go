@@ -36,7 +36,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 
 	for _, p := range ps {
 		// This doesn't feel great yet. I'm not sure what data we need, and some of the gopsutil stuff has
-		// weird extraneous exec routines. So this is a starting point
+		// weird extraneous exec routines. So this is a starting point.
 		pMap := map[string]any{
 			"pid":         p.Pid,
 			"exe":         naIfError(p.ExeWithContext(ctx)),
@@ -48,6 +48,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 			"cpu_times":   naIfError(p.TimesWithContext(ctx)),
 			"status":      naIfError(p.StatusWithContext(ctx)),
 			"uids":        naIfError(p.UidsWithContext(ctx)),
+			"username":    naIfError(p.UsernameWithContext(ctx)),
 		}
 		_ = jsonWriter.Encode(pMap)
 
