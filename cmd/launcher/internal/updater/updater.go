@@ -104,7 +104,7 @@ func (u *updaterCmd) execute() error {
 
 	select {
 	case <-u.stopChan:
-		level.Debug(u.config.Logger).Log("msg", "updater stopped requested during initial delay, Breaking loop")
+		level.Debug(u.config.Logger).Log("msg", "updater stopped requested during initial delay, breaking loop")
 		return nil
 	case <-time.After(u.config.InitialDelay):
 		level.Debug(u.config.Logger).Log("msg", "updater initial delay complete")
