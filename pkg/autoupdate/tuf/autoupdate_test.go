@@ -89,7 +89,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
 
 	// Set the check interval to something short so we can make a couple requests to our test metadata server
-	autoupdater.checkInterval = 1 * time.Second
+	autoupdater.checkInterval = 100 * time.Millisecond
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -119,7 +119,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
 	go autoupdater.Execute()
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -164,7 +164,7 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
 
 	// Set the check interval to something short so we can make a couple requests to our test metadata server
-	autoupdater.checkInterval = 1 * time.Second
+	autoupdater.checkInterval = 100 * time.Millisecond
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -194,7 +194,7 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 
 	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
 	go autoupdater.Execute()
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -207,7 +207,7 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 
 	// The autoupdater won't stop on its own, so stop it
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestExecute_osquerydUpdate(t *testing.T) {
@@ -239,7 +239,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
 
 	// Set the check interval to something short so we can make a couple requests to our test metadata server
-	autoupdater.checkInterval = 1 * time.Second
+	autoupdater.checkInterval = 100 * time.Millisecond
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -265,7 +265,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -282,13 +282,13 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestExecute_withInitialDelay(t *testing.T) {
 	t.Parallel()
 
-	initialDelay := 5 * time.Second
+	initialDelay := 500 * time.Millisecond
 
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
@@ -323,11 +323,11 @@ func TestExecute_withInitialDelay(t *testing.T) {
 
 	// Let the autoupdater run for less than the initial delay
 	go autoupdater.Execute()
-	time.Sleep(3 * time.Second)
+	time.Sleep(300 * time.Millisecond)
 
 	// Shut down the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	// Assert expectation that we closed the library
 	mockLibraryManager.AssertExpectations(t)
@@ -389,7 +389,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
-	time.Sleep(3 * time.Second)
+	time.Sleep(300 * time.Millisecond)
 	autoupdater.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -509,15 +509,15 @@ func Test_storeError(t *testing.T) {
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Set the check interval to something short so we can accumulate some errors
-	autoupdater.checkInterval = 1 * time.Second
+	autoupdater.checkInterval = 100 * time.Millisecond
 
 	// Start the autoupdater going
 	go autoupdater.Execute()
 
 	// Wait 5 seconds to accumulate errors, stop it, and give it a second to shut down
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	// Confirm that we saved the errors
 	errorCount := 0
