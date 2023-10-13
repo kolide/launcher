@@ -1,7 +1,7 @@
 package tufci
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,33 +15,17 @@ import (
 	"github.com/theupdateframework/go-tuf"
 )
 
-var (
-	//go:embed testdata/darwin_launcher.tar.gz
-	darwinLauncher []byte
-	//go:embed testdata/darwin_osqueryd.tar.gz
-	darwinOsqueryd []byte
-	//go:embed testdata/linux_launcher.tar.gz
-	linuxLauncher []byte
-	//go:embed testdata/linux_osqueryd.tar.gz
-	linuxOsqueryd []byte
-	//go:embed testdata/windows_launcher.tar.gz
-	windowsLauncher []byte
-	//go:embed testdata/windows_osqueryd.tar.gz
-	windowsOsqueryd []byte
+//go:embed testdata/*.tar.gz
+var testTarballs embed.FS
 
-	tarballContentsMap = map[string]map[string][]byte{
-		"launcher": {
-			"darwin":  darwinLauncher,
-			"linux":   linuxLauncher,
-			"windows": windowsLauncher,
-		},
-		"osqueryd": {
-			"darwin":  darwinOsqueryd,
-			"linux":   linuxOsqueryd,
-			"windows": windowsOsqueryd,
-		},
-	}
-)
+func getTarballContents(t *testing.T, binary string) []byte {
+	tarballName := fmt.Sprintf("testdata/%s_%s.tar.gz", runtime.GOOS, binary)
+
+	contents, err := testTarballs.ReadFile(tarballName)
+	require.NoError(t, err)
+
+	return contents
+}
 
 // InitRemoteTufServer sets up a local TUF repo with some targets to serve metadata about; returns the URL
 // of a test HTTP server to serve that metadata and the root JSON needed to initialize a client.
@@ -88,7 +72,7 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 
 				f, err := os.Create(filepath.Join(stagedTargetsDir, binaryFileName))
 				require.NoError(t, err)
-				_, err = f.Write(tarballContentsMap[b][runtime.GOOS])
+				_, err = f.Write(getTarballContents(t, b))
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			} else {
