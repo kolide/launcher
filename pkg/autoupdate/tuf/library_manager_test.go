@@ -480,10 +480,17 @@ func TestTidyLibrary(t *testing.T) {
 						executablePath = strings.TrimSuffix(executablePath, ".exe")
 					}
 
-					tufci.CopyBinary(t, executablePath)
-
 					if isExecutable {
+						tufci.CopyBinary(t, executablePath)
 						require.NoError(t, os.Chmod(executablePath, 0755))
+					} else {
+						// Create a non-executable file at `executablePath`
+						require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+						f, err := os.Create(executablePath)
+						require.NoError(t, err, "creating non-executable file for test")
+						_, err = f.Write([]byte("test"))
+						require.NoError(t, err, "writing non-executable file for test")
+						f.Close()
 					}
 				}
 
