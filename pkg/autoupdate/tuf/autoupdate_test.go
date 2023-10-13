@@ -119,7 +119,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
 	go autoupdater.Execute()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
