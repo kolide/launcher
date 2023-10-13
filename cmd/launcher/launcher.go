@@ -27,6 +27,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -306,6 +307,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		// register accelerate control consumer
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
+
+		// register flare consumer
+		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(logger, k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
