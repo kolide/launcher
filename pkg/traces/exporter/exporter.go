@@ -13,7 +13,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
@@ -56,7 +55,9 @@ type TraceExporter struct {
 	disableIngestTLS          bool
 	enabled                   bool
 	traceSamplingRate         float64
-	interrupt                 chan struct{}
+	ctx                       context.Context
+	cancel                    context.CancelFunc
+	interrupted               bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -74,6 +75,8 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 
 	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	t := &TraceExporter{
 		providerLock:              sync.Mutex{},
 		knapsack:                  k,
@@ -87,7 +90,8 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		disableIngestTLS:          k.DisableTraceIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
-		interrupt:                 make(chan struct{}),
+		ctx:                       ctx,
+		cancel:                    cancel,
 	}
 
 	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
@@ -172,17 +176,30 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 
 	// The osqueryd client may not have initialized yet, so retry for up to three minutes on error.
 	var resp []map[string]string
-	if err := backoff.WaitFor(func() error {
-		var err error
+	var err error
+	retryTimeout := time.Now().Add(3 * time.Minute)
+	for {
+		if time.Now().After(retryTimeout) {
+			err = errors.New("could not get osquery details before timeout")
+			break
+		}
+
 		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
-		if err != nil {
-			return err
+		if err == nil && len(resp) > 0 {
+			break
 		}
-		if len(resp) == 0 {
-			return errors.New("no results returned")
+
+		select {
+		case <-t.ctx.Done():
+			level.Debug(t.logger).Log("msg", "trace exporter interrupted while waiting to add osquery attributes")
+			return
+		case <-time.After(osqueryClientRecheckInterval):
+			continue
 		}
-		return nil
-	}, 3*time.Minute, osqueryClientRecheckInterval); err != nil {
+	}
+
+	if err != nil || len(resp) == 0 {
+		level.Debug(t.logger).Log("msg", "trace exporter could not fetch osquery attributes", "err", err)
 		return
 	}
 
@@ -209,7 +226,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	}
 
 	traceClient := otlptracegrpc.NewClient(opts...)
-	exp, err := otlptrace.New(context.Background(), traceClient)
+	exp, err := otlptrace.New(t.ctx, traceClient)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
 		return
@@ -241,7 +258,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	osquerygotraces.SetTracerProvider(newProvider)
 
 	if t.provider != nil {
-		t.provider.Shutdown(context.Background())
+		t.provider.Shutdown(t.ctx)
 	}
 
 	t.provider = newProvider
@@ -250,16 +267,23 @@ func (t *TraceExporter) setNewGlobalProvider() {
 // Execute is a no-op -- the exporter is already running in the background. The TraceExporter
 // otherwise only responds to control server events.
 func (t *TraceExporter) Execute() error {
-	<-t.interrupt
+	<-t.ctx.Done()
 	return nil
 }
 
 func (t *TraceExporter) Interrupt(_ error) {
-	if t.provider != nil {
-		t.provider.Shutdown(context.Background())
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if t.interrupted {
+		return
 	}
 
-	t.interrupt <- struct{}{}
+	t.interrupted = true
+
+	if t.provider != nil {
+		t.provider.Shutdown(t.ctx)
+	}
+
+	t.cancel()
 }
 
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
@@ -295,7 +319,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
 			if t.provider != nil {
-				t.provider.Shutdown(context.Background())
+				t.provider.Shutdown(t.ctx)
 			}
 			t.enabled = false
 			level.Debug(t.logger).Log("msg", "disabling trace export")

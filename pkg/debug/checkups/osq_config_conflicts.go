@@ -8,8 +8,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-
-	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 // osqConfigConflictCheckup is a checkup intended to search for
@@ -17,7 +15,6 @@ import (
 // this is accomplished by checking for the presence of, and contents within
 // any default osquery config directories for the target OS
 type osqConfigConflictCheckup struct {
-	k       types.Knapsack
 	status  Status
 	summary string
 	data    map[string]any
