@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -28,8 +29,8 @@ type LogShipper struct {
 	//baseLogger is for logShipper interal logging
 	baseLogger        log.Logger
 	knapsack          types.Knapsack
-	ctx               context.Context
 	stopFunc          context.CancelFunc
+	stopFuncMutex     sync.Mutex
 	isShippingEnabled bool
 }
 
@@ -46,16 +47,13 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	// setting a ulid as session_ulid allows us to follow a single run of launcher
 	shippingLogger := log.With(log.NewJSONLogger(sendBuffer), "caller", log.Caller(6), "session_ulid", ulid.New())
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	ls := &LogShipper{
 		sender:         sender,
 		sendBuffer:     sendBuffer,
 		shippingLogger: shippingLogger,
 		baseLogger:     log.With(baseLogger, "component", "logshipper"),
 		knapsack:       k,
-		ctx:            ctx,
-		stopFunc:       cancel,
+		stopFuncMutex:  sync.Mutex{},
 	}
 
 	ls.Ping()
@@ -92,10 +90,19 @@ func (ls *LogShipper) Ping() {
 }
 
 func (ls *LogShipper) Run() error {
-	return ls.sendBuffer.Run(ls.ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ls.stopFuncMutex.Lock()
+	ls.stopFunc = cancel
+	ls.stopFuncMutex.Unlock()
+
+	return ls.sendBuffer.Run(ctx)
 }
 
 func (ls *LogShipper) Stop(_ error) {
+	ls.stopFuncMutex.Lock()
+	defer ls.stopFuncMutex.Unlock()
+
 	ls.stopFunc()
 }
 
