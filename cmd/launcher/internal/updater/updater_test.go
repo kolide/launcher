@@ -3,6 +3,7 @@ package updater
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/kolide/updater/tuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_updaterCmd_execute(t *testing.T) {
@@ -229,4 +231,61 @@ func Test_updaterCmd_interrupt(t *testing.T) {
 			wg.Wait()
 		})
 	}
+}
+
+func Test_updaterCmd_interrupt_multiple(t *testing.T) {
+	t.Parallel()
+
+	sigChannel := make(chan os.Signal, 1)
+	logger := log.NewNopLogger()
+	autoupdater := &mocks.Updater{}
+	autoupdater.On("Run", mock.Anything, mock.Anything).Return(func() {}, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	u := &updaterCmd{
+		updater:  autoupdater,
+		ctx:      ctx,
+		cancel:   cancel,
+		stopChan: make(chan bool),
+		config: &UpdaterConfig{
+			Logger:             logger,
+			AutoupdateInterval: 1 * time.Second,
+			InitialDelay:       10 * time.Second,
+			SigChannel:         sigChannel,
+		},
+		runUpdaterRetryInterval: 30 * time.Minute,
+	}
+
+	go u.execute()
+	time.Sleep(3 * time.Second)
+	u.interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			u.interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }

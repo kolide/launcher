@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -29,6 +30,7 @@ type LogShipper struct {
 	baseLogger        log.Logger
 	knapsack          types.Knapsack
 	stopFunc          context.CancelFunc
+	stopFuncMutex     sync.Mutex
 	isShippingEnabled bool
 }
 
@@ -51,6 +53,7 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 		shippingLogger: shippingLogger,
 		baseLogger:     log.With(baseLogger, "component", "logshipper"),
 		knapsack:       k,
+		stopFuncMutex:  sync.Mutex{},
 	}
 
 	ls.Ping()
@@ -88,12 +91,21 @@ func (ls *LogShipper) Ping() {
 
 func (ls *LogShipper) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	ls.stopFuncMutex.Lock()
 	ls.stopFunc = cancel
+	ls.stopFuncMutex.Unlock()
+
 	return ls.sendBuffer.Run(ctx)
 }
 
 func (ls *LogShipper) Stop(_ error) {
-	ls.stopFunc()
+	ls.stopFuncMutex.Lock()
+	defer ls.stopFuncMutex.Unlock()
+
+	if ls.stopFunc != nil {
+		ls.stopFunc()
+	}
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
