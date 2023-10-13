@@ -343,9 +343,9 @@ func TestControllerOverride(t *testing.T) {
 	}{
 		{
 			name:       "happy path",
-			valueToSet: 8 * time.Second,
-			interval:   6 * time.Second,
-			duration:   2 * time.Second,
+			valueToSet: 8 * time.Second, // cannot be below 5 seconds for control request interval
+			interval:   6 * time.Second, // cannot be below 5 seconds for control request interval
+			duration:   100 * time.Millisecond,
 		},
 	}
 	for _, tt := range tests {
