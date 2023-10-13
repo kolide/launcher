@@ -103,7 +103,9 @@ func (ls *LogShipper) Stop(_ error) {
 	ls.stopFuncMutex.Lock()
 	defer ls.stopFuncMutex.Unlock()
 
-	ls.stopFunc()
+	if ls.stopFunc != nil {
+		ls.stopFunc()
+	}
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {

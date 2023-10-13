@@ -136,6 +136,26 @@ func TestStop_Multiple(t *testing.T) {
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
+func TestStopWithoutRun(t *testing.T) {
+	t.Parallel()
+
+	knapsack := mocks.NewKnapsack(t)
+	tokenStore := testTokenStore(t)
+	authToken := ulid.New()
+
+	knapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
+
+	endpoint := "https://someurl"
+	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
+	knapsack.On("Debug").Return(true)
+
+	ls := New(knapsack, log.NewNopLogger())
+
+	ls.Stop(errors.New("test error"))
+}
+
 func testTokenStore(t *testing.T) types.KVStore {
 	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
