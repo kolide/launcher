@@ -58,7 +58,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// We expect a total of 12 attributes: 3 initial attributes, 5 from the ServerProvidedDataStore, and 4 from osquery
 	traceExporter.attrLock.RLock()

@@ -119,20 +119,36 @@ func TestExecute_launcherUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
 	go autoupdater.Execute()
-	time.Sleep(1 * time.Second)
+
+	// Wait up to 5 seconds to confirm we see log files `received interrupt to restart launcher after update, stopping`, indicating that
+	// the autoupdater shut down at the end
+	shutdownDeadline := time.Now().Add(5 * time.Second).Unix()
+	for {
+		if time.Now().Unix() > shutdownDeadline {
+			t.Error("autoupdater did not shut down within 5 seconds")
+			t.FailNow()
+		}
+
+		// Wait for Execute to do its thing
+		time.Sleep(100 * time.Millisecond)
+
+		logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
+		autoupdaterInterrupted := false
+		for _, line := range logLines {
+			if strings.Contains(line, "received interrupt to restart launcher after update, stopping") {
+				autoupdaterInterrupted = true
+				break
+			}
+		}
+
+		if autoupdaterInterrupted {
+			break
+		}
+	}
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
-	// Check log lines to confirm that we see the log `received interrupt to restart launcher after update, stopping`, indicating that
-	// the autoupdater shut down at the end
-	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-
-	// We expect at least 1 log for the shutdown line.
-	require.GreaterOrEqual(t, len(logLines), 1)
-
-	// Check that we shut down
-	require.Contains(t, logLines[len(logLines)-1], "received interrupt to restart launcher after update, stopping")
 }
 
 func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) {
