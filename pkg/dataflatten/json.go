@@ -15,13 +15,14 @@ func JsonFile(file string, opts ...FlattenOpts) ([]Row, error) {
 		return nil, err
 	}
 
-	// Attempt to decode utf16 data.
-	valid_json := json.Valid(rawdata)
-	if !valid_json {
-		rawdata, _, err = transform.Bytes(unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder(), rawdata)
-		if err != nil {
-			return nil, err
-		}
+	if json.Valid(rawdata) {
+		return Json(rawdata, opts...)
+	}
+
+	// We don't have valid json data, so try to convert possible utf16 data to utf8.
+	rawdata, _, err = transform.Bytes(unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder(), rawdata)
+	if err != nil {
+		return nil, fmt.Errorf("invalid json. attempt to transform from utf16 to utf8: %w", err)
 	}
 
 	return Json(rawdata, opts...)
