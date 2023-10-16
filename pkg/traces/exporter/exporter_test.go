@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"testing"
@@ -108,6 +109,56 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	}
 
 	mockKnapsack.AssertExpectations(t)
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	tokenStore := testTokenStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
+	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
+	mockKnapsack.On("ExportTraces").Return(false)
+	mockKnapsack.On("TraceSamplingRate").Return(0.0)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
+	require.NoError(t, err)
+	mockKnapsack.AssertExpectations(t)
+
+	go traceExporter.Execute()
+	time.Sleep(3 * time.Second)
+	traceExporter.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			traceExporter.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
 func Test_addDeviceIdentifyingAttributes(t *testing.T) {
@@ -314,6 +365,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				}, nil)
 			}
 
+			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				osqueryClient:             osqueryClient,
@@ -326,6 +378,8 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.currentEnableValue,
 				traceSamplingRate:         1.0,
+				ctx:                       ctx,
+				cancel:                    cancel,
 			}
 
 			traceExporter.FlagsChanged(keys.ExportTraces)
@@ -380,6 +434,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("TraceSamplingRate").Return(tt.newTraceSamplingRate)
 			osqueryClient := mocks.NewQuerier(t)
 
+			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				osqueryClient:             osqueryClient,
@@ -392,6 +447,8 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         tt.currentTraceSamplingRate,
+				ctx:                       ctx,
+				cancel:                    cancel,
 			}
 
 			traceExporter.FlagsChanged(keys.TraceSamplingRate)
@@ -445,6 +502,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("TraceIngestServerURL").Return(tt.newObservabilityIngestServerURL)
 			osqueryClient := mocks.NewQuerier(t)
 
+			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				osqueryClient:             osqueryClient,
@@ -457,6 +515,8 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
+				ctx:                       ctx,
+				cancel:                    cancel,
 			}
 
 			traceExporter.FlagsChanged(keys.TraceIngestServerURL)
@@ -512,6 +572,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
 
+			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				osqueryClient:             osqueryClient,
@@ -524,6 +585,8 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				disableIngestTLS:          tt.currentDisableTraceIngestTLS,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
+				ctx:                       ctx,
+				cancel:                    cancel,
 			}
 
 			traceExporter.FlagsChanged(keys.DisableTraceIngestTLS)
