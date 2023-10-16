@@ -20,8 +20,8 @@ func TestFlagValueOverride(t *testing.T) {
 		{
 			name:          "happy path",
 			key:           keys.ControlRequestInterval,
-			overrideValue: 1 * time.Second,
-			duration:      2 * time.Second,
+			overrideValue: 100 * time.Millisecond,
+			duration:      200 * time.Millisecond,
 		},
 	}
 	for _, tt := range tests {
@@ -59,8 +59,8 @@ func TestFlagValueOverrideRestart(t *testing.T) {
 		{
 			name:          "happy path",
 			key:           keys.ControlRequestInterval,
-			overrideValue: 1 * time.Second,
-			duration:      2 * time.Second,
+			overrideValue: 100 * time.Millisecond,
+			duration:      200 * time.Millisecond,
 		},
 	}
 	for _, tt := range tests {
