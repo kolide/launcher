@@ -19,6 +19,14 @@ type BinaryUpdateInfo struct {
 	Version string
 }
 
+func (b *BinaryUpdateInfo) String() string {
+	if b.Version != "" {
+		return fmt.Sprintf("%s at %s", b.Version, b.Path)
+	}
+
+	return b.Path
+}
+
 type autoupdateConfig struct {
 	rootDirectory        string
 	updateDirectory      string
@@ -103,7 +111,7 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 	}
 
 	if updateDirectory == "" {
-		updateDirectory = defaultLibraryDirectory(rootDirectory)
+		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
 	update, err := findExecutableFromRelease(binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
