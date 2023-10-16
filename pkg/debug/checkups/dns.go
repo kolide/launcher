@@ -10,12 +10,18 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
-type dnsCheckup struct {
-	k       types.Knapsack
-	status  Status
-	summary string
-	data    map[string]any
-}
+type (
+	Resolver interface {
+		LookupHost(ctx context.Context, host string) ([]string, error)
+	}
+	dnsCheckup struct {
+		k        types.Knapsack
+		status   Status
+		summary  string
+		data     map[string]any
+		resolver Resolver
+	}
+)
 
 func (nc *dnsCheckup) Data() map[string]any  { return nc.data }
 func (nc *dnsCheckup) ExtraFileName() string { return "" }
@@ -24,6 +30,9 @@ func (nc *dnsCheckup) Status() Status        { return nc.status }
 func (nc *dnsCheckup) Summary() string       { return nc.summary }
 
 func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
+	if dc.resolver == nil {
+		dc.resolver = &net.Resolver{}
+	}
 	hosts := []string{
 		dc.k.KolideServerURL(),
 		dc.k.ControlServerURL(),
@@ -34,7 +43,6 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 
 	dc.data = make(map[string]any)
 	attemptedCount, successCount := 0, 0
-	resolver := &net.Resolver{}
 
 	for _, host := range hosts {
 		if len(strings.TrimSpace(host)) == 0 {
@@ -47,7 +55,7 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
-		ips, err := resolveHost(resolver, hostUrl.Hostname())
+		ips, err := dc.resolveHost(ctx, hostUrl.Hostname())
 		// keep attemptedCount as a separate variable to avoid indicating failures where we didn't even try
 		attemptedCount++
 
@@ -76,11 +84,11 @@ func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func resolveHost(resolver *net.Resolver, host string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+func (dc *dnsCheckup) resolveHost(ctx context.Context, host string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
-	ips, err := resolver.LookupHost(ctx, host)
+	ips, err := dc.resolver.LookupHost(ctx, host)
 
 	if err != nil {
 		return "", err

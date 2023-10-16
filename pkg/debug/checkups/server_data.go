@@ -2,13 +2,9 @@ package checkups
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"strings"
 
-	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"go.etcd.io/bbolt"
 )
 
 var serverProvidedDataKeys = []string{
@@ -33,50 +29,32 @@ func (sdc *serverDataCheckup) Status() Status        { return sdc.status }
 func (sdc *serverDataCheckup) Summary() string       { return sdc.summary }
 
 func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error {
-	db := sdc.k.BboltDB()
+	store := sdc.k.ServerProvidedDataStore()
 	sdc.data = make(map[string]any)
 
-	if db == nil {
+	if store == nil {
 		sdc.status = Warning
-		sdc.summary = "no bbolt DB connection in knapsack"
+		sdc.summary = "no server_data store in knapsack"
 		return nil
 	}
 
-	if err := db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(storage.ServerProvidedDataStore))
-		if b == nil {
-			return fmt.Errorf("unable to access bbolt bucket (%s)", storage.ServerProvidedDataStore)
+	// set up the default failure states, we will overwrite when we get the required data
+	sdc.status = Failing
+	sdc.summary = "unable to collect server data"
+	for _, key := range serverProvidedDataKeys {
+		val, err := store.Get([]byte(key))
+		if err != nil {
+			sdc.data[key] = err.Error()
+			continue
 		}
 
-		for _, key := range serverProvidedDataKeys {
-			val := b.Get([]byte(key))
-			if val == nil {
-				continue
-			}
-
-			sdc.data[key] = string(val)
+		if key == "device_id" && string(val) != "" {
+			sdc.status = Passing
+			sdc.summary = "successfully collected server data"
 		}
 
-		return nil
-	}); err != nil {
-		sdc.status = Erroring
-		sdc.data["error"] = err.Error()
-		sdc.summarize()
-		return nil
+		sdc.data[key] = string(val)
 	}
-
-	sdc.status = Passing
-	sdc.summarize()
 
 	return nil
-}
-
-func (sdc *serverDataCheckup) summarize() {
-	summary := make([]string, 0)
-
-	for k, v := range sdc.data {
-		summary = append(summary, fmt.Sprintf("%s: %s", k, v))
-	}
-
-	sdc.summary = fmt.Sprintf("collected server data: [%s]", strings.Join(summary, ", "))
 }

@@ -45,9 +45,8 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 		hc.data["uptime_friendly"] = fmt.Sprintf("ERROR: %s", err.Error())
 	} else {
 		hc.data["uptime_friendly"] = formatUptime(uptimeRaw)
+		hc.data["uptime"] = uptimeRaw
 	}
-
-	hc.data["uptime"] = uptimeRaw
 
 	if runtime.GOOS == "windows" {
 		hc.data["in_modern_standby"] = hc.k.InModernStandby()
