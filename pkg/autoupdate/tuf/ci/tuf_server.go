@@ -1,10 +1,8 @@
 package tufci
 
 import (
-	"archive/tar"
-	"compress/gzip"
+	"embed"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf"
 )
+
+//go:embed testdata/*.tar.gz
+var testTarballs embed.FS
+
+func getTarballContents(t *testing.T, binary string) []byte {
+	tarballName := fmt.Sprintf("testdata/%s_%s.tar.gz", runtime.GOOS, binary)
+
+	contents, err := testTarballs.ReadFile(tarballName)
+	require.NoError(t, err)
+
+	return contents
+}
 
 // InitRemoteTufServer sets up a local TUF repo with some targets to serve metadata about; returns the URL
 // of a test HTTP server to serve that metadata and the root JSON needed to initialize a client.
@@ -58,15 +68,15 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 			if v == testReleaseVersion {
 				// Create test binary and copy it to the staged targets directory
 				stagedTargetsDir := filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, arch)
-				executablePath := executableLocation(stagedTargetsDir, b)
-				require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0777), "could not make staging directory")
-				CopyBinary(t, executablePath)
-				require.NoError(t, os.Chmod(executablePath, 0755))
+				require.NoError(t, os.MkdirAll(stagedTargetsDir, 0755))
 
-				// Compress the binary or app bundle
-				compress(t, binaryFileName, stagedTargetsDir, stagedTargetsDir, b)
+				f, err := os.Create(filepath.Join(stagedTargetsDir, binaryFileName))
+				require.NoError(t, err)
+				_, err = f.Write(getTarballContents(t, b))
+				require.NoError(t, err)
+				require.NoError(t, f.Close())
 			} else {
-				// Create and commit a test binary
+				// Create a fake test binary
 				require.NoError(t, os.MkdirAll(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, arch), 0777), "could not make staging directory")
 				err = os.WriteFile(filepath.Join(tufDir, "staged", "targets", b, runtime.GOOS, arch, binaryFileName), []byte("I am a test target"), 0777)
 				require.NoError(t, err, "could not write test target binary to temp dir")
@@ -149,76 +159,4 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 	rootJson = metadata["root.json"]
 
 	return tufServerURL, rootJson
-}
-
-func compress(t *testing.T, outFileName string, outFileDir string, targetDir string, binary string) {
-	out, err := os.Create(filepath.Join(outFileDir, outFileName))
-	require.NoError(t, err, "creating archive: %s in %s", outFileName, outFileDir)
-	defer out.Close()
-
-	gw := gzip.NewWriter(out)
-	defer gw.Close()
-
-	tw := tar.NewWriter(gw)
-	defer tw.Close()
-
-	srcFilePath := binary
-	if runtime.GOOS == "darwin" {
-		appBundleName := "Kolide.app"
-		if binary == "osqueryd" {
-			appBundleName = "osquery.app"
-		}
-
-		srcFilePath = filepath.Join(appBundleName, "Contents", "MacOS", binary)
-
-		// Create directory structure for app bundle
-		for _, path := range []string{appBundleName, fmt.Sprintf("%s/Contents", appBundleName), fmt.Sprintf("%s/Contents/MacOS", appBundleName)} {
-			pInfo, err := os.Stat(filepath.Join(targetDir, path))
-			require.NoError(t, err, "stat for app bundle path %s", path)
-
-			hdr, err := tar.FileInfoHeader(pInfo, path)
-			require.NoError(t, err, "creating header for directory %s", path)
-			hdr.Name = path
-
-			require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
-		}
-	} else if runtime.GOOS == "windows" {
-		srcFilePath += ".exe"
-	}
-
-	srcFile, err := os.Open(filepath.Join(targetDir, srcFilePath))
-	require.NoError(t, err, "opening binary")
-	defer srcFile.Close()
-
-	srcStats, err := srcFile.Stat()
-	require.NoError(t, err, "getting stats to compress binary")
-
-	hdr, err := tar.FileInfoHeader(srcStats, srcStats.Name())
-	require.NoError(t, err, "creating header")
-	hdr.Name = srcFilePath
-
-	require.NoError(t, tw.WriteHeader(hdr), "writing tar header")
-	_, err = io.Copy(tw, srcFile)
-	require.NoError(t, err, "copying file to archive")
-}
-
-// executableLocation returns the path to the executable in `updateDirectory`.
-func executableLocation(updateDirectory string, binary string) string {
-	switch runtime.GOOS {
-	case "darwin":
-		switch binary {
-		case "launcher":
-			return filepath.Join(updateDirectory, "Kolide.app", "Contents", "MacOS", binary)
-		case "osqueryd":
-			return filepath.Join(updateDirectory, "osquery.app", "Contents", "MacOS", binary)
-		default:
-			return ""
-		}
-	case "windows":
-		return filepath.Join(updateDirectory, fmt.Sprintf("%s.exe", binary))
-	case "linux":
-		return filepath.Join(updateDirectory, binary)
-	default:
-		return filepath.Join(updateDirectory, binary)
-	}
 }

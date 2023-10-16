@@ -1,7 +1,6 @@
 package tufci
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,14 +11,5 @@ import (
 func CopyBinary(t *testing.T, executablePath string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
 
-	destFile, err := os.Create(executablePath)
-	require.NoError(t, err, "create destination file")
-	defer destFile.Close()
-
-	srcFile, err := os.Open(os.Args[0])
-	require.NoError(t, err, "opening binary to copy for test")
-	defer srcFile.Close()
-
-	_, err = io.Copy(destFile, srcFile)
-	require.NoError(t, err, "copying binary")
+	require.NoError(t, os.Symlink(os.Args[0], executablePath))
 }
