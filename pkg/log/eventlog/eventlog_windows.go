@@ -5,9 +5,10 @@ package eventlog
 
 import (
 	"bytes"
+	"fmt"
 	"io"
-	"sync"
 	"reflect"
+	"sync"
 
 	"github.com/go-kit/kit/log"
 )
@@ -39,11 +40,13 @@ func (l *eventLogger) Log(keyvals ...interface{}) error {
 	// so we'll do any pre-processing for these types here
 	formattedKeyVals := make([]interface{}, len(keyvals))
 	for idx, val := range keyvals {
-		switch knownValue := val.(type) {
+		rvalue := reflect.ValueOf(val)
+		switch rvalue.Kind() {
 		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
 			formattedKeyVals[idx] = fmt.Sprintf("%+v", val)
 		default:
 			formattedKeyVals[idx] = val
+		}
 	}
 
 	if err := lb.logger.Log(formattedKeyVals...); err != nil {

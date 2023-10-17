@@ -68,7 +68,7 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
 
-		c.logger.Log(
+		level.Debug(c.logger).Log(
 			"checkup", checkup.Name(),
 			"summary", checkup.Summary(),
 			"data", checkup.Data(),
