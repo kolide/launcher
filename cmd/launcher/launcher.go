@@ -44,7 +44,6 @@ import (
 	"github.com/kolide/launcher/pkg/debug"
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
@@ -211,11 +210,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup := rungroup.NewRunGroup(logger)
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
-	checkpointLogger := log.With(logutil.NewServerLogger(true))
-	checkpointer := checkups.NewCheckupLogger(
-		teelogger.New(checkpointLogger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))),
-		k,
-	)
+	checkpointer := checkups.NewCheckupLogger(logger, k)
 	checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
