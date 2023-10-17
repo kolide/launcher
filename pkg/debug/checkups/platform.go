@@ -52,7 +52,7 @@ func (c *Platform) Summary() string {
 	return fmt.Sprintf("platform: %s, architecture: %s", runtime.GOOS, runtime.GOARCH)
 }
 
-func (c *Platform) Data() map[string]any {
+func (c *Platform) Data() any {
 	return map[string]any{
 		"platform":     runtime.GOOS,
 		"architecture": runtime.GOARCH,

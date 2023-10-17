@@ -16,7 +16,7 @@ import (
 func New(w *Writer) log.Logger {
 	l := &eventLogger{
 		w:         w,
-		newLogger: log.NewLogfmtLogger,
+		newLogger: log.NewJSONLogger,
 		bufPool: sync.Pool{New: func() interface{} {
 			return &loggerBuf{}
 		}},
@@ -33,6 +33,7 @@ type eventLogger struct {
 func (l *eventLogger) Log(keyvals ...interface{}) error {
 	lb := l.getLoggerBuf()
 	defer l.putLoggerBuf(lb)
+
 	if err := lb.logger.Log(keyvals...); err != nil {
 		return err
 	}

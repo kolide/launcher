@@ -20,7 +20,7 @@ type osqConfigConflictCheckup struct {
 	data    map[string]any
 }
 
-func (occ *osqConfigConflictCheckup) Data() map[string]any  { return occ.data }
+func (occ *osqConfigConflictCheckup) Data() any             { return occ.data }
 func (occ *osqConfigConflictCheckup) ExtraFileName() string { return "" }
 func (occ *osqConfigConflictCheckup) Name() string          { return "Osquery Conflicts" }
 func (occ *osqConfigConflictCheckup) Status() Status        { return occ.status }

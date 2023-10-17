@@ -90,7 +90,7 @@ func (c *Processes) Summary() string {
 	return fmt.Sprintf("found %d kolide processes, none running as root or system", c.kolideCount)
 }
 
-func (c *Processes) Data() map[string]any {
+func (c *Processes) Data() any {
 	return c.data
 }
 

@@ -2,9 +2,7 @@ package checkups
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -18,7 +16,7 @@ type (
 		Log(keyvals ...interface{}) error
 	}
 
-	checkPointer struct {
+	logCheckPointer struct {
 		logger      logger
 		knapsack    types.Knapsack
 		interrupt   chan struct{}
@@ -26,8 +24,8 @@ type (
 	}
 )
 
-func NewCheckupLogger(logger logger, k types.Knapsack) *checkPointer {
-	return &checkPointer{
+func NewCheckupLogger(logger logger, k types.Knapsack) *logCheckPointer {
+	return &logCheckPointer{
 		logger:    log.With(logger, "component", "log checkpoint"),
 		knapsack:  k,
 		interrupt: make(chan struct{}, 1),
@@ -36,7 +34,7 @@ func NewCheckupLogger(logger logger, k types.Knapsack) *checkPointer {
 
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
-func (c *checkPointer) Run() error {
+func (c *logCheckPointer) Run() error {
 	ticker := time.NewTicker(time.Minute * 60)
 	defer ticker.Stop()
 
@@ -53,7 +51,7 @@ func (c *checkPointer) Run() error {
 	}
 }
 
-func (c *checkPointer) Interrupt(_ error) {
+func (c *logCheckPointer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if c.interrupted {
 		return
@@ -64,28 +62,17 @@ func (c *checkPointer) Interrupt(_ error) {
 	c.interrupt <- struct{}{}
 }
 
-func (c *checkPointer) Once(ctx context.Context) {
+func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
 
-		logValues := []interface{}{"checkup", checkup.Name()}
-		for k, v := range checkup.Data() {
-			logValues = append(logValues, k, c.summarizeData(v))
-		}
-
-		c.logger.Log(logValues...)
-	}
-}
-
-func (c *checkPointer) summarizeData(data any) any {
-	switch knownValue := data.(type) {
-	case []string:
-		return strings.Join(knownValue, ",")
-	case string, uint, uint64, int, int32, int64:
-		return knownValue
-	default:
-		return fmt.Sprintf("%v", data)
+		level.Debug(c.logger).Log(
+			"checkup", checkup.Name(),
+			"summary", checkup.Summary(),
+			"data", checkup.Data(),
+			"status", checkup.Status(),
+		)
 	}
 }

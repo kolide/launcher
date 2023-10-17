@@ -38,11 +38,12 @@ type (
 	}
 )
 
-func (tc *tufCheckup) Data() map[string]any  { return tc.data }
+func (tc *tufCheckup) Data() any             { return tc.data }
 func (tc *tufCheckup) ExtraFileName() string { return "tuf.json" }
 func (tc *tufCheckup) Name() string          { return "TUF" }
-func (tc *tufCheckup) Status() Status        { return tc.status }
-func (tc *tufCheckup) Summary() string       { return tc.summary }
+
+func (tc *tufCheckup) Status() Status  { return tc.status }
+func (tc *tufCheckup) Summary() string { return tc.summary }
 
 func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	tc.data = make(map[string]any)

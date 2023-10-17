@@ -36,7 +36,7 @@ type (
 	}
 )
 
-func (odc *osqDataCollector) Data() map[string]any  { return odc.data }
+func (odc *osqDataCollector) Data() any             { return odc.data }
 func (odc *osqDataCollector) ExtraFileName() string { return "" }
 func (odc *osqDataCollector) Name() string          { return "Osquery Data" }
 func (odc *osqDataCollector) Status() Status        { return odc.status }
@@ -45,7 +45,7 @@ func (odc *osqDataCollector) Summary() string       { return odc.summary }
 func (odc *osqDataCollector) Run(ctx context.Context, extraFH io.Writer) error {
 	odc.data = make(map[string]any)
 
-	result, err := odc.osqueryInteractive(ctx, osSqlQuery)
+	result, err := odc.queryData(ctx, osSqlQuery)
 	if err != nil {
 		odc.status = Erroring
 		odc.data["error"] = err.Error()
@@ -67,10 +67,10 @@ func (odc *osqDataCollector) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-// osqueryInteractive execs osquery and parses the output to gather some basic host info.
+// queryData sets up a runsimple osq process and parses the output to gather some basic host info.
 // it was done this way to avoid bringing Querier into knapsack for a task that will only be run
 // during flare or doctor
-func (odc *osqDataCollector) osqueryInteractive(ctx context.Context, query string) (map[string]string, error) {
+func (odc *osqDataCollector) queryData(ctx context.Context, query string) (map[string]string, error) {
 	osqPath := odc.k.LatestOsquerydPath(ctx)
 	var resultBuffer bytes.Buffer
 	osqCtx, cmdCancel := context.WithTimeout(ctx, 5*time.Second)

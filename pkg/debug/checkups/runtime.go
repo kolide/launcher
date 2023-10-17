@@ -54,7 +54,7 @@ func (c *runtimeCheckup) Summary() string {
 	return "N/A"
 }
 
-func (c *runtimeCheckup) Data() map[string]any {
+func (c *runtimeCheckup) Data() any {
 	return nil
 }
 
