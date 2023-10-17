@@ -3,6 +3,7 @@ package uninstall
 import (
 	"errors"
 	"os"
+	"runtime"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -12,6 +13,11 @@ import (
 
 func Uninstall(logger log.Logger, knapsack types.Knapsack) {
 	logger = log.With(logger, "component", "uninstall")
+
+	if runtime.GOOS != "darwin" {
+		level.Info(logger).Log("msg", "uninstall is currently only supported on darwin")
+		return
+	}
 
 	if err := knapsack.ConfigStore().Delete([]byte(osquery.NodeKeyKey)); err != nil {
 		level.Error(logger).Log("msg", "deleting node key", "err", err)
