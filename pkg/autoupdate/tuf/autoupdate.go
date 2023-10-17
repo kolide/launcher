@@ -118,7 +118,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
 	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = defaultLibraryDirectory(k.RootDirectory())
+		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
 	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
@@ -170,7 +170,7 @@ func LocalTufDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
-func defaultLibraryDirectory(rootDirectory string) string {
+func DefaultLibraryDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, "updates")
 }
 

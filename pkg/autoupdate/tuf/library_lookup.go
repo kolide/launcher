@@ -103,7 +103,7 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 	}
 
 	if updateDirectory == "" {
-		updateDirectory = defaultLibraryDirectory(rootDirectory)
+		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
 	update, err := findExecutableFromRelease(binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)

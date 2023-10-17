@@ -21,7 +21,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 
 			// Set up an update library
 			rootDir := t.TempDir()
-			updateDir := defaultLibraryDirectory(rootDir)
+			updateDir := DefaultLibraryDirectory(rootDir)
 
 			// Set up a local TUF repo
 			tufDir := LocalTufDirectory(rootDir)
@@ -61,7 +61,7 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 
 			// Set up an update library, but no TUF repo
 			rootDir := t.TempDir()
-			updateDir := defaultLibraryDirectory(rootDir)
+			updateDir := DefaultLibraryDirectory(rootDir)
 			target := fmt.Sprintf("%s-1.1.1.tar.gz", binary)
 			executablePath, executableVersion := pathToTargetVersionExecutable(binary, target, updateDir)
 			require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))

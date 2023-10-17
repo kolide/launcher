@@ -10,6 +10,8 @@ Accepted: October, 2019
 
 Supersedes: [Launcher Auto Update Process](2019-03-11_autoupdate.md)
 
+Superseded by: [Launcher Autoupdate Process, Version 3](2023-10-17_autoupdate_v3.md)
+
 ## Context
 
 Our current update process has several flaws. These lead towards an

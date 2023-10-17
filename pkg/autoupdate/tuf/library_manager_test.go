@@ -42,7 +42,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 func Test_pathToTargetVersionExecutable(t *testing.T) {
 	t.Parallel()
 
-	testBaseDir := defaultLibraryDirectory(t.TempDir())
+	testBaseDir := DefaultLibraryDirectory(t.TempDir())
 
 	testVersion := "1.0.7-30-abcdabcd"
 	testTargetFilename := fmt.Sprintf("launcher-%s.tar.gz", testVersion)
