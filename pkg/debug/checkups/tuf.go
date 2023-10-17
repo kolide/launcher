@@ -200,15 +200,17 @@ func (tc *tufCheckup) selectedVersions() map[string]map[string]string {
 	}
 
 	if launcherVersion, err := tuf.CheckOutLatestWithoutConfig("launcher", log.NewNopLogger()); err != nil {
-		selectedVersions["launcher"]["version"] = fmt.Sprintf("error checking out latest version: %v", err)
+		selectedVersions["launcher"]["path"] = fmt.Sprintf("error checking out latest version: %v", err)
 	} else {
-		selectedVersions["launcher"]["version"] = launcherVersion.String()
+		selectedVersions["launcher"]["path"] = launcherVersion.Path
+		selectedVersions["launcher"]["version"] = launcherVersion.Version
 	}
 
 	if osquerydVersion, err := tuf.CheckOutLatestWithoutConfig("osqueryd", log.NewNopLogger()); err != nil {
-		selectedVersions["osqueryd"]["version"] = fmt.Sprintf("error checking out latest version: %v", err)
+		selectedVersions["osqueryd"]["path"] = fmt.Sprintf("error checking out latest version: %v", err)
 	} else {
-		selectedVersions["osqueryd"]["version"] = osquerydVersion.String()
+		selectedVersions["osqueryd"]["path"] = osquerydVersion.Path
+		selectedVersions["osqueryd"]["version"] = osquerydVersion.Version
 	}
 
 	return selectedVersions
