@@ -5,9 +5,7 @@ package eventlog
 
 import (
 	"bytes"
-	"fmt"
 	"io"
-	"reflect"
 	"sync"
 
 	"github.com/go-kit/kit/log"
@@ -18,7 +16,7 @@ import (
 func New(w *Writer) log.Logger {
 	l := &eventLogger{
 		w:         w,
-		newLogger: log.NewLogfmtLogger,
+		newLogger: log.NewJSONLogger,
 		bufPool: sync.Pool{New: func() interface{} {
 			return &loggerBuf{}
 		}},
@@ -36,20 +34,7 @@ func (l *eventLogger) Log(keyvals ...interface{}) error {
 	lb := l.getLoggerBuf()
 	defer l.putLoggerBuf(lb)
 
-	// fmtlogger does not support array, chan, func, slice, struct, or map
-	// so we'll do any pre-processing for these types here
-	formattedKeyVals := make([]interface{}, len(keyvals))
-	for idx, val := range keyvals {
-		rvalue := reflect.ValueOf(val)
-		switch rvalue.Kind() {
-		case reflect.Array, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice, reflect.Struct:
-			formattedKeyVals[idx] = fmt.Sprintf("%+v", val)
-		default:
-			formattedKeyVals[idx] = val
-		}
-	}
-
-	if err := lb.logger.Log(formattedKeyVals...); err != nil {
+	if err := lb.logger.Log(keyvals...); err != nil {
 		return err
 	}
 
