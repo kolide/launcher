@@ -85,7 +85,7 @@ func (c *Connectivity) Summary() string {
 	return c.summary
 }
 
-func (c *Connectivity) Data() map[string]any {
+func (c *Connectivity) Data() any {
 	return c.data
 }
 

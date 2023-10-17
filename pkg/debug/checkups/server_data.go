@@ -22,7 +22,7 @@ type serverDataCheckup struct {
 	data    map[string]any
 }
 
-func (sdc *serverDataCheckup) Data() map[string]any  { return sdc.data }
+func (sdc *serverDataCheckup) Data() any             { return sdc.data }
 func (sdc *serverDataCheckup) ExtraFileName() string { return "" }
 func (sdc *serverDataCheckup) Name() string          { return "Server Data" }
 func (sdc *serverDataCheckup) Status() Status        { return sdc.status }

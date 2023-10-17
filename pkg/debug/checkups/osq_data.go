@@ -36,7 +36,7 @@ type (
 	}
 )
 
-func (odc *osqDataCollector) Data() map[string]any  { return odc.data }
+func (odc *osqDataCollector) Data() any             { return odc.data }
 func (odc *osqDataCollector) ExtraFileName() string { return "" }
 func (odc *osqDataCollector) Name() string          { return "Osquery Data" }
 func (odc *osqDataCollector) Status() Status        { return odc.status }

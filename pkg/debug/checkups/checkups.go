@@ -72,7 +72,7 @@ type checkupInt interface {
 	ExtraFileName() string                                // If this checkup will have extra data, what name should it use in flare
 	Summary() string                                      // Short summary string about the status
 	Status() Status                                       // State of this checkup
-	Data() map[string]any                                 // What data objects exist, if any
+	Data() any                                            // What data objects exist, if any
 }
 
 type targetBits uint8

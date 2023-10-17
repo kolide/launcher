@@ -23,7 +23,7 @@ type (
 	}
 )
 
-func (nc *dnsCheckup) Data() map[string]any  { return nc.data }
+func (nc *dnsCheckup) Data() any             { return nc.data }
 func (nc *dnsCheckup) ExtraFileName() string { return "" }
 func (nc *dnsCheckup) Name() string          { return "DNS Resolution" }
 func (nc *dnsCheckup) Status() Status        { return nc.status }

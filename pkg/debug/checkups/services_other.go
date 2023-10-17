@@ -31,6 +31,6 @@ func (s *servicesCheckup) Summary() string {
 	return ""
 }
 
-func (s *servicesCheckup) Data() map[string]any {
+func (s *servicesCheckup) Data() any {
 	return nil
 }
