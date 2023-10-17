@@ -26,7 +26,7 @@ type (
 	}
 )
 
-func (hc *hostInfoCheckup) Data() any  { return hc.data }
+func (hc *hostInfoCheckup) Data() any             { return hc.data }
 func (hc *hostInfoCheckup) ExtraFileName() string { return "" }
 func (hc *hostInfoCheckup) Name() string          { return "Host Info" }
 func (hc *hostInfoCheckup) Status() Status        { return hc.status }

@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	Resolver interface {
+	HostResolver interface {
 		LookupHost(ctx context.Context, host string) ([]string, error)
 	}
 	dnsCheckup struct {
@@ -19,20 +19,21 @@ type (
 		status   Status
 		summary  string
 		data     map[string]any
-		resolver Resolver
+		resolver HostResolver
 	}
 )
 
-func (nc *dnsCheckup) Data() any             { return nc.data }
-func (nc *dnsCheckup) ExtraFileName() string { return "" }
-func (nc *dnsCheckup) Name() string          { return "DNS Resolution" }
-func (nc *dnsCheckup) Status() Status        { return nc.status }
-func (nc *dnsCheckup) Summary() string       { return nc.summary }
+func (dc *dnsCheckup) Data() any             { return dc.data }
+func (dc *dnsCheckup) ExtraFileName() string { return "" }
+func (dc *dnsCheckup) Name() string          { return "DNS Resolution" }
+func (dc *dnsCheckup) Status() Status        { return dc.status }
+func (dc *dnsCheckup) Summary() string       { return dc.summary }
 
 func (dc *dnsCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	if dc.resolver == nil {
 		dc.resolver = &net.Resolver{}
 	}
+
 	hosts := []string{
 		dc.k.KolideServerURL(),
 		dc.k.ControlServerURL(),
