@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -94,13 +93,13 @@ func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 		tufData["local_metadata_version"] = localMetadataVersion
 	}
 
-	if localLauncherVersions, err := tc.versionsInLauncherLibrary(); err != nil {
+	if localLauncherVersions, err := tc.versionsInLibrary("launcher"); err != nil {
 		tufData["launcher_versions_in_library"] = fmt.Sprintf("error getting versions available in local launcher library: %v", err)
 	} else {
 		tufData["launcher_versions_in_library"] = localLauncherVersions
 	}
 
-	if localOsqueryVersions, err := tc.versionsInOsquerydLibrary(); err != nil {
+	if localOsqueryVersions, err := tc.versionsInLibrary("osqueryd"); err != nil {
 		tufData["osqueryd_versions_in_library"] = fmt.Sprintf("error getting versions available in local osqueryd library: %v", err)
 	} else {
 		tufData["osqueryd_versions_in_library"] = localOsqueryVersions
@@ -160,46 +159,25 @@ func (tc *tufCheckup) localTufMetadata() (int, error) {
 	return releaseTargets.Signed.Version, nil
 }
 
-// versionsInLauncherLibrary returns all updates available in the launcher update directory.
-func (tc *tufCheckup) versionsInLauncherLibrary() (string, error) {
+// versionsInLibrary returns all updates available in the update directory for the given binary.
+func (tc *tufCheckup) versionsInLibrary(binary string) ([]string, error) {
 	updatesDir := tc.k.UpdateDirectory()
 	if updatesDir == "" {
 		updatesDir = tuf.DefaultLibraryDirectory(tc.k.RootDirectory())
 	}
 
-	launcherVersionMatchPattern := filepath.Join(updatesDir, "launcher", "*")
-	launcherMatches, err := filepath.Glob(launcherVersionMatchPattern)
+	versionMatchPattern := filepath.Join(updatesDir, binary, "*")
+	matches, err := filepath.Glob(versionMatchPattern)
 	if err != nil {
-		return "", fmt.Errorf("globbing for launcher matches at %s: %w", launcherVersionMatchPattern, err)
+		return nil, fmt.Errorf("globbing for %s matches at %s: %w", binary, versionMatchPattern, err)
 	}
 
-	launcherVersions := make([]string, len(launcherMatches))
-	for i := 0; i < len(launcherMatches); i += 1 {
-		launcherVersions[i] = filepath.Base(launcherMatches[i])
+	versions := make([]string, len(matches))
+	for i := 0; i < len(matches); i += 1 {
+		versions[i] = filepath.Base(matches[i])
 	}
 
-	return strings.Join(launcherVersions, ","), nil
-}
-
-// versionsInOsquerydLibrary returns all updates available in the osqueryd update directory.
-func (tc *tufCheckup) versionsInOsquerydLibrary() (string, error) {
-	updatesDir := tc.k.UpdateDirectory()
-	if updatesDir == "" {
-		updatesDir = tuf.DefaultLibraryDirectory(tc.k.RootDirectory())
-	}
-
-	osquerydVersionMatchPattern := filepath.Join(updatesDir, "osqueryd", "*")
-	osquerydMatches, err := filepath.Glob(osquerydVersionMatchPattern)
-	if err != nil {
-		return "", fmt.Errorf("globbing for osqueryd matches at %s: %w", osquerydVersionMatchPattern, err)
-	}
-
-	osquerydVersions := make([]string, len(osquerydMatches))
-	for i := 0; i < len(osquerydMatches); i += 1 {
-		osquerydVersions[i] = filepath.Base(osquerydMatches[i])
-	}
-
-	return strings.Join(osquerydVersions, ","), nil
+	return versions, nil
 }
 
 // selectedVersions returns the versions of launcher and osqueryd that the current
