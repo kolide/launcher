@@ -108,8 +108,8 @@ func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 
 	tufData["selected_versions"] = tc.selectedVersions()
 
-	if b, err := json.Marshal(tufData); err == nil {
-		_, _ = extraFH.Write(b)
+	if err := json.NewEncoder(extraFH).Encode(tufData); err != nil {
+		tc.summary += fmt.Sprintf("; cannot write extra data: %v", err)
 	}
 
 	return nil
