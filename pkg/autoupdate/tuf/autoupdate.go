@@ -367,19 +367,26 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
-	if ta.libraryManager.Available(binary, release) {
-		return "", nil
-	}
-
-	// Get the current running version if available -- don't error out if we can't
-	// get it, since the worst case is that we download an update whose version matches
-	// our install version.
+	// Ensure we don't download duplicate versions
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
 	if currentVersion == versionFromTarget(binary, release) {
 		return "", nil
 	}
 
+	if ta.libraryManager.Available(binary, release) {
+		// The release is already available in the library but we don't know if we're running it
+		// because we couldn't fetch the current version -- err on the side of not restarting.
+		if currentVersion == "" {
+			return "", nil
+		}
+
+		// The release is already available in the library and it's not our current running version --
+		// return the version to signal for a restart.
+		return release, nil
+	}
+
+	// We haven't yet downloaded this release -- download it
 	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
 		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}
