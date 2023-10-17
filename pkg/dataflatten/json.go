@@ -22,7 +22,7 @@ func JsonFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	// We don't have valid json data, so try to convert possible utf16 data to utf8.
 	rawdata, _, err = transform.Bytes(unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder(), rawdata)
 	if err != nil {
-		return nil, fmt.Errorf("invalid json. attempt to transform from utf16 to utf8: %w", err)
+		return nil, fmt.Errorf("invalid json. Attempted transform from utf16 to utf8: %w", err)
 	}
 
 	return Json(rawdata, opts...)
