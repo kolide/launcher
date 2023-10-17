@@ -8,6 +8,9 @@
 
 Accepted: October 2023
 
+Changes rolled out to nightly channel in October 2023. Rollout to beta and
+stable is still TBD.
+
 Supersedes: [Launcher Auto Update Process Version 2](2019-09-05_autoupdate_v2.md)
 
 ## Context
@@ -19,7 +22,7 @@ when they were downloaded. This does not allow launcher to know what version
 the update corresponds to.
 
 Second, release channels are currently implemented by copying the most recent
-version of an autoupdatable binary to <binary>-<channel>.tar.gz and publishing
+version of an autoupdatable binary to `<binary>-<channel>.tar.gz` and publishing
 this copy to Notary. We would like a more flexible implementation that does not
 require storing a binary twice.
 
