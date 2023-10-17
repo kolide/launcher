@@ -37,6 +37,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 	hosts := map[string]string{
 		"device":  c.k.KolideServerURL(),
 		"control": c.k.ControlServerURL(),
+		"trace":   c.k.TraceIngestServerURL(),
 		"log":     c.k.LogIngestServerURL(),
 	}
 
