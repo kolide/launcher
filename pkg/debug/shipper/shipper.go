@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/user"
 	"strings"
 	"sync"
 	"time"
@@ -204,20 +205,19 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	usernames := ""
+	var consoleUsers string
 	foundConsoleUsers, err := consoleuser.CurrentUsers(ctx)
-
 	switch {
 	case err != nil:
-		usernames = fmt.Sprintf("error getting current users: %s", err)
+		consoleUsers = fmt.Sprintf("error getting console users: %s", err)
 	case len(foundConsoleUsers) == 0:
-		usernames = "no console users found"
+		consoleUsers = "no console users found"
 	default:
-		currentUserNames := make([]string, len(foundConsoleUsers))
+		consoleUserNames := make([]string, len(foundConsoleUsers))
 		for i, u := range foundConsoleUsers {
-			currentUserNames[i] = u.Username
+			consoleUserNames[i] = u.Username
 		}
-		usernames = strings.Join(currentUserNames, ", ")
+		consoleUsers = strings.Join(consoleUserNames, ", ")
 	}
 
 	hostname, err := os.Hostname()
@@ -225,9 +225,18 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 		hostname = fmt.Sprintf("error getting hostname: %s", err)
 	}
 
+	runningUser, err := user.Current()
+	var runningUsername string
+	if err != nil {
+		runningUsername = fmt.Sprintf("error getting running user: %s", err)
+	} else {
+		runningUsername = runningUser.Username
+	}
+
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
-		"usernames":     usernames,
+		"console_users": consoleUsers,
+		"running_user":  runningUsername,
 		"hostname":      hostname,
 		"note":          note,
 	})

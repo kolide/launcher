@@ -257,14 +257,14 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	}
 }
 
-type RuntimeEnvironmentType string
+type runtimeEnvironmentType string
 
 const (
-	StandaloneEnviroment RuntimeEnvironmentType = "standalone"
-	InSituEnvironment    RuntimeEnvironmentType = "in situ"
+	StandaloneEnviroment runtimeEnvironmentType = "standalone"
+	InSituEnvironment    runtimeEnvironmentType = "in situ"
 )
 
-func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment RuntimeEnvironmentType) error {
+func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment runtimeEnvironmentType) error {
 	flare := zip.NewWriter(flareStream)
 	combinedSummary := bytes.Buffer{}
 
@@ -303,7 +303,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	return close()
 }
 
-func writeFlareEnv(z *zip.Writer, runtimeEnvironment RuntimeEnvironmentType) error {
+func writeFlareEnv(z *zip.Writer, runtimeEnvironment runtimeEnvironmentType) error {
 	if _, err := z.Create(fmt.Sprintf("FLARE_RUNNING_%s", strings.ReplaceAll(strings.ToUpper(string(runtimeEnvironment)), " ", "_"))); err != nil {
 		return fmt.Errorf("making env note file: %s", err)
 	}
