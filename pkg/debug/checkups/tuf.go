@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -160,7 +161,7 @@ func (tc *tufCheckup) localTufMetadata() (int, error) {
 }
 
 // versionsInLauncherLibrary returns all updates available in the launcher update directory.
-func (tc *tufCheckup) versionsInLauncherLibrary() ([]string, error) {
+func (tc *tufCheckup) versionsInLauncherLibrary() (string, error) {
 	updatesDir := tc.k.UpdateDirectory()
 	if updatesDir == "" {
 		updatesDir = tuf.DefaultLibraryDirectory(tc.k.RootDirectory())
@@ -169,14 +170,19 @@ func (tc *tufCheckup) versionsInLauncherLibrary() ([]string, error) {
 	launcherVersionMatchPattern := filepath.Join(updatesDir, "launcher", "*")
 	launcherMatches, err := filepath.Glob(launcherVersionMatchPattern)
 	if err != nil {
-		return nil, fmt.Errorf("globbing for launcher matches at %s: %w", launcherVersionMatchPattern, err)
+		return "", fmt.Errorf("globbing for launcher matches at %s: %w", launcherVersionMatchPattern, err)
 	}
 
-	return launcherMatches, nil
+	launcherVersions := make([]string, len(launcherMatches))
+	for i := 0; i < len(launcherMatches); i += 1 {
+		launcherVersions[i] = filepath.Base(launcherMatches[i])
+	}
+
+	return strings.Join(launcherVersions, ","), nil
 }
 
 // versionsInOsquerydLibrary returns all updates available in the osqueryd update directory.
-func (tc *tufCheckup) versionsInOsquerydLibrary() ([]string, error) {
+func (tc *tufCheckup) versionsInOsquerydLibrary() (string, error) {
 	updatesDir := tc.k.UpdateDirectory()
 	if updatesDir == "" {
 		updatesDir = tuf.DefaultLibraryDirectory(tc.k.RootDirectory())
@@ -185,10 +191,15 @@ func (tc *tufCheckup) versionsInOsquerydLibrary() ([]string, error) {
 	osquerydVersionMatchPattern := filepath.Join(updatesDir, "osqueryd", "*")
 	osquerydMatches, err := filepath.Glob(osquerydVersionMatchPattern)
 	if err != nil {
-		return nil, fmt.Errorf("globbing for osqueryd matches at %s: %w", osquerydVersionMatchPattern, err)
+		return "", fmt.Errorf("globbing for osqueryd matches at %s: %w", osquerydVersionMatchPattern, err)
 	}
 
-	return osquerydMatches, nil
+	osquerydVersions := make([]string, len(osquerydMatches))
+	for i := 0; i < len(osquerydMatches); i += 1 {
+		osquerydVersions[i] = filepath.Base(osquerydMatches[i])
+	}
+
+	return strings.Join(osquerydVersions, ","), nil
 }
 
 // selectedVersions returns the versions of launcher and osqueryd that the current
