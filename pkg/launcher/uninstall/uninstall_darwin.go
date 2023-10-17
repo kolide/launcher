@@ -27,7 +27,10 @@ func removeStartScripts() error {
 }
 
 func removeInstallation() error {
-	cmd := exec.Command("/usr/sbin/pkgutil", "--forget", "com.kolide.k2.launcher")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "/usr/sbin/pkgutil", "--forget", "com.kolide.k2.launcher")
 	if out, err := cmd.Output(); err != nil {
 		return fmt.Errorf("pkgutil forgetting package: %w: %s", err, out)
 	}
