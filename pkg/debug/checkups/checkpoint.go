@@ -58,6 +58,7 @@ func (c *logCheckPointer) Interrupt(_ error) {
 	}
 
 	c.interrupted = true
+
 	c.interrupt <- struct{}{}
 }
 
