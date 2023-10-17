@@ -9,7 +9,8 @@ import (
 )
 
 type noOpPowerEventWatcher struct {
-	interrupt chan struct{}
+	interrupt   chan struct{}
+	interrupted bool
 }
 
 func New(_ types.Knapsack, _ log.Logger) (*noOpPowerEventWatcher, error) {
@@ -24,5 +25,12 @@ func (n *noOpPowerEventWatcher) Execute() error {
 }
 
 func (n *noOpPowerEventWatcher) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if n.interrupted {
+		return
+	}
+
+	n.interrupted = true
+
 	n.interrupt <- struct{}{}
 }

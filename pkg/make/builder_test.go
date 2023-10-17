@@ -181,23 +181,27 @@ func TestGetVersion(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	b := &Builder{}
 	b.execCC = helperCommandContext
 
 	for _, tt := range tests {
-		ctx = context.WithValue(ctx, "ENV", []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
-		os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
-		ver, err := b.getVersion(ctx)
-		if tt.err == true {
-			require.Error(t, err, tt.in)
-			continue
-		}
+		tt := tt
+		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
 
-		require.NoError(t, err, tt.in)
-		require.Equal(t, tt.out, ver, tt.in)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctx = context.WithValue(ctx, "ENV", []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
+			os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
+			ver, err := b.getVersion(ctx)
+			if tt.err == true {
+				require.Error(t, err, tt.in)
+				return
+			}
+
+			require.NoError(t, err, tt.in)
+			require.Equal(t, tt.out, ver, tt.in)
+		})
 	}
 
 }
@@ -262,7 +266,7 @@ func Test_bootstrapFromNotary_retryOnTimeout(t *testing.T) {
 		require.Equal(t, expectedFirstRequestPath, r.URL.String())
 
 		// Sleep for longer than the timeout before serving a file in response
-		time.Sleep(2 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 
 		// Empty root.json file
 		w.Write([]byte("{}"))
@@ -273,12 +277,12 @@ func Test_bootstrapFromNotary_retryOnTimeout(t *testing.T) {
 		testNotaryServer.Close()
 	})
 
-	err := bootstrapFromNotary(t.TempDir(), testNotaryServer.URL, t.TempDir(), testGun, 1*time.Second, 10*time.Second)
+	err := bootstrapFromNotary(t.TempDir(), testNotaryServer.URL, t.TempDir(), testGun, 100*time.Millisecond, 1*time.Second)
 	require.NotNil(t, err, "expected timeout during bootstrap")
 
 	// Confirm we made (more or less) the expected number of attempts
 	eightOrMoreAttempts := strings.Contains(err.Error(), "timeout after 10s (8 attempts)") ||
-		strings.Contains(err.Error(), "timeout after 10s (9 attempts)") ||
-		strings.Contains(err.Error(), "timeout after 10s (10 attempts)")
+		strings.Contains(err.Error(), "timeout after 1s (9 attempts)") ||
+		strings.Contains(err.Error(), "timeout after 1s (10 attempts)")
 	require.True(t, eightOrMoreAttempts, "expected at least 8 attempts", err.Error())
 }

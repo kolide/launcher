@@ -170,16 +170,6 @@ const (
 	DefaultTufServer     = "https://tuf.kolide.com"
 )
 
-var (
-	// When launcher proper runs, it's expected that these defaults are their zero values
-	// However, special launcher subcommands such as launcher doctor can override these
-	DefaultRootDirectoryPath string
-	DefaultEtcDirectoryPath  string
-	DefaultBinDirectoryPath  string
-	DefaultConfigFilePath    string
-	DefaultAutoupdate        bool
-)
-
 // Adapted from
 // https://stackoverflow.com/questions/28322997/how-to-get-a-list-of-values-into-a-flag-in-golang/28323276#28323276
 type ArrayFlags []string
@@ -562,6 +552,7 @@ func FindOsquery() string {
 	// seem important.
 	likelyDirectories = append(
 		likelyDirectories,
+		"/usr/local/kolide-k2/osquery.app/Contents/MacOS",
 		"/usr/local/kolide/bin",
 		"/usr/local/kolide-k2/bin",
 		"/usr/local/bin",

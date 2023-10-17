@@ -346,18 +346,22 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 
 	// Check to see if we fetched an app bundle. If so, copy over the app bundle directory.
 	// We want the app bundle to go one level above bin dir (e.g. /usr/local/Kolide.app, not /usr/local/bin/Kolide.app).
-	appBundlePath := filepath.Join(filepath.Dir(localPath), "Kolide.app")
+	appBundleName := "Kolide.app"
+	if symbolicName == "osqueryd" {
+		appBundleName = "osquery.app"
+	}
+	appBundlePath := filepath.Join(filepath.Dir(localPath), appBundleName)
 	appBundleInfo, err := os.Stat(appBundlePath)
 	if err == nil && appBundleInfo.IsDir() {
 		if err := fsutil.CopyDir(
 			appBundlePath,
-			filepath.Join(p.packageRoot, filepath.Dir(p.binDir), "Kolide.app"),
+			filepath.Join(p.packageRoot, filepath.Dir(p.binDir), appBundleName),
 		); err != nil {
 			return fmt.Errorf("could not copy app bundle: %w", err)
 		}
 
 		// Create a symlink from <bin dir>/<binary> to the actual binary location within the app bundle
-		target := filepath.Join("..", "Kolide.app", "Contents", "MacOS", binaryName)
+		target := filepath.Join("..", appBundleName, "Contents", "MacOS", binaryName)
 		symlinkFile := filepath.Join(p.packageRoot, p.binDir, binaryName)
 		if err := os.Symlink(target, symlinkFile); err != nil {
 			return fmt.Errorf("could not create symlink after copying app bundle: %w", err)

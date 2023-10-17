@@ -33,6 +33,7 @@ type (
 		unsubscribeProcedure    *syscall.LazyProc
 		renderEventLogProcedure *syscall.LazyProc
 		interrupt               chan struct{}
+		interrupted             bool
 	}
 )
 
@@ -102,6 +103,13 @@ func (p *powerEventWatcher) Execute() error {
 }
 
 func (p *powerEventWatcher) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if p.interrupted {
+		return
+	}
+
+	p.interrupted = true
+
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)
 	level.Debug(p.logger).Log("msg", "unsubscribed from power events", "ret", fmt.Sprintf("%+v", ret), "last_err", err)

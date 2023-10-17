@@ -10,12 +10,10 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -29,6 +27,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
@@ -220,18 +219,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	sigChannel := make(chan os.Signal, 1)
 
 	// Add a rungroup to catch things on the sigChannel
-	// Attach a notifier for os.Interrupt
-	runGroup.Add("sigChannel", func() error {
-		signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
-		select {
-		case sig := <-sigChannel:
-			level.Info(logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
-			return nil
-		}
-	}, func(_ error) {
-		cancel()
-		close(sigChannel)
-	})
+	signalListener := newSignalListener(sigChannel, cancel, logger)
+	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
@@ -322,6 +311,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		// register uninstall consumer
 		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(logger, k))
 
+		// register flare consumer
+		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(logger, k))
+
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			runner,
@@ -379,7 +371,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
-	// If the autoupdater is enabled, enable it for both osquery and launcher
+	// If autoupdating is enabled, run the new autoupdater
 	if k.Autoupdate() {
 		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
@@ -395,12 +387,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			tuf.WithOsqueryRestart(runnerRestart),
 		)
 		if err != nil {
-			// Log the error, but don't return it -- the new TUF autoupdater is not critical yet
-			level.Debug(logger).Log("msg", "could not create TUF autoupdater", "err", err)
-		} else {
-			runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+			return fmt.Errorf("creating TUF autoupdater updater: %w", err)
 		}
 
+		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+	}
+
+	// Run the legacy autoupdater only if autoupdating is enabled and the given channel hasn't moved
+	// to the new autoupdater yet.
+	if k.Autoupdate() && !tuf.ChannelUsesNewAutoupdater(k.UpdateChannel()) {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
@@ -410,7 +405,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2 + 5*time.Minute,
+			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
 			SigChannel:         sigChannel,
 		}
 
@@ -430,7 +425,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			MirrorURL:          k.MirrorServerURL(),
 			NotaryPrefix:       k.NotaryPrefix(),
 			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + 5*time.Minute,
+			InitialDelay:       k.AutoupdateInitialDelay(),
 			SigChannel:         sigChannel,
 		}
 

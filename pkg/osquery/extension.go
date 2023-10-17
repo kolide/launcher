@@ -45,6 +45,7 @@ type Extension struct {
 	serviceClient service.KolideService
 	enrollMutex   sync.Mutex
 	done          chan struct{}
+	interrupted   bool
 	wg            sync.WaitGroup
 	logger        log.Logger
 
@@ -200,6 +201,12 @@ func (e *Extension) Start() {
 // Shutdown should be called to cleanup the resources and goroutines associated
 // with this extension.
 func (e *Extension) Shutdown() {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if e.interrupted {
+		return
+	}
+	e.interrupted = true
+
 	close(e.done)
 	e.wg.Wait()
 }

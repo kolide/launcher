@@ -19,9 +19,10 @@ type (
 	}
 
 	checkPointer struct {
-		logger    logger
-		knapsack  types.Knapsack
-		interrupt chan struct{}
+		logger      logger
+		knapsack    types.Knapsack
+		interrupt   chan struct{}
+		interrupted bool
 	}
 )
 
@@ -53,6 +54,13 @@ func (c *checkPointer) Run() error {
 }
 
 func (c *checkPointer) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if c.interrupted {
+		return
+	}
+
+	c.interrupted = true
+
 	c.interrupt <- struct{}{}
 }
 
@@ -75,7 +83,7 @@ func (c *checkPointer) summarizeData(data any) any {
 	switch knownValue := data.(type) {
 	case []string:
 		return strings.Join(knownValue, ",")
-	case string, uint, int, int32, int64:
+	case string, uint, uint64, int, int32, int64:
 		return knownValue
 	default:
 		return fmt.Sprintf("%v", data)
