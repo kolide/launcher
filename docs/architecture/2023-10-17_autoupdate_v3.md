@@ -28,6 +28,9 @@ require storing a binary twice.
 
 Third, we would like the location of updates to be configurable.
 
+Fourth, we want to remove our reliance on Notary and use the [go-tuf](https://github.com/theupdateframework/go-tuf)
+implementation of TUF instead.
+
 See [Begin work on Autoupdate: The Next Generation](https://github.com/kolide/launcher/issues/954)
 for more details.
 
@@ -53,6 +56,10 @@ more quickly when needed -- if launcher has version 1.2.3 and 1.2.4 in its
 library and we roll back stable from 1.2.4 to 1.2.3, launcher can switch to
 running its local 1.2.3 update immediately, without having to perform a new
 download to fetch newest stable.
+
+The new system also uses the [go-tuf client](https://github.com/theupdateframework/go-tuf/tree/master/client),
+rather than our previous [client implementation](https://github.com/kolide/updater),
+to perform metadata download and verification.
 
 ## Consequences
 
