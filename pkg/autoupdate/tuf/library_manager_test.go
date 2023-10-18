@@ -85,45 +85,28 @@ func TestAvailable(t *testing.T) {
 func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 
-	// Set up TUF dependencies -- we do this here to avoid re-initializing the local tuf server for each
-	// binary. It's unnecessary work since the mirror serves the same data both times.
-	testBaseDir := t.TempDir()
-	testReleaseVersion := "1.2.4"
-	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
-	require.NoError(t, err, "creating metadata client")
-	// Re-initialize the metadata client with our test root JSON
-	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-	_, err = metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client")
-
-	// Get the target metadata
-	launcherTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
-	require.NoError(t, err, "could not get test metadata for launcher target")
-	osquerydTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
-	require.NoError(t, err, "could not get test metadata for launcher target")
-
-	testCases := []struct {
-		binary     autoupdatableBinary
-		targetFile string
-		targetMeta data.TargetFileMeta
-	}{
-		{
-			binary:     binaryLauncher,
-			targetFile: fmt.Sprintf("%s-%s.tar.gz", binaryLauncher, testReleaseVersion),
-			targetMeta: launcherTargetMeta,
-		},
-		{
-			binary:     binaryOsqueryd,
-			targetFile: fmt.Sprintf("%s-%s.tar.gz", binaryOsqueryd, testReleaseVersion),
-			targetMeta: osquerydTargetMeta,
-		},
-	}
-
-	for _, tt := range testCases {
-		tt := tt
-		t.Run(string(tt.binary), func(t *testing.T) {
+	for _, b := range []autoupdatableBinary{binaryLauncher, binaryOsqueryd} {
+		b := b
+		t.Run(string(b), func(t *testing.T) {
 			t.Parallel()
+
+			// Set up TUF dependencies
+			testBaseDir := t.TempDir()
+			testReleaseVersion := "1.2.4"
+			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
+			metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
+			require.NoError(t, err, "creating metadata client")
+
+			// Re-initialize the metadata client with our test root JSON
+			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+			_, err = metadataClient.Update()
+			require.NoError(t, err, "could not update metadata client")
+
+			// Get the target metadata
+			targetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", b, runtime.GOOS, PlatformArch(), b, testReleaseVersion))
+			require.NoError(t, err, "could not get test metadata for target")
+
+			targetFile := fmt.Sprintf("%s-%s.tar.gz", b, testReleaseVersion)
 
 			// Set up test library manager
 			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, log.NewNopLogger())
@@ -135,20 +118,20 @@ func TestAddToLibrary(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					require.NoError(t, testLibraryManager.AddToLibrary(tt.binary, "", tt.targetFile, tt.targetMeta), "expected no error adding to library")
+					require.NoError(t, testLibraryManager.AddToLibrary(b, "", targetFile, targetMeta), "expected no error adding to library")
 				}()
 			}
 
 			wg.Wait()
 
 			// Confirm the update was downloaded
-			dirInfo, err := os.Stat(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion))
+			dirInfo, err := os.Stat(filepath.Join(updatesDirectory(b, testBaseDir), testReleaseVersion))
 			require.NoError(t, err, "checking that update was downloaded")
 			require.True(t, dirInfo.IsDir())
 			if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 				require.Equal(t, "drwxr-xr-x", dirInfo.Mode().String())
 			}
-			executableInfo, err := os.Stat(executableLocation(filepath.Join(updatesDirectory(tt.binary, testBaseDir), testReleaseVersion), tt.binary))
+			executableInfo, err := os.Stat(executableLocation(filepath.Join(updatesDirectory(b, testBaseDir), testReleaseVersion), b))
 			require.NoError(t, err, "checking that downloaded update includes executable")
 			require.False(t, executableInfo.IsDir())
 		})
