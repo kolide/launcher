@@ -511,3 +511,9 @@ func (fc *FlagController) OsqueryHealthcheckStartupDelay() time.Duration {
 		WithMax(1*time.Hour),
 	).get(fc.getControlServerValue(keys.OsqueryHealthcheckStartupDelay))
 }
+
+func (fc *FlagController) LocalDevelopmentPath() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.LocalDevelopmentPath),
+	).get(nil)
+}

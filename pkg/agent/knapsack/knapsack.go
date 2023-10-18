@@ -413,3 +413,7 @@ func (k *knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error 
 func (k *knapsack) OsqueryHealthcheckStartupDelay() time.Duration {
 	return k.flags.OsqueryHealthcheckStartupDelay()
 }
+
+func (k *knapsack) LocalDevelopmentPath() string {
+	return k.flags.LocalDevelopmentPath()
+}
