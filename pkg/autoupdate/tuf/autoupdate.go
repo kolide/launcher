@@ -62,9 +62,7 @@ type TufAutoupdater struct {
 	libraryManager         librarian
 	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
-	channel                string
-	initialDelay           time.Duration
-	checkInterval          time.Duration
+	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
 	interrupted            bool
@@ -93,11 +91,9 @@ func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		channel:                k.UpdateChannel(),
+		knapsack:               k,
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
-		checkInterval:          k.AutoupdateInterval(),
-		initialDelay:           k.AutoupdateInitialDelay(),
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -118,7 +114,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
 	updateDirectory := k.UpdateDirectory()
 	if updateDirectory == "" {
-		updateDirectory = defaultLibraryDirectory(k.RootDirectory())
+		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
 	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
 	if err != nil {
@@ -170,7 +166,7 @@ func LocalTufDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, tufDirectoryName)
 }
 
-func defaultLibraryDirectory(rootDirectory string) string {
+func DefaultLibraryDirectory(rootDirectory string) string {
 	return filepath.Join(rootDirectory, "updates")
 }
 
@@ -183,7 +179,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	case <-ta.interrupt:
 		level.Debug(ta.logger).Log("msg", "received external interrupt during initial delay, stopping")
 		return nil
-	case <-time.After(ta.initialDelay):
+	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
 
@@ -191,7 +187,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.tidyLibrary()
 
-	checkTicker := time.NewTicker(ta.checkInterval)
+	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
 	defer checkTicker.Stop()
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 	defer cleanupTicker.Stop()
@@ -324,7 +320,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// Only perform restarts if we're configured to use this new autoupdate library,
 	// to prevent performing unnecessary restarts.
-	if !ChannelUsesNewAutoupdater(ta.channel) {
+	if !ChannelUsesNewAutoupdater(ta.knapsack.UpdateChannel()) {
 		return nil
 	}
 
@@ -362,24 +358,36 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := findRelease(binary, targets, ta.channel)
+	release, releaseMetadata, err := findRelease(binary, targets, ta.knapsack.UpdateChannel())
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
 
-	if ta.libraryManager.Available(binary, release) {
-		return "", nil
-	}
-
-	// Get the current running version if available -- don't error out if we can't
-	// get it, since the worst case is that we download an update whose version matches
-	// our install version.
+	// Ensure we don't download duplicate versions
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
 	if currentVersion == versionFromTarget(binary, release) {
 		return "", nil
 	}
 
+	if ta.libraryManager.Available(binary, release) {
+		// The release is already available in the library but we don't know if we're running it --
+		// err on the side of not restarting.
+		if currentVersion == "" {
+			return "", nil
+		}
+
+		// We're choosing to run a local build, so we don't need to restart to run a new download.
+		if binary == binaryLauncher && ta.knapsack.LocalDevelopmentPath() != "" {
+			return "", nil
+		}
+
+		// The release is already available in the library and it's not our current running version --
+		// return the version to signal for a restart.
+		return release, nil
+	}
+
+	// We haven't yet downloaded this release -- download it
 	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
 		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
 	}

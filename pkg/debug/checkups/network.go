@@ -78,7 +78,7 @@ func (n *networkCheckup) Summary() string {
 	return n.summary
 }
 
-func (n *networkCheckup) Data() map[string]any {
+func (n *networkCheckup) Data() any {
 	return nil
 }
 

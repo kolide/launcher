@@ -27,7 +27,7 @@ type (
 	}
 )
 
-func (nc *notaryCheckup) Data() map[string]any  { return nc.data }
+func (nc *notaryCheckup) Data() any             { return nc.data }
 func (nc *notaryCheckup) ExtraFileName() string { return "" }
 func (nc *notaryCheckup) Name() string          { return "Notary Version" }
 func (nc *notaryCheckup) Status() Status        { return nc.status }
@@ -36,6 +36,13 @@ func (nc *notaryCheckup) Summary() string       { return nc.summary }
 func (nc *notaryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	nc.data = make(map[string]any)
 	if !nc.k.KolideHosted() || !nc.k.Autoupdate() {
+		nc.status = Unknown
+		if !nc.k.KolideHosted() {
+			nc.summary = "not kolide hosted"
+		} else {
+			nc.summary = "autoupdates are not enabled"
+		}
+
 		return nil
 	}
 

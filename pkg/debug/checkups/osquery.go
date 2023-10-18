@@ -98,6 +98,6 @@ func (o *osqueryCheckup) Summary() string {
 	return o.summary
 }
 
-func (o *osqueryCheckup) Data() map[string]any {
+func (o *osqueryCheckup) Data() any {
 	return o.executionTimes
 }

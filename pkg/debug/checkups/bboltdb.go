@@ -50,6 +50,6 @@ func (c *bboltdbCheckup) Summary() string {
 	return "N/A"
 }
 
-func (c *bboltdbCheckup) Data() map[string]any {
+func (c *bboltdbCheckup) Data() any {
 	return c.data
 }

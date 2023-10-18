@@ -231,6 +231,6 @@ func (q *quarantine) ExtraFileName() string {
 	return "quarantine.log"
 }
 
-func (q *quarantine) Data() map[string]any {
+func (q *quarantine) Data() any {
 	return nil
 }

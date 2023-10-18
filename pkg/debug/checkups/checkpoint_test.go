@@ -29,6 +29,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Autoupdate").Return(true).Maybe()
 	mockKnapsack.On("NotaryServerURL").Return("localhost").Maybe()
 	mockKnapsack.On("LatestOsquerydPath").Return("").Maybe()
+	mockKnapsack.On("ServerProvidedDataStore").Return(nil).Maybe()
 	checkupLogger := NewCheckupLogger(log.NewNopLogger(), mockKnapsack)
 	mockKnapsack.AssertExpectations(t)
 

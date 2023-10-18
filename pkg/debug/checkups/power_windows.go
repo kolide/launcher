@@ -56,6 +56,6 @@ func (p *powerCheckup) Summary() string {
 	return ""
 }
 
-func (p *powerCheckup) Data() map[string]any {
+func (p *powerCheckup) Data() any {
 	return nil
 }

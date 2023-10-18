@@ -26,7 +26,7 @@ type (
 	}
 )
 
-func (hc *hostInfoCheckup) Data() map[string]any  { return hc.data }
+func (hc *hostInfoCheckup) Data() any             { return hc.data }
 func (hc *hostInfoCheckup) ExtraFileName() string { return "" }
 func (hc *hostInfoCheckup) Name() string          { return "Host Info" }
 func (hc *hostInfoCheckup) Status() Status        { return hc.status }
@@ -45,9 +45,8 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 		hc.data["uptime_friendly"] = fmt.Sprintf("ERROR: %s", err.Error())
 	} else {
 		hc.data["uptime_friendly"] = formatUptime(uptimeRaw)
+		hc.data["uptime"] = uptimeRaw
 	}
-
-	hc.data["uptime"] = uptimeRaw
 
 	if runtime.GOOS == "windows" {
 		hc.data["in_modern_standby"] = hc.k.InModernStandby()
