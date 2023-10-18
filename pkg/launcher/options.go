@@ -353,10 +353,12 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		controlServerURL = *flKolideServerURL
 		// We don't plumb flRootPEM through to the control server, just disable TLS for now
 		insecureControlTLS = true
+		*flKolideHosted = true
 
 	case *flKolideServerURL == "localhost:3000" || *flIAmBreakingEELicense:
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
+		*flKolideHosted = true
 	}
 
 	opts := &Options{
