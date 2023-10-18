@@ -292,19 +292,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		os.Exit(0)
 	}
 
-	// If launcher is using a kolide host, we may override many of
-	// the settings. When we're ready, we can _additionally_
-	// conditionalize this on the ServerURL to get all the
-	// existing deployments
-	if *flKolideHosted {
-		*flTransport = "osquery"
-		*flOsqTlsConfig = "/api/osquery/v0/config"
-		*flOsqTlsEnroll = "/api/osquery/v0/enroll"
-		*flOsqTlsLogger = "/api/osquery/v0/log"
-		*flOsqTlsDistRead = "/api/osquery/v0/distributed/read"
-		*flOsqTlsDistWrite = "/api/osquery/v0/distributed/write"
-	}
-
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
 	// osqueryd path, but if it cannot be found, we will fail back to using an
 	// osqueryd found in the path
@@ -352,21 +339,26 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	switch {
 	case *flKolideServerURL == "k2device.kolide.com":
 		controlServerURL = "k2control.kolide.com"
+		*flKolideHosted = true
 
 	case *flKolideServerURL == "k2device-preprod.kolide.com":
 		controlServerURL = "k2control-preprod.kolide.com"
+		*flKolideHosted = true
 
 	case strings.HasSuffix(*flKolideServerURL, "herokuapp.com"):
 		controlServerURL = *flKolideServerURL
+		*flKolideHosted = true
 
 	case *flKolideServerURL == "localhost:3443":
 		controlServerURL = *flKolideServerURL
 		// We don't plumb flRootPEM through to the control server, just disable TLS for now
 		insecureControlTLS = true
+		*flKolideHosted = true
 
 	case *flKolideServerURL == "localhost:3000" || *flIAmBreakingEELicense:
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
+		*flKolideHosted = true
 	}
 
 	opts := &Options{

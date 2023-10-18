@@ -25,6 +25,7 @@ func TestRun_Tuf(t *testing.T) {
 	// Set up mock knapsack
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("Autoupdate").Return(true)
+	mockKnapsack.On("KolideHosted").Return(true)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("RootDirectory").Return(tempRootDir)

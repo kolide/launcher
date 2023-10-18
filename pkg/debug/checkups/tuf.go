@@ -47,7 +47,14 @@ func (tc *tufCheckup) Summary() string { return tc.summary }
 
 func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	tc.data = make(map[string]any)
-	if !tc.k.Autoupdate() {
+	if !tc.k.KolideHosted() || !tc.k.Autoupdate() {
+		tc.status = Unknown
+		if !tc.k.KolideHosted() {
+			tc.summary = "not kolide hosted"
+		} else {
+			tc.summary = "autoupdates are not enabled"
+		}
+
 		return nil
 	}
 
