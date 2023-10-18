@@ -196,4 +196,7 @@ type Flags interface {
 	// OsqueryHealthcheckStartupDelay is the time to wait before beginning osquery healthchecks
 	SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
 	OsqueryHealthcheckStartupDelay() time.Duration
+
+	// LocalDevelopmentPath points to a local build of launcher to use instead of the one selected from the autoupdate library
+	LocalDevelopmentPath() string
 }
