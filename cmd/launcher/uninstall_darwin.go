@@ -49,15 +49,17 @@ func removeLauncher(ctx context.Context, identifier string) error {
 		}
 	}
 
-	// If we've removed everything. unregister the pkg
-	if !removeErr {
-		pkgutiltCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-
-		cmd := exec.CommandContext(pkgutiltCtx, "/usr/sbin/pkgutil", "--forget", fmt.Sprintf("com.%s.launcher", identifier))
-		if out, err := cmd.Output(); err != nil {
-			fmt.Printf("error occurred while forgetting package: output %s: err: %s\n", out, err)
-		}
+        if removeErr {
+                return nil
+        }
+        
+        pkgutiltCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()      
+        cmd := exec.CommandContext(pkgutiltCtx, "/usr/sbin/pkgutil", "--forget", fmt.Sprintf("com.%s.launcher", identifier))
+        
+        if out, err := cmd.Output(); err != nil {
+                fmt.Printf("error occurred while forgetting package: output %s: err: %s\n", out, err)
+                return nil
 	}
 
 	fmt.Println("Kolide launcher uninstalled successfully")
