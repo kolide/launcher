@@ -62,9 +62,7 @@ type TufAutoupdater struct {
 	libraryManager         librarian
 	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
-	channel                string
-	initialDelay           time.Duration
-	checkInterval          time.Duration
+	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	interrupt              chan struct{}
 	interrupted            bool
@@ -93,11 +91,9 @@ func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
-		channel:                k.UpdateChannel(),
+		knapsack:               k,
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
-		checkInterval:          k.AutoupdateInterval(),
-		initialDelay:           k.AutoupdateInitialDelay(),
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -183,7 +179,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	case <-ta.interrupt:
 		level.Debug(ta.logger).Log("msg", "received external interrupt during initial delay, stopping")
 		return nil
-	case <-time.After(ta.initialDelay):
+	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
 
@@ -191,7 +187,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.tidyLibrary()
 
-	checkTicker := time.NewTicker(ta.checkInterval)
+	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
 	defer checkTicker.Stop()
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 	defer cleanupTicker.Stop()
@@ -324,7 +320,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// Only perform restarts if we're configured to use this new autoupdate library,
 	// to prevent performing unnecessary restarts.
-	if !ChannelUsesNewAutoupdater(ta.channel) {
+	if !ChannelUsesNewAutoupdater(ta.knapsack.UpdateChannel()) {
 		return nil
 	}
 
@@ -362,7 +358,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := findRelease(binary, targets, ta.channel)
+	release, releaseMetadata, err := findRelease(binary, targets, ta.knapsack.UpdateChannel())
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
@@ -375,9 +371,14 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 	}
 
 	if ta.libraryManager.Available(binary, release) {
-		// The release is already available in the library but we don't know if we're running it
-		// because we couldn't fetch the current version -- err on the side of not restarting.
+		// The release is already available in the library but we don't know if we're running it --
+		// err on the side of not restarting.
 		if currentVersion == "" {
+			return "", nil
+		}
+
+		// We're choosing to run a local build, so we don't need to restart to run a new download.
+		if binary == binaryLauncher && ta.knapsack.LocalDevelopmentPath() != "" {
 			return "", nil
 		}
 
