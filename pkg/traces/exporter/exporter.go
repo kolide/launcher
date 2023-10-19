@@ -235,9 +235,10 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
+	defaultResource := resource.Default()
 	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(resource.Default().SchemaURL(), t.attrs...),
+		defaultResource,
+		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
 	)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not merge resource", "err", err)
