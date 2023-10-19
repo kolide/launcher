@@ -21,7 +21,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 )
@@ -235,11 +235,13 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
+	defaultResource := resource.Default()
 	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, t.attrs...),
+		defaultResource,
+		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
 	)
 	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not merge resource", "err", err)
 		r = resource.Default()
 	}
 
