@@ -16,10 +16,16 @@ var serverProvidedDataKeys = []string{
 }
 
 type serverDataCheckup struct {
-	k       types.Knapsack
-	status  Status
-	summary string
-	data    map[string]any
+	k              types.Knapsack
+	status         Status
+	summary        string
+	data           map[string]any
+	DeviceId       string
+	OrganizationId string
+}
+
+func NewServerDataCheckup(k types.Knapsack) *serverDataCheckup {
+	return &serverDataCheckup{k: k}
 }
 
 func (sdc *serverDataCheckup) Data() any             { return sdc.data }
@@ -48,9 +54,13 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 			continue
 		}
 
+		// we set the device and organization ids for individual access by downstream consumers
 		if key == "device_id" && string(val) != "" {
+			sdc.DeviceId = string(val)
 			sdc.status = Passing
 			sdc.summary = "successfully collected server data"
+		} else if key == "organization_id" && string(val) != "" {
+			sdc.OrganizationId = string(val)
 		}
 
 		sdc.data[key] = string(val)
