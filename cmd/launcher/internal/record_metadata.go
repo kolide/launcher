@@ -23,6 +23,8 @@ type metadata struct {
 	Version        string `json:"version" plist:"version"`
 }
 
+// RecordMetadata writes out both a json and plist (for darwin) file including all information
+// in the metadata struct to the root install directory
 func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack) error {
 	metadataJSONFile := filepath.Join(rootDir, "metadata.json")
 	sdc := checkups.NewServerDataCheckup(knapsack)
