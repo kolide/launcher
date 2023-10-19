@@ -237,7 +237,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 
 	r, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, t.attrs...),
+		resource.NewWithAttributes(resource.Default().SchemaURL(), t.attrs...),
 	)
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not merge resource", "err", err)
