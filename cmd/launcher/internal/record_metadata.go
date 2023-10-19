@@ -3,16 +3,19 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/debug/checkups"
 )
 
@@ -25,45 +28,63 @@ type metadata struct {
 
 // RecordMetadata writes out both a json and plist (for darwin) file including all information
 // in the metadata struct to the root install directory
-func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack) error {
+func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack, logger log.Logger) {
+	logger = log.With(logger, "method")
 	metadataJSONFile := filepath.Join(rootDir, "metadata.json")
-	sdc := checkups.NewServerDataCheckup(knapsack)
-	if err := sdc.Run(ctx, io.Discard); err != nil {
-		return fmt.Errorf("unable to gather metadata, error: %w", err)
-	}
-
 	metadata := metadata{
-		DeviceId:       sdc.DeviceId,
-		OrganizationId: sdc.OrganizationId,
+		DeviceId:       "",
+		OrganizationId: "",
 		Timestamp:      time.Now().String(),
 		Version:        version.Version().Version,
 	}
 
+	if err := backoff.WaitFor(func() error {
+		sdc := checkups.NewServerDataCheckup(knapsack)
+		if err := sdc.Run(ctx, io.Discard); err != nil {
+			return err
+		}
+
+		if sdc.DeviceId == "" {
+			return errors.New("unable to gather device_id from server data")
+		}
+
+		metadata.DeviceId = sdc.DeviceId
+		metadata.OrganizationId = sdc.OrganizationId
+
+		return nil
+	}, 10*time.Minute, 1*time.Minute); err != nil {
+		level.Error(logger).Log(
+			"msg", "unable to gather device metadata within timeout, metadata files will be incomplete",
+			"err", err,
+		)
+	}
+
 	metadataJSON, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
-		return fmt.Errorf("unable to JSON marshal metadata, error: %w", err)
+		level.Error(logger).Log("msg", "unable to JSON marshal metadata", "err", err)
+		return
 	}
 
 	err = os.WriteFile(metadataJSONFile, metadataJSON, 0644)
 	if err != nil {
-		return fmt.Errorf("unable to write JSON metadata, error: %w", err)
+		level.Error(logger).Log("msg", "unable to write JSON metadata", "err", err)
+		return
 	}
 
 	if runtime.GOOS != "darwin" {
-		return nil
+		return
 	}
 
 	metadataPlistFile := filepath.Join(rootDir, "metadata.plist")
 	metadataPlist, err := plist.MarshalIndent(metadata, "  ")
 
 	if err != nil {
-		return fmt.Errorf("unable to Plist marshal metadata, error: %w", err)
+		level.Error(logger).Log("msg", "unable to plist marshal metadata", "err", err)
+		return
 	}
 
 	err = os.WriteFile(metadataPlistFile, metadataPlist, 0644)
 	if err != nil {
-		return fmt.Errorf("unable to write plist metadata, error: %w", err)
+		level.Error(logger).Log("msg", "unable to write plist metadata", "err", err)
 	}
-
-	return nil
 }
