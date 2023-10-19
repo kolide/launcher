@@ -65,8 +65,7 @@ func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack
 		return
 	}
 
-	err = os.WriteFile(metadataJSONFile, metadataJSON, 0644)
-	if err != nil {
+	if err := os.WriteFile(metadataJSONFile, metadataJSON, 0644); err != nil
 		level.Error(logger).Log("msg", "unable to write JSON metadata", "err", err)
 		return
 	}
