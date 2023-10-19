@@ -28,9 +28,8 @@ type metadata struct {
 
 // RecordMetadata writes out both a json and plist (for darwin) file including all information
 // in the metadata struct to the root install directory
-func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack, logger log.Logger) {
-	logger = log.With(logger, "method")
-	metadataJSONFile := filepath.Join(rootDir, "metadata.json")
+func RecordMetadata(ctx context.Context, logger log.Logger, knapsack types.Knapsack) {
+	metadataJSONFile := filepath.Join(knapsack.RootDirectory(), "metadata.json")
 	metadata := metadata{
 		DeviceId:       "",
 		OrganizationId: "",
@@ -65,7 +64,7 @@ func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack
 		return
 	}
 
-	if err := os.WriteFile(metadataJSONFile, metadataJSON, 0644); err != nil
+	if err = os.WriteFile(metadataJSONFile, metadataJSON, 0644); err != nil {
 		level.Error(logger).Log("msg", "unable to write JSON metadata", "err", err)
 		return
 	}
@@ -74,7 +73,7 @@ func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack
 		return
 	}
 
-	metadataPlistFile := filepath.Join(rootDir, "metadata.plist")
+	metadataPlistFile := filepath.Join(knapsack.RootDirectory(), "metadata.plist")
 	metadataPlist, err := plist.MarshalIndent(metadata, "  ")
 
 	if err != nil {
@@ -82,7 +81,7 @@ func RecordMetadata(rootDir string, ctx context.Context, knapsack types.Knapsack
 		return
 	}
 
-	if err := os.WriteFile(metadataPlistFile, metadataPlist, 0644); err != nil {
+	if err = os.WriteFile(metadataPlistFile, metadataPlist, 0644); err != nil {
 		level.Error(logger).Log("msg", "unable to write plist metadata", "err", err)
 	}
 }

@@ -193,7 +193,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(rootDirectory)
-	go internal.RecordMetadata(rootDirectory, ctx, k, logger)
+	go internal.RecordMetadata(ctx, logger, k)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
