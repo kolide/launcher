@@ -193,7 +193,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(rootDirectory)
-	go internal.RecordMetadata(ctx, logger, k)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -347,6 +346,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
+		}
+
+		if metadataWriter := internal.NewMetadataWriter(ctx, logger, k); metadataWriter == nil {
+			level.Debug(logger).Log(
+				"msg", "unable to set up metadata writer",
+				"err", err,
+			)
+		} else {
+			controlService.RegisterSubscriber(serverDataSubsystemName, metadataWriter)
 		}
 	}
 
