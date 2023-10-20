@@ -99,7 +99,7 @@ func main() {
 	logger = logutil.NewServerLogger(opts.Debug)
 
 	// It's kind of weird exposing the log writers like this, but at this time
-	// were evaluating transitioning to std lib slog and making it accessable
+	// were evaluating transitioning to std lib slog and making it accessible
 	// via knapsack. So we have to pass the writer around so multiple loggers
 	// can log to same file.
 	var logFileWriter io.Writer
