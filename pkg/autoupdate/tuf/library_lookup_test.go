@@ -193,7 +193,7 @@ func TestChannelUsesNewAutoupdater(t *testing.T) {
 		},
 		{
 			channelName:        "alpha",
-			usesNewAutoupdater: false,
+			usesNewAutoupdater: true,
 		},
 		{
 			channelName:        "stable",
