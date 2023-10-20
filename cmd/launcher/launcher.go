@@ -355,6 +355,10 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			)
 		} else {
 			controlService.RegisterSubscriber(serverDataSubsystemName, metadataWriter)
+			// explicitly trigger the ping at least once to ensure updated metadata is written
+			// on upgrades, the subscriber will continue to do this automatically when new
+			// information is made available from server_data (e.g. on a fresh install)
+			metadataWriter.Ping()
 		}
 	}
 
