@@ -175,7 +175,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		slogLevel = slog.LevelDebug
 	}
 
-	slogHandlerOpts := &slog.HandlerOptions{AddSource: true, Level: slogLevel}
+	slogHandlerOpts := &slog.HandlerOptions{AddSource: true, Level: slogLevel, ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key != slog.TimeKey {
+			return a
+		}
+
+		return slog.Attr{
+			Key:   slog.TimeKey,
+			Value: slog.AnyValue(time.Now().UTC()),
+		}
+	}}
+
 	k.AddLogHandler(slog.NewJSONHandler(os.Stderr, slogHandlerOpts))
 	k.AddLogHandler(slog.NewJSONHandler(logFileWriter, slogHandlerOpts))
 
