@@ -48,7 +48,6 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 			continue
 		}
 
-		// we set the device and organization ids for individual access by downstream consumers
 		if key == "device_id" && string(val) != "" {
 			sdc.status = Passing
 			sdc.summary = "successfully collected server data"
